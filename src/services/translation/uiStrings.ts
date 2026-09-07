@@ -4378,6 +4378,66 @@ const STRING_DEFS = {
   // Two variants, because the sibling copy is written only where the storage
   // provider can write one. Promising it to a local-file family would be asking
   // for consent to a one-way migration on a guarantee they were never given.
+  // ── Compaction progress modal ──────────────────────────────────────────
+  // ⚠️ NOT BEANIE-SPEAK IN THE FAILURE AND INSTRUCTION COPY. These sentences
+  // tell someone which device to go and open; "bean" for a device makes a
+  // precise instruction ambiguous at the one moment precision matters.
+  'compactionProgress.title': {
+    en: 'Tidying up your family file',
+    beanie: 'tidying up your family file',
+  },
+  'compactionProgress.subtitle': {
+    en: 'This takes a moment. Please keep beanies open.',
+    beanie: 'this takes a moment. please keep beanies open.',
+  },
+  'compactionProgress.step0': {
+    en: 'Checking everyone is up to date',
+    beanie: 'checking everyone is up to date',
+  },
+  'compactionProgress.step1': {
+    en: 'Saving a copy beside your family file',
+    beanie: 'saving a copy beside your family file',
+  },
+  'compactionProgress.step2': { en: 'Tidying up the history', beanie: 'tidying up the history' },
+  'compactionProgress.step3': {
+    en: 'Sharing it with your family',
+    beanie: 'sharing it with your family',
+  },
+  'compactionProgress.doneTitle': { en: 'All tidied up!', beanie: 'all tidied up!' },
+  'compactionProgress.doneSubtitle': {
+    en: 'Your family file is smaller and quicker to open.',
+    beanie: 'your family file is smaller and quicker to open.',
+  },
+  // `{amount}` is a formatted size, `{percent}` a whole number.
+  'compactionProgress.saved': {
+    en: '{amount} smaller · {percent}% less to download',
+    beanie: '{amount} smaller · {percent}% less to download',
+  },
+  'compactionProgress.doneNothingToDo': {
+    en: 'Your other devices pick this up on their own the next time they open beanies.',
+    beanie: 'your other devices pick this up on their own the next time they open beanies.',
+  },
+  'compactionProgress.todoTitle': {
+    en: 'Still to do',
+    beanie: 'still to do',
+  },
+  'compactionProgress.todoItem': {
+    en: 'Open beanies on their device and let it update. Until then they keep seeing the older copy of your family data, and anything they add will not be kept.',
+    beanie:
+      'open beanies on their device and let it update. until then they keep seeing the older copy of your family data, and anything they add will not be kept.',
+  },
+  'compactionProgress.todoFoot': {
+    en: 'Everyone else catches up on their own. Nothing is lost either way.',
+    beanie: 'everyone else catches up on their own. nothing is lost either way.',
+  },
+  'compactionProgress.failedTitle': {
+    en: 'That did not finish',
+    beanie: 'that did not finish',
+  },
+  'compactionProgress.failedSubtitle': {
+    en: 'Your family file has not been changed.',
+    beanie: 'your family file has not been changed.',
+  },
   'compaction.safetyCopyNote': {
     en: 'beanies keeps a copy of the current file beside it in your storage, and asks you to save one to this device too. To go back to the saved one, use Load another Family Data File above. The one in your storage is there if you ever need support to help you back.',
     beanie:
