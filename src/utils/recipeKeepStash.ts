@@ -163,6 +163,19 @@ function hasRawStash(): boolean {
   }
 }
 
+/**
+ * Reset the session guard. TESTS ONLY.
+ *
+ * The guard is module state, so without this it leaks between tests in a file and quietly
+ * DISARMS them: a second `consumeKeptRecipe()` returns at the guard and never reaches the
+ * mocked storage, so a test named "survives a throwing read" stops reading anything at all.
+ * That happened — two regression tests were vacuous until this existed. Mirrors
+ * `attemptBudget.__resetAttemptBudgetForTests`.
+ */
+export function __resetKeptRecipeSessionForTests(): void {
+  consumedThisSession = false;
+}
+
 /** Sign-out teardown. Clear-data tier only — see `signOutSteps`. */
 export function clearKeptRecipe(): void {
   consumedThisSession = true;

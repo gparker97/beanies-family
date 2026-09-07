@@ -9,7 +9,7 @@
  * matching the mockup's kraft-paper style.
  */
 import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
@@ -95,18 +95,46 @@ const capture = useRecipeCapture({
  * The one case where a keep is genuinely lost (iOS clearing storage across the Drive OAuth
  * hop) is warned about on the share page BEFORE the hop, because after it there is nothing
  * left to detect it with.
+ *
+ * ⚠️ IT WAITS FOR THE ROSTER — it neither consumes without one nor gives up without one.
+ * Both halves are load-bearing, and each was a bug in turn:
+ *
+ *   - Consuming immediately is wrong. On a cold boot straight to /pod/cookbook this page
+ *     first mounts in App.vue's chrome-less branch, BEFORE any session exists, so
+ *     `canEditActivities` is false and the stash would be destroyed with a permission error.
+ *   - Giving up on an empty roster is ALSO wrong, and was the subtler failure. The layout
+ *     branch swaps when auth resolves (App.vue step 2) while `loadMembers` runs inside
+ *     `loadFamilyData` (step 5), so BOTH mounts see an empty roster and there is no third
+ *     mount — `isLoadingData` only drives a `v-show`. The keep was dropped in silence on
+ *     exactly the journey the guard existed to protect.
+ *
+ * A watcher covers both: it fires immediately when the roster is already there (the normal
+ * sign-in journey, where `handleSignedIn` routes here after the person picker) and once more
+ * when it arrives (the cold boot). It is scope-bound, so a podless session that never loads a
+ * roster simply never fires.
  */
-onMounted(() => {
-  // ⚠️ DO NOT CONSUME BEFORE THE ROSTER EXISTS. `<router-view>` is behind `v-show`, not
-  // `v-if`, and `shouldShowAppLayout` is false until auth hydrates — so on a cold boot
-  // straight to /pod/cookbook this component first mounts in the chrome-less branch, with
-  // `familyStore.members` still empty. `canEditActivities` is false for EVERYONE at that
-  // moment, including the owner. Consuming there would destroy the stash, tell the owner
-  // they lack permission, and then the component is destroyed and remounted with nothing
-  // left to take. Leaving it alone costs nothing: the remount runs this again, and the
-  // stash's TTL and single-consume still bound it.
-  if (!familyStore.members.length) return;
+let keptRecipeHandled = false;
 
+// ⚠️ A `let` DECLARED FIRST, plus the `handled` flag — not a `const` holding the watcher.
+// With `immediate: true` the callback runs DURING the `watch()` call, before the returned
+// stop function exists, on the very path that matters most (a roster already loaded). A
+// `const` referenced there is in the temporal dead zone, and `?.()` does not help: the
+// optional call still READS the binding, which is what throws. Declaring the `let` on its
+// own line first makes the read safe (`undefined`), and the flag is what actually makes
+// "decide exactly once" true whether or not the watcher has been stopped yet.
+let stopKeptRecipeWatch: (() => void) | undefined;
+stopKeptRecipeWatch = watch(
+  () => familyStore.members.length,
+  (count) => {
+    if (!count || keptRecipeHandled) return;
+    keptRecipeHandled = true;
+    consumeKeptRecipeIfAllowed();
+    stopKeptRecipeWatch?.();
+  },
+  { immediate: true }
+);
+
+function consumeKeptRecipeIfAllowed(): void {
   const kept = consumeKeptRecipe();
   if (!kept) return;
   // ⚠️ GATED, like every other add affordance on this page. `openWithPrefill` opens the full
@@ -120,7 +148,7 @@ onMounted(() => {
     return;
   }
   openWithPrefill(sharedRecipeToPrefill(kept));
-});
+}
 
 function handlePastedLink(url: string): void {
   linkModalOpen.value = false;

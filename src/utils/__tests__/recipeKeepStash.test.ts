@@ -12,6 +12,7 @@ import {
   consumeKeptRecipe,
   hasPendingKeptRecipe,
   clearKeptRecipe,
+  __resetKeptRecipeSessionForTests,
 } from '../recipeKeepStash';
 import type { SharedRecipeFields } from '../recipeShareLink';
 
@@ -19,6 +20,10 @@ const FIELDS: SharedRecipeFields = { name: 'Cake', ingredients: ['flour'], steps
 
 beforeEach(() => {
   localStorage.clear();
+  // ⚠️ REQUIRED. Single-consume is backed by module state, so without this reset a second
+  // `consumeKeptRecipe()` in the file returns at the guard and never touches storage —
+  // which silently turned two of the tests below into assertions about nothing.
+  __resetKeptRecipeSessionForTests();
   vi.clearAllMocks();
   vi.useRealTimers();
 });
@@ -81,6 +86,10 @@ describe('recipeKeepStash', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(consumeKeptRecipe()).toBeNull();
     expect(hasPendingKeptRecipe()).toBe(false);
+    // The read must actually have been ATTEMPTED. Without this the test passes just as
+    // happily when `consumeKeptRecipe` returns early at the session guard and never touches
+    // storage at all — which is exactly what happened once.
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
     warn.mockRestore();
   });
@@ -89,6 +98,9 @@ describe('recipeKeepStash', () => {
     localStorage.setItem('beanies_kept_recipe', '{not json');
     expect(consumeKeptRecipe()).toBeNull();
     expect(hasPendingKeptRecipe()).toBe(false);
+    // "and clears it" — asserted, not assumed. `hasPendingKeptRecipe` returns false for a
+    // corrupt envelope whether or not it was removed, so it cannot carry this on its own.
+    expect(localStorage.getItem('beanies_kept_recipe')).toBeNull();
   });
 
   it('clears on demand', () => {
