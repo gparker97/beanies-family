@@ -701,6 +701,58 @@ export class RemoteMergeError extends Error implements RemoteBlocker {
   }
 }
 
+/** Which half of `initAndLoadCache` raised. Diagnostics only — nothing branches on it. */
+export type CacheInitStage = 'open' | 'load';
+
+/**
+ * Is there anything of OURS to lose if the caller now installs the remote
+ * wholesale? The only question the cache-init refusal actually turns on.
+ *
+ * ⚠️ DELIBERATELY COARSER THAN "is a document resident". At the open-stage
+ * throw `initPersistenceDB(id)` has just failed, so the DB was never re-pointed
+ * and whatever `currentDoc` holds may belong to a DIFFERENT family — a
+ * residency flag would answer "some document exists", not "this family's
+ * document exists". And it is deliberately WIDER than `currentDoc`: the load
+ * stage is only reached because the open SUCCEEDED, so a writeable cache DB may
+ * still hold rows an install would strand (a wholesale install leaves
+ * `lastPersistedHeads` null, and the next persist deletes every `inc:*` row).
+ * Only the worker can see both halves, so the worker answers.
+ */
+export type CacheInitLoss = 'nothing-to-lose' | 'something-to-lose';
+
+/**
+ * `initAndLoadCache` could not bring this family's cached document up.
+ *
+ * ⚠️ IT CARRIES A VERDICT, NOT A MEASUREMENT, and that is the whole point. Main
+ * used to derive "this device still holds a document" from
+ * `!(e instanceof PayloadLoadError)`, which was wrong in both directions and
+ * locked a user out of a cold boot behind a second tab: `withTimeout` rejected
+ * with `name === 'Error'`, main read that as "doc intact", refused, latched, and
+ * raised a full-screen overlay whose only action reproduced the timeout.
+ *
+ * A `stage` field cannot fix that either — it is constant per code path, so it
+ * cannot separate a cold boot from an open failure over a resident document,
+ * which is exactly the distinction that mattered. `loss` is computed at the
+ * throw, by the layer that can see both `currentDoc` and the cache handle.
+ */
+export class CacheInitError extends Error {
+  /** Which half raised. Kept for telemetry; nothing branches on it. */
+  readonly stage: CacheInitStage;
+  /** The decision. See `CacheInitLoss`. */
+  readonly loss: CacheInitLoss;
+  /** The underlying failure class (`err.name`), e.g. `'CacheOpenTimeoutError'`. */
+  readonly cause: string;
+
+  constructor(stage: CacheInitStage, loss: CacheInitLoss, cause: string) {
+    super(`Cache ${stage} failed (${cause}); ${loss}`);
+    // Literal, never `new.target.name`: the prod build minifies class names.
+    this.name = 'CacheInitError';
+    this.stage = stage;
+    this.loss = loss;
+    this.cause = cause;
+  }
+}
+
 /**
  * This device could not READ its own local copy of the family document.
  *

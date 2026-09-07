@@ -75,4 +75,34 @@ describe('utils/timing', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('withTimeout — naming the deadline', () => {
+    /**
+     * ⚠️ AN ANONYMOUS `'Error'` IS WHAT LOCKED A USER OUT. A cache-open deadline
+     * and a key failure and a DOMException all arrived at the classifier with
+     * `name === 'Error'`, so it could not tell them apart and guessed — wrongly,
+     * in the direction that latched the session. The name is set at the ONE site
+     * that knows what kind of deadline this is.
+     */
+    it('names the rejection when the caller says what the deadline is', async () => {
+      vi.useFakeTimers();
+      const never = new Promise(() => {});
+      const p = withTimeout(never, 1000, 'took too long', 'CacheOpenTimeoutError').catch((e) => e);
+      await vi.advanceTimersByTimeAsync(1000);
+      const err = (await p) as Error;
+      expect(err.name).toBe('CacheOpenTimeoutError');
+      expect(err.message).toBe('took too long');
+      vi.useRealTimers();
+    });
+
+    it('is a WIDENING — an existing caller that passes no name is unchanged', async () => {
+      vi.useFakeTimers();
+      const never = new Promise(() => {});
+      const p = withTimeout(never, 1000, 'took too long').catch((e) => e);
+      await vi.advanceTimersByTimeAsync(1000);
+      const err = (await p) as Error;
+      expect(err.name).toBe('Error');
+      vi.useRealTimers();
+    });
+  });
 });

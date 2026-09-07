@@ -14,7 +14,7 @@
  */
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
+import { CorruptPayloadError, PayloadTooLargeError, CacheInitError } from '@/types/sync';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
 
 const loadHook = vi.hoisted(() => ({ err: null as null | Error }));
@@ -77,14 +77,62 @@ describe('initAndLoadCache — cache preservation', () => {
     expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
   });
 
-  it('STILL clears for an unrecognised error — the conservative default', async () => {
+  it('STILL clears for an unrecognised error, and wraps it so the CAUSE survives', async () => {
     // Anything not positively identified as an allocation failure keeps taking
     // the existing path, including IndexedDB and key errors.
-    loadHook.err = new Error('IndexedDB is closing');
+    //
+    // It is WRAPPED rather than rethrown, because main used to guess whether
+    // this device still held anything worth protecting from the error's class —
+    // and guessed wrong in both directions. The failure class must still reach
+    // telemetry, which is what `cause` is for.
+    loadHook.err = Object.assign(new Error('IndexedDB is closing'), { name: 'InvalidStateError' });
 
-    await expect(initAndLoadCache(FAMILY_ID)).rejects.toThrow('IndexedDB is closing');
+    const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
+    expect(err).toBeInstanceOf(CacheInitError);
+    expect(err.stage).toBe('load');
+    expect(err.cause).toBe('InvalidStateError');
 
     expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
+  });
+
+  it('answers `something-to-lose` when the re-opened cache still holds rows', async () => {
+    // ⚠️ THE PASS-4 NEAR-MISS, PINNED. The load stage is only reached because
+    // the OPEN succeeded, so a writeable cache DB for this family may still hold
+    // `inc:*` rows nobody has read. `dropDoc()` clears memory; it does not make
+    // those rows worthless — a wholesale install over them leaves
+    // `lastPersistedHeads` null and the next persist deletes every one of them.
+    vi.spyOn(cache, 'isCacheReady').mockReturnValue(true);
+    loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
+
+    const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
+    expect(err.loss).toBe('something-to-lose');
+  });
+
+  it('answers `nothing-to-lose` only when neither a doc nor a cache survives', async () => {
+    vi.spyOn(cache, 'isCacheReady').mockReturnValue(false);
+    loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
+
+    const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
+    expect(err.loss).toBe('nothing-to-lose');
+  });
+
+  it('wraps an OPEN-stage failure, and a cold boot there has nothing to lose', async () => {
+    // The cold boot behind a second tab: `initPersistenceDB` times out, nothing
+    // was ever loaded, no cache handle exists. This is the ONE cell of the
+    // classification matrix that changed verdict — it used to refuse, latch, and
+    // raise a full-screen overlay whose only action reproduced the timeout.
+    vi.mocked(cache.initPersistenceDB).mockRejectedValueOnce(
+      Object.assign(new Error('cache open timed out'), { name: 'CacheOpenTimeoutError' })
+    );
+    vi.spyOn(cache, 'isCacheReady').mockReturnValue(false);
+
+    const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
+    expect(err).toBeInstanceOf(CacheInitError);
+    expect(err.stage).toBe('open');
+    expect(err.loss).toBe('nothing-to-lose');
+    expect(err.cause).toBe('CacheOpenTimeoutError');
+    // Nothing was loaded, so nothing was cleared.
+    expect(cache.clearCache).not.toHaveBeenCalled();
   });
 
   it('re-throws the original error in both branches, so the caller can classify', async () => {

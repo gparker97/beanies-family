@@ -8,7 +8,7 @@ import {
   isWorkerSignal,
 } from '../protocol';
 import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
-import { LocalDocUnreadableError, isRemoteBlocker } from '@/types/sync';
+import { LocalDocUnreadableError, isRemoteBlocker, CacheInitError } from '@/types/sync';
 
 describe('protocol — error transport', () => {
   it('round-trips CorruptPayloadError preserving class + step + familyId', () => {
@@ -150,5 +150,58 @@ describe('LocalDocUnreadableError survives the worker boundary', () => {
 
     expect((rebuilt as LocalDocUnreadableError).cause).toBe('worker-holds-no-document');
     expect((rebuilt as LocalDocUnreadableError).blockDetail).toBe('worker-holds-no-document');
+  });
+});
+
+/**
+ * ⚠️ WITHOUT A CODEC ENTRY THE VERDICT IS THE FIELD THAT GETS STRIPPED.
+ *
+ * `CacheInitError` would arrive on main as a generic `DocWorkerError`, `loss`
+ * would read `undefined`, and `replaceDocWithCacheRecovery`'s lookup would land
+ * on the fail-safe "refuse" arm for EVERY cache-init failure — reinstating the
+ * cold-boot lockout this class exists to remove, while type-checking clean.
+ */
+describe('CacheInitError across the wire', () => {
+  it('reconstructs as the real class with stage, loss and cause intact', () => {
+    const rebuilt = reconstructError(
+      serializeError(new CacheInitError('open', 'nothing-to-lose', 'CacheOpenTimeoutError'))
+    );
+
+    expect(rebuilt).toBeInstanceOf(CacheInitError);
+    expect((rebuilt as CacheInitError).stage).toBe('open');
+    expect((rebuilt as CacheInitError).loss).toBe('nothing-to-lose');
+    expect((rebuilt as CacheInitError).cause).toBe('CacheOpenTimeoutError');
+  });
+
+  it('round-trips the load stage too', () => {
+    const rebuilt = reconstructError(
+      serializeError(new CacheInitError('load', 'something-to-lose', 'InvalidStateError'))
+    );
+
+    expect((rebuilt as CacheInitError).stage).toBe('load');
+    expect((rebuilt as CacheInitError).loss).toBe('something-to-lose');
+  });
+
+  it('FAILS SAFE on a malformed wire value — an unknown loss must refuse', () => {
+    // An older or truncated worker bundle, a mangled `data`. The expensive
+    // mistake is authorising a wholesale install over a live document, so an
+    // unrecognised verdict must mean "something to lose", never the reverse.
+    const rebuilt = reconstructError({
+      name: 'CacheInitError',
+      message: 'whatever',
+      data: { stage: 'nonsense', loss: 'nonsense', cause: 7 },
+    });
+
+    expect((rebuilt as CacheInitError).loss).toBe('something-to-lose');
+    expect((rebuilt as CacheInitError).stage).toBe('open');
+    expect((rebuilt as CacheInitError).cause).toBe('unknown');
+  });
+
+  it('does NOT swallow PayloadLoadError — it still reconstructs to its own class', () => {
+    const rebuilt = reconstructError(
+      serializeError(new CorruptPayloadError('bad bytes', 'load', 'fam-1'))
+    );
+
+    expect(rebuilt).toBeInstanceOf(CorruptPayloadError);
   });
 });

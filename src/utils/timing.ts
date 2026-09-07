@@ -12,11 +12,29 @@ export const delay = (ms: number): Promise<void> => new Promise((r) => setTimeou
  *
  * The timer is always cleared once the race settles, so a fast-resolving
  * promise leaves no dangling timeout.
+ *
+ * `errorName` names the timeout rejection at the ONE site that knows what kind
+ * of deadline it is. Without it the rejection's `name` is the generic `'Error'`,
+ * which is indistinguishable from any other failure by the time it reaches a
+ * classifier — that is how a cache-open deadline reached telemetry as
+ * `error_code: 'Error'` and got classified as an unknown failure. Optional and
+ * defaulting to today's behaviour, so every existing caller is unchanged.
  */
-export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string,
+  errorName?: string
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(message)), ms);
+    timer = setTimeout(() => {
+      const err = new Error(message);
+      // Literal string from the caller, never a class name: the prod build
+      // minifies, and a mangled `name` matches nothing downstream.
+      if (errorName) err.name = errorName;
+      reject(err);
+    }, ms);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer !== undefined) clearTimeout(timer);

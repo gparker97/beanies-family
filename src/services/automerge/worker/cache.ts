@@ -137,7 +137,10 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
     db = await withTimeout(
       opening,
       CACHE_OPEN_TIMEOUT_MS,
-      `cache open timed out after ${CACHE_OPEN_TIMEOUT_MS}ms: ${dbName} is queued behind another connection or a pending delete`
+      `cache open timed out after ${CACHE_OPEN_TIMEOUT_MS}ms: ${dbName} is queued behind another connection or a pending delete`,
+      // The one site that knows this deadline is a cache open. Main classifies
+      // the failure by this name; `'Error'` told it nothing.
+      'CacheOpenTimeoutError'
     );
   } catch (e) {
     // ⚠️ `withTimeout` STOPS WAITING; IT CANNOT CANCEL THE REQUEST. A timed-out

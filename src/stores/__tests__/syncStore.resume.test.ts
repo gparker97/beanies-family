@@ -233,7 +233,7 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { CorruptPayloadError, isRemoteBlocker } from '@/types/sync';
+import { CorruptPayloadError, isRemoteBlocker, CacheInitError } from '@/types/sync';
 import { tryUnwrapFamilyKey as mockedTryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { logEvent } from '@/services/telemetry/logEvent';
 import * as docClient from '@/services/automerge/worker/docClient';
@@ -494,8 +494,11 @@ describe('syncStore.completeAutoLoad', () => {
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
+    // The worker's own verdict: the open failed while a document of ours is
+    // resident. This is the cell the refusal was written for, and it does not
+    // move.
     vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
-      new Error('cache open timed out after 10000ms: beanies-automerge-fam-resume-1 is queued')
+      new CacheInitError('open', 'something-to-lose', 'CacheOpenTimeoutError')
     );
 
     const syncStore = useSyncStore();
@@ -1166,5 +1169,154 @@ describe('syncStore — restoring from a backup file', () => {
     // must still be an ordinary baseline compare.
     await syncStore.decryptPendingFile('right-pw');
     expect(basisOfFirstMerge()).toMatchObject({ kind: 'baseline' });
+  });
+});
+
+/**
+ * The full classification matrix, in one place.
+ *
+ * ⚠️ EXACTLY ONE CELL MOVED versus the `!(e instanceof PayloadLoadError)` test
+ * this replaced, and that is the claim this table exists to keep honest. Main
+ * classifies from a verdict the WORKER computed; it never measures residency
+ * itself, because it cannot see either `currentDoc` or the cache handle.
+ */
+describe('syncStore — the cache-init classification matrix', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.resetAllMocks();
+    const ctx = useFamilyContextStore();
+    ctx.activeFamily = {
+      id: 'fam-resume-1',
+      name: 'LaFleur',
+      createdAt: '2026-05-10',
+      updatedAt: '2026-05-14',
+    };
+    if (typeof localStorage !== 'undefined') localStorage.setItem('beanies_pod_created', '0');
+  });
+
+  function preloadPendingFile(syncStore: ReturnType<typeof useSyncStore>) {
+    syncStore.pendingEncryptedFile = {
+      envelope: {
+        version: '4.0',
+        familyId: 'fam-resume-1',
+        familyName: 'LaFleur',
+        keyId: 'k',
+        wrappedKeys: { 'm-1': { salt: 'AAAA', wrapped: 'BBBB' } },
+        passkeyWrappedKeys: {},
+        inviteKeys: {},
+        encryptedPayload: 'base64==',
+      },
+      driveFileId: 'drive-file-abc',
+      driveFileName: 'LaFleur.beanpod',
+      driveAccountEmail: 'owner@example.com',
+    };
+  }
+
+  const ADOPTED = {
+    action: 'adopted' as const,
+    heads: [],
+    dirty: false,
+    changed: true,
+    remoteHeads: [],
+  };
+
+  type Cell = { name: string; error: unknown; refuses: boolean };
+
+  const MATRIX: Cell[] = [
+    {
+      // ⚠️ THE ONE CELL THAT CHANGED. The cold boot behind a second tab: nothing
+      // was ever loaded, no cache handle exists. It used to refuse, latch the
+      // session, and raise a full-screen overlay whose only action reproduced
+      // the timeout — the shell never mounted, so the banner offering the way
+      // out was unreachable.
+      name: 'open stage, nothing to lose (cold boot behind a second tab) — ADOPTS',
+      error: new CacheInitError('open', 'nothing-to-lose', 'CacheOpenTimeoutError'),
+      refuses: false,
+    },
+    {
+      name: 'open stage, something to lose (a document is resident) — refuses',
+      error: new CacheInitError('open', 'something-to-lose', 'CacheOpenTimeoutError'),
+      refuses: true,
+    },
+    {
+      // ⚠️ THE LOAD STAGE IS NOT AUTOMATICALLY SAFE TO ADOPT OVER. It is only
+      // reached because the OPEN succeeded, so a writeable cache DB may still
+      // hold `inc:*` rows nobody has read — and a wholesale install leaves
+      // `lastPersistedHeads` null, so the next persist deletes every one.
+      name: 'load stage over a live cache DB — refuses',
+      error: new CacheInitError('load', 'something-to-lose', 'InvalidStateError'),
+      refuses: true,
+    },
+    {
+      name: 'load stage with neither a doc nor a cache — adopts',
+      error: new CacheInitError('load', 'nothing-to-lose', 'InvalidStateError'),
+      refuses: false,
+    },
+    {
+      name: 'a corrupt payload — adopts (the worker already dropped AND wiped)',
+      error: new CorruptPayloadError('bad bytes', 'load', 'fam-resume-1'),
+      refuses: false,
+    },
+    {
+      // No worker-side error object exists for an RPC deadline or a crash, so
+      // nothing answered the question. The expensive mistake is adopting over a
+      // live document, not refusing over an empty one.
+      name: 'an unclassified failure — refuses (fail-safe)',
+      error: new Error('nope'),
+      refuses: true,
+    },
+  ];
+
+  for (const cell of MATRIX) {
+    it(cell.name, async () => {
+      vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+        familyKey: {} as CryptoKey,
+        memberIds: ['m-1'],
+      });
+      vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(cell.error);
+      vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce(ADOPTED);
+
+      const syncStore = useSyncStore();
+      preloadPendingFile(syncStore);
+      const result = await syncStore.completeAutoLoad('right-pw');
+
+      if (cell.refuses) {
+        expect(docClient.mergeRemoteEnvelope).not.toHaveBeenCalled();
+        expect(result.kind).toBe('lineage-blocked');
+      } else {
+        expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
+          kind: 'no-local-document',
+        });
+        expect(result.kind).not.toBe('lineage-blocked');
+      }
+    });
+  }
+
+  it('reports the stage AND the verdict, so the two are separable in CloudWatch', async () => {
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
+      new CacheInitError('open', 'nothing-to-lose', 'CacheOpenTimeoutError')
+    );
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce(ADOPTED);
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    await syncStore.completeAutoLoad('right-pw');
+
+    const events = vi.mocked(logEvent).mock.calls.map((c) => c[0]);
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        surface: 'pod-open-degrade',
+        context: expect.objectContaining({
+          // The named throw, not the anonymous `'Error'` that told main nothing.
+          error_code: 'CacheOpenTimeoutError',
+          detail: 'open/nothing-to-lose',
+        }),
+      })
+    );
   });
 });
