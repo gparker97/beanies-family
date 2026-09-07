@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
-import { shouldShowAppLayout, isPublicEntryRoute, isNavigationCancelled } from '../appChrome';
+import {
+  shouldShowAppLayout,
+  isPublicEntryRoute,
+  isExternalLandingRoute,
+  isNavigationCancelled,
+} from '../appChrome';
 
 /** Minimal route stub — only `meta` is read by the helper. */
 function route(meta: Record<string, unknown> = {}): Pick<RouteLocationNormalizedLoaded, 'meta'> {
@@ -97,5 +102,33 @@ describe('the beanie wall route', () => {
         { isAuthenticated: true, needsPodSetup: false }
       )
     ).toBe(false);
+  });
+});
+
+describe('isExternalLandingRoute', () => {
+  function namedRoute(name: string | null) {
+    return { name } as Pick<RouteLocationNormalizedLoaded, 'name'>;
+  }
+
+  it('covers exactly the two routes a redirect would destroy state on', () => {
+    // `/recipe` carries the whole shared recipe in its FRAGMENT and `/share` is the only
+    // code that deletes its Cache-Storage stash, so App.vue's podless redirect must not run
+    // on either — suppressing the alert alone was not enough.
+    expect(isExternalLandingRoute(namedRoute('SharedRecipe'))).toBe(true);
+    expect(isExternalLandingRoute(namedRoute('ShareTarget'))).toBe(true);
+  });
+
+  it('does NOT cover the onboarding entries — steering those continues their flow', () => {
+    for (const n of ['Welcome', 'Login', 'JoinFamily', 'CreateFamily', 'OpenFromDrive']) {
+      expect(isExternalLandingRoute(namedRoute(n))).toBe(false);
+    }
+    expect(isExternalLandingRoute(namedRoute('Nook'))).toBe(false);
+    expect(isExternalLandingRoute(namedRoute(null))).toBe(false);
+  });
+
+  it('is a strict subset of isPublicEntryRoute — derived, so it cannot drift', () => {
+    for (const n of ['SharedRecipe', 'ShareTarget']) {
+      expect(isPublicEntryRoute(namedRoute(n))).toBe(true);
+    }
   });
 });

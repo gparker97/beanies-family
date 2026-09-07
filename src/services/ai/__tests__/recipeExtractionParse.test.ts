@@ -132,3 +132,18 @@ describe('the shipped prompt names exactly the inferable fields', () => {
     for (const name of quoted) expect(RECIPE_TIME_FIELDS).toContain(name);
   });
 });
+
+describe('asString trims — the blank-overwrite guard', () => {
+  it('a whitespace-only field parses as empty, not as a truthy blank', () => {
+    // Untrimmed, "   " is truthy and passes every downstream emptiness check (they all test
+    // for ''), so on the re-fetch path it could blank a recipe's NAME.
+    const r = parseRecipeExtractionResult({ ...VALID, name: '   ', prepTime: '\t\n ' });
+    expect(r.name).toBe('');
+    expect(r.prepTime).toBe('');
+  });
+
+  it('keeps the internal line breaks in notes', () => {
+    const r = parseRecipeExtractionResult({ ...VALID, notes: '  one\ntwo  ' });
+    expect(r.notes).toBe('one\ntwo');
+  });
+});

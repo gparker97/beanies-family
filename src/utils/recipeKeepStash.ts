@@ -62,26 +62,23 @@ export function stashKeptRecipe(fields: SharedRecipeFields): boolean {
   }
 }
 
-/** Is a keep waiting? Cheap enough for a routing decision; does not consume. */
+/**
+ * Is a usable keep waiting? Cheap enough for a routing decision; does not consume.
+ *
+ * ⚠️ IT MUST APPLY THE SAME TTL THE CONSUMER DOES. A bare presence check would send someone
+ * who tapped Keep and came back the next day to their cookbook instead of the nook, where
+ * `consumeKeptRecipe` would then find the entry expired and open nothing — a redirect to a
+ * page they did not ask for, for no visible reason. The two answers have to agree.
+ */
 export function hasPendingKeptRecipe(): boolean {
-  try {
-    return localStorage.getItem(STASH_KEY) !== null;
-  } catch {
-    return false;
-  }
+  return readStash() !== null;
 }
 
-/**
- * Take the kept recipe, if one is waiting and still fresh.
- *
- * SINGLE-CONSUME: the entry is deleted on every read, including an expired one, so a stale
- * recipe can never resurface weeks later in someone's cookbook.
- */
-export function consumeKeptRecipe(): SharedRecipeFields | null {
+/** Parse and TTL-check the stash WITHOUT consuming it. `null` for absent, corrupt or stale. */
+function readStash(): StashEnvelope | null {
   let raw: string | null = null;
   try {
     raw = localStorage.getItem(STASH_KEY);
-    if (raw !== null) localStorage.removeItem(STASH_KEY);
   } catch (e) {
     console.warn('[recipe-keep] could not read the stash — localStorage threw.', e);
     return null;
@@ -99,19 +96,52 @@ export function consumeKeptRecipe(): SharedRecipeFields | null {
     ) {
       return null;
     }
-    if (Date.now() - parsed.savedAt > TTL_MS) {
-      logEvent({
-        level: 'warn',
-        surface: 'recipe-share',
-        message: 'kept recipe expired before it was claimed',
-        context: { action: 'keep_stash_lost', detail: 'expired' },
-      });
-      return null;
-    }
-    return parsed.fields;
+    return Date.now() - parsed.savedAt > TTL_MS ? null : parsed;
   } catch {
-    // A corrupt envelope is indistinguishable from none, and the entry is already gone.
     return null;
+  }
+}
+
+/**
+ * Take the kept recipe, if one is waiting and still fresh.
+ *
+ * SINGLE-CONSUME: the entry is deleted on every read, including an expired or corrupt one,
+ * so a stale recipe can never resurface weeks later in someone's cookbook.
+ *
+ * ⚠️ THE DELETE IS ITS OWN `try`. Safari in private mode permits reads and THROWS on writes,
+ * so a shared read/delete block would discard a recipe it had already parsed intact — and
+ * leave it in storage to surprise the user on a later cookbook visit. Read, decide, then
+ * delete best-effort: the TTL still bounds anything the delete could not remove.
+ */
+export function consumeKeptRecipe(): SharedRecipeFields | null {
+  const envelope = readStash();
+  const expired = envelope === null && hasRawStash();
+
+  try {
+    localStorage.removeItem(STASH_KEY);
+  } catch (e) {
+    // Nothing is lost: the recipe below was already read, and the TTL bounds what stays.
+    console.warn('[recipe-keep] could not clear the stash — localStorage refused the write.', e);
+  }
+
+  if (envelope) return envelope.fields;
+  if (expired) {
+    logEvent({
+      level: 'warn',
+      surface: 'recipe-share',
+      message: 'kept recipe was gone or stale before it was claimed',
+      context: { action: 'keep_stash_lost', detail: 'expired' },
+    });
+  }
+  return null;
+}
+
+/** Was there an entry at all? Distinguishes "expired/corrupt" from "nothing was kept". */
+function hasRawStash(): boolean {
+  try {
+    return localStorage.getItem(STASH_KEY) !== null;
+  } catch {
+    return false;
   }
 }
 

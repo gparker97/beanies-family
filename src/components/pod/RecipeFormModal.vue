@@ -95,9 +95,9 @@ const sourceUrl = ref('');
  * Course, meals and tags (#87).
  *
  * 🚨 THESE MUST BE SEEDED AND SAVED IN ALL FOUR PLACES — `onEdit`, `applyPrefill`,
- * `baselinePayload` and `buildPayload`. Miss `onEdit` and the failure is catastrophic and
+ * `recipeComparable` and `buildPayload`. Miss `onEdit` and the failure is catastrophic and
  * silent: opening a saved recipe leaves these blank, `buildPayload` sends ''/[],
- * `baselinePayload` reports the STORED values, `diffPayload` sees a real change and writes the
+ * `recipeComparable` reports the STORED values, `diffPayload` sees a real change and writes the
  * clear — so fixing a typo in the title would erase that recipe's tags, course and meals.
  */
 const course = ref<RecipeCourse | ''>('');
@@ -156,12 +156,13 @@ const willAttachPhoto = computed(() => (dishImage.value?.candidates.length ?? 0)
  * Initialised, never a bare `ref<T>()` — a bare one defaults to `undefined` and would push
  * `?.` into every template site, which is the opposite of what this collapse is for.
  */
-const EMPTY_INFERRED: { ingredients: string[]; steps: string[]; times: RecipeTimeField[] } = {
-  ingredients: [],
-  steps: [],
-  times: [],
-};
-const inferred = ref({ ...EMPTY_INFERRED });
+/** A FACTORY, not a shared constant. A spread of a constant object copies the three ARRAY
+ *  REFERENCES, so every reset would share one set of arrays with the constant — harmless
+ *  while every use is a read, and permanently corrupting the day one is not. */
+function emptyInferred(): { ingredients: string[]; steps: string[]; times: RecipeTimeField[] } {
+  return { ingredients: [], steps: [], times: [] };
+}
+const inferred = ref(emptyInferred());
 
 /** The ingredients / steps hint, or `''` when the reader filled none of them in. */
 function inferredListHint(key: 'ingredients' | 'steps'): string {
@@ -187,7 +188,7 @@ function applyPrefill(prefill: RecipePrefill | null): void {
         steps: prefill.inferredSteps ?? [],
         times: prefill.inferredTimes ?? [],
       }
-    : { ...EMPTY_INFERRED };
+    : emptyInferred();
   const f = prefill?.fields;
   name.value = f?.name ?? '';
   subtitle.value = f?.subtitle ?? '';
@@ -413,7 +414,7 @@ const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
   // Send only what CHANGED. The baseline is read from the store rather than from
   // `props.recipe`, so it is correct on the eager-create path too — there the entity was
   // created by this very form and props.recipe is null, yet a second save must still diff
-  // against what is actually stored. See `baselinePayload` for why this matters.
+  // against what is actually stored. See `recipeComparable` for why this matters.
   update: (id, payload) => {
     const stored = recipesStore.recipes.find((r) => r.id === id);
     return recipesStore.updateRecipe(

@@ -28,6 +28,19 @@ vi.mock('@/composables/useDocumentConsent', () => ({
   useDocumentConsent: () => ({ requestConsent }),
 }));
 
+// A plain object with a getter, not `computed` — a computed over a module-scope `let` has
+// no reactive dependency, so it caches the first read and never sees the flip.
+let online = true;
+vi.mock('@/composables/useOnline', () => ({
+  useOnline: () => ({
+    isOnline: {
+      get value() {
+        return online;
+      },
+    },
+  }),
+}));
+
 const processUrl = vi.fn();
 const attachAfterSave = vi.fn();
 let onReady: ((r: { prefill: RecipePrefill }) => void) | null = null;
@@ -83,6 +96,7 @@ beforeEach(() => {
   __resetAttemptBudgetForTests();
   onReady = null;
   requestConsent.mockResolvedValue(GRANT);
+  online = true;
   updateRecipe.mockResolvedValue({ id: 'r-1' });
 });
 
@@ -111,6 +125,23 @@ describe('the three gates, in order', () => {
     expect(processUrl).not.toHaveBeenCalled();
     // The refusal always names when it lifts, so it is actionable.
     expect(showToast).toHaveBeenCalledWith('info', expect.stringContaining('recipes.refetch'));
+  });
+
+  it('does NOT burn the cooldown when offline', async () => {
+    // `processUrl` toasts and returns without a network call when offline, so a consume
+    // above it charges ten minutes for a read that never left the device. Every pre-flight
+    // refusal has to sit ABOVE the consume.
+    online = false;
+    const r = useRecipeRefetch();
+    await r.start(recipe());
+    expect(processUrl).not.toHaveBeenCalled();
+    expect(requestConsent).not.toHaveBeenCalled();
+    expect(peekAttempt('recipe-refetch:r-1', { max: 1, windowMs: 600_000 }).ok).toBe(true);
+
+    // Back online, the read is still available.
+    online = true;
+    await r.start(recipe());
+    expect(processUrl).toHaveBeenCalledOnce();
   });
 
   it('does nothing at all for a recipe with no source', async () => {

@@ -18,6 +18,7 @@ import ShareChannelGrid from '@/components/family/ShareChannelGrid.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { shareableOrigin } from '@/utils/shareableOrigin';
 import { encodeRecipeShare, MAX_SHARE_PAYLOAD_CHARS } from '@/utils/recipeShareLink';
 import { buildRecipeShareText, MAX_SHARE_MESSAGE_CHARS } from '@/utils/recipeShareText';
 import type { Recipe } from '@/types/models';
@@ -43,8 +44,12 @@ const payload = computed(() => {
   return encoded.length > MAX_SHARE_PAYLOAD_CHARS ? null : encoded;
 });
 
+// ⚠️ `shareableOrigin()`, never `window.location.origin`. Inside the iOS shell the document
+// origin is `capacitor://app.beanies.family`, so every share from the iOS app would carry a
+// link that opens nothing on the recipient's phone — invisibly, because the browser and
+// Android both give the right answer and the person who cannot open it is not the sender.
 const link = computed(() =>
-  payload.value ? `${window.location.origin}/recipe#${payload.value}` : null
+  payload.value ? `${shareableOrigin()}/recipe#${payload.value}` : null
 );
 
 const message = computed(() =>

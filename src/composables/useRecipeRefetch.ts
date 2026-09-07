@@ -19,6 +19,7 @@ import { ref } from 'vue';
 import { useRecipeCapture } from './useRecipeCapture';
 import { useDocumentConsent } from './useDocumentConsent';
 import { useTranslation } from './useTranslation';
+import { useOnline } from './useOnline';
 import { showToast } from './useToast';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -53,6 +54,7 @@ function refetchBudgetKey(recipeId: string): string {
 export function useRecipeRefetch() {
   const { t } = useTranslation();
   const { requestConsent } = useDocumentConsent();
+  const { isOnline } = useOnline();
   const recipesStore = useRecipesStore();
 
   const diff = ref<RecipeDiff | null>(null);
@@ -123,13 +125,26 @@ export function useRecipeRefetch() {
    * Read the source again.
    *
    * Order matters and is the whole of the logic here:
-   *   1. peek — refuse cheaply, before asking the user for anything;
-   *   2. consent (ADR-030) — a decline is a silent no-op by design;
-   *   3. consume — immediately before the call, so a declined consent never burns the slot;
-   *   4. hand off to the existing ladder.
+   *   1. offline — `processUrl` returns without a network call when offline, so consuming
+   *      first would spend a ten-minute lockout on a press that never left the device;
+   *   2. peek — refuse cheaply, before asking the user for anything;
+   *   3. consent (ADR-030) — a decline is a silent no-op by design;
+   *   4. consume — immediately before the call, so nothing above it can burn the slot;
+   *   5. hand off to the existing ladder.
+   *
+   * Every pre-flight refusal sits ABOVE the consume. That is the single rule here, and both
+   * bugs this ordering has had were the same shape: a gate that refuses on the far side of
+   * the consume charges the user for a read that never happened.
    */
   async function start(recipe: Recipe): Promise<void> {
     if (!recipe.sourceUrl) return;
+
+    // `processUrl` toasts and returns when offline (useRecipeCapture), so it would look
+    // exactly like a completed read to the budget.
+    if (!isOnline.value) {
+      showToast('info', t('ai.offline.title'), t('ai.offline.message'));
+      return;
+    }
 
     const key = refetchBudgetKey(recipe.id);
     const peeked = peekAttempt(key, REFETCH_BUDGET);

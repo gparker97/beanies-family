@@ -194,3 +194,23 @@ describe('the photo offer', () => {
     expect(d.changed).toBe(true);
   });
 });
+
+describe('whitespace is empty, and must never overwrite content', () => {
+  it('does not let a whitespace-only value blank a populated field', () => {
+    // `asString` now trims, so this should be unreachable from the real parser — but a
+    // blank name reaching `updateRecipe` renders the recipe as an empty heading, and this
+    // is the boundary that writes, so it checks rather than assumes.
+    const d = diffRecipe(
+      recipe(),
+      prefill({
+        name: '   ',
+        prepTime: '\t\n',
+        ingredients: ['225g butter', '4 eggs'],
+        steps: ['Heat the oven.', 'Beat the butter.'],
+      })
+    );
+    expect(d.patch).not.toHaveProperty('name');
+    expect(d.patch).not.toHaveProperty('prepTime');
+    expect(d.changed).toBe(false);
+  });
+});
