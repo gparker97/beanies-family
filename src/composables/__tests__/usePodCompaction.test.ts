@@ -501,10 +501,32 @@ describe('who is on an older version is a notice, never a gate', () => {
     compactedOk();
 
     expect(c.progressPhase.value).toBe('done');
-    expect(c.olderVersionNames.value).toContain('Sam');
+    // The ARRAY the modal lists one name per line from — not the joined
+    // sentence, which is what a comma in a member's name once split in two.
+    expect(c.olderVersion.value).toContain('Sam');
     expect(c.progressOpen.value).toBe(true);
 
     c.dismissProgress();
     expect(c.progressOpen.value).toBe(false);
+  });
+
+  it('a PUBLISH failure does not claim the family file is unchanged', async () => {
+    // ⚠️ THE PRODUCING SIDE OF THE FALSE SENTENCE. The modal test proves it
+    // RENDERS whatever three keys it is handed; only this proves the composable
+    // hands it the right ones — swap the subtitle back and that test stays green.
+    // At a publish failure the document IS compacted, IS on a new lineage and IS
+    // persisted to cache; only the cloud copy is stale. "Your family file has not
+    // been changed" is flatly false there, and it is the sentence that would stop
+    // someone re-publishing.
+    syncNow.mockRejectedValueOnce(new Error('drive is down'));
+
+    const c = usePodCompaction();
+    await c.compact();
+    compactedOk();
+
+    expect(c.progressPhase.value).toBe('failed');
+    expect(c.progressFailure.value?.subtitleKey).toBe('compaction.publishFailed');
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.publishFailedHelp');
+    expect(c.progressFailure.value?.subtitleKey).not.toBe('compactionProgress.failedSubtitle');
   });
 });

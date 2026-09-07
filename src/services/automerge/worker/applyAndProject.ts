@@ -110,23 +110,44 @@ let familyKey: CryptoKey | null = null;
 /**
  * Is there anything of OURS to lose if the caller now installs the remote
  * wholesale? Answered HERE because this realm is the only one that can see both
- * halves of the question, and answered by ONE expression called from both
- * `initAndLoadCache` throw sites so the two can never drift.
+ * the document and the state of the cache.
  *
- * ⚠️ `isCacheReady()` IS PART OF THE QUESTION, not padding. The load stage is
- * only reached because `initPersistenceDB` SUCCEEDED, so a writeable cache DB
- * for this family may still hold `inc:*` rows nobody has read. `dropDoc()`
- * clears memory; it does not make those rows worthless. A wholesale install over
- * them leaves `lastPersistedHeads` null and the very next persist deletes every
- * one of them as stale. Asking only about `currentDoc` would authorise exactly
- * that.
+ * ⚠️ TWO CALL SITES, TWO DIFFERENT QUESTIONS, AND SHARING ONE EXPRESSION WAS A
+ * BUG. The first version asked `currentDoc || cache.isCacheReady()` at both
+ * throw sites. `isCacheReady()` answers "is a DB HANDLE open" — not "does the
+ * cache hold anything" — and at the load stage those come apart in the worst
+ * possible direction: `clearCache` CLOSES the handle before deleting, so a
+ * delete blocked by another tab (the normal state after a two-session soak)
+ * leaves every `inc:*` row on disk with the handle null, and the expression
+ * answered `nothing-to-lose` — authorising a wholesale install that strands
+ * them. A review caught it; the suite did not.
  *
- * Called AFTER each catch body has run, so it describes the state the caller
- * actually inherits — e.g. a corrupt-cache reseed has already wiped and re-opened
- * the DB by then, which is why that path can still answer honestly.
+ * So each site answers its own question, in one line each.
  */
-function cacheInitLoss(): CacheInitLoss {
-  return currentDoc || cache.isCacheReady() ? 'something-to-lose' : 'nothing-to-lose';
+
+/**
+ * The OPEN stage: `initPersistenceDB(id)` failed, so there is no cache handle for
+ * this family and there never was one this call — `isCacheReady()` is
+ * unconditionally false here and adds nothing. The only thing at risk is a
+ * document already in memory.
+ *
+ * ⚠️ It may belong to a DIFFERENT family (the DB was never re-pointed), which is
+ * exactly why the verdict is the coarse "is anything of value at risk" rather
+ * than a residency claim: the answer is the same either way — do not install
+ * over it without the guard.
+ */
+function openStageLoss(): CacheInitLoss {
+  return currentDoc ? 'something-to-lose' : 'nothing-to-lose';
+}
+
+/**
+ * The LOAD stage: `dropDoc()` has already run unconditionally, so `currentDoc` is
+ * null and tells us nothing. The only thing that can still be lost is what is on
+ * DISK, and the one fact that settles it is whether the reseed actually deleted
+ * the database.
+ */
+function loadStageLoss(cacheWasReset: boolean): CacheInitLoss {
+  return cacheWasReset ? 'nothing-to-lose' : 'something-to-lose';
 }
 let sink: WorkerSink = NOOP_SINK;
 
@@ -340,7 +361,7 @@ function raiseCachePersistFailure(
  * waits for a delete that waits for a connection nobody here controls. When the
  * delete did not land, the only safe thing is not to ask.
  */
-async function reseedCacheAfterCorruption(id: string): Promise<void> {
+async function reseedCacheAfterCorruption(id: string): Promise<boolean> {
   const result = await cache.clearCache(id).catch(() => null);
   // `?.` deliberately. A null (it threw) and a `{ deleted: false }` (it was
   // blocked) both mean "do not re-open", and an `undefined` from a stale mock or
@@ -348,7 +369,11 @@ async function reseedCacheAfterCorruption(id: string): Promise<void> {
   // TypeError over the error the caller still has to classify.
   if (!result?.deleted) {
     raiseCachePersistFailure('open', 'DeleteBlocked');
-    return;
+    // ⚠️ FALSE, AND THE CALLER'S REFUSAL DEPENDS ON IT. The delete was BLOCKED —
+    // by another tab, which after a two-session soak is the normal state — so
+    // every `inc:*` row this family had is still on disk, unread. The caller
+    // must not be allowed to install the remote wholesale over them.
+    return false;
   }
   try {
     await cache.initPersistenceDB(id);
@@ -356,6 +381,8 @@ async function reseedCacheAfterCorruption(id: string): Promise<void> {
     console.error('[applyAndProject] cache re-open after clear failed', openErr);
     raiseCachePersistFailure('open', openErr instanceof Error ? openErr.name : 'UnknownError');
   }
+  // The rows are gone either way — the DELETE is what mattered, not the re-open.
+  return true;
 }
 
 /**
@@ -602,7 +629,7 @@ export async function initAndLoadCache(
     // worth protecting — guessing "yes" on a cold boot behind a second tab, which
     // latched the session behind an overlay whose only action reproduced the
     // timeout. `cacheInitLoss()` answers it here instead.
-    throw new CacheInitError('open', cacheInitLoss(), name);
+    throw new CacheInitError('open', openStageLoss(), name);
   }
   const key = requireKey('initAndLoadCache');
   let loaded: { doc: Doc; recovered: boolean } | null;
@@ -637,13 +664,17 @@ export async function initAndLoadCache(
     // installs a real doc. All three callers are cold-open paths that hold no
     // doc worth keeping.
     dropDoc();
+    // ⚠️ DEFAULTS TO FALSE — "we did not prove the cache is empty". The OOM arm
+    // below skips the reseed deliberately, precisely to KEEP those bytes, so a
+    // default of `true` would tell the caller they are expendable.
+    let cacheWasReset = false;
     if (!(e instanceof PayloadLoadError) || !e.deviceCannotOpen) {
       // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
       // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
       // `clearCache` deletes the whole DB — base AND snapshot rows — which is
       // why the cursors above had to go: only one of this function's three
       // callers recovers with `dropDoc()`; the other two just log.
-      await reseedCacheAfterCorruption(id); // never throws; see its contract
+      cacheWasReset = await reseedCacheAfterCorruption(id); // never throws; see its contract
     }
     // ⚠️ `PayloadLoadError` IS NOT WRAPPED. `syncStore.ts` needs
     // `e instanceof PayloadLoadError && e.deviceCannotOpen` to keep working, and
@@ -652,7 +683,11 @@ export async function initAndLoadCache(
     if (e instanceof PayloadLoadError) {
       throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
     }
-    throw new CacheInitError('load', cacheInitLoss(), e instanceof Error ? e.name : 'UnknownError');
+    throw new CacheInitError(
+      'load',
+      loadStageLoss(cacheWasReset),
+      e instanceof Error ? e.name : 'UnknownError'
+    );
   }
   if (!loaded) {
     // Reached AFTER `initPersistenceDB(id)` re-pointed the DB, so the cursors still
