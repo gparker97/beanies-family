@@ -158,6 +158,44 @@ describe('when the roster arrives later (the cold boot)', () => {
   });
 });
 
+describe('the form the receiver actually sees', () => {
+  it('is FILLED IN, not blank — with the real RecipeFormModal, not a stub', async () => {
+    // 🚨 The bug greg hit in Chrome, and the reason this test uses the real component.
+    // The stub-based tests above all passed while this was broken: they assert that the
+    // right props ARRIVE, and the props were perfect. The form ignored them, because the
+    // keep watcher flips `open` during the page's setup — so the modal's first render
+    // already had `open: true` and `useFormModal` had no transition to seed on.
+    // Testing the wiring is not testing the outcome.
+    members.value = [MEMBER];
+    vi.mocked(consumeKeptRecipe).mockReturnValue(KEPT);
+    const w = mount(FamilyCookbookPage, {
+      global: {
+        stubs: {
+          AiProcessingOverlay: true,
+          AiDocumentPicker: true,
+          RecipeLinkModal: true,
+          MagicReaderPill: true,
+          CookbookControls: true,
+          AddEntityButton: true,
+          AddTile: true,
+          EmptyState: true,
+          PolaroidImage: true,
+          RecipeTaxonomyBadges: true,
+          BeanieIcon: true,
+          BeanieFormModal: { template: '<div><slot /></div>' },
+          PhotoAttachments: true,
+          RecipeSourceStrip: true,
+          DocumentExtractConsentModal: true,
+        },
+      },
+    });
+    await nextTick();
+    const name = w.findAll('input').find((i) => (i.element as HTMLInputElement).value);
+    expect(name).toBeDefined();
+    expect((name!.element as HTMLInputElement).value).toBe(KEPT.name);
+  });
+});
+
 describe('permission', () => {
   it('tells a view-only member rather than opening an add form they cannot reach', async () => {
     canEdit = false;
