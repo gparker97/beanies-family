@@ -34,6 +34,7 @@ import {
   recipeExtractionToPrefill,
   type RecipePrefill,
 } from '@/utils/recipeExtractionToRecipe';
+import { RECIPE_TIME_FIELDS } from '@/constants/recipeTimeFields';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
@@ -51,6 +52,10 @@ import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
 const SURFACE = 'recipe-extract';
+
+/** Fixed buckets for how many of the three times were inferred — never a raw digit in
+ *  `detail`, which is a closed vocabulary across this surface. */
+const INFERRED_TIME_BUCKETS = ['none', 'one', 'two', 'all'] as const;
 
 /**
  * What a developer should DO about each `image_none` reason.
@@ -378,6 +383,28 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
               : gotMeals
                 ? 'meal_only'
                 : 'none',
+      },
+    });
+
+    // Did the times actually get filled in (#93)? THE signal for that whole change, and the
+    // only thing that can say whether it worked in production: before it, prep/cook/servings
+    // came back empty far more often than they should and nothing measured the rate.
+    //
+    // It is a SECOND per-capture event, which the taxonomy note above deliberately avoided —
+    // `detail` on `ready` is already spent on the taxonomy outcome and this needs two
+    // numbers, not one. Both are small integers or a fixed bucket; no value ever ships.
+    const timesFilled = RECIPE_TIME_FIELDS.filter((f) => Boolean(prefill.fields[f])).length;
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'times filled',
+      context: {
+        action: 'times_filled',
+        kind,
+        // How many of prep / cook / servings carry a value at all (0-3).
+        count: timesFilled,
+        // How many of those the model worked out rather than read, as a fixed bucket.
+        detail: INFERRED_TIME_BUCKETS[prefill.inferredTimes.length] ?? 'all',
       },
     });
 
