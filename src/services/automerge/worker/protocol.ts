@@ -153,13 +153,33 @@ export interface RpcErr {
 
 export type RpcResponse = RpcOk | RpcErr;
 
-/** Which cache write failed + its error class — small triage detail carried on a
- * `cache-persist-failed: true` signal so a durability failure is diagnosable blind
- * (see docs/plans/2026-07-13-cache-persist-durability-signal.md). Only `e.name`
- * crosses the postMessage boundary (PII-free; no stack/message). */
+/** Which cache OPERATION failed + its error class — small triage detail carried on
+ * a `cache-persist-failed: true` signal so a durability failure is diagnosable
+ * blind (see docs/plans/2026-07-13-cache-persist-durability-signal.md). Only the
+ * failing error's `name`, or a fixed sentinel where the failure has no `Error`
+ * (a blocked delete), crosses the postMessage boundary — PII-free, no stack, no
+ * message.
+ *
+ * `'open'` is not a write: it means the cache DB itself could not be opened or
+ * re-seeded, so nothing will persist for the rest of the session. Widening this
+ * union is safe — verified 2026-09-07 that NO exhaustive `switch` or `Record`
+ * anywhere in the tree is keyed on `kind`; every consumer either passes it
+ * through or reads only the boolean beside it. */
 export interface CachePersistFailureDetail {
-  kind: 'base' | 'increment';
+  kind: 'base' | 'increment' | 'open';
   errorName: string;
+}
+
+/** Outcome of a cache-DB delete. `deleted: false` means the delete was BLOCKED by
+ *  another connection and the encrypted cache is still on disk.
+ *
+ *  ⚠️ AN OBJECT, NOT A BARE BOOLEAN. This value crosses four layers and a
+ *  postMessage boundary; `await docClient.clearCache(id)` returning `true` reads
+ *  as "did what?" at every one of them, and a bool is the signature that quietly
+ *  acquires a second meaning later. A future field joins the object instead of
+ *  forcing a fifth signature change. */
+export interface CacheClearResult {
+  deleted: boolean;
 }
 
 /** Unsolicited worker → main messages (no correlation id). */

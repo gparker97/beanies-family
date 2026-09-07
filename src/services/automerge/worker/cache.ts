@@ -23,7 +23,9 @@ import { withoutPayload } from '@/services/sync/envelopeMerge';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
+import { withTimeout } from '@/utils/timing';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
+import type { CacheClearResult } from './protocol';
 import {
   loadAndVerify,
   applyChanges,
@@ -78,6 +80,25 @@ const parseIncKey = (key: string): number => Number(key.slice(INC_PREFIX.length)
 
 const DB_PREFIX = 'beanies-automerge-';
 
+/**
+ * How long to wait for the cache DB to open before giving up on it.
+ *
+ * ⚠️ THE ONLY BOUND ON THIS CALL, and the reason it exists: an `openDB` queued
+ * behind a still-pending `deleteDatabase` fires NO event at all. `blocked` only
+ * fires for a version change, and this DB is opened at version 1 forever, so
+ * there is nothing to listen for. Without a deadline the promise simply never
+ * settles, and `initAndLoadCache` awaits it for the life of the tab.
+ *
+ * 10s: a healthy open is sub-100ms, so this is ~100x headroom. It mirrors
+ * `READY_TIMEOUT_MS` in `docClient.ts`, and it must stay far below that file's
+ * `HEAVY_RPC_TIMEOUT_MS` (120s) so the WORKER classifies the failure rather than
+ * the RPC ceiling tearing the worker down around it. It is also the only bound
+ * anywhere on the inline path, which has none.
+ *
+ * Exported so the tests advance by exactly this and cannot drift from a literal.
+ */
+export const CACHE_OPEN_TIMEOUT_MS = 10_000;
+
 interface CacheDB {
   doc: {
     key: string;
@@ -103,13 +124,36 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   }
 
   const dbName = `${DB_PREFIX}${familyId}`;
-  cacheDb = await openDB<CacheDB>(dbName, 1, {
+  const opening = openDB<CacheDB>(dbName, 1, {
     upgrade(db) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     },
   });
+
+  let db: IDBPDatabase<CacheDB>;
+  try {
+    db = await withTimeout(
+      opening,
+      CACHE_OPEN_TIMEOUT_MS,
+      `cache open timed out after ${CACHE_OPEN_TIMEOUT_MS}ms: ${dbName} is queued behind another connection or a pending delete`
+    );
+  } catch (e) {
+    // ⚠️ `withTimeout` STOPS WAITING; IT CANNOT CANCEL THE REQUEST. A timed-out
+    // open stays queued, and if it later succeeds nobody holds the handle and
+    // nobody closes it. An orphan connection to this name blocks EVERY future
+    // `deleteDatabase` on it, which is the privacy invariant in this file's
+    // header comment. Close it on arrival, whenever that is.
+    void opening.then((late) => late.close()).catch(() => {});
+    throw e;
+  }
+
+  // ⚠️ ASSIGNED ONLY ON SUCCESS, and load-bearing twice. `isCacheReady()` is
+  // exactly `cacheDb !== null`, so a timeout must leave it null or a write will
+  // target a DB we do not hold; and a late open cannot install itself as another
+  // family's handle minutes later.
+  cacheDb = db;
   cacheDbFamilyId = familyId;
   incSeq = await maxIncSeq(cacheDb);
 }
@@ -452,7 +496,7 @@ export function isCacheReady(): boolean {
  * `deleteDatabase` isn't blocked by it (a blocked delete `resolve()`s as if it
  * worked but never deletes → the encrypted cache survives sign-out).
  */
-export async function clearCache(familyId: string): Promise<void> {
+export async function clearCache(familyId: string): Promise<CacheClearResult> {
   if (cacheDbFamilyId === familyId && cacheDb) {
     cacheDb.close();
     cacheDb = null;
@@ -461,13 +505,18 @@ export async function clearCache(familyId: string): Promise<void> {
   }
 
   const dbName = `${DB_PREFIX}${familyId}`;
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<CacheClearResult>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(dbName);
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => resolve({ deleted: true });
     request.onerror = () => reject(request.error);
-    // `onblocked` should not happen now we've closed our own connection, but if
-    // another context still holds one, resolve rather than hang — matches legacy.
-    request.onblocked = () => resolve();
+    // ⚠️ BLOCKED IS NOT DELETED, and reporting it as success was the first half
+    // of a hang. Another context still holds a connection, so the delete is
+    // QUEUED: the encrypted cache is still on disk (the privacy invariant in the
+    // header above), and any open of this name now waits behind a delete that
+    // cannot finish. We still resolve rather than reject, because a blocked
+    // delete must not fail sign-out — but the caller is told the truth and
+    // decides. The one thing it must not do is immediately re-open.
+    request.onblocked = () => resolve({ deleted: false });
   });
 }
 
