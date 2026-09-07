@@ -36,6 +36,7 @@ import {
   setLocalChangeHandler,
   checkWorkerLiveness,
   initAndLoadCache,
+  openCache,
   setInlineExecutor,
   forceInlineMode,
   type DocWorkerLike,
@@ -930,6 +931,149 @@ describe('docClient — A1 recovery-rehydrate re-entrancy', () => {
         .mocked(reportError)
         .mock.calls.filter((c) => c[0].context?.action !== 'rehydrate-failed');
       expect(recoveries).toHaveLength(2);
+    } finally {
+      setRehydrator(null);
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('docClient — a failed rehydrate must not become a wholesale install', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  /**
+   * ⚠️ THE SECOND ROUTE INTO THE WHOLESALE INSTALL.
+   * `applyAndProject.mergeRemoteEnvelope` installs the remote wholesale, without
+   * consulting the lineage guard, when `!currentDoc` — and a rehydrate that
+   * FAILS leaves this client holding exactly that. So a worker death whose
+   * respawn cannot reload the document would silently replace the family's data
+   * on the next merge, with nothing lineage-related logged. The store's own
+   * classification cannot see this case: the basis it sent was perfectly good.
+   */
+  async function killTheWorkerWithAFailingRehydrate(): Promise<void> {
+    const loadWedge: Responder = (req) =>
+      req.method === 'initAndLoadCache'
+        ? { cid: req.cid, ok: true, result: { loaded: true } }
+        : null;
+    const answersReads: Responder = (req) => {
+      if (req.method === 'getHeads') return { cid: req.cid, ok: true, result: { heads: ['h'] } };
+      if (req.method === 'initAndLoadCache')
+        return { cid: req.cid, ok: true, result: { loaded: true } };
+      // `openCache` is answered so the family-change case below can drive a
+      // plain `setCurrentFamily` writer without wedging on an unanswered RPC.
+      if (req.method === 'openCache') return { cid: req.cid, ok: true, result: { loaded: false } };
+      if (req.method === 'mergeRemoteEnvelope')
+        return {
+          cid: req.cid,
+          ok: true,
+          result: {
+            action: 'merged',
+            heads: [],
+            dirty: false,
+            changed: false,
+            remoteHeads: [],
+          },
+        };
+      return null;
+    };
+    useWorkers([loadWedge, answersReads]);
+    setRehydrator(async () => {
+      throw new Error('cache open timed out after 10000ms');
+    });
+    const load = initAndLoadCache('fam-rehydrate');
+    await vi.advanceTimersByTimeAsync(0);
+    await load;
+    // Kill worker #1 → recover → respawn #2 → rehydrate THROWS → we hold nothing.
+    const g = getHeads().then(
+      (r) => r,
+      (e: Error) => e.message
+    );
+    await vi.advanceTimersByTimeAsync(50_000);
+    await g;
+  }
+
+  it('REFUSES the merge instead of installing wholesale', async () => {
+    vi.useFakeTimers();
+    try {
+      await killTheWorkerWithAFailingRehydrate();
+
+      const outcome = await mergeRemoteEnvelope(
+        { version: '4.0', familyId: 'fam-rehydrate' } as never,
+        'fam-rehydrate',
+        { kind: 'baseline', heads: [] }
+      ).then(
+        () => 'installed',
+        (e: Error) => e.name
+      );
+
+      expect(outcome).toBe('LocalDocUnreadableError');
+    } finally {
+      setRehydrator(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it('counts the refusal, and marks WHICH of the two routes it was', async () => {
+    vi.useFakeTimers();
+    try {
+      await killTheWorkerWithAFailingRehydrate();
+      await mergeRemoteEnvelope(
+        { version: '4.0', familyId: 'fam-rehydrate' } as never,
+        'fam-rehydrate',
+        { kind: 'baseline', heads: [] }
+      ).catch(() => {});
+
+      // `detail` separates this from the store's classification route while
+      // keeping the (surface, message) dedup bucket constant across both.
+      expect(vi.mocked(logEvent).mock.calls.map((c) => c[0])).toContainEqual(
+        expect.objectContaining({
+          surface: 'pod-lineage',
+          level: 'warn',
+          context: expect.objectContaining({
+            action: 'local-unreadable-refused',
+            detail: 'rehydrate',
+          }),
+        })
+      );
+    } finally {
+      setRehydrator(null);
+      vi.useRealTimers();
+    }
+  });
+
+  it('CLEARS on a family change, so a healthy device is not refused all session', async () => {
+    // ⚠️ A LATCH WITH NO EXIT IS ITS OWN OUTAGE. Left armed across a family
+    // switch or a sign-out, this would refuse every merge for the rest of the
+    // session on a device that has since reloaded perfectly well.
+    vi.useFakeTimers();
+    try {
+      await killTheWorkerWithAFailingRehydrate();
+      setRehydrator(null);
+      // ⚠️ `openCache`, NOT `initAndLoadCache`. The latter ALSO clears the flag
+      // explicitly on entry ("a fresh load attempt supersedes an earlier
+      // failure"), so driving the family change through it would clear the latch
+      // either way and this test would pass with `setCurrentFamily`'s clear
+      // deleted — a guard that has never been seen to fail. `openCache` is a
+      // plain `setCurrentFamily` writer, so it isolates the family-change clear.
+      // (Verified by mutation: removing that clear makes this test fail.)
+      const opened = openCache('fam-different').catch(() => {});
+      await vi.advanceTimersByTimeAsync(0);
+      await opened;
+
+      const merged = mergeRemoteEnvelope(
+        { version: '4.0', familyId: 'fam-different' } as never,
+        'fam-different',
+        { kind: 'baseline', heads: [] }
+      ).then(
+        () => 'reached the worker',
+        (e: Error) => e.name
+      );
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(await merged).not.toBe('LocalDocUnreadableError');
     } finally {
       setRehydrator(null);
       vi.useRealTimers();

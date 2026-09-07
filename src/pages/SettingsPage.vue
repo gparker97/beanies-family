@@ -39,6 +39,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
+import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
+import { describePickFailure } from '@/services/google/drivePicker';
+import { podFileSourceArm } from '@/services/sync/capabilities';
+import type { RemoteBlocker } from '@/types/sync';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
 import { usePodHealth } from '@/composables/usePodHealth';
@@ -199,7 +203,6 @@ watch(() => route.query.open, applyOpenQuery);
 
 // ── Family Data state ────────────────────────────────────────────────────────
 const showClearConfirm = ref(false);
-const showLoadFileConfirm = ref(false);
 const importError = ref<string | null>(null);
 
 /**
@@ -527,14 +530,120 @@ async function handleMigrateStorage() {
   }
 }
 
-function handleLoadFromFileClick() {
-  showLoadFileConfirm.value = true;
+/**
+ * Does this family already have a data file?
+ *
+ * ⚠️ ONE PREDICATE, TWO CONSEQUENCES, AND THEY MUST NOT DISAGREE. The same
+ * handlers serve the UNCONFIGURED slab ("load existing data file" — a first
+ * load, which binds the picked file) and the CONFIGURED one ("restore from a
+ * file" — which must leave the family on the pod it already has). It decides
+ * BOTH the confirmation wording and the `keepCurrentPod` argument, so the dialog
+ * can never promise one thing while the code does the other. Passing
+ * `keepCurrentPod` on a first load would open the document with nowhere to save
+ * it; `installPendingProvider` enforces the same rule as a backstop.
+ */
+const { pick: pickBeanpod } = usePickBeanpodFile();
+
+const hasPod = computed(() => syncStore.isConfigured && !!syncStore.storageProviderType);
+
+async function handleLoadFromFileClick() {
+  // ONE `confirm()` call, replacing two hand-rolled yellow slabs bound to one
+  // shared ref. `ConfirmModal` is globally mounted and already supports the
+  // caution tone this needs.
+  const ok = await confirm({
+    title: 'settings.switchDataFile',
+    message: hasPod.value ? 'settings.switchFileConfirmation' : 'settings.loadFileConfirmation',
+    confirmLabel: 'settings.yesLoadFile',
+    variant: 'danger',
+  });
+  if (!ok) return;
+  await handleLoadFromFileConfirmed();
+}
+
+/**
+ * The Drive arm of the restore picker.
+ *
+ * Returns a result shaped like `loadFromNewFile`'s so the caller's existing
+ * arms are reused verbatim, or `null` when this function has already spoken
+ * (every failure sets `importError` and logs — nothing returns silently).
+ */
+async function loadRestoreSourceFromDrive(): Promise<{
+  cancelled?: boolean;
+  needsPassword?: boolean;
+  success?: boolean;
+  payloadError?: RemoteBlocker;
+} | null> {
+  const picked = await pickBeanpod();
+  if (picked.kind === 'cancelled') return { cancelled: true };
+  if (picked.kind === 'failed') {
+    // ⚠️ NEVER `picked.message` — for `reason: 'config'` that is the literal
+    // string "VITE_GOOGLE_API_KEY is not configured". One shared table.
+    const { messageKey, errorCode } = describePickFailure(picked.reason);
+    importError.value = t(messageKey);
+    console.warn(`[SettingsPage] Drive pick failed: ${picked.reason} — ${picked.message ?? ''}`);
+    logEvent({
+      level: 'warn',
+      surface: 'pod-load-failure',
+      message: 'restore file picker failed',
+      context: { action: 'picker-failed', error_code: errorCode },
+    });
+    return null;
+  }
+
+  logEvent({
+    level: 'info',
+    surface: 'pod-lineage',
+    message: 'restore started',
+    context: { action: 'restore-started', provider_type: 'google_drive' },
+  });
+  const result = await syncStore.loadFromGoogleDrive(picked.fileId, picked.fileName);
+  if (result.needsPassword || result.success) return result;
+
+  // Every remaining arm speaks. `payloadError` is handled by the shared arm in
+  // the caller (it carries its own classified copy).
+  if (!result.payloadError) {
+    importError.value = t(
+      result.reason === 'not-found' ? 'settings.restoreFileNotFound' : 'settings.importFailed'
+    );
+    console.warn(
+      `[SettingsPage] restore source could not be read: reason=${result.reason} status=${result.status}`
+    );
+    logEvent({
+      level: 'warn',
+      surface: 'pod-lineage',
+      message: 'restore failed',
+      context: { action: 'restore-failed', error_code: result.reason ?? 'error' },
+    });
+    return null;
+  }
+  return result;
 }
 
 async function handleLoadFromFileConfirmed() {
-  showLoadFileConfirm.value = false;
   importError.value = null;
-  const result = await syncStore.loadFromNewFile();
+
+  // ⚠️ PROVIDER FIRST, NOT PLATFORM FIRST, AND ONLY WHEN THERE IS A PROVIDER.
+  // A Drive family must pick from Drive, or the safety copy that
+  // `compaction.safetyCopyNote` tells the user to use is simply invisible on
+  // Chromium desktop: the local File System Access picker cannot see Drive at
+  // all. `LoadPodView` keeps its platform-first rule; the two surfaces answer
+  // different questions.
+  //
+  // ⚠️ THE `hasPod` + `=== 'google_drive'` GUARD IS LOAD-BEARING, not belt and
+  // braces. Asking `podFileSourceArm` with a null preference falls through to
+  // the PLATFORM rule, which answers `drive-picker` in any browser without the
+  // File System Access API — so a FIRST LOAD, where this family has no provider
+  // at all and the user simply wants to open a file from their device, would
+  // have been sent to the Google Picker. That is a surface this change was never
+  // asked to touch, and `SettingsPage.importError.test.ts` caught it.
+  const useDrivePicker =
+    hasPod.value &&
+    syncStore.storageProviderType === 'google_drive' &&
+    podFileSourceArm({ preferProvider: 'google_drive' }) === 'drive-picker';
+  const result = useDrivePicker
+    ? await loadRestoreSourceFromDrive()
+    : await syncStore.loadFromNewFile();
+  if (!result) return;
 
   // Dismissing the OS picker is not a failure and must say nothing.
   if (result.cancelled) return;
@@ -569,7 +678,15 @@ async function handleDecryptFile(password: string) {
   // data with the contents of the selected file". That is what authorises the
   // `user-file` lineage context, and it is passed from here rather than stored,
   // so no other flow can inherit it.
-  const result = await syncStore.decryptPendingFile(password, { userChoseThisFile: true });
+  const result = await syncStore.decryptPendingFile(password, {
+    userChoseThisFile: true,
+    // ⚠️ RESTORE, NOT MOVE — and only when there is a pod to keep. The same
+    // `hasPod` predicate chose the confirmation wording the user just agreed to,
+    // so the sentence and the behaviour are one decision. On a first load this
+    // is false and the picked file becomes the family's data file, exactly as
+    // before.
+    keepCurrentPod: hasPod.value,
+  });
 
   isProcessingEncryption.value = false;
 
@@ -1627,23 +1744,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               </BaseButton>
             </div>
           </template>
-
-          <div
-            v-if="showLoadFileConfirm"
-            class="mt-4 rounded-lg bg-yellow-50 p-4 text-left dark:bg-yellow-900/20"
-          >
-            <p class="dark:text-terracotta-lift mb-3 text-sm text-yellow-800">
-              {{ t('settings.loadFileConfirmation') }}
-            </p>
-            <div class="flex gap-2">
-              <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
-                {{ t('settings.yesLoadFile') }}
-              </BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
-                {{ t('action.cancel') }}
-              </BaseButton>
-            </div>
-          </div>
         </div>
 
         <!-- Configured state -->
@@ -1827,24 +1927,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               >
                 {{ t('settings.browse') }}
               </BaseButton>
-            </div>
-
-            <!-- Load file confirmation -->
-            <div
-              v-if="showLoadFileConfirm"
-              class="mt-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
-            >
-              <p class="dark:text-terracotta-lift mb-3 text-sm text-yellow-800">
-                {{ t('settings.switchFileConfirmation') }}
-              </p>
-              <div class="flex gap-2">
-                <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
-                  {{ t('settings.yesLoadFile') }}
-                </BaseButton>
-                <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
-                  {{ t('action.cancel') }}
-                </BaseButton>
-              </div>
             </div>
 
             <!-- Error display -->

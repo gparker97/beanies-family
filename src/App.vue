@@ -42,6 +42,7 @@ import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
 import LineageBanner from '@/components/common/LineageBanner.vue';
+import LocalDocUnreadableBanner from '@/components/common/LocalDocUnreadableBanner.vue';
 // REVIEW-DEMO: sample-data banner for store-review demo sessions.
 import ReviewDemoBanner from '@/components/common/ReviewDemoBanner.vue';
 import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
@@ -109,9 +110,8 @@ import { isFlagEnabled } from '@/config/flags';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFatalErrorStore } from '@/stores/fatalErrorStore';
-import { PayloadLoadError } from '@/types/sync';
-import { surfacePayloadFatal, surfaceLineageFatal } from '@/utils/payloadFailureSurface';
-import { PodLineageError } from '@/services/sync/podLineage';
+import { isRemoteBlocker, type RemoteBlocker, type PayloadLoadError } from '@/types/sync';
+import { surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
@@ -596,8 +596,19 @@ function noteCacheCorruptRecovered(err: PayloadLoadError): void {
 }
 
 /** The boot path's context for the shared payload-failure surface. */
-function surfaceFatal(err: PayloadLoadError): void {
-  surfacePayloadFatal(err, {
+/**
+ * ⚠️ TAKES ANY `RemoteBlocker`, and the widening is the point.
+ *
+ * This used to be `PayloadLoadError`-only, so every call site had to run its
+ * own `instanceof` chain to decide between the payload overlay, the lineage
+ * overlay, and (for anything else) nothing at all. Three chains in two files,
+ * and a blocker class missing from one of them is a refusal with no render
+ * site — the defect `564b0662` fixed. `surfaceBlockerFatal` owns the chain now,
+ * and its overlay table is exhaustive over `PodBlockMessageKey`, so a new
+ * blocker cannot compile without copy.
+ */
+function surfaceFatal(err: RemoteBlocker): void {
+  surfaceBlockerFatal(err, {
     fileId: syncStore.driveFileId ?? null,
     familyId: familyContextStore.activeFamilyId,
     source: 'boot',
@@ -758,15 +769,12 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         if (success !== true && success !== false) {
           const blocker = success.payloadError;
           initBreadcrumbs.push(`path1b: cached-key ${blocker.blockCode} failure`);
-          // ⚠️ `surfaceFatal` is the PAYLOAD overlay — "your data may be damaged
-          // / this device ran out of memory". A lineage block is neither: the
-          // file is fine and this device is fine, the two histories simply
-          // cannot be combined. It already has its own latch, banner and copy,
-          // so surfacing the payload overlay over it would be a lie AND would
-          // bury the banner that carries the real recovery.
-          if (blocker instanceof PayloadLoadError) surfaceFatal(blocker);
-          else if (blocker instanceof PodLineageError)
-            surfaceLineageFatal(blocker, { familyId: familyContextStore.activeFamilyId });
+          // One dispatch. It picks the payload overlay, the lineage overlay or
+          // the generic blocker overlay — the distinction still matters (a
+          // lineage block is not "your data may be damaged"), it just is not
+          // re-derived here. Previously a blocker that was NEITHER class fell
+          // through both arms and surfaced nothing at all.
+          surfaceFatal(blocker);
           return 'failed';
         }
         if (success) {
@@ -834,17 +842,19 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       // clear your data and start fresh" — useless for an out-of-memory open,
       // and the one action that destroys the local copy. This is the exact path
       // the 3GB tablet takes, so it is the path that has to tell the truth.
-      if (err instanceof PodLineageError) {
-        // The remote must not be MERGED with this device's document. Same shape
-        // as a payload failure from the user's point of view — the app cannot
-        // open — so it lands on the same overlay, with its own honest copy.
-        initBreadcrumbs.push(`path1b: pod lineage blocked (${err.verdict})`);
-        surfaceLineageFatal(err, { familyId: familyContextStore.activeFamilyId });
-        return 'failed';
-      }
-      if (err instanceof PayloadLoadError) {
-        initBreadcrumbs.push(`path1b: payload ${err.step} failure (${err.name})`);
-        console.warn('[loadFamilyData] path1b: payload load failed', err);
+      // ⚠️ STRUCTURAL, not `instanceof`. Every `RemoteBlocker` lands on the
+      // overlay with its own honest copy — the file is fine and this device is
+      // fine for a lineage block, and for a local-cache refusal nothing has
+      // been replaced at all. The breadcrumb keeps the class-specific detail
+      // that made the old chain worth having, without the chain: a blocker that
+      // matched neither `instanceof` used to fall through to the generic init
+      // failure, whose advice ("clear your data and start fresh") is the one
+      // action that destroys the local copy this refusal exists to protect.
+      if (isRemoteBlocker(err)) {
+        initBreadcrumbs.push(
+          `path1b: pod blocked (${err.blockCode}${err.blockDetail ? `:${err.blockDetail}` : ''})`
+        );
+        console.warn('[loadFamilyData] path1b: pod blocked', err);
         surfaceFatal(err);
         return 'failed';
       }
@@ -2202,6 +2212,7 @@ watch(
              syncStore.cachePersistFailed. See #50. -->
         <DurabilityBanner />
         <LineageBanner />
+        <LocalDocUnreadableBanner />
         <!-- REVIEW-DEMO: marks a seeded demo session. Both banners are in-flow, so
              they stack predictably rather than overlapping. -->
         <ReviewDemoBanner />

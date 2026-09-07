@@ -10,6 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-07
 
+### Fixed
+
+- **beanies could quietly replace this device's copy of your family data with the family file, losing anything you had not saved.** If beanies could not open its own local copy — most often because it was open in another tab or window — it treated the device as if it held nothing at all, and took the family file wholesale. Anything written on that device and not yet saved went with it, with no message and nothing to undo. beanies now stops and tells you, keeps what is on the device, and offers to load the family file only if you ask it to.
+- **Loading another family data file no longer moves your family off Google Drive.** Choosing a file replaced your family's data and then quietly re-homed the whole family onto whatever file you picked, so every other device carried on using the old one and never saw the change. It now replaces the data and leaves your family on the data file it already has, so your other devices pick the change up on their own. This is the way back from reorganising a family file, so it matters that it works.
+- **On a family stored in Google Drive, "load another family data file" now offers your Drive files.** On a desktop browser it could only ever show files saved on the computer, which meant the copy beanies saves before reorganising — the one the message on screen tells you to use — could not be chosen at all.
+- **A family file stored on this device, rather than in Google Drive, can now recover work made offline.** After reloading the page beanies had forgotten what the file last contained, so an edit made offline could only be refused, never replayed.
+- **The Google file picker no longer shows developer text when it cannot open.** One failure put a configuration variable's name on screen.
+
+### Changed
+
+- **The wording when you load another family data file now says what actually happens** — that it replaces your family's data everywhere, and that your family keeps using the same data file. It used to promise to "switch to that file", which is no longer what it does.
+
 ### Added
 
 - **beanies on iPhone and Android now offers to update itself when a newer version is out.** It asks once, when nothing else is going on, and "Not now" is always an answer. The browser and the installed web app have always updated themselves; the phone apps could not, so the only way anyone knew to update was for somebody in the family to tell them.

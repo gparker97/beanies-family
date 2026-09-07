@@ -65,8 +65,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import { type PayloadLoadError } from '@/types/sync';
-import { surfacePayloadFatal, surfaceLineageFatal } from '@/utils/payloadFailureSurface';
-import { PodLineageError } from '@/services/sync/podLineage';
+import { surfacePayloadFatal, surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -387,19 +386,25 @@ async function handleAutoLoadSubmit() {
         // sync bar on screen", and it carries the copyable diagnostic and the
         // telemetry too. Writing a message that names unreachable actions is the
         // same defect this whole review round kept finding.
-        // `error` is typed `RemoteBlocker`; only `PodLineageError` reaches this
-        // arm (the producer routes every non-`PayloadLoadError` blocker here, and
-        // `RemoteMergeError` is raised only inside `fetchAndMergeRemote`, which
-        // this path never calls). Narrowed rather than cast, so a future blocker
-        // class degrades to the honest generic message instead of a wrong one.
-        if (result.error instanceof PodLineageError) {
-          surfaceLineageFatal(result.error, {
-            familyId: useFamilyContextStore().activeFamilyId ?? null,
-          });
-        } else {
-          formError.value = t(result.error.inlineMessageKey);
-          phase.value = 'auto-load';
-        }
+        // ⚠️ THE `instanceof` NARROWING AND ITS `else` ARM ARE BOTH GONE, and
+        // removing the `else` is the more important half. `error` is typed
+        // `RemoteBlocker`, and this arm now receives more than `PodLineageError`
+        // — `completeAutoLoad` routes EVERY non-`PayloadLoadError` blocker here,
+        // which since this change includes `LocalDocUnreadableError`. The old
+        // fallback wrote `t(result.error.inlineMessageKey)` into `formError`,
+        // i.e. the sync-bar copy, onto a screen with no sync bar: for the new
+        // blocker that would have printed "choose Use the family file below"
+        // beside a button that is not there.
+        //
+        // `surfaceBlockerFatal` resolves the OVERLAY copy through a table that
+        // is exhaustive over `PodBlockMessageKey`, so every blocker reaching
+        // this screen has copy written for a surface with no app shell — and a
+        // new blocker class cannot compile until someone writes it.
+        surfaceBlockerFatal(result.error, {
+          fileId: null,
+          familyId: useFamilyContextStore().activeFamilyId ?? null,
+          source: 'resume',
+        });
         return;
     }
     // ⚠️ EXHAUSTIVENESS. Every arm above `return`s and the function is

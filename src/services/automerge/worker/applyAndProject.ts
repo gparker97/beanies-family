@@ -883,8 +883,13 @@ export async function mergeRemoteEnvelope(
   //
   // Telling the two apart needs a shared-ancestry walk over the change graph, on
   // the low-memory device this whole tier exists to spare. Not worth it: the
-  // entire affected population is one dev family (`podCompaction` is OFF and has
-  // never shipped enabled). Reading nothing means such a pod compares `same` and
+  // entire affected population is the pods that were compacted while the
+  // envelope carried the lineage — a window that closed when the lineage moved
+  // into the document (ADR-036). ⚠️ THE OLD CLAIM HERE, "`podCompaction` is OFF
+  // and has never shipped enabled", STOPPED BEING TRUE at `142d25a8`; the flag
+  // is now committed ON. What bounds the population is the format, not the flag:
+  // a compacted pod is written as 5.0 and carries its lineage in the document,
+  // so no NEW pod can join this case. Reading nothing means such a pod compares `same` and
   // MERGES, which is right for every device that already holds it and wrong only
   // for one still on the pre-compaction history.
   //

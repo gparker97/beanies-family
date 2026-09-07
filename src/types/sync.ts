@@ -149,10 +149,20 @@ export type CompleteAutoLoadResult =
       error: PayloadTooLargeError;
     }
   /**
-   * The file opened, but its history cannot be combined with this device's.
-   * Distinct from `corrupted` and `too-large` because nothing is damaged and
-   * this device has not run out of anything — telling the user either of those
-   * would be a lie, and the recovery is different (export, then reload).
+   * A `RemoteBlocker` stopped the open. Distinct from `corrupted` and
+   * `too-large` because nothing is damaged and this device has not run out of
+   * anything — telling the user either of those would be a lie, and the
+   * recovery is different.
+   *
+   * ⚠️ THE NAME IS NARROWER THAN THE ARM. `completeAutoLoad` routes EVERY
+   * non-`PayloadLoadError` blocker here, so besides a lineage block this now
+   * also carries `LocalDocUnreadableError` ("this device's own copy could not be
+   * read", where nothing was combined at all) and `RemoteMergeError`. The
+   * doc-comment used to say "its history cannot be combined with this device's",
+   * which is true of only one of the three. The consumer must not assume a
+   * class: `ResumePodSetup` hands the error to `surfaceBlockerFatal`, which
+   * resolves copy from a table exhaustive over `PodBlockMessageKey` rather than
+   * from an `instanceof`.
    */
   | { kind: 'lineage-blocked'; error: RemoteBlocker }
   | { kind: 'network-error'; error: Error };
@@ -193,7 +203,16 @@ export type PodBlockMessageKey =
   | 'podLineage.conflictInline'
   | 'podMerge.failedInline'
   | 'podUnreadable.inline'
-  | 'podNewerVersion.inline';
+  | 'podNewerVersion.inline'
+  /**
+   * ⚠️ THIS DEVICE'S OWN COPY, never the remote file — the distinction is the
+   * whole point of the key. `podUnreadable.inline` means the file we downloaded
+   * could not be read and tells the user to update the app; this one means we
+   * could not open the local cache, so the remote has NOT been adopted and the
+   * user's unsaved work is still here. Reusing the other key would give exactly
+   * the wrong advice.
+   */
+  | 'podLocalUnreadable.inline';
 
 /**
  * Anything that may latch `syncService`'s remote-blocked breaker.
@@ -639,5 +658,67 @@ export class RemoteMergeError extends Error implements RemoteBlocker {
   get isActorCollision(): boolean {
     const m = this.cause instanceof Error ? this.cause.message : String(this.cause);
     return /duplicate seq/i.test(m);
+  }
+}
+
+/**
+ * This device could not READ its own local copy of the family document.
+ *
+ * ⚠️ THE FOURTH `RemoteBlocker`, and it exists because a failed READ and an
+ * EMPTY device were the same value. `syncStore` sent `{ kind:
+ * 'no-local-document' }` whenever `loadedFromCache` was false, and the worker
+ * reads that arm as an INSTRUCTION to install the remote wholesale without
+ * consulting the lineage guard (`applyAndProject.ts:898`, `:919`). So a device
+ * whose IndexedDB open was merely blocked — by another tab, which after a
+ * two-session soak is the normal state — silently replaced its own document,
+ * including work that had never been saved anywhere, and did it with no
+ * banner, no rebase and no telemetry.
+ *
+ * "There is nothing to lose" is true of a fresh device and false of this one.
+ * The distinction cannot be made in the worker: only main knows WHY the cache
+ * read failed. So the refusal is thrown here, before `mergeRemoteEnvelope` is
+ * ever posted, and `applyAndProject.ts` is not touched at all.
+ */
+export class LocalDocUnreadableError extends Error implements RemoteBlocker {
+  /** The failure class (`err.name` of the underlying cache rejection). */
+  readonly cause: string;
+
+  constructor(cause: string) {
+    super(`This device's local copy could not be read: ${cause}`);
+    // Literal, never `new.target.name`: the prod build minifies class names.
+    this.name = 'LocalDocUnreadableError';
+    this.cause = cause;
+  }
+
+  get blockCode(): string {
+    return 'local-unreadable';
+  }
+
+  get inlineMessageKey(): PodBlockMessageKey {
+    return 'podLocalUnreadable.inline';
+  }
+
+  /**
+   * ⚠️ IT LATCHES, and that is a decision rather than a default.
+   *
+   * `notePodUnopenable` early-returns before assigning `backgroundSyncError`,
+   * `backgroundSyncErrorKind` or `podBlockMessageKey` when the blocker did not
+   * latch — so `latches = false` here would mean no banner, no message key, and
+   * a 10-second poller still re-downloading the whole pod against a device that
+   * cannot read its own copy. It is also the honest answer to the interface's
+   * question: while another connection holds the IndexedDB handle, retrying
+   * within this session cannot help, and a save would write this device's
+   * absent-or-foreign document over the family file.
+   *
+   * The two exits are the banner's "use the family file" action and a page
+   * reload. The copy names both.
+   */
+  get latches(): boolean {
+    return true;
+  }
+
+  /** Separates the two routes (classification vs. rehydrate) in the firehose. */
+  get blockDetail(): string {
+    return this.cause;
   }
 }

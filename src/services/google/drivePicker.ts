@@ -4,6 +4,7 @@
  * Selecting a file via Picker grants the app `drive.file` access to that file,
  * which is required when the file was shared by another user (not created by the app).
  */
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
 
@@ -309,4 +310,42 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
       settle({ kind: 'failed', reason: 'open', message });
     }
   });
+}
+
+/** The failure reasons `pickBeanpodFile` can report. */
+export type PickFailureReason = Exclude<
+  PickBeanpodFileResult,
+  { kind: 'picked' } | { kind: 'cancelled' }
+>['reason'];
+
+/**
+ * User-facing copy + a queryable code for a pick failure, in ONE place.
+ *
+ * ⚠️ WHY A TABLE RATHER THAN A SECOND `switch`. Every surface that opens the
+ * Picker has to say something when it fails, and the two that exist rendered
+ * `picked.message` directly — which for `reason: 'config'` puts the literal
+ * string "VITE_GOOGLE_API_KEY is not configured" in front of a family. A table
+ * keyed on the closed `reason` union means a new reason is a compile error here
+ * instead of a raw developer string leaking to a user somewhere else.
+ *
+ * The caller keeps its own error ref and its own telemetry surface — only the
+ * words and the code are shared.
+ */
+const PICK_FAILURE_COPY = {
+  // A build/config problem, not something the user did or can fix. Say what
+  // they CAN do (use a local file) rather than naming an env var at them.
+  config: { messageKey: 'settings.drivePickerUnavailable', errorCode: 'picker-config' },
+  auth: { messageKey: 'settings.drivePickerAuth', errorCode: 'picker-auth' },
+  load: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-load' },
+  open: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-open' },
+  iframe: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-iframe' },
+  timeout: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-timeout' },
+} as const satisfies Record<PickFailureReason, { messageKey: UIStringKey; errorCode: string }>;
+
+export function describePickFailure(reason: PickFailureReason): {
+  messageKey: UIStringKey;
+  errorCode: string;
+} {
+  // `reason` is a closed union and the table is exhaustive over it.
+  return PICK_FAILURE_COPY[reason];
 }

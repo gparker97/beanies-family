@@ -233,7 +233,7 @@ vi.mock('@/stores/syncHighlightStore', () => ({
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { CorruptPayloadError } from '@/types/sync';
+import { CorruptPayloadError, isRemoteBlocker } from '@/types/sync';
 import { tryUnwrapFamilyKey as mockedTryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { logEvent } from '@/services/telemetry/logEvent';
 import * as docClient from '@/services/automerge/worker/docClient';
@@ -467,6 +467,12 @@ describe('syncStore.completeAutoLoad', () => {
     // a `same` verdict return `merge`, CRDT-merging the remote into whatever
     // (possibly FOREIGN) family's document the worker still holds — the exact
     // A∪B corruption this test was written for.
+    //
+    // ⚠️ DO NOT RE-POINT THIS ONE. The unreadable-cache work re-pointed the two
+    // tests below, which drive a cache REJECTION. This test drives the
+    // no-`familyId` cross-family path, where `no-local-document` is correct and
+    // load-bearing. Changing it to the refusal would reintroduce cross-family
+    // corruption while looking like consistency.
     expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
     expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
       kind: 'no-local-document',
@@ -474,13 +480,16 @@ describe('syncStore.completeAutoLoad', () => {
     expect(docClient.dropDoc).not.toHaveBeenCalled();
   });
 
-  it('a cache that will NOT OPEN degrades to the remote instead of hanging', async () => {
-    // ⚠️ THE DEGRADE THE LOCKOUT FIX ROUTES INTO, and it must stay the existing,
-    // tested path rather than a new mechanism. `initAndLoadCache` now REJECTS
-    // where it used to await forever, so this asserts the rejection is caught,
-    // the load completes from the remote, and the basis is `no-local-document`
-    // — the cross-family-safe answer, because a failed cache read means we hold
-    // no document of this family at all.
+  it('a cache that will NOT OPEN refuses the merge instead of adopting wholesale', async () => {
+    // ⚠️ RE-POINTED. This test used to assert `{ kind: 'no-local-document' }`
+    // here — i.e. it PINNED the data-loss bug as expected behaviour, and stayed
+    // green while a peer's unsynced work was destroyed in the field.
+    //
+    // A failed cache READ is not an empty device. `no-local-document` is an
+    // INSTRUCTION to install the remote wholesale without the lineage guard,
+    // which is right for a device that genuinely holds nothing and catastrophic
+    // for one whose document exists behind a blocked IndexedDB handle — it still
+    // has unsaved work in memory. The merge must not happen at all.
     vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
@@ -488,6 +497,37 @@ describe('syncStore.completeAutoLoad', () => {
     vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
       new Error('cache open timed out after 10000ms: beanies-automerge-fam-resume-1 is queued')
     );
+
+    const syncStore = useSyncStore();
+    preloadPendingFile(syncStore);
+    const result = await syncStore.completeAutoLoad('right-pw');
+
+    // The document is NOT replaced. This is the whole point.
+    expect(docClient.mergeRemoteEnvelope).not.toHaveBeenCalled();
+    // It still RESOLVES rather than hanging — the lockout fix's guarantee is
+    // preserved; only the classification of the failure changed.
+    expect(result.kind).toBe('lineage-blocked');
+    // And it must be the blocker, so every latch/banner/refusal site picks it
+    // up structurally rather than by class name.
+    const blocked = result as Extract<typeof result, { kind: 'lineage-blocked' }>;
+    expect(isRemoteBlocker(blocked.error)).toBe(true);
+    expect(blocked.error.blockCode).toBe('local-unreadable');
+    expect(blocked.error.latches).toBe(true);
+  });
+
+  it('a genuine cache MISS still adopts wholesale, so an empty device is never stuck', async () => {
+    // ⚠️ THE COUNTER-PRESSURE, and it is why the refusal keys on the ERROR and
+    // not merely on `!loaded`. A device whose cache truly holds nothing must
+    // still be able to adopt — including a compacted pod — or it can never open
+    // the family again. `applyAndProject.ts:855-859` records the same reasoning.
+    vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
+      familyKey: {} as CryptoKey,
+      memberIds: ['m-1'],
+    });
+    vi.mocked(docClient.initAndLoadCache).mockResolvedValueOnce({
+      loaded: false,
+      remoteBaseline: null,
+    });
     vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
       action: 'adopted' as const,
       heads: [],
@@ -500,39 +540,54 @@ describe('syncStore.completeAutoLoad', () => {
     preloadPendingFile(syncStore);
     const result = await syncStore.completeAutoLoad('right-pw');
 
-    // The promise RESOLVES. Before the bound above it, this was the hang.
-    expect(result.kind).not.toBe('corrupted');
+    // ⚠️ THE ASSERTION IS "THE MERGE HAPPENED, WHOLESALE" — deliberately not
+    // `kind === 'success'`. This harness stubs only as far as the merge, so the
+    // tail of a happy path resolves `network-error` here (the sibling test above
+    // asserts the basis for the same reason and never checks the kind). What
+    // matters is that a genuine miss is NOT refused: it still reaches the worker
+    // with the install-wholesale instruction.
+    expect(result.kind).not.toBe('lineage-blocked');
+    expect(docClient.mergeRemoteEnvelope).toHaveBeenCalledTimes(1);
     expect(vi.mocked(docClient.mergeRemoteEnvelope).mock.calls[0]![2]).toEqual({
       kind: 'no-local-document',
     });
   });
 
-  it('counts the wholesale adopt, so a fleet-wide cache failure is not invisible', async () => {
-    // The FAILURE was already reported by the worker layer. What nothing counted
-    // was the DECISION that followed it: silently abandoning this device's
-    // document. Emitted on both arms, because a rate needs a denominator.
+  it('names the unreadable arm distinctly, so the refusal is filterable in CloudWatch', async () => {
+    // ⚠️ THE MESSAGE CONSTANT IS ASSERTED, NOT JUST THE SURFACE/LEVEL/ACTION.
+    // This test previously asserted only `surface` + `level` + `action` +
+    // `error_code`, every one of which stays true across the change — so it
+    // could not tell the "adopting remote wholesale" arm from the "refusing the
+    // merge" one, and the re-point would have been unenforced. The message
+    // string is also the (surface, message) dedup bucket key, so a stale message
+    // would file the fix under the bug's own name forever.
     vi.mocked(mockedTryUnwrapFamilyKey).mockResolvedValueOnce({
       familyKey: {} as CryptoKey,
       memberIds: ['m-1'],
     });
     vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(new Error('nope'));
-    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValueOnce({
-      action: 'adopted' as const,
-      heads: [],
-      dirty: false,
-      changed: true,
-      remoteHeads: [],
-    });
 
     const syncStore = useSyncStore();
     preloadPendingFile(syncStore);
     await syncStore.completeAutoLoad('right-pw');
 
-    expect(vi.mocked(logEvent).mock.calls.map((c) => c[0])).toContainEqual(
+    const events = vi.mocked(logEvent).mock.calls.map((c) => c[0]);
+    // The degrade counter still fires on this arm — the rate needs a denominator.
+    expect(events).toContainEqual(
       expect.objectContaining({
         surface: 'pod-open-degrade',
         level: 'warn',
+        message: 'cache unreadable — refusing the merge',
         context: expect.objectContaining({ action: 'cache-recovery', error_code: 'Error' }),
+      })
+    );
+    // And the refusal itself is countable, which is what makes the fail-safe's
+    // rate measurable rather than only its absence.
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        surface: 'pod-lineage',
+        level: 'warn',
+        context: expect.objectContaining({ action: 'local-unreadable-refused' }),
       })
     );
   });

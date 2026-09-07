@@ -86,9 +86,23 @@ export interface RemoteBaselineRow {
   checkedAt: string;
 }
 
-/** A decoded baseline payload. `headsFp: null` => unknown => never skip. */
+/**
+ * A decoded baseline payload. `headsFp: null` => unknown => never skip.
+ *
+ * ⚠️ `revision` IS NULLABLE, and that is what makes the row writable for a
+ * provider that has none. A local file and the Capacitor filesystem expose no
+ * revision, so `commitRemoteBaseline` returned before ever persisting a row —
+ * and after any reload those families opened with `heads: null`, which the
+ * lineage guard reads as `dirty`, which makes the REBASE structurally
+ * unavailable. A peer on a local-file family could therefore never have its
+ * offline work replayed onto a compacted pod; it could only ever be blocked.
+ *
+ * `RemoteBaseline.revision` was already nullable and `shouldSkipOpenRead`
+ * already gates on `revision === null`, so a revision-less row can never cause
+ * a read to be skipped — it carries the heads only.
+ */
 export interface DecodedBaseline {
-  revision: string;
+  revision: string | null;
   headsFp: string | null;
 }
 
@@ -147,8 +161,14 @@ export function hasUnpushedChanges(baselineFp: string | null, currentFp: string)
   return baselineFp === null || baselineFp !== currentFp;
 }
 
-/** Encode the baseline row payload (#65). The ONE place that knows the format. */
-export function encodeBaselinePayload(revision: string, headsFp: string | null): string {
+/**
+ * Encode the baseline row payload (#65). The ONE place that knows the format.
+ *
+ * `revision` may be `null` for a provider that has none (local file, Capacitor):
+ * the row then carries the heads alone, which is exactly what the rebase needs
+ * and strictly less than what the open-skip needs.
+ */
+export function encodeBaselinePayload(revision: string | null, headsFp: string | null): string {
   return JSON.stringify({ r: revision, h: headsFp });
 }
 
@@ -185,6 +205,14 @@ export function decodeBaselinePayload(payload: string): DecodedBaseline | null {
   }
   if (typeof parsed === 'object' && parsed !== null) {
     const { r, h } = parsed as { r?: unknown; h?: unknown };
+    // ⚠️ THE REVISION-LESS ARM COMES FIRST, and the order is load-bearing. A row
+    // written by a provider with no revision has `r: null` and a real `h`;
+    // falling through to the arm below would treat it as an unrecognised shape,
+    // return "no baseline", AND `console.error` on every single open. Writing
+    // the row would then be worse than not writing it.
+    if (r == null && typeof h === 'string' && h !== '') {
+      return { revision: null, headsFp: h };
+    }
     if (typeof r === 'string' && r !== '') {
       return { revision: r, headsFp: typeof h === 'string' ? h : null };
     }

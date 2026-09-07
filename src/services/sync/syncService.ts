@@ -1248,6 +1248,22 @@ export function commitRemoteBaseline(driveHeads: readonly string[] | null): void
       // context and `isFullySynced`, which is exactly what it is for.
       remoteBaseline = { revision: null, modifiedTime: null, checkedAt: null, headsFp: fpOnly };
     }
+    // ⚠️ AND PERSIST IT. This branch used to `return` here, so a provider with
+    // no revision — a local file, the Capacitor filesystem — never wrote a
+    // durable baseline row at all. The IN-MEMORY baseline above kept the lineage
+    // context correct for the rest of the session, which is why this looked
+    // fine; but after any reload `initAndLoadCache` returned no `remoteBaseline`,
+    // the open terminus got `heads: null`, and `rebaseOntoRemote` was never even
+    // attempted (`applyAndProject.ts` requires non-null heads). A peer on a
+    // local-file family could therefore only ever be BLOCKED by a compaction,
+    // never rebased — on half the platforms this app runs on.
+    //
+    // `revision` stays null in the row, so `shouldSkipOpenRead`'s
+    // `revision === null` gate still refuses to skip a read. The row carries the
+    // heads and nothing else, which is precisely what the rebase needs.
+    if (fpOnly !== null) {
+      docClient.noteRemoteBaseline(encodeBaselinePayload(null, fpOnly));
+    }
     return;
   }
   // #65: `driveHeads` MUST be the heads of the content DRIVE HOLDS at `revision`
