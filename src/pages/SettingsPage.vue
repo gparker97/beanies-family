@@ -859,19 +859,30 @@ async function handleDecryptFile(password: string) {
 
 /**
  * The file loaded; the SESSION did not settle. Close the decrypt modal and put
- * the message where the person is still looking.
+ * the message somewhere it will actually be seen.
  *
  * ⚠️ ONE WRITER for both switched-family exits. They used to `return` with an
  * error string into a modal that stays open over a `pendingEncryptedFile` the
  * decrypt already consumed, so the two ways out of that screen were "retry and
  * get told there is no pending file" and "close and lose the instruction". The
  * data is loaded and safe either way — the only outstanding action is a sign-in.
+ *
+ * ⚠️ A TOAST, NOT ONLY `importError`, AND THAT IS THE WHOLE POINT OF THIS
+ * FUNCTION. `importError`'s two render sites live inside the Family Data drawer,
+ * which is `v-if="canManagePod"` — and `canManagePod` is FALSE in exactly the
+ * case that brings us here: no member could be bound, so the roster load rejected
+ * the session and the drawer unmounted underneath us. Writing only there would
+ * have relocated the "refusal with no render site" defect this whole change set
+ * exists to remove, rather than fixing it. `importError` is still set, because it
+ * is the durable carrier on the paths where the section IS still mounted; the
+ * toast is the one that always renders.
  */
 function finishDecryptWith(message: string) {
   showDecryptFileModal.value = false;
   syncStore.clearPendingEncryptedFile();
   encryptionError.value = null;
   importError.value = message;
+  showToast('error', message);
 }
 
 function handleDecryptModalClose() {

@@ -95,21 +95,43 @@ describe('initAndLoadCache — cache preservation', () => {
     expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
   });
 
-  it('answers `something-to-lose` when the re-opened cache still holds rows', async () => {
-    // ⚠️ THE PASS-4 NEAR-MISS, PINNED. The load stage is only reached because
-    // the OPEN succeeded, so a writeable cache DB for this family may still hold
-    // `inc:*` rows nobody has read. `dropDoc()` clears memory; it does not make
-    // those rows worthless — a wholesale install over them leaves
-    // `lastPersistedHeads` null and the next persist deletes every one of them.
-    vi.spyOn(cache, 'isCacheReady').mockReturnValue(true);
+  it('says `something-to-lose` when the reseed could NOT delete the cache', async () => {
+    // ⚠️ THE DATA-LOSS PATH, PINNED. A blocked delete is not exotic: `clearCache`
+    // CLOSES its handle before deleting, and the delete is blocked whenever
+    // another connection is open — i.e. whenever a second tab exists, which
+    // after a two-session soak is the normal state. Every `inc:*` row is still
+    // on disk, unread, with no handle held. An earlier version of this asked
+    // `cache.isCacheReady()`, which answers "is a handle open" rather than "does
+    // the cache hold anything", and so answered `nothing-to-lose` here —
+    // authorising a wholesale install that leaves `lastPersistedHeads` null, so
+    // the next persist deletes every one of those rows.
+    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: false });
     loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
     expect(err.loss).toBe('something-to-lose');
+    // And it is the DELETE that decided it, not a handle: nothing re-opened.
+    expect(cache.initPersistenceDB).toHaveBeenCalledTimes(1); // the initial open only
   });
 
-  it('answers `nothing-to-lose` only when neither a doc nor a cache survives', async () => {
-    vi.spyOn(cache, 'isCacheReady').mockReturnValue(false);
+  it('says `nothing-to-lose` once the reseed has PROVED the cache empty', async () => {
+    // The delete landed, so this device holds nothing: refusing here would tell
+    // the person their unsaved work is still present over a document `dropDoc()`
+    // discarded and a cache that was wiped. Same answer the `PayloadLoadError`
+    // arm has always given, for the same reason.
+    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: true });
+    loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
+
+    const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
+    expect(err.loss).toBe('nothing-to-lose');
+  });
+
+  it('does NOT let a live handle from a re-open override the delete', async () => {
+    // The reseed deletes AND re-opens, so a handle is open at the throw. That
+    // handle describes an EMPTY database; treating it as evidence of something
+    // to protect is exactly the inversion this file exists to stop.
+    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: true });
+    vi.spyOn(cache, 'isCacheReady').mockReturnValue(true);
     loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
@@ -124,7 +146,8 @@ describe('initAndLoadCache — cache preservation', () => {
     vi.mocked(cache.initPersistenceDB).mockRejectedValueOnce(
       Object.assign(new Error('cache open timed out'), { name: 'CacheOpenTimeoutError' })
     );
-    vi.spyOn(cache, 'isCacheReady').mockReturnValue(false);
+    // Deliberately NOT stubbing `isCacheReady`: the open stage does not consult
+    // it, and a stub here would hide it if a future edit made it do so.
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
     expect(err).toBeInstanceOf(CacheInitError);

@@ -60,11 +60,25 @@ try {
  * Replaces any previously queued content.
  */
 export function enqueueOfflineSave(content: string): void {
+  enqueueSeq += 1;
   pendingContent = content;
   persistToSession();
   startListening();
   console.warn('[offlineQueue] Save queued for when connection resumes');
 }
+
+/**
+ * How many times anything has been queued, ever, in this session.
+ *
+ * ⚠️ A COUNTER, NOT A CONTENT COMPARISON, and the difference is the whole
+ * reliability of two decisions below. Both ask "did something get queued while
+ * we were saving?", and both used to answer it by comparing the pending string
+ * to the one they started with — which is silently WRONG in the common case,
+ * because a re-queue after a failed save writes the SAME serialized document
+ * back. Identical bytes read as "nothing happened". A monotonic tick cannot be
+ * fooled by equal content.
+ */
+let enqueueSeq = 0;
 
 /**
  * How to re-save this device's CURRENT document.
@@ -108,10 +122,20 @@ export function hasPendingSave(): boolean {
  * failure streak on ANY resolution. So a permanently declining resave never
  * advanced `consecutiveFlushFailures`, `reportFlushFailure` never ran, and
  * `#beanies-errors` never paged for a queue holding unsaved family data. The two
- * falses have to be separable, and the consumer has to be exhaustive so a fourth
+ * falses have to be separable, and the consumer has to be exhaustive so a fifth
  * outcome fails the BUILD rather than landing silently in the reset arm.
+ *
+ * ⚠️ `'requeued'` IS THE THIRD FALSE, and leaving it folded into `'declined'`
+ * turned this alert into a false alarm for every offline user. The save path
+ * returns `false` for an offline write too — the provider catches the network
+ * error, calls `enqueueOfflineSave` again and returns `{queued:true}` — so an
+ * offline person who backgrounds and returns twice paged `#beanies-errors` with
+ * a `critical`. That is the queue working exactly as designed. It is detected
+ * WITHOUT guessing at `navigator.onLine` (which lies both ways): the save path
+ * re-queued during our own flush, so the pending content is no longer the
+ * content we started with.
  */
-export type FlushOutcome = 'flushed' | 'nothing-to-flush' | 'declined';
+export type FlushOutcome = 'flushed' | 'nothing-to-flush' | 'requeued' | 'declined';
 
 /**
  * Flush the queued save.
@@ -162,17 +186,27 @@ export async function flushQueue(): Promise<FlushOutcome> {
     throw new Error('offlineQueue: no resave handler registered');
   }
 
-  const content = pendingContent;
+  const seqBefore = enqueueSeq;
   const saved = await resaveHandler();
   if (!saved) {
+    if (enqueueSeq !== seqBefore) {
+      // The save ran, could not reach the remote, and put fresh bytes back in
+      // this queue. Nothing declined and nothing is stuck — this is the offline
+      // path doing its job, and reporting it would page for being offline.
+      console.warn('[offlineQueue] Resave could not reach the remote — re-queued for later');
+      return 'requeued';
+    }
     // The save path declined (a lineage block, a refused merge, an auth
     // failure). It has already classified and reported; the queue stays so the
     // next trigger retries rather than the work being dropped here.
     console.warn('[offlineQueue] Resave declined — keeping the queued work for a later retry');
     return 'declined';
   }
-  // Only clear if nothing NEWER was queued while we were saving.
-  if (pendingContent === content) {
+  // Only clear if nothing NEWER was queued while we were saving — asked through
+  // the tick for the same reason as above: a newer edit that happens to
+  // serialize to the same bytes must not read as "nothing was queued", or the
+  // clear drops work that was only just added.
+  if (enqueueSeq === seqBefore) {
     pendingContent = null;
     clearFromSession();
   }
@@ -323,6 +357,11 @@ function tryFlush(reason: FlushReason): void {
         case 'nothing-to-flush':
           // A sign-out landed inside the auth gate. Reporting this as a failure
           // would manufacture a page for a queue that is legitimately empty.
+          return;
+        case 'requeued':
+          // Still offline. The work is safe, the queue holds it, and the next
+          // trigger will try again. Neither a success (do not reset the streak,
+          // or a genuine failure either side of it is forgotten) nor a failure.
           return;
         case 'declined':
           // ⚠️ THE ARM THAT WAS MISSING. The save path refused (a lineage block,

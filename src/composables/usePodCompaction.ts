@@ -68,7 +68,7 @@ export function usePodCompaction() {
   const syncStore = useSyncStore();
   const familyContext = useFamilyContextStore();
   const { deliverPod, confirmBackupLanded } = usePodExport();
-  const { canCompactPod, olderVersion, olderVersionNames, olderVersionNotice } = usePodHealth();
+  const { canCompactPod, olderVersion, olderVersionNotice } = usePodHealth();
   const busy = ref(false);
 
   /**
@@ -499,7 +499,6 @@ export function usePodCompaction() {
     progressFailure,
     dismissProgress,
     /** Names the completion panel asks the family to go and update. */
-    olderVersionNames,
     olderVersion,
   };
 }
