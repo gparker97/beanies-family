@@ -1037,6 +1037,17 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
       await handlePendingPassword(payload.fileName);
     } else if (syncStore.error) {
       formError.value = syncStore.error;
+    } else {
+      // ⚠️ THE ARM THAT DID NOT EXIST, AND ITS ABSENCE WAS SILENCE. `loadFromGoogleDrive`
+      // correctly stopped writing raw English into `syncStore.error` and now
+      // returns `{success:false, reason:'error'}` on its own — so an empty or
+      // unreadable `.beanpod` fell past every branch here and the person picked a
+      // file and saw NOTHING happen at all, on the sign-in screen, with no way to
+      // tell a broken file from a broken tap.
+      //
+      // Reuses the key this function's own `catch` already uses: same failure to
+      // the person, same sentence, no new string.
+      formError.value = t('googleDrive.loadError');
     }
     // Return the load result so the reconnect caller can branch on `reason`
     // (a 404 → picker fallback). The picker `@select` caller ignores it.

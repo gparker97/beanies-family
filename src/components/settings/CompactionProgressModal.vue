@@ -40,7 +40,15 @@ const props = defineProps<{
   step: number;
   phase: 'running' | 'done' | 'failed';
   stats: { beforeBytes: number; afterBytes: number } | null;
-  errorKey: UIStringKey | null;
+  /**
+   * All three pieces of a failure's copy, or null.
+   *
+   * ⚠️ THE SUBTITLE IS PART OF IT, and that is the point. This used to be a lone
+   * `errorKey` under a FIXED title and subtitle, so a publish failure rendered
+   * "Your family file has not been changed" — false at that moment, and the one
+   * sentence that would stop someone re-publishing.
+   */
+  failure: { titleKey: UIStringKey; subtitleKey: UIStringKey; helpKey: UIStringKey } | null;
   /** Members still on a build that cannot open a compacted file. */
   behind: string[];
 }>();
@@ -94,6 +102,30 @@ const savedLine = computed(() => {
  * which is the whole point of not using a toast.
  */
 const closable = computed(() => props.phase !== 'running');
+
+/**
+ * ⚠️ THE FAILURE COPY COMES FROM THE FAILURE, all three lines of it. A fixed
+ * subtitle rendered "Your family file has not been changed" for a PUBLISH
+ * failure, where the document is compacted, on a new lineage and persisted to
+ * cache — only the cloud copy is stale. That is the one sentence that would stop
+ * someone re-publishing, and it was the one nothing could override.
+ *
+ * The `??` fallbacks are for a `failed` phase with no failure object, which the
+ * composable does not produce; they keep the surface honest rather than blank if
+ * a future path forgets.
+ */
+const titleKey = computed<UIStringKey>(() => {
+  if (props.phase === 'done') return 'compactionProgress.doneTitle';
+  if (props.phase === 'failed') return props.failure?.titleKey ?? 'compactionProgress.failedTitle';
+  return 'compactionProgress.title';
+});
+
+const subtitleKey = computed<UIStringKey>(() => {
+  if (props.phase === 'done') return 'compactionProgress.doneSubtitle';
+  if (props.phase === 'failed')
+    return props.failure?.subtitleKey ?? 'compactionProgress.failedSubtitle';
+  return 'compactionProgress.subtitle';
+});
 </script>
 
 <template>
@@ -113,22 +145,10 @@ const closable = computed(() => props.phase !== 'running');
       />
 
       <h2 class="font-outfit dark:text-ink text-center text-xl font-bold text-[#2C3E50]">
-        {{
-          phase === 'done'
-            ? t('compactionProgress.doneTitle')
-            : phase === 'failed'
-              ? t('compactionProgress.failedTitle')
-              : t('compactionProgress.title')
-        }}
+        {{ t(titleKey) }}
       </h2>
       <p class="dark:text-ink-faint mb-5 text-center text-sm text-gray-500">
-        {{
-          phase === 'done'
-            ? t('compactionProgress.doneSubtitle')
-            : phase === 'failed'
-              ? t('compactionProgress.failedSubtitle')
-              : t('compactionProgress.subtitle')
-        }}
+        {{ t(subtitleKey) }}
       </p>
 
       <!-- Progress + steps: while running, and on a failure so the person can
@@ -220,10 +240,10 @@ const closable = computed(() => props.phase !== 'running');
 
       <!-- A refusal or a failure, in the place the person is already looking. -->
       <div
-        v-if="phase === 'failed' && errorKey"
+        v-if="phase === 'failed' && failure"
         class="dark:bg-accent-lift/10 mb-4 rounded-2xl bg-[rgba(241,93,34,0.08)] p-4"
       >
-        <p class="dark:text-ink text-sm text-[#2C3E50]">{{ t(errorKey) }}</p>
+        <p class="dark:text-ink text-sm text-[#2C3E50]">{{ t(failure.helpKey) }}</p>
       </div>
 
       <BaseButton v-if="phase !== 'running'" variant="primary" full-width @click="emit('close')">
