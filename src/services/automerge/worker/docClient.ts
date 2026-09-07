@@ -32,7 +32,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
-import { PayloadLoadError, isRemoteBlocker } from '@/types/sync';
+import { PayloadLoadError, isRemoteBlocker, LocalDocUnreadableError } from '@/types/sync';
 // Type + `instanceof` only — never `guardLineage`, which the eslint rule
 // correctly bans outside the worker. Reading a flag off a thrown error is
 // not making a lineage decision.
@@ -170,10 +170,39 @@ let needsRehydrate = false;
 // by the reset-invariant test.
 let rehydrating = false;
 /**
+ * The family whose cache the worker most recently reported EMPTY, or null.
+ *
+ * ⚠️ NOT A MIRROR OF THE WORKER'S `currentDoc`, and deliberately NOT MONOTONE.
+ * The worker owns residency and answers it at the moment of the merge; this
+ * records the LAST answer main was given about the CACHE, so that when the
+ * worker refuses a merge for want of a document, main can say whether it already
+ * knew the cache was empty. A monotone "was a document ever installed here"
+ * reads true from a PREVIOUS session on the exact device this exists for — a
+ * worker whose rehydrate resolved `{loaded:false}` after an earlier session had
+ * loaded fine — and the correction below would never fire.
+ *
+ * Keyed by family id rather than a boolean so a missed clear cannot answer for
+ * the wrong family. Read in exactly ONE place: `mergeRemoteEnvelope`'s catch.
+ */
+let cacheProvenEmptyFor: string | null = null;
+
+/** The worker reported this family's cache empty. */
+function noteCacheProvenEmpty(familyId: string): void {
+  cacheProvenEmptyFor = familyId;
+}
+
+/** A document is now installed — whatever we knew about an empty cache is stale. */
+function noteDocInstalled(): void {
+  cacheProvenEmptyFor = null;
+}
+
+/**
  * The ONE writer of `currentFamilyId`, so the flags that describe "the document
  * we hold for that family" cannot fall out of step with it.
  */
 function setCurrentFamily(familyId: string | null): void {
+  // Covers the family switch AND sign-out (`reset()` routes through here).
+  if (familyId !== currentFamilyId) cacheProvenEmptyFor = null;
   currentFamilyId = familyId;
 }
 
@@ -1109,6 +1138,7 @@ export function compactDoc(): Promise<{
 export function initDoc(): Promise<{ loaded: true }> {
   // A fresh doc means a fresh session — restore normal toast policy immediately.
   quietTeardownUntil = 0;
+  noteDocInstalled();
   return request('initDoc');
 }
 
@@ -1130,6 +1160,11 @@ export async function initAndLoadCache(
   // would report rec=2 for one real rebuild. Routing through `request` covers the
   // inline-fallback realm as well as the worker.
   if (res.loaded) bumpOpenCycle('reconstruction');
+  // The one fact main can hold about this family's cache, from the one call that
+  // is told it. `bootstrap.ts`'s rehydrator routes through here, so it learns it
+  // for free and needs no writer of its own.
+  if (res.loaded) noteDocInstalled();
+  else noteCacheProvenEmpty(familyId);
   return res;
 }
 
@@ -1266,19 +1301,20 @@ export async function mergeRemoteEnvelope(
   // holds no document (`applyAndProject.mergeRemoteEnvelope`). That is the one
   // place the fact is actually known, it is checked at the moment of the merge
   // rather than before it, and it covers all three docless routes instead of one.
-  let res;
+  type MergeResult = {
+    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+    /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
+    replayed?: number;
+    conflicts?: number;
+    rebaseUnavailable?: true;
+    heads: Heads;
+    dirty: boolean;
+    changed: boolean;
+    remoteHeads: Heads;
+  };
+  let res: MergeResult;
   try {
-    res = await request<{
-      action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-      /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
-      replayed?: number;
-      conflicts?: number;
-      rebaseUnavailable?: true;
-      heads: Heads;
-      dirty: boolean;
-      changed: boolean;
-      remoteHeads: Heads;
-    }>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
+    res = await request<MergeResult>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
   } catch (err) {
     // ⚠️ THE OTHER HALF OF THE SAME SIGNAL. A rebase that could not run either
     // adopts (`user-file`) or throws (everything else), so reporting only the
@@ -1287,9 +1323,58 @@ export async function mergeRemoteEnvelope(
     if (err instanceof PodLineageError && err.rebaseUnavailable) {
       noteRebaseUnavailable(familyId, 'blocked');
     }
+    // ⚠️ MAIN NEVER ASSERTS ABSENCE; IT ONLY CORROBORATES THE WORKER'S.
+    //
+    // The worker refuses a merge it was not told to install wholesale when it
+    // holds no document. That refusal is correct and stays exactly as written.
+    // But a worker whose respawn rehydrate resolved EMPTY meets it on every
+    // `baseline` call — three of them (`hydrateFromEnvelope`, `loadFromFile`'s
+    // merging branch, and the poll) — so the device latches for the rest of the
+    // session where it used to self-heal. Main is the only layer that remembers
+    // being TOLD the cache was empty, and it survives the respawn that lost the
+    // worker's own memory of it, so main re-states the instruction ONCE.
+    //
+    // The tempting simplification is to compute the basis at the call site:
+    // `cacheProvenEmptyFor === familyId ? {kind:'no-local-document'} : ...`. It
+    // is strictly worse. That sends the wholesale-install instruction on MAIN'S
+    // BELIEF ALONE, so a stale value while the worker genuinely holds this
+    // family's document destroys a resident document with no guard, no rebase
+    // and no banner — the exact failure this whole change set exists to stop.
+    // Overriding only AFTER a proven `worker-holds-no-document` means main never
+    // claims the document is absent, it only agrees.
+    //
+    // BOUNDED TO ONE, and never recursive: the re-issue is a single `request`
+    // that is not itself substituted. `mergeRemoteEnvelope` is in
+    // `RETRYABLE_METHODS`, so the worst case is two dispatches each with their
+    // own single respawn replay — stated here so nobody has to derive it.
+    if (
+      err instanceof LocalDocUnreadableError &&
+      err.cause === 'worker-holds-no-document' &&
+      cacheProvenEmptyFor === familyId &&
+      basis.kind !== 'no-local-document'
+    ) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-lineage',
+        message: 'merge re-issued as a wholesale install — main had been told this cache was empty',
+        context: { action: 'no-local-document-corroborated', family_id: familyId },
+      });
+      res = await request<MergeResult>(
+        'mergeRemoteEnvelope',
+        { envelope, familyId, basis: { kind: 'no-local-document' } satisfies LineageBasis },
+        opts
+      );
+      if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
+      noteDocInstalled();
+      bumpOpenCycle('reconstruction');
+      return res;
+    }
     throw err;
   }
   if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
+  // The worker installed a document for this family, so whatever we knew about
+  // an empty cache is stale. (`kept-local` too: it kept a document it holds.)
+  noteDocInstalled();
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');
@@ -1384,6 +1469,7 @@ export function verifyEnvelope(envelope: BeanpodFileV4, opts?: RequestOpts): Pro
 
 /** DEV/E2E-only: load a raw (unencrypted) Automerge binary as the doc. */
 export function loadSnapshot(binary: Uint8Array): Promise<{ loaded: true }> {
+  noteDocInstalled();
   return request('loadSnapshot', { binary });
 }
 /** DEV/E2E-only: serialize the doc to a raw (unencrypted) binary. */
@@ -1530,6 +1616,7 @@ export function __resetDocClientForTesting(): void {
   docActor = null;
   releaseActorLease();
   currentFamilyId = null;
+  cacheProvenEmptyFor = null;
   needsRehydrate = false;
   rehydrating = false;
   inlineExecutor = null;
