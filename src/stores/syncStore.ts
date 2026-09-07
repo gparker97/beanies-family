@@ -121,6 +121,8 @@ import {
   type ResumeFromRegistryResult,
   type CompleteAutoLoadResult,
   PayloadLoadError,
+  CacheInitError,
+  type CacheInitLoss,
   isRemoteBlocker,
   PayloadTooLargeError,
   payloadErrorMessageKey,
@@ -200,6 +202,43 @@ export type RefreshOutcome =
  * Keying on `inlineMessageKey` makes it a closed union, so a new blocker class
  * cannot compile until it says which banner it belongs to.
  */
+/**
+ * Does a cache-init failure leave something of OURS to protect?
+ *
+ * ⚠️ EXACTLY ONE CELL OF THIS MATRIX MOVED versus the `instanceof` test it
+ * replaced, and saying which one is the cheapest way to stop a reader
+ * over-reading the change. An open-stage failure with NO document resident and
+ * NO ready cache — the cold boot behind a second tab — now ADOPTS instead of
+ * refusing. Every other cell keeps its previous verdict: an open-stage failure
+ * over a resident document still refuses (that is the case the refusal was
+ * written for), a load-stage failure over a live cache DB still refuses, a
+ * `PayloadLoadError` still adopts, an unknown still refuses.
+ */
+const CACHE_INIT_LOSS: Record<CacheInitLoss, boolean> = {
+  'something-to-lose': true, // refuse, latch, offer the family file
+  'nothing-to-lose': false, // adopt — there is nothing here to protect
+};
+
+/**
+ * ⚠️ THE `unknown` ARM MUST FAIL SAFE. An RPC deadline or a worker crash carries
+ * no worker-side error object, so nothing answered the question — and the
+ * expensive mistake is adopting over a live document, not refusing over an empty
+ * one. That arm is survivable only because the overlay it can reach now has a
+ * working exit (`BLOCKER_OVERLAY_KEY['podLocalUnreadable.inline']` →
+ * `resumeSetup.podLocalUnreadable`, whose Reload button resolves it). The
+ * cold-boot case that had NO exit is removed by the `CacheInitError` arm above,
+ * not by weakening this one.
+ */
+function CACHE_INIT_LOSS_REFUSES(e: unknown): boolean {
+  if (e instanceof CacheInitError) return CACHE_INIT_LOSS[e.loss];
+  // The worker already dropped the document AND cleared the whole cache DB
+  // before rethrowing this class, precisely so a fresh remote load can re-seed.
+  // Refusing would tell the user their unsaved work is safe when it demonstrably
+  // is not, and dead-end the self-heal `App.vue` mandates.
+  if (e instanceof PayloadLoadError) return false;
+  return true;
+}
+
 export const BLOCKER_BANNER_KIND = {
   'podTooLarge.inline': 'decrypt',
   'podCorrupted.inline': 'decrypt',
@@ -1141,6 +1180,8 @@ export const useSyncStore = defineStore('sync', () => {
      * cleared the cache, and adopting the remote is the repair.
      */
     let cacheReadFailedWithDocIntact = false;
+    /** `<stage>/<loss>` when the worker answered; null otherwise. Diagnostics only. */
+    let cacheInitDetail: string | null = null;
     try {
       const cacheResult = await docClient.initAndLoadCache(familyId);
       loadedFromCache = cacheResult?.loaded === true; // only a genuine HIT authorises a merge
@@ -1164,23 +1205,18 @@ export const useSyncStore = defineStore('sync', () => {
       // room is futile anyway, so surface it and let the caller show the honest
       // message.
       if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
-      cacheErrorName = e instanceof Error ? e.name : 'UnknownError';
-      // ⚠️ ONLY THE CLASSES WHERE THE DOCUMENT ACTUALLY SURVIVES MAY REFUSE.
-      //
-      // A `PayloadLoadError` here means the worker already ran
-      // `reseedCacheAfterCorruption`: it DROPPED the document and CLEARED the
-      // whole cache DB before rethrowing, precisely so a fresh Drive load can
-      // re-seed it. For that class this device genuinely holds nothing, so
-      // `no-local-document` is the honest answer — and refusing instead would
-      // (a) tell the user "anything you have not saved yet is still here" when
-      // it demonstrably is not, and (b) dead-end the self-heal that App.vue's
-      // own comment mandates, turning a recoverable hiccup into a permanent
-      // "your data may be damaged" screen while the pod on Drive is fine.
-      //
-      // Everything else — a blocked IndexedDB delete, the cache-open deadline,
-      // an RPC timeout — leaves the resident document untouched. Those are the
-      // ones with something to lose, and those are the ones that refuse.
-      cacheReadFailedWithDocIntact = !(e instanceof PayloadLoadError);
+      cacheErrorName =
+        e instanceof CacheInitError ? e.cause : e instanceof Error ? e.name : 'UnknownError';
+      // ⚠️ MAIN CLASSIFIES; IT DOES NOT MEASURE. This test used to be
+      // `!(e instanceof PayloadLoadError)`, which was wrong in BOTH directions.
+      // It refused over documents the worker had already dropped, and — the one
+      // that stranded a user — it read a cold-boot cache-open deadline as "doc
+      // intact", refused, latched the session, and raised a full-screen overlay
+      // whose only action reproduced the timeout. The worker is the only layer
+      // that can see both `currentDoc` and the cache handle, so the worker
+      // answers the question and sends the verdict on `CacheInitError.loss`.
+      cacheReadFailedWithDocIntact = CACHE_INIT_LOSS_REFUSES(e);
+      if (e instanceof CacheInitError) cacheInitDetail = `${e.stage}/${e.loss}`;
       console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
 
@@ -1213,6 +1249,10 @@ export const useSyncStore = defineStore('sync', () => {
       context: {
         action: 'cache-recovery',
         error_code: loadedFromCache ? 'hit' : (cacheErrorName ?? 'miss'),
+        // Which half raised and what it decided — so a refusal and a wholesale
+        // install are separable in CloudWatch without a repro. `null` on the hit
+        // and miss arms, and on a failure the worker did not classify.
+        detail: cacheInitDetail ?? undefined,
       },
     });
 

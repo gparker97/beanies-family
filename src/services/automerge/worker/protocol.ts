@@ -15,7 +15,13 @@
  *     generic `DocWorkerError`.
  */
 import type { CollectionName } from '@/types/automerge';
-import { CorruptPayloadError, PayloadTooLargeError, LocalDocUnreadableError } from '@/types/sync';
+import {
+  CorruptPayloadError,
+  PayloadTooLargeError,
+  LocalDocUnreadableError,
+  CacheInitError,
+} from '@/types/sync';
+import type { CacheInitStage, CacheInitLoss } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 import type { PodLineage } from '@/types/models';
@@ -331,6 +337,28 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
     serialize: (err) => (err instanceof LocalDocUnreadableError ? { cause: err.cause } : undefined),
     reconstruct: (_message, data) =>
       new LocalDocUnreadableError(typeof data?.cause === 'string' ? data.cause : 'unknown'),
+  },
+  // ⚠️ WITHOUT THIS ENTRY THE VERDICT IS THE FIELD THAT GETS STRIPPED. The class
+  // would arrive on main as a generic `DocWorkerError`, `loss` would read
+  // `undefined`, and `replaceDocWithCacheRecovery`'s table lookup would land on
+  // the fail-safe "refuse" arm for EVERY cache-init failure — reinstating the
+  // cold-boot lockout this class exists to remove, while type-checking clean.
+  CacheInitError: {
+    serialize: (err) =>
+      err instanceof CacheInitError
+        ? { stage: err.stage, loss: err.loss, cause: err.cause }
+        : undefined,
+    reconstruct: (_message, data) =>
+      new CacheInitError(
+        // Fail SAFE on a malformed wire value: an unrecognised `loss` must mean
+        // "something to lose" (refuse) rather than silently authorising a
+        // wholesale install. The stage default is diagnostic only.
+        data?.stage === 'load' ? 'load' : ('open' as CacheInitStage),
+        (data?.loss === 'nothing-to-lose'
+          ? 'nothing-to-lose'
+          : 'something-to-lose') as CacheInitLoss,
+        typeof data?.cause === 'string' ? data.cause : 'unknown'
+      ),
   },
 };
 
