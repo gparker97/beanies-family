@@ -134,15 +134,15 @@ describe('offlineQueue', () => {
   });
 
   describe('flushQueue', () => {
-    it('returns false when no pending content', async () => {
+    it("returns 'nothing-to-flush' when no pending content", async () => {
       const result = await offlineQueue.flushQueue();
-      expect(result).toBe(false);
+      expect(result).toBe('nothing-to-flush');
     });
 
-    it('returns false when no flush provider', async () => {
+    it("returns 'nothing-to-flush' when no flush provider", async () => {
       offlineQueue.enqueueOfflineSave('{"data":"test"}');
       const result = await offlineQueue.flushQueue();
-      expect(result).toBe(false);
+      expect(result).toBe('nothing-to-flush');
     });
 
     it('RE-SAVES rather than replaying the queued bytes, and clears the queue', async () => {
@@ -162,7 +162,7 @@ describe('offlineQueue', () => {
 
       const result = await offlineQueue.flushQueue();
 
-      expect(result).toBe(true);
+      expect(result).toBe('flushed');
       expect(resave).toHaveBeenCalledTimes(1);
       // The stale bytes are never written.
       expect(mockWrite).not.toHaveBeenCalled();
@@ -188,14 +188,18 @@ describe('offlineQueue', () => {
       expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"stale"}');
     });
 
-    it('keeps the queue when the save DECLINES (a lineage block, say)', async () => {
-      // `false` means "declined, already reported" — the work must survive for
-      // a later retry rather than being dropped here.
+    it("reports 'declined' — NOT 'nothing-to-flush' — when the save refuses", async () => {
+      // ⚠️ THE TWO FALSES THAT WERE ONE. `flushQueue` used to answer `false` both
+      // for "there was nothing to flush" and for "the save path declined and the
+      // work is still stuck here", and `tryFlush` zeroed the failure streak on
+      // ANY resolution — so a permanently declining resave never paged, on a
+      // queue holding unsaved family data. The work must survive for a later
+      // retry AND the outcome must be distinguishable from a no-op.
       offlineQueue.setFlushProvider({ write: vi.fn() } as any);
       offlineQueue.setResaveHandler(vi.fn().mockResolvedValue(false));
       offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
 
-      expect(await offlineQueue.flushQueue()).toBe(false);
+      expect(await offlineQueue.flushQueue()).toBe('declined');
       expect(offlineQueue.hasPendingSave()).toBe(true);
     });
 
@@ -241,6 +245,70 @@ describe('offlineQueue', () => {
 
       // Restore
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    });
+  });
+
+  describe('a queue that will not drain must PAGE', () => {
+    /**
+     * ⚠️ THE ALERT THIS MODULE EXISTS TO RAISE, AND IT WAS SILENT. `tryFlush`
+     * zeroed `consecutiveFlushFailures` on ANY resolution, and a declined resave
+     * RESOLVES — so the streak never advanced, `reportFlushFailure` never ran,
+     * and `#beanies-errors` never paged for a queue holding a family's unsaved
+     * work. A throwing provider paged; a politely refusing save path did not.
+     */
+    it('advances the streak and pages when the save keeps DECLINING', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+      offlineQueue.setFlushProvider({ write: vi.fn() } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      offlineQueue.setResaveHandler(async () => false);
+      offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
+
+      window.dispatchEvent(new Event('online'));
+      await new Promise((r) => setTimeout(r, 0));
+      window.dispatchEvent(new Event('online'));
+      await new Promise((r) => setTimeout(r, 0));
+
+      const severities = vi.mocked(reportError).mock.calls.map((c) => c[0].severity);
+      expect(vi.mocked(reportError)).toHaveBeenCalled();
+      // Second consecutive failure crosses FLUSH_FAILURE_PAGE_THRESHOLD.
+      expect(severities).toContain('critical');
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+    });
+
+    it('does NOT page when there was simply nothing to flush', async () => {
+      // ⚠️ THE FALSE PAGE THE SPLIT PREVENTS. `tryFlush`'s own `pendingContent`
+      // check runs BEFORE the auth gate, so the only way to reach `flushQueue`
+      // with an empty queue is for a sign-out to land INSIDE that gate — which
+      // is exactly what this drives. Reporting it as a failure would manufacture
+      // a critical page for a queue that is legitimately empty.
+      const { reportError } = await import('@/utils/errorReporter');
+      vi.mocked(reportError).mockClear();
+
+      let releaseGate: () => void = () => {};
+      whenRedirectAuthSettledMock.mockImplementationOnce(
+        () => new Promise<void>((r) => (releaseGate = r))
+      );
+      offlineQueue.setFlushProvider({ write: vi.fn() } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      offlineQueue.setResaveHandler(async () => true);
+      offlineQueue.enqueueOfflineSave('{"data":"ok"}');
+
+      // An auth-gated trigger ('visible'), held open...
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        configurable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      await new Promise((r) => setTimeout(r, 0));
+      // ...a sign-out lands while it is held...
+      offlineQueue.clearQueue();
+      releaseGate();
+      await new Promise((r) => setTimeout(r, 0));
+
+      // ...and nothing was reported.
+      expect(vi.mocked(reportError)).not.toHaveBeenCalled();
     });
   });
 

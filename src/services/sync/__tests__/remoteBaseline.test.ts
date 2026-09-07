@@ -251,3 +251,36 @@ describe('heads fingerprint round-trip', () => {
     expect(decodeHeadsFingerprint(null)).toBeNull();
   });
 });
+
+describe('baseline payload round-trip', () => {
+  /**
+   * ⚠️ THE TWO ARMS READ THE SAME FIELD TWO WAYS. The revision-less arm required
+   * a NON-EMPTY string; the revision arm accepted any string. So an empty heads
+   * fingerprint survived one and not the other — and `''` is not hypothetical:
+   * `decodeHeadsFingerprint('')` deliberately answers `[]`, because "a document
+   * with no heads" is a real, empty answer rather than a missing one. One helper
+   * now reads it for both arms, so they cannot disagree again.
+   */
+  it('round-trips an EMPTY heads fingerprint on the revision-less arm', () => {
+    const decoded = decodeBaselinePayload(encodeBaselinePayload(null, ''));
+    expect(decoded).toEqual({ revision: null, headsFp: '' });
+  });
+
+  it('round-trips an empty heads fingerprint on the revision arm too', () => {
+    const decoded = decodeBaselinePayload(encodeBaselinePayload('ver:1', ''));
+    expect(decoded).toEqual({ revision: 'ver:1', headsFp: '' });
+  });
+
+  it('still decodes a NULL fingerprint as null on both arms', () => {
+    // "We committed a baseline and could not prove what the remote held" — the
+    // fail-safe row, which must keep reading as `dirty`.
+    expect(decodeBaselinePayload(encodeBaselinePayload(null, null))).toEqual({
+      revision: null,
+      headsFp: null,
+    });
+    expect(decodeBaselinePayload(encodeBaselinePayload('ver:1', null))).toEqual({
+      revision: 'ver:1',
+      headsFp: null,
+    });
+  });
+});

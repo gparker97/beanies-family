@@ -159,6 +159,60 @@ describe('syncService — save failure tracking', () => {
       );
     });
 
+    /**
+     * ⚠️ A QUEUED WRITE IS NOT A SAVE, AND TWO SIGNALS SAID IT WAS. The provider
+     * catches a network failure, enqueues the bytes and RESOLVES `{queued:true}`.
+     * `noteWrittenVersion` and `recordPersistedBytes` ran above that gate, so:
+     *
+     *   - the version transition — a ONE-SHOT memo keyed on `detail` — was spent
+     *     by a write that never left the device, and the real save that landed on
+     *     reconnect emitted nothing at all; and
+     *   - the registry usage signal reported bytes for a file nobody received.
+     */
+    it('a QUEUED write emits no version event and reports no persisted bytes', async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      vi.mocked(docClient.exportEncryptedPayload).mockResolvedValueOnce({
+        payload: 'base64-payload==',
+        heads: ['h-queued'],
+        lineage: null,
+      });
+      syncService.setProvider(okProvider({ revision: null, queued: true }));
+
+      const result = await syncService.save();
+
+      // Not a save.
+      expect(result).toBe(false);
+      expect(syncService.getLastPersistedBytes()).toBeNull();
+      const versionEvents = vi
+        .mocked(logEvent)
+        .mock.calls.map((c) => c[0])
+        .filter((e) => e.surface === 'pod-version');
+      expect(versionEvents).toHaveLength(0);
+    });
+
+    it('and the version memo is still UNSPENT, so the real save reports it', async () => {
+      // The half that makes the ordering matter: after a queued write, the write
+      // that actually lands must be the one that announces the version.
+      const { logEvent } = await import('@/services/telemetry');
+      vi.mocked(docClient.exportEncryptedPayload).mockResolvedValue({
+        payload: 'base64-payload==',
+        heads: ['h'],
+        lineage: null,
+      });
+
+      syncService.setProvider(okProvider({ revision: null, queued: true }));
+      await syncService.save();
+      syncService.setProvider(okProvider({ revision: 'ver:1' }));
+      await syncService.save();
+
+      const versionEvents = vi
+        .mocked(logEvent)
+        .mock.calls.map((c) => c[0])
+        .filter((e) => e.surface === 'pod-version');
+      expect(versionEvents).toHaveLength(1);
+      expect(syncService.getLastPersistedBytes()).toBeGreaterThan(0);
+    });
+
     it('does NOT pair a re-probed revision with our heads (it may be a peer write)', async () => {
       // Malformed 2xx => the ack carries no revision => syncService re-probes. A peer
       // may have written in that gap, so the revision is not necessarily ours.

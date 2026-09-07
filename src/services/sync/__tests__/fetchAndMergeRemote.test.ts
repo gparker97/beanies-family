@@ -224,7 +224,9 @@ describe('syncService.save → fetchAndMergeRemote — local-wins merge', () => 
     await syncService.save();
 
     expect(docClient.logMergeTerminus).toHaveBeenCalledWith(
-      'poll terminus',
+      // Its OWN bucket: `where` keys the (surface, message) rate limiter, so
+      // sharing a label with syncStore's terminus put both in one bucket.
+      'background poll terminus',
       expect.objectContaining({ action: 'rebased', replayed: 4, conflicts: 1 }),
       expect.anything()
     );
