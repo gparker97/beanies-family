@@ -72,11 +72,17 @@ beanies to look again.
   `jsonLdToPrefill`, beside the existing `inferredIngredients: []` and its "marking it as such
   would be a lie" comment — not in the composable, which would split one guarantee across two
   files.
-- **⚠️ Never clear on re-fetch.** `RecipePrefill.fields.ingredients`/`steps` are
-  unconditional arrays, and the `titleOnly` rung produces both empty. `diffPayload`
-  normalises empty to `undefined`, which is the repository's DELETE signal — so an unguarded
-  diff would cheerfully offer "wipe every ingredient" as a change. Re-fetch may ADD or CHANGE
-  to a non-empty value; it may never empty one.
+- **⚠️ Never clear on re-fetch — TWO distinct mechanisms, one filter.** `diffPayload`'s
+  `normalize` maps ONLY `''` and `null` to `undefined` (`diffPayload.ts:40-42`), so:
+  - a key **present with `undefined`** becomes a DELETE;
+  - an **empty array** is NOT normalised, so it is written as a literal `[]` — an
+    assignment that wipes the list just as thoroughly, by a different route.
+    `RecipePrefill.fields.ingredients`/`steps` are unconditional arrays and the `titleOnly`
+    rung produces both empty, so the second case is live on every video re-fetch. And
+    `recipeExtractionToPrefill` deliberately accepts an extraction with ingredients and **no
+    name** (`recipeExtractionToRecipe.ts:114-126`), so the first case can reach the recipe's
+    NAME. Re-fetch may ADD or CHANGE to a non-empty value; it may never empty one. One named
+    `isEmptyish` predicate, applied once, covers both.
 - **⚠️ A re-fetch would attach a DUPLICATE photo.** `PhotoAttachment` carries no source URL,
   so there is no way to distinguish "the same og:image we already stored" from a new one.
   With no per-field toggles in v1, taking a text change would silently add a duplicate on
@@ -85,8 +91,15 @@ beanies to look again.
   replacement is an explicit follow-up.
 - **Re-fetch costs money and is rate-limited.** `attemptBudget` already exists for exactly
   this, with `peekAttempt`/`consumeAttempt`, a `resetsAt` on refusal, storage-failure
-  tolerance and its own tests. `services/share/types.ts` explicitly names budgeting the LINK
-  path as the deliberate follow-up this is. Do not hand-roll localStorage.
+  tolerance and its own tests. Do not hand-roll localStorage.
+- **The budget is a per-recipe COOLDOWN, not a cost bound, and it must say so.** Keyed by
+  recipe id, a family with fifty recipes can still fire fifty fetches. That is fine and
+  deliberate — the requirement is "pressing it repeatedly must not be free" — but do not
+  write "this caps spend". The real cost bound is the server's per-family limiter.
+- **The budget lives with the FEATURE, not in `services/share/types.ts`,** whose header
+  scopes it to "the one shape every share-target platform implements (#64)". A recipe
+  cooldown there is cohesion rot for the sake of putting two constants side by side.
+  `refetchBudgetKey` embeds a recipe id, so like `shareTextBudgetKey` it is NEVER logged.
 - **ADR-030 consent applies.** `processUrl` requires a branded `ConsentGrant`, so skipping
   the gate is a compile error — but state it, because `RecipeFormModal.vue:286-296` records
   an incident where a new mount point inherited a capture without its gate.
@@ -94,8 +107,22 @@ beanies to look again.
   used, never re-read from a ref inside the async body. Its ownership note also claims
   "exactly one expression in the codebase passes this" — re-fetch makes that two, so the
   comment is updated in the same commit or the invariant becomes a lie.
-- **The affordance is absent, not disabled, when there is no `sourceUrl`,** and it lives
-  inside the existing `v-if="canEditActivities"` action row: re-fetch writes to a recipe.
+- **The affordance is absent, not disabled, when there is no usable `sourceUrl`,** and the
+  test is `safeExternalHref`, not truthiness — the same screen the page already applies
+  before rendering its Source link (`RecipeDetailPage.vue:34,51`). Offering to re-read a URL
+  the page refuses to link would be incoherent. It lives inside the existing
+  `v-if="canEditActivities"` row: re-fetch writes to a recipe.
+- **`RecipeDetailPage` does not grow.** It is already 481 lines hosting three modals. The
+  whole affordance is ONE component, following the precedent `RecipeFormModal.vue:269-284`
+  set for exactly this ("the form runs its OWN capture… owning it here means every caller
+  gets it for free"). Consent needs no host (singleton, mounted in `App.vue`) and
+  `BaseModal` teleports to `body`, so nothing forces this upward.
+- **⚠️ `updateRecipe` NEVER throws.** It runs inside `wrapAsync`, which catches, toasts with
+  the error attached, and returns `undefined` → the store returns `null`
+  (`recipesStore.ts:55-62`). A `try/catch` around the apply would catch nothing, and a second
+  toast would double-report one failure. Check the RETURN VALUE, exactly as
+  `RecipeFormModal.handleSave:476` already does: `if (!result) return; // store reported via
+wrapAsync; keep modal open for retry`.
 
 ## Assumptions
 
@@ -179,12 +206,39 @@ RecipeTimeField[]` (not optional). This makes the compiler force an answer at
 guessed" comment), and at the `titleOnly` literal (`[]`). The JSON-LD guarantee therefore
 lives in the code, beside the identical `inferredIngredients: []`.
 
-**7. UI — via a `FormFieldGroup` hint prop, not five copies of a class string.** The exact
-hint markup already appears twice and this change would add three more inside a 3-column
-grid. Instead `FormFieldGroup` gains an optional `hint?: string` rendering the Heritage
-Orange line once, app-wide; `RecipeFormModal` passes `:hint` on all five fields and its two
-hand-written `<p>` blocks are deleted. `applyPrefill` records `localInferredTimes` beside the
-two existing local refs, so both capture routes disclose identically.
+**7. UI — a named ten-line component, and FEWER refs than before.**
+
+`src/components/ui/InferredHint.vue` is the whole component: one `<p v-if="text">` carrying
+the existing `font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs`. Used five
+times in `RecipeFormModal`; the two hand-written `<p>` blocks are deleted.
+
+**`FormFieldGroup` is deliberately NOT touched.** An optional `hint` prop would cost its ~45
+call sites nothing, but it would bake a feature-specific attention colour ("beanies filled
+this in, check it") into the app's generic label/control primitive, where the next caller will
+reasonably read `hint` as neutral helper text and be handed Heritage Orange. A named component
+owns the idiom and leaves the primitive generic.
+
+**Copy constraint:** the three time fields sit in `sm:grid-cols-3` (`RecipeFormModal.vue:594`),
+so `recipeExtract.inferred.times` is ONE SHORT WORD, not a sentence, or the row balloons on
+mobile.
+
+And in the same edit, collapse the disclosure state. Today there are two local refs
+(`:149-150`) plus two computeds that only rename them (`:196-197`); a third pair would make six
+declarations for one concept, and the bug documented at `:141-148` was precisely "one of these
+was left behind". Replace all of it with one
+`inferred = ref<{ ingredients: string[]; steps: string[]; times: RecipeTimeField[] }>()`, set
+in ONE statement inside `applyPrefill` so the reset can never be partial. Net effect: this file
+is **shorter** after the feature than before it.
+
+**8. Close the missed-bump hole, in the drift test itself.** `extractionPromptDrift.test.ts`
+asserts only _equality_ across the three copies, so a missed `PROMPT_VERSION` bump passes
+silently — this plan named that as the failure it must not make, then left it unguarded. It
+gains a `PROMPT_FINGERPRINTS: Record<version, hash>` over the built messages: changing a prompt
+without bumping fails on the hash, bumping without recording fails on the missing key. ~12
+lines, once, retiring a rule that has until now lived only in a comment header. The same file
+gains a sync assertion that the shipped `inferredTimes` description names exactly
+`RECIPE_TIME_FIELDS`, mirroring the `extractionPromptCategory` sync-test idiom — otherwise that
+constant is simply a fourth unguarded copy of the list.
 
 ### Part B — the re-fetch
 
@@ -197,13 +251,17 @@ copies must not exist.
 **2. `src/utils/recipeDiff.ts` (pure, wraps `diffPayload`).**
 `diffRecipe(current: Recipe, prefill: RecipePrefill): RecipeDiff`:
 
-a. Build the incoming side from `prefill.fields`, **omitting `sourceUrl` and `tags`** —
-`sourceUrl` is rewritten to `provenanceUrl` on capture and would read as spurious churn;
-`tags` are never supplied and `applyPrefill` refuses to touch them. Because `diffPayload`
-iterates `Object.keys(next)`, omission IS the exclusion — no filter code.
+a. Build the incoming side by **rest-spread**: `const { sourceUrl: _drop, ...incoming } =
+prefill.fields`. ⚠️ Never re-pick field by field — `prefill.fields` uses conditional spread
+throughout, and a re-pick turns every absent key into a present-`undefined` one, which
+`diffPayload` emits as a DELETE. `sourceUrl` is dropped because capture rewrites it to
+`provenanceUrl` and it would read as spurious churn; `tags` are not on `RecipePrefill.fields`
+at all, so omission already excludes them.
 b. `diffPayload(recipeComparable(current), incoming)`.
-c. **Never-clear rule:** drop any key whose value is `undefined` or an empty array while the
-baseline had content.
+c. **Never-clear:** one named predicate applied once — `isEmptyish(v) => v === undefined ||
+(Array.isArray(v) && v.length === 0)` — dropping any such key whose baseline had content. One
+rule covers BOTH mechanisms in the caveat above (present-undefined → delete, empty array →
+wipe-by-assignment).
 d. Project the survivors into `{ field, mine, theirs }[]` in a fixed display order.
 e. `photo: boolean` — true only when a candidate exists **and** the recipe has no photo yet.
 f. `changed = rows.length > 0 || photo`, so "nothing new" is a plain empty result rather
@@ -226,8 +284,17 @@ const capture = useRecipeCapture({ onRecipeReady: ({ prefill }) => { … diff �
 
 Everything else — offline, in-flight, routing, the four resolver outcomes, every
 `ExtractionErrorCode` toast, `reportError` on a throw, the `finally` — is inherited unchanged.
-**No failure mapping is written for this feature.** `capture.isProcessing` is re-exported for
-the button spinner.
+**No failure mapping is written for this feature.**
+
+What the second `useRecipeCapture` instance actually inherits, written down so nobody has to
+re-derive it: `processUrl` passes `sourceFile: null` on every rung, so this instance's
+`pendingSource`/`pendingCompressed` are null by construction and its `attachAfterSave` is
+dish-only; `isProcessing` and `discardPendingSource` are instance-local, so this instance's
+in-flight guard and the form modal's cannot interfere.
+
+The composable **returns only** `{ start, isProcessing, diff, isOpen, take, dismiss }`.
+`processFile`, `deliverRecipe` and `discardPendingSource` are NOT re-exported: a composable
+that leaks its dependency's whole API is a second public door onto the capture ladder.
 
 `onRecipeReady` calls `diffRecipe`; a `changed: false` result shows the "nothing new" toast
 and does not open the modal. Otherwise the diff is stored and the modal opens.
@@ -239,12 +306,33 @@ budget of one. One shared refusal helper: one `logEvent` at `warn` plus one toas
 `fillTemplate({ resetsAt })`, so the refusal always says _when_ it lifts and peek/consume
 cannot drift into two messages.
 
-**5. `RecipeRefetchModal.vue`.** `BaseModal` with its `footer` slot. Renders the rows
+**5. `RecipeRefetchAction.vue` — the whole affordance, in one component.** Button + the
+composable + the modal. `RecipeDetailPage` renders ONE line inside its existing
+`v-if="canEditActivities"` row:
+
+```html
+<RecipeRefetchAction v-if="recipeSourceHref" :key="recipe.id" :recipe="recipe" />
+```
+
+- **Zero script change to the page**, which is already 481 lines hosting three modals. The
+  precedent is `RecipeFormModal.vue:269-284`, where the form took ownership of its own
+  capture for exactly this reason. Consent is a singleton mounted in `App.vue` and
+  `BaseModal` teleports to `body`, so nothing about hosting forces this upward.
+- **`:key="recipe.id"` is load-bearing.** `recipeId` is a computed off `route.params` and
+  vue-router reuses the page instance across param changes — which is why the page needs its
+  own present-then-absent delete watcher at `:165-167`. Unkeyed, an open diff or in-flight
+  fetch for recipe A survives navigation to recipe B and could be applied to the wrong
+  recipe. The key removes that class with no guard code.
+- The `v-if` is the page's EXISTING `safeExternalHref` screen, not truthiness on `sourceUrl`.
+- Sitting inside the page's `v-if="recipe"`, the modal unmounts with the recipe, so "apply to
+  a deleted id" cannot arise. Do not hoist it to page level later without restoring that.
+
+**6. `RecipeRefetchModal.vue`.** `BaseModal` with its `footer` slot. Renders the rows
 old-beside-new per the mockup, an optional photo row, an explicit "nothing has been saved
 yet" note, and two actions: **Keep mine** and **Take These Changes**. Presentational only: it
 takes an already-computed `RecipeDiff` and emits `take` / `close`. No per-field toggles in v1.
 
-**6. Applying.** One `recipesStore.updateRecipe(id, patch)` where `patch` is the diff's field
+**7. Applying.** One `recipesStore.updateRecipe(id, patch)` where `patch` is the diff's field
 map — already minimal, already `diffPayload`-shaped, so it is the same write the edit form
 makes. A taken photo goes through `capture.attachAfterSave(recipe.id, prefill.dishImage)` —
 the existing path, which appends via `usePhotos`, honours the cap and cloud check, runs the
@@ -252,11 +340,21 @@ candidate ladder and logs `image_resolved`/`image_none`. Zero new attach code. T
 rule is respected, and `attachAfterSave`'s "exactly one expression passes this" comment is
 updated to name both owners.
 
-**7. Failure of the APPLY (not the fetch).** `updateRecipe` is awaited inside a `try/catch`:
-on failure the modal stays open, a toast fires, and `reportError({ surface:
-'recipe-refetch', severity: 'error', context: { action: 'apply_failed' } })` runs with a
-`console.error` naming the store call. The recipe is unchanged, so nothing is lost, but it is
-never swallowed.
+**8. Failure of the APPLY (not the fetch).** ⚠️ `updateRecipe` does NOT throw — it runs inside
+`wrapAsync`, which catches, toasts with the stack attached, and returns `undefined`, so the
+store returns `null`. A `try/catch` would catch nothing and a second toast would double-report
+one failure. Check the RETURN VALUE, exactly as `RecipeFormModal.handleSave:476` does:
+
+```ts
+const updated = await recipesStore.updateRecipe(id, patch);
+if (!updated) {
+  logEvent(warn, 'apply_failed');
+  return;
+} // store already toasted + reported
+```
+
+The modal stays open for retry and the recipe is unchanged — with exactly one toast and one
+report for one failure.
 
 ### Part C — copy
 

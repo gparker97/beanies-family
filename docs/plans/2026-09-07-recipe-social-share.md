@@ -69,19 +69,27 @@ accepted for a recipe and explicitly NOT generalised to finance or health data.
 - **⚠️ `meta.requiresAuth: false` is NOT enough — this is the finding that would have made
   the feature silently not work.** Two boot-time redirects in `App.vue` throw the fragment
   away before the page ever renders:
-  - `App.vue:1218-1231` holds a **hardcoded array of route NAMES** (`Welcome`, `Login`,
-    `JoinFamily`, `CreateFamily`, `OpenFromDrive`, `DevWorkerSpike`) and does
+  - `App.vue:1216-1228` holds a **hardcoded array of route NAMES** and does
     `if (!authPages.includes(route.name)) router.replace('/welcome')`. An unauthenticated
     receiver — the primary case — is bounced and the recipe is gone.
   - `App.vue:1243-1279` — an authenticated-but-podless user is
     `safeRouterReplace(RESUME_SETUP_PATH)`-ed, losing the fragment **and** paging Slack with
-    a `critical` `app.onboardingZombieState` report on every single share-link open.
-    Fixed by one declared flag (`meta.noAuthRedirect`) consulted at both sites, plus adding
-    `'SharedRecipe'` to `PODLESS_EXPECTED_ROUTE_NAMES` (`utils/appChrome.ts`). A declared flag
-    rather than appending to two more hardcoded name arrays.
-- **Route meta must be `requiresAuth: false` + `noChrome: true` + `hideQuickAdd: true` +
-  `noAuthRedirect: true`.** `App.vue` gates the chrome on `showLayout`, and the `v-else`
-  branch renders a bare `<router-view />`.
+    a `critical` `app.onboardingZombieState` report on every share-link open.
+    Fixed by **merging that inline array into the route-name predicate the codebase already
+    has** (`PODLESS_EXPECTED_ROUTE_NAMES` / `isPodlessExpectedRoute` in `utils/appChrome.ts`).
+    **No new route-meta flag** — see Approach §5.
+- **⚠️ That inline array is ALREADY WRONG today, and it is the same bug — verified on
+  `main`.** `/share` (`ShareTarget`) is declared `requiresAuth: false` with a comment
+  explaining it _must_ mount for a signed-out user so the Cache-Storage stash is deleted:
+  "_this page is the only code that deletes the stash… nothing sweeps it, there is no TTL,
+  and sign-out clears IndexedDB but not `caches`_" (`router/index.ts:333-346`). But
+  `'ShareTarget'` is **absent** from App.vue's `authPages`, so the router-level fix is
+  defeated by the second gate and a signed-out document share leaks into Cache Storage
+  permanently. One word in the merged list fixes it. This is the evidence that the mechanism
+  must be ONE list, not a per-route boolean a route author can forget.
+- **Route meta is `requiresAuth: false` + `noChrome: true` + `hideQuickAdd: true`** — the
+  same three every other public route already sets. `App.vue` gates the chrome on
+  `showLayout`, and the `v-else` branch renders a bare `<router-view />`.
 - **Do NOT add the new path to `ALREADY_AUTH_REDIRECT_FROM`** (`router/index.ts:377`, today
   `{'/welcome','/login'}`). That set bounces signed-in users to `/nook`; a signed-in user
   opening a share link must land on the recipe.
@@ -123,7 +131,19 @@ memberName, hideExpiryNote? }` and emits `shared`. It has exactly **two** render
   cannot survive — new user choosing Google Drive on iOS — is handled by an honest,
   actionable recovery, not by pretending. **The recovery is expected behaviour on that
   path, not an edge case.** See Approach §6.
-- **No compression.** See Approach §1 for why, and why the cap is set where it is.
+- **⚠️ The size cap must be derived from Discord, not picked.** Requirement 10 makes
+  paste-into-Discord a first-class path, and a Discord message caps at **2000 characters**.
+  An 8000-character URL guarantees that paste fails for exactly the recipes worth sharing.
+  There is ONE constant, `MAX_SHARE_MESSAGE_CHARS = 2000`, measured on the composed message.
+- **No compression, and now for a hard reason rather than a preference.** The app targets
+  **iOS 15** (`docs/STATUS.md`); `CompressionStream` is Safari 16.4+. A compressed format
+  would have to be conditional on the _sender's_ platform, putting two wire formats in the
+  wild simultaneously — exactly the trap the version byte exists to avoid.
+- **`SharedRecipePage` must not be consolidated with `RecipeDetailPage` later.** They look
+  similar and are not: the detail page renders a stored `Recipe` with photos, cook logs,
+  permissions and a pod behind it; the shared page renders untrusted, photo-less,
+  store-less, session-less fields. Sharing markup would drag pod-aware code onto a public
+  route. Stated so a future DRY sweep does not "helpfully" merge them.
 
 ## Assumptions
 
@@ -167,15 +187,50 @@ pages/SharedRecipePage.vue           the public receiving surface.
 ### 1. `src/utils/recipeShareLink.ts` — the wire format, and the guard
 
 ```ts
-export const SHARE_FORMAT_VERSION = 1;
-/** Bounds the WHOLE URL, not the fragment alone. */
-export const MAX_SHARE_URL_CHARS = 8000;
+/** The version this build WRITES. */
+export const SHARE_WIRE_VERSION = 1;
+/**
+ * The versions this build can READ. This set only ever GROWS — a share link lives in
+ * someone's chat forever, so dropping a version breaks messages already sent. This is the
+ * one place the contract differs from `redirectState.ts`, whose exact-match gate is safe
+ * because its payload round-trips in seconds and the fallback is "retry".
+ */
+export const SUPPORTED_WIRE_VERSIONS: ReadonlySet<number> = new Set([1]);
+
+/** Compact wire keys, declared once and pinned by a golden test. */
+const WIRE_KEYS = {
+  name: 'n',
+  subtitle: 's',
+  prepTime: 'p',
+  cookTime: 'c',
+  servings: 'y',
+  ingredients: 'i',
+  steps: 't',
+  notes: 'o',
+  sourceUrl: 'u',
+  course: 'r',
+  mealSlots: 'm',
+} as const;
 
 /** No new type: the decode target IS the existing prefill shape. */
 export type SharedRecipeFields = RecipePrefill['fields'];
 
+export type ShareDecodeFailure =
+  | 'empty'
+  | 'too-long'
+  | 'bad-encoding'
+  | 'bad-json'
+  | 'not-an-object'
+  | 'unsupported-version'
+  | 'no-name';
+
+export type ShareDecodeResult =
+  { ok: true; fields: SharedRecipeFields } | { ok: false; reason: ShareDecodeFailure };
+
 export function encodeRecipeShare(recipe: Recipe): string;
-export function decodeRecipeShare(raw: string): SharedRecipeFields | null;
+export function decodeRecipeShare(raw: string): ShareDecodeResult;
+/** Adapter to the form's prefill envelope. No model was involved. */
+export function sharedRecipeToPrefill(fields: SharedRecipeFields): RecipePrefill;
 ```
 
 **Reuse, not re-derivation.** Four helpers already own the hard parts:
@@ -217,8 +272,9 @@ In order:
 2. `decodeURIComponent` inside the `try` — some chat clients percent-encode a fragment.
 3. base64url-decode + UTF-8 decode inside the same `try/catch`; any throw → `null`.
 4. `JSON.parse` inside the same `try/catch`; any throw → `null`.
-5. Reject unless the result is a plain object with `v === SHARE_FORMAT_VERSION`
-   (**exact match**, never `>=`).
+5. Reject unless the result is a plain object (`not-an-object`) whose `v` is in
+   `SUPPORTED_WIRE_VERSIONS` (`unsupported-version`) — a **set membership test**, never
+   `>=`, and never "best-effort parse a newer shape".
 6. Build the result as a **fresh object literal, field by field, from an allowlist**. Never
    a spread, never `Object.assign` onto the parsed object — constructing a new literal is
    what actually neutralises `__proto__` / `constructor` keys, and makes "nothing outside
@@ -261,50 +317,112 @@ lines of header markup and two dark-mode token sets. So, one small extraction no
 The **message preview** is new and load-bearing: the message contains the user's own recipe,
 so they should see exactly what will be sent before it leaves.
 
-**`ShareChannelGrid` generalisation — additive, both invite call sites unchanged:**
+**`ShareChannelGrid` takes a MESSAGE, not four optional overrides.** An additive prop set
+buys one round of zero-diff at the cost of a permanent eight-prop component in which
+`familyName`/`memberName` are dead whenever `body` is supplied, with no type that can say so.
+`errorKeyPrefix` is worse than cosmetic: `t(key: UIStringKey)` is typed, so a runtime-built
+key needs `as UIStringKey` and silently opts the component out of the i18n key contract — and
+the two strings it would switch are already channel-generic in _text_; only their key names
+say "invite".
 
-| new prop                    | default                | why                                                                                                                                                |
-| --------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `body?: string`             | today's invite body    | the recipe supplies its own                                                                                                                        |
-| `copyText?: string`         | `link`                 | **the Discord path** — Discord has no share-intent URL, so pasting the whole message is how a recipe reaches it. Invites still copy the bare link. |
-| `errorKeyPrefix?: string`   | `'inviteWizard.error'` | so failures speak recipe language                                                                                                                  |
-| `showSystemShare?: boolean` | `false`                | the mockup's **More** tile → the OS sheet, the _other_ Discord path. Off for invites.                                                              |
+Final prop surface, one mode, every prop always meaningful:
 
-While in the file, `:31-38`'s `String#replace` interpolation is swapped for `fillTemplate`.
+| prop               | notes                                                                          |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `link`             | shown in the copy row; the URL channels deep-link to                           |
+| `body`             | the message. Callers build it (`inviteShareText` / `recipeShareText`)          |
+| `emailSubject`     | was hardcoded invite copy                                                      |
+| `copyText?`        | defaults to `link`. **The Discord path** — the recipe passes the whole message |
+| `showSystemShare?` | default `false`. The **More** tile → the OS sheet, the _other_ Discord path    |
 
-The **More** tile calls the generalised `useShareText`, which has zero callers today, so two
-fixes land free with its first real use: its toast keys and surface become parameters, and
-it gains an `isNative()` branch over `@capacitor/share`'s `Share.share({ title, text })`.
-Without the latter, More silently becomes a clipboard copy on both native apps.
+`hideExpiryNote` becomes a `#footer` slot: the "link expires in 24 hours" line is invite
+vocabulary. The result is a component with **zero invite vocabulary**, which is the real
+answer to "will the two share paths drift?" — one channel implementation parameterised by a
+message, and two message builders side by side in `utils/`.
 
-### 4. Oversize behaviour
+Invite templating moves to a pure `utils/inviteShareText.ts`, which is where the live `$&`
+`fillTemplate` fix actually lands — in a tested pure function rather than a component
+computed. Cost of not being additive: three lines of `defaultProps` in the grid's test and
+two call sites. The invite _behaviour_ is unchanged and pinned by the same suites.
 
-The payload is encoded **once** and the resulting **full URL** length is measured. If it
-exceeds the cap the modal does **not** silently truncate — a half-recipe presented as whole
-is worse than no link. It shares the readable text with **no** link and says plainly that
-this recipe is too long to send as a link. The text still carries the whole recipe.
+The **More** tile calls `useShareText`, which has zero callers today and is therefore
+**re-homed rather than parameterised**: its dead `mealPlanner.share.*` keys become neutral
+`share.*` ones and `surface` becomes a required argument. One behaviour, no knobs. Its native
+branch reuses the cancel detection that already exists — `shareOrDownloadFile.ts:63-75` owns
+`isAbortError` and `isPluginCancel` ("_@capacitor/share rejects a dismissed sheet with a
+MESSAGE rather than a DOM AbortError_") — moved to a shared `utils/shareCancel.ts`. A second
+`/cancel/i` regex in a second file is a drift bug with a delay fuse.
 
-### 5. `SharedRecipePage.vue` + the route
+### 4. One size budget, derived from the tightest real channel
+
+```ts
+/**
+ * The whole composed message (text + link) must fit in one chat message. 2000 is
+ * Discord's per-message ceiling — the binding constraint, because requirement 10 makes
+ * paste-into-Discord first-class and Discord publishes no share-intent URL. `mailto:`
+ * bodies cap around the same; WhatsApp, Telegram and SMS are well above it.
+ */
+export const MAX_SHARE_MESSAGE_CHARS = 2000;
+```
+
+The payload is encoded once, the link is built, and the message is composed to fit that one
+number. The ladder is fixed, documented in the module header, and unit tested rung by rung —
+**text is trimmed before the link is ever dropped**, because the link carries the whole
+recipe and the whole acquisition loop:
+
+1. drop `notes`
+2. drop steps beyond the first three (replaced by one "full method in the link" line)
+3. drop the remaining steps
+4. cap ingredients with "and N more"
+5. drop the subtitle
+6. floor: dish name + one line + sign-off + link
+
+If the **link alone** cannot fit beside the floor text, the modal does not silently truncate —
+a half-recipe presented as whole is worse than no link. It shares the _full_ readable text
+with **no** link (the whole budget is now available for text) and says so plainly.
+
+The rung the composer stopped at ships as `detail` on `share_opened`, so we learn whether
+2000 squeezes real recipes without ever logging a byte of one.
+
+### 5. `SharedRecipePage.vue`, the route, and ONE public-entry list
 
 ```ts
 { path: '/recipe', name: 'SharedRecipe',
   component: () => import('@/pages/SharedRecipePage.vue'),
   meta: { titleKey: 'recipeShare.received.title', requiresAuth: false,
-          hideQuickAdd: true, noChrome: true, noAuthRedirect: true } }
+          hideQuickAdd: true, noChrome: true } }
 ```
 
-`noAuthRedirect` is a **new, declared** meta flag, typed beside `noChrome` in `RouteMeta`
-and consulted at both `App.vue` boot redirects. A declared flag rather than appending to two
-more hardcoded route-name arrays. `'SharedRecipe'` also joins
-`PODLESS_EXPECTED_ROUTE_NAMES` so a podless receiver does not page Slack on every open.
+**No new route meta.** `utils/appChrome.ts` already states the position in writing: the
+public-route test is "_a DERIVED predicate keyed on the route NAME, deliberately NOT a second
+`meta` flag… One source of truth, no overlapping booleans to drift._" A `noAuthRedirect`
+boolean would be the fourth per-route flag on routes where three already always co-occur —
+and, decisively, it is _forgettable_: a route author who sets `requiresAuth: false` and
+nothing else gets a public route silently bounced at boot. That has already happened to
+`ShareTarget`.
 
-Reads `route.hash`, strips the leading `#`, decodes. Three states: **decoded** (mockup
-Direction A — the "someone shared a recipe with you" bar, the warm hero, ingredients and
-method, and a sticky "Keep This Recipe" bar); **undecodable** (a friendly dead-end, never a
-stack trace); **no fragment** (the same dead-end).
+So `utils/appChrome.ts` gets **one** list and **one** predicate — `PUBLIC_ENTRY_ROUTE_NAMES`
 
-Rendering is entirely mustache interpolation. No `v-html`. `sourceUrl` was screened at
-decode and is re-screened at the binding.
+- `isPublicEntryRoute` — consulted by all three consumers (both `App.vue` boot redirects and
+  `useNotifications`' auto-open suppression), listing the onboarding entry points plus
+  `ShareTarget` (fixing the leak above), `SharedRecipe`, and the dev spike.
+  `isPodlessExpectedRoute` is renamed and its existing consumers updated.
+
+Merging is behaviour-preserving for every route that exists today: the two lists were already
+identical apart from `DevWorkerSpike`, which the podless branch never reaches because of its
+`!route.path.startsWith('/dev')` guard.
+
+**Net effect on `App.vue`: an 11-line inline array deleted and one predicate swapped.** For a
+2245-line file carrying the app's boot sequence, "this feature made App.vue smaller" is the
+outcome worth insisting on.
+
+The page reads `route.hash`, strips the `#`, decodes. Four states: **decoded** (mockup
+Direction A); **no fragment** and **malformed** (the same friendly dead-end, one string —
+this is where the no-oracle rule is enforced); and **`unsupported-version`** (its own
+actionable "refresh beanies and try again").
+
+Rendering is entirely mustache interpolation. No `v-html`. `sourceUrl` was screened at decode
+and is re-screened at the binding.
 
 ### 6. "Keep This Recipe"
 
@@ -318,6 +436,16 @@ stashKeptRecipe(fields)  →  router.push(hasPod ? '/pod/cookbook' : '/welcome')
 and `FamilyCookbookPage` — which already owns a `prefill` ref and a mounted
 `RecipeFormModal` — consumes the stash on mount and opens the form. **No new modal, no new
 mapper, no second write path into the pod.**
+
+Two disciplines at that seam. **One open-the-form helper:** the page already does
+`prefill / editing / modalOpen` inside `onRecipeReady`, and `openAdd()` documents the
+`useFormModal` "onNew fires on the open TRANSITION only" trap — the stash consumer calls the
+same local `openWithPrefill(p)` both paths share, never a third hand-rolled copy. **A named
+adapter, not a fake AI envelope:** `RecipePrefill` requires `inferredIngredients`,
+`inferredSteps`, `dishImage`, `taxonomyRejected` and `confidence` — extraction metadata, none
+of which applies here. `sharedRecipeToPrefill()` fills the envelope with honest neutrals and
+says in a comment that no model was involved, tested once, rather than an object literal full
+of invented confidence scores inline in a page.
 
 **Why the form and not a direct `createRecipe`.** The app already has a rule for untrusted
 recipes arriving from outside, written at the inbound share boundary
@@ -335,8 +463,13 @@ report, so a hand-rolled `reportError` beside it would double-page.
   it is documented non-secret and transits Google and logs. `localStorage` is chosen because
   it survives every _other_ journey — tab close, app backgrounding, local-file setup, an
   already-signed-in user — not because it beats the hop.
-- Bounded by a **60-minute TTL**, **single-consume** (read-then-delete), and cleared on
-  sign-out alongside the existing teardown.
+- Bounded by a **60-minute TTL** and **single-consume** (read-then-delete, including on an
+  expired read).
+- **Clearing on sign-out is scoped and costed, not assumed.** Sign-out is an ordered
+  step-list with a unit-tested superset property (`services/auth/signOutSteps.ts`), so a
+  teardown means a new `SignOutStepName`, an implementation, list membership and a test
+  update. It is added to the **clear-data tier only**; the lower tiers are covered by the TTL
+  and single-consume.
 - Every access `try/catch`-ed (private mode, quota, disabled storage) with a `console.warn`
   naming the fix and a `warn` `logEvent` — never a bare `catch`.
 - **A miss is never silent, and on the Drive-on-iOS path it is expected rather than
@@ -344,11 +477,36 @@ report, so a hand-rolled `reportError` beside it would double-page.
   recipe across sign-up; open the link again from your chat and tap Keep" — plus a `warn`
   event. The link is still in their chat, so the recovery is real and one tap long.
 
-**`src/composables/useKeptRecipeHandoff.ts`** — one line in `App.vue`, mounted next to
-`useShareTargets()`. Watches for "authenticated **and** a pod exists **and** a stash is
-pending **and** not already on the cookbook" and routes to `/pod/cookbook`. Without it a
-user who creates a pod lands on `/nook` and the recipe sits in storage unseen — a silent
-loss at the most important step in the funnel.
+**Getting the user back to the recipe after sign-up — one line, no watcher.**
+`LoginPage.handleSignedIn(destination)` (`LoginPage.vue:655-666`) is the documented "_single
+canonical arm-and-register point for EVERY entry path — create, load, join, reconnect_" and
+ends in `router.replace(destination)`. So:
+
+```ts
+router.replace(hasPendingKeptRecipe() ? KEPT_RECIPE_DESTINATION : destination);
+```
+
+That covers every sign-up and sign-in journey there is. A previously-planned
+`useKeptRecipeHandoff` App.vue watcher on "authenticated **and** pod exists **and** stash
+pending **and** not already on the cookbook" is **dropped**: a global watcher issuing
+`router.push` on auth/pod transitions is precisely the failure mode `appChrome.ts:12-19` and
+the 2026-06-15 onboarding-remount-race plan exist to prevent, it would run for every user
+forever to serve a rare path, and it would add a fifth thing to App.vue instead of removing
+one.
+
+**The Drive-on-iOS recovery is stated BEFORE the hop, because after it the loss is
+invisible.** Any marker saying "a keep was in flight" would live in the same script-writable
+storage WebKit clears, so on the one path where the recipe is lost there is nothing left to
+detect it with; a post-hop message would never fire. Instead the Keep affordance tells a
+signed-out user up front that if the recipe is not waiting when they arrive, re-opening the
+link from their chat and tapping Keep takes one second. `keep_stash_lost` telemetry stays,
+honestly scoped to the _detectable_ race (present at sign-in, gone at cookbook mount: TTL,
+eviction, a second tab).
+
+Rejected and recorded: carrying a 1-bit "keep pending" flag in the OAuth `state`. It would
+survive, but `redirectState.ts:19-25` requires a `v:2` bump plus a dual-accept release of a
+security-sensitive shared payload — a real cost against a security boundary, to deliver a
+message we can deliver for free before the hop.
 
 ### 7. The entry point
 
@@ -367,36 +525,50 @@ All under `recipeShare.*`, both `en` and `beanie`.
 
 - `src/utils/recipeShareLink.ts`
 - `src/utils/recipeShareText.ts`
+- `src/utils/inviteShareText.ts` (lifted out of `ShareChannelGrid`; the `$&` bug fixed here)
 - `src/utils/recipeKeepStash.ts`
-- `src/composables/useKeptRecipeHandoff.ts`
+- `src/utils/shareCancel.ts` (`isAbortError` + `isPluginCancel`, shared with `shareOrDownloadFile`)
 - `src/components/ui/ShareSheetModal.vue` (extracted from `ShareInviteModal`)
 - `src/components/pod/RecipeShareModal.vue`
 - `src/pages/SharedRecipePage.vue`
-- `src/utils/__tests__/recipeShareLink.test.ts`
+- `src/utils/__tests__/recipeShareLink.test.ts` (incl. the golden wire-format fixture)
 - `src/utils/__tests__/recipeShareText.test.ts`
+- `src/utils/__tests__/inviteShareText.test.ts`
 - `src/utils/__tests__/recipeKeepStash.test.ts`
 - `src/pages/__tests__/SharedRecipePage.test.ts`
 
 **Modified**
 
 - `src/pages/RecipeDetailPage.vue` — Share action (outside the edit gate) + modal host
-- `src/components/family/ShareChannelGrid.vue` — `body` / `copyText` / `errorKeyPrefix` /
-  `showSystemShare` props (all defaulted to today's behaviour) + the `fillTemplate` fix
-- `src/components/family/ShareInviteModal.vue` — reduced to a wrapper over `ShareSheetModal`
-- `src/composables/useShareText.ts` — parameterised toast keys + surface; native branch
-- `src/pages/FamilyCookbookPage.vue` — consume the keep stash into the existing `prefill`
-- `src/router/index.ts` — the public route + the `noAuthRedirect` meta declaration
-- `src/utils/appChrome.ts` — `'SharedRecipe'` in `PODLESS_EXPECTED_ROUTE_NAMES`
-- `src/App.vue` — both boot redirects honour `meta.noAuthRedirect`; mount the handoff
-- `src/services/translation/uiStrings.ts` — `recipeShare.*`
+- `src/components/family/ShareChannelGrid.vue` — takes a message (`body` / `emailSubject` /
+  `copyText?` / `showSystemShare?`); `hideExpiryNote` → `#footer` slot; invite templating removed
+- `src/components/family/ShareInviteModal.vue` — composed over `ShareSheetModal`; props and
+  call site unchanged; supplies body + subject + expiry footer
+- `src/components/family/InviteWizardModal.vue` — supplies body + subject
+- `src/components/family/__tests__/ShareChannelGrid.test.ts` — prop migration
+- `src/composables/useShareText.ts` — neutral `share.*` keys + required `surface`; native
+  branch using the shared cancel predicates
+- `src/utils/shareOrDownloadFile.ts` — cancel predicates moved to `shareCancel.ts`
+- `src/pages/FamilyCookbookPage.vue` — one `openWithPrefill()` helper; consume the keep stash
+- `src/pages/LoginPage.vue` — one line in `handleSignedIn`
+- `src/router/index.ts` — the public `/recipe` route (no new meta field)
+- `src/utils/appChrome.ts` — `PUBLIC_ENTRY_ROUTE_NAMES` + `isPublicEntryRoute`; adds
+  `SharedRecipe` **and** `ShareTarget`
+- `src/utils/__tests__/appChrome.test.ts` — renamed predicate + the two added names
+- `src/composables/useNotifications.ts` — renamed predicate import
+- `src/App.vue` — **delete** the inline `authPages` array; both boot redirects use
+  `isPublicEntryRoute`. Net: the file gets shorter and gains no new mounts.
+- `src/stores/authStore.ts` + `src/services/auth/signOutSteps.ts` — one clear-data-tier step
+- `src/services/translation/uiStrings.ts` — `recipeShare.*`, neutral `share.*`
 
 **Explicitly NOT touched**
 
 - `src/utils/shareStash.ts` — the inbound Web Share Target reader. Different direction.
 - `src/composables/useSharedDocumentIngest.ts` / `src/services/share/*` — the inbound
-  AI-extraction pipeline. Rejected as a channel: it carries AI-consent and billing gating
-  that does not apply to a decoded link. What _is_ reused is the `RecipePrefill` shape and
-  the `RecipeFormModal` review surface it feeds.
+  AI-extraction pipeline, rejected as a channel: it carries AI-consent and billing gating
+  that does not apply to a decoded link. What _is_ reused is `RecipePrefill` and the
+  `RecipeFormModal` review surface.
+- `RecipeDetailPage`'s recipe body markup — deliberately not shared with `SharedRecipePage`.
 
 ## Observability Coverage
 
@@ -474,7 +646,7 @@ in `message`. Stricter than the usual rule because the content is by definition 
 
 - **Pass 1 (Initial draft)**: Drafted from the approved mockup and verified router/App-shell/store facts; chose no-compression with a version byte; made `decodeRecipeShare` an explicit security boundary; added a stash for the signed-out funnel.
 - **Pass 2 (DRY + error handling)**: Found a day-one crash (`btoa` cannot encode a non-ASCII recipe name) and, more seriously, that the feature **would not have worked at all** — `App.vue:1218-1231` holds a hardcoded route-name array and redirects the unauthenticated receiver to `/welcome`, destroying the fragment; the podless case additionally pages Slack `critical` on every open. Fixed with a declared `meta.noAuthRedirect` + `PODLESS_EXPECTED_ROUTE_NAMES`. Replaced the bespoke `SharedRecipe` type with the existing `RecipePrefill['fields']`, and the silent `createRecipe` with the `RecipeFormModal` review the app already mandates for untrusted inbound recipes — which also removed a double-report against `wrapAsync`. Adopted `boundText`, `fillTemplate`, `safeHttpsUrl`, `isRecipeCourse`/`isMealSlot`; fixed `ShareChannelGrid`'s live `$&`-interpolation bug in passing. Extracted `ShareSheetModal` rather than hand-building a second shell. Closed the Discord gap the title promised, and with it `useShareText`'s silent native degradation. **Corrected while applying:** Pass 2 proposed `localStorage` as surviving the OAuth hop; `redirectState.ts:1-11` says WebKit clears _script-writable_ storage, which is localStorage too, and the `state`-param workaround is non-secret so the recipe can never use it — so the stash is now justified on the journeys it does survive, with the Drive-on-iOS miss documented as expected behaviour with a real recovery.
-- **Pass 3 (Sustainability)**: _pending_
+- **Pass 3 (Sustainability)**: Removed three sources of long-term complexity and two reliability defects. **(1) The `meta.noAuthRedirect` flag is gone.** `appChrome.ts:31-38` already argues in writing against a second route-meta boolean, and `useNotifications` already reuses its name-list predicate; a fourth per-route flag is _forgettable_, and that has already bitten — **verified live on `main`**: `/share` is declared `requiresAuth: false` with a comment saying it must mount signed-out to delete its Cache stash, yet `'ShareTarget'` is missing from App.vue's inline `authPages`, so a signed-out document share leaks into Cache Storage permanently today. The two lists were the same set anyway, so they merge into one `PUBLIC_ENTRY_ROUTE_NAMES` + `isPublicEntryRoute`; the inline array is deleted and the pre-existing leak is fixed in one word. **(2) The `useKeptRecipeHandoff` App.vue watcher is gone**, replaced by one line in `LoginPage.handleSignedIn` — the documented single canonical post-sign-in seam. A global watcher issuing `router.push` on auth transitions is the exact failure mode the 2026-06-15 remount-race plan exists to prevent. **(3) `ShareChannelGrid` takes a message instead of four optional overrides** — `errorKeyPrefix` could not have worked (`t` is typed `UIStringKey`), and `body?` would have left two props dead in a combination nothing could check; invite templating moves to a pure `inviteShareText.ts`, which is where the `$&` fix now lands, and the component ends with zero invite vocabulary. **(4) The size cap was picked, not derived, and broke the flagship channel:** a Discord paste caps at 2000 characters, so an 8000-char URL guaranteed failure for exactly the recipes worth sharing; there is now one `MAX_SHARE_MESSAGE_CHARS = 2000` with a documented ladder that sacrifices text before the link. No-compression is upgraded from preference to constraint (iOS 15 floor vs Safari 16.4). **(5) The versioning story was incoherent:** copying `redirectState`'s exact-match gate would break every link already in a chat the day v2 ships — its round trip is seconds, ours is forever — so write-version and a never-shrinking read-set are now separate, pinned by a golden fixture, and `decodeRecipeShare` returns a discriminated reason rather than the `null` that could not have produced the telemetry `detail` the plan promised. **(6) Two free-looking lines that are not:** clearing the stash on sign-out costs a new step in a superset-tested list (now scoped and costed), and the post-hop "stash lost" message was unimplementable because its marker would live in the storage WebKit clears — so the recovery is stated _before_ the hop.
 - **Pass 4 (Fresh-eyes sweep)**: _pending_
 
 ## Prompt Log
