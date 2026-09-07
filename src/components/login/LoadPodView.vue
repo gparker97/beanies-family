@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { payloadErrorMessageKey, PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
+import { describePickFailure } from '@/services/google/drivePicker';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -241,8 +242,23 @@ async function tryAutoDecrypt(): Promise<boolean> {
           // ran out of memory). Deleting it would cost trusted-device auto-open
           // permanently for a problem it has nothing to do with.
           payloadExplanationShown.value = true;
-          formError.value = t(result.payloadError.inlineMessageKey);
-          podUnopenableHere.value = true;
+          // ⚠️ NOT EVERY BLOCKER IS A DEAD END, AND TREATING THEM ALIKE LOCKED
+          // PEOPLE OUT. `podUnopenableHere` closes the password form AND the
+          // recovery-kit form for the rest of the session (`:342` returns
+          // early), which is right for a damaged pod and wrong for a local
+          // cache that another tab happened to be holding: that clears by
+          // closing the other tab and reloading, and the person needs the
+          // password form to still be there.
+          //
+          // The inline copy is the SYNC-BAR copy too — it names "Use the family
+          // file below" and Settings, neither of which exists on this screen.
+          // So a `local-unreadable` block gets the copy written for a surface
+          // with no app shell, and leaves the forms open.
+          const localCacheHeld = result.payloadError.blockCode === 'local-unreadable';
+          formError.value = t(
+            localCacheHeld ? 'resumeSetup.podLocalUnreadable' : result.payloadError.inlineMessageKey
+          );
+          podUnopenableHere.value = !localCacheHeld;
           return false;
         }
         // Otherwise a stale/rotated key: say nothing here (the password form
@@ -507,7 +523,12 @@ async function loadSavedFileViaPicker() {
     return;
   }
   // picked.kind === 'failed'
-  formError.value = picked.message || t('auth.fileLoadFailed');
+  // ⚠️ NEVER `picked.message` — for `reason: 'config'` that is the literal
+  // string "VITE_GOOGLE_API_KEY is not configured", which was reaching users on
+  // the SIGN-IN screen. `describePickFailure` is the one table both picker
+  // surfaces read, so a new reason is a compile error rather than a raw
+  // developer string leaking somewhere nobody is looking.
+  formError.value = t(describePickFailure(picked.reason).messageKey);
   reportError({
     surface: 'load-existing-family',
     severity: 'warning',

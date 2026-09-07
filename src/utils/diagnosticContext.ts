@@ -530,7 +530,15 @@ export function enrichAndRedact(
   // Sync state
   try {
     const sync = useSyncStore();
-    raw.provider_type = sync.storageProviderType ?? null;
+    // ⚠️ THE CALLER'S VALUE WINS. This is auto-enrichment, and overwriting a
+    // field the event deliberately set turns a specific claim into ambient
+    // state. It defeats the provider-mismatch diagnostic outright: that event
+    // exists to report the DRIFT between the registry's provider and this
+    // device's, and stamping the device's own value over it makes the two
+    // always agree in the log. Same rule `openCycle.ts` already records.
+    if (raw.provider_type === undefined) {
+      raw.provider_type = sync.storageProviderType ?? null;
+    }
     raw.save_failure_level = sync.saveFailureLevel ?? null;
     raw.drive_file_not_found = sync.driveFileNotFound ?? null;
   } catch {

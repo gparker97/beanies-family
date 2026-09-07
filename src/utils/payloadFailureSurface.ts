@@ -333,9 +333,12 @@ export function surfaceBlockerFatal(
       ...(ctx.familyId ? { family_id: ctx.familyId } : {}),
     },
   });
-  // `inlineMessageKey` is a closed union and the table is exhaustive over it.
-
-  const overlayKey = BLOCKER_OVERLAY_KEY[err.inlineMessageKey];
+  // ⚠️ `??` DESPITE THE TABLE BEING COMPILE-TIME EXHAUSTIVE, for the same reason
+  // as `blockerErrorKind`: `isRemoteBlocker` is duck-typed on purpose, so a
+  // value can reach here carrying a key outside the union — and the lookup then
+  // yields `undefined`, which `t()` renders as a BLANK fatal overlay. That is
+  // the worst possible outcome on the app's most serious screen.
+  const overlayKey = BLOCKER_OVERLAY_KEY[err.inlineMessageKey] ?? 'resumeSetup.podCorrupted';
   useFatalErrorStore().setFatal(
     useTranslationStore().t(overlayKey),
     JSON.stringify(
