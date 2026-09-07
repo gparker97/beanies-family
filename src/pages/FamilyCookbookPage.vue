@@ -30,6 +30,7 @@ import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocument
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import { useTranslation } from '@/composables/useTranslation';
+import { showToast } from '@/composables/useToast';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
@@ -95,7 +96,18 @@ const capture = useRecipeCapture({
  */
 onMounted(() => {
   const kept = consumeKeptRecipe();
-  if (kept) openWithPrefill(sharedRecipeToPrefill(kept));
+  if (!kept) return;
+  // ⚠️ GATED, like every other add affordance on this page. `openWithPrefill` opens the full
+  // add form, and neither `RecipeFormModal` nor `recipesStore.createRecipe` checks
+  // permission — the gate lives on the call sites. Sharing is deliberately ungated (a
+  // view-only member may send a recipe to a friend), so without this a view-only member
+  // could open a share link, tap Keep, and reach the add form they can otherwise never
+  // reach. The stash is already consumed, so telling them is the only honest option.
+  if (!canEditActivities.value) {
+    showToast('info', t('recipes.keep.notAllowed'), t('recipes.keep.notAllowedHelp'));
+    return;
+  }
+  openWithPrefill(sharedRecipeToPrefill(kept));
 });
 
 function handlePastedLink(url: string): void {

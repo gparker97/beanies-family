@@ -142,7 +142,9 @@ export function buildRecipeShareText(args: BuildShareTextArgs): ShareTextResult 
     },
   ];
 
-  let last = compose(args, ladder[0].opts);
+  // Not seeded with a compose: the loop's first iteration uses `ladder[0].opts` anyway, so
+  // seeding here composed every recipe twice.
+  let last = '';
   for (const step of ladder) {
     last = compose(args, step.opts);
     if (last.length <= MAX_SHARE_MESSAGE_CHARS) return { text: last, rung: step.rung, linkDropped };

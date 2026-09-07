@@ -10616,6 +10616,14 @@ const STRING_DEFS = {
   // here balloons the row on tablet. The ingredient/step hints above have a full column.
   'recipeExtract.inferred.times': { en: 'Estimated', beanie: 'estimated' },
 
+  'recipes.keep.notAllowed': {
+    en: "That recipe couldn't be added to your cookbook",
+    beanie: 'that recipe couldn’t be added to your cookbook',
+  },
+  'recipes.keep.notAllowedHelp': {
+    en: 'Ask someone who can add recipes to your family to put it in for you.',
+    beanie: 'ask someone who can add recipes to your family to put it in for you.',
+  },
   'recipes.refetch.action': { en: 'Read again', beanie: 'read again' },
   'recipes.refetch.title': { en: 'Read the source again', beanie: 'read the source again' },
   'recipes.refetch.subtitle': {

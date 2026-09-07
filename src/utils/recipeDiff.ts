@@ -62,7 +62,12 @@ export interface RecipeDiff {
  * A user who hand-edited a recipe must never lose that work to a worse reading of the page.
  */
 function isEmptyish(value: unknown): boolean {
-  return value === undefined || value === '' || (Array.isArray(value) && value.length === 0);
+  if (value === undefined) return true;
+  // Whitespace counts. `asString` now trims at the parser, so this is belt-and-braces on a
+  // path where getting it wrong blanks a field — and it holds for any future producer that
+  // does not trim.
+  if (typeof value === 'string') return value.trim() === '';
+  return Array.isArray(value) && value.length === 0;
 }
 
 function hasContent(value: unknown): boolean {

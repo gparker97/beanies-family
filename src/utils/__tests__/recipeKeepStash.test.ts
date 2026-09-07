@@ -97,3 +97,29 @@ describe('recipeKeepStash', () => {
     expect(hasPendingKeptRecipe()).toBe(false);
   });
 });
+
+describe('the two agreements the routing decision depends on', () => {
+  it('hasPendingKeptRecipe applies the SAME TTL as the consumer', () => {
+    // A bare presence check would route someone to their cookbook, where the consumer then
+    // finds the entry expired and opens nothing — a redirect they did not ask for.
+    stashKeptRecipe({ name: 'Cake', ingredients: [], steps: [] });
+    expect(hasPendingKeptRecipe()).toBe(true);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 61 * 60_000);
+    expect(hasPendingKeptRecipe()).toBe(false);
+    expect(consumeKeptRecipe()).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('does NOT lose a recipe it already read when the delete throws', () => {
+    // Safari private mode permits reads and throws on writes. A shared read/delete block
+    // discarded a perfectly good recipe here, and left it in storage to surprise the user.
+    stashKeptRecipe({ name: 'Cake', ingredients: ['flour'], steps: ['bake'] });
+    const spy = vi.spyOn(window.localStorage, 'removeItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    expect(consumeKeptRecipe()).toEqual({ name: 'Cake', ingredients: ['flour'], steps: ['bake'] });
+    spy.mockRestore();
+  });
+});

@@ -46,6 +46,15 @@ export type SignOutStepName =
   | 'untrustDevice'
   | 'reArmTrustPrompt'
   | 'sweepHandoffFiles'
+  /**
+   * A recipe kept from a share link but never reviewed (#92). ON EVERY TIER, and the
+   * reasoning matters: an earlier version put it on tier 3 alone, arguing the 60-minute TTL
+   * and single-consume already bounded it. They bound DURATION and REPETITION; they do not
+   * bind IDENTITY. The envelope names no account, and the consumer is whoever signs in next
+   * — so on a shared device, a recipe one person kept and abandoned could pre-fill the next
+   * person's recipe form, inside a different family's pod. Clearing it is idempotent and
+   * cannot fail, so there is no reason for any tier to skip it.
+   */
   | 'clearKeptRecipe';
 
 /** Tier 2, trusted device: silent-reconnect sign-out — tokens, caches, wraps all kept. */
@@ -56,6 +65,7 @@ export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'resetSyncState',
   'resetDocClient',
   'sweepHandoffFiles',
+  'clearKeptRecipe',
 ];
 
 /** Tier 2, untrusted device: full family-scoped local teardown (still NO revoke). */
@@ -74,6 +84,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'removeRosterFamily',
   'reArmTrustPrompt',
   'sweepHandoffFiles',
+  'clearKeptRecipe',
 ];
 
 /** Tier 3: clean-device promise — everything, every family (still NO revoke). */
@@ -93,10 +104,6 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'reclaimAllPasskeys',
   'removeRosterAll',
   'sweepHandoffFiles',
-  // A recipe kept from a share link but never reviewed (#92). Tier 3 only: it is
-  // already bounded by a 60-minute TTL and deleted on first read, so the lower tiers
-  // need nothing, and adding it here alone keeps the strict-superset property intact
-  // with no new documented exception.
   'clearKeptRecipe',
 ];
 

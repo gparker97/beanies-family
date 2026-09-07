@@ -208,12 +208,23 @@ export const MODEL_TEXT_MAX = 4000; // free text (description, notes)
 export const MODEL_LIST_MAX = 100; // entries in any model-returned array
 
 /**
- * Coerce to string and BOUND it. Defaults to the generous free-text cap so a caller that
- * forgets to pass a limit still cannot be unbounded; short fields pass MODEL_FIELD_MAX.
+ * Coerce to string, TRIM it, and BOUND it. Defaults to the generous free-text cap so a
+ * caller that forgets to pass a limit still cannot be unbounded; short fields pass
+ * MODEL_FIELD_MAX.
+ *
+ * ⚠️ THE TRIM IS LOAD-BEARING, and its absence was a real data-loss path. `parseRecipeLine`
+ * and `toStringList` both trim; this did not, so a model answering `"   "` for a field
+ * produced a truthy string that passed every downstream emptiness check — `''`-only spreads,
+ * `diffPayload`'s `normalize`, and `recipeDiff`'s never-empty rule all test for `''`. On the
+ * re-fetch path (#93) that string reached `updateRecipe` and could blank a recipe's NAME,
+ * which is spread unconditionally. Trimming here fixes it for every consumer at once.
+ *
+ * Leading/trailing only, so `notes` keeps its internal line breaks.
  */
 function asString(v: unknown, max: number = MODEL_TEXT_MAX): string {
   if (typeof v !== 'string') return '';
-  return v.length > max ? v.slice(0, max) : v;
+  const trimmed = v.trim();
+  return trimmed.length > max ? trimmed.slice(0, max) : trimmed;
 }
 
 function asBool(v: unknown): boolean {

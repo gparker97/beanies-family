@@ -21,7 +21,11 @@ defineProps<{
 </script>
 
 <template>
-  <p v-if="text" class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs">
+  <p
+    v-if="text"
+    data-testid="inferred-hint"
+    class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 text-xs"
+  >
     {{ text }}
   </p>
 </template>

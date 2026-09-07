@@ -51,7 +51,12 @@ import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
 import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
 import type { OpenToken } from '@/services/telemetry/openCycle';
-import { shouldShowAppLayout, isPublicEntryRoute, isNavigationCancelled } from '@/utils/appChrome';
+import {
+  shouldShowAppLayout,
+  isPublicEntryRoute,
+  isExternalLandingRoute,
+  isNavigationCancelled,
+} from '@/utils/appChrome';
 import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
 import {
   hardReload,
@@ -1252,15 +1257,25 @@ onMounted(async () => {
           message:
             'App boot found an authenticated session with no pod file — routing to resume-setup',
           severity: 'critical',
-          // fullPath preserves the query — useful for diagnosing how the
-          // user reached a non-recovery route in zombie state.
-          context: { route_path: route.fullPath },
+          // ⚠️ `path`, NEVER `fullPath`. `fullPath` is path + query + HASH, and a shared
+          // recipe carries the ENTIRE RECIPE in its hash (#92) — shipping it would put
+          // private recipe content in the firehose for 90 days and break the guarantee
+          // `recipeShareLink.ts` opens with. The path alone answers the diagnostic
+          // question; the recovery-query distinction is already held by `onRecoveryQuery`.
+          context: { route_path: route.path },
         });
       }
       // Steer non-recovery surfaces to resume-setup (keep the recovery path),
       // via the hardened wrapper so a guard-cancelled nav surfaces rather than
       // silently resolving. Already on a recovery query → no redundant replace.
-      if (!onRecoveryQuery) {
+      //
+      // ⚠️ `isExternalLandingRoute` is a SEPARATE, STRICTER test from the one gating the
+      // report above, and it has to be. Suppressing the Slack page is not enough on
+      // `/recipe` and `/share`: this `replace` would still destroy the state those pages
+      // exist to read. `/recipe` carries the entire shared recipe in its FRAGMENT, and
+      // `/share` is the only code that deletes its Cache-Storage stash. The onboarding
+      // entries are deliberately NOT exempt — steering them here continues their flow.
+      if (!onRecoveryQuery && !isExternalLandingRoute(route)) {
         await safeRouterReplace(RESUME_SETUP_PATH, 'app.boot.onboardingZombie');
       }
       isInitializing.value = false;
@@ -1535,7 +1550,10 @@ onMounted(async () => {
         // the comment above says to page; under the gate that means critical.
         severity: 'critical',
         context: {
-          route_path: route.fullPath,
+          // `path`, never `fullPath` — a shared recipe rides in the hash. See the note on
+          // the zombie report above. One of these two is `severity: 'critical'`, so
+          // `fullPath` here would page a private recipe to Slack as well as the firehose.
+          route_path: route.path,
           breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
         },
       });
@@ -1552,7 +1570,10 @@ onMounted(async () => {
         error: err,
         severity: 'error',
         context: {
-          route_path: route.fullPath,
+          // `path`, never `fullPath` — a shared recipe rides in the hash. See the note on
+          // the zombie report above. One of these two is `severity: 'critical'`, so
+          // `fullPath` here would page a private recipe to Slack as well as the firehose.
+          route_path: route.path,
           breadcrumbs: breadcrumbsForReport(initBreadcrumbs),
         },
       });

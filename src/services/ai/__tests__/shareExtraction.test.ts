@@ -156,3 +156,28 @@ describe('parseShareExtractionResult delegates by kind (#64)', () => {
     expect(() => parseShareExtractionResult({ kind: 'event', event: { title: 'x' } })).toThrow();
   });
 });
+
+describe('the share path carries inferredTimes too (#93)', () => {
+  it('survives the delegated parse, so the carve-out is not silently share-only-broken', () => {
+    // The share task inherits RECIPE_JSON_SHAPE verbatim and delegates to the recipe parser,
+    // so `inferredTimes` parses here for free — but the system RULES are per-builder, and a
+    // shared recipe handed a field it is simultaneously forbidden to fill would meet the
+    // requirement on one capture route and silently miss it on the other.
+    const out = parseShareExtractionResult({
+      kind: 'recipe',
+      recipe: { ...recipePayload, inferredTimes: ['prepTime', 'servings'] },
+    });
+    expect(out.kind === 'recipe' && out.recipe.inferredTimes).toEqual(['prepTime', 'servings']);
+  });
+
+  it('tells the model about the exception in the kind="recipe" block', () => {
+    // The rule the shape needs in order to ever be filled. Without it the share prompt is
+    // self-contradictory: a field it must fill and a blanket rule forbidding it.
+    const [system] = buildShareExtractionMessages(
+      { kind: 'text', text: 'some page text' },
+      '2026-09-07'
+    );
+    expect(system.content).toContain('inferredTimes');
+    expect(String(system.content)).toMatch(/When kind="recipe", ONE EXCEPTION/);
+  });
+});

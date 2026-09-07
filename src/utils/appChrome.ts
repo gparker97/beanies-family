@@ -25,45 +25,82 @@ export function shouldShowAppLayout(
 }
 
 /**
- * Routes a person can legitimately arrive on **before** the app has a pod — the onboarding
- * entry points, plus the two surfaces that must mount for a signed-out visitor.
+ * The onboarding entry points: a podless session here is the NORMAL mid-flow state, and
+ * steering one to the resume-setup recovery screen CONTINUES that flow rather than
+ * interrupting it. The recovery screen `/welcome?resume=setup` resolves to `Welcome`, so it
+ * is covered without inspecting the query.
+ */
+const ONBOARDING_ENTRY_ROUTE_NAMES: ReadonlyArray<string> = [
+  'Welcome',
+  'Login',
+  'JoinFamily',
+  'CreateFamily',
+  'OpenFromDrive',
+];
+
+/**
+ * Landing pages for content that arrived from OUTSIDE the app, and the reason they are a
+ * separate list rather than more names on the one above.
  *
- * ONE list, consulted by three places: both of `App.vue`'s boot redirects and
- * `useNotifications`' auto-open suppression. It used to be two — this list and an identical
- * inline array in `App.vue` — and they had already drifted: `ShareTarget` is declared
- * `requiresAuth: false` with a comment explaining it MUST mount signed-out so it can delete
- * its Cache-Storage stash (nothing sweeps it, there is no TTL, and sign-out clears IndexedDB
- * but not `caches`), yet it was absent from `App.vue`'s copy, so a signed-out document share
- * was bounced to onboarding and leaked into Cache Storage permanently.
+ * Each holds state that exists NOWHERE ELSE and dies the moment it is navigated away from:
+ *
+ *   - `SharedRecipe` (#92) carries the entire shared recipe in the URL FRAGMENT. A
+ *     `router.replace` to the recovery screen does not defer it, it DESTROYS it — the
+ *     sender's link is the only copy, and the receiver sees an unexplained onboarding
+ *     screen instead of the recipe a friend sent them.
+ *   - `ShareTarget` (#64) is the ONLY code that deletes its Cache-Storage stash. Steered
+ *     away, someone else's shared document stays on the device permanently: nothing sweeps
+ *     it, there is no TTL, and sign-out clears IndexedDB but not `caches`.
+ *
+ * So for these two, "an authenticated session with no pod yet" means WAIT — render the page,
+ * let it do its one job — never "resume onboarding first". Both pages already handle a
+ * podless visitor themselves.
+ */
+const EXTERNAL_LANDING_ROUTE_NAMES: ReadonlyArray<string> = ['ShareTarget', 'SharedRecipe'];
+
+/**
+ * Routes a person can legitimately arrive on BEFORE the app has a pod.
+ *
+ * DERIVED from the two lists above plus the dev spike, so the union can never disagree with
+ * its parts. It answers "may this session be here at all?", consulted by both of `App.vue`'s
+ * boot redirects and by `useNotifications`' auto-open suppression.
+ *
+ * It used to be two hand-maintained lists — this one and an identical inline array in
+ * `App.vue` — and they had already drifted: `ShareTarget` was in one and not the other, so a
+ * signed-out document share was bounced to onboarding and leaked into Cache Storage forever.
  *
  * A DERIVED predicate keyed on the route NAME, deliberately NOT a `meta` flag.
  * `meta.noChrome` answers "render the shell?" and is also set on NotFound +
  * PlausibleExclude, where a podless session genuinely IS anomalous and SHOULD still alert.
  * And a `meta.noAuthRedirect` boolean would be *forgettable*: a route author who sets
  * `requiresAuth: false` and nothing else gets a public route silently bounced at boot —
- * which is exactly what happened to `ShareTarget`. One name list, no overlapping booleans.
- *
- * The recovery screen `/welcome?resume=setup` resolves to the `Welcome` name, so it is
- * covered here without inspecting the query.
+ * which is exactly what happened to `ShareTarget`.
  */
 const PUBLIC_ENTRY_ROUTE_NAMES: ReadonlyArray<string> = [
-  'Welcome',
-  'Login',
-  'JoinFamily',
-  'CreateFamily',
-  'OpenFromDrive',
-  // Mounts signed-out on purpose, to clear its own Cache-Storage stash.
-  'ShareTarget',
-  // A shared recipe reads entirely from the URL fragment — no account, no pod (#92).
-  'SharedRecipe',
+  ...ONBOARDING_ENTRY_ROUTE_NAMES,
+  ...EXTERNAL_LANDING_ROUTE_NAMES,
   // Dev-only ADR-032 worker spike — a standalone measurement page with no auth/pod.
   // Harmless in the podless branch, which never reaches it anyway thanks to that
   // branch's own `!route.path.startsWith('/dev')` guard.
   'DevWorkerSpike',
 ];
 
+/** May this session be on this route without auth or a pod? Suppresses both boot redirects. */
 export function isPublicEntryRoute(route: Pick<RouteLocationNormalizedLoaded, 'name'>): boolean {
   return typeof route.name === 'string' && PUBLIC_ENTRY_ROUTE_NAMES.includes(route.name);
+}
+
+/**
+ * Must this route be left exactly where it is, even mid-onboarding?
+ *
+ * A STRICTER question than `isPublicEntryRoute`, and the distinction is the whole point: the
+ * onboarding entries may be steered to the recovery screen (that IS their flow), while these
+ * two carry state that a redirect destroys. Consulted only by `App.vue`'s podless redirect.
+ */
+export function isExternalLandingRoute(
+  route: Pick<RouteLocationNormalizedLoaded, 'name'>
+): boolean {
+  return typeof route.name === 'string' && EXTERNAL_LANDING_ROUTE_NAMES.includes(route.name);
 }
 
 /**

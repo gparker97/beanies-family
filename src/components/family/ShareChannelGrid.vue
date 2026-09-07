@@ -114,9 +114,11 @@ async function handleSystemShare() {
 
 function handleChannel(channel: (typeof channels.value)[0]) {
   if (channel.id === 'wechat') {
-    // WeChat doesn't expose a share URL — copy the link and show a hint
-    // so the user can paste manually.
-    copy(props.link).then((ok) => {
+    // WeChat doesn't expose a share URL — copy and show a hint so the user can paste
+    // manually. It copies `clipboardText`, the SAME thing the copy row does: on a recipe
+    // share that is the whole readable message, and copying the bare link here would send
+    // a friend a naked URL with none of the recipe, which is the premise of the feature.
+    copy(clipboardText.value).then((ok) => {
       if (!ok) {
         console.error('[ShareChannelGrid] WeChat copy failed');
         showToast('error', t('inviteWizard.error.couldntCopy'), undefined, { silent: true });
