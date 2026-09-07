@@ -12,15 +12,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Restoring your family's data from a file now lets you say where the file is.** It guessed, and on a family stored in Google Drive it went straight to Google every time, with no way to say the file was on this device. There are now two buttons, and the one you press is the one that runs.
+- **Choosing a file from Google Drive no longer disconnects your Google account on the way.** Asking to restore quietly gave up the connection the family was already using, and reconnected as if you were signing in for the first time.
+- **The Google file chooser is gone from this screen, replaced by the one beanies already uses when you sign in.** It lists your family files and nothing else, opens straight away, and closes when you tell it to. The old one could put up an error of its own that covered the app with no way to dismiss it.
+- **Restoring a file that belongs to a different family no longer writes over the first family's file.** beanies now checks that the data file it is holding on to actually belongs to the family whose data it just opened.
+- **When beanies is not connected to your family's storage, it now refuses to replace your data rather than quietly moving your family onto the file you picked.** It says to reconnect first. This is the state a device is in after it has lost track of where the family file lives, which is exactly when someone is most likely to try to restore.
+- **The warning shown before restoring now describes what actually happens.** It said your data would be replaced everywhere; what beanies really does is bring the file's contents back in alongside what is already there, and delete nothing. It is no longer coloured as a destructive action, because it is not one.
+- **A rare syncing fault between two open tabs no longer claims your family file was reorganised on another device**, and no longer offers to throw away this device's copy as the remedy.
 - **beanies could quietly replace this device's copy of your family data with the family file, losing anything you had not saved.** If beanies could not open its own local copy — most often because it was open in another tab or window — it treated the device as if it held nothing at all, and took the family file wholesale. Anything written on that device and not yet saved went with it, with no message and nothing to undo. beanies now stops and tells you, keeps what is on the device, and offers to load the family file only if you ask it to.
 - **Loading another family data file no longer moves your family off Google Drive.** Choosing a file replaced your family's data and then quietly re-homed the whole family onto whatever file you picked, so every other device carried on using the old one and never saw the change. It now replaces the data and leaves your family on the data file it already has, so your other devices pick the change up on their own. This is the way back from reorganising a family file, so it matters that it works.
 - **On a family stored in Google Drive, "load another family data file" now offers your Drive files.** On a desktop browser it could only ever show files saved on the computer, which meant the copy beanies saves before reorganising — the one the message on screen tells you to use — could not be chosen at all.
 - **A family file stored on this device, rather than in Google Drive, can now recover work made offline.** After reloading the page beanies had forgotten what the file last contained, so an edit made offline could only be refused, never replayed.
-- **The Google file picker no longer shows developer text when it cannot open.** One failure put a configuration variable's name on screen.
 
 ### Changed
 
-- **The wording when you load another family data file now says what actually happens** — that it replaces your family's data everywhere, and that your family keeps using the same data file. It used to promise to "switch to that file", which is no longer what it does.
+- **The wording when you load another family data file now says what actually happens** — that it brings the file's contents back into your family's data, deletes nothing, and leaves your family on the same data file. It used to promise to "switch to that file", which is no longer what it does.
 
 ### Added
 

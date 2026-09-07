@@ -91,6 +91,62 @@ describe('no-local-document INSTALLS, and never merges', () => {
   });
 });
 
+describe('a docless worker REFUSES rather than installing wholesale', () => {
+  /**
+   * ⚠️ THE INSTALL IS AN INSTRUCTION, NOT AN INFERENCE, AND THIS IS THE LINE
+   * THAT MAKES IT ONE.
+   *
+   * `installWholesale` used to be `!currentDoc || basis.kind ===
+   * 'no-local-document'`. The first half reads as "there is nothing to lose" but
+   * really means "we cannot SEE anything to lose", and three separate routes
+   * reached it with a document that existed: a cache READ that failed, a
+   * rehydrate that THREW, and a rehydrate that RESOLVED empty. Each was fixed
+   * once, elsewhere, and the next one arrived by a different door.
+   *
+   * Now only the caller's own statement can put the merge in the wholesale
+   * branch, and a worker holding no document that was NOT told to install is a
+   * contradiction — refused, never resolved in the remote's favour.
+   */
+  it('throws a RemoteBlocker instead of taking the remote', async () => {
+    // No `loadSnapshot`: the worker holds nothing, exactly as it does after a
+    // teardown whose rehydrate failed OR resolved empty.
+    const remote = await envelopeFor(docWith('todos', 'b1', { id: 'b1', title: 'remote' }), key);
+
+    await expect(
+      ap.mergeRemoteEnvelope(remote, 'fam', { kind: 'baseline', heads: [] })
+    ).rejects.toMatchObject({
+      name: 'LocalDocUnreadableError',
+      blockCode: 'local-unreadable',
+      // It must LATCH: retrying inside this session cannot conjure the document
+      // back, and a save would write nothing over the family's file.
+      latches: true,
+    });
+  });
+
+  it('refuses a user-file basis too, because a human cannot vouch for bytes we do not have', async () => {
+    // `user-file` never BLOCKS on lineage — but that is a statement about
+    // combining two histories, and here there is only one. The human authorised
+    // replacing what is on this device; they did not authorise us guessing that
+    // there was nothing on it.
+    const remote = await envelopeFor(docWith('todos', 'b1', { id: 'b1', title: 'remote' }), key);
+
+    await expect(
+      ap.mergeRemoteEnvelope(remote, 'fam', { kind: 'user-file', heads: null })
+    ).rejects.toMatchObject({ blockCode: 'local-unreadable' });
+  });
+
+  it('still installs when the caller SAYS the device holds nothing', async () => {
+    // The counter-pressure, and the reason the refusal keys on the instruction
+    // rather than on `!currentDoc`: a genuinely empty device must still be able
+    // to adopt, including a compacted pod, or it can never open the family.
+    const remote = await envelopeFor(docWith('todos', 'b1', { id: 'b1', title: 'remote' }), key);
+
+    const res = await ap.mergeRemoteEnvelope(remote, 'fam', { kind: 'no-local-document' });
+
+    expect(res.action).toBe('adopted');
+  });
+});
+
 describe('a baseline basis still merges same-lineage documents', () => {
   it('merges rather than installing, so today fleet is unchanged', async () => {
     // ⚠️ BOTH SIDES MUST SHARE ANCESTRY. Two independent `Automerge.from` calls

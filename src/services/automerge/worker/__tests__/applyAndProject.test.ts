@@ -281,7 +281,14 @@ describe('worker/applyAndProject', () => {
     expect(chunks.filter((c) => c.final)).toHaveLength(1);
   });
 
-  it('mergeRemoteEnvelope with no local doc adopts the remote (dirty:false)', async () => {
+  it('mergeRemoteEnvelope adopts the remote when the caller DECLARES no local doc (dirty:false)', async () => {
+    // ⚠️ THE BASIS IS THE DECLARATION, NOT AN INFERENCE. This used to pass
+    // `{kind:'baseline'}` with no document loaded and rely on the worker
+    // inferring "nothing here, install wholesale". That inference was the bug:
+    // it could not tell an empty device from one whose document merely could not
+    // be READ, and installed over unsaved work either way. A genuinely empty
+    // device says so — production has exactly three sites that do — and the
+    // worker now refuses the contradiction instead of resolving it.
     setKey(key);
     await initAndLoadCache(FAMILY_ID); // no doc yet
     expect(__hasDocForTesting()).toBe(false);
@@ -293,8 +300,7 @@ describe('worker/applyAndProject', () => {
       entity: { id: 'r1', title: 'remote' },
     }).doc;
     const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
-      kind: 'baseline',
-      heads: null,
+      kind: 'no-local-document',
     });
 
     expect(res.dirty).toBe(false);
@@ -583,8 +589,7 @@ describe('worker/applyAndProject', () => {
       }).doc;
 
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       // Nothing to push BACK (we had no local changes), but every consumer's
@@ -602,11 +607,12 @@ describe('worker/applyAndProject', () => {
         id: 'r1',
         entity: { id: 'r1', title: 'remote' },
       }).doc;
-      // Adopt it first, then merge the SAME bytes again — the classic "open the app
-      // twice with nothing having happened" case.
+      // Adopt it first (no document yet, so the caller SAYS so — production's
+      // three `no-local-document` sites exist for exactly this), then merge the
+      // SAME bytes again on the baseline path: the classic "open the app twice
+      // with nothing having happened" case.
       await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       const res = await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
@@ -627,8 +633,7 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'l1', title: 'local' },
       }).doc;
       await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       const remote = applyMutation(local, {
@@ -638,8 +643,7 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'r2', title: 'remote' },
       }).doc;
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       expect(res.changed).toBe(true);
@@ -660,8 +664,7 @@ describe('worker/applyAndProject', () => {
       const rawHeads = getHeads(remote);
 
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       expect(res.remoteHeads).toEqual(rawHeads);
@@ -684,8 +687,7 @@ describe('worker/applyAndProject', () => {
       }).doc;
 
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       expect(res.dirty).toBe(false);
@@ -700,9 +702,9 @@ describe('worker/applyAndProject', () => {
         id: 'l1',
         entity: { id: 'l1', title: 'local' },
       }).doc;
+      // Install the local side first — no document yet, so the caller says so.
       await mergeRemoteEnvelope(await envelopeFor(local, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       const remote = applyMutation(base(), {
@@ -711,6 +713,7 @@ describe('worker/applyAndProject', () => {
         id: 'r2',
         entity: { id: 'r2', title: 'remote' },
       }).doc;
+      // Now the MERGE branch, which is what this test is about.
       const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
         kind: 'baseline',
         heads: null,
@@ -732,8 +735,7 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'e1', title: 'exported' },
       }).doc;
       await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
 
       const res = await exportEncryptedPayload();
@@ -750,8 +752,7 @@ describe('worker/applyAndProject', () => {
         entity: { id: 'e1', title: 'exported' },
       }).doc;
       await mergeRemoteEnvelope(await envelopeFor(doc, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
       const headsAtExport = getHeads(doc);
 
@@ -822,16 +823,14 @@ describe('worker/applyAndProject', () => {
         entity: { id: 's1', title: 'seed' },
       }).doc;
       await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
       await flush();
       const warm = perf.filter((l) => l === 'snapshot.persist').length;
 
       await openCache(FAMILY_ID); // re-open (stands in for a family switch)
       await mergeRemoteEnvelope(await envelopeFor(seed, key), FAMILY_ID, {
-        kind: 'baseline',
-        heads: null,
+        kind: 'no-local-document',
       });
       await flush();
 

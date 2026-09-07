@@ -39,10 +39,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
-import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
-import { describePickFailure } from '@/services/google/drivePicker';
-import { podFileSourceArm } from '@/services/sync/capabilities';
-import type { RemoteBlocker } from '@/types/sync';
+import { isNative } from '@/services/sync/capabilities';
+import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
 import { usePodHealth } from '@/composables/usePodHealth';
@@ -542,11 +540,68 @@ async function handleMigrateStorage() {
  * `keepCurrentPod` on a first load would open the document with nowhere to save
  * it; `installPendingProvider` enforces the same rule as a backstop.
  */
-const { pick: pickBeanpod } = usePickBeanpodFile();
+/**
+ * Three states, not two — and the third is the one that bit us.
+ *
+ *  - `first-load`  — nothing configured. The picked file BECOMES the family's
+ *                    data file. `keepCurrentPod` must be false or the document
+ *                    opens with nowhere to save.
+ *  - `connected`   — a pod is bound and we can see it. A restore replaces the
+ *                    DATA and leaves the pod alone.
+ *  - `disconnected`— ⚠️ `isConfigured` is TRUE but no provider is installed.
+ *                    `loadFromPersistenceCache` produces exactly this: the
+ *                    cache-only state after a config eviction, which is the
+ *                    state a person is MOST likely to be restoring from. A
+ *                    two-valued predicate called it `first-load`, showed the
+ *                    "this becomes your data file" wording, and re-homed a Drive
+ *                    family onto the backup — the ADR-033 fork `keepCurrentPod`
+ *                    exists to prevent, reached by the cohort most in need of a
+ *                    restore. We cannot see where this family's pod is, so we
+ *                    must not move it: refuse and ask them to reconnect first.
+ */
+const podBinding = computed<'first-load' | 'connected' | 'disconnected'>(() => {
+  if (!syncStore.isConfigured) return 'first-load';
+  return syncStore.storageProviderType ? 'connected' : 'disconnected';
+});
 
-const hasPod = computed(() => syncStore.isConfigured && !!syncStore.storageProviderType);
+const hasPod = computed(() => podBinding.value === 'connected');
 
-async function handleLoadFromFileClick() {
+/**
+ * Can this family's data file live in Google Drive, so a restore has two places
+ * to look? Native keeps the OS sheet only — the Picker is unreliable in the iOS
+ * WebView (see `LoadPodView`).
+ */
+/** Our own .beanpod chooser for the restore flow — never the Google Picker. */
+const showDriveRestorePicker = ref(false);
+const isDriveRestoreLoading = ref(false);
+const driveRestoreFiles = ref<Array<{ fileId: string; name: string; modifiedTime: string }>>([]);
+
+const canRestoreFromDrive = computed(
+  () => hasPod.value && syncStore.storageProviderType === 'google_drive' && !isNative()
+);
+
+/**
+ * @param source Where the user said the file is. NEVER inferred: a guess sent a
+ *   Drive family into Google's consent screen with no way back to a local file.
+ */
+async function handleLoadFromFileClick(source: 'google_drive' | 'local') {
+  // ⚠️ REFUSE BEFORE READING ANYTHING. Replacing the family's data while we
+  // cannot see which file is the family's would either strand every peer on the
+  // old pod or point the family at a backup. Both are worse than not starting.
+  if (podBinding.value === 'disconnected') {
+    importError.value = t('settings.restoreNeedsConnection');
+    console.warn(
+      '[SettingsPage] restore refused: the family is configured but no storage provider is ' +
+        'installed (cache-only / evicted config). Reconnect storage first.'
+    );
+    logEvent({
+      level: 'warn',
+      surface: 'pod-access',
+      message: 'restore refused — no storage provider installed',
+      context: { action: 'restore-refused', error_code: 'no-provider' },
+    });
+    return;
+  }
   // ONE `confirm()` call, replacing two hand-rolled yellow slabs bound to one
   // shared ref. `ConfirmModal` is globally mounted and already supports the
   // caution tone this needs.
@@ -554,72 +609,99 @@ async function handleLoadFromFileClick() {
     title: 'settings.switchDataFile',
     message: hasPod.value ? 'settings.switchFileConfirmation' : 'settings.loadFileConfirmation',
     confirmLabel: 'settings.yesLoadFile',
-    variant: 'danger',
+    // ⚠️ RED ONLY WHEN SOMETHING IS ACTUALLY DESTROYED. A first load REPLACES
+    // whatever is on this device, so it earns `danger`. A restore into an
+    // existing family is a union — nothing is deleted (see
+    // `settings.switchFileConfirmation`) — and the CIG reserves Alert Red for
+    // destructive confirmations. Painting a non-destructive action red teaches
+    // people to click through red.
+    variant: hasPod.value ? 'info' : 'danger',
   });
   if (!ok) return;
-  await handleLoadFromFileConfirmed();
+  await handleLoadFromFileConfirmed(source);
 }
 
 /**
  * The Drive arm of the restore picker.
  *
- * Returns a result shaped like `loadFromNewFile`'s so the caller's existing
- * arms are reused verbatim, or `null` when this function has already spoken
- * (every failure sets `importError` and logs — nothing returns silently).
+ * ⚠️ IT USES OUR OWN FILE LIST, NOT THE GOOGLE PICKER, and that is a
+ * correctness decision rather than a styling one.
+ *
+ * The Google Picker is a third-party iframe that renders its own modals. When
+ * Google rejects the developer key it puts up "There was an error! The API
+ * developer key is invalid." — a dialog with no close control of its own, which
+ * covered the app until the Picker gave up 10-15 seconds later. It also needs a
+ * second credential (`VITE_GOOGLE_API_KEY`) nothing else on this path needs, and
+ * it lists whatever its query matches rather than what we know is loadable.
+ *
+ * `GoogleDriveFilePicker` is the component the SIGN-IN screen already uses for
+ * exactly this question: it lists the `.beanpod` files `searchBeanpodFilesGlobal`
+ * found, in our own modal, with our own loading and empty states. A non-beanpod
+ * file cannot be chosen because it is never listed. Same question, same answer,
+ * one implementation.
  */
-async function loadRestoreSourceFromDrive(): Promise<{
-  cancelled?: boolean;
-  needsPassword?: boolean;
-  success?: boolean;
-  payloadError?: RemoteBlocker;
-} | null> {
-  const picked = await pickBeanpod();
-  if (picked.kind === 'cancelled') return { cancelled: true };
-  if (picked.kind === 'failed') {
-    // ⚠️ NEVER `picked.message` — for `reason: 'config'` that is the literal
-    // string "VITE_GOOGLE_API_KEY is not configured". One shared table.
-    const { messageKey, errorCode } = describePickFailure(picked.reason);
-    importError.value = t(messageKey);
-    console.warn(`[SettingsPage] Drive pick failed: ${picked.reason} — ${picked.message ?? ''}`);
+async function openDriveRestorePicker(): Promise<void> {
+  importError.value = null;
+  showDriveRestorePicker.value = true;
+  isDriveRestoreLoading.value = true;
+  try {
+    driveRestoreFiles.value = await syncStore.listGoogleDriveFiles();
+  } catch (e) {
+    showDriveRestorePicker.value = false;
+    importError.value = t('settings.drivePickerFailed');
+    console.warn('[SettingsPage] could not list Drive .beanpod files for restore', e);
     logEvent({
       level: 'warn',
       surface: 'pod-load-failure',
-      message: 'restore file picker failed',
-      context: { action: 'picker-failed', error_code: errorCode },
+      message: 'restore file list failed',
+      context: { action: 'picker-failed', error_code: 'list-failed' },
     });
-    return null;
+  } finally {
+    isDriveRestoreLoading.value = false;
   }
+}
 
+/** The user picked a file from OUR list. Same tail as the local arm. */
+async function handleDriveRestoreSelected(payload: {
+  fileId: string;
+  fileName: string;
+}): Promise<void> {
+  showDriveRestorePicker.value = false;
   logEvent({
     level: 'info',
     surface: 'pod-lineage',
     message: 'restore started',
     context: { action: 'restore-started', provider_type: 'google_drive' },
   });
-  const result = await syncStore.loadFromGoogleDrive(picked.fileId, picked.fileName);
-  if (result.needsPassword || result.success) return result;
+  const result = await syncStore.loadFromGoogleDrive(payload.fileId, payload.fileName);
 
-  // Every remaining arm speaks. `payloadError` is handled by the shared arm in
-  // the caller (it carries its own classified copy).
-  if (!result.payloadError) {
-    importError.value = t(
-      result.reason === 'not-found' ? 'settings.restoreFileNotFound' : 'settings.importFailed'
-    );
-    console.warn(
-      `[SettingsPage] restore source could not be read: reason=${result.reason} status=${result.status}`
-    );
-    logEvent({
-      level: 'warn',
-      surface: 'pod-lineage',
-      message: 'restore failed',
-      context: { action: 'restore-failed', error_code: result.reason ?? 'error' },
-    });
-    return null;
+  if (result.needsPassword) {
+    showDecryptFileModal.value = true;
+    return;
   }
-  return result;
+  if (result.success) {
+    importSuccess.value = true;
+    setTimeout(() => {
+      importSuccess.value = false;
+    }, 3000);
+    return;
+  }
+  // Every remaining arm speaks; nothing returns silently.
+  importError.value = result.payloadError
+    ? t(result.payloadError.inlineMessageKey)
+    : t(result.reason === 'not-found' ? 'settings.restoreFileNotFound' : 'settings.importFailed');
+  console.warn(
+    `[SettingsPage] restore source could not be read: reason=${result.reason} status=${result.status}`
+  );
+  logEvent({
+    level: 'warn',
+    surface: 'pod-lineage',
+    message: 'restore failed',
+    context: { action: 'restore-failed', error_code: result.reason ?? 'error' },
+  });
 }
 
-async function handleLoadFromFileConfirmed() {
+async function handleLoadFromFileConfirmed(source: 'google_drive' | 'local' = 'local') {
   importError.value = null;
 
   // ⚠️ PROVIDER FIRST, NOT PLATFORM FIRST, AND ONLY WHEN THERE IS A PROVIDER.
@@ -636,14 +718,11 @@ async function handleLoadFromFileConfirmed() {
   // at all and the user simply wants to open a file from their device, would
   // have been sent to the Google Picker. That is a surface this change was never
   // asked to touch, and `SettingsPage.importError.test.ts` caught it.
-  const useDrivePicker =
-    hasPod.value &&
-    syncStore.storageProviderType === 'google_drive' &&
-    podFileSourceArm({ preferProvider: 'google_drive' }) === 'drive-picker';
-  const result = useDrivePicker
-    ? await loadRestoreSourceFromDrive()
-    : await syncStore.loadFromNewFile();
-  if (!result) return;
+  if (source === 'google_drive') {
+    await openDriveRestorePicker();
+    return;
+  }
+  const result = await syncStore.loadFromNewFile();
 
   // Dismissing the OS picker is not a failure and must say nothing.
   if (result.cancelled) return;
@@ -1739,7 +1818,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
               <BaseButton v-else @click="handleResumeSetup">
                 {{ t('settings.resumeSetup') }}
               </BaseButton>
-              <BaseButton variant="secondary" @click="handleLoadFromFileClick">
+              <BaseButton variant="secondary" @click="handleLoadFromFileClick('local')">
                 {{ t('settings.loadExistingDataFile') }}
               </BaseButton>
             </div>
@@ -1919,15 +1998,46 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
                   {{ t('settings.switchDataFile') }}
                 </p>
               </div>
-              <BaseButton
-                variant="secondary"
-                size="sm"
-                :loading="syncStore.isSyncing"
-                @click="handleLoadFromFileClick"
-              >
-                {{ t('settings.browse') }}
-              </BaseButton>
+              <!-- ⚠️ THE SOURCE IS CHOSEN, NEVER GUESSED. One "Browse" button that
+                   picked the source itself sent a Drive family straight into the
+                   Google consent screen with no way to say "actually, the file
+                   is on this device" — and when the Picker then failed, the copy
+                   told them to choose a local file through a control that did
+                   not exist. Two buttons, both always available on a Drive
+                   family. A local family keeps the single local button, because
+                   there is no second place its data could be. -->
+              <div class="flex flex-wrap justify-end gap-2">
+                <BaseButton
+                  v-if="canRestoreFromDrive"
+                  variant="secondary"
+                  size="sm"
+                  :loading="syncStore.isSyncing"
+                  @click="handleLoadFromFileClick('google_drive')"
+                >
+                  {{ t('settings.browseDrive') }}
+                </BaseButton>
+                <BaseButton
+                  variant="secondary"
+                  size="sm"
+                  :loading="syncStore.isSyncing"
+                  @click="handleLoadFromFileClick('local')"
+                >
+                  {{ canRestoreFromDrive ? t('settings.browseDevice') : t('settings.browse') }}
+                </BaseButton>
+              </div>
             </div>
+
+            <!-- Our own .beanpod chooser (the sign-in screen's component), not
+                 the Google Picker: it lists only files this app can actually
+                 load, in our own modal, with a close control that works. -->
+            <GoogleDriveFilePicker
+              :open="showDriveRestorePicker"
+              :files="driveRestoreFiles"
+              :is-loading="isDriveRestoreLoading"
+              @close="showDriveRestorePicker = false"
+              @select="handleDriveRestoreSelected"
+              @refresh="openDriveRestorePicker"
+            />
 
             <!-- Error display -->
             <div

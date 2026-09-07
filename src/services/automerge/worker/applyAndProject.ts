@@ -23,7 +23,7 @@ import { firstJsonDifference } from '@/utils/firstJsonDifference';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
 import type { PodLineage } from '@/types/models';
-import { PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, LocalDocUnreadableError } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
@@ -900,7 +900,42 @@ export async function mergeRemoteEnvelope(
   // that cell in any context. (It is also Stage THREE, not two.) The only
   // mitigation is resetting the one affected dev family before soaking. Do not
   // reintroduce the reader.
-  let installWholesale = !currentDoc || basis.kind === 'no-local-document';
+  // ⚠️ A POSITIVE ASSERTION, NOT A DERIVATION — and the change is the whole
+  // point of this guard.
+  //
+  // This was `!currentDoc || basis.kind === 'no-local-document'`, which reads as
+  // "install wholesale if there is nothing to lose". It is really "install
+  // wholesale if we CANNOT SEE anything to lose", and those are different
+  // claims. Three separate routes reached it with a document that existed:
+  //
+  //   1. A cache READ that failed. `syncStore` sent `no-local-document` for any
+  //      false `loadedFromCache`, including a ten-second IndexedDB timeout on a
+  //      device whose document was sitting in memory with unsaved work in it.
+  //      Now classified on main and refused there.
+  //   2. A rehydrate that THREW after a worker teardown, leaving this worker
+  //      docless. A main-thread latch was tried and could not work: the check
+  //      ran BEFORE the `ensureReady()` that performs the rehydrate, so it could
+  //      not fire on the merge it was written to stop.
+  //   3. A rehydrate that RESOLVED `{loaded: false}` — no throw, no latch, no
+  //      signal of any kind. `initAndLoadCache` does exactly this whenever the
+  //      cache row is absent, which `reseedCacheAfterCorruption` guarantees.
+  //
+  // Only the CALLER knows whether this device genuinely holds nothing, and it
+  // already says so. So the install is driven by that statement alone, and a
+  // docless worker that was NOT told to install wholesale is a contradiction we
+  // refuse rather than resolve in the remote's favour. That refusal cannot be
+  // forgotten by a future route, because there is no longer a route: every path
+  // into the wholesale install now runs through one explicit instruction.
+  // The CALLER's instruction, and the only thing that may put us in the
+  // wholesale branch before the guard has run. Kept separate from the mutable
+  // flag below so the assertion cannot be weakened by a later assignment.
+  const toldToInstallWholesale = basis.kind === 'no-local-document';
+  if (!currentDoc && !toldToInstallWholesale) {
+    throw new LocalDocUnreadableError('worker-holds-no-document');
+  }
+  // Seeded from the instruction; the lineage verdict may set it below (an
+  // `adopt` or a completed `rebase` both install).
+  let installWholesale = toldToInstallWholesale;
   /** The policy asked for a rebase and it could not run. Diagnostic only. */
   let rebaseUnavailable = false;
   /**
@@ -921,7 +956,9 @@ export async function mergeRemoteEnvelope(
    */
   let stampNewGeneration = false;
   let priorLineage: PodLineage | null = null;
-  if (currentDoc && basis.kind !== 'no-local-document') {
+  // `currentDoc` is non-null here by the assertion above; the check is kept as a
+  // type narrowing, not as a second decision.
+  if (currentDoc && !toldToInstallWholesale) {
     const lineageCtx = lineageContextFor(basis, currentDoc);
     priorLineage = docLineage(currentDoc);
     // Throws `PodLineageError` on a block; every caller between here and the

@@ -143,7 +143,11 @@ describe('blockerErrorKind — the classification both store sites share', () =>
   });
 
   it('leaves the existing classes exactly where they were', () => {
-    expect(blockerErrorKind(new RemoteMergeError(new Error('duplicate seq 2')))).toBe('lineage');
+    // ⚠️ `decrypt`, and it must stay there. An actor collision is not a
+    // compaction; routing it to `LineageBanner` tells the user their file was
+    // "reorganised on another device" and offers a button that discards this
+    // device's document.
+    expect(blockerErrorKind(new RemoteMergeError(new Error('duplicate seq 2')))).toBe('decrypt');
     expect(blockerErrorKind(new CorruptPayloadError('boom', 'load', null))).toBe('decrypt');
   });
 

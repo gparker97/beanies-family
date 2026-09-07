@@ -3433,13 +3433,28 @@ const STRING_DEFS = {
     beanie: "restore your family's beans from a file",
   },
   'settings.browse': { en: 'Browse...', beanie: 'browse...' },
+  // ⚠️ TWO BUTTONS, NOT ONE THAT GUESSES. A single "Browse" that chose the
+  // source itself walked a Drive family into Google's consent screen with no way
+  // to say the file is on this device.
+  // ⚠️ THE COHORT MOST LIKELY TO WANT A RESTORE. `isConfigured` is true but no
+  // provider is installed (a cache-only session after the stored config was
+  // evicted), so beanies cannot see which file is the family's — and replacing
+  // the data from here would either strand every other device or point the
+  // family at a backup.
+  'settings.restoreNeedsConnection': {
+    en: "beanies is not connected to your family's storage right now, so it cannot safely replace your data. Reconnect your storage above, then try again.",
+    beanie:
+      "beanies is not connected to your family's storage right now, so it cannot safely replace your data. reconnect your storage above, then try again.",
+  },
+  'settings.browseDrive': { en: 'Google Drive...', beanie: 'google drive...' },
+  'settings.browseDevice': { en: 'This device...', beanie: 'this device...' },
   // ⚠️ NEVER THE RAW REASON. These replace rendering `picked.message`, which for
   // a `config` failure put the literal text "VITE_GOOGLE_API_KEY is not
   // configured" in front of a family. Each says what the person can do next.
   'settings.drivePickerUnavailable': {
     en: 'beanies could not open Google Drive to pick a file. You can still choose a file saved on this device.',
     beanie:
-      'beanies could not open google drive to pick a file. you can still choose a file saved on this bean.',
+      'beanies could not open google drive to pick a file. you can still choose a file saved on this device.',
   },
   'settings.drivePickerAuth': {
     en: 'beanies needs you to reconnect your Google account before it can open Google Drive.',
@@ -3448,7 +3463,7 @@ const STRING_DEFS = {
   'settings.drivePickerFailed': {
     en: 'beanies could not open the Google file picker. Try again in a moment, or choose a file saved on this device.',
     beanie:
-      'beanies could not open the google file picker. try again in a moment, or choose a file saved on this bean.',
+      'beanies could not open the google file picker. try again in a moment, or choose a file saved on this device.',
   },
   'settings.restoreFileNotFound': {
     en: 'That file is no longer in your Google Drive. If it was the copy beanies saved before reorganising, it may have been removed.',
@@ -3461,10 +3476,20 @@ const STRING_DEFS = {
   // than a move, and what stops every other device being abandoned on the old
   // file. Moving the family between storage is a different control
   // ("Move to Google Drive" / "Move to a local file").
+  // ⚠️ IT NO LONGER PROMISES A REPLACE, BECAUSE THE POLICY DOES NOT PERFORM ONE.
+  // A restore travels as the `user-file` context, and `podLineage.ts`'s POLICY
+  // maps `same × user-file` to `merge` — only `ours-newer × user-file` adopts.
+  // For a pod that has never been compacted, both files carry the same lineage
+  // generation, so a restore UNIONS with the live document: entries added since
+  // the backup survive, and a deletion made since it still wins. Telling a
+  // person their data is "replaced everywhere" on a red destructive dialog, and
+  // then merging, is the worst kind of wrong — they accept it believing an undo
+  // they are not getting. The copy now describes the union, and says the one
+  // thing that IS unconditionally true: nothing is lost.
   'settings.switchFileConfirmation': {
-    en: "This replaces your family's data everywhere with the contents of the selected file. Your family keeps using the same data file, and your other devices will pick up the change on their own. Continue?",
+    en: "beanies will bring the contents of the selected file into your family's data. Anything in the file that is missing here is added back; anything added since is kept. Your family stays on the same data file, and your other devices pick the change up on their own. Nothing is deleted. Continue?",
     beanie:
-      "this replaces your family's beans everywhere with the contents of the selected file. your family keeps using the same data file, and your other beans will pick up the change on their own. continue?",
+      "beanies will bring the contents of the selected file into your family's data. anything in the file that is missing here is added back; anything added since is kept. your family stays on the same data file, and your other devices pick the change up on their own. nothing is deleted. continue?",
   },
   'settings.dataLoadedSuccess': {
     en: 'Data loaded successfully!',
@@ -4600,12 +4625,12 @@ const STRING_DEFS = {
   'podLocalUnreadable.inline': {
     en: 'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies is open in another tab or window. Close the others and reload this page. If the message stays, choose "Use the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
     beanie:
-      'beanies could not open this bean\'s own copy of your family beans, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "use the family file" below (beans made only on this device will be let go), or export your beans from settings and contact support@beanies.family.',
+      'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "use the family file" below (changes made only on this device will be let go), or export your data from settings and contact support@beanies.family.',
   },
   // The banner heading for the above. Short — the sentence does the work.
   'podLocalUnreadable.title': {
     en: "This device's copy could not be opened",
-    beanie: "this bean's copy could not be opened",
+    beanie: "this device's copy could not be opened",
   },
   // The confirm before discarding this device's copy. It must be explicit that
   // the cost is unknown: we could not read the local copy, so we cannot say
@@ -4617,7 +4642,7 @@ const STRING_DEFS = {
   'podLocalUnreadable.useFileConfirmMessage': {
     en: "beanies will load your family file and let go of this device's own copy. Because that copy could not be opened, there is no way to tell whether it held anything that was never saved. Everything already saved to your family file is safe. If you would rather not risk it, close any other beanies tabs and reload this page first.",
     beanie:
-      "beanies will load your family file and let go of this bean's own copy. because that copy could not be opened, there is no way to tell whether it held any beans that were never saved. everything already saved to your family file is safe. if you would rather not risk it, close any other beanies tabs and reload this page first.",
+      "beanies will load your family file and let go of this device's own copy. because that copy could not be opened, there is no way to tell whether it held anything that was never saved. everything already saved to your family file is safe. if you would rather not risk it, close any other beanies tabs and reload this page first.",
   },
   // ⚠️ THE OVERLAY VARIANT, and it names ONLY actions that exist before the app
   // shell is up. The inline copy points at "Use the family file" and Settings;
@@ -4626,7 +4651,7 @@ const STRING_DEFS = {
   'resumeSetup.podLocalUnreadable': {
     en: "beanies could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
     beanie:
-      "beanies could not open this bean's own copy of your family beans. nothing has been changed and nothing has been lost. this usually means beanies is already open in another tab or window, so close the others and reload this page. if it keeps happening, contact support@beanies.family.",
+      "beanies could not open this device's own copy of your family data. nothing has been changed and nothing has been lost. this usually means beanies is already open in another tab or window, so close the others and reload this page. if it keeps happening, contact support@beanies.family.",
   },
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.

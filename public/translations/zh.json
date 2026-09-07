@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-07",
-    "translationCount": 4568
+    "translationCount": 4571
   },
   "translations": {
     "app.name": {
@@ -2162,8 +2162,8 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.switchFileConfirmation": {
-      "translation": "这将用所选文件的内容替换任何地方的家庭数据。您的家人继续使用相同的数据文件，您的其他设备将自行接收更改。是否继续？",
-      "hash": "xw4gvn",
+      "translation": "beanies会将所选文件的内容带入您家庭的数据中。此处缺少的文件中的任何内容都将被重新添加；此后添加的任何内容都将保留。您的家人会保持在同一个数据文件中，其他设备会自行接收更改。未删除任何内容。是否继续？",
+      "hash": "9qyi8j",
       "lastUpdated": "2026-09-07"
     },
     "settings.dataLoadedSuccess": {
@@ -22844,6 +22844,21 @@
     "resumeSetup.podLocalUnreadable": {
       "translation": "beanies无法打开此设备自己的家庭数据副本。什么都没有改变，什么都没有丢失。这通常意味着beanies已在其他选项卡或窗口中打开，因此请关闭其他选项卡或窗口并重新加载此页面。如果问题仍然存在，请联系support@beanies.family。",
       "hash": "8eeok4",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.browseDrive": {
+      "translation": "Google Drive",
+      "hash": "22uhcl",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.browseDevice": {
+      "translation": "这台设备……",
+      "hash": "t208sq",
+      "lastUpdated": "2026-09-07"
+    },
+    "settings.restoreNeedsConnection": {
+      "translation": "beanies目前未连接到您家人的存储空间，因此无法安全地替换您的数据。请重新连接上面的存储空间，然后重试。",
+      "hash": "9ony91",
       "lastUpdated": "2026-09-07"
     }
   }

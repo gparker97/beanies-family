@@ -8,6 +8,7 @@ import {
   isWorkerSignal,
 } from '../protocol';
 import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
+import { LocalDocUnreadableError, isRemoteBlocker } from '@/types/sync';
 
 describe('protocol — error transport', () => {
   it('round-trips CorruptPayloadError preserving class + step + familyId', () => {
@@ -109,5 +110,45 @@ describe('protocol — error transport', () => {
     expect(isWorkerSignal({ cid: 3, ok: true })).toBe(false);
     expect(isRpcResponse(null)).toBe(false);
     expect(isWorkerSignal(undefined)).toBe(false);
+  });
+});
+
+describe('LocalDocUnreadableError survives the worker boundary', () => {
+  /**
+   * ⚠️ WITHOUT A CODEC ENTRY THE REFUSAL SILENTLY STOPS BEING A BLOCKER.
+   *
+   * The worker refuses a merge when it holds no document and was not told to
+   * install wholesale. That throw crosses the boundary, and `ERROR_REGISTRY`
+   * keys on `err.name` — so a missing entry rebuilds it as a generic
+   * `DocWorkerError` with no `blockCode` and no `inlineMessageKey`.
+   * `isRemoteBlocker` then returns false, and every latch, banner, save-refusal
+   * and fatal dispatch in the app stops seeing it at once. The document would
+   * still be protected and the user would still be told nothing, which is the
+   * exact failure this whole change set exists to remove.
+   */
+  it('reconstructs as the real class, not a generic worker error', () => {
+    const rebuilt = reconstructError(serializeError(new LocalDocUnreadableError('DeleteBlocked')));
+
+    expect(rebuilt).toBeInstanceOf(LocalDocUnreadableError);
+    expect(rebuilt.name).toBe('LocalDocUnreadableError');
+  });
+
+  it('is still a RemoteBlocker on the other side, with its latch intact', () => {
+    // The two members every dispatch in the app reads, plus the latch decision.
+    const rebuilt = reconstructError(serializeError(new LocalDocUnreadableError('DeleteBlocked')));
+
+    expect(isRemoteBlocker(rebuilt)).toBe(true);
+    expect((rebuilt as LocalDocUnreadableError).blockCode).toBe('local-unreadable');
+    expect((rebuilt as LocalDocUnreadableError).inlineMessageKey).toBe('podLocalUnreadable.inline');
+    expect((rebuilt as LocalDocUnreadableError).latches).toBe(true);
+  });
+
+  it('carries the failure class across, so the two routes stay separable', () => {
+    const rebuilt = reconstructError(
+      serializeError(new LocalDocUnreadableError('worker-holds-no-document'))
+    );
+
+    expect((rebuilt as LocalDocUnreadableError).cause).toBe('worker-holds-no-document');
+    expect((rebuilt as LocalDocUnreadableError).blockDetail).toBe('worker-holds-no-document');
   });
 });

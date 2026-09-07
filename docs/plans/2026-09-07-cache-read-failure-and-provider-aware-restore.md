@@ -590,6 +590,89 @@ Found by reading the code in Pass 4, in descending order of consequence.
 13. **Minor:** `decryptPendingFileWithKey` has **six** callers, not five (conclusion unchanged — none is a restore surface); its "deliberately no parameter" comment is at `:2520-2523`; the byte-identical span is `:1703-1759` ≡ `:2541-2597` (57 lines); `BackgroundSyncErrorKind` is `:151-156`.
 14. **Two stale comments** to fix in the docs commit: `applyAndProject.ts:~887` ("`podCompaction` is OFF and has never shipped enabled") and `types/sync.ts:151-157`'s `lineage-blocked` doc-comment.
 
+## Post-implementation: what the code review and the field changed
+
+The plan was implemented, reviewed at `max`, and then corrected twice — once by
+the review, once by greg testing the result. Both rounds are recorded here
+because the corrections are more instructive than the plan.
+
+### The plan's central technical decision was wrong
+
+**"Do not touch `applyAndProject.ts`."** Passes 2-4 all endorsed keeping the
+refusal on main. The review showed that produced two hand-placed guards in two
+layers with different rules, and found three separate leaks:
+
+1. The `docClient` gate was a synchronous pre-check that ran BEFORE
+   `request()` → `ensureReady()` → `spawn()` — which is where the rehydrate
+   happens and where the latch would be set. It could not fire on the merge it
+   was written to stop. Its tests passed only because they called merge a second
+   time, after a prior call had armed the latch.
+2. The retryable re-issue went through `requestCore`, bypassing the wrapper and
+   its gate entirely.
+3. A rehydrate that RESOLVED `{loaded:false}` — which `initAndLoadCache` does
+   whenever the cache row is absent — armed nothing at all.
+
+**The fix is the one `applyAndProject.ts:861-870` already argued for:** make the
+install a POSITIVE ASSERTION (`basis.kind === 'no-local-document'`) and refuse a
+docless worker that was not told to install. That subsumes all three, deletes the
+main-thread latch, and means there is no longer a _route_ into the wholesale
+install that can be forgotten — there is one instruction. `LocalDocUnreadableError`
+now crosses the worker boundary, so it needed a `protocol.ts` codec entry; without
+one it degrades to a bare `DocWorkerError`, `isRemoteBlocker` returns false, and
+every dispatch silently stops seeing it. That entry had no test until a mutation
+proved it was unguarded.
+
+### Two data-loss paths the implementation introduced
+
+- **Cross-family corruption.** `installPendingProvider`'s `hasPod` read the
+  SESSION's provider, but the family-identity block has already switched to the
+  picked file's family — so "keep the current pod" meant "keep the previous
+  family's pod" while holding this one's document, and the next save would write
+  over it. Now gated on `getProviderFamilyId() === activeFamilyId`.
+- **The lost-provider cohort.** `isConfigured && !storageProviderType` is the
+  cache-only state after a config eviction — the state someone is most likely to
+  restore FROM. A two-valued `hasPod` called it a first load, showed the wrong
+  wording and re-homed a Drive family onto the backup. Now a third state that
+  REFUSES: if we cannot see where the family's pod is, we must not move it.
+
+### The copy promised something the policy does not do
+
+`same × user-file` resolves to `merge` (`podLineage.ts:162`), so for a pod that
+has never been compacted a restore UNIONS with the live document. The dialog said
+"replaces your family's data everywhere", on a red destructive confirm. It now
+describes the union, says nothing is deleted, and is no longer red.
+
+### The field found what neither the plan nor the review did
+
+greg tested and hit three things:
+
+1. **The picker guessed the source.** Also review finding 8 — and when the Picker
+   failed, the copy named a local-file control that no longer existed.
+2. **Restoring revoked the family's Google grant.** `usePickBeanpodFile.pick()`
+   defaults `forceConsent: true`, and `googleAuth.ts:1019` does revoke-before-mint.
+3. **An unclosable dialog that cost a browser restart.** `picker.setVisible(true)`
+   had NO counterpart anywhere in `drivePicker.ts` — no dispose on timeout, on
+   iframe failure, or on throw. When Google rejected the developer key its own
+   modal, which has no close control, stayed up permanently.
+
+**greg's question was the better fix:** use `GoogleDriveFilePicker`, the component
+the sign-in screen already uses, instead of the Google Picker. It lists only
+`.beanpod` files (so a non-beanpod file cannot be chosen because it is never
+offered), needs no `VITE_GOOGLE_API_KEY`, renders no third-party modal, and was
+already built. The teardown fix stays, because the folder picker still uses the
+Picker and had the same defect plus no timeout at all.
+
+### Mutation results
+
+Thirteen mutations across both rounds; all caught. Two were NOT caught first
+time and are worth naming, because both were guards written specifically to
+avoid this failure mode:
+
+- The `rehydrateFailed` family-change clear was driven through
+  `initAndLoadCache`, which clears the flag itself, so the test passed with the
+  clear deleted. (Moot now — the latch is gone.)
+- The `protocol.ts` codec entry had no test at all.
+
 ## Review Passes
 
 - **Pass 1 (Initial draft)**: Drafted from the confirmed field repro, the 586-line provider-switch investigation, and a direct read of the registry/canonical/rebind machinery; chose restore-in-place over greg's literal pointer-move after finding `rebindPodFile`'s safety-copy refusal and the ADR-033 reasoning behind it.
