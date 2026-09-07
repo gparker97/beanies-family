@@ -12,8 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **beanies no longer locks you out when it cannot open its own copy of your data.** With a second beanies tab open, the first one could not get at the stored copy on this device, decided your unsaved work was at risk, and put up a full-screen message whose only button reloaded into the same problem. On a device that has nothing to protect, beanies now just loads your family file and carries on. Where there genuinely is something to protect, it still stops, and the way out is now reachable.
+- **A device whose stored copy came back empty no longer stops syncing for the rest of the session.**
 - **Opening a family file that belongs to a different family no longer leaves beanies in a half-finished state.** The data loaded, but the sidebar and the family settings disappeared, as though you had no permission to be there, until you refreshed the page. beanies now works out who you are in that family and signs you in properly, or tells you to sign out and back in when it cannot.
-- **A family file that is too OLD to open now says so, instead of asking you to update beanies.** Every file beanies could not read was described as being saved by a newer version, so the suggested fix for an old file was an app update that could never help.
+- **A family file that is too OLD to open now says so, instead of asking you to update beanies.** Every file beanies could not read was described as being saved by a newer version, so the suggested fix for an old file was an app update that could never help. Joining a family with such a file also used to report the family's data as damaged, which it is not.
+- **Restoring from a file now describes what actually happens.** The confirmation said "Nothing is deleted", but where the file and this device disagree, the file you chose wins, so changes made since it was saved can be replaced. It says that now, and asks in the same tone as every other change that replaces something.
+- **A tidy-up that could not reach the cloud no longer says your family file is unchanged.** It had been tidied and saved on this device; only the cloud copy was behind, and the message said the opposite.
+- **Picking a Google Drive file that turns out to be empty now says so.** Nothing happened at all before.
+- **A family member whose name contains a comma is no longer listed twice** in the "still to do" list after tidying up.
+- **beanies now raises an alert when saved work stays stuck on a device.** If a save kept being refused, the queue could sit there indefinitely without anyone being told.
 
 ### Added
 
