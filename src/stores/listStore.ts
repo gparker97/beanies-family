@@ -14,6 +14,7 @@ import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/
 import { buildCopySeeds, freshItems } from '@/utils/listSeed';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { useTranslationStore } from '@/stores/translationStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useFamilyStore } from '@/stores/familyStore';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -37,14 +38,22 @@ import type {
  * reaching that catch is the batch write itself, which reports `batch-write-threw`.
  */
 class CopyFailure extends Error {
-  // An explicit field, not a constructor parameter property — `erasableSyntaxOnly`
+  // Explicit fields, not constructor parameter properties — `erasableSyntaxOnly`
   // rejects the shorthand.
   code: 'unknown-member' | 'verify-missing';
+  /** What the USER is told. `wrapAsync` would otherwise toast `message` verbatim,
+   *  which here is a bare member id or an internal count. */
+  userMessageKey: UIStringKey;
 
-  constructor(code: 'unknown-member' | 'verify-missing', message: string) {
+  constructor(
+    code: 'unknown-member' | 'verify-missing',
+    userMessageKey: UIStringKey,
+    message: string
+  ) {
     super(message);
     this.name = 'CopyFailure';
     this.code = code;
+    this.userMessageKey = userMessageKey;
   }
 }
 
@@ -484,7 +493,11 @@ export const useListStore = defineStore('lists', () => {
               // Ids come from FamilyChipPicker, which renders familyStore members, so an
               // unknown id is a bug — and a list with a dangling ownerId is worse than a
               // failure the user can retry.
-              throw new CopyFailure('unknown-member', `unknown member id ${id}`);
+              throw new CopyFailure(
+                'unknown-member',
+                'lists.copy.unknownMember',
+                `unknown member id ${id}`
+              );
             }
             return { id: member.id, name: member.name };
           });
@@ -509,19 +522,39 @@ export const useListStore = defineStore('lists', () => {
           });
           return created;
         } catch (e) {
-          // ONE explicit critical report (the Slack page), naming which step gave way.
-          // Then rethrow so `wrapAsync` owns the user toast, the `error` ref and the
-          // engine-panic classification. Reporting again there would double-page.
+          // The repository's verify error means the batch COMMITTED and the lists are
+          // merely invisible — so it must never be reported or worded as "nothing was
+          // created". Telling the user that invites a retry that makes a second set.
+          const failure =
+            e instanceof listRepo.ListsNotVisibleError
+              ? new CopyFailure('verify-missing', 'lists.copy.verifyFailed', e.message)
+              : e instanceof CopyFailure
+                ? e
+                : null;
+
+          // ONE explicit critical report — the Slack page — naming which step gave way.
           reportError({
             surface: 'list-copy',
-            message: 'copy failed: nothing was created (the batch is atomic)',
+            message:
+              failure?.code === 'verify-missing'
+                ? 'copy verify failed: the batch committed but the lists are not in the projection'
+                : 'copy failed: nothing was created (the batch is atomic)',
             severity: 'critical',
             error: e,
-            context: {
-              action: 'copy_failed',
-              error_code: e instanceof CopyFailure ? e.code : 'batch-write-threw',
-            },
+            context: { action: 'copy_failed', error_code: failure?.code ?? 'batch-write-threw' },
           });
+
+          if (failure) {
+            // Own the toast for anything we classified: `wrapAsync` would surface the
+            // raw Error text, which is a member id or an internal count. `silent` stops
+            // `showToast` reporting a second time on top of the page above.
+            showToast('error', useTranslationStore().t(failure.userMessageKey), undefined, {
+              silent: true,
+            });
+            return null;
+          }
+          // Genuinely unexpected: rethrow so `wrapAsync` owns the toast, the `error`
+          // ref and the engine-panic classification.
           throw e;
         }
       },
@@ -552,7 +585,12 @@ export const useListStore = defineStore('lists', () => {
     return result ?? null;
   }
 
-  async function deleteList(id: string): Promise<boolean> {
+  /**
+   * @returns `true` deleted · `false` refused (nothing was said to the user yet) ·
+   *   `null` threw (`wrapAsync` has already toasted). The caller must not toast on
+   *   `null`, or the user gets two stacked errors for one failure.
+   */
+  async function deleteList(id: string): Promise<boolean | null> {
     const result = await wrapAsync(
       isLoading,
       error,
@@ -580,7 +618,7 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:deleteList' }
     );
-    return result ?? false;
+    return result ?? null;
   }
 
   /**

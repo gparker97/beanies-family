@@ -42,13 +42,20 @@ export async function confirmAndDeleteList(id: string): Promise<boolean> {
   if (!ok) return false;
 
   const deleted = await useListStore().deleteList(id);
-  if (!deleted) {
-    // `deleteList` already reported the missing-list case at `warning`, but it did so
-    // without telling the user anything. Say so here, where a person is watching.
+
+  // `null` means the action THREW, and `wrapAsync` has already shown an error toast and
+  // reported it. Saying anything here would stack a second sticky toast and a duplicate
+  // report on one failure — which is why `deleteList` distinguishes the two at all.
+  if (deleted === null) return false;
+
+  if (deleted === false) {
+    // The refused path: `deleteList` reported it at `warning` but told the user nothing,
+    // so the drawer used to close as though it had worked. Say it, where a person is
+    // watching.
     showToast('error', useTranslationStore().t('lists.detail.deleteFailed'));
     reportError({
       surface: 'lists',
-      message: 'deleteList returned false — the list was not removed',
+      message: 'deleteList refused — the list was not removed',
       severity: 'warning',
       context: { action: 'delete_returned_false' },
     });
