@@ -66,6 +66,21 @@ export function enqueueOfflineSave(content: string): void {
 }
 
 /**
+ * How to re-save this device's CURRENT document.
+ *
+ * Registered by `syncService` alongside the provider. It must run the ordinary
+ * save — read the remote, merge it, consult the lineage guard, serialize what
+ * the document holds now — and return whether the save actually landed.
+ * Returning `false` (rather than throwing) means "declined, already reported",
+ * and leaves the queue intact for the next trigger.
+ */
+let resaveHandler: (() => Promise<boolean>) | null = null;
+
+export function setResaveHandler(fn: (() => Promise<boolean>) | null): void {
+  resaveHandler = fn;
+}
+
+/**
  * Set the provider to use when flushing the queue.
  * Auto-flushes if there's pending content and we're online.
  */
@@ -97,15 +112,60 @@ export function hasPendingSave(): boolean {
 export async function flushQueue(): Promise<boolean> {
   if (!pendingContent || !flushProvider) return false;
 
+  // ⚠️ RE-SAVE, NEVER REPLAY THE BYTES. This used to be
+  // `await flushProvider.write(pendingContent)` — a blind write of a payload
+  // serialized BEFORE the device went offline, straight over whatever the
+  // family's file holds now.
+  //
+  // That is how an offline peer silently reverted a compaction for everyone,
+  // and it bypassed every guard this subsystem has, because all of them live in
+  // the SAVE path and this wrote around it. Observed in the field, 2026-09-07:
+  //
+  //   1. B goes offline, adds a to-do, save is queued.
+  //   2. A compacts the pod (new lineage, smaller file).
+  //   3. B comes online. The queue flushes B's PRE-COMPACTION document over
+  //      A's compacted one. No read, no merge, no lineage check.
+  //   4. A polls, correctly reads `ours-newer`, and republishes its compacted
+  //      document over B's upload.
+  //   5. B polls, and because B's own publish "succeeded" its baseline now
+  //      matches its own document — context `clean` — so `adopt-remote × clean`
+  //      ADOPTS. B's to-do is gone, with no rebase and no banner.
+  //
+  // Every step there is correct in isolation. The defect is step 3 writing
+  // bytes that no longer describe anything true.
+  //
+  // So the queue no longer owns a payload to write; it owns the FACT that this
+  // device has unsaved work. Resuming means re-running the ordinary save, which
+  // reads the remote, merges it, consults the lineage guard, and serializes the
+  // document as it stands NOW — the offline edit included.
+  if (!resaveHandler) {
+    // ⚠️ NO FALLBACK TO THE OLD WRITE. Replaying stale bytes is the bug; doing
+    // it "just this once" because a handler is missing would reintroduce it on
+    // exactly the paths nobody is watching. Keep the queue and say so — the
+    // work is still on the device and the next trigger can retry.
+    console.error(
+      '[offlineQueue] No resave handler registered — refusing to replay stale bytes. ' +
+        'The queued work is still on this device; it will be saved when the sync ' +
+        'service registers its handler (syncService.setProvider).'
+    );
+    throw new Error('offlineQueue: no resave handler registered');
+  }
+
   const content = pendingContent;
-  await flushProvider.write(content);
-  // Only clear if this specific content was flushed
-  // (a newer save may have been queued during the flush)
+  const saved = await resaveHandler();
+  if (!saved) {
+    // The save path declined (a lineage block, a refused merge, an auth
+    // failure). It has already classified and reported; the queue stays so the
+    // next trigger retries rather than the work being dropped here.
+    console.warn('[offlineQueue] Resave declined — keeping the queued work for a later retry');
+    return false;
+  }
+  // Only clear if nothing NEWER was queued while we were saving.
   if (pendingContent === content) {
     pendingContent = null;
     clearFromSession();
   }
-  console.log('[offlineQueue] Queued save flushed successfully');
+  console.log('[offlineQueue] Queued work re-saved through the normal save path');
   return true;
 }
 
