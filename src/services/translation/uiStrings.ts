@@ -6053,6 +6053,17 @@ const STRING_DEFS = {
   'lists.copy.createOther': { en: 'Create {count} Copies', beanie: 'create {count} copies' },
   'lists.copy.doneOne': { en: 'Copied.', beanie: 'copied.' },
   'lists.copy.doneOther': { en: '{count} copies made.', beanie: '{count} copies made.' },
+  'lists.copy.unknownMember': {
+    en: 'One of the beans you picked is no longer in your family, so nothing was copied. Close this and try again.',
+    beanie:
+      'one of the beans you picked is no longer in your family, so nothing was copied. close this and try again.',
+  },
+  'lists.copy.verifyFailed': {
+    en: 'The copies were made, but beanies cannot see them yet. Reload before trying again, so you don’t end up with two of each.',
+    beanie:
+      'the copies were made, but beanies cannot see them yet. reload before trying again, so you don’t end up with two of each.',
+  },
+  'lists.tile.openFor': { en: '{list}, {name}’s list', beanie: '{list}, {name}’s list' },
   'lists.copy.sourceGone': {
     en: 'That list is no longer here, so there was nothing to copy.',
     beanie: 'that list is no longer here, so there was nothing to copy.',

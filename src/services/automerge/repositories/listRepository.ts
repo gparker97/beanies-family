@@ -6,6 +6,27 @@ import { generateUUID } from '@/utils/id';
 import type { MutationOp } from '../worker/protocol';
 import type { FamilyList, CreateFamilyListInput, UpdateFamilyListInput } from '@/types/models';
 
+/**
+ * The batch COMMITTED but the created lists are not in the projection.
+ *
+ * Typed, because the difference matters to the user: "the write was rejected" means
+ * nothing exists and retrying is safe, while this means the lists probably DO exist and
+ * a retry would make a second set. The store maps this to its own message.
+ */
+export class ListsNotVisibleError extends Error {
+  missing: number;
+  total: number;
+
+  constructor(missing: number, total: number) {
+    super(
+      `createLists: ${missing} of ${total} lists missing from the projection after a batch write`
+    );
+    this.name = 'ListsNotVisibleError';
+    this.missing = missing;
+    this.total = total;
+  }
+}
+
 const repo = createAutomergeRepository<
   'lists',
   FamilyList,
@@ -66,9 +87,10 @@ export async function createLists(inputs: CreateFamilyListInput[]): Promise<Fami
   // surface much later as an inexplicable missing list.
   const missing = entities.filter((e) => !projectionGetById('lists', e.id));
   if (missing.length) {
-    throw new Error(
-      `createLists: ${missing.length} of ${entities.length} lists missing from the projection after a batch write`
-    );
+    // NOTE this fires AFTER the batch has committed, so the lists very likely exist in
+    // the document — they are just not where readers look. Callers must NOT tell the
+    // user "nothing was created", or the retry makes a second set.
+    throw new ListsNotVisibleError(missing.length, entities.length);
   }
 
   return entities;

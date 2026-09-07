@@ -10,6 +10,7 @@ import { formatDateShort } from '@/utils/date';
 import { resolveListRule } from '@/services/recurrence/adapters';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import { useFamilyStore } from '@/stores/familyStore';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import type { FamilyList } from '@/types/models';
 
@@ -17,6 +18,20 @@ const props = defineProps<{ list: FamilyList }>();
 const emit = defineEmits<{ open: [id: string]; copy: [id: string]; delete: [id: string] }>();
 
 const { t } = useTranslation();
+const familyStore = useFamilyStore();
+
+/**
+ * The overlay covers the whole tile, so it shadows the owner avatar's `title` tooltip
+ * exactly as it shadows the status pill's. The avatar still shows initials, but the
+ * full name was only ever available on hover — so it moves into the accessible name
+ * here rather than being lost.
+ */
+const tileLabel = computed(() => {
+  const owner = familyStore.members.find((m) => m.id === props.list.ownerId);
+  return owner
+    ? fillTemplate(t('lists.tile.openFor'), { list: props.list.title, name: owner.name })
+    : props.list.title;
+});
 const { describe } = useRecurrenceLabel();
 const { categoryLabel } = useListCategoryLabel();
 const { today } = useToday();
@@ -142,7 +157,7 @@ const statusPill = computed<Pill | null>(() => {
       type="button"
       data-testid="list-tile-open"
       class="focus-visible:ring-primary-500 absolute inset-0 z-10 rounded-2xl focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-      :aria-label="list.title"
+      :aria-label="tileLabel"
       @click="emit('open', list.id)"
     />
   </article>
