@@ -8,6 +8,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-08
+
+### Added
+
+- **A recipe can now be sent to anyone, on any app.** Share is on the recipe itself, beside Edit. One message goes out carrying the recipe written out as text and a link, so it is useful to a friend who never taps it and an offer to one who does. The recipe travels inside the link rather than through any beanies server, and beanies shows the whole message before it leaves. WhatsApp, Telegram, Messages, Messenger, WeChat and email have their own buttons; Copy and the phone's own share sheet cover Discord and everything else.
+- **Someone who receives a beanies recipe can read it without an account, and keep it in one tap.** The link opens the recipe first, with the invitation underneath rather than in front of it. Tapping Keep opens the recipe in your own cookbook for a look before it is saved, whether you already have a beanpod or are signing up on the spot.
+- **A recipe captured from a website can be read again.** "Read again" appears on any recipe that came from a link. beanies re-reads the page, shows what changed with your version beside the site's, and writes nothing until you say so, so a recipe you have edited by hand cannot lose your work. It never empties something you already have, and it offers a dish photo only when the recipe does not have one yet.
+
+### Fixed
+
+- **Prep time, cook time and servings now get filled in far more often.** beanies was only allowed to copy these three out of a page word for word, so on the many recipe pages that never state them it left them blank. It can now work them out and say that it did, marked so you can check them. It still never invents an ingredient quantity.
+- **An invite to a family whose name contains certain punctuation is no longer garbled in the message.**
+- **A recipe or document shared into beanies while signed out no longer leaves a copy on the device.** The page that clears it away was being sent to the sign-in screen before it could run.
+- **The QR code on a printed recovery kit now works when the kit was made on an iPhone.** Kits printed from the iOS app encoded a link only that app could open, so a phone camera pointed at the code did nothing. Typing the code by hand always worked, and still does.
+- **Links inside synced calendar events now open** when the event was synced from the iOS app. They pointed somewhere only that phone could reach, so tapping one from a laptop, or from anyone else the calendar is shared with, went nowhere.
+- **Buttons no longer disappear under the cursor in dark mode.** Several buttons on the recipe pages turned white-on-white on hover.
+
 ## 2026-09-07
 
 ### Added

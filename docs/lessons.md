@@ -4,6 +4,110 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A bare `hover:` background beats a bare `dark:` background, whatever the order
+
+**Date:** 2026-09-08
+**Context:** Three new buttons — the re-fetch modal's "Keep Mine", the "Read again" button,
+and the recipe hero's Share — carried `dark:bg-surface-raised/80 dark:text-ink … hover:bg-white`.
+In dark mode, hovering painted pure white under near-white ink: **~1.09:1**. The label vanished
+under the cursor, on a modal's cancel action among others.
+
+The cause is specificity, not ordering. `src/style.css` defines
+`@custom-variant dark (&:where(.dark, .dark *))`, and `:where()` contributes **zero**
+specificity. So the compiled utilities are:
+
+```
+.hover\:bg-gray-200:hover                  →  (0,2,0)   pseudo-class + class
+.dark\:bg-surface-raised:where(.dark, …)   →  (0,1,0)   class only
+```
+
+Any `hover:bg-*` outranks any `dark:bg-*`. Source order never enters into it, which is why
+reading the class list left to right does not reveal the bug — and why it survived a dark-mode
+sweep that checked every _non-hover_ background had a partner.
+
+**The mistake:** treating "every painted background has a `dark:` partner" as the whole rule.
+A `hover:` background is a painted background, and it needs its own partner.
+
+**Rule:** every `hover:bg-*` needs a `dark:hover:bg-*`, and every `hover:text-*` on an accent
+needs a `dark:hover:text-*-lift`. When auditing, grep for `hover:bg-` and `hover:text-` and
+check each hit for a `dark:hover:` sibling — the plain `dark:` sibling does not count. The same
+holds for `focus:`, `active:` and `group-hover:`.
+
+---
+
+## The environment you test in is not the environment the link is opened in
+
+**Date:** 2026-09-08
+**Context:** Recipe sharing (#92) built its link with `` `${window.location.origin}/recipe#...` ``.
+Inside the iOS Capacitor shell the document origin is `capacitor://app.beanies.family` — not
+an accident, and stated outright in `capacitor.config.ts` and `services/appUpdate/versionPolicy.ts`,
+because it is what keeps the native WebView serving local content. So every recipe shared from
+the iPhone carried a link that opens nothing at all on the recipient's phone.
+
+Nothing in the development loop can surface this. `npm run dev` is `http://localhost`, the
+deployed PWA is `https://app.beanies.family`, and Android sets `androidScheme: 'https'` — three
+environments out of four give the right answer. The fourth fails only on a real device, only in
+a message that has already been sent, and only for the person on the other end, who has no way
+to report it. `buildInviteLink` has carried the same flaw for as long as it has existed.
+
+**The mistake:** reaching for the ambient value (`location.origin`) when the question was not
+"where am I?" but "where can someone ELSE open this?". Those are different questions that happen
+to share an answer in most environments.
+
+**Rule:** any URL built for an external recipient — a share, an invite, a calendar link, an
+email body — goes through `utils/shareableOrigin.ts`, never `location.origin`. When a value is
+correct in three environments and wrong in the fourth, name the concept in a function so the
+fourth cannot be forgotten. And when auditing, grep for `location.origin` and ask of each hit:
+who opens this?
+
+---
+
+## `fullPath` is path + query + HASH, and the hash can be the payload
+
+**Date:** 2026-09-08
+**Context:** Three `reportError` calls in `App.vue` passed `context: { route_path: route.fullPath }`,
+with a comment explaining that `fullPath` was chosen because it preserves the query. Recipe
+sharing then added `/recipe#<the entire recipe, base64url>`. On that route the diagnostic field
+IS the private content the whole feature was designed to keep off our servers — and
+`redactContext` truncates to 200 characters from the START, so the surviving prefix decodes
+cleanly into the dish name, subtitle, times and first ingredients. One of the three sites is
+`severity: 'critical'`, which also pages it to Slack.
+
+The context allowlist did not help: `route_path` is allowlisted, so nothing was dropped. The
+allowlist was being satisfied by a key that had quietly changed meaning.
+
+**The mistake:** treating an allowlisted key as permanently safe. The allowlist bounds which
+FIELDS ship, not what those fields now contain — and a route added years later can change the
+answer without touching the telemetry code.
+
+**Rule:** never put `route.fullPath` in a telemetry context; `route.path` answers the diagnostic
+question. More generally, when adding a route that carries data in its query or fragment, grep
+for every place the route is logged and re-ask whether the field is still PII-free. Add the
+question to the allowlist's own doc comment rather than trusting it to be re-derived.
+
+---
+
+## An autofixer can rewrite a security test into its opposite
+
+**Date:** 2026-09-08
+**Context:** `recipeShareLink.test.ts` asserted that a decoded `sourceUrl` of
+`http://example.com/x` is dropped, because the decoder screens for `https:` only. The
+pre-commit hook runs `eslint --fix`, and `@microsoft/sdl/no-insecure-url` is a fixable rule: it
+silently rewrote the fixture to `https://example.com/x`. The test then asserted that a
+perfectly valid https URL gets dropped, which is false — so it failed, which is the only reason
+anyone noticed. Had the assertion been `toBeTruthy()`-shaped instead, it would have gone green
+and the screen would have been untested from that day on.
+
+**The mistake:** assuming a test fixture is inert data. To a fixer it is just source, and a
+hostile-input fixture looks exactly like the bad code the fixer exists to remove.
+
+**Rule:** build hostile fixtures so a fixer cannot pattern-match them — assemble the scheme
+(`` `${'ht' + 'tp'}://…` ``) rather than writing the literal — and say in a comment why. A
+`eslint-disable` works too but is worse: the next person running `--fix` on a nearby line does
+not see it.
+
+---
+
 ## A capability can exist one layer below where you looked
 
 **Date:** 2026-09-07

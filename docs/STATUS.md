@@ -626,6 +626,37 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
+> **Last updated:** 2026-09-08 (SESSION 3 — **RECIPE SOCIAL SHARE (#92) + RE-FETCH AND INFERRED TIMES (#93). Committed to `main` as `bb2a6221` → `9462fe9a` → `5b21a295` → `91fcb77b` → `d8c31eb6` → `9cad5679` → `925f96fe`, NOT PUSHED, NOT DEPLOYED, NOT VISUALLY VERIFIED** — greg is pushing from the concurrent compaction session. Notion #92 + #93 both `Ready for Testing` with plan URLs written back; plans `docs/plans/2026-09-07-recipe-social-share.md` and `docs/plans/2026-09-07-recipe-refetch-and-times.md`; mockups `docs/mockups/recipe-share-2026-09-07.html` and `recipe-refetch-2026-09-07.html`; prompts `docs/prompts/2026-09/2026-09-07-recipe-share-and-refetch.md`.)
+>
+> **#92 — a recipe can be sent to anyone.** One message carries the recipe as readable text AND a link whose URL **fragment** holds the whole recipe, so it is a gift to someone who never taps through and an offer to someone who does. A public `/recipe` route renders it for a visitor with no account and no pod: recipe first, invitation in a sticky bar underneath, never a wall in front of the content. Keep stashes it and routes to the cookbook or to onboarding; `FamilyCookbookPage` consumes the stash and opens the **normal review form**, the same rule the inbound share boundary already follows ("nothing from outside is persisted without the user confirming it"). `ShareChannelGrid` now takes a finished **message** instead of building the invite itself, so one channel row serves both paths with two message builders side by side in `utils/`.
+>
+> **#93 — capture quality.** The extraction prompt gains `inferredTimes` in **all three copies** (`PROMPT_VERSION` → `2026-09-07.1`): the model may now infer prep/cook/servings **and must declare which**, with the blanket no-guessing rule untouched and the exception scoped twice over so ingredient quantities stay forbidden. The share builder got the same sentence — it inherits the SHAPE but not the RULES, so a shared recipe would otherwise have been handed a field it was simultaneously forbidden to fill. `inferredTimes` is **required** on `RecipePrefill`, which is what makes the compiler force the JSON-LD path to state its "nothing here was guessed" guarantee in code. And "Read again" re-fetches a recipe's source, diffs it old-beside-new, and writes nothing until taken.
+>
+> ⚠️ **TWO DEFECTS THAT WOULD HAVE SHIPPED, both invisible from a desktop browser and both missed by the first pass that read the code directly.**
+>
+> 1. **The iOS share link was dead.** `window.location.origin` inside the iOS shell is `capacitor://app.beanies.family` — deliberate, and stated in `capacitor.config.ts`. Every share sent from the iPhone carried a link that opens nothing on the recipient's phone. Three of four environments give the right answer, and the person who cannot open it is not the sender, so nothing surfaces it. Now behind a named `utils/shareableOrigin.ts`. **`buildInviteLink` (`services/crypto/inviteService.ts:159`) has the SAME flaw and is deliberately NOT fixed here** — see the pending block.
+> 2. **The shared recipe was being written to CloudWatch.** Three `reportError` calls passed `route_path: route.fullPath`; `fullPath` is path + query + **hash**, so on `/recipe#<payload>` that field IS the recipe, and redaction truncates from the START so the surviving prefix decodes cleanly. One of the three pages Slack. The allowlist did not help — `route_path` is allowlisted, and was being satisfied by a key that had quietly changed meaning. All three now pass `route.path`.
+>
+> **Also found and fixed:** the podless boot redirect still destroyed the fragment after the first fix silenced only its Slack report (`PUBLIC_ENTRY_ROUTE_NAMES` is now DERIVED from `ONBOARDING_ENTRY_ROUTE_NAMES` + `EXTERNAL_LANDING_ROUTE_NAMES`, and the redirect consults the stricter `isExternalLandingRoute`); a whitespace-only value could blank a recipe's **name** (`asString` did not trim where its two siblings do, and every downstream emptiness check tests for `''`); the keep-stash was cleared on the clear-data tier only, on the argument that a TTL and single-consume bounded it — they bound duration and repetition, **not identity**, so on a shared device one person's recipe could pre-fill another's form in a different pod; the keep path bypassed the cookbook's own `canEditActivities` gate; `hasPendingKeptRecipe` ignored the TTL and sent people to a cookbook that then opened nothing; `consumeKeptRecipe` discarded a recipe it had already read if the delete threw (Safari private mode reads fine and throws on writes); WeChat copied the bare link instead of the message; an offline press burnt the ten-minute re-fetch cooldown; and the `times_filled` event — the only signal that can say whether the times fix worked in production — was missing.
+>
+> **A pre-existing live bug fixed in passing:** `/share` is `requiresAuth: false` with a comment explaining it MUST mount signed-out to delete its Cache-Storage stash, but `'ShareTarget'` was absent from `App.vue`'s separate inline copy of the public-route list — so a signed-out document share was bounced to onboarding and leaked into Cache Storage permanently (no TTL, nothing sweeps it, sign-out clears IndexedDB but not `caches`). The merged predicate fixes it; `App.vue` is eleven lines shorter. Also fixed: the invite message was templated with `String#replace`, so a family named `Smith $& Co` sent strangers a garbled message (now `fillTemplate`, in a tested pure function).
+>
+> ⚠️ **A lint autofixer rewrote a security test into its opposite.** A fixture asserting `http://` links are dropped was silently changed to `https://` by the pre-commit `eslint --fix` (`@microsoft/sdl/no-insecure-url`). The assertion inverted, and only failed because it was written as an equality — a truthiness-shaped assertion would have gone green with the screen untested from that day on. The scheme is now assembled so `--fix` cannot reach it. Three lessons written up at the top of `docs/lessons.md`.
+>
+> ⭐ **THE SECOND REVIEW ROUND FOUND FOUR DEFECTS INSIDE THE FIRST ROUND'S FIXES**, which is the pattern `docs/lessons.md` warns about — so each was answered structurally rather than patched: the route lists became one DERIVED list with two named parts, and the origin became one named helper now used at every fixable site. What that grep then turned up is the finding that matters most, and it is **not in this feature at all**:
+>
+> - **The recovery-kit QR was dead on iOS.** `recoveryKit.kitDeepLink` built the PRINTED QR from `location.origin`, so a kit printed from the iOS app encoded `capacitor://…` and a phone camera pointed at it opened nothing. Typing the code by hand always worked. **Fixed.**
+> - **Every calendar event beanies syncs to Google carries an app deep link in its description**, built the same way — persisted in Google's copy and read by everyone the calendar is shared with. **Fixed.**
+> - Both already fell back to exactly the canonical origin, so the swap is a provable no-op on web and Android and only changes iOS, where the value was already broken.
+>
+> **A credential was reaching telemetry.** `LoginPage`'s two podless-rescue reports passed `route.fullPath`, and `recoveryKit` builds `/welcome#beanies-kit=<code>` — `/welcome` IS LoginPage, and the fragment strip runs LATER than the rescue, so the code that unwraps the family key could ship to CloudWatch. Found only because the recipe leak prompted the question of what else rides a fragment.
+>
+> **And a whole class of dark-mode bug the last sweep could not have caught.** `dark` is `&:where(.dark, .dark *)` and `:where()` contributes **zero specificity**, so a bare `hover:bg-*` (0,2,0) beats a bare `dark:bg-*` (0,1,0) **whatever the source order**. Three buttons went white-on-white under the cursor (~1.09:1), one of them a modal's cancel action. The 2026-09-05 sweep checked that every non-hover background had a partner; a `hover:` background is a painted background too. Rule written up at the top of `docs/lessons.md`.
+>
+> **A third round then checked the second round's fixes, and found two more — both mine, both in the cookbook handoff.** The roster guard was inverted: it correctly stopped the consume before a roster existed (`canEditActivities` is false there, so the recipe would have been destroyed with a permission error shown to the pod's OWNER) but it BAILED rather than waiting, and both mounts of a cold boot see an empty roster — the layout branch swaps at App.vue step 2 while `loadMembers` runs at step 5, and there is no third mount. So the keep was dropped in silence on exactly the journey the guard was added to protect. It now waits on a watcher. That watcher then had a TDZ bug of its own, **caught by the new test on its first run**: with `immediate: true` the callback runs before the returned stop function is assigned, and `stop?.()` does not save you, because the optional call still READS the binding. And the session flag added in round two had quietly **disarmed two existing tests** — one never reached its mocked read, the other stopped checking the "and clears it" half of its own name. Both re-armed, with a reset helper. That logic has now broken twice in opposite directions, so it has its own test file.
+>
+> **Gates:** type-check, ESLint (0 errors), stylelint, production build (both new chunks emit), **6,981 unit tests green**. Reviewed in **three rounds by eight agents** (security, correctness ×2, plan fidelity, fresh eyes, fix verification ×3); **26 confirmed findings, all fixed**. Findings per round: 14 → 10 → 2. ⏳ **OWED: greg's eyes in a browser — none of this is visually verified, in either mode; the iOS share link fix is not verified on a real device; the push.**
+
 > **Last updated:** 2026-09-07 (SESSION 2 — **BEANIE LIST COPY: one bean or several. Committed to `main` as `f55921a4` + `68cae7c1`, NOT PUSHED, NOT DEPLOYED** — greg is pushing from the concurrent compaction session. Tracker #91; plan `docs/plans/2026-09-07-list-copy-for-beans.md`; mockup `docs/mockups/list-duplicate-2026-09-07.html`.) Copy + delete icon buttons on each list tile following `BeanCard`'s cluster; copy opens a `BeanieFormModal` with a `{bean}`-token title and a multi-select `FamilyChipPicker`; N beans produce N lists in **one atomic Automerge batch**. ⚠️ **The batch API existed all along and the first plan draft said it did not** — `{ op: 'batch' }` is in `worker/protocol.ts:127` and `docOps.ts:676-679` documents the atomicity; `listRepository.ts` is thin re-exports, so the capability lives a layer below where I looked, and `listCycleRepository` had been using it in three places. Never write a loop of `create` calls for a multi-entity write. ⚠️ **A verify that runs AFTER a commit must not be worded as "nothing happened"** — `createLists` checks the projection post-`mutate`, so its failure means the lists probably exist and are merely invisible; the first cut told the user nothing was created, which invites a retry that makes a second set. ⚠️ **`wrapAsync` toasts `e.message` verbatim**, so any store-path `throw` puts raw developer text in front of a user; classified failures now carry a `UIStringKey` and the store owns the toast. **Two pre-existing defects fixed in passing:** `deleteList` returned `false` without throwing when the list was already gone and `ListDetailModal` closed the drawer anyway (a live silent failure, now a tri-state behind `useListDeletion`), and `ActionButtons`' buttons had no `type="button"`, so inside a `<form>` they submitted it. The four-pass plan discipline earned its keep: pass 2 found the batch API, pass 3 found three type/contract defects, pass 4 found a focus ring clipped to nothing by `overflow-hidden`, a `useFormModal` reset that never fires unless the modal stays mounted, and an unbound `isSubmitting` that let a double-tap create 2N lists. Gates: type-check, ESLint, 82 tests across the 7 affected suites, full suite 6842 green. ✅ greg verified the flow locally. ⏳ **OWED: dark-mode and 360px-mobile visual checks; the push.** ⚠️ `/code-review high` findings in the CONCURRENT compaction work (offlineQueue, applyAndProject, LoadPodView, SettingsPage) are listed in the pending block — deliberately untouched, that session was mid-edit on those files.)
 
 > **Last updated:** 2026-09-05 (SESSION 2 — **DARK MODE: THE SURFACE UNDER THE INK. Shipped to `main` as `02f49910`, NOT DEPLOYED.** 106 files, 965 insertions. A parallel session ran Tier 2 pod compaction throughout; all work here stayed off that session's files and was committed by explicit path, and that session's push carried this commit to `origin/main`.) ⭐ **The bug greg reported was CREATED by the previous dark-mode pass, not missed by it.** That pass added `dark:text-ink` app-wide; on a `bg-white` card that is right, but on a hand-painted pastel with no dark partner the ink went near-white and the paper stayed yellow — **1.01:1, invisible**, now 14.42. A grep for `bg-white` finds none of these and the lint rule cannot see an arbitrary hex or an inline style. **The ink and the surface are one unit of work.** Also fixed: two further instances greg had not hit (the milestones hero, `StickyNote`'s three pastel papers); **three `html.dark` rules that had never once applied** (a descendant combinator swallowed into a `:not()` makes the selector invalid and the whole rule is dropped — and reviving one meant fixing the old-ramp 50%-alpha grey it carried); the onboarding suite's `opacity`-dimmed text compositing to ~1.4:1 on the wizard's Back/Skip controls; and **~120 accent sites** that lacked their `-lift` partner. ⚠️ **A contrast figure I asserted from memory was wrong** — Heritage Orange on `surface-ground` is **5.08**, not 3.61; it clears AA on the page and fails on every surface above it (4.40 card, 3.85 overlay), which is exactly why it survived review. Corrected in all three docs. **Sky Silk had no lift token**, so blue accents were hand-rolled as 14 one-off hexes, three under the floor; added `--color-silk-lift` + `--color-teal-lift` and consolidated 27 call sites. **CIG gains two full slides (08 The Scale, 09 The Rules)** rendered on the real dark tokens, and its nav — which had drifted out of alignment with the section ids — is rebuilt to 19 entries; `CLAUDE.md` + the theme skill now name the CIG as the authority for both modes. Gates: type-check, ESLint, **stylelint**, build (verified the new utilities emit), 6223 tests — all green. ⚠️ stylelint was missing from my gate set and the pre-commit hook caught a real error; ESLint ≠ stylelint. ⏳ **OWED: greg's eyes in a browser — none of this is visually verified.** Detail in the header block above; prompts at `docs/prompts/2026-09/2026-09-05-dark-mode-surface-sweep.md`; lessons at the top of `docs/lessons.md`.
@@ -1948,6 +1979,67 @@ Discord file-downloads item is SHIPPED (`@capacitor/share` present, `downloadAsF
 (grep=0), `useWakeLock` is still called unconditionally at `BeanieWallPage.vue:77`, and the
 #65/#61 open-guard CloudWatch query is still unrun. This session's work was net-new and
 orthogonal to the rest of the block.
+
+### ⭐ Session 2026-09-08 (3) — Recipe share (#92) + re-fetch and inferred times (#93) ⭐
+
+Shipped to `main`, **NOT pushed, NOT deployed, NOT visually verified** (`bb2a6221`,
+`9462fe9a`, `5b21a295`, `91fcb77b`, `d8c31eb6`). Notion #92 + #93 are `Ready for Testing`.
+
+**1. `buildInviteLink` is the LAST unfixed instance of the iOS origin bug.**
+`src/services/crypto/inviteService.ts:159` builds the family invite URL from
+`globalThis.location?.origin`, so an invite shared **from the iPhone app** carries
+`capacitor://app.beanies.family/join?…` — a link that opens nothing on the recipient's phone.
+The other two instances found alongside it (the recovery-kit QR and the calendar event deep
+link) are fixed; this one is deliberately left, for a reason the others did not have:
+**its fallback is `https://beanies.family`, the marketing apex, not `app.beanies.family`** —
+and `/join` lives on the app subdomain. So switching it to `shareableOrigin()` also changes
+the no-`location` fallback, which is a second question rather than a pure no-op. On top of
+that, `inviteService.ts` is the join flow's territory and the concurrent compaction session
+has been in adjacent files.
+
+**Verify on a real device before changing anything.** If iOS invites HAVE been working,
+something else is normalising that URL and it must be found first; if they have not, this is a
+live acquisition bug and the fix is one line plus a decision about the fallback.
+
+**2. Nothing here has been seen in a browser, in either mode.** Six new surfaces
+(`SharedRecipePage`, `RecipeShareModal`, `RecipeRefetchModal`, `RecipeRefetchAction`,
+`ShareSheetModal`, `InferredHint`) plus a rebuilt `ShareChannelGrid`. Light AND dark, and
+360px mobile — the sticky offer bar on `/recipe` and the two-column diff in the re-fetch modal
+are the two most likely to be wrong. **Hover every button in dark mode**: three of them were
+white-on-white and the `dark:hover:` partners that fix it are unverified visually.
+⚠️ **The same `:where()` specificity bug is almost certainly elsewhere in the app** — the
+pre-existing Edit button on the recipe hero had it too (fixed in passing).
+`grep -rn "hover:bg-" src/ | grep -v "dark:hover:bg-"` is the sweep; it was NOT run repo-wide
+this session and is the single highest-value follow-up here.
+
+**3. Three iOS link fixes are unverified on a real device.** `shareableOrigin()` has unit
+tests but no device test. On TestFlight, confirm all three: (a) send a recipe to a phone that
+does not have beanies and check the link opens `/recipe` with the recipe rendered; (b) print
+or preview a recovery kit and scan its QR with another phone's camera; (c) sync an activity to
+Google Calendar and tap the link in the event description from a laptop.
+
+**4. The inferred-times change is a LIVE PROMPT CHANGE and needs a real capture.**
+`PROMPT_VERSION` is now `2026-09-07.1` in all three copies. Capture a recipe from a page that
+does NOT state prep/cook/servings and confirm (a) they come back filled, (b) they are marked
+"Estimated", and (c) ingredient quantities are still not invented. The `times_filled`
+CloudWatch event (`surface: recipe-extract`, `action: times_filled`) is the rate signal — read
+it after a day of real use to see whether the fix actually moved anything.
+
+**5. The re-fetch is a real spend.** Each press is a content-fetch plus possibly a metered AI
+extraction, bounded per-recipe by a ten-minute cooldown (`recipe-refetch:<id>`, max 1). That is
+a cooldown, **not** a cost bound — a family with fifty recipes can still fire fifty reads. The
+real bound is the server's per-family limiter. Watch `action: refused` / `detail: quota` on
+`recipe-refetch` after release.
+
+**6. Follow-ups the plans named as out of scope:** provenance-aware photo replacement on
+re-fetch (a photo is currently offered only when the recipe has none, because `PhotoAttachment`
+carries no source URL so a duplicate is indistinguishable from a new photo); per-field toggles
+in the re-fetch diff; native Universal/App Links so a share link opens the installed app rather
+than the PWA (that is tracker **#63**); and the `PROMPT_FINGERPRINTS` hardening for
+`extractionPromptDrift.test.ts` (the drift guard asserts only EQUALITY across the three prompt
+copies, so a missed `PROMPT_VERSION` bump still passes silently).
+
+---
 
 ### ⭐ Session 2026-09-07 (2) — Beanie List copy, for one bean or several ⭐
 
