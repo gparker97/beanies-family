@@ -201,6 +201,20 @@ watch(() => route.query.open, applyOpenQuery);
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
 const importError = ref<string | null>(null);
+
+/**
+ * Close the Family Data drawer, and take the refusal with it.
+ *
+ * ⚠️ `importError` HAS NO OTHER RESET until the next pick begins. That did not
+ * matter while its render site was unreachable; now that it renders, a refusal
+ * from an hour ago would still be sitting under the section before anyone has
+ * picked anything. `importSuccess` already self-clears on a timer; the failure
+ * arm clears on the way out.
+ */
+function closeFamilyData(): void {
+  showFamilyData.value = false;
+  importError.value = null;
+}
 const importSuccess = ref(false);
 const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
@@ -1564,8 +1578,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       icon-bg="var(--tint-silk-20)"
       size="wide"
       :save-label="t('action.close')"
-      @close="showFamilyData = false"
-      @save="showFamilyData = false"
+      @close="closeFamilyData"
+      @save="closeFamilyData"
     >
       <p class="dark:text-ink-soft text-sm text-gray-500">
         {{ t('settings.familyDataDescription') }}

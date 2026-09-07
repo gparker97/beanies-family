@@ -88,6 +88,13 @@ async function deleteDB(dbName: string): Promise<void> {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
     request.onblocked = () => {
+      // ⚠️ DEFERRED, 2026-09-07 (plan A10). This is the same shape that caused
+      // the cache-open lockout: resolving a BLOCKED delete as success leaves it
+      // queued, and any later open of the same name waits behind it forever.
+      // Left alone deliberately — these are the legacy entity DB and the photo
+      // queue, this one at least warns rather than going silent, and nothing
+      // here re-opens immediately afterwards, which is the pairing that hangs.
+      // If a re-open is ever added below, fix this first.
       console.warn(`Database ${dbName} delete blocked — closing and retrying`);
       resolve();
     };
