@@ -11,8 +11,10 @@ import { buildCycleSnapshot, expiredCycleIds, CYCLE_SWEEP_ENABLED } from '@/util
 import { clockVerdict, readSweepDay, recordSweepDay } from '@/utils/cycleSweepClock';
 import { list as projectionList } from '@/services/automerge/projection';
 import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/listLifecycle';
+import { buildCopySeeds, freshItems } from '@/utils/listSeed';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
@@ -28,6 +30,23 @@ import type {
   ListCategory,
   ListLifecycle,
 } from '@/types/models';
+
+/**
+ * A copy failure whose cause we already classified, so the `catch` can put a stable
+ * `error_code` on the Slack page instead of guessing from the message. Anything else
+ * reaching that catch is the batch write itself, which reports `batch-write-threw`.
+ */
+class CopyFailure extends Error {
+  // An explicit field, not a constructor parameter property — `erasableSyntaxOnly`
+  // rejects the shorthand.
+  code: 'unknown-member' | 'verify-missing';
+
+  constructor(code: 'unknown-member' | 'verify-missing', message: string) {
+    super(message);
+    this.name = 'CopyFailure';
+    this.code = code;
+  }
+}
 
 // Sort comparators — newest-created first / most-recently-completed first
 // (same shapes todoStore uses).
@@ -408,7 +427,7 @@ export const useListStore = defineStore('lists', () => {
       emoji: tmpl.icon,
       category: tmpl.category,
       ownerId: memberId,
-      items: tmpl.starterItems.map((title) => ({ id: generateUUID(), title, completed: false })),
+      items: freshItems(tmpl.starterItems),
       lifecycle: tmpl.lifecycle,
       frequency: tmpl.frequency,
       lastResetDate: tmpl.lifecycle === 'recurring' ? today.value : undefined,
@@ -419,6 +438,96 @@ export const useListStore = defineStore('lists', () => {
       ...overrides,
     };
     return createList(seed);
+  }
+
+  /**
+   * Copy `sourceId` once per selected bean, in ONE atomic write.
+   *
+   * Returns the created lists, or `null` when nothing was created — for ANY reason,
+   * graceful or thrown. `wrapAsync` turns a throw into `undefined` and the `?? null`
+   * below folds that into the same sentinel, so **callers branch on falsy**, never on
+   * `=== null`. Every `null` has already been toasted and reported, so a caller must
+   * not toast again (that would page Slack a second time via `showToast('error', …)`).
+   *
+   * Field policy lives in `buildCopySeeds` (`@/utils/listSeed`); this is orchestration.
+   */
+  async function copyListForMembers(
+    sourceId: string,
+    memberIds: string[],
+    titleTemplate: string
+  ): Promise<FamilyList[] | null> {
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        // Read the PROJECTION, not the reactive array — the same defence `deleteList`
+        // uses, so a stale array cannot claim a list the document no longer has.
+        const source = projectionList('lists').find((l) => l.id === sourceId);
+        if (!source) {
+          // A race, not a defect: another device deleted the list mid-gesture. Warn and
+          // toast, but do NOT page, and do NOT throw — the user gets one clear message.
+          reportError({
+            surface: 'list-copy',
+            message: 'copy source is no longer in the document',
+            severity: 'warning',
+            context: { action: 'copy_missing_source' },
+          });
+          showToast('error', useTranslationStore().t('lists.copy.sourceGone'));
+          return null;
+        }
+
+        try {
+          const familyStore = useFamilyStore();
+          const owners = memberIds.map((id) => {
+            const member = familyStore.members.find((m) => m.id === id);
+            if (!member) {
+              // Ids come from FamilyChipPicker, which renders familyStore members, so an
+              // unknown id is a bug — and a list with a dangling ownerId is worse than a
+              // failure the user can retry.
+              throw new CopyFailure('unknown-member', `unknown member id ${id}`);
+            }
+            return { id: member.id, name: member.name };
+          });
+
+          const seeds = buildCopySeeds({
+            source,
+            owners,
+            titleTemplate,
+            today: today.value,
+            createdBy: familyStore.currentMember?.id ?? '',
+          });
+
+          const created = await listRepo.createLists(seeds);
+          // ONE array write, not one per copy.
+          lists.value = [...lists.value, ...created];
+
+          logEvent({
+            level: 'info',
+            surface: 'list-copy',
+            message: `copy completed: ${created.length} lists, ${source.items.length} items, ${source.lifecycle}`,
+            context: { action: 'copy_completed', kind: source.lifecycle },
+          });
+          return created;
+        } catch (e) {
+          // ONE explicit critical report (the Slack page), naming which step gave way.
+          // Then rethrow so `wrapAsync` owns the user toast, the `error` ref and the
+          // engine-panic classification. Reporting again there would double-page.
+          reportError({
+            surface: 'list-copy',
+            message: 'copy failed: nothing was created (the batch is atomic)',
+            severity: 'critical',
+            error: e,
+            context: {
+              action: 'copy_failed',
+              error_code: e instanceof CopyFailure ? e.code : 'batch-write-threw',
+            },
+          });
+          throw e;
+        }
+      },
+      { action: 'listStore:copyListForMembers' }
+    );
+    return trackFeature(result ?? null, 'list');
   }
 
   async function updateList(id: string, input: UpdateFamilyListInput): Promise<FamilyList | null> {
@@ -814,6 +923,7 @@ export const useListStore = defineStore('lists', () => {
     loadLists,
     createList,
     createFromTemplate,
+    copyListForMembers,
     updateList,
     deleteList,
     toggleItem,

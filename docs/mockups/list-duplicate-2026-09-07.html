@@ -1,0 +1,679 @@
+<title>Copy List for Every Bean</title>
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ── Tokens ──────────────────────────────────────────────────────────────
+     Light values are the CIG five-colour palette; the dark scale is lifted
+     verbatim from packages/brand/theme.css. Every token is declared on bare
+     :root first, so the un-stamped (system-default) state resolves a complete
+     palette before any media query or [data-theme] block runs. */
+  :root {
+    --board: #eef1f4;
+    --ground: #ffffff;
+    --raised: #f8f9fa;
+    --overlay: #eef1f4;
+    --ink: #2c3e50;
+    --ink-soft: #55677a;
+    --ink-faint: #7d8b99;
+    --line: rgba(44, 62, 80, 0.1);
+    --line-strong: rgba(44, 62, 80, 0.22);
+    --accent: #f15d22;
+    --accent-warm: #e67e22;
+    --accent-wash: rgba(241, 93, 34, 0.08);
+    --silk: #aed6f1;
+    --silk-wash: rgba(174, 214, 241, 0.28);
+    --slate-wash: rgba(44, 62, 80, 0.05);
+    --danger: #c0392b;
+    --shadow: 0 18px 46px rgba(44, 62, 80, 0.13);
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+    --modal-border: transparent;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --board: #0e151c;
+      --ground: #1e2a36;
+      --raised: #26343f;
+      --overlay: #2f3e4b;
+      --ink: #f2f5f7;
+      --ink-soft: #c3ced6;
+      --ink-faint: #9aa9b4;
+      --line: rgba(255, 255, 255, 0.1);
+      --line-strong: #7a8a97;
+      --accent: #ff8b5e;
+      --accent-warm: #f0a05a;
+      --accent-wash: rgba(255, 139, 94, 0.13);
+      --silk: #8fc7e8;
+      --silk-wash: rgba(143, 199, 232, 0.15);
+      --slate-wash: rgba(255, 255, 255, 0.05);
+      --danger: #ff8484;
+      --shadow: none;
+      --card-shadow: none;
+      --modal-border: rgba(255, 255, 255, 0.09);
+    }
+  }
+  :root[data-theme='dark'] {
+    --board: #0e151c;
+    --ground: #1e2a36;
+    --raised: #26343f;
+    --overlay: #2f3e4b;
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: rgba(255, 255, 255, 0.1);
+    --line-strong: #7a8a97;
+    --accent: #ff8b5e;
+    --accent-warm: #f0a05a;
+    --accent-wash: rgba(255, 139, 94, 0.13);
+    --silk: #8fc7e8;
+    --silk-wash: rgba(143, 199, 232, 0.15);
+    --slate-wash: rgba(255, 255, 255, 0.05);
+    --danger: #ff8484;
+    --shadow: none;
+    --card-shadow: none;
+    --modal-border: rgba(255, 255, 255, 0.09);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--board);
+    color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    padding: 36px 24px 80px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1220px; margin: 0 auto; }
+
+  header.page {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .eyebrow {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 6px;
+  }
+  h1 {
+    font-family: Outfit, system-ui, sans-serif; font-size: 27px; font-weight: 700;
+    margin: 0 0 7px; text-wrap: balance; color: var(--ink);
+  }
+  .standfirst { margin: 0; max-width: 66ch; font-size: 14.5px; color: var(--ink-soft); }
+  .theme-btn {
+    font: inherit; font-size: 13px; font-weight: 500; padding: 9px 15px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--ground);
+    color: var(--ink); cursor: pointer; flex: 0 0 auto;
+  }
+  .theme-btn:hover { border-color: var(--line-strong); }
+  .theme-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  h2.sec {
+    font-family: Outfit, system-ui, sans-serif; font-size: 19px; font-weight: 700;
+    margin: 46px 0 4px; color: var(--ink);
+  }
+  h2.sec .num {
+    display: inline-block; min-width: 26px; height: 26px; line-height: 26px;
+    text-align: center; border-radius: 9px; background: var(--accent-wash);
+    color: var(--accent); font-size: 13px; font-weight: 700; margin-right: 9px;
+  }
+  .sec-note { margin: 0 0 22px; font-size: 14px; color: var(--ink-soft); max-width: 72ch; }
+
+  .stage {
+    display: flex; gap: 26px; align-items: flex-start; flex-wrap: wrap;
+    background: var(--slate-wash); border: 1px solid var(--line);
+    border-radius: 24px; padding: 26px;
+  }
+  .stage-col { display: flex; flex-direction: column; gap: 10px; }
+  .stage-label {
+    font-family: Outfit, system-ui, sans-serif; font-size: 11.5px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+  }
+
+  /* ── Modal shell (BaseModal / BeanieFormModal anatomy) ─────────────────── */
+  .modal {
+    background: var(--ground); border-radius: 24px; box-shadow: var(--shadow);
+    border: 1px solid var(--modal-border); overflow: hidden;
+  }
+  .modal.desktop { width: 520px; max-width: 100%; }
+  .modal.phone { width: 330px; border-radius: 24px; }
+  .m-head {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 22px; border-bottom: 1px solid var(--line);
+  }
+  .icon-box {
+    width: 44px; height: 44px; border-radius: 14px; background: var(--accent-wash);
+    display: flex; align-items: center; justify-content: center; font-size: 21px;
+    flex: 0 0 auto;
+  }
+  .m-title {
+    font-family: Outfit, system-ui, sans-serif; font-size: 18px; font-weight: 700;
+    color: var(--ink); margin: 0;
+  }
+  .m-sub { font-size: 12.5px; color: var(--ink-faint); margin: 1px 0 0; }
+  .m-x {
+    margin-left: auto; width: 32px; height: 32px; border-radius: 10px; border: 0;
+    background: transparent; color: var(--ink-faint); font-size: 17px; cursor: pointer;
+  }
+  .m-body { background: var(--raised); padding: 20px 22px; }
+  .m-foot {
+    display: flex; gap: 12px; padding: 16px 22px; border-top: 1px solid var(--line);
+    background: var(--ground);
+  }
+
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .lbl {
+    display: block; font-family: Outfit, system-ui, sans-serif; font-size: 11.5px;
+    font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 8px;
+  }
+  .input {
+    width: 100%; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--ground); color: var(--ink); padding: 11px 13px;
+    font-family: Outfit, system-ui, sans-serif; font-size: 15px; font-weight: 600;
+  }
+  .help { font-size: 12.5px; color: var(--ink-faint); margin: 8px 0 0; }
+
+  /* ── Bean chips (FamilyChipPicker) ─────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; border-radius: 999px;
+    padding: 6px 13px 6px 6px; border: 2px solid transparent;
+    background: var(--slate-wash); cursor: pointer; font: inherit;
+  }
+  .chip .nm {
+    font-family: Outfit, system-ui, sans-serif; font-size: 12.5px; font-weight: 600;
+    color: var(--ink);
+  }
+  .chip.on { border-color: var(--accent); background: var(--accent-wash); }
+  .chip:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .av {
+    width: 24px; height: 24px; border-radius: 999px; display: flex;
+    align-items: center; justify-content: center; color: #fff; font-size: 11px;
+    font-weight: 700; font-family: Outfit, system-ui, sans-serif; flex: 0 0 auto;
+  }
+  .av.lg { width: 30px; height: 30px; font-size: 13px; }
+  .av-joey { background: #f15d22; }
+  .av-ollie { background: #2980b9; }
+  .av-max { background: #27ae60; }
+  .av-greg { background: #8e44ad; }
+
+  /* ── Buttons ───────────────────────────────────────────────────────────── */
+  .btn {
+    flex: 1; border: 0; border-radius: 16px; padding: 13px 18px; cursor: pointer;
+    font-family: Outfit, system-ui, sans-serif; font-size: 14px; font-weight: 700;
+  }
+  .btn-primary { background: linear-gradient(135deg, #f15d22, #e67e22); color: #fff; }
+  .btn-ghost {
+    flex: 0 0 auto; background: transparent; color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  /* ── Preview rows (direction B) ────────────────────────────────────────── */
+  .prow {
+    display: flex; align-items: center; gap: 11px; background: var(--ground);
+    border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .prow:last-child { margin-bottom: 0; }
+  .prow input {
+    flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink);
+    font-family: Outfit, system-ui, sans-serif; font-size: 14px; font-weight: 600;
+    padding: 2px 0;
+  }
+  .prow input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .prow .drop {
+    border: 0; background: transparent; color: var(--ink-faint); font-size: 15px;
+    cursor: pointer; padding: 4px 6px; border-radius: 8px; flex: 0 0 auto;
+  }
+  .prow.muted { opacity: 0.55; }
+
+  .summary {
+    display: flex; align-items: center; gap: 9px; margin-top: 14px; padding: 11px 13px;
+    border-radius: 14px; background: var(--silk-wash); font-size: 13px; color: var(--ink-soft);
+  }
+
+  /* ── List shelf tiles (ListTile + ListShelf grid) ──────────────────────── */
+  .shelf { display: grid; gap: 12px; }
+  .shelf.desk { grid-template-columns: repeat(3, 216px); }
+  .shelf.mob { grid-template-columns: repeat(2, 158px); }
+  .tile {
+    background: var(--ground); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden; box-shadow: var(--card-shadow); cursor: pointer;
+    display: flex; flex-direction: column;
+  }
+  .tile:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .tile-strip {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px 6px 12px; background: var(--accent-wash); min-height: 48px;
+  }
+  .tile-emoji { font-size: 19px; }
+  .tile-acts { display: flex; gap: 2px; }
+  .iact {
+    width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent;
+    color: var(--ink-faint); font-size: 14px; cursor: pointer; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .iact:hover { background: var(--slate-wash); color: var(--accent); }
+  .iact.danger:hover { color: var(--danger); }
+  .iact:focus-visible { outline: 3px solid var(--accent); outline-offset: -2px; }
+  .tile-body { display: flex; flex-direction: column; gap: 7px; padding: 11px 12px 13px; }
+  .tile-title {
+    font-family: Outfit, system-ui, sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--ink); margin: 0; line-height: 1.3;
+  }
+  .tile-meta {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    font-size: 12px; color: var(--ink-faint);
+  }
+  .cat { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .cdot {
+    width: 8px; height: 8px; border-radius: 999px; background: var(--accent);
+    flex: 0 0 auto;
+  }
+  .av.sm { width: 18px; height: 18px; font-size: 9px; }
+  .bar { display: flex; align-items: center; gap: 8px; }
+  .bar-track {
+    flex: 1; height: 6px; border-radius: 999px; background: var(--slate-wash);
+    overflow: hidden; min-width: 0;
+  }
+  .bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .bar-n {
+    font-size: 11.5px; font-weight: 500; color: var(--ink-faint); flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+
+  /* ── Verdict panel ─────────────────────────────────────────────────────── */
+  .verdict {
+    margin-top: 46px; background: var(--ground); border: 1px solid var(--line);
+    border-radius: 24px; padding: 26px 28px; box-shadow: var(--card-shadow);
+  }
+  .verdict h3 {
+    font-family: Outfit, system-ui, sans-serif; font-size: 17px; font-weight: 700;
+    margin: 0 0 14px;
+  }
+  .verdict table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .verdict th {
+    text-align: left; font-family: Outfit, system-ui, sans-serif; font-size: 11.5px;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+    font-weight: 600; padding: 0 14px 10px 0; border-bottom: 1px solid var(--line);
+  }
+  .verdict td {
+    padding: 12px 14px 12px 0; vertical-align: top; color: var(--ink-soft);
+    border-bottom: 1px solid var(--line);
+  }
+  .verdict tr:last-child td { border-bottom: 0; }
+  .verdict td strong { color: var(--ink); font-weight: 600; }
+  .pick {
+    display: inline-block; padding: 2px 9px; border-radius: 999px;
+    background: var(--accent-wash); color: var(--accent);
+    font-family: Outfit, system-ui, sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 26px 15px 60px; }
+    .stage { padding: 18px; gap: 20px; }
+    .modal.desktop { width: 100%; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <div>
+      <p class="eyebrow">beanies.family · Beanie Lists</p>
+      <h1>Copy a list, once or for every bean</h1>
+      <p class="standfirst">
+        Families keep one chore list per child with the same items in each. Today the only way
+        to make the second one is to retype it. Two directions for the copy flow below, both
+        clamped to the CIG: Heritage Orange for every action, squircle corners, Outfit and
+        Inter, and the semantic dark scale from <code>packages/brand/theme.css</code>.
+      </p>
+    </div>
+    <button class="theme-btn" id="tt" type="button">Switch theme</button>
+  </header>
+
+  <!-- ───────────────────────── 1. Entry point ───────────────────────── -->
+  <h2 class="sec"><span class="num">1</span>Where it lives</h2>
+  <p class="sec-note">
+    Copy and delete sit top-right of the tile, matching <code>BeanCard.vue</code>&rsquo;s
+    edit / share / delete cluster. To make room, the owner dot moves out of the tinted strip
+    and down beside the category label. Two consequences worth naming: <code>ListTile</code>&rsquo;s
+    root has to stop being a <code>&lt;button&gt;</code> (no nested buttons), and it should keep
+    keyboard focus while doing so &mdash; <code>BeanCard</code>&rsquo;s <code>&lt;article @click&gt;</code>
+    isn&rsquo;t focusable, and copying that verbatim would regress this tile.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">Desktop shelf &middot; lg:grid-cols-4</span>
+      <div class="shelf desk">
+        <div class="tile">
+          <div class="tile-strip">
+            <span class="tile-emoji" aria-hidden="true">&#129529;</span>
+            <div class="tile-acts">
+              <button class="iact" type="button" title="Copy list">&#128203;</button>
+              <button class="iact danger" type="button" title="Delete list">&#128465;</button>
+            </div>
+          </div>
+          <div class="tile-body">
+            <p class="tile-title">Saturday Chores</p>
+            <div class="tile-meta">
+              <span class="cat"><span class="cdot"></span>Kids</span>
+              <span class="av av-joey sm">J</span>
+            </div>
+            <div class="bar"><span class="bar-track"><span class="bar-fill" style="width: 20%"></span></span><span class="bar-n">1/5</span></div>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-strip">
+            <span class="tile-emoji" aria-hidden="true">&#127890;</span>
+            <div class="tile-acts">
+              <button class="iact" type="button" title="Copy list">&#128203;</button>
+              <button class="iact danger" type="button" title="Delete list">&#128465;</button>
+            </div>
+          </div>
+          <div class="tile-body">
+            <p class="tile-title">Before School</p>
+            <div class="tile-meta">
+              <span class="cat"><span class="cdot"></span>Kids</span>
+              <span class="av av-ollie sm">O</span>
+            </div>
+            <div class="bar"><span class="bar-track"><span class="bar-fill" style="width: 60%"></span></span><span class="bar-n">3/5</span></div>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-strip">
+            <span class="tile-emoji" aria-hidden="true">&#128722;</span>
+            <div class="tile-acts">
+              <button class="iact" type="button" title="Copy list">&#128203;</button>
+              <button class="iact danger" type="button" title="Delete list">&#128465;</button>
+            </div>
+          </div>
+          <div class="tile-body">
+            <p class="tile-title">Grocery Run</p>
+            <div class="tile-meta">
+              <span class="cat"><span class="cdot"></span>Out</span>
+              <span class="av av-greg sm">G</span>
+            </div>
+            <div class="bar"><span class="bar-track"><span class="bar-fill" style="width: 40%"></span></span><span class="bar-n">2/5</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stage-col">
+      <span class="stage-label">Mobile shelf &middot; grid-cols-2</span>
+      <div class="shelf mob">
+        <div class="tile">
+          <div class="tile-strip">
+            <span class="tile-emoji" aria-hidden="true">&#129529;</span>
+            <div class="tile-acts">
+              <button class="iact" type="button" title="Copy list">&#128203;</button>
+              <button class="iact danger" type="button" title="Delete list">&#128465;</button>
+            </div>
+          </div>
+          <div class="tile-body">
+            <p class="tile-title">Saturday Chores</p>
+            <div class="tile-meta">
+              <span class="cat"><span class="cdot"></span>Kids</span>
+              <span class="av av-joey sm">J</span>
+            </div>
+            <div class="bar"><span class="bar-track"><span class="bar-fill" style="width: 20%"></span></span><span class="bar-n">1/5</span></div>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-strip">
+            <span class="tile-emoji" aria-hidden="true">&#127890;</span>
+            <div class="tile-acts">
+              <button class="iact" type="button" title="Copy list">&#128203;</button>
+              <button class="iact danger" type="button" title="Delete list">&#128465;</button>
+            </div>
+          </div>
+          <div class="tile-body">
+            <p class="tile-title">Before School</p>
+            <div class="tile-meta">
+              <span class="cat"><span class="cdot"></span>Kids</span>
+              <span class="av av-ollie sm">O</span>
+            </div>
+            <div class="bar"><span class="bar-track"><span class="bar-fill" style="width: 60%"></span></span><span class="bar-n">3/5</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="help" style="max-width: 34ch">
+        The 36px targets are the same size <code>BeanCard</code> already ships. This is the
+        tightest the layout gets: 2-across, longest realistic title.
+      </p>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 2. Direction A ───────────────────────── -->
+  <h2 class="sec"><span class="num">A</span>Chips, one title</h2>
+  <p class="sec-note">
+    Reuses <code>FamilyChipPicker</code> exactly as it is (multi-select, avatar plus name,
+    Heritage Orange border when on). One title field with a token that expands per bean.
+    Cheapest to build; nothing new is invented.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">Desktop · 520px</span>
+      <div class="modal desktop">
+        <div class="m-head">
+          <div class="icon-box">📋</div>
+          <div>
+            <p class="m-title">Copy List</p>
+            <p class="m-sub">From “Saturday Chores”</p>
+          </div>
+          <button class="m-x" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="m-body">
+          <div class="field">
+            <span class="lbl">Name the copies</span>
+            <input class="input" value="{bean}’s Saturday Chores" />
+            <p class="help">{bean} becomes each bean’s name. Remove it to give every copy the same name.</p>
+          </div>
+          <div class="field">
+            <span class="lbl">Make a copy for</span>
+            <div class="chips">
+              <button class="chip on" type="button"><span class="av av-joey">J</span><span class="nm">Joey</span></button>
+              <button class="chip on" type="button"><span class="av av-ollie">O</span><span class="nm">Ollie</span></button>
+              <button class="chip on" type="button"><span class="av av-max">M</span><span class="nm">Max</span></button>
+              <button class="chip" type="button"><span class="av av-greg">G</span><span class="nm">Greg</span></button>
+            </div>
+          </div>
+          <div class="summary">
+            <span aria-hidden="true">🌱</span>
+            <span>3 new lists, 5 things each, all unticked. Copies aren’t linked, so later edits won’t carry across.</span>
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-ghost" type="button">Cancel</button>
+          <button class="btn btn-primary" type="button">Create 3 Copies</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage-col">
+      <span class="stage-label">Mobile · 330px</span>
+      <div class="modal phone">
+        <div class="m-head">
+          <div class="icon-box">📋</div>
+          <div>
+            <p class="m-title">Copy List</p>
+            <p class="m-sub">From “Saturday Chores”</p>
+          </div>
+        </div>
+        <div class="m-body">
+          <div class="field">
+            <span class="lbl">Name the copies</span>
+            <input class="input" value="{bean}’s Saturday Chores" />
+          </div>
+          <div class="field">
+            <span class="lbl">Make a copy for</span>
+            <div class="chips">
+              <button class="chip on" type="button"><span class="av av-joey">J</span><span class="nm">Joey</span></button>
+              <button class="chip on" type="button"><span class="av av-ollie">O</span><span class="nm">Ollie</span></button>
+              <button class="chip on" type="button"><span class="av av-max">M</span><span class="nm">Max</span></button>
+              <button class="chip" type="button"><span class="av av-greg">G</span><span class="nm">Greg</span></button>
+            </div>
+          </div>
+          <div class="summary">
+            <span aria-hidden="true">🌱</span><span>3 new lists, 5 things each.</span>
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-primary" type="button">Create 3 Copies</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── 3. Direction B ───────────────────────── -->
+  <h2 class="sec"><span class="num">B</span>A row per copy</h2>
+  <p class="sec-note">
+    Same chips, but choosing a bean adds an editable row so each copy can be named and dropped
+    individually before anything is created. More control, and the single-copy case reads as one
+    row rather than a special mode.
+  </p>
+  <div class="stage">
+    <div class="stage-col">
+      <span class="stage-label">Desktop · 520px</span>
+      <div class="modal desktop">
+        <div class="m-head">
+          <div class="icon-box">📋</div>
+          <div>
+            <p class="m-title">Copy List</p>
+            <p class="m-sub">From “Saturday Chores”</p>
+          </div>
+          <button class="m-x" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="m-body">
+          <div class="field">
+            <span class="lbl">Make a copy for</span>
+            <div class="chips">
+              <button class="chip on" type="button"><span class="av av-joey">J</span><span class="nm">Joey</span></button>
+              <button class="chip on" type="button"><span class="av av-ollie">O</span><span class="nm">Ollie</span></button>
+              <button class="chip on" type="button"><span class="av av-max">M</span><span class="nm">Max</span></button>
+              <button class="chip" type="button"><span class="av av-greg">G</span><span class="nm">Greg</span></button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="lbl">These get made</span>
+            <div class="prow">
+              <span class="av lg av-joey">J</span>
+              <input value="Joey’s Saturday Chores" />
+              <button class="drop" type="button" aria-label="Don’t copy for Joey">✕</button>
+            </div>
+            <div class="prow">
+              <span class="av lg av-ollie">O</span>
+              <input value="Ollie’s Saturday Chores" />
+              <button class="drop" type="button" aria-label="Don’t copy for Ollie">✕</button>
+            </div>
+            <div class="prow">
+              <span class="av lg av-max">M</span>
+              <input value="Max’s Weekend Jobs" />
+              <button class="drop" type="button" aria-label="Don’t copy for Max">✕</button>
+            </div>
+          </div>
+          <div class="summary">
+            <span aria-hidden="true">🌱</span>
+            <span>5 things each, all unticked. Copies aren’t linked, so later edits won’t carry across.</span>
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-ghost" type="button">Cancel</button>
+          <button class="btn btn-primary" type="button">Create 3 Copies</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage-col">
+      <span class="stage-label">Mobile · 330px</span>
+      <div class="modal phone">
+        <div class="m-head">
+          <div class="icon-box">📋</div>
+          <div>
+            <p class="m-title">Copy List</p>
+            <p class="m-sub">From “Saturday Chores”</p>
+          </div>
+        </div>
+        <div class="m-body">
+          <div class="field">
+            <span class="lbl">Make a copy for</span>
+            <div class="chips">
+              <button class="chip on" type="button"><span class="av av-joey">J</span><span class="nm">Joey</span></button>
+              <button class="chip on" type="button"><span class="av av-ollie">O</span><span class="nm">Ollie</span></button>
+              <button class="chip" type="button"><span class="av av-max">M</span><span class="nm">Max</span></button>
+              <button class="chip" type="button"><span class="av av-greg">G</span><span class="nm">Greg</span></button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="lbl">These get made</span>
+            <div class="prow">
+              <span class="av lg av-joey">J</span>
+              <input value="Joey’s Saturday Chores" />
+              <button class="drop" type="button" aria-label="Don’t copy for Joey">✕</button>
+            </div>
+            <div class="prow">
+              <span class="av lg av-ollie">O</span>
+              <input value="Ollie’s Saturday Chores" />
+              <button class="drop" type="button" aria-label="Don’t copy for Ollie">✕</button>
+            </div>
+          </div>
+        </div>
+        <div class="m-foot">
+          <button class="btn btn-primary" type="button">Create 2 Copies</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────────────────── Verdict ───────────────────────── -->
+  <div class="verdict">
+    <h3>Choosing between them</h3>
+    <table>
+      <thead>
+        <tr><th style="width: 15%">&nbsp;</th><th style="width: 42%">A · Chips, one title</th><th>B · A row per copy</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>New parts</strong></td>
+          <td>None. <code>FamilyChipPicker</code> plus one text input inside a <code>BeanieFormModal</code>.</td>
+          <td>A repeating row component, and the chips have to stay in sync with the rows both ways.</td>
+        </tr>
+        <tr>
+          <td><strong>Naming</strong></td>
+          <td>One pattern for all. A bean who needs a different name has to be renamed afterwards.</td>
+          <td>Each copy named before it exists. Handles “Max’s Weekend Jobs” without a follow-up edit.</td>
+        </tr>
+        <tr>
+          <td><strong>One copy</strong></td>
+          <td>Reads slightly oddly: a token in a name field for a single bean.</td>
+          <td>Reads naturally. One chip on, one row, button says Create Copy.</td>
+        </tr>
+        <tr>
+          <td><strong>Mobile</strong></td>
+          <td>Short. Fits without scrolling at four beans.</td>
+          <td>Grows a row per bean, so a five-bean family scrolls inside the sheet.</td>
+        </tr>
+        <tr>
+          <td><strong>Verdict</strong></td>
+          <td><span class="pick">Recommended</span> Ships the chores case with nothing new to maintain. The <code>{bean}</code> token is the one idea a person has to learn, and the helper text under the field teaches it.</td>
+          <td>Better product if list-copying becomes a habit rather than a setup step. Worth revisiting once there is usage to look at.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  // Cycles light → dark → system so all three resolution paths are checkable.
+  (function () {
+    var order = ['light', 'dark', null];
+    var i = 0;
+    document.getElementById('tt').addEventListener('click', function () {
+      i = (i + 1) % order.length;
+      if (order[i]) document.documentElement.setAttribute('data-theme', order[i]);
+      else document.documentElement.removeAttribute('data-theme');
+      this.textContent = order[i] ? 'Theme: ' + order[i] : 'Theme: system';
+    });
+  })();
+</script>
