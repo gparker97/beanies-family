@@ -15,6 +15,7 @@
 import type { BeanpodFileV4, RecoveryKeyPackage } from '@/types/syncFileV4';
 import { unwrapFamilyKey, wrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
 import { toISODateString } from '@/utils/date';
+import { shareableOrigin } from '@/utils/shareableOrigin';
 
 /** Crockford base32 — no I, L, O, U; unambiguous to read back from paper. */
 // eslint-disable-next-line no-secrets/no-secrets -- a PUBLIC alphabet constant, not a secret
@@ -111,9 +112,12 @@ export const KIT_LINK_HASH = 'beanies-kit=';
  * fragment — fragments never leave the browser.
  */
 export function kitDeepLink(code: string): string {
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : 'https://app.beanies.family';
-  return `${origin}/welcome#${KIT_LINK_HASH}${encodeURIComponent(code)}`;
+  // ⚠️ `shareableOrigin()`, never `window.location.origin`. This string is printed into a QR
+  // code that a DIFFERENT device's camera scans — the canonical "built here, opened
+  // elsewhere" case. Generated inside the iOS shell, `location.origin` is
+  // `capacitor://app.beanies.family`, so the printed kit encoded a private scheme and a
+  // phone pointed at it opened nothing at all. The fallback is unchanged.
+  return `${shareableOrigin()}/welcome#${KIT_LINK_HASH}${encodeURIComponent(code)}`;
 }
 
 /** Accept a scanned QR payload OR a hand-typed code: extract the kit code either way. */

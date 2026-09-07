@@ -15,7 +15,7 @@
  * "which part was malformed" signal shown to whoever holds the link tells an attacker which
  * of their probes got closer.
  */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
@@ -35,11 +35,20 @@ type State = 'recipe' | 'dead-end' | 'stale';
 const state = ref<State>('dead-end');
 const fields = ref<SharedRecipeFields | null>(null);
 
-// Decoded ONCE, in setup rather than `onMounted`. The fragment is already in the address
-// bar, so there is nothing to wait for — and mounting first would paint the dead-end for a
-// frame before the recipe replaced it, which is a bad first impression of the product for
-// exactly the person we are trying to win over. `route.hash` includes the leading '#'.
-{
+/**
+ * Decode the fragment.
+ *
+ * Runs SYNCHRONOUSLY from setup rather than `onMounted`: the fragment is already in the
+ * address bar, so there is nothing to wait for, and mounting first painted the dead-end for
+ * a frame before the recipe replaced it — a bad first impression for exactly the person we
+ * are trying to win over.
+ *
+ * It also runs again on a hash CHANGE. `<router-view>` carries no `:key`, so opening a
+ * second `/recipe` link in the same tab (an address-bar paste, or an in-app browser reusing
+ * the WebView) is a same-document navigation that reuses this component — without the
+ * watcher the page would keep showing the FIRST friend's recipe.
+ */
+function decode(): void {
   const raw = route.hash.startsWith('#') ? route.hash.slice(1) : route.hash;
   const result = decodeRecipeShare(raw);
 
@@ -65,6 +74,8 @@ const fields = ref<SharedRecipeFields | null>(null);
     });
   }
 }
+
+watch(() => route.hash, decode, { immediate: true });
 
 /** Re-screened at the binding, not trusted from the decode. */
 const sourceHref = computed(() => safeHttpsUrl(fields.value?.sourceUrl ?? null));
@@ -221,7 +232,7 @@ function keep() {
           :href="sourceHref"
           target="_blank"
           rel="noopener noreferrer"
-          class="font-inter text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft mt-5 inline-flex items-center gap-1.5 text-xs transition-colors"
+          class="font-inter text-secondary-500/70 hover:text-primary-500 dark:text-ink-soft dark:hover:text-accent-lift mt-5 inline-flex items-center gap-1.5 text-xs transition-colors"
         >
           <span aria-hidden="true">🔗</span>
           <span>{{ t('recipeShare.received.source') }}</span>

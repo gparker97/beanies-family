@@ -307,7 +307,7 @@ watch(recipe, (now, before) => {
             <button
               v-if="canEditActivities"
               type="button"
-              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
               @click="editRecipeOpen = true"
             >
               <BeanieIcon name="edit" size="xs" />
@@ -327,7 +327,7 @@ watch(recipe, (now, before) => {
                  page the gradient is reserved for the one action that records something. -->
             <button
               type="button"
-              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
               data-testid="recipe-share-open"
               @click="shareRecipeOpen = true"
             >

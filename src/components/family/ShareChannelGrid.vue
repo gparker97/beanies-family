@@ -41,6 +41,16 @@ const props = defineProps<{
   showSystemShare?: boolean;
   /** kebab-case telemetry surface of the caller, for the system-share fallback path. */
   surface: string;
+  /**
+   * Title for the OS share sheet, required whenever `showSystemShare` is set.
+   *
+   * ⚠️ It is a PROP, not `t('share.title')`. That key is "Share Invite Link", and the More
+   * tile only ever appears on a recipe share — so the one caller of the system sheet was
+   * sending a friend a recipe under an invite heading, which several targets surface
+   * verbatim (Gmail uses it as the subject). In a component whose header claims zero
+   * invite vocabulary, that was the last of it.
+   */
+  systemShareTitle?: string;
 }>();
 
 const emit = defineEmits<{
@@ -108,7 +118,11 @@ async function handleCopy() {
 
 /** The OS share sheet. `useShareText` owns its own failure toast and cancel detection. */
 async function handleSystemShare() {
-  const ok = await shareViaSystem(t('share.title'), props.body, props.surface);
+  const ok = await shareViaSystem(
+    props.systemShareTitle ?? t('app.name'),
+    props.body,
+    props.surface
+  );
   if (ok) emit('shared', 'system');
 }
 

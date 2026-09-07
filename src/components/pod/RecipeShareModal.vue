@@ -145,6 +145,7 @@ function onShared(channelId: string) {
         :body="message.text"
         :email-subject="emailSubject"
         :copy-text="message.text"
+        :system-share-title="recipe.name"
         show-system-share
         surface="recipe-share"
         @shared="onShared"
@@ -159,11 +160,18 @@ function onShared(channelId: string) {
       <!-- The message contains the user's own recipe, so they see exactly what leaves. -->
       <div>
         <p
+          id="recipe-share-preview-label"
           class="font-outfit text-secondary-500/60 dark:text-ink-faint mb-1.5 text-xs font-semibold tracking-wide uppercase"
         >
           {{ t('recipeShare.modal.previewLabel') }}
         </p>
+        <!-- `tabindex="0"` is not decoration: the box scrolls, and without it a
+             keyboard-only user cannot reach past the fold of the message this modal exists
+             to let them read before it leaves (WCAG 2.1.1). -->
         <pre
+          tabindex="0"
+          role="region"
+          aria-labelledby="recipe-share-preview-label"
           class="dark:bg-surface-overlay/50 dark:text-ink-soft font-inter max-h-48 overflow-y-auto rounded-2xl bg-gray-50 p-3 text-xs leading-relaxed whitespace-pre-wrap text-gray-600"
           data-testid="recipe-share-preview"
           >{{ message.text }}</pre>

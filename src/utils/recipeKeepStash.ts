@@ -24,6 +24,13 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import type { SharedRecipeFields } from './recipeShareLink';
 
 const STASH_KEY = 'beanies_kept_recipe';
+
+/**
+ * Has this page session already taken the stash? Belt to `removeItem`'s braces — see
+ * `consumeKeptRecipe`. Reset by `stashKeptRecipe`, because keeping a SECOND recipe in the
+ * same session is a perfectly ordinary thing to do.
+ */
+let consumedThisSession = false;
 /** Long enough for a sign-up, short enough that a forgotten recipe does not linger. */
 const TTL_MS = 60 * 60_000;
 
@@ -43,6 +50,9 @@ export function stashKeptRecipe(fields: SharedRecipeFields): boolean {
   try {
     const envelope: StashEnvelope = { savedAt: Date.now(), fields };
     localStorage.setItem(STASH_KEY, JSON.stringify(envelope));
+    // A new keep is a new journey — the session guard must not refuse the second recipe
+    // someone sends you.
+    consumedThisSession = false;
     return true;
   } catch (e) {
     // Private mode, quota, storage disabled. Never a bare catch: the user is about to be
@@ -114,13 +124,21 @@ function readStash(): StashEnvelope | null {
  * delete best-effort: the TTL still bounds anything the delete could not remove.
  */
 export function consumeKeptRecipe(): SharedRecipeFields | null {
+  // The in-memory half of single-consume. It is what makes the property TRUE rather than
+  // best-effort: when `removeItem` throws (Safari private mode reads fine and refuses
+  // writes) the entry survives in storage, and without this the same recipe would re-open
+  // the add form on EVERY cookbook visit for the rest of the TTL. Returning the recipe and
+  // leaving it behind was the first fix's trade; this removes the need to make one.
+  if (consumedThisSession) return null;
+
   const envelope = readStash();
   const expired = envelope === null && hasRawStash();
+  consumedThisSession = true;
 
   try {
     localStorage.removeItem(STASH_KEY);
   } catch (e) {
-    // Nothing is lost: the recipe below was already read, and the TTL bounds what stays.
+    // The recipe below was already read, and the session flag above stops it coming back.
     console.warn('[recipe-keep] could not clear the stash — localStorage refused the write.', e);
   }
 
@@ -147,6 +165,7 @@ function hasRawStash(): boolean {
 
 /** Sign-out teardown. Clear-data tier only — see `signOutSteps`. */
 export function clearKeptRecipe(): void {
+  consumedThisSession = true;
   try {
     localStorage.removeItem(STASH_KEY);
   } catch {

@@ -13,6 +13,8 @@
  */
 import { BaseModal } from '@/components/ui';
 import { useTranslation } from '@/composables/useTranslation';
+import { useRecipeCourseLabel } from '@/composables/useRecipeCourseLabel';
+import { isMealSlot, SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import type { RecipeDiff, RecipeDiffField } from '@/utils/recipeDiff';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -24,6 +26,7 @@ defineProps<{
 const emit = defineEmits<{ take: []; close: [] }>();
 
 const { t } = useTranslation();
+const { courseLabel } = useRecipeCourseLabel();
 
 /** The diff's field names are exactly the form's, so its labels are reused rather than
  *  duplicated. `mealSlots` is the one that differs — the form calls it "Good for". */
@@ -40,8 +43,25 @@ const FIELD_LABEL_KEY: Record<RecipeDiffField, UIStringKey> = {
   mealSlots: 'recipes.field.meals',
 };
 
-/** One readable line per value. Lists become one entry per line so the two sides line up. */
-function render(value: unknown): string {
+/**
+ * One readable line per value. Lists become one entry per line so the two sides line up.
+ *
+ * ⚠️ `course` and `mealSlots` are IDS, not display text, and this modal's whole job is to
+ * put two values side by side. Rendering them raw would show `main` and `dinner` where the
+ * badges, the shelf headings and the planner all show "🍲 Main" and "Dinner" — and would
+ * put bare English ids in front of a Chinese-locale or beanie-mode user, which is the
+ * ADR-008 hole the render-site resolvers exist to close. Both resolvers already exist.
+ */
+function render(field: RecipeDiffField, value: unknown): string {
+  if (field === 'course') return typeof value === 'string' ? courseLabel(value) : '';
+  if (field === 'mealSlots') {
+    return Array.isArray(value)
+      ? value
+          .filter(isMealSlot)
+          .map((s) => t(SLOT_LABEL_KEYS[s]))
+          .join(', ')
+      : '';
+  }
   if (Array.isArray(value)) return value.join('\n');
   return typeof value === 'string' ? value : '';
 }
@@ -77,10 +97,10 @@ function render(value: unknown): string {
               {{ t('recipes.refetch.yours') }}
             </p>
             <p
-              v-if="render(row.mine)"
+              v-if="render(row.field, row.mine)"
               class="font-inter text-secondary-500/80 dark:text-ink-soft text-sm leading-relaxed whitespace-pre-line"
             >
-              {{ render(row.mine) }}
+              {{ render(row.field, row.mine) }}
             </p>
             <p v-else class="font-inter text-secondary-500/40 dark:text-ink-faint text-sm italic">
               {{ t('recipes.refetch.wasEmpty') }}
@@ -95,7 +115,7 @@ function render(value: unknown): string {
             <p
               class="font-inter text-secondary-500 dark:text-ink text-sm leading-relaxed whitespace-pre-line"
             >
-              {{ render(row.theirs) }}
+              {{ render(row.field, row.theirs) }}
             </p>
           </div>
         </div>
@@ -120,7 +140,7 @@ function render(value: unknown): string {
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="font-outfit text-secondary-500 dark:bg-surface-overlay dark:text-ink rounded-2xl bg-gray-100 px-4 py-2 text-sm font-semibold transition-colors hover:bg-gray-200"
+          class="font-outfit text-secondary-500 dark:bg-surface-overlay dark:text-ink dark:hover:bg-surface-hover rounded-2xl bg-gray-100 px-4 py-2 text-sm font-semibold transition-colors hover:bg-gray-200"
           data-testid="refetch-keep-mine"
           @click="emit('close')"
         >

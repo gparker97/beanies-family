@@ -83,6 +83,7 @@ import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
+import { shareableOrigin } from '@/utils/shareableOrigin';
 
 const FLAG = 'googleCalendarSync';
 
@@ -180,8 +181,13 @@ function makeMemberNameResolver(): (id: string) => string | undefined {
 function buildMapContext(memberName: (id: string) => string | undefined): ActivityMapContext {
   return {
     memberName,
-    appOrigin:
-      typeof window !== 'undefined' ? window.location.origin : 'https://app.beanies.family',
+    // ⚠️ `shareableOrigin()`, never `window.location.origin`. This is written into the
+    // DESCRIPTION BODY of every event beanies syncs to Google, so it is read on other
+    // devices, by other people the calendar is shared with, and it PERSISTS in Google's
+    // copy rather than being transient like a message. Synced from the iOS shell,
+    // `location.origin` is `capacitor://app.beanies.family` and every one of those links is
+    // dead. The fallback is unchanged.
+    appOrigin: shareableOrigin(),
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
 }

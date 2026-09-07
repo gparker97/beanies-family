@@ -404,7 +404,12 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         // How many of prep / cook / servings carry a value at all (0-3).
         count: timesFilled,
         // How many of those the model worked out rather than read, as a fixed bucket.
-        detail: INFERRED_TIME_BUCKETS[prefill.inferredTimes.length] ?? 'all',
+        // DE-DUPLICATED. `validatedInferredTimes` filters to legal names but does not
+        // dedupe, so a model answering ["prepTime","prepTime"] would report 'two' against
+        // a count of 1 — and a `?? 'all'` fallback would launder any overflow into the
+        // most extreme legitimate bucket, which is the worst direction to guess in on the
+        // one metric that measures whether this feature did anything.
+        detail: INFERRED_TIME_BUCKETS[new Set(prefill.inferredTimes).size] ?? 'none',
       },
     });
 

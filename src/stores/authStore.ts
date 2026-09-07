@@ -2520,8 +2520,9 @@ export const useAuthStore = defineStore('auth', () => {
       // them — the delivery sweep is age-based and only runs on the NEXT
       // delivery, which may never come.
       sweepHandoffFiles: () => sweepHandoffFiles(),
-      // Tier-3 only (see signOutSteps): the stash already self-bounds via TTL +
-      // single-consume, so the lower tiers need no teardown for it.
+      // EVERY tier — see the reasoning on `SignOutStepName` in `signOutSteps.ts`. (An
+      // earlier cut put this on tier 3 alone, arguing the TTL and single-consume already
+      // bounded it; they bound duration and repetition, not IDENTITY.)
       clearKeptRecipe: () => clearKeptRecipe(),
     };
   }

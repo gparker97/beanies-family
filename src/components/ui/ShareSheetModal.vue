@@ -57,8 +57,11 @@ const { t } = useTranslation();
         <!-- Content -->
         <div class="relative flex items-center gap-3 px-5 py-3">
           <!-- Close button -->
+          <!-- `BeanieIcon` renders `aria-hidden`, so without a label this button has no
+               accessible name at all (WCAG 4.1.2) — it announces as "button". -->
           <button
             type="button"
+            :aria-label="t('action.close')"
             class="dark:text-ink-faint dark:hover:bg-surface-hover/50 dark:hover:text-ink-soft absolute top-2 right-2 rounded-xl p-1.5 text-gray-400/60 transition-colors hover:bg-white/40 hover:text-gray-600"
             @click="emit('close')"
           >

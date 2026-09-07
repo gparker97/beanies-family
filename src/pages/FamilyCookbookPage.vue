@@ -35,6 +35,7 @@ import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePhotoStore } from '@/stores/photoStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import type { Recipe } from '@/types/models';
 import { consumeKeptRecipe } from '@/utils/recipeKeepStash';
 import { sharedRecipeToPrefill } from '@/utils/recipeShareLink';
@@ -45,6 +46,7 @@ const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const photoStore = usePhotoStore();
 const { canEditActivities } = usePermissions();
+const familyStore = useFamilyStore();
 
 const modalOpen = ref(false);
 const editing = ref<Recipe | null>(null);
@@ -95,6 +97,16 @@ const capture = useRecipeCapture({
  * left to detect it with.
  */
 onMounted(() => {
+  // ⚠️ DO NOT CONSUME BEFORE THE ROSTER EXISTS. `<router-view>` is behind `v-show`, not
+  // `v-if`, and `shouldShowAppLayout` is false until auth hydrates — so on a cold boot
+  // straight to /pod/cookbook this component first mounts in the chrome-less branch, with
+  // `familyStore.members` still empty. `canEditActivities` is false for EVERYONE at that
+  // moment, including the owner. Consuming there would destroy the stash, tell the owner
+  // they lack permission, and then the component is destroyed and remounted with nothing
+  // left to take. Leaving it alone costs nothing: the remount runs this again, and the
+  // stash's TTL and single-consume still bound it.
+  if (!familyStore.members.length) return;
+
   const kept = consumeKeptRecipe();
   if (!kept) return;
   // ⚠️ GATED, like every other add affordance on this page. `openWithPrefill` opens the full
