@@ -618,6 +618,8 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
+> **Last updated:** 2026-09-07 (SESSION 2 — **BEANIE LIST COPY: one bean or several. Committed to `main` as `f55921a4` + `68cae7c1`, NOT PUSHED, NOT DEPLOYED** — greg is pushing from the concurrent compaction session. Tracker #91; plan `docs/plans/2026-09-07-list-copy-for-beans.md`; mockup `docs/mockups/list-duplicate-2026-09-07.html`.) Copy + delete icon buttons on each list tile following `BeanCard`'s cluster; copy opens a `BeanieFormModal` with a `{bean}`-token title and a multi-select `FamilyChipPicker`; N beans produce N lists in **one atomic Automerge batch**. ⚠️ **The batch API existed all along and the first plan draft said it did not** — `{ op: 'batch' }` is in `worker/protocol.ts:127` and `docOps.ts:676-679` documents the atomicity; `listRepository.ts` is thin re-exports, so the capability lives a layer below where I looked, and `listCycleRepository` had been using it in three places. Never write a loop of `create` calls for a multi-entity write. ⚠️ **A verify that runs AFTER a commit must not be worded as "nothing happened"** — `createLists` checks the projection post-`mutate`, so its failure means the lists probably exist and are merely invisible; the first cut told the user nothing was created, which invites a retry that makes a second set. ⚠️ **`wrapAsync` toasts `e.message` verbatim**, so any store-path `throw` puts raw developer text in front of a user; classified failures now carry a `UIStringKey` and the store owns the toast. **Two pre-existing defects fixed in passing:** `deleteList` returned `false` without throwing when the list was already gone and `ListDetailModal` closed the drawer anyway (a live silent failure, now a tri-state behind `useListDeletion`), and `ActionButtons`' buttons had no `type="button"`, so inside a `<form>` they submitted it. The four-pass plan discipline earned its keep: pass 2 found the batch API, pass 3 found three type/contract defects, pass 4 found a focus ring clipped to nothing by `overflow-hidden`, a `useFormModal` reset that never fires unless the modal stays mounted, and an unbound `isSubmitting` that let a double-tap create 2N lists. Gates: type-check, ESLint, 82 tests across the 7 affected suites, full suite 6842 green. ✅ greg verified the flow locally. ⏳ **OWED: dark-mode and 360px-mobile visual checks; the push.** ⚠️ `/code-review high` findings in the CONCURRENT compaction work (offlineQueue, applyAndProject, LoadPodView, SettingsPage) are listed in the pending block — deliberately untouched, that session was mid-edit on those files.)
+
 > **Last updated:** 2026-09-05 (SESSION 2 — **DARK MODE: THE SURFACE UNDER THE INK. Shipped to `main` as `02f49910`, NOT DEPLOYED.** 106 files, 965 insertions. A parallel session ran Tier 2 pod compaction throughout; all work here stayed off that session's files and was committed by explicit path, and that session's push carried this commit to `origin/main`.) ⭐ **The bug greg reported was CREATED by the previous dark-mode pass, not missed by it.** That pass added `dark:text-ink` app-wide; on a `bg-white` card that is right, but on a hand-painted pastel with no dark partner the ink went near-white and the paper stayed yellow — **1.01:1, invisible**, now 14.42. A grep for `bg-white` finds none of these and the lint rule cannot see an arbitrary hex or an inline style. **The ink and the surface are one unit of work.** Also fixed: two further instances greg had not hit (the milestones hero, `StickyNote`'s three pastel papers); **three `html.dark` rules that had never once applied** (a descendant combinator swallowed into a `:not()` makes the selector invalid and the whole rule is dropped — and reviving one meant fixing the old-ramp 50%-alpha grey it carried); the onboarding suite's `opacity`-dimmed text compositing to ~1.4:1 on the wizard's Back/Skip controls; and **~120 accent sites** that lacked their `-lift` partner. ⚠️ **A contrast figure I asserted from memory was wrong** — Heritage Orange on `surface-ground` is **5.08**, not 3.61; it clears AA on the page and fails on every surface above it (4.40 card, 3.85 overlay), which is exactly why it survived review. Corrected in all three docs. **Sky Silk had no lift token**, so blue accents were hand-rolled as 14 one-off hexes, three under the floor; added `--color-silk-lift` + `--color-teal-lift` and consolidated 27 call sites. **CIG gains two full slides (08 The Scale, 09 The Rules)** rendered on the real dark tokens, and its nav — which had drifted out of alignment with the section ids — is rebuilt to 19 entries; `CLAUDE.md` + the theme skill now name the CIG as the authority for both modes. Gates: type-check, ESLint, **stylelint**, build (verified the new utilities emit), 6223 tests — all green. ⚠️ stylelint was missing from my gate set and the pre-commit hook caught a real error; ESLint ≠ stylelint. ⏳ **OWED: greg's eyes in a browser — none of this is visually verified.** Detail in the header block above; prompts at `docs/prompts/2026-09/2026-09-05-dark-mode-surface-sweep.md`; lessons at the top of `docs/lessons.md`.
 >
 > **Last updated:** 2026-09-04 (**Session: 0.15.1 SHIPPED TO ALL FOUR SURFACES — the first mobile release since 0.14.** Deployed commit `3b263088`; Astro apex, the Vue PWA (`build_sha 3b263088` verified in the live bundle, not just a green tick), Play `beta` (auto-submitted for Google review), and App Store build `0.15.1 (65)` submitted for review with auto-release. Soft release: no in-app release note, version bump only. Carried #83 (plain-text share), #84 (one magic-beans button) and the link-vs-text precedence fix, plus the DynamoDB per-family/per-IP limiter on the AI proxy, which was verified end to end against prod with one real call before the client shipped.)
@@ -1930,9 +1932,84 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+**Validated 2026-09-07 (list-copy session)** — carried entries re-checked by fingerprint;
+**2 corrected**: the 2026-09-04 dark-mode/tablet block said "not committed" and has been on
+`main` since `5a7c55d4`/`02f49910` (still undeployed, which is the part that matters); and the
+Discord file-downloads item is SHIPPED (`@capacitor/share` present, `downloadAsFile` gone from
+`fileSync.ts`). Re-confirmed still OPEN: #66 has no `weeklyAgenda`/`agendaShare` fingerprint
+(grep=0), `useWakeLock` is still called unconditionally at `BeanieWallPage.vue:77`, and the
+#65/#61 open-guard CloudWatch query is still unrun. This session's work was net-new and
+orthogonal to the rest of the block.
+
+### ⭐ Session 2026-09-07 (2) — Beanie List copy, for one bean or several ⭐
+
+Shipped to `main`, **NOT pushed and NOT deployed** (`f55921a4` feature, `68cae7c1` review
+fixes). Greg checked the flow locally and confirmed it looks good, so the plan's
+manual-verification criterion is met; the remaining unchecked ones are dark-mode and the
+2-across mobile width at 360px. Tracker **#91**; plan
+`docs/plans/2026-09-07-list-copy-for-beans.md`; mockup
+`docs/mockups/list-duplicate-2026-09-07.html` (Direction A).
+
+Copy + delete icon buttons now sit top-right of each list tile, following `BeanCard`'s
+action-cluster convention; copy opens a `BeanieFormModal` with a `{bean}`-token title and a
+multi-select `FamilyChipPicker`, and N beans produce N lists.
+
+⚠️ **The finding worth carrying forward:** the Automerge worker HAS an atomic batch
+(`{ op: 'batch', ops }`, `worker/protocol.ts:127`) and `worker/docOps.ts:676-679` states it
+outright — "exactly ONE `Automerge.change` → atomic: a mid-batch throw commits nothing". The
+first draft of this plan asserted no batch API existed, because `listRepository.ts` is thin
+re-exports and the capability lives one layer down in the mutate protocol. `listCycleRepository`
+had been using it in three places all along. **Do not write a loop of `create` calls for a
+multi-entity write** — reach for the batch.
+
+⚠️ **A verify that runs after a commit must not be worded as "nothing happened".**
+`createLists` checks the projection AFTER `mutate` resolves, so its failure means the lists
+probably DO exist and are merely invisible. The first cut reported and toasted "nothing was
+created", which invites a retry that makes a second set. It is now a typed
+`ListsNotVisibleError` → `verify-missing` with its own message.
+
+⚠️ **`wrapAsync` toasts `e.message` verbatim** (`useStoreActions.ts:88-96`), so any `throw` on
+a store path puts raw developer text in front of a user. Classified failures now carry a
+`UIStringKey` and the store owns the toast with `silent: true`; only genuinely unexpected
+errors rethrow.
+
+**Also fixed while here (pre-existing, not introduced):** `listStore.deleteList` returned
+`false` without throwing when the list was already gone, and `ListDetailModal.handleDelete`
+discarded that boolean and closed the drawer anyway — a live silent failure of the same class
+`useMemberRemoval` was written to close. It is now a tri-state (`true`/`false`/`null`) behind
+the shared `useListDeletion`. `ActionButtons`' buttons were also missing `type="button"`, so
+inside a `<form>` they submitted it.
+
+**Still owed:**
+
+- The feature is **unpushed**. At session end `main` was 14 commits ahead of `origin/main`,
+  12 of them the concurrent compaction session's. Greg is pushing from that session.
+- **`CHANGELOG.md` entry is written; no release note beyond that.**
+- Dark-mode and 360px-mobile visual checks on the new tile cluster and copy modal.
+
+⚠️ **Code review (`/code-review high`) flagged findings in the CONCURRENT compaction work**,
+not in the list-copy code. They were deliberately untouched because that session was mid-edit
+on the same files. Worth triaging there:
+
+- `offlineQueue.ts:327` — the new `'declined'` arm cannot distinguish "the save path refused"
+  from "still offline", and `tryFlush` has no `navigator.onLine` gate. With
+  `FLUSH_FAILURE_PAGE_THRESHOLD` at 2, an ordinary offline user tabbing back twice pages
+  `#beanies-errors` at `critical`. Pre-diff that path returned `true`.
+- `applyAndProject.ts:128` — `cacheInitLoss()` reads inverted in both reachable cells and the
+  contract comment states the opposite of the behaviour; one branch installs remote wholesale
+  with no lineage guard while base and unread `inc:*` rows survive.
+- `LoadPodView.vue:688` — `LocalDocUnreadableError` extends `Error`, not `PayloadLoadError`,
+  so the `keyMayBeWrong` exemption misses it and `podUnopenableHere` latches for the session;
+  only a full reload recovers. Same defect at the recovery-kit site, `:613`.
+- `SettingsPage.vue:681` — `openDriveRestorePicker` calls `requestAccessToken()` from a
+  microtask continuation after `await confirm(...)` with no redirect guard; iOS Safari and any
+  installed PWA lose the gesture and land on `settings.drivePickerFailed` with no fallback.
+- `offlineQueue.ts:175` — the queue is now a "device has unsaved work" flag but only
+  `flushQueue` clears it, so `hasPendingSave()` stays true forever after an ordinary save.
+
 ### ⭐ Session 2026-09-04 — dark-mode remediation + tablet landscape (UNDEPLOYED) ⭐
 
-On `main`'s working tree, **not committed, not deployed**. 5763 unit tests green, type-check
+Committed to `main` (`5a7c55d4`, `02f49910`) but **still undeployed** — last prod deploy is `c3a6be98` (2026-09-04). 5763 unit tests green, type-check
 
 - lint + stylelint clean, production build clean.
 
@@ -1989,40 +2066,11 @@ is still an unrun CloudWatch query. This session was blog-only and shipped none 
 
 Raised by early adopters on Discord; greg wants these fixed asap. A **new context** starts here.
 
-1. **File downloads are dead in BOTH native apps** — the biggest of the set, and it is wider
-   than what was reported. Researched 2026-09-03; findings below so the next context does not
-   have to re-derive them.
-   - **Root cause:** `<a download>` + `blob:` saves nothing in either the Android System
-     WebView (no `DownloadListener` is registered — `grep -rn "DownloadListener" android/ ios/`
-     returns nothing) or iOS WKWebView. `navigator.share` is not exposed in the Android
-     WebView at all, so `shareOrDownloadFile.ts`'s share branch also falls through to the dead
-     anchor.
-   - **It reports success.** `downloadFile()` (`src/utils/shareOrDownloadFile.ts:30-51`)
-     returns `{outcome:'downloaded'}` unconditionally, because `anchor.click()` never throws.
-     So the app logs `export-downloaded` and shows the success path for a file that was never
-     written — which is why nothing about this appears in CloudWatch. **Fix this regardless of
-     which delivery fix is chosen.**
-   - **Reported broken:** recovery-kit PDF (both platforms — its `preferDownload:true`
-     bypasses the share sheet), meal-planner PDF (Android; iOS already has a special case).
-   - **Also broken, NOT reported:** `.beanpod` manual export and "Export Readable Data"
-     (`fileSync.ts:240` `downloadAsFile`, a second copy of the same dead idiom) on **both**
-     platforms — that is the data-portability escape hatch; the meal-planner PNG share on
-     Android; photo/PDF download in `PhotoViewer.vue:454`; and `PhotoViewer`'s bare
-     `target="_blank"` "open in new tab", which navigates the app's own WebView to the Drive
-     file with no way back.
-   - **Fix shape:** one native-aware branch inside `shareOrDownloadFile.ts` (the single
-     delivery seam) — `@capacitor/filesystem` (already installed AND compiled into the shipped
-     binaries) writes the blob to `Directory.Cache`, then the OS share sheet takes the `uri`.
-     Collapse `downloadAsFile` and the `isIosOrIpadOs()` meal-planner special case into it.
-   - **Two tiers.** `@capacitor/share` is the proper fix (real "Save to Files"/Drive on both)
-     but is NOT installed → new native dependency + **new signed store builds**; note two
-     traps: its `<provider>` declares the same `${applicationId}.fileprovider` authority
-     already in `AndroidManifest.xml:88-94` (manifest-merger conflict), and `file_paths.xml`
-     has `<cache-path>` but **no `<files-path>`**, so sharing a `Directory.Data` file throws
-     `Failed to find configured root`. A filesystem-only fallback (write + toast the path)
-     ships as a pure web deploy today but lands somewhere users struggle to find.
-   - Suggested sequence: ship the false-success fix + the JS-only fallback now, then
-     `@capacitor/share` in the next store build. This deserves a `/beanies-plan` pass.
+1. ✅ **File downloads in the native apps — SHIPPED.** `shareOrDownloadFile.ts` now has the
+   native branch (`@capacitor/share` + `@capacitor/filesystem`), a `DeliveryStage` enum and a
+   real `delivered` flag, so the false-success reporting is gone too; `downloadAsFile` no
+   longer exists in `fileSync.ts`. Validated 2026-09-07 by fingerprint.
+
 2. **Dark mode** — reported issues, not yet characterised. Get the specifics from Discord.
 3. **Recipe photos** — reported issues, not yet characterised. Get the specifics from Discord.
 
