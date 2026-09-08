@@ -127,7 +127,7 @@ export const retryAfterRemoteBlock = vi.fn();
  * suite that wants the block overrides it with `mockResolvedValue('dirty')`.
  */
 export const docPushedAgainst = vi.fn(async () => 'clean' as const);
-export const isFullySynced = vi.fn(async () => true);
+export const syncLevel = vi.fn(async () => 'level' as const);
 export const getRemoteBaselineHeadsFp = vi.fn<() => string | null>(() => null);
 export const noteLineageBlocked = vi.fn();
 export const noteMergeFailed = vi.fn();

@@ -1078,10 +1078,35 @@ export async function remoteChanged(): Promise<ChangeResult> {
  * probe and the #65 unpushed-changes comparison — so there is no third notion
  * of "in sync" to keep in step.
  */
-export async function isFullySynced(): Promise<boolean> {
+export type SyncLevel =
+  /** Heads match the bytes on Drive. Safe to compact. */
+  | 'level'
+  /** The remote moved under us; merge before doing anything one-way. */
+  | 'remote-moved'
+  /** We hold changes Drive has not got yet. */
+  | 'unpushed'
+  /**
+   * The probe FAILED, so we do not know. Distinct from `unpushed` and the
+   * distinction is not pedantic: the old boolean collapsed all three, so a
+   * transient 401 or a Drive 5xx was reported to the user as "some changes have
+   * not reached the cloud yet", which is a statement about their data that we
+   * had no evidence for.
+   */
+  | 'cannot-verify';
+
+/**
+ * How level is this device with the bytes on Drive?
+ *
+ * Replaced `isFullySynced(): Promise<boolean>` on 2026-09-08. One caller, and a
+ * boolean could not tell it why, so every refusal borrowed the same wrong copy.
+ */
+export async function syncLevel(): Promise<SyncLevel> {
   const change = await remoteChanged();
-  if (change.status !== 'unchanged') return false; // moved, or we cannot tell
-  return (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean';
+  if (change.status === 'unknown') return 'cannot-verify';
+  if (change.status !== 'unchanged') return 'remote-moved';
+  return (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean'
+    ? 'level'
+    : 'unpushed';
 }
 
 /**
