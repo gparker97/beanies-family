@@ -33,7 +33,7 @@ import {
   type PollWhileVisibleHandle,
 } from '@/composables/usePollWhileVisible';
 import { getAllActivities } from '@/services/automerge/repositories/activityRepository';
-import { getGoogleAccountEmail, hasRefreshToken } from '@/services/google/googleAuth';
+import { getGoogleAccountEmail } from '@/services/google/googleAuth';
 import { revokeGrant, logTokenLifecycle } from '@/services/google/googleRevoke';
 import {
   getCalendarConnectionById,
@@ -952,9 +952,21 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
    * this guard can be relaxed to always revoke.
    */
   function liveDriveGrantSharesAccount(accountEmail: string | undefined): boolean {
-    // No live Drive grant → revoking the calendar token can't harm Drive.
-    if (!hasRefreshToken()) return false;
-    // A live Drive grant exists. FAIL SAFE: only revoke the calendar token when we
+    // ⚠️ NO `hasRefreshToken()` EARLY RETURN (removed 2026-09-08). It used to
+    // return false here — "no live Drive grant, so revoking cannot harm Drive" —
+    // but `hasRefreshToken()` inspects only THIS DEVICE's in-memory Drive token.
+    // Google's revoke is whole-grant for the (user, client_id) pair, and Drive
+    // and Calendar share a client_id, so a calendar-only device, or one where
+    // Drive was signed out or cleared on an `invalid_grant`, would revoke and
+    // kill Drive AND Calendar on every SIBLING device — each of which then
+    // reconnects and revokes in turn. That is exactly the fleet-wide ping-pong
+    // removed from both Drive seams in `googleAuth`, and it was still live here.
+    //
+    // The account comparison below already fails safe on every uncertainty, so
+    // dropping the early return simply skips more revokes. The cost is a larger
+    // token pool, which is the trade `googleAuth` already accepted deliberately.
+    //
+    // FAIL SAFE: only revoke the calendar token when we
     // can POSITIVELY confirm it belongs to a DIFFERENT Google account (a separate
     // grant). Any uncertainty — an 'unknown' sentinel email, or a missing email on
     // either side — is treated as shared, so we skip the revoke and protect the

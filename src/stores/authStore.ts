@@ -294,10 +294,10 @@ async function rotateMemberPassword(
   }
 
   // User-initiated change/reset: block on the REAL Drive save (~12s). The
-  // three-state outcome distinguishes a clean failure (nothing reached Drive)
-  // from a timeout (the non-cancellable write may still land) — the whole reason
-  // we don't use syncNowBounded here. A post-write reject maps to 'saved' inside
-  // syncNowDurable (the credential is durable; only the metadata write failed).
+  // The outcome distinguishes a clean failure (nothing reached Drive) from a
+  // timeout and from an unexpected rejection (in both of which the write may
+  // still have landed) — the whole reason we don't use syncNowBounded here.
+  // ⚠️ 'unknown' is NOT 'failed': see the convergence block below.
   const outcome = await syncStore.syncNowDurable(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
   if (outcome === 'saved') {
     logEvent({
@@ -326,16 +326,21 @@ async function rotateMemberPassword(
     },
   });
 
-  // Convergence re-save ONLY on timeout (the non-cancellable write may have
-  // landed). It serializes the rolled-back (old-password) state BEHIND any stray
-  // in-flight upload via syncService's save() mutex, so Drive converges back to
-  // the old password. On a clean 'failed' nothing reached Drive, so no
-  // convergence + no critical is needed. Reuses syncNowDurable so a post-write
-  // metadata reject here maps to 'saved' (Drive converged) rather than firing a
-  // false page. If this re-save doesn't confirm 'saved', Drive may hold the new
-  // password while local is old (a cross-device lockout window) — the one
-  // data-at-risk case that pages.
-  if (outcome === 'timeout') {
+  // Convergence re-save whenever the write MAY have landed — a timeout (the
+  // non-cancellable write can still be in flight) or an unexpected rejection
+  // (durability unknown). It serializes the rolled-back (old-password) state
+  // BEHIND any stray in-flight upload via syncService's save() mutex, so Drive
+  // converges back to the old password.
+  //
+  // ⚠️ 'unknown' MUST be in this condition. Only a clean 'failed' proves nothing
+  // reached Drive and licenses skipping convergence. Treating an unknown-
+  // durability write as a clean failure would skip it while Drive may hold the
+  // new password and local has reverted, which is precisely the silent
+  // cross-device lockout the critical below exists to catch.
+  //
+  // If this re-save doesn't confirm 'saved', Drive may hold the new password
+  // while local is old — the one data-at-risk case that pages.
+  if (outcome === 'timeout' || outcome === 'unknown') {
     const converged = await syncStore.syncNowDurable(syncStore.DURABLE_ROTATION_SAVE_TIMEOUT_MS);
     if (converged !== 'saved') {
       reportError({

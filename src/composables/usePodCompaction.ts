@@ -76,6 +76,8 @@ type RefusalCode =
  * rather than silently falling into whichever branch an if-ladder ends with.
  */
 const REFUSAL_FOR: Record<Exclude<SyncLevel, 'level'>, RefusalCode> = {
+  // Someone else saved while we were deciding. Retrying pulls it in, which is
+  // why this is retryable rather than a fact about the family.
   'remote-moved': 'not-synced',
   unpushed: 'not-synced',
   'cannot-verify': 'cannot-verify',
@@ -147,9 +149,10 @@ export function usePodCompaction() {
       // True for every refusal: they are all decided BEFORE anything is written.
       subtitleKey: 'compactionProgress.failedSubtitle',
       helpKey: `compaction.refused.${code}` as UIStringKey,
-      // `not-synced` is a snapshot of the sync state and clears itself within
-      // seconds (the debounced save levels the device), so a second press is
-      // the honest next step. Every other refusal is a fact about the family.
+      // `not-synced` and `cannot-verify` both describe a MOMENT — the device
+      // levels itself within seconds, or the probe works next time — so a second
+      // press is the honest next step. Every other refusal is a fact about the
+      // family and pressing again would only repeat it.
       retryable: RETRYABLE.has(code),
     };
     logEvent({
@@ -238,16 +241,23 @@ export function usePodCompaction() {
       //     consulting the probe, so it closes the hole for every provider; one
       //     download on a rare, user-initiated, one-way operation is the
       //     cheapest possible insurance.
-      if (!(await syncStore.loadFromFile({ merge: true })).success) return refuse('not-synced');
+      // A failed DOWNLOAD is not unpushed local work. Reporting it as
+      // `not-synced` told the user to wait for an upload that was never the
+      // problem, on the same false-claim reasoning `cannot-verify` exists to end.
+      if (!(await syncStore.loadFromFile({ merge: true })).success) return refuse('cannot-verify');
 
       // 2c. Now push whatever the merge revealed, and prove we are level.
       //     Still cheapest-proof-first: `syncNow` exports, encrypts, base64s and
       //     uploads the whole pod, so an already-level device skips it.
 
-      if ((await syncService.syncLevel()) !== 'level') {
-        if (!(await syncStore.syncNow(false))) return refuse('not-synced');
-        const level = await syncService.syncLevel();
-        if (level !== 'level') return refuse(REFUSAL_FOR[level]);
+      const level = await syncService.syncLevel();
+      if (level !== 'level') {
+        // ⚠️ The push failing does NOT mean we hold unpushed work — we may
+        // simply have been unable to check in the first place. Carry the reason
+        // we already have rather than asserting the worst one.
+        if (!(await syncStore.syncNow(false))) return refuse(REFUSAL_FOR[level]);
+        const after = await syncService.syncLevel();
+        if (after !== 'level') return refuse(REFUSAL_FOR[after]);
       }
 
       // 3. Backup, gated on DELIVERY. The rollback route the family keeps.

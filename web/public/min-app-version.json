@@ -1,5 +1,5 @@
 {
-  "promptBelowVersion": "0.17",
-  "reason": "Not rendered anywhere. For whoever edits this file, and for telemetry. Raised to 0.17 on 2026-09-08: a device below this can overwrite a compacted pod with its pre-compaction copy, and edits made on it in between are not recoverable. See docs/investigations/2026-09-08-compaction-fallout.md.",
+  "promptBelowVersion": "0.16",
+  "reason": "Not rendered anywhere. For whoever edits this file, and for telemetry. STAYS AT 0.16 until 0.17 is live on BOTH stores: it is currently TestFlight + Play open testing only, so prompting would send people to a listing that still offers 0.16 (runbook section 7, step 1). Raising it is warranted once 0.17 is live, because a device below the floor can overwrite a compacted pod with its pre-compaction copy and the edits made on it in between are not recoverable (docs/investigations/2026-09-08-compaction-fallout.md).",
   "_docs": "docs/runbooks/native-store-submission.md#7-raising-the-update-floor"
 }

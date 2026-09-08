@@ -1623,6 +1623,13 @@ describe('googleAuth (PKCE)', () => {
       // The 2026-09-08 gate. Escalating raises the reconnect surface, and
       // reconnecting forces a Google consent screen — too high a price for a
       // dropped connection or a proxy 5xx. Only a 4xx rejection counts.
+      // ⚠️ THE STUB IS LOAD-BEARING. Without it `performSilentRefresh` returns at
+      // its clientId guard before the retry loop ever runs, and an early return
+      // produces exactly what these tests assert — so they pass while testing
+      // nothing. `.env`/`.env.local` define the var locally but CI does not, so
+      // the failure mode is invisible on a dev machine and total in CI. Proven by
+      // experiment during the 2026-09-08 review.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       sessionStorage.setItem('beanies_silent_refresh_failures', '1');
 
       vi.resetModules();
@@ -1652,12 +1659,22 @@ describe('googleAuth (PKCE)', () => {
       await p;
       vi.useRealTimers();
 
+      // The retry loop actually ran. Without this an early return at the
+      // clientId guard satisfies every other assertion in this test.
+      expect(refreshFn.mock.calls.length).toBeGreaterThan(0);
       expect(permanentSpy).not.toHaveBeenCalled();
       // Counter untouched: a transient failure is not evidence of a dead grant.
       expect(sessionStorage.getItem('beanies_silent_refresh_failures')).toBe('1');
     });
 
     it('DOES escalate on a 5xx? no — a proxy failure is the proxy, not the grant', async () => {
+      // ⚠️ THE STUB IS LOAD-BEARING. Without it `performSilentRefresh` returns at
+      // its clientId guard before the retry loop ever runs, and an early return
+      // produces exactly what these tests assert — so they pass while testing
+      // nothing. `.env`/`.env.local` define the var locally but CI does not, so
+      // the failure mode is invisible on a dev machine and total in CI. Proven by
+      // experiment during the 2026-09-08 review.
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
       sessionStorage.setItem('beanies_silent_refresh_failures', '1');
 
       vi.resetModules();
@@ -1687,6 +1704,7 @@ describe('googleAuth (PKCE)', () => {
       await p;
       vi.useRealTimers();
 
+      expect(refreshFn.mock.calls.length).toBeGreaterThan(0);
       expect(permanentSpy).not.toHaveBeenCalled();
       expect(sessionStorage.getItem('beanies_silent_refresh_failures')).toBe('1');
     });
