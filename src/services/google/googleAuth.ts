@@ -1130,6 +1130,27 @@ export function isTokenValid(): boolean {
 }
 
 /**
+ * Drop the cached ACCESS token (never the refresh token), so the next
+ * acquisition actually asks Google instead of trusting the local clock.
+ *
+ * ⚠️ THIS IS WHAT MAKES "RECONNECT" MEAN SOMETHING when the grant was revoked on
+ * ANOTHER device. `isTokenValid()` is a pure local expiry check: it never
+ * contacts Google, so a token revoked elsewhere keeps reading valid until its own
+ * TTL lapses. Every reconnect path short-circuits on it —
+ * `tryReconnectSilently` returns true at its FIRST line — so the user pressed
+ * reconnect, nothing was acquired, the banner was dismissed, and the very next
+ * request 401'd again. An infinite human loop with a success message on top.
+ *
+ * Call this wherever a 401 has just been OBSERVED. The refresh token is
+ * deliberately untouched: it may well still be good, and the silent path should
+ * get the chance to use it before anyone is shown a consent screen.
+ */
+export function invalidateAccessToken(): void {
+  accessToken = null;
+  expiresAt = 0;
+}
+
+/**
  * Get the current access token. Returns null if not valid.
  */
 export function getAccessToken(): string | null {
@@ -1528,6 +1549,16 @@ async function performSilentRefresh(): Promise<string | null> {
         reason: 'exhausted',
       };
       if (consecutiveSilentRefreshFailures >= SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD) {
+        // ⚠️ DELIBERATELY NOT RESET, unlike the transient counter beside it, and
+        // a 2026-09-09 review round argued it should be. Left alone on purpose:
+        // the `>=` re-fire is long-standing, documented and pinned by a test
+        // that states the reasoning ("subscribers are idempotent — the syncStore
+        // subscriber just sets a ref to true"). The concern raised is real (a
+        // re-raise the user cannot dismiss) but establishing whether dismissal
+        // actually survives a re-fire needs a behavioural check nobody has run,
+        // and inverting a tested invariant on an untested inference is how the
+        // last two review rounds' regressions got in. Recorded as a follow-up
+        // rather than changed blind.
         console.warn(
           '[googleAuth] Escalating to permanent failure — silent refresh has not recovered'
         );

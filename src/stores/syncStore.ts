@@ -44,7 +44,6 @@ import {
   initializeAuth,
   requestAccessToken,
   getValidTokenSilent,
-  TokenExpiredError,
   onTokenPermanentlyExpired,
   onTokenAcquired,
   fetchGoogleUserEmail,
@@ -870,25 +869,20 @@ export const useSyncStore = defineStore('sync', () => {
       // first-sight revision (no matching baseline yet) and false-block with "File
       // has newer data", reliably failing every migration (and it depended on a
       // clock quirk even pre-#61). We own this file; write our data to it.
-      const ok = await syncNow(true);
-      if (!ok) {
-        throw new Error(error.value || 'Could not write to the new storage location');
-      }
-      // `preserveTimestamp` so this does not ALSO churn `updatedAt` on every
-      // call, matching every other post-save write in this file.
+      // ⚠️ BEFORE THE SAVE, NOT AFTER, and the order is the whole fix. Written
+      // afterwards this landed a `setSettings` mutate — a whole-object replace,
+      // so it advances the heads even for an identical value — PAST the sync
+      // baseline `syncNow(true)` had just committed. A compaction attempted
+      // straight after creating a pod or migrating storage then read not-level
+      // and refused with "some changes have not reached the cloud yet", the same
+      // false refusal `lastSyncTimestamp` caused at the other end of this file.
       //
-      // ⚠️ IT DOES NOT MAKE THIS WRITE FREE, and an earlier comment here claimed
-      // it did. `saveSettings` ends in a whole-object `setSettings` mutate, so
-      // even a byte-identical reassign advances the document heads past the
-      // baseline `syncNow(true)` just committed — and here `syncFilePath` and
-      // `syncEnabled` are genuinely new values anyway. So a compaction attempted
-      // straight after creating a pod or migrating storage still reads not-level
-      // and still pays a full re-push.
+      // These values depend only on the `provider` installed above, so there is
+      // nothing to wait for: writing them first means the forced save CARRIES
+      // them and the heads finish level with the baseline it commits.
       //
-      // That is acceptable (it costs one upload on a rare, user-initiated path)
-      // but it is NOT the same as fixed, and the real answer is the one applied
-      // to `lastSyncTimestamp`: device-local sync bookkeeping does not belong in
-      // the shared document at all. Tracked in the plan's follow-ups.
+      // `preserveTimestamp` so it does not also churn `updatedAt`, matching every
+      // other settings write on this path.
       await settingsRepo.saveSettings(
         {
           syncEnabled: true,
@@ -896,6 +890,11 @@ export const useSyncStore = defineStore('sync', () => {
         },
         { preserveTimestamp: true }
       );
+
+      const ok = await syncNow(true);
+      if (!ok) {
+        throw new Error(error.value || 'Could not write to the new storage location');
+      }
     } finally {
       isReloading = false;
     }
@@ -5040,16 +5039,21 @@ export const useSyncStore = defineStore('sync', () => {
       // ⚠️ `'auth'` IS REACHABLE NOW, and was not before. The declared union has
       // always carried it, but nothing here produced it, so the Settings restore
       // could not tell "reconnect and retry" from "this file is broken" and sent
-      // a plain token lapse to the generic import-failed dead end. Both shapes
-      // count: `getValidTokenSilent` throws `TokenExpiredError` when it has
-      // nothing usable, and a grant revoked on ANOTHER device passes the local
-      // `isTokenValid()` check and surfaces as a 401 from the read instead.
-      const isAuth = e instanceof TokenExpiredError || status === 401;
-      const reason: 'auth' | 'not-found' | 'error' = isAuth
-        ? 'auth'
-        : status === 404
-          ? 'not-found'
-          : 'error';
+      // a plain token lapse to the generic import-failed dead end.
+      //
+      // ⚠️ THROUGH `classifyDriveFailure`, NOT a local `instanceof` ladder. An
+      // earlier cut wrote its own, which (a) duplicated a classifier this module
+      // already imports and calls twice elsewhere, guaranteeing the two drift,
+      // and (b) needed `TokenExpiredError` to be a real class in every test's
+      // googleAuth mock factory — it is absent from sixteen of them, so the first
+      // test to reach this catch would have died on
+      // `instanceof undefined`, converting a classified result into an unhandled
+      // throw. The shared helper covers both shapes that mean "reconnect":
+      // a `TokenExpiredError`, and the 401 a grant revoked on ANOTHER device
+      // produces (the local `isTokenValid()` check cannot see that one).
+      const failure = classifyDriveFailure(e);
+      const reason: 'auth' | 'not-found' | 'error' =
+        failure === 'CONSENT_EXPIRED' ? 'auth' : status === 404 ? 'not-found' : 'error';
       return { success: false, reason, status, payloadError: blocker };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped

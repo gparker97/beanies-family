@@ -50,7 +50,7 @@ import { requireReauth, canStepUp } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
-import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { classifyDriveFailure } from '@/utils/podAccess';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
@@ -354,8 +354,13 @@ const isSwitchingAccount = ref(false);
 async function handleSettingsReconnect() {
   // Pre-fill Google's chooser with the expected account when known so
   // multi-account users land on the right one by default.
-  const success = await reconnect(syncStore.providerAccountEmail ?? undefined);
-  if (success) await syncStore.handleGoogleReconnected();
+  // `reconnectSucceeded`, never the bare value: on every redirect surface
+  // (native, iOS, installed PWA) `reconnect` returns `'redirecting'`, meaning the
+  // page is on its way to Google and nothing has been acquired. Treating that as
+  // success clears the reconnect banner and fires a Drive read plus a full pod
+  // upload on the still-dead token, mid-navigation.
+  const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
+  if (reconnectSucceeded(outcome)) await syncStore.handleGoogleReconnected();
 }
 
 /**
@@ -717,7 +722,10 @@ async function openDriveRestorePicker(): Promise<void> {
       // `if (!boundEmail) return false` and the beanpod-mirrored token recovery
       // never runs, so the user is pushed to a consent screen we could have
       // avoided. Line ~357 of this file already does this correctly.
-      const reconnected = await reconnect(syncStore.providerAccountEmail ?? undefined);
+      const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
+      // The page is navigating to Google; say nothing and touch nothing.
+      if (outcome === 'redirecting') return;
+      const reconnected = reconnectSucceeded(outcome);
       if (reconnected) {
         // Re-arm autosync and clear the banner, exactly as this page's own
         // `handleSettingsReconnect` does; a reconnect that leaves the banner up
@@ -736,9 +744,25 @@ async function openDriveRestorePicker(): Promise<void> {
       //
       // So: tell the user what happened and let THEM press the button again.
       // One click is a small price for a loop that cannot happen.
-      importError.value = t(
-        reconnected ? 'settings.reconnectedTryAgain' : 'settings.drivePickerFailed'
-      );
+      logEvent({
+        level: reconnected ? 'info' : 'warn',
+        surface: 'pod-load-failure',
+        message: reconnected ? 'drive restore reconnected' : 'drive restore reconnect failed',
+        // The success arm too, so the reconnect success RATE is measurable —
+        // an event that only fires on failure cannot give you one.
+        context: { action: reconnected ? 'reconnect-ok' : 'reconnect-failed' },
+      });
+      if (reconnected) {
+        // ⚠️ NOT `importError`. That renders in an Alert Red slab, and Red is
+        // reserved for destructive confirmations and hard validation errors, so
+        // painting a SUCCESS sentence there says the opposite of what it means.
+        showToast('success', t('googleDrive.reconnected'));
+        return;
+      }
+      // `drivePickerAuth`, not `drivePickerFailed`: this flow deliberately never
+      // uses the Google Picker (see the header above), and the accurate string
+      // already exists and says the actionable thing — reconnect your account.
+      importError.value = t('settings.drivePickerAuth');
       return;
     }
     importError.value = t('settings.drivePickerFailed');
@@ -788,11 +812,26 @@ async function handleDriveRestoreSelected(payload: {
       message: 'drive restore read needs reconnect',
       context: { action: 'restore-needs-reconnect' },
     });
-    const reconnected = await reconnect(syncStore.providerAccountEmail ?? undefined);
+    const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
+    if (outcome === 'redirecting') return;
+    const reconnected = reconnectSucceeded(outcome);
     if (reconnected) await syncStore.handleGoogleReconnected();
-    importError.value = t(
-      reconnected ? 'settings.reconnectedTryAgain' : 'settings.drivePickerFailed'
-    );
+    logEvent({
+      level: reconnected ? 'info' : 'warn',
+      surface: 'pod-load-failure',
+      message: reconnected ? 'drive restore reconnected' : 'drive restore reconnect failed',
+      context: { action: reconnected ? 'reconnect-ok' : 'reconnect-failed' },
+    });
+    // `loadFromGoogleDrive`'s catch put the raw exception message into
+    // `syncStore.error`, which renders as its own amber slab. Left alone the user
+    // would read a developer string and a reconnect result at the same time,
+    // disagreeing about what just happened.
+    syncStore.clearError();
+    if (reconnected) {
+      showToast('success', t('googleDrive.reconnected'));
+      return;
+    }
+    importError.value = t('settings.drivePickerAuth');
     return;
   }
 
@@ -1268,11 +1307,24 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       }
     }
 
-    // Does a shared pod file survive this deletion? The registry row is that
-    // file's canonical pointer, so the row may only go when the file does.
-    // A local-file family has no shared file at all, so nothing survives for
-    // other devices to be bound to and the row should always go.
-    let podFileSurvives = syncStore.isGoogleDriveConnected;
+    // Did we actually DELETE the pod file? The registry row is that file's
+    // canonical pointer, so the row may only go when the file provably has.
+    //
+    // ⚠️ DEFAULTS FALSE AND IS SET IN EXACTLY ONE PLACE: after `deleteFile`
+    // returns. Two earlier cuts inferred it instead, and both inferences were
+    // wrong in a way that deletes the row while the pod is alive:
+    //   - `wantDeleteDrive` (intent) — a delete that 403s left the file up.
+    //   - `isGoogleDriveConnected` (session state) — false in the cache-only /
+    //     evicted-config state, so a family that simply had no provider
+    //     installed this session had its row removed with the pod untouched.
+    // And a genuine LOCAL family's `.beanpod` also survives, because
+    // `deleteLocalFamily` clears file handles and cannot delete a file on disk.
+    //
+    // The asymmetry is deliberate. A surviving row is an ops nuisance and is
+    // recoverable; a row deleted under a live pod is recreated by the next
+    // device to write and stamps THAT member as owner, permanently. So when we
+    // cannot prove the file is gone, the row stays and we say so.
+    let podFileDeleted = false;
 
     // 2. Delete Drive file if requested
     if (wantDeleteDrive.value) {
@@ -1304,17 +1356,17 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         if (config?.type === 'google_drive' && config.driveFileId) {
           const token = await getValidToken();
           await deleteFile(token, config.driveFileId);
-          // ⚠️ Set only AFTER the delete actually returns. Gating the registry
-          // removal on the user's INTENT rather than the outcome meant a 403 on a
-          // revoked file permission left the pod alive and the shared row gone —
-          // other members still bound to a live file whose row the next device to
-          // write then recreates, stamping ITS user as owner. That is the exact
-          // defect the gate exists to prevent, reached through a failed delete.
-          podFileSurvives = false;
-        } else {
-          // Nothing to delete: no Drive file is bound, so none survives.
-          podFileSurvives = false;
+          // The ONLY place this is set. The delete returned, so the file is gone.
+          podFileDeleted = true;
         }
+        // ⚠️ NO `else` ARM. An earlier cut set the flag here on the reasoning
+        // that a missing binding means no file is bound. `getProviderConfig`
+        // never throws — it catches an IndexedDB read failure, falls back to the
+        // localStorage mirror, and returns null when that is absent too (private
+        // window, cleared site data, iOS storage eviction). So "no config" is
+        // usually "we cannot read the config", not "there is no file", and
+        // treating it as the latter removed the row with the pod untouched and
+        // nothing reported. Silence here is correct: the row stays.
       } catch (e) {
         // Same class as the safety copy above, and it was console-only while
         // its neighbour reported. The user is about to be told their data is
@@ -1331,12 +1383,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
 
     // 3. Remove the SHARED registry row — ONLY when the pod file is going too.
     //
-    //    ⚠️ GATED ON THE FILE ACTUALLY BEING GONE, not on the user's intent, and
-    //    not on the Drive checkbox. Two bugs came out of getting this wrong:
-    //    gating on `wantDeleteDrive` let a FAILED Drive delete remove the row
-    //    anyway, and it also meant a LOCAL-file family — whose checkbox never
-    //    renders — could never have its row removed by any path at all, leaving a
-    //    row alive forever after the user was told the family was gone.
+    //    ⚠️ GATED ON `podFileDeleted` — see its declaration above for the two
+    //    inferences that were tried first and the reason neither is safe.
     //
     //    The
     //    registry row is the family's canonical pointer AT A LIVE FILE. If the
@@ -1357,7 +1405,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     //    Surfaced at `critical`, matching both sibling arms above: below
     //    `critical` nothing pages and nothing renders, and the user is about to
     //    be told their family is gone from everywhere.
-    if (!podFileSurvives) {
+    if (podFileDeleted) {
       const registryRemoved = await removeFamily(familyId);
       if (!registryRemoved) {
         reportError({
