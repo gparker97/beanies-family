@@ -78,7 +78,6 @@ import type { SaveFailureLevel } from '@/services/sync/syncService';
 import { isSafetyCopyName } from '@/constants/compaction';
 import {
   searchBeanpodFilesGlobal,
-  clearFolderCache,
   getAppFolderId,
   getFileMetadata,
   DriveApiError,
@@ -2442,9 +2441,11 @@ export const useSyncStore = defineStore('sync', () => {
       // The envelope's wrappedKeys would undercount (unclaimed beans have none).
       memberCount: useFamilyStore().members.length || null,
       // Sent on every write, but the Lambda stamps it ONLY alongside
-      // `isSignupEvent` and only when the field is still unset — so neither a
-      // later login from another platform nor a disconnect/reconnect (which
-      // DELETES and recreates the row) can move it.
+      // `isSignupEvent` and only when the field is still unset — so a later
+      // login from another platform cannot move it. (This used to cite
+      // `syncStore.disconnect()` as a live delete-and-recreate path; that
+      // function was deleted on 2026-09-08 and the Lambda tombstones a DELETE
+      // rather than dropping the row, so a recreate preserves the stamp.)
       signupPlatform: registrySignupPlatform(),
       isLoginEvent: opts.isLoginEvent === true,
       isSignupEvent: opts.isSignupEvent === true,
@@ -3189,48 +3190,19 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Disconnect from sync file
+   * ⚠️ `disconnect()` WAS HERE AND IS DELETED (2026-09-08).
+   *
+   * It had no production caller and it called `registry.removeFamily`, i.e. it
+   * deleted the family's SHARED registry row. Kept around, it was a loaded gun
+   * pointed at the same defect that made greg's pod report an owner it never
+   * had. It also carried the seventh and last `lastSyncTimestamp` write, which
+   * the `?: never` tombstone on `Settings` cannot catch because it assigned
+   * `undefined`; deleting this function is what removes it.
+   *
+   * If a real "disconnect this device from its file" action is ever needed, it
+   * must NOT touch the remote registry row. Only the owner-gated full-family
+   * deletion may do that. See docs/investigations/2026-09-08-compaction-fallout.md.
    */
-  async function disconnect(): Promise<void> {
-    stopFilePolling();
-
-    const ctx = useFamilyContextStore();
-    if (ctx.activeFamilyId) {
-      registry.removeFamily(ctx.activeFamilyId).catch((e: unknown) => {
-        // Non-critical: registry is optional smoothness; disconnect proceeds
-        // regardless. Logged so the failure isn't silent.
-        console.warn('[syncStore] registry.removeFamily failed (non-critical)', e);
-      });
-    }
-
-    if (storageProviderType.value === 'google_drive') {
-      clearQueue();
-      clearFolderCache();
-    }
-
-    await syncService.disconnect();
-    needsPermission.value = false;
-    lastSync.value = null;
-    // Clear the read-error classification too: `setProvider` fires the state
-    // callback SYNCHRONOUSLY, so a surviving error from the previous family
-    // would otherwise leak into the next one before its first read starts.
-    backgroundSyncError.value = null;
-    backgroundSyncErrorKind.value = null;
-    familyKey.value = null;
-    clearEnvelope();
-    storageProviderType.value = null;
-    providerAccountEmail.value = null;
-    showGoogleReconnect.value = false;
-    driveFileNotFound.value = false;
-
-    const settingsStore = useSettingsStore();
-    await settingsStore.clearCachedFamilyKey(ctx.activeFamilyId ?? undefined);
-    await settingsRepo.saveSettings({
-      syncEnabled: false,
-      syncFilePath: undefined,
-      lastSyncTimestamp: undefined,
-    });
-  }
 
   /**
    * Build the encrypted `.beanpod` envelope for a manual export.
@@ -5905,7 +5877,6 @@ export const useSyncStore = defineStore('sync', () => {
     setMemberWrappedKey,
     addInvitePackage,
     persistFamilyName,
-    disconnect,
     buildExportEnvelope,
     markExported,
     manualImport,
