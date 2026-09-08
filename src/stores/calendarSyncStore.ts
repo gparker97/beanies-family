@@ -984,6 +984,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       });
       return;
     }
+    // ✅ SURVIVING REVOKE 5 of 5, the only one outside googleAuth (audit 2026-09-08).
+    // Already guarded above by `liveDriveGrantSharesAccount`: Google's revoke is
+    // whole-grant per (user, client_id) and Drive shares this client_id, so this
+    // must never fire while a live Drive grant depends on the same account.
+    // Drive no longer needs the symmetric guard, because Drive no longer revokes
+    // on reconnect at all (see googleAuth.ts, both reconnect seams).
     void revokeGrant(refreshToken, { grant: 'calendar', trigger });
   }
 

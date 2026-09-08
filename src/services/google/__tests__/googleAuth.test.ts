@@ -998,15 +998,21 @@ describe('googleAuth (PKCE)', () => {
 
       const { refreshAccessToken } = await import('../oauthProxy');
       const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
-      // Queue 15 transient throws — 3 attemptSilentRefresh calls × 5 retries
+      // Queue 15 REJECTION throws — 3 attemptSilentRefresh calls × 5 retries
       // each (1 initial + 4 retries at 1.5s/3s/6s/12s). We exercise
       // 1 sub-threshold call + 1 threshold-crossing call + 1 past-threshold
       // call. `Once` variants don't leak past their consumed call.
-      const queueTransientThrow = () =>
+      //
+      // ⚠️ These MUST carry `HTTP 4xx` (2026-09-08). Only a rejection by Google
+      // counts toward escalation; a transient failure deliberately does not.
+      // This test is what proves the gate is not a silent off-switch — if it is
+      // ever weakened to a transient error again, it will pass while escalation
+      // has stopped working entirely.
+      const queueRejectionThrow = () =>
         refreshFn.mockImplementationOnce(() => {
-          throw new Error('Token refresh failed: network error');
+          throw new Error('Token refresh failed: HTTP 400 — invalid_request');
         });
-      for (let i = 0; i < 15; i++) queueTransientThrow();
+      for (let i = 0; i < 15; i++) queueRejectionThrow();
 
       // Use vi.useFakeTimers to skip the 1.5s/3s/6s/12s backoff between
       // retries; otherwise each attempt would take ~22.5 real seconds.
@@ -1593,9 +1599,10 @@ describe('googleAuth (PKCE)', () => {
       // 5 throws → one retry-exhausted failure → counter goes 1 → 2,
       // crosses threshold of 2, escalation fires. 2026-05-20 widened the
       // backoff to 5 attempts (1 initial + 4 retries at 1.5s/3s/6s/12s).
+      // Must be a 4xx rejection: transient failures no longer escalate (2026-09-08).
       for (let i = 0; i < 5; i++) {
         refreshFn.mockImplementationOnce(() => {
-          throw new Error('Token refresh failed: network error');
+          throw new Error('Token refresh failed: HTTP 400 — invalid_request');
         });
       }
 
@@ -1610,6 +1617,78 @@ describe('googleAuth (PKCE)', () => {
       expect(sessionStorage.getItem('beanies_silent_refresh_failures')).toBe('2');
 
       vi.unstubAllEnvs();
+    });
+
+    it('does NOT escalate, or advance the counter, when exhaustion was transient', async () => {
+      // The 2026-09-08 gate. Escalating raises the reconnect surface, and
+      // reconnecting forces a Google consent screen — too high a price for a
+      // dropped connection or a proxy 5xx. Only a 4xx rejection counts.
+      sessionStorage.setItem('beanies_silent_refresh_failures', '1');
+
+      vi.resetModules();
+      googleAuth = await import('../googleAuth');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const permanentSpy = vi.fn();
+      googleAuth.onTokenPermanentlyExpired(permanentSpy);
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: network error');
+        });
+      }
+
+      vi.useFakeTimers();
+      const p = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(22_500);
+      await p;
+      vi.useRealTimers();
+
+      expect(permanentSpy).not.toHaveBeenCalled();
+      // Counter untouched: a transient failure is not evidence of a dead grant.
+      expect(sessionStorage.getItem('beanies_silent_refresh_failures')).toBe('1');
+    });
+
+    it('DOES escalate on a 5xx? no — a proxy failure is the proxy, not the grant', async () => {
+      sessionStorage.setItem('beanies_silent_refresh_failures', '1');
+
+      vi.resetModules();
+      googleAuth = await import('../googleAuth');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'stored-refresh-token',
+        issuedAt: null,
+      });
+      await googleAuth.initializeAuth('family-123');
+
+      const permanentSpy = vi.fn();
+      googleAuth.onTokenPermanentlyExpired(permanentSpy);
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+      const refreshFn = refreshAccessToken as ReturnType<typeof vi.fn>;
+      for (let i = 0; i < 5; i++) {
+        refreshFn.mockImplementationOnce(() => {
+          throw new Error('Token refresh failed: HTTP 503 — upstream unavailable');
+        });
+      }
+
+      vi.useFakeTimers();
+      const p = googleAuth.attemptSilentRefresh();
+      await vi.advanceTimersByTimeAsync(22_500);
+      await p;
+      vi.useRealTimers();
+
+      expect(permanentSpy).not.toHaveBeenCalled();
+      expect(sessionStorage.getItem('beanies_silent_refresh_failures')).toBe('1');
     });
 
     it('persists counter resets on successful acquisition', async () => {
