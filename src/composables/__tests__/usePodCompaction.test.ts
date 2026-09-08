@@ -177,17 +177,28 @@ describe('every refusal leaves the pod untouched', () => {
     // green saved-dot on screen, and it cleared itself seconds later when the
     // debounced save levelled things again.
     //
-    // Pinned at the source, because the defect was one line in a store the
-    // compaction gate does not import: `syncNow` must write nothing to the
-    // document after `save()`.
+    // ⚠️ TWO EARLIER CUTS OF THIS GUARD WERE VACUOUS.
+    // `indexOf('async function syncNow')` PREFIX-MATCHES `syncNowDurable`, which
+    // is declared first, so the window covered the wrong function entirely and
+    // re-injecting the offending write left the test green. Anchor on the
+    // parameter list, and assert something POSITIVE first so a bad slice fails
+    // loudly instead of passing empty.
     const { readFileSync } = await import('node:fs');
     const store = readFileSync('src/stores/syncStore.ts', 'utf8');
-    const syncNow = store.slice(
-      store.indexOf('async function syncNow'),
-      store.indexOf('async function syncNow') + 2000
-    );
-    expect(syncNow).not.toContain('lastSyncTimestamp');
-    expect(syncNow).not.toContain('saveSettings');
+    const start = store.indexOf('async function syncNow(force');
+    expect(start, 'syncNow(force …) not found — the anchor moved').toBeGreaterThan(-1);
+    const body = store.slice(start, store.indexOf('\n  }\n', start));
+    expect(body).toContain('await syncService.save()');
+    expect(body.length).toBeGreaterThan(200);
+
+    // Comments are stripped: the tombstone comment inside `syncNow` names
+    // `lastSyncTimestamp` deliberately and must not trip its own guard.
+    const code = body
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join('\n');
+    expect(code).not.toContain('lastSyncTimestamp');
+    expect(code).not.toContain('saveSettings');
   });
 
   it('refuses with cannot-verify, not not-synced, when the probe itself failed', async () => {

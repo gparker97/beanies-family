@@ -156,31 +156,46 @@ describe('SettingsPage — delete family export gate', () => {
     expect(deliverFileMock).toHaveBeenCalledTimes(1);
     expect(deleteLocalFamilyMock).toHaveBeenCalledWith('fam-1');
 
-    // ⚠️ The SHARED registry row is NOT removed here, because this case keeps the
-    // .beanpod (the checkbox is opt-in and defaults to false). The row is the
-    // family's pointer at a LIVE file, so deleting it would leave other members
-    // bound to a surviving pod with no row — and the next device to write
-    // recreates it, stamping ITS user as owner. That is the same defect this
-    // change removed from `deleteLocalFamily`, and an earlier cut of this fix
-    // reintroduced it here on the default path.
-    expect(removeFamilyMock).not.toHaveBeenCalled();
+    // This fixture is a LOCAL-file family (`isGoogleDriveConnected` is false), so
+    // there is no shared pod file for other devices to stay bound to and the row
+    // SHOULD go. An earlier cut gated the removal on the Drive checkbox, which
+    // never renders for a local family, so its row could not be removed by any
+    // path at all — the user was told the family was gone from everywhere while
+    // the row survived forever, still resolvable and still counted in metrics.
+    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1');
+    // Before the local teardown, while the session that decided it still exists.
+    expect(removeFamilyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteLocalFamilyMock.mock.invocationCallOrder[0]!
+    );
   });
 
-  it('gates the shared registry removal on the pod file going too', async () => {
-    // The behavioural half is above: the default path must not remove the row.
-    // This half pins the gate itself. Mounting the ticked case is not worth the
-    // fixture cost here — the checkbox renders only for a Drive-connected family
-    // and `isGoogleDriveConnected` is a computed getter — and a source assertion
-    // cannot be satisfied by a mock that happens not to be reached.
+  it('gates the shared registry removal on the pod file actually being GONE', async () => {
+    // The behavioural half is above: the default keep-the-pod path must not
+    // remove the row. This half pins the gate itself.
+    //
+    // ⚠️ AN EARLIER CUT OF THIS ASSERTION WAS DEGENERATE. It searched for a
+    // comment that sits AFTER the slice point, so `lastIndexOf` returned -1 and
+    // the whole thing reduced to "some `if` appears earlier in the file" — it
+    // stayed green with the gate deleted, satisfied by an unrelated gate.
+    //
+    // It also pins the SHAPE of the gate. Gating on the user's intent
+    // (`wantDeleteDrive`) rather than the outcome let a FAILED Drive delete
+    // remove the row anyway, and left local-file families — whose checkbox never
+    // renders — unable to remove it through any path at all.
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/pages/SettingsPage.vue', 'utf8');
-    const i = source.indexOf('await removeFamily(familyId)');
-    expect(i).toBeGreaterThan(-1);
-    // The call sits inside the `wantDeleteDrive` branch, not beside it.
-    const before = source.slice(0, i);
-    expect(before.lastIndexOf('if (wantDeleteDrive.value)')).toBeGreaterThan(
-      before.lastIndexOf('// 4. Delete local family')
-    );
+
+    const call = source.indexOf('await removeFamily(familyId)');
+    expect(call, 'removeFamily call not found').toBeGreaterThan(-1);
+
+    const gate = source.lastIndexOf('if (!podFileSurvives) {', call);
+    expect(gate, 'the removal is not inside the podFileSurvives gate').toBeGreaterThan(-1);
+    // Immediately enclosing, not merely somewhere earlier in the file.
+    expect(call - gate).toBeLessThan(400);
+
+    // And the flag must be set from the delete succeeding, never from the checkbox.
+    expect(source).toContain('podFileSurvives = false');
+    expect(source).not.toContain('if (wantDeleteDrive.value) {\n      const registryRemoved');
   });
 
   it('aborts the deletion when the export FAILED', async () => {
