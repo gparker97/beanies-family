@@ -769,11 +769,11 @@ const STRING_DEFS = {
   },
   'medicationLog.errors.noCurrentMember': {
     en: 'Pick a member to continue',
-    beanie: 'pick a bean to continue',
+    beanie: 'pick a member to continue',
   },
   'medicationLog.errors.noCurrentMember.detail': {
     en: 'Sign in as the family member giving the dose so we know who to credit.',
-    beanie: 'sign in as the bean giving the dose so we know who to credit.',
+    beanie: 'sign in as the member giving the dose so we know who to credit.',
   },
   'medicationLog.someone': { en: 'someone', beanie: 'someone' },
   // Over-limit copy. Heritage Orange, informative — never alarming. `{over}`,
@@ -798,7 +798,7 @@ const STRING_DEFS = {
   },
   'family.discardChanges.body': {
     en: "You've edited this member but haven't saved. Close without saving?",
-    beanie: "you've edited this bean but haven't saved — close without saving?",
+    beanie: "you've edited this member but haven't saved — close without saving?",
   },
   // Care & Safety page
   'careSafety.title': { en: 'Care & Safety', beanie: 'care & safety' },
@@ -1181,12 +1181,12 @@ const STRING_DEFS = {
   'installNudge.label': { en: 'Install the app', beanie: 'plant beanies on your home screen' },
   'installNudge.tagline': {
     en: 'Keep your family data reliably connected.',
-    beanie: 'keep your beans reliably connected.',
+    beanie: 'keep your family data reliably connected.',
   },
   'installNudge.description': {
     en: 'Add beanies to your home screen and it stays reliably signed in to your data - no more being asked to reconnect after a while. Tap Share, then "Add to Home Screen".',
     beanie:
-      'add beanies to your home screen and it stays reliably signed in to your beans - no more being asked to reconnect after a while. tap share, then "add to home screen".',
+      'add beanies to your home screen and it stays reliably signed in to your data - no more being asked to reconnect after a while. tap share, then "add to home screen".',
   },
   'installNudge.showHow': { en: 'Show me how', beanie: 'show me how!' },
   'installNudge.dismiss': { en: 'Not now', beanie: 'not now' },
@@ -1534,7 +1534,7 @@ const STRING_DEFS = {
   },
   'accountView.adjustError.noAuthorHelp': {
     en: 'No signed-in family member was found. Sign in and try again.',
-    beanie: 'no signed-in beanie was found. sign in and try again.',
+    beanie: 'no signed-in member was found. sign in and try again.',
   },
   'accountView.recurringLabel': { en: 'Recurring: {name}', beanie: 'recurring: {name}' },
   'accountView.loanLabel': { en: 'Loan payment', beanie: 'loan payment' },
@@ -1605,7 +1605,7 @@ const STRING_DEFS = {
   },
   'goalContribute.error.noAuthorHelp': {
     en: 'No signed-in family member was found. Sign in and try again.',
-    beanie: 'no signed-in beanie was found. sign in and try again.',
+    beanie: 'no signed-in member was found. sign in and try again.',
   },
   'goalContribute.deleteConfirmTitle': {
     en: 'Delete this contribution?',
@@ -2087,7 +2087,7 @@ const STRING_DEFS = {
   'family.title': { en: 'Family', beanie: 'the pod' },
   'family.addMember': { en: 'Add Member', beanie: 'add a beanie' },
   'family.editMember': { en: 'Edit Member', beanie: 'edit beanie' },
-  'family.deleteMember': { en: 'Delete Member', beanie: 'remove beanie' },
+  'family.deleteMember': { en: 'Delete Member', beanie: 'remove member' },
   'family.noMembers': {
     en: 'No family members yet.',
     beanie: 'your bean pod is empty — add your first beanie!',
@@ -2120,7 +2120,7 @@ const STRING_DEFS = {
   'permissions.readOnly.title': { en: 'View Only', beanie: 'view only' },
   'permissions.readOnly.message': {
     en: 'You can look around, but changes are down to the grown-ups who manage this pod.',
-    beanie: 'you can look around, but changes are down to the beanies who manage this pod.',
+    beanie: 'you can look around, but changes are down to the grown-ups who manage this pod.',
   },
   'family.role.owner': { en: 'Owner', beanie: 'head beanie' },
   'family.role.admin': { en: 'Admin', beanie: 'admin beanie' },
@@ -2129,7 +2129,7 @@ const STRING_DEFS = {
   'family.role.ownerBadge': { en: 'Pod Owner', beanie: 'pod owner' },
   'family.normalizeRolesFailed': {
     en: 'Could not finish updating member roles. Reload the page to try again.',
-    beanie: 'could not finish updating bean roles. reload to try again.',
+    beanie: 'could not finish updating member roles. reload to try again.',
   },
 
   // ── Change Password (Settings → Security & Privacy) ──────────────────────
@@ -2355,7 +2355,7 @@ const STRING_DEFS = {
   'settings.deleteFamilyExportCheckMsg': {
     en: "Check your files and make sure the export is really there. Once you continue, your family is deleted and this copy is all you'll have.",
     beanie:
-      "check your files and make sure the export is really there. once you continue, your beans are deleted and this copy is all you'll have.",
+      "check your files and make sure the export is really there. once you continue, your family is deleted and this copy is all you'll have.",
   },
   'settings.deleteFamilyExportCheckConfirm': {
     en: "Yes, it's saved",
@@ -2381,7 +2381,7 @@ const STRING_DEFS = {
   'reauth.unavailableTitle': { en: 'Not Ready Yet', beanie: 'not ready yet' },
   'reauth.unavailable': {
     en: 'Your family is still loading, so we can’t check it’s you yet. Give it a moment and try again.',
-    beanie: 'your beans are still loading, so we can’t check it’s you yet. try again in a moment.',
+    beanie: 'your family is still loading, so we can’t check it’s you yet. try again in a moment.',
   },
   'transferOwnership.reauthTitle': { en: 'Verify Identity', beanie: 'verify identity' },
   'transferOwnership.reauthDescription': {
@@ -2442,7 +2442,7 @@ const STRING_DEFS = {
   },
   'transferOwnership.invalidTarget': {
     en: 'That member can’t become the owner.',
-    beanie: 'that bean can’t become the owner.',
+    beanie: 'that member can’t become the owner.',
   },
   'settings.transferOwnership': { en: 'Transfer Pod Ownership', beanie: 'transfer pod ownership' },
   'settings.transferOwnershipDesc': {
@@ -2569,9 +2569,9 @@ const STRING_DEFS = {
   'settings.card.familyMembers': { en: 'Family Members', beanie: 'family members' },
   'settings.card.familyMembersDesc': { en: 'Manage your family', beanie: 'manage your pod' },
   'settings.card.familyData': { en: 'Family Data', beanie: 'family data' },
-  'settings.card.familyDataDesc': { en: 'Cloud storage & sync', beanie: 'your bean vault' },
+  'settings.card.familyDataDesc': { en: 'Cloud storage & sync', beanie: 'your family file & sync' },
   'settings.card.dataManagement': { en: 'Data Management', beanie: 'data management' },
-  'settings.card.dataManagementDesc': { en: 'Export & clear data', beanie: 'export & clear beans' },
+  'settings.card.dataManagementDesc': { en: 'Export & clear data', beanie: 'export & clear data' },
   'settings.card.countryHolidays': { en: 'Country & Holidays', beanie: 'country & holidays' },
   'settings.card.countryHolidaysDesc': {
     en: 'Where your family lives & public-holiday display',
@@ -2692,27 +2692,27 @@ const STRING_DEFS = {
   'settings.exportData': { en: 'Export Encrypted Backup', beanie: 'export encrypted backup' },
   'settings.exportDataDescription': {
     en: 'Download your data as an encrypted .beanpod file (password-protected)',
-    beanie: 'download your beans as an encrypted .beanpod file (password-protected)',
+    beanie: 'download your data as an encrypted .beanpod file (password-protected)',
   },
   'settings.clearAllData': { en: 'Clear All Data', beanie: 'clear all data' },
   'settings.clearAllDataDescription': {
     en: 'Permanently delete all your data',
-    beanie: 'remove all your beanies from this device',
+    beanie: 'permanently delete all your data from this device',
   },
   'settings.clearData': { en: 'Clear Data', beanie: 'clear data' },
   'settings.clearDataConfirmation': {
     en: 'Are you sure you want to delete all your data? This action cannot be undone.',
-    beanie: 'this will clear all your beans. are you really sure? this cannot be undone.',
+    beanie: 'this will delete all your data. are you really sure? this cannot be undone.',
   },
   'settings.yesDeleteEverything': {
     en: 'Yes, Delete Everything',
-    beanie: 'yes, clear my bean pod',
+    beanie: 'yes, delete everything',
   },
   'settings.reconnectDrive': { en: 'Reconnect', beanie: 'reconnect' },
   'settings.forceSave': { en: 'Force Save', beanie: 'force save' },
   'settings.cachePersistWarning': {
     en: 'Local cache is not updating — your data may not survive a page refresh',
-    beanie: "local cache isn't saving — your beans might not survive a refresh",
+    beanie: "local cache isn't saving — your data might not survive a refresh",
   },
   'sync.durabilityBannerTitle': {
     en: "This device can't save locally right now",
@@ -2720,7 +2720,7 @@ const STRING_DEFS = {
   },
   'sync.durabilityBanner': {
     en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe.',
-    beanie: 'recent changes might not survive a refresh on this device. your saved beans are safe.',
+    beanie: 'recent changes might not survive a refresh on this device. your saved copy is safe.',
   },
   'sync.durabilityBannerCta': {
     en: "What's This?",
@@ -2850,11 +2850,11 @@ const STRING_DEFS = {
   },
   'confirm.deleteAccount': {
     en: 'Are you sure you want to delete this account? All associated transactions will also be deleted.',
-    beanie: 'remove this account? all the beans inside go with it.',
+    beanie: 'delete this account? all its transactions go with it.',
   },
   'confirm.deleteMember': {
     en: 'Are you sure you want to delete this family member?',
-    beanie: 'remove this beanie from your pod?',
+    beanie: 'remove this member from your pod?',
   },
   'confirm.unsavedChanges': {
     en: 'You have unsaved changes. Are you sure you want to leave?',
@@ -2870,27 +2870,27 @@ const STRING_DEFS = {
   // Error messages
   'error.generic': {
     en: 'Something went wrong. Please try again.',
-    beanie: 'hmm, a bean got stuck. try again?',
+    beanie: 'something went wrong. try again?',
   },
-  'error.loadFailed': { en: 'Failed to load data', beanie: "couldn't load your beanies" },
-  'error.saveFailed': { en: 'Failed to save changes', beanie: "hmm, couldn't save your beanies" },
-  'error.deleteFailed': { en: 'Failed to delete', beanie: "couldn't remove that beanie" },
+  'error.loadFailed': { en: 'Failed to load data', beanie: "couldn't load your data" },
+  'error.saveFailed': { en: 'Failed to save changes', beanie: "hmm, couldn't save your changes" },
+  'error.deleteFailed': { en: 'Failed to delete', beanie: "couldn't delete that" },
   'error.networkError': {
     en: 'Network error. Please check your connection.',
-    beanie: 'no connection — your beanies are still here though!',
+    beanie: 'no connection — your data is still here though!',
   },
   'error.backgroundRefreshFailed': {
     en: "Couldn't refresh your data",
-    beanie: "couldn't refresh your beanies",
+    beanie: "couldn't refresh your data",
   },
   'error.backgroundRefreshFailedHelp': {
     en: 'Some data may be out of date. Try refreshing the app. If it keeps happening, sign out and sign back in.',
     beanie:
-      'some beans may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
+      'some data may be out of date. try refreshing the app. if it keeps happening, sign out and sign back in.',
   },
   'docWorker.updateFailed': {
     en: "We couldn't update your data",
-    beanie: "couldn't update your beans",
+    beanie: "couldn't update your data",
   },
   'error.refreshFailed': {
     en: 'Refresh failed',
@@ -2931,7 +2931,7 @@ const STRING_DEFS = {
   },
   'error.unexpectedFailure': {
     en: 'Something went wrong',
-    beanie: 'a bean got stuck',
+    beanie: 'something went wrong',
   },
   'error.unexpectedFailureHelp': {
     en: 'Please refresh and try again. Support has been notified.',
@@ -3213,7 +3213,7 @@ const STRING_DEFS = {
   },
   'family.deleteConfirm': {
     en: 'Are you sure you want to remove this family member?',
-    beanie: 'remove this beanie from your pod?',
+    beanie: 'remove this member from your pod?',
   },
   'family.editFamilyName': { en: 'Edit family name', beanie: 'edit family name' },
   'family.createLogin': { en: 'Create Login', beanie: 'create login' },
@@ -3244,7 +3244,7 @@ const STRING_DEFS = {
   'family.memberAdded': { en: 'Member Added!', beanie: 'new beanie added!' },
   'family.addMemberFailed': {
     en: "Couldn't add that member — please try again.",
-    beanie: "couldn't add that beanie — please try again",
+    beanie: "couldn't add that member — please try again",
   },
   'family.scanOrShare': {
     en: 'Scan QR code or share the link',
@@ -3361,7 +3361,7 @@ const STRING_DEFS = {
   'settings.familyDataOptions': { en: 'Family Data Options', beanie: 'family data options' },
   'settings.familyDataDescription': {
     en: "Your family's financial data is encrypted and safely stored in a file you control.",
-    beanie: 'your beans are safe — encrypted and stored in a file only you control.',
+    beanie: 'your data is safe — encrypted and stored in a file only you control.',
   },
   'settings.saveDataToFile': { en: 'Save your data to a file', beanie: 'save your data to a file' },
   'settings.createOrLoadDataFile': {
@@ -3419,7 +3419,7 @@ const STRING_DEFS = {
   // file; it does not move the family onto it.
   'settings.switchDataFile': {
     en: "Restore your family's data from a file",
-    beanie: "restore your family's beans from a file",
+    beanie: "restore your family's data from a file",
   },
   // ⚠️ THE TITLE FOLLOWS THE SAME `hasPod` PREDICATE AS THE BODY. With one
   // hard-coded title, a FIRST load was headed "Restore your family's data from a
@@ -3445,7 +3445,7 @@ const STRING_DEFS = {
   'settings.loadedOtherFamilyNeedsSignIn': {
     en: 'That file belongs to a different family, and beanies could not work out which member you are in it. Your data is safe. Sign out and sign back in to open that family.',
     beanie:
-      'that file belongs to a different family, and beanies could not work out which member you are in it. your beans are safe. sign out and sign back in to open that family.',
+      'that file belongs to a different family, and beanies could not work out which member you are in it. your data is safe. sign out and sign back in to open that family.',
   },
   'settings.restoreNeedsConnection': {
     en: "beanies is not connected to your family's storage right now, so it cannot safely replace your data. Reconnect your storage above, then try again.",
@@ -3501,7 +3501,7 @@ const STRING_DEFS = {
   'settings.switchFileConfirmation': {
     en: "beanies will bring the contents of the selected file into your family's data. Anything in the file that is missing here is added back, and anything added since is kept where the two agree. Where they disagree, the file you chose wins, so changes made since it was saved can be replaced. Your family stays on the same data file, and your other devices pick the change up on their own. Continue?",
     beanie:
-      "beanies will bring the contents of the selected file into your family's beans. anything in the file that is missing here is added back, and anything added since is kept where the two agree. where they disagree, the file you chose wins, so changes made since it was saved can be replaced. your family stays on the same data file, and your other devices pick the change up on their own. continue?",
+      "beanies will bring the contents of the selected file into your family's data. anything in the file that is missing here is added back, and anything added since is kept where the two agree. where they disagree, the file you chose wins, so changes made since it was saved can be replaced. your family stays on the same data file, and your other devices pick the change up on their own. continue?",
   },
   'settings.dataLoadedSuccess': {
     en: 'Data loaded successfully!',
@@ -3514,12 +3514,12 @@ const STRING_DEFS = {
   },
   'settings.familyKeyDescription': {
     en: 'Your data is protected with AES-256 encryption',
-    beanie: 'your beans are locked with aes-256 encryption',
+    beanie: 'your data is locked with aes-256 encryption',
   },
   'settings.exportAsJson': { en: 'Export Readable Data', beanie: 'export readable data' },
   'settings.exportAsJsonDesc': {
     en: 'Download all your data as a plain-text JSON file (not encrypted)',
-    beanie: 'download all your beans as a plain-text json file (not encrypted)',
+    beanie: 'download all your data as a plain-text json file (not encrypted)',
   },
   'settings.noAutoSyncWarning': {
     en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
@@ -3558,7 +3558,7 @@ const STRING_DEFS = {
   'password.decryptionError': {
     en: "That password didn't unlock the pod. If you're sure it's right, ask a family member to open the pod first — we'll automatically repair the issue on your next sign-in.",
     beanie:
-      "that password didn't unlock the pod. if you're sure it's right, ask a family bean to open the pod first — we'll quietly fix it next time you sign in.",
+      "that password didn't unlock the pod. if you're sure it's right, ask a family member to open the pod first — we'll quietly fix it next time you sign in.",
   },
   'password.setAndContinue': { en: 'Set Password & Continue', beanie: 'set password & continue' },
   'password.strongPasswordDescription': {
@@ -3667,11 +3667,11 @@ const STRING_DEFS = {
   'auth.signOutConfirmTitle': { en: 'Sign Out', beanie: 'sign out' },
   'auth.signOutConfirmMessage': {
     en: 'Are you sure you want to sign out?',
-    beanie: 'are you sure you want to leave the pod?',
+    beanie: 'are you sure you want to sign out?',
   },
   'auth.signOutConfirmHint': {
     en: 'Your data is saved and will be here when you come back.',
-    beanie: 'your beans are safe and will be here when you come back.',
+    beanie: 'your data is saved and will be here when you come back.',
   },
   'auth.signOutClearDataHint': {
     en: 'Signs out and removes all local data from this device. Use this on shared or public devices.',
@@ -3809,7 +3809,7 @@ const STRING_DEFS = {
   'confirm.deleteRecurringTitle': { en: 'Delete Recurring Item', beanie: 'remove recurring item' },
   'confirm.deleteAssetTitle': { en: 'Delete Asset', beanie: 'remove your asset' },
   'confirm.deleteGoalTitle': { en: 'Delete Goal', beanie: 'remove your goal' },
-  'confirm.deleteMemberTitle': { en: 'Remove Family Member', beanie: 'remove beanie' },
+  'confirm.deleteMemberTitle': { en: 'Remove Family Member', beanie: 'remove member' },
   'confirm.removePasskeyTitle': { en: 'Remove Passkey', beanie: 'remove passkey' },
   'confirm.cannotDeleteOwnerTitle': { en: 'Cannot Delete Owner', beanie: 'cannot delete owner' },
   'confirm.notAllowedTitle': { en: 'Not Allowed', beanie: 'not allowed' },
@@ -3821,19 +3821,19 @@ const STRING_DEFS = {
   // Confirmation dialog messages
   'accounts.deleteConfirm': {
     en: 'Are you sure you want to delete this account?',
-    beanie: 'remove this bean jar for good?',
+    beanie: 'delete this account for good?',
   },
   'assets.deleteConfirm': {
     en: 'Are you sure you want to delete this asset?',
-    beanie: 'remove this valuable bean?',
+    beanie: 'delete this asset for good?',
   },
   'goals.deleteConfirm': {
     en: 'Are you sure you want to delete this goal?',
-    beanie: 'remove this bean dream for good?',
+    beanie: 'delete this goal for good?',
   },
   'goals.deleteCompletedConfirm': {
     en: 'Are you sure you want to delete this completed goal?',
-    beanie: 'remove this finished bean dream?',
+    beanie: 'delete this finished goal?',
   },
   'passkey.removeConfirm': {
     en: 'Remove this passkey? You will no longer be able to sign in with it.',
@@ -3841,7 +3841,7 @@ const STRING_DEFS = {
   },
 
   // Passkey / biometric login
-  'passkey.signInButton': { en: 'Biometric Sign In', beanie: 'beanie face sign in!' },
+  'passkey.signInButton': { en: 'Biometric Sign In', beanie: 'biometric sign in' },
   'passkey.usePassword': { en: 'Use password instead', beanie: 'use password instead' },
   'passkey.authenticating': { en: 'Verifying...', beanie: 'verifying...' },
   'passkey.welcomeBack': { en: 'Welcome back', beanie: 'welcome back' },
@@ -4127,7 +4127,7 @@ const STRING_DEFS = {
   'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
   'loginV6.unlockMemberCount': {
     en: '{count} members in this family',
-    beanie: '{count} beans in this pod',
+    beanie: '{count} members in this pod',
   },
   'loginV6.unlockFooter': {
     en: "This password decrypts your local data. We don't store or recover it.",
@@ -4140,7 +4140,7 @@ const STRING_DEFS = {
   'loginV6.unlockNoPasswordHint': {
     en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow, no password needed up front.',
     beanie:
-      'this file is another family’s encrypted data. to join, ask the family owner for an invite link. you’ll set up your own bean through that flow.',
+      'this file is another family’s encrypted data. to join, ask the family owner for an invite link. you’ll set up your own account through that flow.',
   },
   // Family picker view
   'familyPicker.title': { en: 'Which family?', beanie: 'which beanies?' },
@@ -4193,12 +4193,12 @@ const STRING_DEFS = {
   'resumeSetup.subtitle': {
     en: 'One last step: set your password to finish. We never store it, so your data stays encrypted end-to-end.',
     beanie:
-      'one last step: set your password to finish. we never store it, so your beans stay encrypted end-to-end.',
+      'one last step: set your password to finish. we never store it, so your data stays encrypted end-to-end.',
   },
   'resumeSetup.subtitleRecovery': {
     en: "Your last setup didn't quite finish. Re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
     beanie:
-      "your last setup didn't quite finish. re-enter your password to wrap things up — we never store it, so your beans stay encrypted end-to-end.",
+      "your last setup didn't quite finish. re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
   },
   'resumeSetup.storagePrompt': {
     en: 'Where should your pod live?',
@@ -4288,7 +4288,7 @@ const STRING_DEFS = {
   'resumeSetup.podTooLarge': {
     en: 'This device ran out of memory opening a family file this size. Your file is safe: nothing is damaged and nothing has been deleted. Reloading is worth a try; clearing your data will not help, because the file itself is unchanged. A computer or a newer device will still open it. If it keeps happening, send support@beanies.family the details below and we can make the file smaller for you.',
     beanie:
-      'this bean ran out of memory opening a family file this size. your file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. a computer or a newer bean will still open it. if it keeps happening, send support@beanies.family the details below and we can make the file smaller for you.',
+      'this device ran out of memory opening a family file this size. your file is safe: nothing is damaged and nothing has been deleted. reloading is worth a try; clearing your data will not help, because the file itself is unchanged. a computer or a newer device will still open it. if it keeps happening, send support@beanies.family the details below and we can make the file smaller for you.',
   },
   // The INLINE variant, for the compact error slots under a password field
   // (LoadPodView, SettingsPage, the join and login flows). The overlay copy
@@ -4298,7 +4298,7 @@ const STRING_DEFS = {
   'podTooLarge.inline': {
     en: 'This device ran out of memory opening your family file. Your file is safe; the problem is this device, not your data. A computer or a newer device will still open it.',
     beanie:
-      'this bean ran out of memory opening your family file. your file is safe; the problem is this bean, not your data. a computer or a newer bean will still open it.',
+      'this device ran out of memory opening your family file. your file is safe; the problem is this device, not your data. a computer or a newer device will still open it.',
   },
   // The corrupt-payload INLINE variant. `loginFlow.recoveryCorruptBody` cannot
   // stand in for it: that string was written for OpenRecoveryPanel, which has a
@@ -4317,7 +4317,7 @@ const STRING_DEFS = {
   // Was a hardcoded English literal rendered straight into the overlay.
   'app.initError.noData': {
     en: 'beanies started up but could not find your family data.',
-    beanie: 'beanies woke up but could not find your beans.',
+    beanie: 'beanies woke up but could not find your family data.',
   },
   // The sync bar's toast title when the pod itself cannot be opened. The detail
   // line carries the specific reason (`podTooLarge.inline` / `podCorrupted.inline`).
@@ -4328,12 +4328,12 @@ const STRING_DEFS = {
   'header.refreshUnopenable': {
     en: "Nothing to refresh — this device can't open your family file. Your data on screen is still yours.",
     beanie:
-      "nothing to refresh — this device can't open your family file. your beans on screen are still yours.",
+      "nothing to refresh — this device can't open your family file. your data on screen is still yours.",
   },
   'join.error.fileCorrupt': {
     en: "Your family's data could not be read and may be damaged. A new invite link points at the same file, so it will not help. Please ask whoever invited you to get in touch with support@beanies.family.",
     beanie:
-      "your family's beans could not be read and may be damaged. a new invite link points at the same file, so it will not help. please ask whoever invited you to get in touch with support@beanies.family.",
+      "your family's data could not be read and may be damaged. a new invite link points at the same file, so it will not help. please ask whoever invited you to get in touch with support@beanies.family.",
   },
   // The join flow's out-of-memory case. Distinct from `join.error.fileDecrypt`,
   // which tells the joiner to ask for a new invite link: the invite is fine and
@@ -4341,7 +4341,7 @@ const STRING_DEFS = {
   'join.error.fileTooLarge': {
     en: "This device ran out of memory opening your family's data. Nothing is wrong with your invite; the pod is simply bigger than this device can open. Try again on a device with more memory.",
     beanie:
-      "this device ran out of memory opening your family's beans. nothing is wrong with your invite; the pod is simply bigger than this device can open. try again on a device with more memory.",
+      "this device ran out of memory opening your family's data. nothing is wrong with your invite; the pod is simply bigger than this device can open. try again on a device with more memory.",
   },
   // The decrypt-step case, where a stale key and damaged bytes look identical.
   // Names the recoverable half, because that one has an action.
@@ -4351,7 +4351,7 @@ const STRING_DEFS = {
   'resumeSetup.podCredentialStale': {
     en: "Your family's data could not be unlocked on this device. The saved key may be out of date — a family member may have changed the password or removed a member. Reload and sign in with your password, or use your recovery kit. Your data is safe.",
     beanie:
-      "your family's beans could not be unlocked on this device. the saved key may be out of date — a family bean may have changed the password or removed a member. reload and sign in with your password, or use your recovery kit. your beans are safe.",
+      "your family's data could not be unlocked on this device. the saved key may be out of date — a family member may have changed the password or removed a member. reload and sign in with your password, or use your recovery kit. your data is safe.",
   },
   // The two ways a lineage check can BLOCK. Both are recoverable, and both name
   // the action, because the alternative — a merge — would silently discard one
@@ -4479,6 +4479,7 @@ const STRING_DEFS = {
     beanie:
       'some changes have not reached the cloud yet. wait for the sync to finish, then try again.',
   },
+  'compaction.refused.checkAgain': { en: 'Check Again', beanie: 'check again' },
   'compaction.refused.backup-not-delivered': {
     en: 'The backup was not saved, so beanies stopped. Nothing has changed. Try again and save the file when asked.',
     beanie:
@@ -4623,14 +4624,14 @@ const STRING_DEFS = {
   },
   'podLineage.bannerTitle': {
     en: 'Some changes on this device are waiting',
-    beanie: 'some beans on this device are waiting',
+    beanie: 'some changes on this device are waiting',
   },
   'podLineage.bannerMessage': {
     en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Nothing has been lost. Export those changes first if you want to keep them, then choose Use the family file.',
     beanie:
-      'your family file was reorganised on another bean, and this one still has beans that were never saved to it. nothing has been lost. export them first if you want to keep them, then choose use the family file.',
+      'your family file was reorganised on another device, and this one still has changes that were never saved to it. nothing has been lost. export those changes first if you want to keep them, then choose use the family file.',
   },
-  'podLineage.bannerCta': { en: 'Export my changes', beanie: 'export my beans' },
+  'podLineage.bannerCta': { en: 'Export my changes', beanie: 'export my changes' },
   'podLineage.conflictTitle': {
     en: 'Your family file needs a hand',
     beanie: 'your family file needs a hand',
@@ -4639,7 +4640,7 @@ const STRING_DEFS = {
   'podLineage.useFileBusy': { en: 'Opening…', beanie: 'opening…' },
   'podLineage.useFileDone': {
     en: 'This device is now on the reorganised family file.',
-    beanie: 'this bean is now on the reorganised family file.',
+    beanie: 'this device is now on the reorganised family file.',
   },
   'podLineage.useFileConfirmTitle': {
     en: 'Use the family file?',
@@ -4648,7 +4649,7 @@ const STRING_DEFS = {
   'podLineage.useFileConfirmMessage': {
     en: 'This device will take the reorganised family file, and the changes made here that were never saved to it will be let go for good. Export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
     beanie:
-      'this bean will take the reorganised family file, and the beans made here that were never saved to it will be let go for good. export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
+      'this device will take the reorganised family file, and the changes made here that were never saved to it will be let go for good. export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
   },
   'podLineage.useFileConfirmAction': { en: 'Use the family file', beanie: 'use the family file' },
   'podLineage.useFileFailed': {
@@ -4659,22 +4660,22 @@ const STRING_DEFS = {
   'podLineage.unsyncedInline': {
     en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Export them from Settings if you want to keep them, then choose Use the family file.',
     beanie:
-      'your family file was reorganised on another device, and this one still has beans that were never saved to it. export them from settings if you want to keep them, then choose use the family file.',
+      'your family file was reorganised on another device, and this one still has changes that were never saved to it. export them from settings if you want to keep them, then choose use the family file.',
   },
   'podLineage.conflictInline': {
     en: 'Two devices reorganised your family file at the same time. beanies cannot safely pick between them. Please contact support@beanies.family before making more changes.',
     beanie:
-      'two beans reorganised your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
+      'two devices reorganised your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
   },
   'podMerge.failedInline': {
     en: 'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
     beanie:
-      'beanies could not combine the beans in your family file with the ones on this device, so nothing has been written over. your beans are kept here. close any other beanies tabs and reload; if this keeps happening, export your beans from settings and contact support@beanies.family.',
+      'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. your changes are kept here. close any other beanies tabs and reload; if this keeps happening, export your changes from settings and contact support@beanies.family.',
   },
   'podUnreadable.inline': {
     en: 'beanies could not read your family file this time. It may have been part-way through saving on another device, or it may have been written by a newer version of beanies. Nothing has been changed. Try again in a moment, and update beanies on this device if the message keeps coming back.',
     beanie:
-      'beanies could not read your family file this time. it may have been part-way through saving on another bean, or written by a newer version of beanies. nothing has been changed. try again in a moment, and update beanies on this device if it keeps happening.',
+      'beanies could not read your family file this time. it may have been part-way through saving on another device, or written by a newer version of beanies. nothing has been changed. try again in a moment, and update beanies on this device if it keeps happening.',
   },
   // ⚠️ THIS DEVICE'S OWN COPY, not the family file. Deliberately distinct from
   // `podUnreadable.inline` above, which is about the DOWNLOADED file and tells
@@ -4720,7 +4721,7 @@ const STRING_DEFS = {
   'resumeSetup.podOlderVersion': {
     en: 'This family file was saved by a much older version of beanies and can no longer be opened. Nothing is wrong with your family data. Contact support@beanies.family if this is the only copy you have.',
     beanie:
-      'this family file was saved by a much older version of beanies and can no longer be opened. nothing is wrong with your family beans. contact support@beanies.family if this is the only copy you have.',
+      'this family file was saved by a much older version of beanies and can no longer be opened. nothing is wrong with your family data. contact support@beanies.family if this is the only copy you have.',
   },
   'resumeSetup.podLocalUnreadable': {
     en: "beanies could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
@@ -4732,12 +4733,12 @@ const STRING_DEFS = {
   'resumeSetup.podLineageBlocked': {
     en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Nothing has been lost, but the two cannot be combined here and reloading will not change that. Please contact support@beanies.family before making more changes on this device.',
     beanie:
-      'your family file was reorganised on another bean, and this one still has beans that were never saved to it. nothing has been lost, but the two cannot be combined here and reloading will not change that. please contact support@beanies.family before making more beans on this bean.',
+      'your family file was reorganised on another device, and this one still has changes that were never saved to it. nothing has been lost, but the two cannot be combined here and reloading will not change that. please contact support@beanies.family before making more changes on this device.',
   },
   'podCredentialStale.inline': {
     en: "Your family's data could not be unlocked. Your saved key may be out of date, so try your password. If that does not work, contact support@beanies.family.",
     beanie:
-      "your family's beans could not be unlocked. your saved key may be out of date, so try your password. if that does not work, contact support@beanies.family.",
+      "your family's data could not be unlocked. your saved key may be out of date, so try your password. if that does not work, contact support@beanies.family.",
   },
   'podCorrupted.inline': {
     en: 'Your family data could not be read and may be damaged. Trying again will not help. Please contact support@beanies.family so we can look at it with you.',
@@ -4799,14 +4800,15 @@ const STRING_DEFS = {
   },
   'loginFlow.recoveryErrorBody': {
     en: "Something got in the way of loading your family data. It's usually temporary — try again.",
-    beanie: "something got in the way of loading your beans. it's usually temporary — try again.",
+    beanie:
+      "something got in the way of loading your family data. it's usually temporary — try again.",
   },
   // ── Logout tiers + Google disconnect (login rethink Phase 5) ──
-  'auth.switchMember': { en: 'Switch Member', beanie: 'switch bean' },
+  'auth.switchMember': { en: 'Switch Member', beanie: 'switch member' },
   'auth.switchMemberHint': {
     en: 'Hand the app to another family member — your family data stays open, they just sign in as themselves.',
     beanie:
-      'hand the app to another bean — your family stays open, they just sign in as themselves.',
+      'hand the app to another member — your family data stays open, they just sign in as themselves.',
   },
   'googleDisconnect.title': {
     en: 'Disconnect Google Everywhere',
@@ -4825,7 +4827,7 @@ const STRING_DEFS = {
   'googleDisconnect.confirmMessage': {
     en: 'Every device and family member using this Google account with beanies will lose access until they reconnect. Continue?',
     beanie:
-      'every device and bean using this google account with beanies will lose access until they reconnect. continue?',
+      'every device and member using this google account with beanies will lose access until they reconnect. continue?',
   },
   // ── Recovery kit + passphrase (login rethink Phase 3) ──
   'deviceLink.title': { en: 'Link a Device', beanie: 'link a device' },
@@ -4850,14 +4852,14 @@ const STRING_DEFS = {
   },
   'recovery.podNotOpen': {
     en: 'Your family data must be open to do this.',
-    beanie: 'your beans must be open to do this.',
+    beanie: 'your family data must be open to do this.',
   },
   'recovery.sectionTitle': { en: 'Recovery & Backup', beanie: 'recovery & backup' },
   'recovery.kitTitle': { en: 'Recovery Kit', beanie: 'recovery kit' },
   'recovery.kitDescription': {
     en: "A one-page backup key that unlocks your family data if every password and PIN is forgotten. Keep it somewhere safe — beanies can't recover your data without it.",
     beanie:
-      'a one-page backup key that unlocks your beans if every password and pin is forgotten. keep it somewhere safe.',
+      'a one-page backup key that unlocks your family data if every password and pin is forgotten. keep it somewhere safe.',
   },
   'recovery.kitGenerate': { en: 'Create Recovery Kit', beanie: 'create recovery kit' },
   'recovery.kitRegenerate': { en: 'Create a New Kit', beanie: 'create a new kit' },
@@ -4900,7 +4902,7 @@ const STRING_DEFS = {
   'recovery.passphraseDescription': {
     en: 'An optional memorable phrase that can unlock your family data on any device — sign in to Google, type the phrase, done. Anyone who knows it can open your data, so make it strong and keep it private.',
     beanie:
-      'an optional memorable phrase that unlocks your beans on any device. anyone who knows it can open your data, so keep it private.',
+      'an optional memorable phrase that unlocks your family data on any device. anyone who knows it can open your data, so keep it private.',
   },
   'recovery.passphraseSet': { en: 'Set Passphrase', beanie: 'set passphrase' },
   'recovery.passphraseChange': { en: 'Change Passphrase', beanie: 'change passphrase' },
@@ -4918,7 +4920,7 @@ const STRING_DEFS = {
   'recovery.passphraseRules': {
     en: "At least 14 characters and 3 different words — spaces or dashes between words are fine, and any characters are allowed. Your family or member names are too easy to guess and won't be accepted.",
     beanie:
-      'at least 14 characters and 3 different words — spaces or dashes are fine, any characters allowed. family or bean names are too easy to guess.',
+      'at least 14 characters and 3 different words — spaces or dashes are fine, any characters allowed. family or member names are too easy to guess.',
   },
   'recovery.passphraseTooWeak': {
     en: 'That phrase is too easy to guess — use at least 14 characters and 3 different words.',
@@ -4926,7 +4928,7 @@ const STRING_DEFS = {
   },
   'recovery.passphraseMatchesName': {
     en: "Your family or a member's name is too easy to guess — pick something else.",
-    beanie: "your family or a bean's name is too easy to guess — pick something else.",
+    beanie: "your family or a member's name is too easy to guess — pick something else.",
   },
   'recovery.passphraseSaved': {
     en: 'Recovery passphrase saved. It works on any device from the next sync.',
@@ -4960,7 +4962,7 @@ const STRING_DEFS = {
   'recovery.passphraseAcceptedProve': {
     en: 'Recovery passphrase accepted — your family data is open. Now confirm who you are to sign in.',
     beanie:
-      'recovery passphrase accepted — your beans are open. now confirm who you are to sign in.',
+      'recovery passphrase accepted — your family data is open. now confirm who you are to sign in.',
   },
   // ── Member PIN (login rethink Phase 2) ──
   'pin.invalidFormat': {
@@ -4970,7 +4972,7 @@ const STRING_DEFS = {
   'pin.noSignedInMember': {
     en: 'beanies does not know who you are on this device yet, so it cannot set your PIN. Sign in as yourself from the welcome screen first, then set a PIN here.',
     beanie:
-      'beanies does not know which bean you are on this device yet, so it cannot set your pin. sign in as yourself from the welcome screen first, then set a pin here.',
+      'beanies does not know who you are on this device yet, so it cannot set your pin. sign in as yourself from the welcome screen first, then set a pin here.',
   },
   'pin.currentRequired': {
     en: 'Enter your current PIN to change it.',
@@ -4978,7 +4980,7 @@ const STRING_DEFS = {
   },
   'pin.notSet': {
     en: "This member hasn't set a PIN yet.",
-    beanie: "this bean hasn't set a pin yet.",
+    beanie: "this member hasn't set a pin yet.",
   },
   'pin.incorrect': { en: "That PIN isn't right.", beanie: "that pin isn't right." },
   'pin.tooManyAttempts': {
@@ -5052,17 +5054,17 @@ const STRING_DEFS = {
   'loginFlow.recoveryAuthBodyUnproven': {
     en: 'We need to reconnect to Google before you can sign in — one tap, then pick up right where you were.',
     beanie:
-      'we need to reconnect to google before you can sign in — one tap, then right back to your beans.',
+      'we need to reconnect to google before you can sign in — one tap, then right back to where you were.',
   },
   'loginFlow.recoveryCorruptBody': {
     en: "Your family data file couldn't be read — the file may be damaged. Try again, or load a different copy of your family file.",
     beanie:
       "your family file couldn't be read — it may be damaged. try again, or load a different copy.",
   },
-  'auth.memberNotFound': { en: 'Member not found.', beanie: 'that bean is not here.' },
+  'auth.memberNotFound': { en: 'Member not found.', beanie: 'member not found.' },
   'auth.memberHasPassword': {
     en: 'This member has a password — please sign in with it.',
-    beanie: 'this bean has a password — please sign in with it.',
+    beanie: 'this member has a password — please sign in with it.',
   },
   'auth.memberNeedsInvite': {
     en: 'This grown-up bean needs an invite before it can be opened. Ask someone in your family to invite you from The Pod.',
@@ -5094,7 +5096,7 @@ const STRING_DEFS = {
   'loginV6.pickBeanInfoText': {
     en: 'Onboarded members can sign in with their password. New members need to create a password first.',
     beanie:
-      'onboarded beans can sign in with their password. new beans need to create a password first.',
+      'onboarded members can sign in with their password. new members need to create a password first.',
   },
   'loginV6.growPodTitle': {
     en: 'Start your pod \ud83c\udf31',
@@ -5103,7 +5105,7 @@ const STRING_DEFS = {
   'loginV6.signInPasswordLabel': { en: 'Your sign-in password', beanie: 'your sign-in password' },
   'loginV6.signInPasswordHint': {
     en: '8+ characters. Used to sign into your profile.',
-    beanie: '8+ characters. used to sign into your bean profile.',
+    beanie: '8+ characters. used to sign into your profile.',
   },
   'loginV6.storageSectionLabel': {
     en: 'Where should we save it?',
@@ -5209,7 +5211,7 @@ const STRING_DEFS = {
   'join.familyFound': { en: 'Family found!', beanie: 'found your pod!' },
   'join.familyNotFound': {
     en: 'Family not found. Check the code and try again.',
-    beanie: 'your family pod could not be found. check the code and try again.',
+    beanie: 'your family could not be found. check the code and try again.',
   },
   'join.registryOffline': {
     en: "We couldn't reach the registry. You can still join by loading the shared file directly.",
@@ -5218,7 +5220,7 @@ const STRING_DEFS = {
   },
   'join.needsFile': {
     en: 'You need the family data file',
-    beanie: 'you need the family pod data file',
+    beanie: 'you need the family data file',
   },
   'join.needsFileDesc': {
     en: 'Ask the owner to share the .beanpod file with you via email, a shared cloud folder, or USB.',
@@ -5228,7 +5230,7 @@ const STRING_DEFS = {
   'join.expectedFile': { en: 'Look for a file named:', beanie: 'look for a file named:' },
   'join.fileMismatch': {
     en: 'This file belongs to a different family. Please load the correct file.',
-    beanie: 'this file belongs to a different pod. please load the correct file.',
+    beanie: 'this file belongs to a different family. please load the correct file.',
   },
   'join.loadFileButton': { en: 'Load .beanpod file', beanie: 'load .beanpod file' },
   'join.dropZoneText': {
@@ -5242,15 +5244,15 @@ const STRING_DEFS = {
   },
   'join.noUnclaimedMembers': {
     en: 'No unclaimed profiles found. Ask the family owner to create your profile first.',
-    beanie: 'no unclaimed beanies found. ask your pod owner to create your profile first.',
+    beanie: 'no unclaimed profiles found. ask the family owner to create your profile first.',
   },
   'join.inviteTokenInvalid': {
     en: 'This invite link is invalid. Ask the family owner for a new one.',
-    beanie: 'this invite link is no good. ask your pod owner for a new one.',
+    beanie: 'this invite link is no good. ask the family owner for a new one.',
   },
   'join.inviteTokenExpired': {
     en: 'This invite link has expired. Ask the family owner for a new one.',
-    beanie: 'this invite link has expired. ask your pod owner for a new one.',
+    beanie: 'this invite link has expired. ask the family owner for a new one.',
   },
   'join.generatingLink': {
     en: 'Generating secure invite link...',
@@ -5267,7 +5269,7 @@ const STRING_DEFS = {
     beanie:
       'to sign in on a brand-new device later, use a device link or your family recovery kit.',
   },
-  'join.completing': { en: 'Joining your family...', beanie: 'joining your beanies...' },
+  'join.completing': { en: 'Joining your family...', beanie: 'joining your family...' },
   'join.success': { en: 'Welcome to the family!', beanie: 'welcome to your pod!' },
   'join.shareFileNote': {
     en: 'Important: also share the .beanpod file with them (email, cloud folder, or USB)',
@@ -5284,7 +5286,7 @@ const STRING_DEFS = {
   },
   'join.loadingFromCloud': {
     en: 'Loading family data from Google Drive...',
-    beanie: 'fetching your beans from the cloud...',
+    beanie: 'fetching your family data from the cloud...',
   },
   'join.howToJoinTitle': { en: 'How to join', beanie: 'how to join' },
   'join.howToJoinStep1': {
@@ -5361,7 +5363,7 @@ const STRING_DEFS = {
   },
   'join.error.noUnclaimed': {
     en: 'Every member in this family has already been claimed. Ask a family admin to add you.',
-    beanie: 'every bean in this pod has already been claimed. ask a family admin to add you.',
+    beanie: 'every member in this pod has already been claimed. ask a family admin to add you.',
   },
 
   // Recovery action button labels.
@@ -5471,7 +5473,7 @@ const STRING_DEFS = {
   'join.pickerPrompt.description': {
     en: "One last step to join: open your family's data file from Google Drive so you have access.",
     beanie:
-      "one last step to join: open your family's bean pod from google drive so you have access.",
+      "one last step to join: open your family's data file from google drive so you have access.",
   },
   'join.pickerPrompt.fileHint': {
     en: 'After you tap, pick this file:',
@@ -5501,7 +5503,7 @@ const STRING_DEFS = {
   },
   'invite.shareEmail.error': {
     en: "Couldn't share the file. You can share it manually from Google Drive.",
-    beanie: "couldn't share the pod. try sharing from google drive",
+    beanie: "couldn't share the family file. try sharing from google drive",
   },
 
   // Invite Wizard — 2-step wizard for inviting beanies
@@ -5564,7 +5566,7 @@ const STRING_DEFS = {
   'inviteWizard.step1.faq.a1': {
     en: "Yes. The family data file is encrypted with a key only you and your family members have. Google can't read what's inside — they're just storing the locked file for you.",
     beanie:
-      "yes. the family pod is encrypted with a key only you and your beanies have. google can't read what's inside — they're just storing the locked pod for you",
+      "yes. the family file is encrypted with a key only you and your family members have. google can't read what's inside — they're just storing the locked file for you",
   },
   'inviteWizard.step1.faq.q2': {
     en: 'What about the children?',
@@ -5740,7 +5742,7 @@ const STRING_DEFS = {
   // PWA / Offline / Install
   'pwa.offlineBanner': {
     en: "You're offline — changes are saved locally",
-    beanie: "you're offline — beans are safe in the pod",
+    beanie: "you're offline — changes are saved on this device",
   },
   'pwa.backOnline': {
     en: 'Back online',
@@ -5773,16 +5775,17 @@ const STRING_DEFS = {
   'settings.deleteFamily': { en: 'Delete Family & All Data', beanie: 'delete family & all data' },
   'settings.deleteFamilyDesc': {
     en: 'Permanently remove this family and all data from all systems. This cannot be undone.',
-    beanie: 'permanently remove this family and all beans from everywhere. this cannot be undone.',
+    beanie:
+      'permanently remove this family and all its data from everywhere. this cannot be undone.',
   },
   'settings.deleteFamilyWarning': {
     en: 'This will permanently delete all family data including members, accounts, transactions, activities, and settings. Data will be removed from this device, cloud storage, and all connected systems. This action cannot be undone.',
     beanie:
-      'this will permanently delete all family beans including members, accounts, transactions, activities, and settings. beans will be removed from this device, cloud storage, and all connected systems. this cannot be undone.',
+      'this will permanently delete all family data including members, accounts, transactions, activities, and settings. data will be removed from this device, cloud storage, and all connected systems. this cannot be undone.',
   },
   'settings.deleteFamilyExport': {
     en: 'Download all data as a readable file before deleting',
-    beanie: 'download all beans as a readable file before deleting',
+    beanie: 'download all data as a readable file before deleting',
   },
   'settings.deleteFamilyDriveDelete': {
     en: 'Also delete the encrypted .beanpod file from Google Drive',
@@ -5800,7 +5803,7 @@ const STRING_DEFS = {
   'settings.deleteFamilyFarewellMsg': {
     en: "Your family data has been deleted from all systems. We're sorry to see you go — every bean counts.",
     beanie:
-      "your family beans have been deleted from everywhere. we're sorry to see you go — every bean counts.",
+      "your family data has been deleted from everywhere. we're sorry to see you go — every bean counts.",
   },
 
   // Family To-Do
@@ -6440,12 +6443,12 @@ const STRING_DEFS = {
   },
   'setupProgress.error.title': {
     en: 'almost there — one last step hiccuped',
-    beanie: 'almost there — one last bean tripped',
+    beanie: 'almost there — one last step hiccuped',
   },
   'setupProgress.error.description': {
     en: "Your pod is created and your data is safe — we just couldn't finish a background step (a final save / arming auto-sync). Try again, continue (it'll retry next time you open the app), or go back.",
     beanie:
-      "your pod is created and your beans are safe — we just couldn't finish a background step (a final save / arming auto-sync). try again, continue (it'll retry next time you open the app), or go back.",
+      "your pod is created and your data is safe — we just couldn't finish a background step (a final save / arming auto-sync). try again, continue (it'll retry next time you open the app), or go back.",
   },
   'setupProgress.error.retry': { en: 'Try Again', beanie: 'try again' },
   'setupProgress.error.continue': { en: 'Continue', beanie: 'continue' },
@@ -7051,12 +7054,12 @@ const STRING_DEFS = {
   },
   'googleDrive.fileNotFoundTitle': {
     en: 'Your data file was not found',
-    beanie: "we can't find your beanpod",
+    beanie: "we can't find your family file",
   },
   'googleDrive.fileNotFoundBody': {
     en: "We couldn't find your data file in {email}'s Drive. It may have been deleted, moved, or you may be signed in with a different account.",
     beanie:
-      "we couldn't find your beanpod in {email}'s drive. it may have been moved, deleted, or you may be signed in with a different account",
+      "we couldn't find your family file in {email}'s drive. it may have been moved, deleted, or you may be signed in with a different account",
   },
   'googleDrive.thisAccount': {
     en: 'this account',
@@ -7077,7 +7080,7 @@ const STRING_DEFS = {
   },
   'googleDrive.reconnected': {
     en: 'Reconnected — all data saved',
-    beanie: 'reconnected — all beanies safe & sound',
+    beanie: 'reconnected — all data saved',
   },
   'googleDrive.noFilesHint': {
     en: 'Make sure the file is in a folder named "beanies.family" on this account.',
@@ -7093,7 +7096,7 @@ const STRING_DEFS = {
   },
   'sync.backgroundError': {
     en: 'Could not refresh from cloud. Using cached data.',
-    beanie: 'beans got lost in the cloud... using fresh-ish beans',
+    beanie: 'could not refresh from the cloud. using the cached copy.',
   },
   'storage.localFile': { en: 'Local File', beanie: 'local file' },
   'storage.dropbox': { en: 'Dropbox', beanie: 'dropbox' },
@@ -7863,7 +7866,7 @@ const STRING_DEFS = {
   'budget.upcoming.recurring': { en: 'recurring', beanie: 'recurring' },
 
   // Initialization error recovery
-  'app.initError.title': { en: 'Something Went Wrong', beanie: 'oh no, the beans spilled' },
+  'app.initError.title': { en: 'Something Went Wrong', beanie: 'something went wrong' },
   'app.initError.description': {
     en: 'The app failed to start properly. You can try reloading, or clear your data and start fresh.',
     beanie:
@@ -9849,11 +9852,11 @@ const STRING_DEFS = {
   },
   'calendarSync.reconnect.bannerSub': {
     en: 'Google needs you to reconnect {account} before your activities can sync again.',
-    beanie: 'google needs you to reconnect {account} before your beans can sync again.',
+    beanie: 'google needs you to reconnect {account} before your activities can sync again.',
   },
   'calendarSync.reconnect.bannerSubGeneric': {
     en: 'Google needs you to reconnect this calendar before your activities can sync again.',
-    beanie: 'google needs you to reconnect this calendar before your beans can sync again.',
+    beanie: 'google needs you to reconnect this calendar before your activities can sync again.',
   },
   'calendarSync.reconnect.bannerError': {
     en: "That didn't work. Please try again.",
@@ -9882,13 +9885,13 @@ const STRING_DEFS = {
   'calendarSync.disconnect.message': {
     en: 'beanies will remove the events it added to this calendar. Your activities stay safe in beanies.',
     beanie:
-      'beanies will remove the beans it added to this calendar. your activities stay safe in beanies.',
+      'beanies will remove the events it added to this calendar. your activities stay safe in beanies.',
   },
   'calendarSync.disconnect.confirm': { en: 'Disconnect', beanie: 'disconnect' },
   'calendarSync.toast.connected.title': { en: 'Calendar connected', beanie: 'calendar connected' },
   'calendarSync.toast.connected.message': {
     en: 'Your activities will sync to this calendar.',
-    beanie: 'your beans will sync to this calendar.',
+    beanie: 'your activities will sync to this calendar.',
   },
   'calendarSync.toast.reconnected.title': { en: 'Reconnected', beanie: 'reconnected' },
   'calendarSync.toast.reconnected.message': {
@@ -9898,7 +9901,7 @@ const STRING_DEFS = {
   'calendarSync.toast.synced.title': { en: 'Synced', beanie: 'synced' },
   'calendarSync.toast.synced.message': {
     en: 'Your activities are up to date.',
-    beanie: 'your beans are up to date.',
+    beanie: 'your activities are up to date.',
   },
   'calendarSync.toast.disconnected.title': {
     en: 'Calendar disconnected',
@@ -9924,7 +9927,7 @@ const STRING_DEFS = {
   },
   'calendarSync.toast.disconnectPartial.message': {
     en: "Some events couldn't be removed yet. beanies will finish next time you open this.",
-    beanie: "some beans couldn't be removed yet. beanies will finish next time you open this.",
+    beanie: "some events couldn't be removed yet. beanies will finish next time you open this.",
   },
   'calendarSync.toast.connectFailed.title': { en: "Couldn't connect", beanie: "couldn't connect" },
   'calendarSync.toast.destinationFailed.title': {
@@ -9934,7 +9937,7 @@ const STRING_DEFS = {
   'calendarSync.toast.destinationFailed.message': {
     en: 'Some events could not be removed from the old calendar, so the change was undone. Please try again.',
     beanie:
-      'some beans could not be removed from the old calendar, so the change was undone. please try again.',
+      'some events could not be removed from the old calendar, so the change was undone. please try again.',
   },
   'settings.ai.tierLabel': {
     en: 'How documents are processed',

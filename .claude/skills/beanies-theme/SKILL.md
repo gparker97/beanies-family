@@ -292,6 +292,17 @@ Because the six-level scale and all Tailwind spacing/sizing utilities are rem-ba
 
 ---
 
+## Beanie mode: playful, never opaque
+
+Beanie mode swaps register, not meaning. Two tiers:
+
+- **Cosmetic surfaces** (headers, KPI labels, empty states, mottos, celebrations, loaders, pickers): "beans in / beans out", "little bean", "counting beans..." are the brand.
+- **Important surfaces** (anything about losing, saving, syncing, deleting, unlocking, signing in, memory, or money at risk): write the sentence in plain lowercase English. Real nouns only: device, changes, data, family file, member, account, password, PIN. One euphemism per sentence at most, and never one whose referent shifts mid-sentence ("bean" = device, then "beans" = changes).
+
+Keep: `pod` for the family, `.beanpod` for the file, `beanies` for the app, the tagline. Red flags to reject in review: "your beans are safe", "another bean" for a device, "beans" for changes, "bean jar" inside a delete confirm.
+
+Enforced by `src/services/translation/uiStrings.test.ts` ("important-surface beanie values"): a `beanie` value under an important-surface key prefix may not introduce a bean-word its `en` value does not contain. When you add a new important-surface namespace, add its prefix to that list.
+
 ## Text Casing Standard
 
 `uiStrings.ts` uses a dual-value system — every entry has an `en` value (standard English) and a `beanie` value (cosmetic overlay):

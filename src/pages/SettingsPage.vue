@@ -2656,6 +2656,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       :failure="compactionFailure"
       :behind="compactionBehind"
       @close="dismissCompactionProgress"
+      @retry="compactPod"
     />
 
     <!-- ── Transfer Ownership ──────────────────────────────────────────── -->

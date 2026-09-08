@@ -49,12 +49,17 @@ const props = defineProps<{
    * "Your family file has not been changed" — false at that moment, and the one
    * sentence that would stop someone re-publishing.
    */
-  failure: { titleKey: UIStringKey; subtitleKey: UIStringKey; helpKey: UIStringKey } | null;
+  failure: {
+    titleKey: UIStringKey;
+    subtitleKey: UIStringKey;
+    helpKey: UIStringKey;
+    retryable?: boolean;
+  } | null;
   /** Members still on a build that cannot open a compacted file. */
   behind: string[];
 }>();
 
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; retry: [] }>();
 
 const { t } = useTranslation();
 
@@ -253,7 +258,21 @@ const subtitleKey = computed<UIStringKey>(() => {
         <p class="dark:text-ink text-sm text-[#2C3E50]">{{ t(failure.helpKey) }}</p>
       </div>
 
-      <BaseButton v-if="phase !== 'running'" variant="primary" full-width @click="emit('close')">
+      <BaseButton
+        v-if="phase === 'failed' && failure?.retryable"
+        variant="primary"
+        full-width
+        class="mb-2"
+        @click="emit('retry')"
+      >
+        {{ t('compaction.refused.checkAgain') }}
+      </BaseButton>
+      <BaseButton
+        v-if="phase !== 'running'"
+        :variant="phase === 'failed' && failure?.retryable ? 'secondary' : 'primary'"
+        full-width
+        @click="emit('close')"
+      >
         {{ t('action.done') }}
       </BaseButton>
     </div>
