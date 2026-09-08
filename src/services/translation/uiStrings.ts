@@ -3471,6 +3471,10 @@ const STRING_DEFS = {
     beanie:
       'beanies could not open the google file picker. try again in a moment, or choose a file saved on this device.',
   },
+  'settings.reconnectedTryAgain': {
+    en: 'Reconnected to Google. Try loading the file again.',
+    beanie: 'reconnected to google. try loading the file again.',
+  },
   'settings.restoreFileNotFound': {
     en: 'That file is no longer in your Google Drive. If it was the copy beanies saved before reorganising, it may have been removed.',
     beanie:

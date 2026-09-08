@@ -18,18 +18,42 @@ set -euo pipefail
 FLOOR_FILE="web/public/min-app-version.json"
 VERSION_FILE="src/constants/appVersion.ts"
 
+# `|| true` then an explicit check: under `set -euo pipefail` a grep miss would
+# otherwise kill the script mid-pipeline with no output, and a deploy gate that
+# dies silently is a deploy gate that gets skipped.
 floor=$(grep -o '"promptBelowVersion"[[:space:]]*:[[:space:]]*"[^"]*"' "$FLOOR_FILE" \
-  | sed 's/.*"\([^"]*\)"$/\1/')
-shipping=$(grep -o "APP_VERSION = '[^']*'" "$VERSION_FILE" | sed "s/.*'\([^']*\)'/\1/")
+  | sed 's/.*"\([^"]*\)"$/\1/' || true)
+shipping=$(grep -o "APP_VERSION = '[^']*'" "$VERSION_FILE" | sed "s/.*'\([^']*\)'/\1/" || true)
+
+if [ -z "$floor" ] || [ -z "$shipping" ]; then
+  echo "ERROR: could not read the floor ($FLOOR_FILE) or APP_VERSION ($VERSION_FILE)." >&2
+  echo "Do not skip the floor question — read both files by hand." >&2
+  exit 1
+fi
 
 echo "update floor (promptBelowVersion): ${floor}"
 echo "version being shipped (APP_VERSION): ${shipping}"
 
 if [ "$floor" = "$shipping" ]; then
   echo "floor is current — nothing to ask."
-else
-  echo "floor LAGS the shipping version."
-  echo "ASK GREG: raise promptBelowVersion to ${shipping}? (default: no)"
-  echo "Raise it when this release fixes something a stale device can do to the"
-  echo "family's data. Leave it when the release is additive."
+  exit 0
 fi
+
+echo
+echo "The floor differs from the shipping version. A NORMAL RELEASE DOES NOT RAISE IT"
+echo "(docs/runbooks/native-store-submission.md section 7)."
+echo
+echo "Propose raising it ONLY if BOTH are true, and say which:"
+echo "  1. ${shipping} is already LIVE ON BOTH STORES. Not TestFlight. Not Play open"
+echo "     testing. Live. Prompting people to fetch a version Apple has not finished"
+echo "     reviewing sends them to a listing that still offers the old one."
+echo "     ⚠️ THIS IS THE ONE THAT GETS SKIPPED. It was skipped on 2026-09-08."
+echo "  2. A device below the floor can DAMAGE THE FAMILY'S DATA, not merely miss a"
+echo "     feature. Live example: a pre-compaction device can overwrite a compacted"
+echo "     pod, and the edits made on it in between are not recoverable."
+echo
+echo "If either fails, leave it and say so in one line. The floor prompts rather than"
+echo "blocks, so it is cheap to raise later and there is no cost to waiting."
+echo
+echo "⚠️ The file reaches users only via deploy-web.yml. On an app-only deploy,"
+echo "raising it commits a change that publishes nothing."

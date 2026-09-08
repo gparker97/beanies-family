@@ -44,6 +44,7 @@ import {
   initializeAuth,
   requestAccessToken,
   getValidTokenSilent,
+  TokenExpiredError,
   onTokenPermanentlyExpired,
   onTokenAcquired,
   fetchGoogleUserEmail,
@@ -873,14 +874,21 @@ export const useSyncStore = defineStore('sync', () => {
       if (!ok) {
         throw new Error(error.value || 'Could not write to the new storage location');
       }
-      // `preserveTimestamp`, and it is load-bearing. Without it `saveSettings`
-      // stamps a fresh millisecond-precision `updatedAt`, which lands a new
-      // Automerge change PAST the baseline `syncNow(true)` just committed — the
-      // identical mechanism that made compaction false-refuse, reached through
-      // `updatedAt` rather than through `lastSyncTimestamp`, so the `?: never`
-      // tombstone on that field cannot see it. A compaction attempted straight
-      // after creating a pod or migrating storage hit exactly this. Every other
-      // post-save write in this file already passes it.
+      // `preserveTimestamp` so this does not ALSO churn `updatedAt` on every
+      // call, matching every other post-save write in this file.
+      //
+      // ⚠️ IT DOES NOT MAKE THIS WRITE FREE, and an earlier comment here claimed
+      // it did. `saveSettings` ends in a whole-object `setSettings` mutate, so
+      // even a byte-identical reassign advances the document heads past the
+      // baseline `syncNow(true)` just committed — and here `syncFilePath` and
+      // `syncEnabled` are genuinely new values anyway. So a compaction attempted
+      // straight after creating a pod or migrating storage still reads not-level
+      // and still pays a full re-push.
+      //
+      // That is acceptable (it costs one upload on a rare, user-initiated path)
+      // but it is NOT the same as fixed, and the real answer is the one applied
+      // to `lastSyncTimestamp`: device-local sync bookkeeping does not belong in
+      // the shared document at all. Tracked in the plan's follow-ups.
       await settingsRepo.saveSettings(
         {
           syncEnabled: true,
@@ -5029,7 +5037,19 @@ export const useSyncStore = defineStore('sync', () => {
       // reload-if-changed catch above. The reconnect flow branches on this
       // `reason` to fall back to the file picker when the known file is gone.
       const status = e instanceof DriveApiError ? e.status : undefined;
-      const reason: 'not-found' | 'error' = status === 404 ? 'not-found' : 'error';
+      // ⚠️ `'auth'` IS REACHABLE NOW, and was not before. The declared union has
+      // always carried it, but nothing here produced it, so the Settings restore
+      // could not tell "reconnect and retry" from "this file is broken" and sent
+      // a plain token lapse to the generic import-failed dead end. Both shapes
+      // count: `getValidTokenSilent` throws `TokenExpiredError` when it has
+      // nothing usable, and a grant revoked on ANOTHER device passes the local
+      // `isTokenValid()` check and surfaces as a 401 from the read instead.
+      const isAuth = e instanceof TokenExpiredError || status === 401;
+      const reason: 'auth' | 'not-found' | 'error' = isAuth
+        ? 'auth'
+        : status === 404
+          ? 'not-found'
+          : 'error';
       return { success: false, reason, status, payloadError: blocker };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped

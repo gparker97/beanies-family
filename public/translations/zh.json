@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-08",
-    "translationCount": 4655
+    "translationCount": 4658
   },
   "translations": {
     "app.name": {
@@ -23279,6 +23279,21 @@
     "share.copyFailedHelp": {
       "translation": "您的浏览器阻止了剪贴板。选择文本，然后手动复制。",
       "hash": "o7154p",
+      "lastUpdated": "2026-09-08"
+    },
+    "settings.reconnectedTryAgain": {
+      "translation": "已重新连接到Google。请尝试重新加载文件。",
+      "hash": "cz300k",
+      "lastUpdated": "2026-09-08"
+    },
+    "compaction.refused.cannot-verify": {
+      "translation": "beanies无法检查此设备是否与云保持同步。您的数据正常；检查本身失败。请稍后重试。",
+      "hash": "s8rd8o",
+      "lastUpdated": "2026-09-08"
+    },
+    "compaction.refused.checkAgain": {
+      "translation": "再次檢查",
+      "hash": "fd33m0",
       "lastUpdated": "2026-09-08"
     }
   }

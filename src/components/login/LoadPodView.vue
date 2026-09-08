@@ -1063,14 +1063,25 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
 async function handleDriveRefresh() {
   isDriveLoading.value = true;
   try {
-    // `silent`: this refresh re-lists a picker that is already open, so a token
-    // was acquired moments ago. An interactive acquisition here would open a
-    // popup with no user gesture behind it, which is blocked on desktop and does
-    // not survive a Capacitor WebView. Failing quietly and keeping the existing
-    // list is the right outcome: the list on screen is still valid.
-    driveFiles.value = await syncStore.listGoogleDriveFiles({ silent: true });
-  } catch {
-    // Keep existing list
+    // ⚠️ NOT `{ silent: true }`. A cut of this on 2026-09-09 made it silent on the
+    // reasoning that "an interactive acquisition would open a popup with no user
+    // gesture behind it" — which is simply false: this handler is bound to the
+    // picker's Refresh BUTTON and nothing is awaited before the token call, so
+    // the gesture is right there. Silent turned Refresh into an invisible no-op:
+    // the token lapses, `getValidTokenSilent` throws, the bare catch below eats
+    // it, and the user gets a spinner flash and the same stale list forever.
+    driveFiles.value = await syncStore.listGoogleDriveFiles();
+  } catch (e) {
+    // Keep the existing list — it is still valid — but never silently. This is a
+    // newly reachable failure class (a grant revoked on another device surfaces
+    // here as a Drive 401) and a bare `catch {}` would put it beyond CloudWatch.
+    console.warn('[LoadPodView] Drive list refresh failed; keeping the existing list', e);
+    logEvent({
+      level: 'warn',
+      surface: 'pod-load-failure',
+      message: 'drive list refresh failed',
+      context: { action: 'drive-refresh-failed' },
+    });
   } finally {
     isDriveLoading.value = false;
   }
