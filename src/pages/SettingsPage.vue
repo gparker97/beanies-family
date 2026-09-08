@@ -51,7 +51,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
-import { TokenExpiredError } from '@/services/google/googleAuth';
+import { classifyDriveFailure } from '@/utils/podAccess';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
@@ -698,10 +698,14 @@ async function openDriveRestorePicker(): Promise<void> {
     driveRestoreFiles.value = await syncStore.listGoogleDriveFiles({ silent: true });
   } catch (e) {
     showDriveRestorePicker.value = false;
-    if (e instanceof TokenExpiredError) {
-      // Not a listing failure: we simply have no live credential. Offering
-      // "could not list your files" here would be both wrong and a dead end,
-      // because the thing the user needs is a reconnect, which this page owns.
+    // ⚠️ `classifyDriveFailure`, NOT `instanceof TokenExpiredError`.
+    // `getValidTokenSilent` returns the cached token whenever `isTokenValid()` —
+    // a purely LOCAL expiry check — so a grant revoked on another device does
+    // not throw `TokenExpiredError` at all. It throws `DriveApiError(401)` from
+    // the listing request, which an `instanceof` check misses entirely, landing
+    // the one case that most needs a reconnect on the generic "could not list
+    // your files". `classifyDriveFailure` already maps both to CONSENT_EXPIRED.
+    if (classifyDriveFailure(e) === 'CONSENT_EXPIRED') {
       console.warn('[SettingsPage] Drive restore needs a reconnect', e);
       logEvent({
         level: 'info',
@@ -709,7 +713,21 @@ async function openDriveRestorePicker(): Promise<void> {
         message: 'drive restore listing needs reconnect',
         context: { action: 'restore-needs-reconnect' },
       });
-      await reconnect();
+      // `loginHint`: without it `tryReconnectSilently` bails at its
+      // `if (!boundEmail) return false` and the beanpod-mirrored token recovery
+      // never runs, so the user is pushed to a consent screen we could have
+      // avoided. Line ~357 of this file already does this correctly.
+      const reconnected = await reconnect(syncStore.providerAccountEmail ?? undefined);
+      if (reconnected) {
+        // Re-list, or the user is left staring at a picker they just fixed.
+        await openDriveRestorePicker();
+        return;
+      }
+      // A failed reconnect must SAY so. `reconnectError` renders only inside a
+      // block gated on `syncStore.error`, which is null here, so relying on it
+      // showed the user nothing at all — strictly worse than the generic message
+      // this branch replaced.
+      importError.value = t('settings.drivePickerFailed');
       return;
     }
     importError.value = t('settings.drivePickerFailed');
@@ -737,7 +755,26 @@ async function handleDriveRestoreSelected(payload: {
     message: 'restore started',
     context: { action: 'restore-started', provider_type: 'google_drive' },
   });
-  const result = await syncStore.loadFromGoogleDrive(payload.fileId, payload.fileName);
+  // `silent`: the listing above ran silently because a popup does not survive a
+  // Capacitor WebView. Acquiring interactively here would just move the dead end
+  // from the list to the tap. `reason: 'auth'` comes back if the token lapsed
+  // between listing and choosing, and the arm below routes it to reconnect.
+  const result = await syncStore.loadFromGoogleDrive(payload.fileId, payload.fileName, {
+    silent: true,
+  });
+
+  if (result.reason === 'auth') {
+    showDriveRestorePicker.value = false;
+    console.warn('[SettingsPage] restore needs a reconnect before the file can be read');
+    logEvent({
+      level: 'info',
+      surface: 'pod-load-failure',
+      message: 'drive restore read needs reconnect',
+      context: { action: 'restore-needs-reconnect' },
+    });
+    await reconnect();
+    return;
+  }
 
   if (result.needsPassword) {
     showDecryptFileModal.value = true;
@@ -1256,26 +1293,52 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       }
     }
 
-    // 3. Remove the SHARED registry row. Must run BEFORE the local delete and
-    //    the auth teardown below: after step 4 there is no session left to
-    //    authorise it, and after 2026-09-08 `deleteLocalFamily` no longer does
-    //    it (it is a per-device action and the row belongs to the whole family).
+    // 3. Remove the SHARED registry row — ONLY when the pod file is going too.
     //
-    //    Awaited and SURFACED, never swallowed: we are about to tell the user
-    //    their family is gone from everywhere, so "everywhere" had better be
-    //    true, and if it is not they need to know which part survived.
-    const registryRemoved = await removeFamily(familyId);
-    if (!registryRemoved) {
-      reportError({
-        surface: 'registry',
-        severity: 'warning',
-        message: 'family deleted but its registry row could not be removed',
-        context: { action: 'delete-failed', error_code: 'delete-family' },
-      });
+    //    ⚠️ GATED ON `wantDeleteDrive`, and this gate is the whole point. The
+    //    registry row is the family's canonical pointer AT A LIVE FILE. If the
+    //    user keeps the `.beanpod` (the default: the checkbox is opt-in and is
+    //    not even rendered for a local-file family), the family still exists and
+    //    other members' devices are still bound to it. Deleting the row then is
+    //    the SAME defect this change removed from `deleteLocalFamily`: the next
+    //    member device to write recreates the row, and the Lambda's write-once
+    //    owner fields stamp whoever wrote first as the owner. Ungated, the
+    //    default path here reintroduced it at a new caller.
+    //
+    //    Ordering: before the auth teardown, so the row goes while the session
+    //    that decided to remove it is still the one making the request. (The
+    //    endpoint authorises with a build-time API key, not a session, so this
+    //    is intent, not a hard requirement — an earlier version of this comment
+    //    claimed otherwise.)
+    //
+    //    Surfaced at `critical`, matching both sibling arms above: below
+    //    `critical` nothing pages and nothing renders, and the user is about to
+    //    be told their family is gone from everywhere.
+    if (wantDeleteDrive.value) {
+      const registryRemoved = await removeFamily(familyId);
+      if (!registryRemoved) {
+        reportError({
+          surface: 'registry',
+          severity: 'critical',
+          message: 'the registry row survived a family deletion',
+          context: { action: 'delete-family', error_code: 'registry-delete-failed' },
+        });
+      }
     }
 
-    // 4. Delete local family (IndexedDB, passkeys, file handles, local registry)
-    await familyContextStore.deleteLocalFamily(familyId);
+    // 4. Delete local family (IndexedDB, passkeys, file handles, local registry).
+    //    The boolean matters: `familyContextStore.deleteLocalFamily` catches every
+    //    throw and returns false, so discarding it let a failed IndexedDB or
+    //    passkey teardown sail through to the farewell screen with the members,
+    //    the passkeys and the cached family key still on the device.
+    if (!(await familyContextStore.deleteLocalFamily(familyId))) {
+      reportError({
+        surface: 'pod-access',
+        severity: 'critical',
+        message: 'local family data survived a family deletion',
+        context: { action: 'delete-family', error_code: 'local-delete-failed' },
+      });
+    }
 
     // 5. Auth teardown
     await authStore.signOutAndClearData();

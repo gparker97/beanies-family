@@ -681,11 +681,16 @@ describe('syncStore — save-failure banner visibility', () => {
   // 'saved' there would tell a password rotation its new credential is durable
   // on no evidence — the one thing this function exists to get right.
   describe('syncNowDurable / syncNowBounded delegation', () => {
-    it('maps an UNEXPECTED reject to "failed" — durability is unknown, not proven', async () => {
+    it('maps an UNEXPECTED reject to "unknown" — NOT "failed", which means nothing landed', async () => {
+      // The distinction is load-bearing, not pedantic. The rotation caller skips
+      // its convergence re-save on a clean 'failed' because nothing reached
+      // Drive. An unknown-durability write that took that branch could leave
+      // Drive holding the new password while local reverted: the silent
+      // cross-device lockout the three-state design exists to prevent.
       const store = useSyncStore();
       vi.mocked(syncServiceModule.save).mockRejectedValueOnce(new Error('unexpected'));
 
-      await expect(store.syncNowDurable(50)).resolves.toBe('failed');
+      await expect(store.syncNowDurable(50)).resolves.toBe('unknown');
       // Never silent, and no longer a mere warning: this state should not occur.
       expect(reportErrorMock).toHaveBeenCalledWith(
         expect.objectContaining({ surface: 'sync-now-durable', severity: 'error' })

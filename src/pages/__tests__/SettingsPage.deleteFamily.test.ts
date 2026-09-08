@@ -156,13 +156,30 @@ describe('SettingsPage — delete family export gate', () => {
     expect(deliverFileMock).toHaveBeenCalledTimes(1);
     expect(deleteLocalFamilyMock).toHaveBeenCalledWith('fam-1');
 
-    // The SHARED registry row is removed here, and only here. It must run before
-    // the local teardown: after `signOutAndClearData` there is no session left to
-    // authorise it. Pinned because the per-device `deleteLocalFamily` used to do
-    // this, which is how a pod came to report an owner it never had (2026-09-08).
-    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1');
-    expect(removeFamilyMock.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteLocalFamilyMock.mock.invocationCallOrder[0]!
+    // ⚠️ The SHARED registry row is NOT removed here, because this case keeps the
+    // .beanpod (the checkbox is opt-in and defaults to false). The row is the
+    // family's pointer at a LIVE file, so deleting it would leave other members
+    // bound to a surviving pod with no row — and the next device to write
+    // recreates it, stamping ITS user as owner. That is the same defect this
+    // change removed from `deleteLocalFamily`, and an earlier cut of this fix
+    // reintroduced it here on the default path.
+    expect(removeFamilyMock).not.toHaveBeenCalled();
+  });
+
+  it('gates the shared registry removal on the pod file going too', async () => {
+    // The behavioural half is above: the default path must not remove the row.
+    // This half pins the gate itself. Mounting the ticked case is not worth the
+    // fixture cost here — the checkbox renders only for a Drive-connected family
+    // and `isGoogleDriveConnected` is a computed getter — and a source assertion
+    // cannot be satisfied by a mock that happens not to be reached.
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync('src/pages/SettingsPage.vue', 'utf8');
+    const i = source.indexOf('await removeFamily(familyId)');
+    expect(i).toBeGreaterThan(-1);
+    // The call sits inside the `wantDeleteDrive` branch, not beside it.
+    const before = source.slice(0, i);
+    expect(before.lastIndexOf('if (wantDeleteDrive.value)')).toBeGreaterThan(
+      before.lastIndexOf('// 4. Delete local family')
     );
   });
 

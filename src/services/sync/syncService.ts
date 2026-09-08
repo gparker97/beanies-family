@@ -1104,9 +1104,21 @@ export async function syncLevel(): Promise<SyncLevel> {
   const change = await remoteChanged();
   if (change.status === 'unknown') return 'cannot-verify';
   if (change.status !== 'unchanged') return 'remote-moved';
-  return (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean'
-    ? 'level'
-    : 'unpushed';
+
+  // ⚠️ The REASON, not `docPushedAgainst`'s boolean. That helper collapses three
+  // different answers into `'dirty'`: real unpushed changes, an unknown baseline
+  // (a null fingerprint — every device's first open after the #65 upgrade, every
+  // legacy `ver:` baseline), and a failed heads probe (a wedged worker, which is
+  // exactly the low-memory device compaction exists for). Collapsing them here
+  // would report two "we cannot tell" states to the user as "some changes have
+  // not reached the cloud yet" — a positive claim about their data on a failed
+  // probe, which is the entire reason `cannot-verify` was added.
+  //
+  // `docPushedAgainst` keeps the boolean for its own caller, where "do not know"
+  // correctly means "read anyway".
+  const check = await unpushedLocalChangesCheck(remoteBaseline?.headsFp ?? null);
+  if (check === null) return 'level';
+  return check.reason === 'unpushed-local-changes' ? 'unpushed' : 'cannot-verify';
 }
 
 /**

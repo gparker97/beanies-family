@@ -1063,7 +1063,12 @@ async function handleDriveFileSelected(payload: { fileId: string; fileName: stri
 async function handleDriveRefresh() {
   isDriveLoading.value = true;
   try {
-    driveFiles.value = await syncStore.listGoogleDriveFiles();
+    // `silent`: this refresh re-lists a picker that is already open, so a token
+    // was acquired moments ago. An interactive acquisition here would open a
+    // popup with no user gesture behind it, which is blocked on desktop and does
+    // not survive a Capacitor WebView. Failing quietly and keeping the existing
+    // list is the right outcome: the list on screen is still valid.
+    driveFiles.value = await syncStore.listGoogleDriveFiles({ silent: true });
   } catch {
     // Keep existing list
   } finally {

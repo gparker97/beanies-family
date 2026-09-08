@@ -57,5 +57,15 @@ export function isRefreshRejection(errOrMessage: unknown): boolean {
       : typeof errOrMessage === 'string'
         ? errOrMessage
         : '';
-  return /HTTP 4\d\d/.test(message);
+  const m = /HTTP (4\d\d)/.exec(message);
+  if (!m) return false;
+
+  // ⚠️ NOT EVERY 4xx IS A REFUSAL. 408 (request timeout) and 429 (rate limited)
+  // are explicitly named transient by this module's header, and an API Gateway
+  // usage-plan throttle returns a JSON 429 — so counting them would force a
+  // Google consent screen for a rate limit, the exact harm the gate exists to
+  // prevent. `googleRevoke.postRevoke` already classes 429/403 transient; these
+  // two predicates must not disagree.
+  const status = Number(m[1]);
+  return status !== 408 && status !== 429;
 }

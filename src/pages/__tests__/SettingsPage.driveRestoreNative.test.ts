@@ -34,6 +34,14 @@ describe('Drive restore availability on native', () => {
     // survive a Capacitor WebView. Now that this path runs on native, an
     // expired token must route to the reconnect affordance instead.
     expect(source).toContain('listGoogleDriveFiles({ silent: true })');
-    expect(source).toContain('e instanceof TokenExpiredError');
+    // ⚠️ `classifyDriveFailure`, not `instanceof TokenExpiredError`.
+    // `getValidTokenSilent` hands back the cached token whenever `isTokenValid()`
+    // — a LOCAL expiry check — so a grant revoked on another device surfaces as
+    // `DriveApiError(401)` from the listing request and an instanceof check
+    // misses the very case that most needs a reconnect.
+    expect(source).toContain("classifyDriveFailure(e) === 'CONSENT_EXPIRED'");
+    // And the selection half must be silent too, or the dead end just moves from
+    // the list to the tap.
+    expect(source).toContain('silent: true');
   });
 });

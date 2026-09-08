@@ -112,15 +112,25 @@ No more questions from here. Work the steps in order; on failure, follow each st
 **Decision C — update floor** (always, on every deploy):
 
 Run `bash scripts/deploy/check-version-floor.sh`. It prints the current
-`promptBelowVersion` next to the `APP_VERSION` being shipped and says whether they
-differ. If they do, fold its question into this same message: raise the floor to the
-shipping version, yes or no, defaulting to **no**.
+`promptBelowVersion` next to the `APP_VERSION` being shipped.
 
-Raise it when the release fixes something a STALE device can do to the family's data.
-A device below the floor can overwrite a compacted pod with its pre-compaction copy,
-and the edits made on it in between are not recoverable. Leave it when the release is
-additive. The floor prompts, it does not block (`versionPolicy.ts` has no hard-block
-field), so raising it is cheap and reversible.
+**A normal release does NOT raise the floor** (`docs/runbooks/native-store-submission.md`
+section 7). Propose raising it only when BOTH hold, and say which:
+
+1. **The target version is already live on BOTH stores.** Not TestFlight, not Play open
+   testing: live. Prompting people to fetch a version Apple has not finished reviewing
+   sends them to a listing that still offers the old one. This precondition is the one
+   that is easy to skip and it was skipped on 2026-09-08.
+2. **A device below the floor can damage the family's data**, not merely miss a feature.
+   The live example: a pre-compaction device can overwrite a compacted pod with its own
+   copy, and the edits made on it in between are not recoverable.
+
+If either fails, leave it and say so in one line. The floor prompts rather than blocks
+(`versionPolicy.ts` has no hard-block field), so it is cheap to raise later and there is
+no cost to waiting.
+
+⚠️ The file reaches users only through `deploy-web.yml`. On an app-only deploy, raising it
+commits a change that publishes nothing, so raise it on a deploy that includes WEB.
 
 ## Step 5: Apply the decisions + push once
 
