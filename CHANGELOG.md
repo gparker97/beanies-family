@@ -25,6 +25,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Links inside synced calendar events now open** when the event was synced from the iOS app. They pointed somewhere only that phone could reach, so tapping one from a laptop, or from anyone else the calendar is shared with, went nowhere.
 - **Buttons no longer disappear under the cursor in dark mode.** Several buttons on the recipe pages turned white-on-white on hover.
 
+### Changed
+
+- **Everything above is now live, as release 0.17.** Four days of work reached the web app, the iOS test build and the Android open test at once. A form that was already open when it appeared no longer comes up blank.
+
 ## 2026-09-07
 
 ### Added
