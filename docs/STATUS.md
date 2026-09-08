@@ -1985,6 +1985,65 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### ⭐ Session 2026-09-08/09 — the compaction fallout: nine findings, four-pass plan, stages 1 + 3 ⭐
+
+greg ran the first real pod compaction across a mixed 0.16/0.17 fleet. Compaction worked
+(4MB+ -> ~350KB); nine distinct problems fell out of it. Full record:
+`docs/investigations/2026-09-08-compaction-fallout.md` (root causes with file:line) and
+`docs/plans/2026-09-08-compaction-fallout-remediation.md` (seven independently shippable
+stages, four review passes).
+
+**None of these were compaction bugs.** Compaction exposed pre-existing defects in the auth,
+registry, sync-gate and lineage layers.
+
+**SHIPPED to `main`, NOT deployed** (`a21f2bb6`, `4fff34e5`, `94f4a30d`, `1db5f446`,
+`87bfc738`). Type-check, eslint and 7007 unit tests green.
+
+- **Google re-consent storm (the priority).** Both reconnect revokes removed: Google's revoke
+  is whole-grant per (user, client_id) and Drive + Calendar share one, so each reconnect killed
+  the grant on every OTHER device, pushing those into consent, whose revoke killed the first.
+  Plus an escalation gate so transient failures and 5xx no longer force a consent.
+- **The "new owner" on the registry row.** `deleteLocalFamily` no longer deletes the family's
+  SHARED row. Remote removal happens only at the owner-gated full deletion, and only when the
+  pod file goes too.
+- **Compaction false refusal.** `syncNow` wrote `lastSyncTimestamp` into the doc right after
+  committing the sync baseline, advancing the heads past it. Field tombstoned as `?: never`.
+- **Native Drive restore**, **iOS invite links**, and a `cannot-verify` refusal.
+
+⚠️ **THE UPDATE FLOOR STAYS AT `0.16`, and a first cut of this work wrongly raised it.**
+0.17 is TestFlight + Play open testing only, so prompting sends people to a listing that still
+offers 0.16 (runbook § 7 step 1, and the standing decision recorded further down this file).
+Both deploy skills now ask about the floor on every deploy AND require the target version to be
+live on BOTH stores first. Raise it once 0.17 is live: a device below the floor can overwrite a
+compacted pod with its pre-compaction copy, and edits made on it in between are unrecoverable.
+
+⚠️ **greg's registry row was REPAIRED by hand** (`ae92950b…`): `country` back to SG,
+`createdAt` reconstructed from the Drive file's creation time (the original is unrecoverable),
+and **both owner fields deliberately NULLED** so the correct identity is stamped rather than
+guessed. Setting `ownerMemberId` by hand would permanently refuse his own pointer writes. It is
+re-claimable by whichever device writes next until the roster-sourced fix (plan stage 5) ships,
+which is no worse than the state it was already in.
+
+**STILL OWED from the plan** (stages 2, 4, 5, 6, 7 and the rest of 1):
+
+- §1d — a lineage-blocked device healing its token from the remote envelope. Needs a read-only
+  decrypt the worker does not expose today; larger than the plan's sketch implied.
+- §5 — the local-only entity CARRY on a clean adopt, which is the actual item-4 data-preservation
+  fix. Scoped to `adopt-remote × clean` ONLY: the two `user-file` adopt cells are the rollback
+  route and a guard there would close the only exit the lineage banner offers.
+- §8/§9 — the reconnect toast on the shared-recipe page (`UnifiedReconnectToast`, not
+  `PodAccessBanner`, which cannot render on a `noChrome` route) and the blocker banner for the
+  seven `decrypt` kinds.
+- Stages 2/4/5/7 — the Lambda ladder (`writerMemberId` guard, `ConsistentRead`, tombstone,
+  owner-gated DELETE) plus the `pull_registry.mjs` tombstone filter that must ship with it.
+
+⚠️ **Two code-review passes ran** (`/code-review max`). The first found 15 issues, three of
+which the fixes themselves had caused — a reintroduced owner-resurrection on the default delete
+path, a rotation-durability contract break, and two guard tests that were provably CI no-ops.
+All are fixed in `87bfc738`. The theme worth carrying: **a fix that repairs one instance of a
+defect must check for the same defect one layer up**, because several did not, and two shipped a
+new comment asserting the survivor was safe.
+
 **Validated 2026-09-07 (list-copy session)** — carried entries re-checked by fingerprint;
 **2 corrected**: the 2026-09-04 dark-mode/tablet block said "not committed" and has been on
 `main` since `5a7c55d4`/`02f49910` (still undeployed, which is the part that matters); and the

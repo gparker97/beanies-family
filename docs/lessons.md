@@ -4,6 +4,53 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Fixing one instance of a defect is not fixing the defect
+
+**Date:** 2026-09-09
+**Context:** Five commits fixed real bugs. A `/code-review max` pass then found the SAME defect
+still live one layer up, in five separate places, and in two of them the fix had added a comment
+asserting the survivor was safe:
+
+- Both Drive reconnect revokes were removed because Google's revoke is whole-grant. The calendar
+  seam still revoked, guarded by a check that only inspects THIS device's Drive token, so a
+  calendar-only device still killed the whole fleet. The new comment called it guarded.
+- `lastSyncTimestamp` was tombstoned so it could never again re-dirty the doc after a save.
+  `installProvider` still wrote settings post-save without `preserveTimestamp`, re-dirtying via
+  `updatedAt`, which the tombstone cannot see.
+- `syncLevel` was added so a failed change-probe stopped being reported as unsaved work.
+  `docPushedAgainst` still collapsed "unknown baseline" and "probe failed" into `dirty`, so two
+  more "we cannot tell" states kept making the same false claim.
+- The Drive restore was made popup-safe for the LISTING. The selection half still opened a popup,
+  so the dead end moved from the list to the tap.
+- `deleteLocalFamily` stopped deleting the shared registry row. The new caller deleted it
+  unconditionally while the pod deletion was opt-in, reintroducing the same owner-resurrection on
+  the default path.
+
+**Rule:** after fixing an instance, grep for the MECHANISM, not the symptom, and enumerate every
+other site before claiming the class is closed. If a fix leaves a sibling standing, say so in the
+commit rather than writing a comment that implies it is safe. A comment asserting safety is worth
+nothing unless the assertion was checked, and it actively costs the next reader time.
+
+---
+
+## A guard that cannot fail is worse than no guard
+
+**Date:** 2026-09-09
+**Context:** Two tests written specifically to protect a new escalation gate were CI no-ops,
+proven by experiment in review: they never stubbed `VITE_GOOGLE_CLIENT_ID`, so the code returned
+early at its client-id guard, and an early return produces exactly what they asserted. `.env`
+supplies the var locally, CI does not, so they passed everywhere and tested nothing. A third
+guard sliced a file from `indexOf('async function syncNow')`, which matches `syncNowDurable`
+(declared first), so its window covered 68 characters of the wrong function; restoring the bug it
+guarded left it green.
+
+**Rule:** every guard needs a POSITIVE assertion that fails when the setup is wrong — the mock was
+called, the slice contains the code it is about to search. And when a test depends on env, stub it
+in the test; do not inherit it from a file CI does not have. Ask of any new guard: "what would I
+break to make this fail?" If the answer is not obvious, it is not a guard.
+
+---
+
 ## A bare `hover:` background beats a bare `dark:` background, whatever the order
 
 **Date:** 2026-09-08
