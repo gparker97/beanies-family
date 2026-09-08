@@ -167,7 +167,13 @@ export async function refreshAccessToken(params: {
     const err = (body ?? {}) as OAuthError;
     const detail = err.error_description ?? err.error ?? 'unknown';
     console.warn(`[oauthProxy] Token refresh failed: HTTP ${res.status} — ${detail}`);
-    throw new Error(`Token refresh failed: ${detail}`);
+    // ⚠️ The status MUST stay in the thrown message, not only in the warn above.
+    // `refreshFailure.isRefreshRejection` reads it to tell a 4xx (Google refused
+    // the exchange) from a 5xx (our proxy fell over), and that distinction is what
+    // stops a proxy outage escalating to a permanent failure and driving every
+    // device into a consent screen. Dropping it here silently disables the
+    // silent-refresh escalation gate. See docs/investigations/2026-09-08-*.md.
+    throw new Error(`Token refresh failed: HTTP ${res.status} — ${detail}`);
   }
 
   if (!body) {

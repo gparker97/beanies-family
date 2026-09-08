@@ -33,3 +33,29 @@ export function isPermanentRefreshFailure(errOrMessage: unknown): boolean {
         : '';
   return message.includes('invalid_grant') || message.includes('expired or revoked');
 }
+
+/**
+ * Whether an OAuth refresh failure is a REJECTION by Google (a 4xx from the
+ * proxy) as opposed to the proxy itself failing (a 5xx) or the network dropping.
+ *
+ * Distinct from `isPermanentRefreshFailure` in both directions:
+ *   - a permanent failure (`invalid_grant`) is already handled earlier and never
+ *     reaches the escalation counter, so this is NOT a superset of it;
+ *   - a 5xx is explicitly NOT a rejection. Per this module's header, "everything
+ *     else (network, timeout, 5xx, rate limiting) is transient and must stay
+ *     retryable", and treating a proxy outage as a rejection is what made the
+ *     reconnect prompt fire for causes the user could do nothing about.
+ *
+ * Depends on `oauthProxy` including `HTTP <status>` in the thrown message. That
+ * coupling is deliberate and commented at the throw site; without it this
+ * predicate is false for every real rejection and escalation silently stops.
+ */
+export function isRefreshRejection(errOrMessage: unknown): boolean {
+  const message =
+    errOrMessage instanceof Error
+      ? errOrMessage.message
+      : typeof errOrMessage === 'string'
+        ? errOrMessage
+        : '';
+  return /HTTP 4\d\d/.test(message);
+}
