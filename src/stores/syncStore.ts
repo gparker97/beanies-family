@@ -876,7 +876,6 @@ export const useSyncStore = defineStore('sync', () => {
       await settingsRepo.saveSettings({
         syncEnabled: true,
         syncFilePath: provider.getDisplayName(),
-        lastSyncTimestamp: toISODateString(new Date()),
       });
     } finally {
       isReloading = false;
@@ -920,11 +919,19 @@ export const useSyncStore = defineStore('sync', () => {
    *   - `'failed'`  — a clean failure; the write did NOT complete (nothing reached Drive).
    *   - `'timeout'` — the bound elapsed; the non-cancellable write MAY still be in flight.
    *
-   * `syncNow(true)` only ever rejects AFTER a successful Drive write (the post-write
-   * `settingsRepo.saveSettings` metadata write throws — `save()`/`doSave` themselves
-   * catch all and return `false`). So a rejection means the credential IS durable: we
-   * surface the metadata failure as a `warning` and report `'saved'`, never failing a
-   * genuinely-durable rotation or firing a false page.
+   * ⚠️ THE REJECTION ARM CHANGED MEANING ON 2026-09-08. It used to report `'saved'`,
+   * and that was sound at the time: `syncNow(true)` could only reject from the
+   * post-write `settingsRepo.saveSettings` metadata write, since `save()`/`doSave`
+   * catch everything and return `false`. A rejection therefore PROVED the Drive
+   * write had already succeeded, so the credential was durable.
+   *
+   * That metadata write is gone (it was re-dirtying the document and false-refusing
+   * compaction; see `Settings.lastSyncTimestamp`), so `syncNow` should now never
+   * reject at all. If it does, the cause is unknown and we have NO evidence the
+   * write landed. Reporting `'saved'` on that would tell a password rotation its
+   * new credential is durable when it may not be, which is the one thing this
+   * function exists to get right. It reports `'failed'` instead: the rotation
+   * rolls back cleanly on not-saved, so that is the safe direction.
    */
   async function syncNowDurable(timeoutMs: number): Promise<'saved' | 'failed' | 'timeout'> {
     try {
@@ -934,12 +941,12 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       reportError({
         surface: 'sync-now-durable',
-        severity: 'warning',
+        severity: 'error',
         message:
-          'syncNow rejected after a successful Drive write (settings metadata write failed) — credential is durable',
+          'syncNow rejected unexpectedly — durability of the write is unknown, reporting failed',
         error: e,
       });
-      return 'saved';
+      return 'failed';
     }
   }
 
@@ -985,12 +992,15 @@ export const useSyncStore = defineStore('sync', () => {
     }
 
     const success = await syncService.save();
-    if (success) {
-      await settingsRepo.saveSettings(
-        { lastSyncTimestamp: lastSync.value ?? undefined },
-        { preserveTimestamp: true }
-      );
-    }
+    // ⚠️ NOTHING IS WRITTEN TO THE DOCUMENT HERE, and that is the point.
+    // This used to persist `lastSyncTimestamp` right after `save()`. `save()`
+    // commits the remote baseline as the exported heads; this write then
+    // advanced the heads PAST that baseline with a fresh value every time, so
+    // the compaction gate's very next `isFullySynced()` read dirty and refused
+    // with "some changes have not reached the cloud yet" on a device that was
+    // perfectly level. The 2s debounced save levelled it again moments later,
+    // which is why compaction eventually succeeded after several tries.
+    // The value was never read back; the UI reads the `lastSync` ref.
     return success;
   }
 
@@ -1890,7 +1900,6 @@ export const useSyncStore = defineStore('sync', () => {
         {
           syncEnabled: true,
           syncFilePath: fileName.value ?? undefined,
-          lastSyncTimestamp: lastSync.value ?? undefined,
         },
         { preserveTimestamp: true }
       );
@@ -1937,7 +1946,6 @@ export const useSyncStore = defineStore('sync', () => {
         {
           syncEnabled: true,
           syncFilePath: fileName.value ?? undefined,
-          lastSyncTimestamp: lastSync.value ?? undefined,
         },
         { preserveTimestamp: true }
       );
@@ -2123,7 +2131,6 @@ export const useSyncStore = defineStore('sync', () => {
           syncEnabled: true,
           encryptionEnabled: true,
           syncFilePath: fileName.value ?? undefined,
-          lastSyncTimestamp: lastSync.value ?? undefined,
         },
         { preserveTimestamp: true }
       );
@@ -2981,7 +2988,6 @@ export const useSyncStore = defineStore('sync', () => {
           syncEnabled: true,
           encryptionEnabled: true,
           syncFilePath: fileName.value ?? undefined,
-          lastSyncTimestamp: lastSync.value ?? undefined,
         },
         { preserveTimestamp: true }
       );

@@ -670,29 +670,45 @@ describe('syncStore — save-failure banner visibility', () => {
     });
   });
 
-  // Guards the single-core refactor: syncNowBounded delegates to syncNowDurable,
-  // whose catch maps a post-write syncNow rejection (successful Drive write,
-  // failed settings-metadata write) to 'saved' — so a durable save is never
-  // misreported as a failure and never false-pages. (docs/plans/2026-07-16-password-rotation-remediation.md)
+  // Guards the single-core refactor: syncNowBounded delegates to syncNowDurable.
+  //
+  // ⚠️ THE REJECTION CASE INVERTED ON 2026-09-08. It used to assert 'saved',
+  // and that was right while `syncNow` wrote settings metadata AFTER the Drive
+  // write: a rejection could only come from that metadata write, so it PROVED
+  // the credential was durable. That write is gone (it re-dirtied the document
+  // and false-refused compaction), so `syncNow` should never reject at all, and
+  // an unexpected rejection is no longer evidence of anything. Reporting
+  // 'saved' there would tell a password rotation its new credential is durable
+  // on no evidence — the one thing this function exists to get right.
   describe('syncNowDurable / syncNowBounded delegation', () => {
-    it('maps a post-write reject to "saved" (durable) and does not throw', async () => {
+    it('maps an UNEXPECTED reject to "failed" — durability is unknown, not proven', async () => {
       const store = useSyncStore();
-      vi.mocked(syncServiceModule.save).mockResolvedValue(true); // Drive write succeeds
-      saveSettingsMock.mockRejectedValueOnce(new Error('settings write failed')); // metadata write throws
+      vi.mocked(syncServiceModule.save).mockRejectedValueOnce(new Error('unexpected'));
 
-      await expect(store.syncNowDurable(50)).resolves.toBe('saved');
-      // A warning is logged for the swallowed metadata failure — never silent.
+      await expect(store.syncNowDurable(50)).resolves.toBe('failed');
+      // Never silent, and no longer a mere warning: this state should not occur.
       expect(reportErrorMock).toHaveBeenCalledWith(
-        expect.objectContaining({ surface: 'sync-now-durable', severity: 'warning' })
+        expect.objectContaining({ surface: 'sync-now-durable', severity: 'error' })
       );
     });
 
-    it('syncNowBounded returns true on a post-write reject (does not throw)', async () => {
+    it('syncNowBounded returns false on an unexpected reject (does not throw)', async () => {
+      const store = useSyncStore();
+      vi.mocked(syncServiceModule.save).mockRejectedValueOnce(new Error('unexpected'));
+
+      await expect(store.syncNowBounded(50)).resolves.toBe(false);
+    });
+
+    it('no longer writes settings metadata after the Drive write', async () => {
+      // The regression this whole change exists to prevent: that write advanced
+      // the document heads past the sync baseline `save()` had just committed,
+      // so the compaction gate read dirty on a level device.
       const store = useSyncStore();
       vi.mocked(syncServiceModule.save).mockResolvedValue(true);
-      saveSettingsMock.mockRejectedValueOnce(new Error('settings write failed'));
+      saveSettingsMock.mockClear();
 
-      await expect(store.syncNowBounded(50)).resolves.toBe(true);
+      await expect(store.syncNowDurable(50)).resolves.toBe('saved');
+      expect(saveSettingsMock).not.toHaveBeenCalled();
     });
 
     it('maps a clean save failure to "failed" (nothing reached Drive)', async () => {

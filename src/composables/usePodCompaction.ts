@@ -38,6 +38,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { getAuxStore } from '@/services/sync/storageProvider';
 import { safetyCopyName } from '@/constants/compaction';
 import { PayloadLoadError } from '@/types/sync';
+import type { SyncLevel } from '@/services/sync/syncService';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
 type RefusalCode =
@@ -48,6 +49,11 @@ type RefusalCode =
   // one that rewrites everyone's file.
   | 'not-owner'
   | 'not-synced'
+  // ⚠️ ITS OWN CODE. `not-synced` asserts the device holds changes Drive has not
+  // got, which is a claim about the family's data. When the change probe itself
+  // fails (a 401 blip, a Drive 5xx) we know nothing of the sort, and saying so
+  // sends the user to wait for a sync that already finished.
+  | 'cannot-verify'
   | 'backup-not-delivered'
   | 'no-envelope'
   | 'no-permission'
@@ -63,6 +69,24 @@ type RefusalCode =
   // too big for this phone" is a different sentence from "the backup failed to
   // save", and only the first tells the user something they can act on.
   | 'backup-too-large';
+
+/**
+ * Why a given sync state refuses. A total `Record`, so a new `SyncLevel` is a
+ * compile error at the one place that has to decide what it means to a user,
+ * rather than silently falling into whichever branch an if-ladder ends with.
+ */
+const REFUSAL_FOR: Record<Exclude<SyncLevel, 'level'>, RefusalCode> = {
+  'remote-moved': 'not-synced',
+  unpushed: 'not-synced',
+  'cannot-verify': 'cannot-verify',
+};
+
+/**
+ * Refusals that describe a MOMENT rather than a fact about the family, so
+ * pressing again is the honest next step. A Set, not a boolean expression, so
+ * adding one is an entry rather than an edit to a condition.
+ */
+const RETRYABLE: ReadonlySet<RefusalCode> = new Set(['not-synced', 'cannot-verify']);
 
 export function usePodCompaction() {
   const syncStore = useSyncStore();
@@ -126,7 +150,7 @@ export function usePodCompaction() {
       // `not-synced` is a snapshot of the sync state and clears itself within
       // seconds (the debounced save levels the device), so a second press is
       // the honest next step. Every other refusal is a fact about the family.
-      retryable: code === 'not-synced',
+      retryable: RETRYABLE.has(code),
     };
     logEvent({
       level: 'warn',
@@ -220,9 +244,10 @@ export function usePodCompaction() {
       //     Still cheapest-proof-first: `syncNow` exports, encrypts, base64s and
       //     uploads the whole pod, so an already-level device skips it.
 
-      if (!(await syncService.isFullySynced())) {
+      if ((await syncService.syncLevel()) !== 'level') {
         if (!(await syncStore.syncNow(false))) return refuse('not-synced');
-        if (!(await syncService.isFullySynced())) return refuse('not-synced');
+        const level = await syncService.syncLevel();
+        if (level !== 'level') return refuse(REFUSAL_FOR[level]);
       }
 
       // 3. Backup, gated on DELIVERY. The rollback route the family keeps.

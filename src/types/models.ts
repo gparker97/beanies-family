@@ -1888,7 +1888,29 @@ export interface Settings {
   syncFilePath?: string; // Display name of sync file
   autoSyncEnabled: boolean;
   encryptionEnabled: boolean;
-  lastSyncTimestamp?: ISODateString;
+  /**
+   * @deprecated (2026-09-08) Derived state that was never read, and whose write
+   * immediately after `syncService.save()` re-dirtied the document and made the
+   * compaction gate refuse with "some changes have not reached the cloud yet"
+   * while the device was perfectly level. `save()` commits the remote baseline
+   * as the exported heads; this write then advanced the heads past that
+   * baseline, so the very next `isFullySynced()` read dirty. The debounced save
+   * levelled it a couple of seconds later, which is why it eventually went
+   * through after several tries.
+   *
+   * `never`, not deleted, so a re-added write is a compile error rather than a
+   * comment nobody reads. The UI value lives on `syncStore.lastSync`.
+   *
+   * Existing documents still carry the stored value and nothing removes it:
+   * `settingsRepository.saveSettings` rebuilds from `getSettings()`, which
+   * spreads the stored object, so an unmodelled key rides through untouched and
+   * `compactDoc`'s JSON round-trip is unaffected.
+   *
+   * ⚠️ One write the compiler could NOT catch assigned `undefined` (accepted by
+   * `?: never` without `exactOptionalPropertyTypes`). It lived in the dead
+   * `syncStore.disconnect()`, deleted in the same change.
+   */
+  lastSyncTimestamp?: never;
   aiProvider: AIProvider;
   aiApiKeys: AIApiKeys;
   // #133: which AI tier processes documents. Optional because pre-existing family

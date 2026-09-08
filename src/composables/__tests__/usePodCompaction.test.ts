@@ -15,6 +15,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const hooks = vi.hoisted(() => ({
   confirmed: true,
   synced: true,
+  syncLevel: undefined as undefined | 'level' | 'remote-moved' | 'unpushed' | 'cannot-verify',
   exported: true,
   backupLanded: true,
   canWrite: true,
@@ -84,7 +85,7 @@ vi.mock('@/stores/familyStore', () => ({
 }));
 vi.mock('@/services/sync/syncService', () => ({
   flushPendingSave: vi.fn(async () => {}),
-  isFullySynced: vi.fn(async () => hooks.synced),
+  syncLevel: vi.fn(async () => hooks.syncLevel ?? (hooks.synced ? 'level' : 'unpushed')),
   // The write proof: a revoked file permission or an expired token must be
   // caught BEFORE the lineage is stamped, not at the publish.
   hasPermission: vi.fn(async () => hooks.canWrite),
@@ -139,6 +140,7 @@ beforeEach(() => {
   Object.assign(hooks, {
     confirmed: true,
     synced: true,
+    syncLevel: undefined,
     exported: true,
     backupLanded: true,
     canWrite: true,
@@ -165,6 +167,40 @@ describe('every refusal leaves the pod untouched', () => {
     hooks.synced = false;
     await usePodCompaction().compact();
     expect(docClient.compactDoc).not.toHaveBeenCalled();
+  });
+
+  it('does NOT refuse merely because syncNow dirtied the doc on its way out', async () => {
+    // The 2026-09-08 false refusal. `syncNow` committed the remote baseline and
+    // then wrote `lastSyncTimestamp` into the document, advancing the heads past
+    // the baseline it had just committed, so the gate's next check read dirty and
+    // refused a device that was perfectly level. greg hit this repeatedly, with a
+    // green saved-dot on screen, and it cleared itself seconds later when the
+    // debounced save levelled things again.
+    //
+    // Pinned at the source, because the defect was one line in a store the
+    // compaction gate does not import: `syncNow` must write nothing to the
+    // document after `save()`.
+    const { readFileSync } = await import('node:fs');
+    const store = readFileSync('src/stores/syncStore.ts', 'utf8');
+    const syncNow = store.slice(
+      store.indexOf('async function syncNow'),
+      store.indexOf('async function syncNow') + 2000
+    );
+    expect(syncNow).not.toContain('lastSyncTimestamp');
+    expect(syncNow).not.toContain('saveSettings');
+  });
+
+  it('refuses with cannot-verify, not not-synced, when the probe itself failed', async () => {
+    // `not-synced` asserts the device holds changes Drive has not got. When the
+    // change probe fails we know nothing of the sort, and telling the user to
+    // "wait for the sync to finish" sends them to wait for one that already
+    // finished. Same refusal, honest reason, and retryable.
+    hooks.syncLevel = 'cannot-verify';
+    const c = usePodCompaction();
+    await c.compact();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.refused.cannot-verify');
+    expect(c.progressFailure.value?.retryable).toBe(true);
   });
 
   it('refuses when this device cannot WRITE, before anything moves', async () => {

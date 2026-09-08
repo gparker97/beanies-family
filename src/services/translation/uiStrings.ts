@@ -4479,6 +4479,11 @@ const STRING_DEFS = {
     beanie:
       'some changes have not reached the cloud yet. wait for the sync to finish, then try again.',
   },
+  'compaction.refused.cannot-verify': {
+    en: 'beanies could not check whether this device is up to date with the cloud. Your data is fine; the check itself failed. Try again in a moment.',
+    beanie:
+      'beanies could not check whether this device is up to date with the cloud. your data is fine; the check itself failed. try again in a moment.',
+  },
   'compaction.refused.checkAgain': { en: 'Check Again', beanie: 'check again' },
   'compaction.refused.backup-not-delivered': {
     en: 'The backup was not saved, so beanies stopped. Nothing has changed. Try again and save the file when asked.',
