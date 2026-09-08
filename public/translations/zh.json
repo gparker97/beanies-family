@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-07",
-    "translationCount": 4587
+    "lastUpdated": "2026-09-08",
+    "translationCount": 4655
   },
   "translations": {
     "app.name": {
@@ -20006,21 +20006,6 @@
       "hash": "oy6jba",
       "lastUpdated": "2026-08-18"
     },
-    "mealPlanner.share.copied": {
-      "translation": "复制到剪贴板",
-      "hash": "nhirm2",
-      "lastUpdated": "2026-08-18"
-    },
-    "mealPlanner.share.copyFailed": {
-      "translation": "无法复制计划",
-      "hash": "o1ypp",
-      "lastUpdated": "2026-08-18"
-    },
-    "mealPlanner.share.copyFailedHelp": {
-      "translation": "此处没有副本—请尝试手动选择文本。",
-      "hash": "4ezvxf",
-      "lastUpdated": "2026-08-18"
-    },
     "mealPlanner.briefing.owner": {
       "translation": "您正在烹饪： {meal}",
       "hash": "1g0012",
@@ -22940,6 +22925,361 @@
       "translation": "将此文件用作您的家庭数据文件",
       "hash": "l369xs",
       "lastUpdated": "2026-09-07"
+    },
+    "action.copy": {
+      "translation": "复制",
+      "hash": "19579",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.title": {
+      "translation": "复制列表",
+      "hash": "dywuqf",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.nameLabel": {
+      "translation": "为副本命名",
+      "hash": "b0i5uf",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.namePlaceholder": {
+      "translation": "{bean}的列表",
+      "hash": "7y3jj4",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.titleDefault": {
+      "translation": "{bean}的{list}",
+      "hash": "qyg67u",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.nameHint": {
+      "translation": "{bean}成为每个bean的名称。将其删除，为每个副本提供相同的名称。",
+      "hash": "e8mo8r",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.beansLabel": {
+      "translation": "创建副本",
+      "hash": "4ba2wh",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.notLinked": {
+      "translation": "副本不会链接，因此稍后所做的更改不会继续进行。",
+      "hash": "5awocu",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.createOne": {
+      "translation": "创建副本",
+      "hash": "ifn09l",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.createOther": {
+      "translation": "创建{count}个副本",
+      "hash": "3t74eq",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.doneOne": {
+      "translation": "复制成功",
+      "hash": "rqlliu",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.doneOther": {
+      "translation": "已制作{count}个副本。",
+      "hash": "91gxwd",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.unknownMember": {
+      "translation": "您选择的豆子之一已不在您的家庭中，因此没有复制任何内容。请关闭此操作，然后重试。",
+      "hash": "9jdx7e",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.verifyFailed": {
+      "translation": "复印件已经制作完毕，但Beanies还看不到它们。请重新加载，然后重试，这样您就不会每次都得到两个。",
+      "hash": "4m6rru",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.tile.openFor": {
+      "translation": "{list} ， {name}的列表",
+      "hash": "50fat1",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.copy.sourceGone": {
+      "translation": "该列表已不在此处，因此没有可复制的内容。",
+      "hash": "4skdgr",
+      "lastUpdated": "2026-09-08"
+    },
+    "lists.detail.deleteFailed": {
+      "translation": "无法删除该列表。请重试。",
+      "hash": "mprels",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeExtract.inferred.times": {
+      "translation": "Estimated",
+      "hash": "mttwrg",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.keep.notAllowed": {
+      "translation": "该食谱无法添加到您的烹饪书中",
+      "hash": "9c82rb",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.keep.notAllowedHelp": {
+      "translation": "请一位可以为您的家人添加食谱的人帮您放入食谱。",
+      "hash": "7lzc29",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.action": {
+      "translation": "再念",
+      "hash": "93xbq",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.title": {
+      "translation": "再次阅读源代码",
+      "hash": "cjmiy4",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.subtitle": {
+      "translation": "除了您拥有的内容外，以下是页面现在显示的内容。",
+      "hash": "map4r7",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.yours": {
+      "translation": "你",
+      "hash": "1ez1xc",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.theirs": {
+      "translation": "从网站",
+      "hash": "lwij8",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.wasEmpty": {
+      "translation": "还没有",
+      "hash": "iqizu3",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.photo": {
+      "translation": "此食谱尚未提供的菜肴照片",
+      "hash": "x15fxq",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.nothingSaved": {
+      "translation": "尚未保存任何内容—在您使用这些内容之前，您的食谱不会受到影响。",
+      "hash": "ooq1ar",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.keepMine": {
+      "translation": "保留我的",
+      "hash": "39boy6",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.take": {
+      "translation": "接受这些更改",
+      "hash": "4d02j7",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.noChange": {
+      "translation": "没什么新鲜事--页面上仍然是这么写的",
+      "hash": "u6rexz",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipes.refetch.cooldown": {
+      "translation": "只要读一读这个就行了。请在{resetsAt}后重试。",
+      "hash": "am60kl",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.prep": {
+      "translation": "准备{value}",
+      "hash": "bmvatw",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.cook": {
+      "translation": "烹饪{value}",
+      "hash": "n3eonl",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.ingredients": {
+      "translation": "你需要",
+      "hash": "mk9r8u",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.method": {
+      "translation": "工作",
+      "hash": "1k4w",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.andMore": {
+      "translation": "和%{count}更多...",
+      "hash": "1xomb3",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.restInLink": {
+      "translation": "…方法的其余部分在链接中",
+      "hash": "qfps08",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.signoff": {
+      "translation": "发自我的豆豆烹饪书 🌱",
+      "hash": "morzqd",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.text.openIt": {
+      "translation": "在此处打开以保留您自己的副本：",
+      "hash": "pojm8r",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.action": {
+      "translation": "共享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.title": {
+      "translation": "分享这道菜",
+      "hash": "gu4jn3",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.previewLabel": {
+      "translation": "他们将获得",
+      "hash": "z5eq1h",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.privacyNote": {
+      "translation": "食谱在链接中传输，而不是通过我们的服务器。任何知道链接的人都可以阅读。",
+      "hash": "i12qrh",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.emailSubject": {
+      "translation": "我的豆豆烹饪书中的食谱： {name}",
+      "hash": "amjjc8",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.oversizeTitle": {
+      "translation": "这个对于链接来说太大了",
+      "hash": "se5uga",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.oversizeBody": {
+      "translation": "此配方比链接可以携带的长，因此它仅以文本形式显示。复制并粘贴到您喜欢的任何位置。",
+      "hash": "ofbuy9",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.modal.longNote": {
+      "translation": "对Discord来说有点长，它可能会以两条消息的形式发送。",
+      "hash": "5cjcgn",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.title": {
+      "translation": "共享配方",
+      "hash": "vmjna",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.eyebrow": {
+      "translation": "有人与您分享了食谱",
+      "hash": "vbpq0b",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.from": {
+      "translation": "从他们的beanies食谱中发送",
+      "hash": "uwbge6",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.ingredients": {
+      "translation": "食材",
+      "hash": "77hsv2",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.method": {
+      "translation": "方法",
+      "hash": "wyzncv",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.notes": {
+      "translation": "注 意 事 项",
+      "hash": "18xach",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.source": {
+      "translation": "原创配方",
+      "hash": "nkr1pf",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.keep": {
+      "translation": "保留此配方",
+      "hash": "kadzfv",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.keepHint": {
+      "translation": "免费，您的烹饪书将归您所有。",
+      "hash": "pmpvj",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.what": {
+      "translation": "什么是Beanies ？",
+      "hash": "uni4mq",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.keepAcrossSignup": {
+      "translation": "如果食谱在您加入后仍未找到，请在聊天中再次打开此链接，然后轻触“保留”。",
+      "hash": "jrxs4t",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.keepFailed": {
+      "translation": "我们抓不住那个食谱",
+      "hash": "2kzeba",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.keepFailedHelp": {
+      "translation": "在聊天中再次打开链接，然后轻触“保留”。",
+      "hash": "4va1df",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.deadEndTitle": {
+      "translation": "此链接未带来食谱",
+      "hash": "qsllcr",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.deadEndBody": {
+      "translation": "它可能在来这里的路上被缩短了。让发送者再次分享。",
+      "hash": "h5zkxf",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.staleTitle": {
+      "translation": "此链接需要更新的beanies",
+      "hash": "2mbiha",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.staleBody": {
+      "translation": "刷新页面，然后再次打开链接。",
+      "hash": "cke9jf",
+      "lastUpdated": "2026-09-08"
+    },
+    "recipeShare.received.explore": {
+      "translation": "了解Beanies是什么",
+      "hash": "5liqia",
+      "lastUpdated": "2026-09-08"
+    },
+    "share.copy": {
+      "translation": "复制",
+      "hash": "19579",
+      "lastUpdated": "2026-09-08"
+    },
+    "share.more": {
+      "translation": "更多",
+      "hash": "1fj3p",
+      "lastUpdated": "2026-09-08"
+    },
+    "share.copied": {
+      "translation": "[[[{0}]]] 已复制到您的剪贴板",
+      "hash": "dai86q",
+      "lastUpdated": "2026-09-08"
+    },
+    "share.copyFailed": {
+      "translation": "无法复制",
+      "hash": "idzwu3",
+      "lastUpdated": "2026-09-08"
+    },
+    "share.copyFailedHelp": {
+      "translation": "您的浏览器阻止了剪贴板。选择文本，然后手动复制。",
+      "hash": "o7154p",
+      "lastUpdated": "2026-09-08"
     }
   }
 }
