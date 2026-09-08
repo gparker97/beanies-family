@@ -92,6 +92,20 @@ Skipping a platform is valid. **Record the answers** — Phase 2 consumes them w
 
 No more questions. Skip-CI means the remote CI/Security gate is bypassed — the Vue deploy fires with `skip_gate=true` and the mobile releases dispatch without waiting for CI. (CI + Security still run in the background from the push; they're not awaited. If they fail, investigate on the next cycle.)
 
+
+**Decision C — update floor** (always, on every deploy):
+
+Run `bash scripts/deploy/check-version-floor.sh`. It prints the current
+`promptBelowVersion` next to the `APP_VERSION` being shipped and says whether they
+differ. If they do, fold its question into this same message: raise the floor to the
+shipping version, yes or no, defaulting to **no**.
+
+Raise it when the release fixes something a STALE device can do to the family's data.
+A device below the floor can overwrite a compacted pod with its pre-compaction copy,
+and the edits made on it in between are not recoverable. Leave it when the release is
+additive. The floor prompts, it does not block (`versionPolicy.ts` has no hard-block
+field), so raising it is cheap and reversible.
+
 ## Step 5: Apply the decisions + push once
 
 If Decision A produced a note/version, prepend the entry to `src/content/release-notes/deploys.ts` (skip if "no note") and set `src/constants/appVersion.ts` to the approved `APP_VERSION` (Edit tool), then commit:

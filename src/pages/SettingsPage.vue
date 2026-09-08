@@ -39,7 +39,6 @@ import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { getFullVersionLabel } from '@/utils/diagnosticContext';
 import { alert as showAlert, confirm } from '@/composables/useConfirm';
-import { isNative } from '@/services/sync/capabilities';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
@@ -52,6 +51,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { TokenExpiredError } from '@/services/google/googleAuth';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
@@ -569,18 +569,27 @@ const podBinding = computed<'first-load' | 'connected' | 'disconnected'>(() => {
 
 const hasPod = computed(() => podBinding.value === 'connected');
 
-/**
- * Can this family's data file live in Google Drive, so a restore has two places
- * to look? Native keeps the OS sheet only — the Picker is unreliable in the iOS
- * WebView (see `LoadPodView`).
- */
 /** Our own .beanpod chooser for the restore flow — never the Google Picker. */
 const showDriveRestorePicker = ref(false);
 const isDriveRestoreLoading = ref(false);
 const driveRestoreFiles = ref<Array<{ fileId: string; name: string; modifiedTime: string }>>([]);
 
+/**
+ * Can this family's data file live in Google Drive, so a restore has two places
+ * to look?
+ *
+ * ⚠️ NO `!isNative()` (removed 2026-09-08). The gate that stood here was added in
+ * `02c2e347` because the restore was going to use the Google Picker, which is
+ * unreliable in the iOS WebView (ADR-026). In the SAME commit the mechanism was
+ * swapped to `GoogleDriveFilePicker` — REST `files.list` plus a plain BaseModal,
+ * no gapi, no third-party iframe — which works fine in a WebView. The guard
+ * outlived its reason, and the comment above it contradicted the line below it.
+ *
+ * The effect was that a native-only user could not recover their family from
+ * Drive at all: the one place a family's data actually lives.
+ */
 const canRestoreFromDrive = computed(
-  () => hasPod.value && syncStore.storageProviderType === 'google_drive' && !isNative()
+  () => hasPod.value && syncStore.storageProviderType === 'google_drive'
 );
 
 /**
@@ -682,9 +691,27 @@ async function openDriveRestorePicker(): Promise<void> {
   showDriveRestorePicker.value = true;
   isDriveRestoreLoading.value = true;
   try {
-    driveRestoreFiles.value = await syncStore.listGoogleDriveFiles();
+    // `silent`: this path now runs on native too (the `!isNative()` gate above is
+    // gone), and `requestAccessToken` is the desktop POPUP path, which does not
+    // survive a Capacitor WebView. An expired token routes to the reconnect
+    // affordance below instead, which uses the redirect flow on native.
+    driveRestoreFiles.value = await syncStore.listGoogleDriveFiles({ silent: true });
   } catch (e) {
     showDriveRestorePicker.value = false;
+    if (e instanceof TokenExpiredError) {
+      // Not a listing failure: we simply have no live credential. Offering
+      // "could not list your files" here would be both wrong and a dead end,
+      // because the thing the user needs is a reconnect, which this page owns.
+      console.warn('[SettingsPage] Drive restore needs a reconnect', e);
+      logEvent({
+        level: 'info',
+        surface: 'pod-load-failure',
+        message: 'drive restore listing needs reconnect',
+        context: { action: 'restore-needs-reconnect' },
+      });
+      await reconnect();
+      return;
+    }
     importError.value = t('settings.drivePickerFailed');
     console.warn('[SettingsPage] could not list Drive .beanpod files for restore', e);
     logEvent({

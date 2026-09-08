@@ -43,6 +43,7 @@ import { LocalStorageProvider } from '@/services/sync/providers/localProvider';
 import {
   initializeAuth,
   requestAccessToken,
+  getValidTokenSilent,
   onTokenPermanentlyExpired,
   onTokenAcquired,
   fetchGoogleUserEmail,
@@ -5321,10 +5322,21 @@ export const useSyncStore = defineStore('sync', () => {
 
   async function listGoogleDriveFiles(options?: {
     forceNewAccount?: boolean;
+    /**
+     * Acquire the token SILENTLY, throwing `TokenExpiredError` rather than
+     * opening a consent popup. Used by the Settings restore picker, which runs
+     * on native too: `requestAccessToken` is the desktop popup path
+     * (`openBlankPopup`), and a popup does not survive a Capacitor WebView.
+     * The caller routes the throw to the reconnect affordance instead, which
+     * knows to use the redirect flow on native.
+     */
+    silent?: boolean;
   }): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
-    const token = await requestAccessToken({
-      forceConsent: options?.forceNewAccount,
-    });
+    const token = options?.silent
+      ? await getValidTokenSilent()
+      : await requestAccessToken({
+          forceConsent: options?.forceNewAccount,
+        });
     // Drive-wide search so we don't resolve (and potentially create) the
     // `beanies.family` folder at listing time. For joiners who will load
     // a shared `.beanpod` from someone else's Drive, this avoids eagerly

@@ -108,6 +108,20 @@ Skipping a platform is valid (the change still ships to web/PWA; the app catches
 
 No more questions from here. Work the steps in order; on failure, follow each step's recovery. Stop only on an unrecoverable failure after 3 fix attempts.
 
+
+**Decision C — update floor** (always, on every deploy):
+
+Run `bash scripts/deploy/check-version-floor.sh`. It prints the current
+`promptBelowVersion` next to the `APP_VERSION` being shipped and says whether they
+differ. If they do, fold its question into this same message: raise the floor to the
+shipping version, yes or no, defaulting to **no**.
+
+Raise it when the release fixes something a STALE device can do to the family's data.
+A device below the floor can overwrite a compacted pod with its pre-compaction copy,
+and the edits made on it in between are not recoverable. Leave it when the release is
+additive. The floor prompts, it does not block (`versionPolicy.ts` has no hard-block
+field), so raising it is cheap and reversible.
+
 ## Step 5: Apply the decisions + push once
 
 If Decision A produced a note/version, prepend the entry to `src/content/release-notes/deploys.ts` (skip if "no note") and set `src/constants/appVersion.ts` to the approved `APP_VERSION` (Edit tool), then commit:
