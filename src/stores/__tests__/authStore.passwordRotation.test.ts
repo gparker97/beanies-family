@@ -51,15 +51,22 @@ const canDurablySaveNowState = { value: true };
 const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 50;
 
 // Faithful mirror of the real syncNowDurable over syncNowMock: undefined→'timeout',
-// false→'failed', true→'saved', reject→'saved' (post-write metadata failure). Tests
-// drive it via the existing syncNowMock so call counts stay assertable.
-async function syncNowDurableImpl(ms = 5000): Promise<'saved' | 'failed' | 'timeout'> {
+// false→'failed', true→'saved', reject→'unknown'. Tests drive it via the existing
+// syncNowMock so call counts stay assertable.
+//
+// ⚠️ THE REJECT ARM RETURNS 'unknown', NOT 'saved' (changed 2026-09-09). It used
+// to return 'saved', and that was faithful while `syncNow` wrote settings metadata
+// AFTER the Drive write: a rejection could only come from that write, so it PROVED
+// the credential was durable. That write is gone, so a rejection now proves
+// nothing, and reporting 'saved' would tell a rotation its new password is durable
+// on no evidence. 'unknown' converges like a timeout instead.
+async function syncNowDurableImpl(ms = 5000): Promise<'saved' | 'failed' | 'timeout' | 'unknown'> {
   try {
     const r = await raceTimeout(syncNowMock(true), ms);
     if (r === undefined) return 'timeout';
     return r ? 'saved' : 'failed';
   } catch {
-    return 'saved';
+    return 'unknown';
   }
 }
 
@@ -576,24 +583,56 @@ describe('authStore.resetMemberPassword', () => {
     expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
   });
 
-  it('treats a post-write syncNow rejection as a durable success (no rollback)', async () => {
+  it('rolls back AND converges on an unexpected syncNow rejection (durability unknown)', async () => {
+    // ⚠️ THIS TEST INVERTED ON 2026-09-09, and the old version was the only thing
+    // covering the one change in that work that can cause a cross-device lockout.
+    // It used to assert a rejection was a durable success and skip the rollback,
+    // which was correct while the only possible rejection came from a settings
+    // write that ran AFTER the Drive write. With that write gone, a rejection
+    // proves nothing, so treating it as durable could leave Drive holding the new
+    // password while local reverted.
     const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
     const target = await memberWithPassword('m2', 'oldpw');
     membersRef.value = [me, target];
-    // syncNow rejects only AFTER a successful Drive write → syncNowDurable maps to 'saved'.
-    syncNowMock.mockRejectedValueOnce(new Error('settings metadata write failed'));
+    // Reject once for the rotation save; the convergence re-save then succeeds.
+    syncNowMock.mockRejectedValueOnce(new Error('unexpected'));
+    syncNowMock.mockResolvedValue(true);
 
     const store = useAuthStore();
     store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
     store.isAuthenticated = true;
 
     const result = await store.resetMemberPassword('m2', 'temp-pw');
-    expect(result).toEqual({ success: true });
-    // Durable success → NO rollback, NO critical.
-    expect(setMemberWrappedKeyMock).not.toHaveBeenCalled();
+
+    // Not a success: durability was never established.
+    expect(result).not.toEqual({ success: true });
+    // The credential is rolled back...
+    expect(setMemberWrappedKeyMock).toHaveBeenCalled();
+    // ...and a convergence re-save runs, because the write MAY have landed.
+    // Skipping it is what would leave Drive and local disagreeing.
+    expect(syncNowMock.mock.calls.length).toBeGreaterThan(1);
+    // It converged, so no page.
     expect(reportErrorMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ severity: 'critical' })
     );
+  });
+
+  it('pages critical when the convergence re-save after an unknown outcome fails', async () => {
+    // The data-at-risk case: Drive may hold the new password, local has reverted,
+    // and we could not push the revert back. This must page.
+    const me = await memberWithPassword('admin', 'pw', { canManagePod: true });
+    const target = await memberWithPassword('m2', 'oldpw');
+    membersRef.value = [me, target];
+    syncNowMock.mockRejectedValueOnce(new Error('unexpected'));
+    syncNowMock.mockResolvedValue(false); // convergence re-save cannot confirm
+
+    const store = useAuthStore();
+    store.currentUser = { memberId: 'admin', email: 'a@x.com', familyId: 'fam-1' };
+    store.isAuthenticated = true;
+
+    await store.resetMemberPassword('m2', 'temp-pw');
+
+    expect(reportErrorMock).toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
   it('rolls back + returns saveFailed on a CLEAN save failure (no convergence, no-prior-entry removes)', async () => {

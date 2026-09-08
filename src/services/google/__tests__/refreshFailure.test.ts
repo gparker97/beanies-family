@@ -40,7 +40,9 @@ describe('isRefreshRejection', () => {
   // something the module header declares transient.
   it('matches a 4xx, which is Google refusing the exchange', () => {
     expect(isRefreshRejection('Token refresh failed: HTTP 400 — invalid_request')).toBe(true);
-    expect(isRefreshRejection(new Error('Token refresh failed: HTTP 403 — forbidden'))).toBe(true);
+    expect(isRefreshRejection(new Error('Token refresh failed: HTTP 401 — unauthorized'))).toBe(
+      true
+    );
   });
 
   it('does NOT match a 5xx — that is our proxy failing, not the grant', () => {
@@ -54,6 +56,10 @@ describe('isRefreshRejection', () => {
     // the gate exists to prevent, and would disagree with `googleRevoke`.
     expect(isRefreshRejection('Token refresh failed: HTTP 429 — Too Many Requests')).toBe(false);
     expect(isRefreshRejection('Token refresh failed: HTTP 408 — Request Timeout')).toBe(false);
+    // 403 too: our proxy returns it for a missing API key and for a WAF block,
+    // and Google for rateLimitExceeded. `googleRevoke` classes it transient and
+    // these two predicates must agree.
+    expect(isRefreshRejection('Token refresh failed: HTTP 403 — forbidden')).toBe(false);
   });
 
   it('does NOT match a message with no status at all', () => {

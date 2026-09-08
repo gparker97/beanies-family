@@ -67,5 +67,10 @@ export function isRefreshRejection(errOrMessage: unknown): boolean {
   // prevent. `googleRevoke.postRevoke` already classes 429/403 transient; these
   // two predicates must not disagree.
   const status = Number(m[1]);
-  return status !== 408 && status !== 429;
+  // 403 is in here because our OAuth proxy is API Gateway + Lambda: it returns
+  // 403 for a missing or invalid API key and for a WAF block, and Google returns
+  // it for `rateLimitExceeded`. None of those is the grant being refused, and
+  // `googleRevoke.postRevoke` already classes 403 transient — the comment above
+  // said these two predicates must not disagree while the code let them.
+  return status !== 403 && status !== 408 && status !== 429;
 }

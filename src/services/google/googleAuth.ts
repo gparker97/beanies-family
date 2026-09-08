@@ -1502,7 +1502,16 @@ async function performSilentRefresh(): Promise<string | null> {
           consecutiveFailures: consecutiveSilentRefreshFailures,
           reason: 'exhausted-transient',
         };
-        if (dead) firePermanentFailureCallbacks();
+        if (dead) {
+          // ⚠️ RESET AFTER FIRING. Without this the counter stays at or above the
+          // threshold, so every subsequent ladder also satisfies `dead` and
+          // re-raises the reconnect surface — a user on a captive portal could
+          // not dismiss it, and the `warn` event per ladder would trip the
+          // 50/surface/min client rate cap and start silently dropping the very
+          // telemetry this branch exists to provide.
+          consecutiveTransientExhaustions = 0;
+          firePermanentFailureCallbacks();
+        }
         return null;
       }
       consecutiveTransientExhaustions = 0;
