@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-08",
-    "translationCount": 4658
+    "translationCount": 4657
   },
   "translations": {
     "app.name": {
@@ -23279,11 +23279,6 @@
     "share.copyFailedHelp": {
       "translation": "您的浏览器阻止了剪贴板。选择文本，然后手动复制。",
       "hash": "o7154p",
-      "lastUpdated": "2026-09-08"
-    },
-    "settings.reconnectedTryAgain": {
-      "translation": "已重新连接到Google。请尝试重新加载文件。",
-      "hash": "cz300k",
       "lastUpdated": "2026-09-08"
     },
     "compaction.refused.cannot-verify": {
