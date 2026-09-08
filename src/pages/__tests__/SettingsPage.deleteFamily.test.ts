@@ -156,17 +156,14 @@ describe('SettingsPage — delete family export gate', () => {
     expect(deliverFileMock).toHaveBeenCalledTimes(1);
     expect(deleteLocalFamilyMock).toHaveBeenCalledWith('fam-1');
 
-    // This fixture is a LOCAL-file family (`isGoogleDriveConnected` is false), so
-    // there is no shared pod file for other devices to stay bound to and the row
-    // SHOULD go. An earlier cut gated the removal on the Drive checkbox, which
-    // never renders for a local family, so its row could not be removed by any
-    // path at all — the user was told the family was gone from everywhere while
-    // the row survived forever, still resolvable and still counted in metrics.
-    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1');
-    // Before the local teardown, while the session that decided it still exists.
-    expect(removeFamilyMock.mock.invocationCallOrder[0]).toBeLessThan(
-      deleteLocalFamilyMock.mock.invocationCallOrder[0]!
-    );
+    // ⚠️ NOT REMOVED, and this assertion has now been wrong in both directions.
+    // Nothing deleted a pod file on this path — the Drive checkbox is unticked —
+    // so the file is still out there and the row is its pointer. A row deleted
+    // under a live pod is recreated by the next device to write, which stamps
+    // THAT member as owner, permanently. A surviving row is merely an ops
+    // nuisance. The asymmetry is why the gate proves deletion rather than
+    // inferring it from intent or from session state.
+    expect(removeFamilyMock).not.toHaveBeenCalled();
   });
 
   it('gates the shared registry removal on the pod file actually being GONE', async () => {
@@ -188,14 +185,16 @@ describe('SettingsPage — delete family export gate', () => {
     const call = source.indexOf('await removeFamily(familyId)');
     expect(call, 'removeFamily call not found').toBeGreaterThan(-1);
 
-    const gate = source.lastIndexOf('if (!podFileSurvives) {', call);
-    expect(gate, 'the removal is not inside the podFileSurvives gate').toBeGreaterThan(-1);
+    const gate = source.lastIndexOf('if (podFileDeleted) {', call);
+    expect(gate, 'the removal is not inside the podFileDeleted gate').toBeGreaterThan(-1);
     // Immediately enclosing, not merely somewhere earlier in the file.
     expect(call - gate).toBeLessThan(400);
 
-    // And the flag must be set from the delete succeeding, never from the checkbox.
-    expect(source).toContain('podFileSurvives = false');
-    expect(source).not.toContain('if (wantDeleteDrive.value) {\n      const registryRemoved');
+    // The flag must default false and be set in exactly ONE place: after the
+    // delete returns. Every inference tried instead (the checkbox, the session's
+    // provider state, a null config) removed the row with the pod still alive.
+    expect(source).toContain('let podFileDeleted = false');
+    expect(source.match(/podFileDeleted = true/g) ?? []).toHaveLength(1);
   });
 
   it('aborts the deletion when the export FAILED', async () => {

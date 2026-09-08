@@ -18,15 +18,15 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
 import {
   getGoogleAccountEmail,
-  shouldUseRedirectAuth,
   isTokenValid,
   whenRedirectAuthSettled,
 } from '@/services/google/googleAuth';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
-import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { supportsFileSystemAccess, canUseLocalFiles, isNative } from '@/services/sync/capabilities';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { classifyDriveFailure } from '@/utils/podAccess';
 import { reportError } from '@/utils/errorReporter';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
@@ -847,13 +847,15 @@ async function handleReconnectAndLoad() {
   formError.value = null;
   isReconnectBusy.value = true;
   try {
-    const ok = await reconnect(syncStore.providerAccountEmail ?? undefined);
+    const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
 
-    // On iOS/PWA `reconnect()` triggered a full-page redirect; the page is
-    // navigating away and LoginPage re-runs the silent auto-load on return.
-    if (shouldUseRedirectAuth()) return;
+    // The page is navigating away to Google and nothing has been acquired yet;
+    // LoginPage re-runs the silent auto-load on return. Asked of the OUTCOME now
+    // rather than re-testing the platform: `reconnect` already made this decision
+    // and a second copy of the predicate is a second chance to disagree with it.
+    if (outcome === 'redirecting') return;
 
-    if (!ok) {
+    if (!reconnectSucceeded(outcome)) {
       // Stay on the reconnect panel so the user can try again.
       formError.value = reconnectError.value || t('googleDrive.reconnectFailed');
       return;
@@ -1080,7 +1082,11 @@ async function handleDriveRefresh() {
       level: 'warn',
       surface: 'pod-load-failure',
       message: 'drive list refresh failed',
-      context: { action: 'drive-refresh-failed' },
+      // Classified and carrying the error: a popup block, a revoked-grant 401 and
+      // an offline drop are three different problems and were emitting one
+      // identical line, which cannot be triaged from the logs alone.
+      context: { action: 'drive-refresh-failed', error_code: classifyDriveFailure(e) },
+      error: e,
     });
   } finally {
     isDriveLoading.value = false;

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useGoogleReconnect } from '../useGoogleReconnect';
+import { useGoogleReconnect, reconnectSucceeded } from '../useGoogleReconnect';
 
 vi.mock('@/services/google/googleAuth', () => ({
   requestAccessToken: vi.fn(async () => 'mock-token'),
   hasRefreshToken: vi.fn(() => false),
   shouldUseRedirectAuth: vi.fn(() => false),
+  invalidateAccessToken: vi.fn(),
   startRedirectAuth: vi.fn(async () => {
     /* noop in tests — would navigate the page in real browser */
   }),
@@ -15,10 +16,11 @@ describe('useGoogleReconnect', () => {
     vi.clearAllMocks();
   });
 
-  it('reconnect calls requestAccessToken and returns true on success', async () => {
+  it('reconnect calls requestAccessToken and reports reconnected on success', async () => {
     const { reconnect } = useGoogleReconnect();
     const result = await reconnect();
-    expect(result).toBe(true);
+    expect(result).toBe('reconnected');
+    expect(reconnectSucceeded(result)).toBe(true);
 
     const { requestAccessToken } = await import('@/services/google/googleAuth');
     expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: true });
@@ -33,7 +35,8 @@ describe('useGoogleReconnect', () => {
     const { reconnect, reconnectError } = useGoogleReconnect();
     const result = await reconnect();
 
-    expect(result).toBe(false);
+    expect(result).toBe('failed');
+    expect(reconnectSucceeded(result)).toBe(false);
     expect(reconnectError.value).toBe('Auth failed');
   });
 
@@ -80,8 +83,26 @@ describe('useGoogleReconnect', () => {
 
     expect(startRedirectAuth).toHaveBeenCalled();
     expect(requestAccessToken).not.toHaveBeenCalled();
-    // Returns true even though page would navigate in a real browser —
-    // ensures callers don't treat the in-flight redirect as a failure.
-    expect(result).toBe(true);
+    // ⚠️ `'redirecting'`, and it must NOT satisfy `reconnectSucceeded`. The page
+    // is on its way to Google and nothing has been acquired. This used to be
+    // `true`, and two call sites read that as success: they cleared the reconnect
+    // banner and fired a Drive read plus a full pod upload on the still-dead
+    // token while the user was looking at the consent screen.
+    expect(result).toBe('redirecting');
+    expect(reconnectSucceeded(result)).toBe(false);
+  });
+
+  it('drops the cached access token BEFORE trying the silent path', async () => {
+    // Without this a "reconnect" can reconnect nothing: when the grant was
+    // revoked on ANOTHER device the local token has not passed its own expiry,
+    // so `tryReconnectSilently` short-circuits on `isTokenValid()` and returns
+    // true without contacting Google. The caller then reports success and the
+    // next request 401s identically, forever.
+    const { invalidateAccessToken } = await import('@/services/google/googleAuth');
+
+    const { reconnect } = useGoogleReconnect();
+    await reconnect();
+
+    expect(invalidateAccessToken).toHaveBeenCalled();
   });
 });
