@@ -873,10 +873,21 @@ export const useSyncStore = defineStore('sync', () => {
       if (!ok) {
         throw new Error(error.value || 'Could not write to the new storage location');
       }
-      await settingsRepo.saveSettings({
-        syncEnabled: true,
-        syncFilePath: provider.getDisplayName(),
-      });
+      // `preserveTimestamp`, and it is load-bearing. Without it `saveSettings`
+      // stamps a fresh millisecond-precision `updatedAt`, which lands a new
+      // Automerge change PAST the baseline `syncNow(true)` just committed — the
+      // identical mechanism that made compaction false-refuse, reached through
+      // `updatedAt` rather than through `lastSyncTimestamp`, so the `?: never`
+      // tombstone on that field cannot see it. A compaction attempted straight
+      // after creating a pod or migrating storage hit exactly this. Every other
+      // post-save write in this file already passes it.
+      await settingsRepo.saveSettings(
+        {
+          syncEnabled: true,
+          syncFilePath: provider.getDisplayName(),
+        },
+        { preserveTimestamp: true }
+      );
     } finally {
       isReloading = false;
     }
@@ -918,22 +929,30 @@ export const useSyncStore = defineStore('sync', () => {
    *   - `'saved'`   — the Drive write confirmed.
    *   - `'failed'`  — a clean failure; the write did NOT complete (nothing reached Drive).
    *   - `'timeout'` — the bound elapsed; the non-cancellable write MAY still be in flight.
+   *   - `'unknown'` — an unexpected rejection; the write may or may not have landed.
    *
-   * ⚠️ THE REJECTION ARM CHANGED MEANING ON 2026-09-08. It used to report `'saved'`,
-   * and that was sound at the time: `syncNow(true)` could only reject from the
-   * post-write `settingsRepo.saveSettings` metadata write, since `save()`/`doSave`
-   * catch everything and return `false`. A rejection therefore PROVED the Drive
-   * write had already succeeded, so the credential was durable.
+   * ⚠️ `'unknown'` IS NEW (2026-09-08) AND IS NOT A SYNONYM FOR `'failed'`.
    *
-   * That metadata write is gone (it was re-dirtying the document and false-refusing
+   * The rejection arm used to report `'saved'`, and that was sound at the time:
+   * `syncNow(true)` could only reject from the post-write `settingsRepo.saveSettings`
+   * metadata write, since `save()`/`doSave` catch everything and return `false`. A
+   * rejection therefore PROVED the Drive write had already succeeded.
+   *
+   * That metadata write is gone (it re-dirtied the document and false-refused
    * compaction; see `Settings.lastSyncTimestamp`), so `syncNow` should now never
-   * reject at all. If it does, the cause is unknown and we have NO evidence the
-   * write landed. Reporting `'saved'` on that would tell a password rotation its
-   * new credential is durable when it may not be, which is the one thing this
-   * function exists to get right. It reports `'failed'` instead: the rotation
-   * rolls back cleanly on not-saved, so that is the safe direction.
+   * reject at all, and if it does we have no evidence either way.
+   *
+   * Folding that into `'failed'` would be wrong in a way that matters: `'failed'`
+   * means "nothing reached Drive", and the rotation caller relies on it to SKIP the
+   * convergence re-save. An unknown-durability write that skips convergence can
+   * leave Drive holding the new password while local reverted, which is the
+   * cross-device lockout this whole three-state design exists to prevent. Callers
+   * must treat `'unknown'` like `'timeout'`: the write may be out there, so
+   * converge.
    */
-  async function syncNowDurable(timeoutMs: number): Promise<'saved' | 'failed' | 'timeout'> {
+  async function syncNowDurable(
+    timeoutMs: number
+  ): Promise<'saved' | 'failed' | 'timeout' | 'unknown'> {
     try {
       const r = await raceTimeout(syncNow(true), timeoutMs);
       if (r === undefined) return 'timeout';
@@ -943,17 +962,20 @@ export const useSyncStore = defineStore('sync', () => {
         surface: 'sync-now-durable',
         severity: 'error',
         message:
-          'syncNow rejected unexpectedly — durability of the write is unknown, reporting failed',
+          'syncNow rejected unexpectedly — durability of the write is unknown, callers must converge',
         error: e,
       });
-      return 'failed';
+      return 'unknown';
     }
   }
 
   /** Bounded best-effort save → boolean. Thin wrapper over `syncNowDurable` so there
-   * is exactly ONE implementation of the timeout + reject-means-saved core. (A
-   * post-write reject now maps to `true` instead of throwing — strictly safer for
-   * both callers: login-completion + signin-heal.) */
+   * is exactly ONE implementation of the timeout + rejection handling.
+   *
+   * Only `'saved'` is true. An unexpected rejection is `'unknown'`, not `'saved'`
+   * (it used to be the latter, on a premise that no longer holds — see
+   * `syncNowDurable`), and for a best-effort caller "we do not know" and "it did
+   * not happen" want the same conservative answer. */
   async function syncNowBounded(timeoutMs = POST_AUTH_SAVE_TIMEOUT_MS): Promise<boolean> {
     return (await syncNowDurable(timeoutMs)) === 'saved';
   }
@@ -4889,7 +4911,20 @@ export const useSyncStore = defineStore('sync', () => {
 
   async function loadFromGoogleDrive(
     fileId: string,
-    driveFileName: string
+    driveFileName: string,
+    /**
+     * `silent`: acquire the token without an interactive popup, throwing
+     * `TokenExpiredError` instead.
+     *
+     * The Settings RESTORE path passes this. It lists silently (a popup does not
+     * survive a Capacitor WebView), so acquiring interactively here would move
+     * the dead end from the list to the tap: the picker renders, the user
+     * chooses a file, and the popup fails inside the WebView with no route out.
+     *
+     * Sign-in and join do NOT pass it: they run `beginDriveAuthRedirect` first,
+     * so an interactive acquisition there is both expected and reachable.
+     */
+    opts?: { silent?: boolean }
   ): Promise<{
     success: boolean;
     needsPassword?: boolean;
@@ -4942,7 +4977,7 @@ export const useSyncStore = defineStore('sync', () => {
     }
 
     try {
-      const token = await requestAccessToken();
+      const token = opts?.silent ? await getValidTokenSilent() : await requestAccessToken();
       await fetchGoogleUserEmail(token);
 
       const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);

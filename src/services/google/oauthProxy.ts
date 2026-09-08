@@ -160,7 +160,17 @@ export async function refreshAccessToken(params: {
   try {
     body = await safeJsonParse(res);
   } catch {
-    throw new Error('Token refresh failed');
+    // ⚠️ THE STATUS GOES IN HERE TOO. This arm runs BEFORE the `!res.ok` branch
+    // below, so a 4xx whose body is not JSON — a WAF 403, a gateway error page —
+    // used to throw a bare message with the status dropped, and
+    // `isRefreshRejection` then read a genuinely refused grant as transient and
+    // never surfaced a reconnect. `res.ok` is still reported so a 2xx with an
+    // unparseable body stays distinguishable from a refusal.
+    throw new Error(
+      res.ok
+        ? 'Token refresh failed: unparseable response body'
+        : `Token refresh failed: HTTP ${res.status} — unparseable response body`
+    );
   }
 
   if (!res.ok) {

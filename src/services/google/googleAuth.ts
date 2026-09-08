@@ -335,6 +335,24 @@ let consecutiveSilentRefreshFailures = loadFailureCounter();
 // 2 retry-exhausted failures = 6 OAuth proxy fetches across two
 // `attemptSilentRefresh` calls. Plenty of patience for transients while
 // reaching the user fast on real failures.
+/**
+ * How many CONSECUTIVE transiently-exhausted silent refreshes before we accept
+ * that the path is simply dead and raise the reconnect surface anyway.
+ *
+ * Deliberately far above the rejection threshold. A rejection is Google telling
+ * us the grant is refused, which is worth acting on twice; a transient failure
+ * is usually a tunnel or a flaky minute, and acting on it costs the user a
+ * consent screen they did not need. But "transient forever" is not transient,
+ * and escalation trigger 2 in the module header exists precisely for it.
+ *
+ * Each run is a full 5-attempt ladder (~22.5s), so this is a sustained dead
+ * state, not a bad moment. NOT persisted across reloads, unlike the rejection
+ * counter: a reload is itself a recovery attempt and a fresh tab deserves a
+ * fresh benefit of the doubt.
+ */
+const TRANSIENT_EXHAUSTION_ESCALATION_THRESHOLD = 6;
+let consecutiveTransientExhaustions = 0;
+
 const SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD = 2;
 
 function firePermanentFailureCallbacks(): void {
@@ -1031,9 +1049,14 @@ async function performPopupAuth(
   // What we gave up, stated plainly: nothing keeps the token pool flat on a forced
   // consent any more. Judged the better trade — the eviction needs ~100 accumulated
   // tokens for one account, while the revoke was deterministic on every reconnect,
-  // and the `signout` / `explicit-disconnect` / `account-change` revokes still tidy
-  // the pool. If eviction turns out to be real, the fix is a token-hygiene pass, NOT
-  // a revoke here; Google offers no narrower revoke than whole-grant.
+  // and the `explicit-disconnect` / `account-change` revokes still tidy the pool.
+  //
+  // ⚠️ NARROWER THAN IT FIRST LOOKED. The `signout` pair lives in `revokeToken`,
+  // which has NO production caller, so nothing revokes on an ordinary sign-out.
+  // The real margin under the #62 cap is therefore smaller than this trade-off
+  // assumed, and the watch-item below will trip sooner. If eviction turns out to
+  // be real, the fix is a token-hygiene pass, NOT a revoke here; Google offers no
+  // narrower revoke than whole-grant.
   //
   // Watch `token_op: 'revoke'` + `token_outcome: 'skipped'` against
   // `surface: 'drive-token-silent-reconnect'` failures. If both climb together, the
@@ -1446,18 +1469,43 @@ async function performSilentRefresh(): Promise<string | null> {
       // also revoked the whole grant on every other device. A 4xx means Google
       // actually refused the exchange; anything else is transient and must stay
       // retryable (`refreshFailure.ts` header states this contract).
-      if (!isRefreshRejection(errorMessage)) {
-        console.warn(
-          `[googleAuth] Silent refresh exhausted but NOT escalating — transient: ${errorMessage}`
-        );
+      // ⚠️ ANY attempt, not just the last. Classifying the run by the final
+      // message alone meant four `HTTP 400 — invalid_request` responses followed
+      // by one dropped connection read as transient forever. The per-attempt
+      // classification is already recorded above; use it.
+      const sawRejection = diagnosticAttempts.some((a) => isRefreshRejection(a.errorMessage));
+
+      if (!sawRejection) {
+        // Transient, so it does NOT count toward the fast escalation. But it is
+        // still counted, on its own much slower streak: escalation trigger 2
+        // (see the module header) exists to catch a system that fails only
+        // transiently and never recovers — a corporate DNS block, a CORS
+        // regression, a long proxy outage. Deleting it outright would let a
+        // long-lived tab stop syncing with no signal at all, which is the
+        // failure the header explicitly says this trigger prevents.
+        consecutiveTransientExhaustions++;
+        const dead = consecutiveTransientExhaustions >= TRANSIENT_EXHAUSTION_ESCALATION_THRESHOLD;
+        logEvent({
+          level: dead ? 'warn' : 'info',
+          surface: 'google-token-lifecycle',
+          message: dead
+            ? 'silent refresh has not recovered from transient failures — escalating'
+            : 'silent refresh exhausted transiently — not escalating',
+          context: {
+            action: dead ? 'transient-streak-escalated' : 'transient-suppressed',
+            count: consecutiveTransientExhaustions,
+          },
+        });
         lastSilentRefreshDiagnostics = {
           attempts: diagnosticAttempts,
           hadRefreshToken: true,
           consecutiveFailures: consecutiveSilentRefreshFailures,
           reason: 'exhausted-transient',
         };
+        if (dead) firePermanentFailureCallbacks();
         return null;
       }
+      consecutiveTransientExhaustions = 0;
       consecutiveSilentRefreshFailures++;
       persistFailureCounter(consecutiveSilentRefreshFailures);
       console.warn(
@@ -1594,6 +1642,12 @@ export async function revokeToken(): Promise<void> {
   // the access token when none is in memory. `await` preserves ordering.
   // ✅ SURVIVING REVOKE 2 of 4 (audit 2026-09-08). Safe: the user asked to sign
   // out. Whole-grant is what "sign out of Google" means.
+  // ⚠️ BUT `revokeToken` HAS NO PRODUCTION CALLER — grep says only test mocks and
+  // prose reference it, and `authStore` states it outright: "the explicit Settings
+  // disconnect is the sole revoke site". So this and the arm below are audit
+  // stamps on dead code, and the REACHABLE Drive revokes number two, not four.
+  // That matters where it is cited as a compensating control; see the note at the
+  // popup seam.
   const revokeTarget = currentRefreshToken?.token ?? accessToken;
   if (revokeTarget) {
     await revokeGrant(revokeTarget, { grant: 'drive', trigger: 'signout' });
@@ -1792,6 +1846,7 @@ async function notifyTokenAcquired(
   // the silent-refresh failure streak. Reset before subscribers run so any
   // future refresh failure starts counting fresh from 0.
   consecutiveSilentRefreshFailures = 0;
+  consecutiveTransientExhaustions = 0;
   persistFailureCounter(0);
   // Covers the interactive paths (popup / redirect reconnect) that never reach
   // `performSilentRefresh`'s success branch.
@@ -1827,6 +1882,7 @@ function clearTokenState(): void {
   cachedEmail = null;
   cachedEmailToken = null;
   consecutiveSilentRefreshFailures = 0;
+  consecutiveTransientExhaustions = 0;
   persistFailureCounter(0);
 
   // Clean up legacy localStorage token (from GIS flow)
