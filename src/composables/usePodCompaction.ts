@@ -109,6 +109,8 @@ export function usePodCompaction() {
     titleKey: UIStringKey;
     subtitleKey: UIStringKey;
     helpKey: UIStringKey;
+    /** The refusal was about a moment, not a fact; offer "Check again". */
+    retryable: boolean;
   } | null>(null);
 
   function refuse(code: RefusalCode, detail?: string): void {
@@ -121,6 +123,10 @@ export function usePodCompaction() {
       // True for every refusal: they are all decided BEFORE anything is written.
       subtitleKey: 'compactionProgress.failedSubtitle',
       helpKey: `compaction.refused.${code}` as UIStringKey,
+      // `not-synced` is a snapshot of the sync state and clears itself within
+      // seconds (the debounced save levels the device), so a second press is
+      // the honest next step. Every other refusal is a fact about the family.
+      retryable: code === 'not-synced',
     };
     logEvent({
       level: 'warn',
@@ -424,6 +430,7 @@ export function usePodCompaction() {
           titleKey: 'compactionProgress.failedTitle',
           subtitleKey: 'compaction.publishFailed',
           helpKey: 'compaction.publishFailedHelp',
+          retryable: false,
         };
         return;
       }
@@ -478,6 +485,7 @@ export function usePodCompaction() {
         // reassurance is true here.
         subtitleKey: 'compactionProgress.failedSubtitle',
         helpKey: 'compaction.failedHelp',
+        retryable: false,
       };
     } finally {
       busy.value = false;

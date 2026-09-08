@@ -86,4 +86,96 @@ describe('uiStrings', () => {
       expect(hash1).not.toBe(hash2);
     });
   });
+  describe('important-surface beanie values', () => {
+    // Beanie mode swaps register, not meaning. On surfaces where a family could
+    // lose work, money, or access, the `beanie` value must keep the real nouns
+    // (device, changes, data, family file, member). "bean" standing in for a
+    // device in one clause and for unsaved changes in the next is how the
+    // lineage banner became unreadable on 2026-09-08. `pod` and `.beanpod` are
+    // brand nouns and stay; the bare app name "beanies" is allowed unless it is
+    // being used as a noun for data ("your beanies").
+    const IMPORTANT_PREFIXES = [
+      'podLineage.',
+      'podMerge.',
+      'podUnreadable.',
+      'podTooLarge.',
+      'podCredentialStale.',
+      'resumeSetup.pod',
+      'resumeSetup.subtitle',
+      'sync.',
+      'docWorker.',
+      'error.',
+      'app.initError.',
+      'auth.',
+      'reauth.',
+      'password.',
+      'pin.',
+      'recovery.',
+      'passkey.',
+      'loginFlow.recovery',
+      'loginV6.unlock',
+      'loginV6.pickBeanInfoText',
+      'loginV6.signInPasswordHint',
+      'join.error.',
+      'join.inviteToken',
+      'join.fileMismatch',
+      'join.needsFile',
+      'join.familyNotFound',
+      'join.noUnclaimedMembers',
+      'join.pickerPrompt.',
+      'join.loadingFromCloud',
+      'googleDrive.',
+      'googleDisconnect.',
+      'calendarSync.reconnect.',
+      'calendarSync.disconnect.',
+      'calendarSync.toast.',
+      'confirm.',
+      'transferOwnership.',
+      'permissions.',
+      'settings.clear',
+      'settings.deleteFamily',
+      'settings.switch',
+      'settings.loadedOtherFamily',
+      'settings.export',
+      'settings.familyKey',
+      'settings.familyData',
+      'settings.cachePersist',
+      'settings.card.dataManagement',
+      'settings.card.familyData',
+      'installNudge.',
+      'header.refreshUnopenable',
+      'pwa.offlineBanner',
+      'setupProgress.error.',
+      'inviteWizard.step1.faq.a1',
+      'invite.shareEmail.error',
+      'family.deleteConfirm',
+      'family.deleteMember',
+      'family.discardChanges',
+      'family.normalizeRolesFailed',
+      'family.addMemberFailed',
+      'accountView.adjustError.',
+      'goalContribute.error.',
+      'medicationLog.errors.',
+    ];
+    const KEY_SUFFIXES =
+      /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;
+    const BEAN_WORD =
+      /\b(beans?|beanie)\b|(?<=\b(?:your|all|my|our|the|these|those)\s)beanies\b(?!\.family)/gi;
+
+    it('use real nouns, not bean euphemisms', () => {
+      const bad: string[] = [];
+      for (const [key, beanie] of Object.entries(BEANIE_STRINGS)) {
+        const important =
+          IMPORTANT_PREFIXES.some((p) => key.startsWith(p)) || KEY_SUFFIXES.test(key);
+        if (!important) continue;
+        const en = UI_STRINGS[key as UIStringKey] ?? '';
+        const allowed = new Set((en.match(BEAN_WORD) ?? []).map((w) => w.toLowerCase()));
+        const introduced = (beanie.match(BEAN_WORD) ?? [])
+          .map((w) => w.toLowerCase())
+          .filter((w) => !allowed.has(w));
+        if (introduced.length) bad.push(`${key}: ${beanie}`);
+      }
+      expect(bad, `beanie euphemism on an important surface:\n${bad.join('\n')}`).toEqual([]);
+    });
+  });
 });
