@@ -1987,6 +1987,18 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ### ⭐ Session 2026-09-08/09 — the compaction fallout: nine findings, four-pass plan, stages 1 + 3 ⭐
 
+> ⭐⭐ **NEXT SESSION: READ `docs/investigations/2026-09-08-compaction-fallout.md`
+> § HANDOFF FIRST.** It carries the stage-by-stage status, every deliberate
+> non-decision with its reason, and the traps. The two that will cost you most if
+> skipped: **stage 6 is NOT already fixed** (the offline-after-compaction rebase
+> that WAS shipped and tested is a different path — see Path A vs Path B), and
+> **the compaction dirty-document class is NOT closed** (`lastSyncTimestamp` was
+> one writer; the calendar reconcile poll is another and is still live).
+>
+> **First action, before any new work:** `/code-review max e6d445af`. Three review
+> rounds each found defects in the previous round's fixes; round three has not
+> been independently reviewed at all.
+
 greg ran the first real pod compaction across a mixed 0.16/0.17 fleet. Compaction worked
 (4MB+ -> ~350KB); nine distinct problems fell out of it. Full record:
 `docs/investigations/2026-09-08-compaction-fallout.md` (root causes with file:line) and
@@ -2024,13 +2036,25 @@ guessed. Setting `ownerMemberId` by hand would permanently refuse his own pointe
 re-claimable by whichever device writes next until the roster-sourced fix (plan stage 5) ships,
 which is no worse than the state it was already in.
 
-**STILL OWED from the plan** (stages 2, 4, 5, 6, 7 and the rest of 1):
+**STAGE STATUS** (full table + reasons in the investigation's § HANDOFF):
+stage 3 **DONE**; stage 1 mostly done (§1d owed); stage 7's version floor done;
+stages **2, 4, 5, 6** not started, and stage 6 is a deliberate hold, not an
+oversight.
+
+**STILL OWED from the plan:**
 
 - §1d — a lineage-blocked device healing its token from the remote envelope. Needs a read-only
   decrypt the worker does not expose today; larger than the plan's sketch implied.
-- §5 — the local-only entity CARRY on a clean adopt, which is the actual item-4 data-preservation
-  fix. Scoped to `adopt-remote × clean` ONLY: the two `user-file` adopt cells are the rollback
-  route and a guard there would close the only exit the lineage banner offers.
+- §5 (stage 6) — the local-only entity CARRY on a clean adopt. ⚠️ **greg's decision
+  2026-09-09: LEAVE AS PLANNED, do not implement now.** It touches the adopt path,
+  the highest-risk code here, and both Pass 3 and Pass 4 found serious defects in
+  earlier drafts of this exact change. It rescues NEW items on a straggler device;
+  edits and deletions on that device can never be recovered (no common ancestor
+  exists after a compaction). If built, it gets its own session and own review.
+  Scoped to `adopt-remote × clean` ONLY — the two `user-file` adopt cells are the
+  rollback route and a guard there would close the only exit the banner offers.
+  A far cheaper alternative, not done: tighten `compaction.olderVersion.notice`
+  (`uiStrings.ts:4595`) to say what happens if a member does NOT update.
 - §8/§9 — the reconnect toast on the shared-recipe page (`UnifiedReconnectToast`, not
   `PodAccessBanner`, which cannot render on a `noChrome` route) and the blocker banner for the
   seven `decrypt` kinds.

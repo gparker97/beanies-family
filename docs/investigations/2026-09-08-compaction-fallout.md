@@ -642,3 +642,144 @@ per-device actions never delete the shared row, the Lambda tombstones instead of
   member's device could re-claim it, which is no worse than the state it was already in.
 - `signupPlatform` left NULL on purpose. 63 of 75 rows are null (the field postdates them);
   stamping `web` would be fabricating data.
+
+---
+
+# HANDOFF — read this before touching anything (written 2026-09-09)
+
+The plan is `docs/plans/2026-09-08-compaction-fallout-remediation.md`. It has a
+seven-stage table; this section says what is actually done, what is deliberately
+NOT done, and the traps.
+
+## Stage status
+
+| Stage                | What it is                                                                               | Status                                              |
+| -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 1 Auth               | remove reconnect revokes, escalation gate, heal a blocked device's token                 | **Mostly done.** §1d NOT done (see below)           |
+| 2 Registry server    | Lambda `ConsistentRead`, tombstone, `writerMemberId` guard, + `pull_registry.mjs` filter | **Not started**                                     |
+| 3 Client fixes       | registry delete, compaction refusal, native Drive, invite link, telemetry                | **DONE**                                            |
+| 4 Registry wire      | client sends `writerMemberId` (additive no-op)                                           | **Not started**                                     |
+| 5 Registry semantics | owner fields from the roster + the ops step that finishes greg's row repair              | **Not started**                                     |
+| 6 Preservation       | carry local-only entities on adopt                                                       | **Not started, and that is a DECISION — see below** |
+| 7 Surfaces           | recipe-page toast, blocker banner, version floor, DELETE enforcement                     | **Version floor done; §8 §9 §2d-ii not started**    |
+
+Shipped commits: `a21f2bb6`, `4fff34e5`, `94f4a30d`, `1db5f446`, `87bfc738`,
+`675602e7`, `31a90180`, `e6d445af` (+ two docs commits). NOT DEPLOYED.
+
+## ⚠️ STAGE 6 — DO NOT "DISCOVER" THIS IS ALREADY FIXED. IT IS NOT.
+
+greg asked exactly the right question and it is worth writing out, because the two
+paths look identical and a reader will otherwise either re-fix a working path or
+dismiss a real gap.
+
+**Path A — ALREADY FIXED, WORKS, DO NOT TOUCH.** Both devices on 0.17. Device B is
+offline, makes edits, comes back online after a compaction. Its baseline is
+HONEST (it genuinely has not pushed), so `lineageContextFor` answers `dirty`,
+`POLICY['adopt-remote'].dirty = 'rebase'`, and `rebaseOntoRemote` replays the
+edits onto the compacted document. This was implemented and tested before this
+investigation. Nothing in this work changed it.
+
+**Path B — mary's case, NOT fixed.** Her phone was on 0.16, which cannot READ a
+5.0 pod (`parseBeanpodV4` throws before decrypt) but whose save path writes over
+it anyway and then calls `commitRemoteBaseline` with ITS OWN heads. That baseline
+is a lie. When the phone later upgraded to 0.17, the 0.17 code compared
+`basis.heads` against `headsOf(currentDoc)`, found them equal, answered `clean`,
+and took `POLICY['adopt-remote'].clean = 'adopt'` — the wholesale install at
+`applyAndProject.ts:1152`. The rebase never ran, not because it is broken but
+because the device believed it had nothing to replay.
+
+Same code. Different entry condition. Path A's fix is sound; Path B walks past
+its trigger.
+
+**It IS fixable in code, and 0.16 does nothing.** The todo lives in her local
+Automerge document in IndexedDB, which survives the app upgrade. At the moment of
+loss 0.17 is running and holds BOTH her document (with the todo) and the compacted
+pod. It discards the todo by choice, not by inability.
+
+**What can never be recovered, and this is the honest limit.** Compaction builds a
+fresh document from a snapshot, so there is NO common ancestor between the old
+lineage and the new one and a true three-way merge is impossible. Entity-level is
+the best available:
+
+- new items created on the stale device -> recoverable (mary's todo is this case)
+- edits to an item that exists in both -> NOT (the adopt replaces the entity and
+  there is no basis to pick a winner)
+- deletions made on the stale device -> NOT (they would resurrect)
+
+**greg's decision, 2026-09-09: leave stage 6 exactly as the plan has it, do not
+implement it now.** Reasoning: it touches `applyAndProject`'s adopt path, the
+highest-risk code in the plan, and BOTH Pass 3 and Pass 4 found serious defects in
+earlier drafts of this very change (one would have closed the lineage banner's
+only exit, one would have republished dead refresh tokens that §1d then reads to
+heal). Set against that, it rescues new items on a straggler device — a window
+that shrinks as the fleet updates. If it is built, it gets its OWN session and its
+OWN review, never appended to other work.
+
+**The cheaper alternative, NOT done, offered for a future session.**
+`compaction.olderVersion.notice` (`uiStrings.ts:4595`) already names the members on
+older versions: "{list} last opened beanies on an older version. Ask them to update
+beanies before you compact." It is decent but it is the soak-gate framing greg
+rejected, and it never says what happens if they do NOT update. Tightening it to
+state the consequence in one brief line is far smaller and far safer than stage 6.
+Not done because greg said make no changes.
+
+## Other things deliberately NOT done, with reasons
+
+- **§1d (heal a lineage-blocked device's token from the remote envelope).** Needs a
+  read-only decrypt the Automerge worker does not expose; that is a new worker
+  protocol op, larger than the plan's sketch implied. Not attempted.
+- **The persisted escalation counter's re-fire** (`consecutiveSilentRefreshFailures`,
+  `googleAuth.ts`). A review round argued it should reset after firing. Left alone:
+  it is long-standing behaviour pinned by a test that states the reasoning
+  ("subscribers are idempotent"), and establishing whether a dismissal survives a
+  re-fire needs a behavioural check nobody ran. The reasoning is in the code.
+- **`promptBelowVersion` stays `0.16`.** greg asked for 0.17; it was raised and then
+  REVERTED, because 0.17 is TestFlight + Play open testing only and both
+  `STATUS.md` and runbook section 7 say not to prompt before a version is live on
+  BOTH stores. Raise it on the first WEB deploy after 0.17 goes live. Both deploy
+  skills and `scripts/deploy/check-version-floor.sh` now ask, with store-liveness
+  as precondition 1.
+- **`ownerMemberId` on greg's registry row is NULL on purpose.** It is write-once in
+  the Lambda, so a wrong value permanently refuses his own pointer writes, and his
+  memberId is not readable from here (the pod is encrypted). It is re-claimable by
+  whichever device writes next until stage 5 ships. Stage 5 carries the re-verify.
+
+## ⚠️ The compaction dirty-document class is NOT closed
+
+`lastSyncTimestamp` was ONE writer. Verified still open:
+`calendarSyncStore.ts` — `RECONCILE_POLL_MS = 300_000` (`:102`) against
+`FRESHNESS_WINDOW_MS = 120_000` (`:105`). The guard at `:767` exists, per its own
+comment, "to stop a no-op reconcile from churning the CRDT", but the poll interval
+is larger than the window so `Date.now() - lastAt` is always bigger and the guard
+can never fire on that path. The write at `:777` therefore runs every 5 minutes,
+putting per-device sync bookkeeping into the SHARED document. Any calendar-connected
+family goes dirty within minutes of every save, so the compaction gate pays a full
+re-push each attempt.
+
+The fix is the one already applied to `lastSyncTimestamp` and to `installProvider`:
+device-local bookkeeping does not belong in the family document. It is a schema
+change and was NOT made unilaterally. **Before touching the compaction gate again,
+sweep for other writers of this class rather than fixing one more site.**
+
+## How this session went, because it should change how the next one runs
+
+Three `/code-review max` rounds found 45 issues and a large share were caused by
+the fixes themselves, not pre-existing: an unbounded infinite loop, the
+owner-resurrection reintroduced TWICE at a new caller, three guard tests that could
+not fail, and a contract flip that silently broke its caller. Two lessons are in
+`docs/lessons.md`. The pattern to watch: **fixing one instance of a defect is not
+fixing the defect**, and twice a comment was shipped asserting a survivor was safe.
+
+Round three changed approach — decisions moved into the owning layer
+(`reconnect()` returns an outcome, the registry gate proves deletion) rather than
+patching call sites a fourth time. That is the approach to continue.
+
+**Recommended first action in the new session, BEFORE any new work:**
+`/code-review max e6d445af` with fresh eyes over everything shipped. The
+convergence is real but unproven — three rounds each found defects in the last
+round's fixes, and round three has not been independently reviewed at all.
+
+Then one stage per chunk, each with its own commit and its own review. Stage 2
+before stage 5 (it is the prerequisite); stage 4 before stage 5 and before stage
+7's DELETE enforcement. Stages 2/4/5/7 are a deliberately ordered ladder in which
+each step is a no-op alone — do not merge them.
