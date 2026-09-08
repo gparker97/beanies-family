@@ -111,6 +111,53 @@ describe('inviteService', () => {
       expect(link).toContain('fam=family-123');
     });
 
+    it('never builds a capacitor: link — an invite sent from iOS opened nothing', () => {
+      // The bug: inside the iOS shell the document origin is
+      // `capacitor://app.beanies.family`, a private scheme that exists only
+      // inside that app. An invite shared FROM the iPhone carried a link the
+      // recipient's phone could not open at all, and it is invisible in every
+      // environment a developer tests in. Fixed 2026-09-08 (the last of three).
+      const original = globalThis.location;
+      Object.defineProperty(globalThis, 'location', {
+        value: { origin: 'capacitor://app.beanies.family' },
+        configurable: true,
+        writable: true,
+      });
+      try {
+        const link = buildInviteLink({ familyId: 'fam' });
+        expect(link).not.toContain('capacitor:');
+        expect(link.startsWith('https://')).toBe(true);
+        expect(link).toContain('https://app.beanies.family/join?');
+      } finally {
+        Object.defineProperty(globalThis, 'location', {
+          value: original,
+          configurable: true,
+          writable: true,
+        });
+      }
+    });
+
+    it('falls back to the APP origin, not the marketing apex, when there is no location', () => {
+      // `/join` lives on the app subdomain. The old hardcoded fallback here was
+      // `https://beanies.family`, which has no /join route — the reason this
+      // instance was left unfixed when the other two were done.
+      const original = globalThis.location;
+      Object.defineProperty(globalThis, 'location', {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      });
+      try {
+        expect(buildInviteLink({ familyId: 'fam' })).toContain('https://app.beanies.family/join?');
+      } finally {
+        Object.defineProperty(globalThis, 'location', {
+          value: original,
+          configurable: true,
+          writable: true,
+        });
+      }
+    });
+
     it('produces a non-hash-routed URL matching the production share format', () => {
       const link = buildInviteLink({ familyId: 'fam' });
       expect(link).toContain('/join?');

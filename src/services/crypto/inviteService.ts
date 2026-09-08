@@ -12,6 +12,7 @@
  */
 
 import { bufferToBase64url, base64urlToBuffer } from '@/utils/encoding';
+import { shareableOrigin } from '@/utils/shareableOrigin';
 import { SALT_LENGTH, wrapFamilyKey, unwrapFamilyKey } from '@/services/crypto/familyKeyService';
 
 const PBKDF2_ITERATIONS = 100_000;
@@ -156,7 +157,19 @@ export interface InviteLinkParams {
  * a non-hash-routed URL (matches the production share-modal output).
  */
 export function buildInviteLink(params: InviteLinkParams): string {
-  const origin = globalThis.location?.origin ?? 'https://beanies.family';
+  // ⚠️ `shareableOrigin()`, never `location.origin`. Inside the iOS shell the
+  // document origin is `capacitor://app.beanies.family`, a private scheme that
+  // exists only inside that app, so an invite shared FROM the iPhone carried a
+  // link that opened nothing on the recipient's phone. Invisible in every
+  // environment a developer tests in.
+  //
+  // This was the last of three instances and was deliberately left behind when
+  // the other two were fixed, because its fallback was `https://beanies.family`
+  // (the marketing apex) while `/join` lives on the app subdomain, so the swap
+  // was not a pure no-op. That objection no longer applies: `shareableOrigin()`
+  // already falls back to `https://app.beanies.family`, which is the correct
+  // host for this URL and a strict improvement on the apex.
+  const origin = shareableOrigin();
   const search = new URLSearchParams();
   search.set('fam', params.familyId);
   if (params.provider) search.set('p', params.provider);
