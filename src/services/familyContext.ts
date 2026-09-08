@@ -248,11 +248,16 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
     await setLastActiveFamilyId(null);
   }
 
-  // 8. Unregister from remote registry (fire-and-forget)
-  try {
-    const { removeFamily } = await import('@/services/registry/registryService');
-    await removeFamily(familyId);
-  } catch {
-    // Non-critical — remote registry may not be configured
-  }
+  // ⚠️ THE REMOTE REGISTRY ROW IS DELIBERATELY NOT TOUCHED HERE (2026-09-08).
+  // There used to be a step 8 that called `removeFamily(familyId)`. This function
+  // deletes what THIS DEVICE holds — its own confirm copy promises "The original
+  // file is not affected" — but the registry row is shared by the whole family,
+  // so deleting it from here removed the family's canonical pointer for everyone.
+  // The next write from any member then recreated the row with that member
+  // stamped as owner (the Lambda's owner fields are write-once, so whoever writes
+  // first wins). That is how greg's pod reported an owner he never transferred to.
+  //
+  // Remote removal now lives ONLY at the owner-gated full-family deletion in
+  // SettingsPage, called explicitly and awaited there. See
+  // docs/investigations/2026-09-08-compaction-fallout.md.
 }

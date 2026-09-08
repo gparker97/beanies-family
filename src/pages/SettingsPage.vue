@@ -44,6 +44,7 @@ import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue
 import { usePodExport } from '@/composables/usePodExport';
 import { usePodCompaction } from '@/composables/usePodCompaction';
 import CompactionProgressModal from '@/components/settings/CompactionProgressModal.vue';
+import { removeFamily } from '@/services/registry/registryService';
 import { usePodHealth } from '@/composables/usePodHealth';
 import { showToast } from '@/composables/useToast';
 import { requireReauth, canStepUp } from '@/composables/useReauth';
@@ -1228,20 +1229,38 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       }
     }
 
-    // 3. Delete local family (IndexedDB, passkeys, file handles, registry, etc.)
+    // 3. Remove the SHARED registry row. Must run BEFORE the local delete and
+    //    the auth teardown below: after step 4 there is no session left to
+    //    authorise it, and after 2026-09-08 `deleteLocalFamily` no longer does
+    //    it (it is a per-device action and the row belongs to the whole family).
+    //
+    //    Awaited and SURFACED, never swallowed: we are about to tell the user
+    //    their family is gone from everywhere, so "everywhere" had better be
+    //    true, and if it is not they need to know which part survived.
+    const registryRemoved = await removeFamily(familyId);
+    if (!registryRemoved) {
+      reportError({
+        surface: 'registry',
+        severity: 'warning',
+        message: 'family deleted but its registry row could not be removed',
+        context: { action: 'delete-failed', error_code: 'delete-family' },
+      });
+    }
+
+    // 4. Delete local family (IndexedDB, passkeys, file handles, local registry)
     await familyContextStore.deleteLocalFamily(familyId);
 
-    // 4. Auth teardown
+    // 5. Auth teardown
     await authStore.signOutAndClearData();
 
-    // 5. Track deletion — BEFORE the store reset, not after. `resetAllAppStores`
+    // 6. Track deletion — BEFORE the store reset, not after. `resetAllAppStores`
     // calls `clearDemoSession()`, which sets `isDemoSession` false, so a call
     // placed after it sails straight past `track()`'s demo guard: an App Store
     // or Play reviewer exercising Delete Family in the demo pod would emit a
     // real `family_deleted` into the production property.
     track('family_deleted');
 
-    // 6. Reset all Pinia stores
+    // 7. Reset all Pinia stores
     resetAllAppStores();
 
     // 7. Farewell

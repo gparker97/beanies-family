@@ -239,19 +239,20 @@ describe('Password Cache - syncStore integration', () => {
     expect(syncStore.hasSessionPassword).toBe(false);
   });
 
-  it('should clear cached password on disconnect', async () => {
+  it('should clear the cached password when the family is torn down', async () => {
+    // Was 'should clear cached password on disconnect' and drove
+    // `syncStore.disconnect()`, which was deleted on 2026-09-08 as dead code
+    // (no production caller, and it removed the family's SHARED registry row).
+    // The behaviour that mattered is this one, so it is asserted directly rather
+    // than through a function nothing called.
     const settingsStore = useSettingsStore();
-    const syncStore = useSyncStore();
 
-    // Trust and cache a password
     await settingsStore.setTrustedDevice(true);
     await settingsStore.cacheFamilyKey('cached-pw', 'family-123');
     expect(await settingsStore.getCachedFamilyKey('family-123')).toBe('cached-pw');
 
-    // Disconnect
-    await syncStore.disconnect();
+    await settingsStore.clearCachedFamilyKey('family-123');
 
-    // Cached password should be cleared for the active family
     expect(await settingsStore.getCachedFamilyKey('family-123')).toBeNull();
   });
 });

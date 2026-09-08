@@ -15,6 +15,7 @@ import { setActivePinia, createPinia } from 'pinia';
 const {
   deliverFileMock,
   deleteLocalFamilyMock,
+  removeFamilyMock,
   deleteDriveFileMock,
   signOutMock,
   showToastMock,
@@ -33,6 +34,7 @@ const {
       }) as import('@/utils/shareOrDownloadFile').ShareOrDownloadResult
   ),
   deleteLocalFamilyMock: vi.fn(async () => {}),
+  removeFamilyMock: vi.fn(async () => true),
   deleteDriveFileMock: vi.fn(async () => {}),
   signOutMock: vi.fn(async () => {}),
   showToastMock: vi.fn(),
@@ -85,6 +87,14 @@ vi.mock('@/services/google/googleAuth', async (importOriginal) => ({
   shouldUseRedirectAuth: () => false,
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+
+// The owner-gated full deletion now removes the family's SHARED registry row
+// itself, explicitly and before the local teardown (2026-09-08): the per-device
+// `deleteLocalFamily` no longer does it, because that row belongs to the whole
+// family. Unmocked, this would reach a real `fetch`.
+vi.mock('@/services/registry/registryService', () => ({
+  removeFamily: removeFamilyMock,
+}));
 
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({
@@ -145,6 +155,15 @@ describe('SettingsPage — delete family export gate', () => {
 
     expect(deliverFileMock).toHaveBeenCalledTimes(1);
     expect(deleteLocalFamilyMock).toHaveBeenCalledWith('fam-1');
+
+    // The SHARED registry row is removed here, and only here. It must run before
+    // the local teardown: after `signOutAndClearData` there is no session left to
+    // authorise it. Pinned because the per-device `deleteLocalFamily` used to do
+    // this, which is how a pod came to report an owner it never had (2026-09-08).
+    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1');
+    expect(removeFamilyMock.mock.invocationCallOrder[0]).toBeLessThan(
+      deleteLocalFamilyMock.mock.invocationCallOrder[0]!
+    );
   });
 
   it('aborts the deletion when the export FAILED', async () => {

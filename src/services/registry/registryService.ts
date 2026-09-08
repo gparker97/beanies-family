@@ -29,9 +29,13 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
   /**
    * Transient, like `isLoginEvent` — never stored. Marks the ONE write that
    * accompanies family creation, which is the only write permitted to stamp
-   * `signupPlatform`. Row existence cannot stand in for this: `disconnect()`
-   * deletes the row, so a reconnect from another platform would otherwise
-   * relabel the family permanently.
+   * `signupPlatform`. Row existence cannot stand in for this: a DELETE used to
+   * drop the row outright, so a reconnect from another platform would otherwise
+   * relabel the family permanently. (`syncStore.disconnect()`, cited here until
+   * 2026-09-08, is deleted; `deleteLocalFamily` no longer removes the shared row
+   * either. The flag stays because the owner-gated full deletion can still
+   * remove a row, and because the guarantee should not rest on which callers
+   * happen to exist this week.)
    */
   isSignupEvent?: boolean;
 };
@@ -172,15 +176,53 @@ export async function registerFamilyOrThrow(
 }
 
 /**
- * Remove a family from the registry.
- * Fire-and-forget — failures are logged but never block the caller.
+ * Remove a family from the registry. Returns whether the row is actually gone.
+ *
+ * ⚠️ ONLY the owner-gated full-family deletion may call this. It removes the
+ * SHARED row for the whole family, not anything device-local. Until 2026-09-08
+ * `familyContext.deleteLocalFamily` called it too, so "Delete Local Family Data"
+ * on the login picker — whose own confirm copy promises "The original file is not
+ * affected" — deleted the family's registry row, and the next write from any
+ * member recreated it with that member stamped as the owner. That is how greg's
+ * pod reported a new owner it never had.
+ *
+ * ⚠️ NO LONGER FIRE-AND-FORGET. The response used to be discarded entirely, so a
+ * non-2xx was perfectly silent; the caller told the user their data was gone
+ * while the row sat there. It returns a boolean now and the caller must surface a
+ * false. `features.registry` off returns true: there is no row to remove, so
+ * nothing failed.
  */
-export async function removeFamily(familyId: string): Promise<void> {
-  if (!features.registry) return;
+export async function removeFamily(familyId: string): Promise<boolean> {
+  if (!features.registry) return true;
 
   try {
-    await request('DELETE', familyId);
+    const res = await request('DELETE', familyId);
+    if (!res.ok) {
+      console.warn(`[registry] removeFamily refused — HTTP ${res.status}`);
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: 'family delete refused',
+        context: { action: 'delete-failed', http_status: res.status },
+      });
+      return false;
+    }
+    logEvent({
+      level: 'info',
+      surface: 'registry',
+      message: 'family removed from registry',
+      context: { action: 'delete' },
+    });
+    return true;
   } catch (err) {
     console.warn('[registry] removeFamily failed — registry unavailable', err);
+    logEvent({
+      level: 'warn',
+      surface: 'registry',
+      message: 'family delete threw',
+      context: { action: 'delete-failed' },
+      error: err,
+    });
+    return false;
   }
 }
