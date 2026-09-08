@@ -12,7 +12,7 @@
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
-import { isPermanentRefreshFailure } from './refreshFailure';
+import { isPermanentRefreshFailure, isRefreshRejection } from './refreshFailure';
 import { revokeGrant, logTokenLifecycle } from './googleRevoke';
 import { encodeRedirectState, type RedirectMode, type RedirectGrant } from './redirectState';
 import {
@@ -587,6 +587,10 @@ async function reconcileDepartedAccount(familyId: string): Promise<void> {
  */
 async function teardownDepartedAccount(prev: LastGoogleAccount): Promise<void> {
   // 1. Revoke the old grant (whole-grant: kills old Drive + Calendar together).
+  // ✅ SURVIVING REVOKE 1 of 4 (audit 2026-09-08). Safe: a genuinely DIFFERENT
+  // Google account is taking over this device, so the departing account's grant
+  // is not one anybody here still wants. Whole-grant is the intent, not a
+  // side effect.
   try {
     const stored = await getGoogleRefreshToken(prev.familyId);
     await revokeGrant(stored?.token, { grant: 'drive', trigger: 'account-change' });
@@ -1010,16 +1014,38 @@ async function performPopupAuth(
 
   const prompt = options?.forceConsent ? 'consent' : 'select_account';
 
-  // Revoke-before-mint (#62): a forced consent MINTS a brand-new refresh token.
-  // Revoke the one it replaces FIRST so the account's live-token count stays flat
-  // and Google's 100-token FIFO cap never evicts a working token. Fire-and-forget:
-  // `revokeGrant` is idempotent + offline-durable, so it must not block sign-in,
-  // and it runs strictly BEFORE the consent because a whole-grant revoke after the
-  // exchange would kill the token we just minted. Only forced-consent seams mint.
+  // ⚠️ NO REVOKE-BEFORE-MINT HERE. Removed 2026-09-08; do not reinstate without
+  // reading this comment and `docs/investigations/2026-09-08-compaction-fallout.md`.
+  //
+  // This used to revoke the prior token whenever `forceConsent` was set, to keep
+  // the account's live-token count flat under Google's ~100-token FIFO cap (#62).
+  // The cost was far larger than the benefit: Google's revoke endpoint is
+  // WHOLE-GRANT for the (user, client_id) pair (see `googleRevoke.ts` header), and
+  // Drive and Calendar share one client_id, so every reconnect killed the grant on
+  // EVERY device of that account and on the calendar too. Since #62 the fleet
+  // converges on one mirrored refresh token per family (`driveTokenRecovery.ts`),
+  // so one revoke here put every other device into a consent screen, whose own
+  // revoke then killed this one: a ping-pong that cost greg a re-consent every few
+  // hours across four devices.
+  //
+  // What we gave up, stated plainly: nothing keeps the token pool flat on a forced
+  // consent any more. Judged the better trade — the eviction needs ~100 accumulated
+  // tokens for one account, while the revoke was deterministic on every reconnect,
+  // and the `signout` / `explicit-disconnect` / `account-change` revokes still tidy
+  // the pool. If eviction turns out to be real, the fix is a token-hygiene pass, NOT
+  // a revoke here; Google offers no narrower revoke than whole-grant.
+  //
+  // Watch `token_op: 'revoke'` + `token_outcome: 'skipped'` against
+  // `surface: 'drive-token-silent-reconnect'` failures. If both climb together, the
+  // #62 cap is biting and this decision needs revisiting.
   if (options?.forceConsent) {
-    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    const prior = (await getGoogleRefreshToken(storageKey))?.token;
-    void revokeGrant(prior, { grant: 'drive', trigger: 'reconnect' });
+    logTokenLifecycle({
+      grant: 'drive',
+      op: 'revoke',
+      outcome: 'skipped',
+      reason: 'reconnect-revoke-removed',
+      trigger: 'reconnect',
+    });
   }
 
   const authUrl = buildAuthUrl(
@@ -1125,8 +1151,19 @@ export type SilentRefreshReason =
   | 'no-token-stored'
   /** Google rejected the refresh token (`invalid_grant`). A real incident. */
   | 'revoked'
-  /** Every retry attempt failed without a permanent classification (network, 5xx, timeout). */
-  | 'exhausted';
+  /**
+   * Every retry attempt failed and the LAST one was a 4xx rejection from Google.
+   * Counts toward escalation. Renamed in meaning on 2026-09-08: it used to cover
+   * every exhausted run whatever the cause.
+   */
+  | 'exhausted'
+  /**
+   * Every retry attempt failed for a transient reason (network, timeout, 5xx).
+   * Deliberately does NOT count toward escalation, because escalating raises the
+   * reconnect surface and reconnecting forces a Google consent screen — a real
+   * cost to impose for a dropped connection. See `refreshFailure.isRefreshRejection`.
+   */
+  | 'exhausted-transient';
 
 export interface SilentRefreshDiagnostics {
   attempts: SilentRefreshAttemptDiagnostic[];
@@ -1395,12 +1432,32 @@ async function performSilentRefresh(): Promise<string | null> {
       // All retries exhausted. Increment the consecutive-failure counter
       // (persisted across reloads via sessionStorage); when the threshold
       // is crossed, escalate to permanent-failure even though no individual
-      // attempt was classified as `invalid_grant`. The user's experience of
-      // "silent refresh keeps failing forever" is the same regardless of
-      // cause, and the reconnect surface auto-clears when a later refresh
-      // succeeds via the `notifyTokenAcquired` path. `>=` (not `===`)
-      // protects against a counter-overshoot race; the subscriber
+      // attempt was classified as `invalid_grant`. `>=` (not `===`) protects
+      // against a counter-overshoot race; the subscriber
       // (`syncStore.setupTokenExpiryHandler` ref-set) is idempotent.
+      //
+      // ⚠️ ONLY A 4xx COUNTS (2026-09-08). This used to increment on every
+      // exhausted run whatever the cause, on the reasoning that "the user's
+      // experience of silent refresh failing forever is the same regardless of
+      // cause". That reasoning is wrong in the one way that matters: escalating
+      // raises the reconnect surface, and reconnecting FORCES a consent screen.
+      // So an ordinary network drop or a proxy 5xx, twice, put the user through
+      // a Google consent they did not need — and until 2026-09-08 that consent
+      // also revoked the whole grant on every other device. A 4xx means Google
+      // actually refused the exchange; anything else is transient and must stay
+      // retryable (`refreshFailure.ts` header states this contract).
+      if (!isRefreshRejection(errorMessage)) {
+        console.warn(
+          `[googleAuth] Silent refresh exhausted but NOT escalating — transient: ${errorMessage}`
+        );
+        lastSilentRefreshDiagnostics = {
+          attempts: diagnosticAttempts,
+          hadRefreshToken: true,
+          consecutiveFailures: consecutiveSilentRefreshFailures,
+          reason: 'exhausted-transient',
+        };
+        return null;
+      }
       consecutiveSilentRefreshFailures++;
       persistFailureCounter(consecutiveSilentRefreshFailures);
       console.warn(
@@ -1535,6 +1592,8 @@ export async function revokeToken(): Promise<void> {
   // REFRESH token: an offline sign-out queues the revoke, and a queued ACCESS
   // token would expire before the queue drains and leak the grant. Fall back to
   // the access token when none is in memory. `await` preserves ordering.
+  // ✅ SURVIVING REVOKE 2 of 4 (audit 2026-09-08). Safe: the user asked to sign
+  // out. Whole-grant is what "sign out of Google" means.
   const revokeTarget = currentRefreshToken?.token ?? accessToken;
   if (revokeTarget) {
     await revokeGrant(revokeTarget, { grant: 'drive', trigger: 'signout' });
@@ -1544,6 +1603,8 @@ export async function revokeToken(): Promise<void> {
     // be CLEARED un-revoked, leaking a live grant toward Google's per-account
     // cap (#62c). Read it and revoke it first. Best-effort: `revokeGrant` is
     // idempotent + offline-durable and self-logs via `logTokenLifecycle`.
+    // ✅ SURVIVING REVOKE 3 of 4 (audit 2026-09-08). Same sign-out intent as
+    // above; this arm only differs in where the token is read from.
     const stored = await getGoogleRefreshToken(currentFamilyId);
     if (stored?.token) {
       await revokeGrant(stored.token, { grant: 'drive', trigger: 'signout' });
@@ -1636,6 +1697,8 @@ export async function disconnectGoogleEverywhere(): Promise<void> {
   target ??= tokenSnapshot;
 
   if (target) {
+    // ✅ SURVIVING REVOKE 4 of 4 (audit 2026-09-08). Safe: `disconnectGoogleEverywhere`
+    // is the user asking for exactly this. Whole-grant is the feature.
     // Shared helper: idempotent, offline-durable, observable (#62). Awaited — this is
     // an explicit, deliberate action, not a teardown side effect.
     await revokeGrant(target, { grant: 'drive', trigger: 'explicit-disconnect' });
@@ -2100,17 +2163,22 @@ export async function startRedirectAuth(
   const grant: RedirectGrant = opts.grant ?? 'drive';
   const scope = opts.scope; // undefined ⇒ buildAuthUrl's Drive default
 
-  // Revoke-before-mint (#62), Drive only. This redirect always forces consent →
-  // it MINTS a new refresh token; revoke the one it replaces first so the token
-  // pool stays flat. Runs before either arm builds its authorize URL (a whole-
-  // grant revoke after the exchange would kill the freshly-minted token). The
-  // calendar grant is NOT revoked here — its reconnect path owns that (so a Drive
-  // reconnect never disturbs a live calendar grant); see calendarSyncStore. Fire-
-  // and-forget: `revokeGrant` is idempotent + offline-durable.
+  // ⚠️ NO REVOKE-BEFORE-MINT HERE. Removed 2026-09-08 for the reasons spelled out
+  // at the popup seam in `requestAccessToken` above; read that comment first.
+  //
+  // The comment that stood here claimed "a Drive reconnect never disturbs a live
+  // calendar grant". That was FALSE while this revoke existed: the endpoint is
+  // whole-grant per (user, client_id), and Drive and Calendar share a client_id,
+  // so this line killed the calendar token on every device too. It is true now,
+  // as a property of the code rather than an aspiration.
   if (grant === 'drive') {
-    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
-    const prior = (await getGoogleRefreshToken(storageKey))?.token;
-    void revokeGrant(prior, { grant: 'drive', trigger: 'reconnect' });
+    logTokenLifecycle({
+      grant: 'drive',
+      op: 'revoke',
+      outcome: 'skipped',
+      reason: 'reconnect-revoke-removed',
+      trigger: 'reconnect',
+    });
   }
 
   if (isNative()) {
