@@ -4,6 +4,49 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Review the premise, not just the mechanism
+
+**Date:** 2026-09-09
+**Context:** Stage 6 (carry local-only entities across a clean lineage adopt) went
+through the full four-pass plan discipline and then a `/code-review max`. The four
+passes each found real defects and improved the design materially: a test that could
+never reach the code it targeted, a vacuous assertion, a latent post-commit-throw
+hazard, a false comment about Automerge materialization, five hand-copies of one type.
+Every one of those is a finding about the MECHANISM.
+
+None of the four passes asked whether the feature's central inference was true. It was
+not. The carry reasons "absent from the compacted remote, therefore this device created
+it", and scopes itself with `lineageCtx === 'clean'` for safety. But `clean` is
+`headsEqual(basis.heads, headsOf(doc))` — our last-read Drive baseline against our own
+doc heads. It proves _we_ hold nothing the remote has not seen. It says nothing about
+what the remote gained since we last read it. `podLineage.ts`'s own one-line gloss says
+so precisely, and is exactly one direction short of what the carry needed.
+
+Consequence: any device that had merely not polled since a peer's deletions read
+`clean` and resurrected all of them, then republished them to the family. A phone in a
+pocket all day was the textbook case, not an edge case. The whole thing was implemented,
+7166 tests green, and reverted.
+
+The brief had already accepted resurrection as "a false positive costing a resurrected
+entity the user can delete again". That sentence is what let four passes skip the
+question: the risk was pre-labelled ACCEPTED, so each pass reviewed how well the
+mechanism implemented an accepted decision rather than re-testing the decision. The
+magnitude was wrong (common path, unbounded) and the consequences were never
+enumerated: denormalised balances with no recompute path, re-armed OS notifications,
+duplicate calendar events beanies can no longer reach, health records with unreachable
+dangling owners.
+
+**Rule:** before reviewing how a change is built, state its central inference as one
+sentence and try to falsify it against the code that supplies its inputs. If the change
+is guarded by an existing predicate, read that predicate's own doc comment and check it
+proves the direction you need — `clean` proving "we hold nothing new" is not `clean`
+proving "they hold nothing new". And treat a risk the source document marks ACCEPTED as
+un-reviewed rather than settled: verify its magnitude and enumerate its consequences,
+because "the user can just delete it again" is only true when deleting it again is
+possible, reachable, and harmless.
+
+---
+
 ## Verify a fix the way a reviewer would: by driving it, not by reading it
 
 **Date:** 2026-09-09
