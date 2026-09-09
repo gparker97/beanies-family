@@ -827,10 +827,21 @@ export function noteRemoteBaseline(payload: string): void {
 function rebaseOntoRemote(
   local: Doc,
   baselineHeads: Heads,
-  remote: Doc
+  /**
+   * ⚠️ ALREADY MIGRATED, and it must be the CALLER'S one migrate. This used to
+   * take the raw `remote` and call `migrateDoc` itself, which dead-ended the
+   * rollback route: `migrateDoc` emits a real `Automerge.change` on a remote that
+   * predates a collection, marking that handle OUTDATED, and when `buildRebaseOps`
+   * then answered `null` the caller's wholesale-install branch migrated the SAME
+   * handle again and threw `RangeError: Attempting to change an outdated
+   * document`. The whole merge rejected, `doSave` classified it as a blocker and
+   * refused, and the human who had just hand-picked their pre-compaction
+   * `.beanpod` had no way forward — on the one path the policy calls "the only
+   * exit there is". Reproduced against @automerge/automerge 3.4.1.
+   */
+  target: Doc
 ): { doc: Doc; replayed: number; conflicts: number } | null {
   try {
-    const target = migrateDoc(remote);
     const ops = buildRebaseOps(local, baselineHeads, target);
     if (!ops) return null; // cannot compose → the caller blocks
     // Nothing to replay: the peer is level with its baseline, so the remote can
@@ -1018,6 +1029,18 @@ export async function mergeRemoteEnvelope(
    * `user-file` rebase fallback (`adopt-remote`, a NEWER file: nothing to mint).
    */
   let stampNewGeneration = false;
+  /**
+   * The migrated remote, computed AT MOST ONCE per merge.
+   *
+   * ⚠️ `migrateDoc` IS NOT IDEMPOTENT ON ITS INPUT HANDLE. It returns the doc
+   * unchanged when nothing is missing, but otherwise emits an `Automerge.change`,
+   * which marks the input outdated — so a second call on the same handle throws.
+   * Two call sites can be reached in one merge (the rebase target, then the
+   * wholesale install on the `user-file` rebase-unavailable fallback), so the
+   * migrate is memoised here rather than repeated at each site.
+   */
+  let migratedRemote: Doc | null = null;
+  const migrateRemoteOnce = (): Doc => (migratedRemote ??= migrateDoc(remote));
   let priorLineage: PodLineage | null = null;
   // `currentDoc` is non-null here by the assertion above; the check is kept as a
   // type narrowing, not as a second decision.
@@ -1057,7 +1080,22 @@ export async function mergeRemoteEnvelope(
       // never gets here, because it installs before the guard is consulted, and
       // TypeScript has already narrowed it away by this point.
       const baseline = basis.heads;
-      const rebased = baseline ? rebaseOntoRemote(currentDoc, baseline, remote) : null;
+      // ⚠️ THE MIGRATE IS INSIDE THE GUARD, NOT JUST THE COMPOSE. It used to sit
+      // inside `rebaseOntoRemote`'s own try; hoisting it out to fix the
+      // double-migrate dead-end also moved it out of that guard, which broke the
+      // ordering guarantee this branch exists to provide ("a throw anywhere inside
+      // it — the migrate, the compose, the apply — cannot leave the worker holding
+      // an adopted-but-un-rebased document"). Caught by that very test. The
+      // fallback is identical either way: `null`, which blocks, or adopts under
+      // `user-file`.
+      let rebased: { doc: Doc; replayed: number; conflicts: number } | null = null;
+      if (baseline) {
+        try {
+          rebased = rebaseOntoRemote(currentDoc, baseline, migrateRemoteOnce());
+        } catch (e) {
+          console.warn('[applyAndProject] rebase unavailable — the migrate threw:', e);
+        }
+      }
       if (rebased) {
         // Captured from the UNMIGRATED remote, exactly as the branches below
         // do: it describes the bytes on Drive, so the replay cannot taint it.
@@ -1141,7 +1179,7 @@ export async function mergeRemoteEnvelope(
     // the migrated remote, deliberately unlike `compactDoc`'s stamp-into-source:
     // rebuilding here would destroy the history the restore exists to recover.
     // A throw inside the change leaves the old document installed.
-    const adopted = migrateDoc(remote);
+    const adopted = migrateRemoteOnce();
     currentDoc = stampNewGeneration
       ? Automerge.change(adopted, (d) => {
           (d as { podLineage?: PodLineage | null }).podLineage = nextLineage(priorLineage);

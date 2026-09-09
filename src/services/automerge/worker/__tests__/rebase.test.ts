@@ -878,3 +878,34 @@ describe('a restore is a lineage event', () => {
     expect(lineageOf()).toBeUndefined();
   });
 });
+
+describe('the rollback route must never dead-end', () => {
+  it('adopts a legacy remote when the rebase cannot compose, instead of throwing', async () => {
+    // ⚠️ THIS THREW `RangeError: Attempting to change an outdated document` and
+    // rejected the whole merge. `rebaseOntoRemote` migrated `remote` itself; on a
+    // remote that predates a collection that migrate emits a real
+    // `Automerge.change`, marking the handle outdated. When `buildRebaseOps` then
+    // answered `null` (here: an EMPTY baseline, which means "unknown", not "the
+    // beginning of time"), the wholesale-install branch migrated the SAME handle
+    // again and threw. `doSave` classified it as a blocker and refused, so a human
+    // who had just hand-picked their pre-compaction .beanpod had no way forward —
+    // on the one path the policy calls "the only exit there is".
+    //
+    // The migrate is now memoised per merge, so both sites share one call.
+    ap.loadSnapshot(Automerge.save(base()));
+    // A compacted remote MISSING collections, so `migrateDoc` genuinely changes it.
+    const remote = Automerge.from<Doc>({ todos: {}, podLineage: { id: 'L-NEW', seq: 1 } });
+
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', {
+      kind: 'user-file',
+      heads: [],
+    });
+
+    expect(res.action).toBe('adopted');
+    expect(res.rebaseUnavailable).toBe(true);
+    // The human's chosen file landed, and the migration ran exactly once.
+    const doc = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as Doc;
+    expect(doc.podLineage).toEqual({ id: 'L-NEW', seq: 1 });
+    expect(doc.accounts).toEqual({});
+  });
+});
