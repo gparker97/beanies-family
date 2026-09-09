@@ -21,6 +21,27 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
 import { useSyncStore, type BackgroundSyncErrorKind } from '@/stores/syncStore';
 
+/**
+ * Which blocker kinds the user has dismissed the banner for, right now.
+ *
+ * ⚠️ MODULE SCOPE, DELIBERATELY, and it exists to close a hole the banner work
+ * opened. `BackgroundSyncBar` suppresses its toast for kinds that have a banner —
+ * but `dismissed` was a component-local ref, so the bar could not see it. One tap
+ * on Dismiss therefore left a session-ending blocker with NO surface at all:
+ * the banner hidden by `dismissed`, the toast suppressed by a condition whose own
+ * comment claims to check "is a banner ACTUALLY up".
+ *
+ * A `Set` rather than a ref per component because the reader is a different
+ * component from the writer, and the question is about the KIND, not about any
+ * one instance of a banner.
+ */
+const dismissedKinds = new Set<NonNullable<BackgroundSyncErrorKind>>();
+
+/** Has the user dismissed the banner for this kind, for this block? */
+export function isBlockerDismissed(kind: NonNullable<BackgroundSyncErrorKind>): boolean {
+  return dismissedKinds.has(kind);
+}
+
 export interface BlockerLatch {
   /** The pod is latched on THIS banner's kind. */
   blocked: ComputedRef<boolean>;
@@ -33,11 +54,19 @@ export interface BlockerLatch {
 export function useBlockerLatch(kind: NonNullable<BackgroundSyncErrorKind>): BlockerLatch {
   const syncStore = useSyncStore();
 
-  const dismissed = ref(false);
+  const dismissed = ref(dismissedKinds.has(kind));
   const busy = ref(false);
   const blocked = computed(
     () => syncStore.podUnopenable && syncStore.backgroundSyncErrorKind === kind
   );
+
+  // Mirror every dismissal into the module-scope set so the toast layer can see
+  // it. `watch` rather than a setter so a banner that assigns `dismissed = true`
+  // directly — which all three do — stays correct without changing its template.
+  watch(dismissed, (isDismissed) => {
+    if (isDismissed) dismissedKinds.add(kind);
+    else dismissedKinds.delete(kind);
+  });
 
   // A NEW block after a dismissal must speak again — the user dismissed the last
   // one, not every one. `clearPodUnopenable` is the only thing that clears the
@@ -45,7 +74,10 @@ export function useBlockerLatch(kind: NonNullable<BackgroundSyncErrorKind>): Blo
   // the same file as the `blocked` it watches, which is why the two travel
   // together rather than each banner keeping its own copy.
   watch(blocked, (isBlocked) => {
-    if (!isBlocked) dismissed.value = false;
+    if (!isBlocked) {
+      dismissed.value = false;
+      dismissedKinds.delete(kind);
+    }
   });
 
   // `busy` belongs here, not in each banner, because the rule that governs it is
@@ -54,4 +86,9 @@ export function useBlockerLatch(kind: NonNullable<BackgroundSyncErrorKind>): Blo
   // unguarded — the button is not disabled yet and the flag is still false, so
   // two clicks open two dialogs and run two exits.
   return { blocked, dismissed, busy };
+}
+
+/** Test-only: drop every recorded dismissal. */
+export function __resetBlockerDismissalsForTesting(): void {
+  dismissedKinds.clear();
 }

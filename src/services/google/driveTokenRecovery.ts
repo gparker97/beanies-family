@@ -44,6 +44,7 @@ import {
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
+import { PodLineageError } from '@/services/sync/podLineage';
 
 /**
  * The one correctness guard, kept PURE (no I/O, no store access) so it is
@@ -295,10 +296,28 @@ export async function reconnectForWriteRetry(email?: string | null): Promise<boo
  * unchanged forced-consent flow. Never throws.
  */
 export async function tryReconnectSilently(
-  boundEmail: string | null | undefined
+  boundEmail: string | null | undefined,
+  opts?: { assumeStale?: boolean }
 ): Promise<boolean> {
   try {
-    if (isTokenValid()) return true; // already connected
+    // ⚠️ `assumeStale` EXISTS BECAUSE `isTokenValid()` CANNOT ANSWER THIS. It is
+    // a local clock check that never contacts Google, so a grant revoked on
+    // another device still reads valid until its own expiry — and this line then
+    // returns true without acquiring anything, the caller reports success, and
+    // the next request fails identically. An infinite loop with a human in it.
+    //
+    // Observing the 401 in `driveService` covers the case where a Drive request
+    // actually failed, but NOT the prompts raised without one: an account
+    // mismatch (a 404 plus a session check), or `firePermanentFailureCallbacks`.
+    // A user pressing Reconnect is asserting the connection is broken, so their
+    // assertion beats the clock.
+    //
+    // It does NOT destroy the token, which is the point: an earlier fix
+    // invalidated unconditionally here and threw away working credentials when
+    // the button was pressed for an unrelated sync error. Skipping the
+    // short-circuit just means we ASK Google — and if the token really was fine,
+    // the refresh succeeds and installs a fresher one.
+    if (!opts?.assumeStale && isTokenValid()) return true; // already connected
     const familyId = getActiveFamilyId();
     if (!familyId) return false;
 
@@ -311,8 +330,26 @@ export async function tryReconnectSilently(
     const local = await getGoogleRefreshToken(familyId);
     const tried = new Set<string>();
 
-    /** Adopt a candidate token and see whether Google accepts it. */
+    /**
+     * Adopt a candidate token and see whether Google accepts it.
+     *
+     * ⚠️ REFUSES AN OLDER COPY. `restoreLocalFromDoc` writes to IndexedDB and
+     * primes memory BEFORE anything validates the candidate, so without this an
+     * older mirrored token overwrites a newer local one — and if Google then
+     * answers `invalid_grant`, the permanent branch CLEARS the refresh token and
+     * the device ends its "recovery" with no credential at all. The module header
+     * promises this never clobbers a good local token; `reconcileDriveTokenWithDoc`
+     * exists for the same reason and already uses `isStrictlyNewer`.
+     *
+     * The local token is re-read rather than closed over: step 3 can spend
+     * seconds on a multi-MB download, and a redirect return or the wake listener
+     * may have installed a fresher credential in that window.
+     */
     const adopt = async (tok: StoredRefreshToken): Promise<boolean> => {
+      const current = await getGoogleRefreshToken(familyId);
+      if (current?.token && current.token !== tok.token && !isStrictlyNewer(tok, current)) {
+        return false;
+      }
       await restoreLocalFromDoc(familyId, tok, epochAtStart);
       return (await attemptSilentRefresh()) !== null;
     };
@@ -347,14 +384,23 @@ export async function tryReconnectSilently(
     //    sitting in the remote file, readable, and the only route to it used to
     //    be a consent screen — the storm this work exists to stop.
     //
-    //    WHAT IT EXPLICITLY DOES NOT FIX, and the distinction matters because
-    //    it is easy to expect more of this than it gives: a device whose
-    //    credential is WHOLLY dead cannot read Drive at all, so the fetch
-    //    fails, this returns false, and behaviour is exactly today's. The
-    //    target is narrower than "any permanent failure" — it is precisely
-    //    "can still READ, cannot MERGE". `remote-read-unavailable` counts the
-    //    other half, so an inert step 3 shows up as a number rather than being
-    //    rediscovered months later.
+    //    ⚠️ ITS REACHABLE WINDOW IS NARROW, AND SAYING SO PRECISELY MATTERS —
+    //    it is easy to expect far more of this than it gives. Reading the remote
+    //    file needs a working Drive credential, and steps 1 and 2 have just
+    //    failed to refresh one. So the ONLY state this can serve is: the cached
+    //    ACCESS token is still live (it has up to an hour), every refresh token
+    //    this device can reach is dead, and the pod is lineage-blocked. Outside
+    //    that window the fetch fails, this returns false, and behaviour is
+    //    exactly today's.
+    //
+    //    Two things widen it slightly and deliberately: `reconnect()` passes
+    //    `assumeStale`, so the clock short-circuit no longer hides a live access
+    //    token from steps 1-3; and a peer that rotated recently is exactly the
+    //    case where the remote mirror holds something this device has not tried.
+    //
+    //    `remote-read-unavailable` versus `healed-from-remote` measures the
+    //    split, so an inert step 3 shows up as a number rather than being
+    //    rediscovered months later and argued about from memory.
     //
     //    Dynamic import, deliberately: this module's header states that it
     //    depends only on `googleAuth`'s public surface, `driveRepository` and
@@ -364,9 +410,21 @@ export async function tryReconnectSilently(
     const fromRemoteDocCopy = async (account: string): Promise<boolean> => {
       const syncService = await import('@/services/sync/syncService');
 
-      // Only in the latched state. Everywhere else the ordinary merge is about
-      // to deliver the same document, so a second full download would be waste.
-      if (!syncService.isRemoteBlocked()) return false;
+      // ⚠️ THE LINEAGE CLASS ONLY, not any blocker. `isRemoteBlocked()` is true
+      // for every latch, including the two this must never act on:
+      //
+      //   - `PayloadTooLargeError` — the device could not ALLOCATE the document.
+      //     The latch exists precisely to stop re-downloading megabytes to fail
+      //     the same way, and `readDriveConnections` is a whole-doc decrypt, the
+      //     identical allocation that just failed. On a device whose worker never
+      //     spawned it runs on the MAIN thread.
+      //   - `CorruptPayloadError` — the bytes cannot be decrypted, so this is
+      //     guaranteed to fail while burning a multi-MB download per attempt.
+      //
+      // The target is the device that can READ the file but must not MERGE it,
+      // and that is exactly one class.
+      const blocker = syncService.isRemoteBlocked();
+      if (!(blocker instanceof PodLineageError)) return false;
 
       const connections = await syncService.readRemoteDriveConnections();
       if (!connections) {

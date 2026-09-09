@@ -21,6 +21,7 @@ import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
+import { showToast } from '@/composables/useToast';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { resolveErrorView } from '@/utils/structuredError';
 import { POD_ACCESS_ERRORS, type PodRecoveryAction } from '@/utils/podAccess';
@@ -85,7 +86,18 @@ const handlers: Record<PodRecoveryAction, () => Promise<void>> = {
     //    unreachable — pushing the user to a consent screen every other call
     //    site avoids. See CLAUDE.md § Cloud Auth UX.
     const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
-    if (!reconnectSucceeded(outcome)) return;
+    if (outcome === 'redirecting') return; // the page is on its way to Google
+    if (!reconnectSucceeded(outcome)) {
+      // ⚠️ SAY SOMETHING. A bare `return` made this button a perfect no-op on
+      // `'failed'`: `reconnectError` is set inside the composable but is not
+      // destructured here and appears nowhere in this template, `busy` clears in
+      // the caller's `finally`, and the banner text is unchanged — so a blocked
+      // popup or a cancelled consent left the screen byte-identical to before the
+      // tap. Indistinguishable from a dead button, on a banner whose ONLY
+      // recovery this is.
+      showToast('warning', t('googleDrive.reconnectFailed'));
+      return;
+    }
     await syncStore.verifyPodAccess();
   },
   pickFamilyFile,

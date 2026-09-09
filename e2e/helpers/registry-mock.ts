@@ -37,8 +37,17 @@ export async function mockRegistry(page: Page): Promise<void> {
       return;
     }
     const method = request.method();
-    // URL shape: <API_URL>/family/<familyId>
-    const familyId = decodeURIComponent(request.url().split('/family/')[1] ?? '');
+    // URL shape: <API_URL>/family/<familyId>[?query]
+    //
+    // ⚠️ THE QUERY STRING MUST BE STRIPPED. The DELETE now carries
+    // `?writerMemberId=<uuid>` (see `registryService.request`), and splitting on
+    // '/family/' alone captured it into the key — so `store.delete()` missed the
+    // row stored under the bare id, the route still fulfilled 200, and because
+    // `dataBridge.cleanupActiveFamily` is fire-and-forget by design NOTHING
+    // failed loudly. Every E2E run would have quietly stopped cleaning up after
+    // itself. Parsed through `URL` so a future query param on GET or PUT cannot
+    // reintroduce it.
+    const familyId = decodeURIComponent(new URL(request.url()).pathname.split('/family/')[1] ?? '');
 
     if (method === 'GET') {
       const entry = store.get(familyId);

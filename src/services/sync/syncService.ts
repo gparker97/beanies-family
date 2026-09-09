@@ -2247,7 +2247,15 @@ export async function loadAndParseV4(): Promise<{
  * a property of the provider, not something re-asserted here.
  */
 export async function readRemoteDriveConnections(): Promise<DriveConnection[] | null> {
-  if (!currentProvider || !hasFamilyKey()) return null;
+  // ⚠️ GOOGLE DRIVE ONLY, and the guard is not defensive tidiness. This is a
+  // GOOGLE-TOKEN side channel: without the check it would call `read()` on
+  // whatever provider happens to be installed, including the LOCAL file
+  // provider. A local read whose OS handle has gone stale or unpermissioned is
+  // classified `clearHandle: true`, which WIPES the family's file-handle binding
+  // — a token lookup destroying the user's link to their own pod. This
+  // function's whole reason for existing is a mirrored Drive credential, so a
+  // non-Drive provider has nothing here worth the risk.
+  if (currentProvider?.type !== 'google_drive' || !hasFamilyKey()) return null;
   try {
     const text = await currentProvider.read();
     if (!text) return null;
@@ -2258,7 +2266,22 @@ export async function readRemoteDriveConnections(): Promise<DriveConnection[] | 
     const { connections } = await docClient.readDriveConnections(envelope, { quiet: true });
     return connections;
   } catch (e) {
-    console.warn('[syncService] readRemoteDriveConnections failed — no remote token to adopt', e);
+    // Classified and counted, never console-only. `info`, not `warn`: the
+    // expected reason is a wholly dead credential, which is an ordinary state
+    // for the device this runs on and the caller already emits
+    // `remote-read-unavailable` for it. What would be invisible otherwise is a
+    // read failing for some OTHER reason — an unparseable payload, a Drive 5xx —
+    // and `error_code` is what separates the two.
+    logEvent({
+      level: 'info',
+      surface: 'drive-token-silent-reconnect',
+      message: 'remote beanpod read failed during token recovery',
+      context: {
+        action: 'remote-read-unavailable',
+        error_code: e instanceof Error ? e.name : 'unknown',
+      },
+      error: e instanceof Error ? e : undefined,
+    });
     return null;
   }
 }

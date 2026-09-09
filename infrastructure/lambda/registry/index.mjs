@@ -172,11 +172,24 @@ export async function handler(event) {
       // Remove the fallback only once no pre-split client is in the field.
       const writerMemberId = 'writerMemberId' in body ? body.writerMemberId : body.ownerMemberId;
 
+      // ⚠️ TIER 2 NEEDS THE SAME SPLIT, and missing it opened a hole rather than
+      // closing one. The email arm below is the LEGACY authority for rows
+      // registered between 2026-04-12 and 2026-08-10, which have `ownerEmail` and
+      // no `ownerMemberId`. It used to compare the SIGNED-IN member's email,
+      // because that is what the client sent — so a member device sent its own
+      // address and was refused.
+      //
+      // Once `ownerEmail` started coming from the pod roster, every device sent
+      // the OWNER'S address, which of course matches: the arm would have accepted
+      // a pointer move from any member on every legacy row, which is the exact
+      // family-fork the guard exists to prevent, reported as `pointerAccepted:
+      // true` so nothing pages. Same presence rule as the id above.
+      const writerEmail = 'writerEmail' in body ? body.writerEmail : body.ownerEmail;
+
       const isOwner = existing.ownerMemberId
         ? writerMemberId === existing.ownerMemberId
         : !existing.ownerEmail ||
-          (!!normEmail(body.ownerEmail) &&
-            normEmail(body.ownerEmail) === normEmail(existing.ownerEmail));
+          (!!normEmail(writerEmail) && normEmail(writerEmail) === normEmail(existing.ownerEmail));
 
       // A write that would not CHANGE the pointer is a no-op, not a refusal.
       // This matters: the common case is a member device re-picking the family's
@@ -197,7 +210,7 @@ export async function handler(event) {
           '[registry] pointer write refused',
           familyId,
           String(existing.ownerEmail).split('@')[1],
-          String(body.ownerEmail).split('@')[1],
+          String(writerEmail).split('@')[1],
           String(existing.ownerMemberId ?? '').slice(-6),
           String(writerMemberId ?? '').slice(-6)
         );
@@ -290,6 +303,23 @@ export async function handler(event) {
         signupPlatform:
           existing.signupPlatform ??
           (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
+        // ⚠️ A TOMBSTONE IS ONLY LIFTED BY A WRITE THAT MAY SET THE POINTER.
+        //
+        // `PutItem` replaces the whole item, so simply omitting `deletedAt` made
+        // EVERY write revive a deleted family — including a refused one. A member
+        // device doing an ordinary background register after the owner deleted
+        // the family took the refused branch, wrote `provider: 'local', fileId:
+        // null` (the else-arms above, reading a tombstone that carries no
+        // pointer), and cleared `deletedAt` — resurrecting the row as LIVE with a
+        // pointer at nothing. GET starts answering 200, the metrics count it
+        // again, resume-from-registry dies on the null fileId, and only the owner
+        // can ever repair it. The hard delete could not produce that state, so
+        // this was a regression the tombstone introduced.
+        //
+        // `pointerAccepted` is exactly the right gate: it is true for the owner,
+        // and for a write that would not move the pointer anyway. Anything else
+        // leaves the row deleted, which is what the user asked for.
+        ...(!pointerAccepted && existing.deletedAt ? { deletedAt: existing.deletedAt } : {}),
         updatedAt: now,
       };
       await client.send(

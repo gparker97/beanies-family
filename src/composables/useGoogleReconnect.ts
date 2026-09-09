@@ -94,7 +94,13 @@ export function useGoogleReconnect() {
       // `driveService.driveRequest` now invalidates when Google actually refuses.
       // That covers every consumer of `isTokenValid()`, not just this one, and it
       // never touches a token Google still accepts.
-      if (await tryReconnectSilently(loginHint)) {
+      //
+      // That alone is not enough, though, because not every reconnect prompt
+      // follows an observed 401 — an account mismatch raises one from a 404, and
+      // `firePermanentFailureCallbacks` raises one from no request at all. So the
+      // silent path is asked NOT to trust the local clock here. It still destroys
+      // nothing: if the token really is live the refresh simply succeeds.
+      if (await tryReconnectSilently(loginHint, { assumeStale: true })) {
         outcome = 'recovered';
         return outcome;
       }

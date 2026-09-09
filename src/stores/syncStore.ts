@@ -86,6 +86,7 @@ import {
 import {
   POD_ACCESS_SEVERITY,
   classifyDriveFailure,
+  driveStatusOf,
   evaluatePodMetadata,
   type PodAccessErrorCode,
   type PodAccessFailure,
@@ -2549,6 +2550,11 @@ export const useSyncStore = defineStore('sync', () => {
       // tests PRESENCE, so an omitted field means "a client from before the
       // split" and would silently take the legacy path forever.
       writerMemberId: authStore.currentUser?.memberId ?? null,
+      // The email half of the same question. The server's LEGACY pointer tier
+      // (rows predating `ownerMemberId`) compares emails, and it must compare
+      // this one — `ownerEmail` above is now the roster owner's, which every
+      // device sends identically and which would therefore match for everyone.
+      writerEmail: authStore.currentUser?.email ?? null,
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),
@@ -5130,10 +5136,10 @@ export const useSyncStore = defineStore('sync', () => {
       // this catch to a class identity that a mocked `driveService` does not
       // provide, which is the same trap `classifyDriveFailure` had to be freed
       // from. See `podAccess.driveStatusOf`.
-      const status =
-        typeof (e as { status?: unknown })?.status === 'number'
-          ? (e as { status: number }).status
-          : undefined;
+      // The SAME helper the classifier uses, not a fourth-line copy of it four
+      // lines below a comment pointing at it. Duplicating the read here is
+      // exactly how "two answers to one question" starts again.
+      const status = driveStatusOf(e) ?? undefined;
       const failure = classifyDriveFailure(e);
       const reason: 'auth' | 'not-found' | 'error' =
         failure === 'CONSENT_EXPIRED'

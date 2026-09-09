@@ -7,6 +7,7 @@
  */
 import { ref, watch } from 'vue';
 import { useSyncStore, BANNERED_BLOCKER_KINDS } from '@/stores/syncStore';
+import { isBlockerDismissed } from '@/composables/useBlockerLatch';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -52,8 +53,21 @@ watch(
     // `notePodUnopenable` declines to latch. The banner's gate is
     // `podUnopenable && kind === 'decrypt'`, so neither of those gets one — and
     // suppressing on kind alone would take their only surface away.
+    // ⚠️ AND `!isBlockerDismissed(kind)`, WITHOUT WHICH THIS COMMENT IS A LIE.
+    // The banner's `dismissed` flag was component-local, so this condition could
+    // not see it: one tap on Dismiss hid the banner AND kept the toast
+    // suppressed, leaving a session-ending blocker with no surface at all for the
+    // rest of the session. Nothing on the failed-retry path calls
+    // `clearPodUnopenable`, so the latch never re-arms on its own.
     const kind = syncStore.backgroundSyncErrorKind;
-    if (syncStore.podUnopenable && kind && BANNERED_BLOCKER_KINDS.has(kind)) return;
+    if (
+      syncStore.podUnopenable &&
+      kind &&
+      BANNERED_BLOCKER_KINDS.has(kind) &&
+      !isBlockerDismissed(kind)
+    ) {
+      return;
+    }
 
     // The store resolves a SPECIFIC translated message for a pod that cannot be
     // opened at all ("this device ran out of memory…"). Showing the generic

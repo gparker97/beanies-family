@@ -850,16 +850,26 @@ async function handleDriveRestoreSelected(payload: {
       return;
     }
 
-    // ⚠️ AND ON THIS ARM WE MUST NOT CLEAR, which is the opposite of what an
-    // earlier cut did. That amber slab is the ONLY host of the Reconnect Drive
-    // button, the Force Save button, and the `reconnectError` line naming the
-    // actual cause. Clearing it and then setting `importError` to "beanies needs
-    // you to reconnect your Google account" instructed the user to do the one
-    // thing the UI had just removed, with the reason deleted alongside it.
+    // ⚠️ TWO REVIEW ROUNDS PULLED THIS ARM IN OPPOSITE DIRECTIONS. Writing down
+    // both, because the next reader will otherwise "fix" it back.
     //
-    // No `importError` either: the slab already carries the failure and its
-    // recovery, and adding a second red slab beside it recreates the
-    // two-disagreeing-messages problem in the other direction.
+    // Round 3 said: do not clear. That amber slab hosts the Reconnect Drive and
+    // Force Save buttons, so clearing it and then telling the user to reconnect
+    // instructs them to do the thing the UI just removed.
+    //
+    // Round 4 said: you MUST clear. `syncStore.error` mirrors the service's raw
+    // `lastError`, which on this path is an untranslated exception string —
+    // sometimes carrying two email addresses — and line 924 of this very file
+    // states the rule: never show it to a user. A Chinese-locale user would get
+    // that developer string as their entire message.
+    //
+    // Round 4 wins, and the button is not actually lost: the Restore button that
+    // started this flow is still on the page, so the user's path is "reconnect
+    // failed, try the restore again", which is what the copy says. The raw cause
+    // is not discarded either — it went to the firehose above, which is where a
+    // developer string belongs.
+    syncStore.clearError();
+    importError.value = t('settings.drivePickerAuth');
     return;
   }
 
@@ -1474,16 +1484,20 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         });
       }
     } else {
-      // ⚠️ THE SKIP IS A DECISION AND IT HAS TO BE COUNTED. This is the DEFAULT
-      // path, not an edge: the checkbox above is opt-in, and for a local-file
-      // family it is never even rendered — so an ordinary Delete Family leaves
-      // the shared row standing, resolvable, and counted in the founder metrics
-      // forever. That is the deliberate trade (see `podFileDeleted`'s
-      // declaration), but it was invisible, and its rate is exactly what decides
-      // whether the trade is still the right one.
-      kept.push('registry-row');
+      // ⚠️ COUNTED, BUT NOT REPORTED AS A FAILURE, and the distinction is the
+      // whole point. This is the DEFAULT path: the Drive checkbox is opt-in and
+      // for a local-file family is never even rendered, so an ordinary Delete
+      // Family reaches here. The user chose to keep their family data file, and
+      // the row is that file's pointer — so nothing went wrong and there is
+      // nothing for them to do.
+      //
+      // An earlier cut pushed this into `kept`, which meant every ordinary
+      // deletion ended with "Not everything could be removed for you — get in
+      // touch", at the single most trust-sensitive moment in the app, for a
+      // state the user had asked for. And `warn` on the default path is the
+      // opposite of a usable alerting signal.
       logEvent({
-        level: 'warn',
+        level: 'info',
         surface: 'registry',
         message: 'registry row kept during a family deletion — the pod file survives',
         context: { action: 'delete-family', error_code: 'registry-kept-file-survives' },
@@ -1523,6 +1537,14 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     // one — and false again whenever the Drive delete could not run. A farewell
     // that lies about a deletion is the worst place in the app to be wrong, and
     // it left the user with nothing to act on.
+    if (kept.length) {
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: `family deletion could not remove: ${kept.join(', ')}`,
+        context: { action: 'delete-family', error_code: 'delete-incomplete', count: kept.length },
+      });
+    }
     await showAlert({
       title: 'settings.deleteFamilyFarewellTitle',
       message: kept.length

@@ -11,8 +11,13 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import PodUnreadableBanner from '@/components/common/PodUnreadableBanner.vue';
 import { BLOCKER_BANNER_KIND, BANNERED_BLOCKER_KINDS } from '@/stores/syncStore';
+import {
+  isBlockerDismissed,
+  __resetBlockerDismissalsForTesting,
+} from '@/composables/useBlockerLatch';
 
 const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 
@@ -21,16 +26,28 @@ vi.mock('@/composables/useTranslation', () => ({
 }));
 vi.mock('@/composables/useToast', () => ({ showToast: toastMock }));
 
-const holder = vi.hoisted(() => ({
-  store: {
-    podUnopenable: false,
-    backgroundSyncErrorKind: null as string | null,
-    podBlockMessageKey: null as string | null,
-    backgroundSyncFromFile: vi.fn(async () => 'refreshed'),
-  },
-}));
+interface FakeSyncStore {
+  podUnopenable: boolean;
+  backgroundSyncErrorKind: string | null;
+  podBlockMessageKey: string | null;
+  backgroundSyncFromFile: ReturnType<typeof vi.fn>;
+}
+
+// ⚠️ `reactive`, NOT a plain object, and this is not a detail. `useBlockerLatch`
+// is built on a `computed` and two `watch`es; against a plain holder none of them
+// ever re-evaluates, so the dismissal re-arm had ZERO coverage — which is exactly
+// how a bug shipped where dismissing the banner left the blocker with no surface
+// at all. The sibling `backgroundSyncBarToast.test.ts` learned this first.
+const holder = vi.hoisted(() => ({ store: null as unknown as FakeSyncStore }));
 vi.mock('@/stores/syncStore', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/stores/syncStore')>();
+  const { reactive } = await import('vue');
+  holder.store = reactive<FakeSyncStore>({
+    podUnopenable: false,
+    backgroundSyncErrorKind: null,
+    podBlockMessageKey: null,
+    backgroundSyncFromFile: vi.fn(async () => 'refreshed'),
+  });
   return { ...actual, useSyncStore: () => holder.store };
 });
 
@@ -60,6 +77,7 @@ describe('PodUnreadableBanner — render', () => {
     holder.store.backgroundSyncErrorKind = null;
     holder.store.podBlockMessageKey = null;
     holder.store.backgroundSyncFromFile = vi.fn(async () => 'refreshed');
+    __resetBlockerDismissalsForTesting();
     vi.clearAllMocks();
   });
 
@@ -105,6 +123,7 @@ describe('PodUnreadableBanner — render', () => {
 describe('PodUnreadableBanner — the retry', () => {
   beforeEach(() => {
     holder.store.backgroundSyncFromFile = vi.fn(async () => 'refreshed');
+    __resetBlockerDismissalsForTesting();
     vi.clearAllMocks();
   });
 
@@ -176,6 +195,38 @@ describe('PodUnreadableBanner — the retry', () => {
 
     await wrapper.findAll('button')[1]!.trigger('click');
     expect(wrapper.text()).toBe('');
+  });
+
+  it('a dismissal is VISIBLE to the toast layer, so the block keeps a surface', async () => {
+    // ⚠️ THE HOLE THIS CLOSES. `BackgroundSyncBar` suppresses its toast for kinds
+    // that have a banner. `dismissed` used to be component-local, so the bar
+    // could not see it, and one tap on Dismiss left a session-ending blocker with
+    // NO surface at all — banner hidden, toast suppressed — for the rest of the
+    // session. Nothing on the failed-retry path calls `clearPodUnopenable`, so
+    // the latch never re-arms by itself.
+    block('podTooLarge.inline');
+    expect(isBlockerDismissed('decrypt')).toBe(false);
+
+    const wrapper = mountBanner();
+    await wrapper.findAll('button')[1]!.trigger('click');
+
+    expect(isBlockerDismissed('decrypt')).toBe(true);
+  });
+
+  it('a NEW block after a dismissal speaks again', async () => {
+    block('podTooLarge.inline');
+    const wrapper = mountBanner();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    expect(wrapper.text()).toBe('');
+
+    // The latch clears (a recovery), then a fresh failure arrives.
+    holder.store.podUnopenable = false;
+    await nextTick();
+    expect(isBlockerDismissed('decrypt')).toBe(false);
+
+    holder.store.podUnopenable = true;
+    await nextTick();
+    expect(wrapper.text()).toContain('sync.podUnopenable');
   });
 });
 

@@ -11,7 +11,9 @@ const mockInvalidateAccessToken = vi.fn();
 vi.mock('../googleAuth', () => ({
   getGoogleAccountEmail: () => mockGetGoogleAccountEmail(),
   fetchGoogleUserEmail: (token: string) => mockFetchGoogleUserEmail(token),
-  invalidateAccessToken: () => mockInvalidateAccessToken(),
+  // Compare-and-clear: the caller passes the token THIS request carried, so a
+  // late 401 from a superseded token cannot wipe a fresher one.
+  invalidateAccessTokenIfCurrent: (token: string) => mockInvalidateAccessToken(token),
 }));
 
 import {
@@ -726,6 +728,17 @@ describe('driveRequest — a 401 drops the cached access token', () => {
     global.fetch = mockFetch({ error: { message: 'Invalid Credentials' } }, 401);
     await expect(readFile(mockToken, 'file-1')).rejects.toThrow(DriveApiError);
     expect(mockInvalidateAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the token THAT FAILED, so a late 401 cannot wipe a fresher one', async () => {
+    // ⚠️ Drive calls run concurrently — a photo grid issues one metadata request
+    // per photo. When the grant is revoked the FIRST 401 invalidates, its
+    // caller's recovery installs a new token, and requests 2..N then 401 while
+    // still carrying the OLD one. An unconditional clear there wipes the healthy
+    // replacement: `isTokenValid()` starts reading false on a live grant.
+    global.fetch = mockFetch({ error: { message: 'Invalid Credentials' } }, 401);
+    await expect(readFile('the-stale-token', 'file-1')).rejects.toThrow(DriveApiError);
+    expect(mockInvalidateAccessToken).toHaveBeenCalledWith('the-stale-token');
   });
 
   it('does so on EVERY Drive call, not just reads — there is one door', async () => {
