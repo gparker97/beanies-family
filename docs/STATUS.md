@@ -1985,19 +1985,43 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐ Session 2026-09-08/09 — the compaction fallout: nine findings, four-pass plan, stages 1 + 3 ⭐
+### ⭐ Session 2026-09-09 (2) — the compaction plan is DONE except stage 6 ⭐
 
-> ⭐⭐ **NEXT SESSION: READ `docs/investigations/2026-09-08-compaction-fallout.md`
-> § HANDOFF FIRST.** It carries the stage-by-stage status, every deliberate
-> non-decision with its reason, and the traps. The two that will cost you most if
-> skipped: **stage 6 is NOT already fixed** (the offline-after-compaction rebase
-> that WAS shipped and tested is a different path — see Path A vs Path B), and
-> **the compaction dirty-document class is NOT closed** (`lastSyncTimestamp` was
-> one writer; the calendar reconcile poll is another and is still live).
+> ⭐⭐ **READ `docs/investigations/2026-09-08-compaction-fallout.md` § HANDOFF
+> FIRST** — it has the stage table, every deliberate non-decision with its reason,
+> and the traps.
 >
-> **First action, before any new work:** `/code-review max e6d445af`. Three review
-> rounds each found defects in the previous round's fixes; round three has not
-> been independently reviewed at all.
+> **SIX OF SEVEN STAGES ARE ON `main`. NOTHING IS DEPLOYED.**
+> Stage 2 `f9e3bda6` · §1d `b80adc69` · stage 7 §8/§9 + review round 4 `4a9b524e`
+> · stages 4+5 `623b908d`.
+>
+> ⚠️ **DEPLOY THE STAGE-2 LAMBDA BEFORE THE WEB BUNDLE.** Stage 5 sources the
+> registry owner from the pod roster; against the OLD Lambda every device then
+> sends a value that MATCHES the stored owner, so the canonical-pointer guard is
+> neutered rather than tightened, for every family, until the server catches up.
+> Lambda first, confirm in prod, then web.
+>
+> **Stage 6 is NOT done, and that is greg's decision, made twice.** It gets its own
+> session: `docs/plans/2026-09-09-stage-6-preservation-brief.md` is written and
+> ready to execute. Do not fold it into other work, and do not "discover" it is
+> already fixed — the offline-after-compaction rebase that WAS shipped is a
+> different path (Path A vs Path B in the handoff).
+>
+> **Two things are deliberately gated, not forgotten:**
+>
+> - §2d-ii (the registry DELETE 403) waits on a MEASUREMENT: the Lambda's
+>   `delete would be refused` warn must be quiet for real families for a full
+>   release cycle first. Every pre-stage-4 client sends no writer id.
+> - `promptBelowVersion` stays `0.16` until 0.17 is live on BOTH stores.
+>
+> **Still owed (ops, not code):** re-verify `ownerMemberId` on greg's registry row
+> `ae92950b` once the Lambda and the client are both live. It was hand-NULLed and
+> is re-claimable by whichever device writes next.
+>
+> **The compaction dirty-document class is still NOT closed.** `lastSyncTimestamp`
+> was one writer and `installProvider` was another (both fixed); the calendar
+> reconcile poll is a third and is still live. Sweep for the MECHANISM before
+> touching the compaction gate again.
 
 greg ran the first real pod compaction across a mixed 0.16/0.17 fleet. Compaction worked
 (4MB+ -> ~350KB); nine distinct problems fell out of it. Full record:

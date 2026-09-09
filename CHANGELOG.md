@@ -17,6 +17,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The Refresh button in the Google Drive file list works again.** It had been quietly changed to a version that could not ask for a new connection, so on an older list it did nothing at all and said nothing.
 - **Removing a family now only removes it from the beanies directory when the family's file was actually deleted.** Deciding from what you had asked for, rather than from what happened, meant a delete that failed part-way could still take the directory entry away while the file was sitting there.
 - **Tidying up your family file no longer refuses right after you move it to a new place.**
+- **When beanies cannot open your family file, it now says so and stays on screen.** Six of the seven reasons this can happen — a device out of memory, a damaged file, a file from a newer or older beanies — were announced only in a message that vanished after four seconds, on a screen with no other text. There is a message that waits for you now, on every screen, with a Try again button, and it names the actual reason rather than a generic one.
+- **The family's owner no longer changes.** Whoever wrote to beanies last was being recorded as the owner, and removing a family used to erase the record entirely so the next device to write became the owner by default. The owner now comes from your family's own list of people, so every device gives the same answer, and a removed family keeps who it belonged to.
+- **Opening a recipe someone shared with you no longer asks you to reconnect Google.** A visitor has no connection of ours to repair.
+- **A device that cannot open your family file can now fix its own Google connection**, using the copy other devices in the family have already refreshed, instead of sending you to a Google approval screen.
+- **Deleting your family no longer claims more than it did.** The goodbye message said your data had been removed from all systems even when part of it could not be, which is the default when you keep your family data file.
+- **Reconnecting from the Restore screen keeps the Reconnect button on screen** when it does not work, instead of removing it and then telling you to reconnect. A reconnect that works there no longer says your data was saved, because nothing was saved and the restore still needs starting again.
+- **Moving your family file to a new place no longer uploads it twice.**
 
 ## 2026-09-08
 

@@ -4,6 +4,45 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Widening a return type does not migrate its callers, and a truthy union has no compiler
+
+**Date:** 2026-09-09
+**Context:** `reconnect()` was widened from `boolean` to
+`'recovered' | 'reconnected' | 'redirecting' | 'failed'` specifically so callers
+could not misread it. The change reached four of its six call sites. The other
+two kept `if (!ok)`, and because EVERY arm of the union is a non-empty string,
+that branch became dead code that always takes the success path. So the sites did
+not stay wrong — they got worse, silently:
+
+- The app-wide reconnect prompt showed a green "Reconnected" on a FAILED
+  reconnect, which is verbatim the defect the commit widening the type existed to
+  fix, at the surface most users meet.
+- The login flow cleared its error area and re-ran the pod open against a token it
+  had just invalidated — a silent retry loop at the login gate.
+
+Nothing signalled it. `npm run type-check` exits 0, `npx eslint` reports 0 errors,
+966 tests across the changed areas passed. **This repo has no type-aware linting**
+(`eslint.config.js` sets no `project`/`projectService`), so
+`@typescript-eslint/no-unnecessary-condition` — the one rule that catches an
+always-false condition — cannot run without a slow, invasive config change.
+
+A second trap kept it invisible: the coordinator's test mock still returned the
+retired `true`. A mock that lies about its contract converts a live defect into
+green CI.
+
+**Rule:** when you widen or narrow a return type, `grep` every call site and open
+each one — the compiler only helps when the new type is INCOMPATIBLE with the old
+use, and going from `boolean` to a string union is not. Prefer a shape the caller
+must narrow, and where that is not practical, add a test per call site that
+asserts the NON-success arms. Then prove each test fails against the old code
+before believing it: three of the ones written for this were verified by reverting
+the fix, and one that could not fail was rewritten until it could.
+
+**Corollary:** update the mock in the same commit as the contract. Grep for the
+old return shape in `__tests__` whenever a signature changes.
+
+---
+
 ## Fixing one instance of a defect is not fixing the defect
 
 **Date:** 2026-09-09

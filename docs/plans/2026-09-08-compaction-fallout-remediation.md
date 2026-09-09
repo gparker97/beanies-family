@@ -1116,6 +1116,51 @@ keys already carry.
   Corrected five counts, added the registry pre-flight and post-ship ops steps that actually
   complete the row repair, and recorded the issue-#62 trade-off §1a was silently accepting.
 
+## Outcome (2026-09-09, second session)
+
+**Six of seven stages shipped to `main`. Nothing deployed.** Stage 2 `f9e3bda6`,
+stage 1 §1d `b80adc69`, stage 7 §8/§9 `4a9b524e`, stages 4+5 `623b908d`.
+
+Deviations from this plan, each deliberate:
+
+- **Stage 6 was not built.** greg's decision, twice. The ready-to-execute version
+  is `docs/plans/2026-09-09-stage-6-preservation-brief.md`.
+- **Stages 4 and 5 share one commit.** Separable on the wire, not in a release:
+  both are client-side and reach a device in the same bundle however they are
+  committed. The ordering hazard this plan guards against (5 without 4) cannot
+  occur for that same reason.
+- **§2d-ii (the DELETE 403) is not shipped.** This plan gates it on a measurement
+  — the Lambda's warn must be quiet for real families for a full release cycle —
+  and that cannot be satisfied on the day the warn ships.
+- **§6's `promptBelowVersion` stays `0.16`.** The acceptance criterion says 0.17;
+  it is superseded by the standing decision not to prompt before a version is live
+  on both stores. 0.17 is TestFlight + Play open testing only.
+- **The Lambda's compat fallback is presence-based, not `??`** as §2d-i sketched.
+  With `??`, a current client sending `writerMemberId: null` would fall back to
+  `ownerMemberId` — which from stage 5 is the ROSTER owner, a value any device
+  holding the decrypted pod can compute — handing the guard's own answer to an
+  unauthenticated writer. `'writerMemberId' in body` distinguishes "old client"
+  from "no signed-in member"; only the first may fall back.
+- **Owner fields are sent as `null` rather than omitted** when no roster owner
+  resolves. The Lambda's preserve-on-omit is `existing.x ?? body.x ?? null`, which
+  treats null and absent identically, so this satisfies §2c-ii's actual
+  requirement (never substitute the local session) with no type churn.
+
+⚠️ **DEPLOY ORDER: the stage-2 LAMBDA BEFORE the web bundle.** Against the old
+server, stage 5's roster-sourced owner MATCHES the stored owner on every device,
+so the pointer guard is neutered rather than tightened until the server catches
+up.
+
+**Still owed (ops):** re-verify `ownerMemberId` on greg's row `ae92950b` once both
+halves are live; it was hand-NULLed and is re-claimable until a current client
+stamps it.
+
+A fourth `/code-review max` round over the third round's fixes found fourteen
+findings, all fixed. See `docs/lessons.md` — widening a return type does not
+migrate its callers, and this repo has no type-aware linting to catch it.
+
+---
+
 ## Prompt Log
 
 <details>

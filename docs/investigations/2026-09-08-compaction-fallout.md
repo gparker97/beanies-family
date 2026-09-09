@@ -655,13 +655,54 @@ NOT done, and the traps.
 
 | Stage                | What it is                                                                               | Status                                              |
 | -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| 1 Auth               | remove reconnect revokes, escalation gate, heal a blocked device's token                 | **Mostly done.** §1d NOT done (see below)           |
-| 2 Registry server    | Lambda `ConsistentRead`, tombstone, `writerMemberId` guard, + `pull_registry.mjs` filter | **Not started**                                     |
+| 1 Auth               | remove reconnect revokes, escalation gate, heal a blocked device's token                 | **DONE** (§1d shipped 2026-09-09, `b80adc69`)       |
+| 2 Registry server    | Lambda `ConsistentRead`, tombstone, `writerMemberId` guard, + `pull_registry.mjs` filter | **DONE** (`f9e3bda6`) — NOT DEPLOYED                |
 | 3 Client fixes       | registry delete, compaction refusal, native Drive, invite link, telemetry                | **DONE**                                            |
-| 4 Registry wire      | client sends `writerMemberId` (additive no-op)                                           | **Not started**                                     |
-| 5 Registry semantics | owner fields from the roster + the ops step that finishes greg's row repair              | **Not started**                                     |
+| 4 Registry wire      | client sends `writerMemberId` (additive no-op)                                           | **DONE** (`623b908d`)                               |
+| 5 Registry semantics | owner fields from the roster + the ops step that finishes greg's row repair              | **DONE** (`623b908d`) — the ops re-verify is OWED   |
 | 6 Preservation       | carry local-only entities on adopt                                                       | **Not started, and that is a DECISION — see below** |
-| 7 Surfaces           | recipe-page toast, blocker banner, version floor, DELETE enforcement                     | **Version floor done; §8 §9 §2d-ii not started**    |
+| 7 Surfaces           | recipe-page toast, blocker banner, version floor, DELETE enforcement                     | **§8 §9 + floor DONE (`4a9b524e`); §2d-ii GATED**   |
+
+### Updated 2026-09-09 (second session)
+
+Every stage except 6 has shipped to `main`. **Nothing is deployed.** Three things
+are deliberately still open, and none of them is an oversight:
+
+- **§2d-ii, the DELETE 403.** Gated on a MEASUREMENT, not on effort. The stage-2
+  Lambda logs `[registry] delete would be refused` and still deletes; enforce only
+  once that line is quiet for real families for a full release cycle. Every client
+  older than stage 4 sends no writer id at all — including the Playwright teardown
+  hook, silently, because it is fire-and-forget.
+- **The version floor stays `0.16`.** Unchanged and still correct: 0.17 is
+  TestFlight + Play open testing only. Raise it on the first WEB deploy after 0.17
+  is live on BOTH stores.
+- **Stage 6.** greg's decision, twice — see below, and
+  `docs/plans/2026-09-09-stage-6-preservation-brief.md` for the ready-to-execute
+  version.
+
+⚠️ **DEPLOY ORDER IS NOT OPTIONAL. The stage-2 LAMBDA MUST GO FIRST.** Stage 5
+sources the registry's owner fields from the pod roster. Against the OLD Lambda,
+whose guard compares `body.ownerMemberId` to the stored owner, every device now
+sends the roster owner and therefore every device MATCHES — the pointer guard is
+neutered rather than tightened, on every family, for as long as the client is
+ahead of the server. Deploy `f9e3bda6`'s Lambda, confirm it in prod, then ship the
+web bundle.
+
+⚠️ **STILL OWED: greg's row `ae92950b`.** Both owner fields were deliberately
+NULLed by hand and the row is re-claimable by whichever device writes next. Once
+the Lambda AND the client are both live, re-check `ownerMemberId`: it should be
+greg's roster-owner id. If a pre-stage-5 device re-claimed it with something else,
+NULL it again and let a current client stamp it.
+
+A fourth `/code-review max` round ran over the third round's fixes and found
+fourteen findings, all fixed in `4a9b524e`. The headline: `reconnect()`'s widening
+from boolean to a string union had been applied to four of its six call sites, and
+because every arm of the union is truthy, the two that kept `if (!ok)` went from
+wrong on one arm to wrong on two with nothing to signal it — type-check clean,
+eslint clean, tests green, and the app-wide reconnect prompt showing "Reconnected"
+in green on a failed reconnect. **There is no type-aware linting in this repo**, so
+that class cannot be caught by the compiler; the call sites carry tests instead,
+and each was verified by experiment to fail against the old code.
 
 Shipped commits: `a21f2bb6`, `4fff34e5`, `94f4a30d`, `1db5f446`, `87bfc738`,
 `675602e7`, `31a90180`, `e6d445af` (+ two docs commits). NOT DEPLOYED.

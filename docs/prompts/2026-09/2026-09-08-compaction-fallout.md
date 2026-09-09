@@ -72,3 +72,71 @@ asked and then REVERTED, because 0.17 is TestFlight and open testing only and a 
 decision plus the runbook both say not to prompt before a version is live on both stores; and
 `ownerMemberId` was left null rather than set, because the Lambda treats it as write-once and a
 wrong value would permanently refuse greg's own pointer writes.
+
+---
+
+## Session 3 — 2026-09-09 (second session)
+
+**Prompt (07:20, verbatim):**
+
+> Please work autonomously to complete all the work remaining in the 7 stage plan that was
+> started in the previous session. Read the plans carefully, reason completely about what is
+> the owning layer and where to actually apply your work, and take as much additional time to
+> reason as necessary especially for risky changes. proceed with implementation and once done
+> run code reviews to review and fix the code implemented until you are satisfied with the
+> implementation and it is ready for manual review. start with /code-review max c03f3e8e and
+> once done proceed to review and complete the remaining stages.
+
+**Category:** implementation + review
+**Plan:** `docs/plans/2026-09-08-compaction-fallout-remediation.md`
+
+### Clarification asked, and why
+
+One question was put to greg mid-session, on stage 6. The handoff written earlier the same day
+recorded his decision to hold it — "if it is built, it gets its OWN session and its OWN review,
+never appended to other work" — and "complete all the work remaining" read naturally as
+including it. Proceeding under either assumption was costly: implementing it would touch the
+adopt path against a same-day decision not to, and skipping it would leave requested work
+undone. **greg chose: build it, but in a fresh session.** So
+`docs/plans/2026-09-09-stage-6-preservation-brief.md` was written instead of the code.
+
+## Outcome — session 3
+
+Six of seven stages are on `main`, none deployed.
+
+- **Stage 2** (`f9e3bda6`) — Lambda: pointer guard on the WRITER with a presence-based (not
+  `??`) compat fallback, `ConsistentRead` on all three reads, DELETE tombstones instead of
+  dropping, the DELETE ladder warning without enforcing, plus the founder-metrics scan filter
+  the tombstone would otherwise corrupt. 64 tests.
+- **Stage 1 §1d** (`b80adc69`) — a lineage-blocked device heals its Drive token from the remote
+  envelope. Needed a new read-only worker op that returns connections and never a document.
+- **Stage 7 §8 §9 + review round 4** (`4a9b524e`) — reconnect suppressed on public routes; one
+  persistent banner for all seven `decrypt` blockers, mounted outside the layout so it covers
+  `noChrome` routes; and the fourteen review findings.
+- **Stages 4 + 5** (`623b908d`) — `writerMemberId` on the wire, owner fields from the pod
+  roster. Combined deliberately: both are client-side and reach a device in the same bundle
+  regardless of how they are committed.
+
+### The fourth review round
+
+`/code-review max c03f3e8e` found fourteen findings and they were not marginal. The central one:
+`reconnect()`'s widening from `boolean` to a string union had been applied to four of six call
+sites, and because every arm is truthy the two that kept `if (!ok)` went from wrong on one arm
+to wrong on two — with type-check clean, eslint clean and tests green. The app-wide reconnect
+prompt showed "Reconnected" in green on a failed reconnect. A lesson is in `docs/lessons.md`.
+
+Two fixes were moved to their owning layer rather than patched again: the 401 that invalidates
+the cached access token now fires in `driveService.driveRequest`, the only place that learns
+Google refused, instead of at one UI button where it destroyed working tokens; and the reconnect
+outcome is emitted once in the composable rather than at six call sites that between them made
+the success rate unmeasurable.
+
+### Deviations and holds, all stated at the time
+
+- **Stage 6 not built** — greg's call, twice. Brief written instead.
+- **§2d-ii (the DELETE 403) not shipped** — the plan gates it on a measurement that needs a full
+  release cycle of quiet, not on effort.
+- **The version floor stays `0.16`** — unchanged; 0.17 is still TestFlight and open testing only.
+- **Stages 4 and 5 share a commit** — separable on the wire, not in a release.
+- **Nothing pushed or deployed** — not asked for. The stage-2 Lambda must go to prod BEFORE the
+  web bundle, or stage 5 neuters the pointer guard it is meant to tighten.
