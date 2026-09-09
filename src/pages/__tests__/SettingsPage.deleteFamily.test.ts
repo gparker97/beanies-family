@@ -168,17 +168,22 @@ describe('SettingsPage — delete family export gate', () => {
     expect(removeFamilyMock).not.toHaveBeenCalled();
   });
 
-  it('does NOT tell the user their data is gone from everywhere when the row stays', async () => {
-    // ⚠️ THE FAREWELL USED TO ASSERT "deleted from all systems" UNCONDITIONALLY,
-    // including on this — the DEFAULT — path, where the pod file and its registry
-    // row both survive by design. Keeping them is a defensible trade; telling the
-    // user the opposite is not, and it is the last thing the app ever says to
-    // them.
+  it('does NOT cry failure on the default path, where nothing failed', async () => {
+    // ⚠️ THIS ASSERTION HAS NOW BEEN WRONG IN BOTH DIRECTIONS, so both are worth
+    // writing down. The farewell first claimed "deleted from all systems"
+    // unconditionally, which is false whenever the row stays. The fix then
+    // flipped every ordinary deletion to "Not everything could be removed for
+    // you — get in touch", which is worse: this IS the default path (the Drive
+    // checkbox is opt-in, and never rendered at all for a local-file family), the
+    // user CHOSE to keep their family data file, and nothing went wrong.
+    //
+    // "Could not" is reserved for something the user asked for that did not
+    // happen. Keeping the file they kept is not that.
     const wrapper = await mountPage();
     await runDeleteWithExport(wrapper);
 
     expect(alertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'settings.deleteFamilyFarewellPartialMsg' })
+      expect.objectContaining({ message: 'settings.deleteFamilyFarewellMsg' })
     );
   });
 

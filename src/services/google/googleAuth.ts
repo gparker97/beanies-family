@@ -1151,6 +1151,21 @@ export function invalidateAccessToken(): void {
 }
 
 /**
+ * Drop the cached access token ONLY if it is still the one that just failed.
+ *
+ * ⚠️ COMPARE-AND-CLEAR, because Drive calls run concurrently. A photo grid issues
+ * one metadata request per photo; when the grant is revoked, the FIRST 401
+ * invalidates, its caller's recovery installs a fresh token, and then requests
+ * 2..N — still carrying the old one — 401 in turn. An unconditional invalidate
+ * there wipes the healthy replacement: `isTokenValid()` starts reading false on a
+ * live grant, the reconnect prompt can re-raise, and the next silent refresh runs
+ * a redundant ladder that pushes the escalation counter toward its threshold.
+ */
+export function invalidateAccessTokenIfCurrent(token: string): void {
+  if (accessToken === token) invalidateAccessToken();
+}
+
+/**
  * Get the current access token. Returns null if not valid.
  */
 export function getAccessToken(): string | null {

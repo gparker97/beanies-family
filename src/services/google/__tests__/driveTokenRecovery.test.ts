@@ -6,6 +6,8 @@ import {
   getDriveConnectionByAccount,
 } from '@/services/automerge/repositories/driveRepository';
 import type { StoredRefreshToken } from '@/services/sync/fileHandleStore';
+import { PodLineageError } from '@/services/sync/podLineage';
+import { PayloadTooLargeError } from '@/types/sync';
 
 // ── Mock the heavy auth deps; use the REAL docService + driveRepository ────────
 const primeRefreshToken = vi.fn();
@@ -47,6 +49,10 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 // Step 3 reaches `syncService` through a DYNAMIC import, so the factory is only
 // ever evaluated on the path that takes it.
+// ⚠️ A REAL `PodLineageError`, not `{ blockCode: 'lineage' }`. Step 3 gates on the
+// CLASS, because `isRemoteBlocked()` is also true for an out-of-memory or corrupt
+// latch — states where re-downloading a multi-MB pod and re-running the same
+// whole-doc decrypt is precisely what the latch exists to prevent.
 let remoteBlocked: object | null = null;
 const readRemoteDriveConnections = vi.fn<() => Promise<unknown[] | null>>();
 vi.mock('@/services/sync/syncService', () => ({
@@ -295,7 +301,7 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
 
   it('adopts a newer token from the remote pod when the pod is LATCHED', async () => {
     bothLocalCopiesDead();
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue([REMOTE_ENTRY]);
     // The adopt attempt is the one that succeeds.
     attemptSilentRefresh
@@ -315,6 +321,20 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     );
   });
 
+  it('does NOT read the remote pod on a MEMORY or CORRUPT latch', async () => {
+    // ⚠️ THE LATCH IS NOT ONE THING. `isRemoteBlocked()` is true for every
+    // blocker class, and two of them are states where a second full download plus
+    // another whole-doc decrypt is exactly what must not happen: the device that
+    // could not ALLOCATE the document, and bytes that cannot be decrypted at all.
+    // The first is the Galaxy Tab case that started this investigation, and on a
+    // device whose worker never spawned it would run on the main thread.
+    bothLocalCopiesDead();
+    remoteBlocked = new PayloadTooLargeError('too big', 'load', null);
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(readRemoteDriveConnections).not.toHaveBeenCalled();
+  });
+
   it('does NOT read the remote pod when the pod is not latched', async () => {
     // Everywhere else the ordinary merge is about to deliver the same document,
     // so a second full download would be pure waste.
@@ -329,7 +349,7 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     // The honest limit of step 3: a device that cannot read Drive at all gets
     // today's behaviour. Without the event, an inert step 3 would be invisible.
     bothLocalCopiesDead();
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue(null);
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(false);
@@ -342,7 +362,7 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
 
   it('never re-tries a token this device has already proved dead', async () => {
     bothLocalCopiesDead();
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     // The remote mirrors the very token step 1 just failed on.
     readRemoteDriveConnections.mockResolvedValue([
       { accountEmail: 'greg@example.com', refreshToken: 'local-tok', issuedAt: 9000 },
@@ -353,11 +373,29 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
   });
 
+  it('never overwrites a NEWER local token with an older mirrored one', async () => {
+    // ⚠️ `restoreLocalFromDoc` WRITES BEFORE ANYTHING VALIDATES. Without an age
+    // check an older remote copy lands in IndexedDB and memory first, and if
+    // Google then answers `invalid_grant` the permanent branch CLEARS the refresh
+    // token — so the device ends its "recovery" with no credential at all. The
+    // module header promises this never clobbers a good local token.
+    localToken = { token: 'local-tok', issuedAt: 5000 };
+    attemptSilentRefresh.mockResolvedValue(null);
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
+    readRemoteDriveConnections.mockResolvedValue([
+      { accountEmail: 'greg@example.com', refreshToken: 'older-tok', issuedAt: 1000 },
+    ]);
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(primeRefreshToken).not.toHaveBeenCalled();
+  });
+
   it('never adopts a token belonging to a DIFFERENT Google account', async () => {
     // The per-account invariant holds on the remote read exactly as it does on
     // the local one — a device acting as B must never take A's credential.
     bothLocalCopiesDead();
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue([
       { accountEmail: 'someone-else@example.com', refreshToken: 'other-tok', issuedAt: 9000 },
     ]);
@@ -369,7 +407,7 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
   it('does not reach step 3 at all when there is no bound account', async () => {
     localToken = { token: 'local-tok', issuedAt: 1000 };
     attemptSilentRefresh.mockResolvedValue(null);
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
 
     expect(await tryReconnectSilently(undefined)).toBe(false);
     expect(readRemoteDriveConnections).not.toHaveBeenCalled();
@@ -378,7 +416,7 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
   it('prefers our own doc copy — the remote read is a last resort, not a first', async () => {
     localToken = { token: 'local-tok', issuedAt: 1000 };
     await seedDoc('greg@example.com', 'doc-tok', 2000);
-    remoteBlocked = { blockCode: 'lineage' };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     attemptSilentRefresh
       .mockResolvedValueOnce(null) // step 1
       .mockResolvedValueOnce('access-token'); // step 2 succeeds

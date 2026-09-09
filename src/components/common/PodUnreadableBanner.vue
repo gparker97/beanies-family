@@ -36,6 +36,7 @@ import { useBlockerLatch } from '@/composables/useBlockerLatch';
 import { useSyncStore } from '@/stores/syncStore';
 import { showToast } from '@/composables/useToast';
 import { presentRefreshOutcome } from '@/components/common/refreshOutcome';
+import { logEvent } from '@/services/telemetry';
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
@@ -61,8 +62,25 @@ async function tryAgain(): Promise<void> {
   try {
     const outcome = await syncStore.backgroundSyncFromFile(undefined, { manual: true });
     const { toast } = presentRefreshOutcome(outcome);
+    // ⚠️ A FALLBACK IS REQUIRED, and this component is why. `presentRefreshOutcome`
+    // returns NOTHING for the network and decrypt outcomes, on the explicit
+    // premise that "BackgroundSyncBar already toasts" — a premise this banner's
+    // own arrival made false, because the bar now suppresses that toast for
+    // exactly the latched `decrypt` kinds this component owns. And
+    // `'decrypt-failed'` is the outcome a retry here will MOST often produce: the
+    // latch half-opens, the read fails identically, and it re-latches. Without
+    // this the button would flicker `busy` and say nothing at all.
     if (toast) showToast(toast.type, t(toast.key));
-  } catch {
+    else showToast('warning', t('sync.podUnopenable'));
+  } catch (e) {
+    // Classified, never a bare `catch {}` — CLAUDE.md § Observability rule 2.
+    logEvent({
+      level: 'warn',
+      surface: 'pod-load-failure',
+      message: 'retry from the pod-unreadable banner threw',
+      context: { action: 'banner-retry-failed' },
+      error: e instanceof Error ? e : undefined,
+    });
     showToast('warning', t('sync.backgroundError'));
   } finally {
     busy.value = false;

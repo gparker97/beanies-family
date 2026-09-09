@@ -43,6 +43,18 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
    * silently take the compatibility path forever.
    */
   writerMemberId: string | null;
+  /**
+   * The signed-in member's email on the device making this write, or null.
+   * Transient — never stored.
+   *
+   * ⚠️ REQUIRED FOR THE SAME REASON AS `writerMemberId`, and forgetting it opened
+   * a hole rather than closing one. The server's pointer guard has a LEGACY tier
+   * for rows registered before `ownerMemberId` existed, which compares emails.
+   * Once `ownerEmail` began coming from the pod roster, every device sent the
+   * OWNER'S address, so that tier matched for everyone and any member could move
+   * a legacy row's pointer. This is the value that tier must compare.
+   */
+  writerEmail: string | null;
   isLoginEvent?: boolean;
   /**
    * Transient, like `isLoginEvent` — never stored. Marks the ONE write that

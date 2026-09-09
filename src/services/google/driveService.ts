@@ -5,7 +5,11 @@
  * All functions require a valid access token from googleAuth.ts.
  */
 
-import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
+import {
+  getGoogleAccountEmail,
+  fetchGoogleUserEmail,
+  invalidateAccessTokenIfCurrent,
+} from './googleAuth';
 import { isSafetyCopyName } from '@/constants/compaction';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -689,7 +693,10 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     // no second door. Safe to call unconditionally: the refresh token is
     // untouched, so the silent path still gets its chance, and the caller's own
     // 401 arm (`attemptSilentRefresh`) installs a fresh token moments later.
-    if (status === 401) invalidateAccessToken();
+    // Compare-and-clear against the token THIS request carried: concurrent Drive
+    // calls mean a late 401 from a superseded token would otherwise wipe the
+    // fresh one an earlier 401's recovery just installed.
+    if (status === 401) invalidateAccessTokenIfCurrent(token);
 
     // 404 Not Found or 403 Forbidden both mean "the file isn't accessible to this
     // caller" — photoStore treats these identically (flags the photo as unresolved).
