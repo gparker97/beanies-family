@@ -99,7 +99,7 @@ import {
   createBeanpodV4,
   parseBeanpodV4,
   tryUnwrapFamilyKey,
-  envelopeNeedsRecovery,
+  envelopeCapabilities,
   reEncryptEnvelope,
   UnlockFailedError,
 } from '@/services/sync/fileSync';
@@ -5318,10 +5318,16 @@ export const useSyncStore = defineStore('sync', () => {
       };
     }
 
-    // Phase 4: a kit-born envelope has NO password wraps — a password can never
-    // succeed and `tryUnwrapFamilyKey` would throw "No wrapped keys" (which the
-    // old mapping surfaced as a retrying network-error). Route to recovery.
-    if (envelopeNeedsRecovery(pending.envelope)) {
+    // A password can never open an envelope with no password wraps, and
+    // `tryUnwrapFamilyKey` would throw `UnlockFailedError('no-candidates')` — which this
+    // path used to map to a retrying network-error, i.e. a Try Again button over a
+    // failure retrying can never fix.
+    //
+    // ⚠️ Keyed on `!password`, NOT on `envelopeNeedsRecovery`: that predicate is FALSE
+    // for an envelope carrying no wraps AT ALL, so keying on it let exactly that file
+    // fall through to the password path. `fileSync.ts` names this call site as one of
+    // the three that must use the capability.
+    if (!envelopeCapabilities(pending.envelope).password) {
       return { kind: 'needs-recovery' };
     }
 

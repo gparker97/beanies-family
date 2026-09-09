@@ -53,7 +53,7 @@ import {
 } from '@/services/auth/deviceUnlock';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { envelopeNeedsRecovery, envelopeCapabilities } from '@/services/sync/fileSync';
+import { envelopeCapabilities } from '@/services/sync/fileSync';
 import { stagePendingFile, type StageOutcome } from '@/services/auth/stagePendingFile';
 import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
@@ -155,12 +155,14 @@ export function useLoginFlow(opts: {
 
   /**
    * How long the prove screen will wait for the envelope before deciding without it.
-   * `loginFlow.ts:16-22` states the machine's inversion — prove first, THEN open — and a
-   * prove screen that blocks indefinitely on a Drive round-trip inverts it. On timeout
-   * the offer fails closed and the reconnect route is dispatched, so waiting longer buys
-   * nothing a retry would not.
+   *
+   * A BACKSTOP against a hung promise, not the real bound — the underlying fetch has its
+   * own timeout, so this sits above it deliberately. `loginFlow.ts:16-22` states the
+   * machine's inversion (prove first, THEN open), and a prove screen that blocks
+   * indefinitely on a Drive round-trip inverts it; but timing out is not evidence of
+   * failure, so it withdraws the envelope-dependent offers and nothing else.
    */
-  const STAGE_FOR_PROVE_TIMEOUT_MS = 8000;
+  const STAGE_FOR_PROVE_TIMEOUT_MS = 20_000;
 
   /**
    * Dedupe of the in-flight stage fetch, TAGGED with the family it belongs to.
@@ -455,15 +457,13 @@ export function useLoginFlow(opts: {
       // than a default. Bounded: `loginFlow.ts:16-22` states the machine's inversion —
       // prove first, THEN open — and a prove screen that blocks indefinitely on a Drive
       // round-trip inverts it. Only awaited when the tag matches this family.
-      let stage: StageOutcome = { ok: true };
+      // `undefined` = the stage is STILL IN FLIGHT (we stopped waiting), which is not
+      // the same fact as a failure and must not be reported as one. `raceTimeout`
+      // resolves to undefined on timeout rather than throwing.
+      let stage: StageOutcome | undefined = { ok: true };
       if (!podOpen()) {
         if (stageInFlight?.familyId !== s.familyId) beginStage(s.familyId);
-        // `raceTimeout` RESOLVES to undefined on timeout rather than throwing, so the
-        // `??` is the timeout branch — not a defensive default.
-        stage = (await raceTimeout(stageInFlight!.promise, STAGE_FOR_PROVE_TIMEOUT_MS)) ?? {
-          ok: false,
-          reason: 'error',
-        };
+        stage = await raceTimeout(stageInFlight!.promise, STAGE_FOR_PROVE_TIMEOUT_MS);
       }
       // One derivation for both temperatures: warm, `syncStore.envelope` is live; cold,
       // the stage just populated `pendingEncryptedFile`. A failed stage is reported as
@@ -471,7 +471,7 @@ export function useLoginFlow(opts: {
       // failed" from "we never tried" — they look identical from the offer list alone.
       const derived = currentCapabilities(s.familyId);
       const envelope: CapabilityState =
-        derived.known || stage.ok ? derived : { known: false, reason: 'stage-failed' };
+        derived.known || stage?.ok !== false ? derived : { known: false, reason: 'stage-failed' };
       if (!envelope.known) emitEnvelopeCapabilitiesUnknown(envelope.reason);
 
       const methods = await resolveProveMethods({
@@ -500,7 +500,12 @@ export function useLoginFlow(opts: {
         // different fact. This is what preserves "no behaviour change for legacy
         // families": one with a dead Drive token reaches the reconnect panel a step
         // sooner, rather than a recovery terminal with its password silently withdrawn.
-        if (!stage.ok) dispatch({ type: 'OPEN_FAILED', reason: stage.reason });
+        // ONLY a definite failure routes to the reconnect panel. A slow-but-healthy
+        // download (a large .beanpod on mobile data) resolves after we stopped waiting,
+        // and reporting that as an open failure would push the user to an error screen
+        // for something that is still working. The fetch keeps going; the offer list is
+        // simply resolved without it, and every device-local method is unaffected.
+        if (stage && !stage.ok) dispatch({ type: 'OPEN_FAILED', reason: stage.reason });
       }
       return;
     }
@@ -573,11 +578,14 @@ export function useLoginFlow(opts: {
 
     // 'error' is the only reason that is genuinely unexpected; the other three are
     // ordinary transport states the machine renders a panel for.
-    if (outcome.reason === 'error') {
+    // Only a genuine THROW is reported, and it is reported with its own message and
+    // stack. Reporting a classified `reason: 'error'` too would have made this surface
+    // noisier and less informative at the same time.
+    if (outcome.cause !== undefined) {
       reportError({
         surface: 'login-flow',
         message: 'staging the pod file for prove failed',
-        error: new Error('stage failed'),
+        error: outcome.cause,
         severity: 'warning',
         context: { action: 'stage_failed' },
       });
@@ -588,6 +596,7 @@ export function useLoginFlow(opts: {
 
   function onPickPerson(person: PersonCard): void {
     proveError.value = null;
+    clearLastAttempted();
     dispatch({ type: 'PICK_PERSON', person });
   }
 
@@ -612,6 +621,7 @@ export function useLoginFlow(opts: {
   }
 
   async function onBiometric(): Promise<void> {
+    clearLastAttempted();
     const s = currentProve();
     if (!s || isBusy.value) return;
     proveError.value = null;
@@ -679,6 +689,7 @@ export function useLoginFlow(opts: {
    *    enrol this device's wrap so the NEXT login can use the PIN cold.
    */
   async function onPinSubmit(pin: string): Promise<void> {
+    clearLastAttempted();
     const s = currentProve();
     if (!s || isBusy.value) return;
     const pinMethod = s.methods.find((m) => m.kind === 'pin');
@@ -900,6 +911,16 @@ export function useLoginFlow(opts: {
     dispatch({ type: 'PASSWORD_SUBMITTED', memberId: s.person.id });
   }
 
+  /**
+   * Forget which secret was last typed. Called by every NON-password prove entry point:
+   * `onPinSubmit`'s destroyed / no-record / stale-wrap arms re-enter `prove-loading` with
+   * `proveError` still set, and a stale `'passphrase'` would bring the passphrase field
+   * back with a PIN error above it.
+   */
+  function clearLastAttempted(): void {
+    lastAttempted.value = null;
+  }
+
   function onFellBack(): void {
     dispatch({ type: 'PROVE_FELL_BACK' });
   }
@@ -935,13 +956,17 @@ export function useLoginFlow(opts: {
         const password = pendingPassword;
         if (!podOpen()) {
           if (!(await ensureStaged())) return; // dispatched OPEN_FAILED already (password kept)
-          // Review R2-F4: a KIT-BORN envelope has no password wraps — a password can
-          // never succeed (only the passphrase branch of decryptPendingFile could).
-          // When no passphrase is set either, route to recovery with honest copy
-          // instead of surfacing the raw "No wrapped keys" throw as an error.
+          // A typed secret can only work if the envelope carries a wrap it could match:
+          // a member password wrap, or the recovery passphrase. With neither, route to
+          // recovery with honest copy instead of spending the attempt on a crypto throw.
+          //
+          // ⚠️ Keyed on the CAPABILITIES, not on `envelopeNeedsRecovery`, which is FALSE
+          // for an envelope carrying no wraps at all — the one file this most needs to
+          // catch. Third of the three call sites `fileSync.ts` names.
           {
             const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
-            if (pendingEnv && envelopeNeedsRecovery(pendingEnv) && !pendingEnv.recoveryPassphrase) {
+            const c = pendingEnv ? envelopeCapabilities(pendingEnv) : null;
+            if (c && !c.password && !c.passphrase) {
               pendingPassword = null;
               proveError.value = t('loginFlow.recoveryOnlyBody');
               emitProveOutcome({
