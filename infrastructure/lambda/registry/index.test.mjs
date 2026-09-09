@@ -813,3 +813,150 @@ describe('registry DELETE — the ladder measures, it does not enforce', () => {
     expect(logged).not.toContain(M_B);
   });
 });
+
+describe('registry PUT — the LEGACY email tier asks the writer too', () => {
+  // Rows registered 2026-04-12..2026-08-10 have `ownerEmail` and no
+  // `ownerMemberId`, so the guard falls to the email arm — which never consults
+  // `writerMemberId`.
+  const LEGACY = {
+    ownerEmail: 'owner@example.com',
+    provider: 'google_drive',
+    fileId: 'ORIGINAL',
+  };
+
+  it('REFUSES a member device that sends the roster owner as ownerEmail', async () => {
+    // ⚠️ THE REGRESSION THIS PINS, and it was introduced by the roster change
+    // itself. Once `ownerEmail` came from the pod roster, EVERY device sent
+    // `owner@example.com` — so the legacy tier matched for everyone and any
+    // member could re-point a legacy row at its own private copy, reported as
+    // `pointerAccepted: true` so nothing paged.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-PRIVATE-COPY',
+        ownerEmail: 'owner@example.com',
+        ownerMemberId: M_A,
+        writerEmail: 'member@example.com',
+        writerMemberId: M_B,
+      },
+      LEGACY
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('accepts the real owner on a legacy row, and upgrades it off the email', async () => {
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MOVED',
+        ownerEmail: 'owner@example.com',
+        ownerMemberId: M_A,
+        writerEmail: 'owner@example.com',
+        writerMemberId: M_A,
+      },
+      LEGACY
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.fileId).toBe('MOVED');
+    expect(item.ownerMemberId).toBe(M_A);
+  });
+
+  it('still judges a PRE-SPLIT client on ownerEmail, which is its own address', async () => {
+    // Compatibility: no `writerEmail` in the body at all.
+    const refused = await put(
+      { provider: 'google_drive', fileId: 'MEMBER-COPY', ownerEmail: 'member@example.com' },
+      LEGACY
+    );
+    expect(JSON.parse(refused.res.body).pointerAccepted).toBe(false);
+
+    const accepted = await put(
+      { provider: 'google_drive', fileId: 'MOVED', ownerEmail: 'owner@example.com' },
+      LEGACY
+    );
+    expect(JSON.parse(accepted.res.body).pointerAccepted).toBe(true);
+  });
+
+  it('REFUSES a current client with no signed-in member on a legacy row', async () => {
+    const { res } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'ANON',
+        ownerEmail: 'owner@example.com',
+        ownerMemberId: M_A,
+        writerEmail: null,
+        writerMemberId: null,
+      },
+      LEGACY
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+  });
+});
+
+describe('registry PUT — a tombstone is only lifted by a write that may re-point', () => {
+  const TOMB = {
+    createdAt: '2025-03-01T00:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    deletedAt: '2026-09-09T00:00:00.000Z',
+  };
+
+  it('a REFUSED write leaves the family deleted', async () => {
+    // ⚠️ THE REGRESSION THE TOMBSTONE ITSELF INTRODUCED. `PutItem` replaces the
+    // whole item, so omitting `deletedAt` made every write revive the row —
+    // including a refused one, which writes the else-arms' `provider: 'local',
+    // fileId: null`. The family came back as LIVE with a pointer at nothing:
+    // GET answers 200, the metrics count it forever, resume-from-registry dies
+    // on the null fileId, and only the owner could ever repair it. A hard delete
+    // could not produce that state.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-COPY',
+        ownerMemberId: M_A,
+        writerMemberId: M_B,
+      },
+      TOMB
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.deletedAt).toBe('2026-09-09T00:00:00.000Z');
+    expect(item.fileId).toBeNull();
+  });
+
+  it('the OWNER re-registering does lift it', async () => {
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'FILE-2',
+        ownerMemberId: M_A,
+        writerMemberId: M_A,
+      },
+      TOMB
+    );
+    expect(item.deletedAt).toBeUndefined();
+    expect(item.fileId).toBe('FILE-2');
+    expect(item.createdAt).toBe('2025-03-01T00:00:00.000Z');
+  });
+
+  it('a same-pointer write lifts it too — it is not moving anything', async () => {
+    const { item } = await put(
+      { provider: 'local', ownerMemberId: M_A, writerMemberId: M_B },
+      { ...TOMB, provider: 'local', fileId: null, displayPath: null }
+    );
+    expect(item.deletedAt).toBeUndefined();
+  });
+
+  it('never invents a deletedAt on an ordinary LIVE row, refused or not', async () => {
+    // The preserve is conditional on there BEING a tombstone, so a refused write
+    // to a live row must not stamp one.
+    const refused = await put(
+      { provider: 'google_drive', fileId: 'X', ownerMemberId: M_A, writerMemberId: M_B },
+      { ownerMemberId: M_A, provider: 'google_drive', fileId: 'ORIGINAL' }
+    );
+    expect(JSON.parse(refused.res.body).pointerAccepted).toBe(false);
+    expect(refused.item.deletedAt).toBeUndefined();
+
+    const firstWrite = await put({ ownerMemberId: M_A, writerMemberId: M_A }, null);
+    expect(firstWrite.item.deletedAt).toBeUndefined();
+  });
+});

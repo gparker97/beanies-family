@@ -184,7 +184,7 @@ const VERSION_CODE_FOR_KIND = {
  * on a class identity surviving a mock factory. Same reasoning as
  * `isRemoteBlocker`, which CLAUDE.md records as duck-typed by design.
  */
-function driveStatusOf(e: unknown): number | null {
+export function driveStatusOf(e: unknown): number | null {
   const status = (e as { status?: unknown } | null | undefined)?.status;
   return typeof status === 'number' ? status : null;
 }

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-08",
-    "translationCount": 4657
+    "lastUpdated": "2026-09-09",
+    "translationCount": 4659
   },
   "translations": {
     "app.name": {
@@ -23290,6 +23290,16 @@
       "translation": "再次检查",
       "hash": "fd33m0",
       "lastUpdated": "2026-09-08"
+    },
+    "settings.deleteFamilyFarewellPartialMsg": {
+      "translation": "您的家人已从此设备中删除。并非所有内容都可以为您删除—请联系我们，我们可以完成清理。我们很遗憾看到你离开--每一颗豆子都很重要。",
+      "hash": "g5acjm",
+      "lastUpdated": "2026-09-09"
+    },
+    "settings.reconnectedTryAgain": {
+      "translation": "已重新连接到Google。请尝试重新加载文件。",
+      "hash": "cz300k",
+      "lastUpdated": "2026-09-09"
     }
   }
 }
