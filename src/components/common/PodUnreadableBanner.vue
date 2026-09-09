@@ -79,8 +79,19 @@ async function tryAgain(): Promise<void> {
     //
     // The message is the RETRY's own, not a repeat of the banner title sitting
     // directly above it.
+    // ⚠️ ASK THE STATE, NOT THE OUTCOME NAME. A blanket `else` was wrong (it
+    // claimed a failure for `skipped-in-flight`, where a running sync may yet
+    // succeed) and so was narrowing to `'decrypt-failed'`: a THROWN blocker —
+    // the oversized-pod case this banner most often shows for — comes back as
+    // `'network-failed'` while `notePodUnopenable` sets the kind to `decrypt`,
+    // so that arm never fired and the button said nothing at all.
+    //
+    // The honest question is whether the block is STILL UP after the retry. If
+    // it is, the retry half-opened the latch and hit the same wall, whatever the
+    // outcome happened to be called. If it is not, silence is right: either a
+    // toast already spoke, or a sync is running that may still succeed.
     if (toast) showToast(toast.type, t(toast.key));
-    else if (outcome === 'decrypt-failed') showToast('warning', t('sync.retryFailedStillBlocked'));
+    else if (syncStore.podUnopenable) showToast('warning', t('sync.retryFailedStillBlocked'));
   } catch (e) {
     // Classified, never a bare `catch {}` — CLAUDE.md § Observability rule 2.
     logEvent({

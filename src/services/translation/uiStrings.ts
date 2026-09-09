@@ -4677,10 +4677,15 @@ const STRING_DEFS = {
     en: 'Carry on with the family file?',
     beanie: 'carry on with the family file?',
   },
+  // greg's wording, 2026-09-09. It leads with the attempt — "We tried, but we
+  // could not merge" — because the thing a user needs first is that beanies did
+  // not simply give up on their data, and that framing is what makes the rest of
+  // the dialog read as a consequence rather than a choice they are being blamed
+  // for.
   'podLineage.useFileConfirmMessage': {
-    en: 'This device will take the family file as it now stands, and the changes made here that never reached it will be let go for good. A copy saved first can be read, but it cannot be added back in later.',
+    en: 'We tried, but we could not merge the data on this device with your family file. Data on this device will be replaced with the contents of your family file - please confirm to continue. If you prefer, you can take a backup of your local device data first.',
     beanie:
-      'this device will take the family file as it now stands, and the changes made here that never reached it will be let go for good. a copy saved first can be read, but it cannot be added back in later.',
+      'we tried, but we could not merge the data on this device with your family file. data on this device will be replaced with the contents of your family file - please confirm to continue. if you prefer, you can take a backup of your local device data first.',
   },
   'podLineage.useFileConfirmAction': {
     en: 'Carry on with the family file',

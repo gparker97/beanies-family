@@ -1041,3 +1041,86 @@ describe('registry PUT — the write-once owner stamp needs OWNERSHIP', () => {
     expect(item.ownerMemberId).toBe(M_A);
   });
 });
+
+describe('registry PUT — a deleted family with NO recorded owner', () => {
+  /**
+   * ⚠️ VERIFIED EMPIRICALLY BY A REVIEWER before this test existed: driving the
+   * real handler with `{deletedAt, ownerMemberId: null, ownerEmail: null}` and a
+   * stranger's body returned `pointerAccepted: true`, lifted the tombstone, wrote
+   * the stranger's fileId, and restored the deleted family's name and newsletter
+   * consent.
+   *
+   * The cause is that `isOwner`'s third tier FALLS OPEN — `!existing.ownerEmail`
+   * is true for everyone — which is correct for a live legacy row and
+   * catastrophic for a deleted one. Both earlier tombstone fixtures pinned
+   * `ownerMemberId`, so no test could reach it.
+   *
+   * And it is reachable: the client sends both owner fields null when the roster
+   * is not loaded, which is the background-write-mid-boot path the guard's own
+   * comment names as its trigger.
+   */
+  const ORPHAN_TOMB = {
+    createdAt: '2025-03-01T00:00:00.000Z',
+    ownerMemberId: null,
+    ownerEmail: null,
+    deletedAt: '2026-09-09T00:00:00.000Z',
+  };
+
+  it('refuses a stranger, writes nothing, and stays deleted', async () => {
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'MEMBER-COPY',
+        familyName: 'The Parkers',
+        subscribeNewsletter: true,
+        writerMemberId: M_B,
+        writerEmail: 'member@example.com',
+      },
+      ORPHAN_TOMB
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item).toBeNull();
+  });
+
+  it('does NOT let the reviver take the write-once owner field', async () => {
+    // `ownerMemberId` is permanent and there is no in-app route back, so a
+    // stranger stamping it is worse than the revival itself.
+    const { item } = await put(
+      { provider: 'local', ownerMemberId: M_B, writerMemberId: M_B },
+      ORPHAN_TOMB
+    );
+    expect(item).toBeNull();
+  });
+
+  it('still falls open for a LIVE legacy row with no owner recorded', async () => {
+    // The fall-open tier is correct where it came from: a pre-2026-04-12 row that
+    // has never had an owner must still be claimable by its first writer.
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'FIRST', ownerMemberId: M_A, writerMemberId: M_A },
+      { provider: 'local' }
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.ownerMemberId).toBe(M_A);
+  });
+});
+
+describe('registry PUT — an empty string never latches a write-once identity', () => {
+  it('stores ownerEmail as null, not as an empty string', async () => {
+    // ⚠️ THE POISONING THIS PREVENTS. `ownerEmail` is write-once and `''` is not
+    // nullish, so an empty string latches forever — and the legacy pointer tier
+    // reads `!existing.ownerEmail` as TRUE, falling open for EVERY writer on that
+    // row from then on, with no route back. Guarded on the server as well as the
+    // client because already-deployed clients can still send one.
+    const { item } = await put({ provider: 'local', ownerEmail: '', ownerMemberId: '' }, {});
+    expect(item.ownerEmail).toBeNull();
+    expect(item.ownerMemberId).toBeNull();
+  });
+
+  it('still preserves a real stored ownerEmail', async () => {
+    const { item } = await put(
+      { provider: 'local', ownerEmail: 'someone-else@example.com' },
+      { ownerEmail: 'owner@example.com' }
+    );
+    expect(item.ownerEmail).toBe('owner@example.com');
+  });
+});

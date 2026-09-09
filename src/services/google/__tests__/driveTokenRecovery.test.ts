@@ -16,12 +16,17 @@ let tokenValid = false;
 // Controllable session epoch — bump mid-flight to simulate a sign-out between the
 // async doc read and the adopt (the session-epoch guard).
 let mockSessionEpoch = 0;
+let mockLiveAccount: string | null = 'greg@example.com';
 vi.mock('@/services/google/googleAuth', () => ({
   onTokenAcquired: () => () => {},
   primeRefreshToken: (...a: unknown[]) => primeRefreshToken(...a),
   attemptSilentRefresh: () => attemptSilentRefresh(),
   isTokenValid: () => tokenValid,
   getSessionEpoch: () => mockSessionEpoch,
+  // A refresh that restores the WRONG account is not a reconnect: the pod stays
+  // unreachable. Defaults to the bound account so the ordinary tests describe an
+  // ordinary device.
+  getGoogleAccountEmail: () => mockLiveAccount,
 }));
 const logEvent = vi.fn();
 vi.mock('@/services/telemetry', () => ({ logEvent: (...a: unknown[]) => logEvent(...a) }));
@@ -77,6 +82,7 @@ beforeEach(async () => {
   onLocalRead = null;
   tokenValid = false;
   mockSessionEpoch = 0;
+  mockLiveAccount = 'greg@example.com';
   remoteBlocked = null;
   readRemoteDriveConnections.mockReset();
   readRemoteDriveConnections.mockResolvedValue(null);
@@ -373,22 +379,51 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
   });
 
-  it('never overwrites a NEWER local token with an older mirrored one', async () => {
-    // ⚠️ `restoreLocalFromDoc` WRITES BEFORE ANYTHING VALIDATES. Without an age
-    // check an older remote copy lands in IndexedDB and memory first, and if
-    // Google then answers `invalid_grant` the permanent branch CLEARS the refresh
-    // token — so the device ends its "recovery" with no credential at all. The
-    // module header promises this never clobbers a good local token.
+  it('PUTS THE LOCAL TOKEN BACK when a candidate is refused', async () => {
+    // ⚠️ `restoreLocalFromDoc` WRITES BEFORE ANYTHING VALIDATES, so a candidate
+    // that turns out to be dead has already displaced the local one — and on
+    // `invalid_grant` the permanent branch then CLEARS the stored refresh token,
+    // leaving the device with no credential at all. Two age-based guards were
+    // tried here first and each was wrong in one direction, because age is not
+    // the question: `issuedAt` is legitimately null on both sides. Rolling back
+    // makes a failed attempt free, which is what the module header promises.
     localToken = { token: 'local-tok', issuedAt: 5000 };
     attemptSilentRefresh.mockResolvedValue(null);
     remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue([
-      { accountEmail: 'greg@example.com', refreshToken: 'older-tok', issuedAt: 1000 },
+      { accountEmail: 'greg@example.com', refreshToken: 'peer-tok', issuedAt: 1000 },
     ]);
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(false);
-    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
-    expect(primeRefreshToken).not.toHaveBeenCalled();
+
+    // The candidate went in, then the original came back — last write wins, and
+    // the last write must be the token the device arrived with.
+    const written = storeGoogleRefreshToken.mock.calls.map((c) => c[1]);
+    expect(written).toContain('peer-tok');
+    expect(written.at(-1)).toBe('local-tok');
+    expect(primeRefreshToken.mock.calls.at(-1)?.[1]).toEqual({
+      token: 'local-tok',
+      issuedAt: 5000,
+    });
+  });
+
+  it('tries an UNKNOWN-AGE peer token rather than refusing it unread', async () => {
+    // `issuedAt: null` is a live shape — legacy entries predate the field — and
+    // a "strictly newer" rule read it as 0, refusing genuinely-live peer tokens
+    // on exactly the straggler devices this exists for.
+    localToken = { token: 'local-tok', issuedAt: 5000 };
+    remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
+    readRemoteDriveConnections.mockResolvedValue([
+      { accountEmail: 'greg@example.com', refreshToken: 'peer-tok', issuedAt: null },
+    ]);
+    attemptSilentRefresh
+      .mockResolvedValueOnce(null) // step 1, local
+      .mockResolvedValueOnce('access-token'); // step 3, the peer copy works
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(true);
+    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'peer-tok', {
+      issuedAt: null,
+    });
   });
 
   it('never adopts a token belonging to a DIFFERENT Google account', async () => {
@@ -423,5 +458,36 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
     expect(readRemoteDriveConnections).not.toHaveBeenCalled();
+  });
+});
+
+describe('tryReconnectSilently — a refresh onto the WRONG account is not a reconnect', () => {
+  it('reports false when the live session is a different Google account', async () => {
+    // ⚠️ THE ACCOUNT-MISMATCH LOOP. The reconnect prompt is also raised when the
+    // session is signed in as B while the pod is bound to A — and B's grant is
+    // usually perfectly live, so the silent refresh SUCCEEDS. Reporting that as
+    // a reconnect cleared the banner and the next Drive call 404'd identically,
+    // once per tap. No token can fix a binding; only signing in as A can.
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    attemptSilentRefresh.mockResolvedValue('access-token');
+    mockLiveAccount = 'someone-else@example.com';
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+  });
+
+  it('still reports true when the refreshed session IS the bound account', async () => {
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    attemptSilentRefresh.mockResolvedValue('access-token');
+    mockLiveAccount = 'Greg@Example.com'; // case drift must not read as a mismatch
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(true);
+  });
+
+  it('does not manufacture a mismatch when the live account is unknown', async () => {
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    attemptSilentRefresh.mockResolvedValue('access-token');
+    mockLiveAccount = null;
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(true);
   });
 });

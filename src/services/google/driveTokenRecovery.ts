@@ -29,6 +29,7 @@ import {
   attemptSilentRefresh,
   isTokenValid,
   getSessionEpoch,
+  getGoogleAccountEmail,
 } from './googleAuth';
 import { logEvent } from '@/services/telemetry';
 import {
@@ -59,6 +60,21 @@ export function matchesBoundAccount(
   const b = (boundEmail ?? '').trim().toLowerCase();
   if (!a || !b) return false;
   return a === b;
+}
+
+/**
+ * After a silent refresh, is the live session actually the account this pod is
+ * bound to?
+ *
+ * Unbound (`boundEmail` absent) answers TRUE: there is no binding to violate, and
+ * the caller's own per-account guard already gates everything that reads a stored
+ * entry. Only a POSITIVE mismatch is a failure.
+ */
+function accountMatchesAfterRefresh(boundEmail: string | null | undefined): boolean {
+  if (!boundEmail) return true;
+  const live = getGoogleAccountEmail();
+  if (!live) return true; // unknown, not wrong — do not manufacture a failure
+  return matchesBoundAccount(live, boundEmail);
 }
 
 /** Is `a` strictly newer than `b`? A null `issuedAt` is treated as oldest. */
@@ -336,31 +352,48 @@ export async function tryReconnectSilently(
      * seconds on a multi-MB download, and a redirect return or the wake listener
      * may have installed a fresher credential in that window.
      */
+    /**
+     * Try a candidate token, and PUT THE OLD ONE BACK if Google refuses it.
+     *
+     * ⚠️ THE ROLLBACK IS THE GUARD, and two age-based guards were tried here
+     * first because it was not obvious. `restoreLocalFromDoc` writes to IndexedDB
+     * and primes memory BEFORE anything validates, so a candidate that turns out
+     * to be dead has already displaced whatever was there — and on
+     * `invalid_grant` the permanent branch then CLEARS the stored refresh token,
+     * leaving the device with no credential at all.
+     *
+     * Both age guards failed on the same shape. `issuedAt: number | null` is a
+     * documented live value on both sides (legacy entries predate the field), so
+     * "strictly newer" refused genuinely-live peer tokens on exactly the
+     * straggler devices this exists for, and "provably older" let an
+     * unknown-age or equal-age candidate clobber a good local token. There is no
+     * age rule that is right in both directions, because age is not the
+     * question. Whether Google still accepts it is, and the only way to ask is to
+     * try — so make trying free.
+     */
     const adopt = async (tok: StoredRefreshToken): Promise<boolean> => {
-      const current = await getGoogleRefreshToken(familyId);
-      // ⚠️ REFUSE ONLY WHAT IS PROVABLY OLDER. The first cut used
-      // `!isStrictlyNewer(tok, current)`, which coalesces a null `issuedAt` to 0
-      // — and `issuedAt: number | null` is a documented live shape on BOTH sides
-      // (legacy entries predate the field). So a peer's genuinely-live mirrored
-      // token carrying `issuedAt: null` computed `0 > T` = false and was refused
-      // WITHOUT ever asking Google, on exactly the straggler devices strategies 2
-      // and 3 exist for, pushing them to the consent screen this module exists to
-      // avoid. Unknown age is not evidence of staleness: let Google decide.
-      const provablyOlder =
-        typeof tok.issuedAt === 'number' &&
-        typeof current?.issuedAt === 'number' &&
-        tok.issuedAt < current.issuedAt;
-      if (current?.token && current.token !== tok.token && provablyOlder) {
+      // Re-read rather than closing over: step 3 can spend seconds on a
+      // multi-MB download, and a redirect return or the wake listener may have
+      // installed a fresher credential in that window.
+      const previous = await getGoogleRefreshToken(familyId);
+      if (previous?.token === tok.token) return false; // already tried, by definition
+
+      await restoreLocalFromDoc(familyId, tok, epochAtStart);
+      if ((await attemptSilentRefresh()) !== null) return true;
+
+      // Refused. Put back exactly what was there, so a failed attempt costs
+      // nothing. `restoreLocalFromDoc` carries the session-epoch guard, so a
+      // sign-out mid-recovery still declines to write.
+      if (previous?.token) {
+        await restoreLocalFromDoc(familyId, previous, epochAtStart);
         logEvent({
           level: 'info',
           surface: 'drive-token-silent-reconnect',
-          message: 'declined an older mirrored Drive token',
-          context: { action: 'older-token-declined' },
+          message: 'restored the previous Drive token after a refused candidate',
+          context: { action: 'candidate-rolled-back' },
         });
-        return false;
       }
-      await restoreLocalFromDoc(familyId, tok, epochAtStart);
-      return (await attemptSilentRefresh()) !== null;
+      return false;
     };
 
     // 1. The EXISTING local token. `attemptSilentRefresh` recovers it from the
@@ -369,9 +402,18 @@ export async function tryReconnectSilently(
     const fromLocalToken = async (): Promise<boolean> => {
       if (!local?.token) return false;
       tried.add(local.token);
-      return (await attemptSilentRefresh()) !== null;
-      // A failure here means revoked/exhausted; `attemptSilentRefresh` has
+      if ((await attemptSilentRefresh()) === null) return false;
+      // A failure above means revoked/exhausted; `attemptSilentRefresh` has
       // already cleared it on invalid_grant. Fall through to the copies.
+
+      // ⚠️ AND A REFRESH IS NOT A RECONNECT IF IT RESTORED THE WRONG ACCOUNT.
+      // The reconnect prompt is also raised for a FILE-vs-account mismatch — the
+      // session is signed in as B while the pod is bound to A — and B's grant is
+      // usually perfectly live. Refreshing it succeeds, so this reported success,
+      // the banner cleared, and the next Drive call 404'd identically: the same
+      // human-in-the-loop, once per tap. No token can fix that; only signing in
+      // as A can, which is what the forced consent (carrying `loginHint`) does.
+      return accountMatchesAfterRefresh(boundEmail);
     };
 
     // 2. The account-matched copy in OUR OWN document.
@@ -402,10 +444,19 @@ export async function tryReconnectSilently(
     //    that window the fetch fails, this returns false, and behaviour is
     //    exactly today's.
     //
-    //    Two things widen it slightly and deliberately: `reconnect()` passes
-    //    `assumeStale`, so the clock short-circuit no longer hides a live access
-    //    token from steps 1-3; and a peer that rotated recently is exactly the
-    //    case where the remote mirror holds something this device has not tried.
+    //    ⚠️ AND IT IS NARROWER STILL SINCE THE CLOCK SHORT-CIRCUIT CAME BACK.
+    //    `tryReconnectSilently` returns at its first line whenever
+    //    `isTokenValid()`, so by the time control reaches here the access token
+    //    is expired — and this read needs one. It therefore fires only where a
+    //    refresh can succeed for the READ while steps 1 and 2 could not use it:
+    //    an account-mismatch reconnect, principally, where the session's own
+    //    grant is live and only the binding is wrong.
+    //
+    //    That may well be close to never, and the two events below are what will
+    //    say so rather than an argument. A `healed-from-remote` that stays at
+    //    zero for a release is the signal to delete this strategy, not to defend
+    //    it. An earlier attempt to widen the window by skipping the clock check
+    //    from `reconnect()` was reverted: it destroyed working credentials.
     //
     //    `remote-read-unavailable` versus `healed-from-remote` measures the
     //    split, so an inert step 3 shows up as a number rather than being

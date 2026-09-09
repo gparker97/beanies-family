@@ -214,7 +214,27 @@ export async function handler(event) {
       //
       // So: nothing to merge, nothing to write. The family is deleted, and the
       // caller gets the same success a write to a deleted row has always got.
-      if (existing.deletedAt && !isOwner) {
+      //
+      // ⚠️ AND `isOwner` ALONE IS NOT ENOUGH, because its third tier FALLS OPEN.
+      // `isOwner` is `existing.ownerMemberId ? … : !existing.ownerEmail || …`, so
+      // a row with NEITHER owner field answers true for every writer. That is the
+      // right default for a live legacy row and catastrophic for a deleted one:
+      // any device revived the family AND took the write-once owner field, which
+      // has no route back. Such tombstones are reachable — the client sends both
+      // owner fields null when the roster is not loaded (a background write
+      // mid-boot), which is the very path this guard's trigger names.
+      const ownerKnown = !!existing.ownerMemberId || !!existing.ownerEmail;
+      if (existing.deletedAt && !(ownerKnown && isOwner)) {
+        // Rule 1: a security-relevant branch says why. Without this the rate of
+        // devices writing to deleted families is unobservable — which is exactly
+        // the signal that would have caught the resurrection this branch fixes.
+        // Masked to tails, like the pointer-refusal warn it returns above.
+        console.warn(
+          '[registry] write to a deleted family refused',
+          familyId,
+          ownerKnown ? 'owner-known' : 'no-recorded-owner',
+          String(writerMemberId ?? '').slice(-6) || 'no-writer-id'
+        );
         return response(200, { success: true, pointerAccepted: false }, event);
       }
 
@@ -257,7 +277,12 @@ export async function handler(event) {
         // an ops/contact field (see the guard above) but is also the LEGACY
         // authority for rows registered before `ownerMemberId` existed, so it must
         // be stable either way.
-        ownerEmail: existing.ownerEmail ?? body.ownerEmail ?? null,
+        // ⚠️ `|| null` ON THE BODY, because this field is WRITE-ONCE and `''` is
+        // not nullish. An empty string from any client — deployed ones included,
+        // which is why the guard is here and not only in the client — would latch
+        // permanently, and the legacy pointer tier reads `!existing.ownerEmail`
+        // as TRUE, falling open for every writer on that row forever.
+        ownerEmail: existing.ownerEmail ?? (body.ownerEmail || null) ?? null,
         // Write-once, and the real pointer authority. Stamped on a row's first
         // accepted write — including the first write by the owner of a legacy
         // email-only row, which upgrades that row off the mutable email.
@@ -272,7 +297,8 @@ export async function handler(event) {
         //
         // The tier-2 comment above already says what this should be: stamp "the
         // first time its OWNER writes".
-        ownerMemberId: existing.ownerMemberId ?? (isOwner ? body.ownerMemberId : null) ?? null,
+        ownerMemberId:
+          existing.ownerMemberId ?? (isOwner ? body.ownerMemberId || null : null) ?? null,
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
@@ -417,6 +443,7 @@ export async function handler(event) {
         );
       }
 
+      const deletedNow = new Date().toISOString();
       await client.send(
         new PutItemCommand({
           TableName: tableName,
@@ -435,10 +462,10 @@ export async function handler(event) {
               // deleted family alive in the metrics), and `familyName` +
               // `subscribeNewsletter` (family content and a marketing consent —
               // the user asked for this family to be gone).
-              deletedAt: new Date().toISOString(),
+              deletedAt: deletedNow,
               // Ops hygiene: every other row carries one, and a tombstone with
               // no `updatedAt` is invisible to a "what changed recently" scan.
-              updatedAt: new Date().toISOString(),
+              updatedAt: deletedNow,
             },
             { removeUndefinedValues: true }
           ),

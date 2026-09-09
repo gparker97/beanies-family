@@ -34,7 +34,11 @@ const {
         delivered: true,
       }) as import('@/utils/shareOrDownloadFile').ShareOrDownloadResult
   ),
-  deleteLocalFamilyMock: vi.fn(async () => {}),
+  // ⚠️ RETURNS TRUE, like the real one. `familyContextStore.deleteLocalFamily`
+  // catches every throw and reports a BOOLEAN, and the delete flow now treats a
+  // false as "the local data survived" and says so in the farewell — so a double
+  // returning `undefined` describes a failing teardown on every test.
+  deleteLocalFamilyMock: vi.fn(async () => true),
   removeFamilyMock: vi.fn(async () => true),
   alertMock: vi.fn(async () => {}),
   deleteDriveFileMock: vi.fn(async () => {}),
