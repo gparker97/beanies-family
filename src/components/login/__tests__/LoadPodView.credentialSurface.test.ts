@@ -113,6 +113,23 @@ describe('LoadPodView — cold credential surface', () => {
     expect(text).not.toContain('password');
   });
 
+  it('legacy family WITH a passphrase: the one field names both credentials', async () => {
+    // `tryUnwrapFamilyKey` tries the member wraps and THEN the passphrase, so both work
+    // in this box. Labelling it "Password" made the passphrase a secret feature on the
+    // one surface where it silently works.
+    const w = await renderColdSurface(
+      envelope({ wrappedKeys: { m1: wrap }, recoveryPassphrase: kitWrap })
+    );
+    expect(w.find('input[type="password"]').exists()).toBe(true);
+    const text = w.text().toLowerCase();
+    expect(text).toContain('password or recovery passphrase');
+    // ...and it must not fall back to either single-credential wording.
+    expect(text).not.toContain("enter your password and we'll find your account");
+    expect(text).not.toContain('this password decrypts your local data');
+    // The cold-arrival card is narrow too when a passphrase is also a way in.
+    expect(text).not.toContain("don't have the password?");
+  });
+
   it('all-false envelope: shows the honest message and NO credential field', async () => {
     const w = await renderColdSurface(envelope({}));
     // The acceptance criterion: "resolves to the degenerate terminal, NEVER the kit form".
