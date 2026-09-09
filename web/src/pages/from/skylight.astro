@@ -1,0 +1,1030 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { APP_URL } from '@beanies/brand/nav';
+// Caveat - the CIG handwritten accent face. Imported per-page rather than in
+// BaseLayout, matching /from/maple and WorldsBeanstalk.astro: only the pages that
+// actually use the accent should pay for the font.
+import '@fontsource-variable/caveat';
+import '../../styles/switch-page.css';
+// The kitchen-wall scene. Imported AFTER the shared sheet so its `wall-` classes
+// layer on top of the furniture rather than fighting it.
+import '../../styles/skylight-wall.css';
+
+/**
+ * /from/skylight - the switching page for people who own, or are pricing, a
+ * Skylight Calendar.
+ *
+ * ⚠️ EVERY FACTUAL CLAIM ABOUT SKYLIGHT ON THIS PAGE WAS VERIFIED ON 2026-09-09,
+ * and the ones that could not be verified were CUT rather than softened. An
+ * earlier draft carried six "quotes" presented as reviewers' own words; only one
+ * was verbatim, two were recast from real sources, one was a real number cited to
+ * the wrong place, and two could not be substantiated at all (a sync-lag claim
+ * contradicted by every dated source, and a line attributed to Skylight itself
+ * that appears nowhere in their release notes). Publishing invented reviewer
+ * quotes, or putting words in a named company's mouth, is not a risk worth any
+ * amount of copy. If you add a claim here, source it or leave it out.
+ *
+ * Prices are LIST prices seen on 2026-09-09 and they move. Skylight's own store
+ * is the citation, because retailers run $20-$40 above it on the Calendar 2 and
+ * the Max, which is the opposite of the usual pattern and makes any retailer
+ * figure look wrong against the direct one.
+ */
+
+const PRICE_15 = '$299.99';
+const PRICE_MAX = '$599.99';
+const PLUS_YEAR = '$79';
+---
+
+<BaseLayout
+  title="skylight alternative - keep the wall, bring your own tablet"
+  description="Skylight's Calendar 2 is $299.99 and the 27in wall-mounted Max is $599.99, before the $79 a year subscription. beanies.family does the same job in wall mode on a tablet you already own, with everything included and your family's data in your own encrypted file."
+  canonicalPath="/from/skylight"
+>
+  <div class="welcome-page">
+    <header class="hero">
+      <div class="wrap wall-hero">
+        <Breadcrumbs
+          items={[
+            { label: 'home', href: '/' },
+            { label: 'switching', href: '/from' },
+            { label: 'from skylight', href: '/from/skylight' },
+          ]}
+        />
+        <p class="kicker kicker-pill"><i aria-hidden="true">🖼️</i> switching from skylight</p>
+        <h1>keep the wall.<br /><em>bring your own tablet.</em></h1>
+        <p class="sub">
+          The big idea is completely right: your family's week, chores and meals belong on the wall,
+          not buried in six separate phones. What I'd skip is paying for a screen you already own.
+          Our <em>beanie wall</em> does the same job on any tablet in the house, and your family's
+          data stays in your hands.
+        </p>
+
+        <div class="wall-room">
+          <div class="wall-face">
+            <div class="wall-shelf" aria-hidden="true">🪴<div class="wall-plank"></div></div>
+
+            <div class="wall-mount">
+              <div class="wall-tablet">
+                <div class="wall-cam" aria-hidden="true"></div>
+                <div class="wall-screen">
+                  <div class="wall-bar">
+                    <b>the beanie family 🫘</b>
+                    <span class="wall-stamp"
+                      ><i aria-hidden="true"></i>saved just now · week of 7 sep</span
+                    >
+                  </div>
+                  <div class="wall-stage">
+                    <!-- A · the week -->
+                    <div class="wall-view" data-view="days" data-on>
+                      <div class="wall-grid" style="--n:7">
+                        <div class="wall-head">
+                          <span></span><span>mon</span><span>tue</span><span class="wall-now"
+                            >wed</span
+                          ><span>thu</span><span>fri</span><span>sat</span><span>sun</span>
+                        </div>
+                        <div class="wall-band">
+                          <div></div><div></div><div></div><div></div><div></div><div></div>
+                          <div><span class="wall-allday">🎂 milo's party</span></div>
+                          <div><span class="wall-allday">✈️ lisbon</span></div>
+                        </div>
+                        <div class="wall-body">
+                          <div class="wall-axis" aria-hidden="true">
+                            <i style="top:0%">3</i><i style="top:16.6%">4</i><i style="top:33.3%"
+                              >5</i
+                            ><i style="top:50%">6</i><i style="top:66.6%">7</i><i style="top:83.3%"
+                              >8</i
+                            >
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-s" style="--t:17%;--h:15%">
+                              <b>swim</b><span class="wall-when">milo</span>
+                            </div>
+                            <div class="wall-block wall-b-o" style="--t:52%;--h:14%">
+                              <b>pasta night</b>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-g" style="--t:34%;--h:16%">
+                              <b>football</b><span class="wall-when">ollie</span>
+                            </div>
+                            <div class="wall-block wall-b-p" style="--t:58%;--h:12%">
+                              <b>library</b>
+                            </div>
+                          </div>
+                          <div class="wall-col wall-now">
+                            <div class="wall-block wall-b-t" style="--t:25%;--h:14%">
+                              <b>piano</b><span class="wall-when">amy</span>
+                            </div>
+                            <div class="wall-block wall-b-g" style="--t:34%;--h:16%">
+                              <b>football</b><span class="wall-when">ollie</span>
+                            </div>
+                            <div class="wall-block wall-b-o" style="--t:58%;--h:14%">
+                              <b>taco night</b>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-s" style="--t:0%;--h:14%">
+                              <b>dentist</b><span class="wall-when">greg</span>
+                            </div>
+                            <div class="wall-block wall-b-o" style="--t:55%;--h:13%">
+                              <b>leftovers</b>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-o" style="--t:52%;--h:14%">
+                              <b>pizza night</b>
+                            </div>
+                            <div class="wall-block wall-b-g" style="--t:70%;--h:16%">
+                              <b>movie</b><span class="wall-when">everyone</span>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-s" style="--t:8%;--h:15%">
+                              <b>big shop</b>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-t" style="--t:20%;--h:14%">
+                              <b>pancakes</b>
+                            </div>
+                          </div>
+                          <div class="wall-nowline" style="--now:31%"></div>
+                        </div>
+                      </div>
+                      <div class="wall-cards">
+                        <div class="wall-card">
+                          <h4>chores &amp; lists</h4>
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
+                            ></span
+                          >
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#F15D22">O</i>tidy room<em>2</em
+                            ></span
+                          >
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#E67E22">A</i><s>pack bags</s><em
+                              >✓</em
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card">
+                          <h4>to-dos</h4>
+                          <span class="wall-row"><i class="wall-tick"></i>book dentist</span>
+                          <span class="wall-row"
+                            ><i class="wall-tick wall-on"></i><s>swim kit</s></span
+                          >
+                          <span class="wall-row"><i class="wall-tick"></i>reading log</span>
+                        </div>
+                        <div class="wall-card">
+                          <h4>tonight</h4>
+                          <span class="wall-meal"
+                            ><span class="wall-glyph" aria-hidden="true">🌮</span>
+                            <span class="wall-meal-sub" style="min-width:0"
+                              ><b>taco night</b><span>greg's cooking</span></span
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card wall-dark wall-trip">
+                          <h4>the trip</h4>
+                          <b>lisbon, half term</b>
+                          <span class="wall-sub">amy, ollie, milo · 12-16 oct</span>
+                          <span class="wall-leg"
+                            ><i>LGW</i><span class="wall-arrow" aria-hidden="true">→</span><i
+                              >LIS</i
+                            >06:40<span class="wall-ref">TP1234</span></span
+                          >
+                          <span class="wall-tbar"><b></b></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- B · each bean -->
+                    <div class="wall-view" data-view="lanes">
+                      <div class="wall-grid" style="--n:4">
+                        <div class="wall-head">
+                          <span></span>
+                          <span class="wall-who"
+                            ><i class="wall-dot" style="background:#2C3E50">G</i>greg</span
+                          >
+                          <span class="wall-who"
+                            ><i class="wall-dot" style="background:#E67E22">A</i>amy</span
+                          >
+                          <span class="wall-who"
+                            ><i class="wall-dot" style="background:#F15D22">O</i>ollie</span
+                          >
+                          <span class="wall-who"
+                            ><i class="wall-dot" style="background:#7FB3D5">M</i>milo</span
+                          >
+                        </div>
+                        <div class="wall-band">
+                          <div></div><div></div><div></div>
+                          <div><span class="wall-allday">🎂 party sat</span></div>
+                          <div><span class="wall-allday">🏊 gala</span></div>
+                        </div>
+                        <div class="wall-body">
+                          <div class="wall-axis" aria-hidden="true">
+                            <i style="top:0%">3</i><i style="top:16.6%">4</i><i style="top:33.3%"
+                              >5</i
+                            ><i style="top:50%">6</i><i style="top:66.6%">7</i><i style="top:83.3%"
+                              >8</i
+                            >
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-s" style="--t:0%;--h:15%">
+                              <b>dentist</b><span class="wall-when">3:00</span>
+                            </div>
+                            <div class="wall-block wall-b-o" style="--t:58%;--h:16%">
+                              <b>cook tacos</b><span class="wall-when">6:30</span>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-t" style="--t:25%;--h:15%">
+                              <b>piano run</b><span class="wall-when">4:30</span>
+                            </div>
+                            <div class="wall-block wall-b-p" style="--t:66%;--h:14%">
+                              <b>book club</b>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-g" style="--t:34%;--h:17%">
+                              <b>football</b><span class="wall-when">5:00</span>
+                            </div>
+                          </div>
+                          <div class="wall-col">
+                            <div class="wall-block wall-b-s" style="--t:17%;--h:16%">
+                              <b>swim</b><span class="wall-when">4:00</span>
+                            </div>
+                            <div class="wall-block wall-b-g" style="--t:70%;--h:14%">
+                              <b>reading</b>
+                            </div>
+                          </div>
+                          <div class="wall-nowline" style="--now:31%"></div>
+                        </div>
+                      </div>
+                      <div class="wall-cards">
+                        <div class="wall-card">
+                          <h4>chores &amp; lists</h4>
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
+                            ></span
+                          >
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#F15D22">O</i>tidy room<em>2</em
+                            ></span
+                          >
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#7FB3D5">M</i><s>feed cat</s><em
+                              >✓</em
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card">
+                          <h4>to-dos</h4>
+                          <span class="wall-row"><i class="wall-tick"></i>book dentist</span>
+                          <span class="wall-row"
+                            ><i class="wall-tick wall-on"></i><s>swim kit</s></span
+                          >
+                          <span class="wall-row"><i class="wall-tick"></i>reading log</span>
+                        </div>
+                        <div class="wall-card">
+                          <h4>tonight</h4>
+                          <span class="wall-meal"
+                            ><span class="wall-glyph" aria-hidden="true">🌮</span>
+                            <span class="wall-meal-sub" style="min-width:0"
+                              ><b>taco night</b><span>greg's cooking</span></span
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card wall-dark wall-trip">
+                          <h4>the trip</h4>
+                          <b>lisbon, half term</b>
+                          <span class="wall-sub">amy, ollie, milo · 12-16 oct</span>
+                          <span class="wall-leg"
+                            ><i>LGW</i><span class="wall-arrow" aria-hidden="true">→</span><i
+                              >LIS</i
+                            >06:40<span class="wall-ref">TP1234</span></span
+                          >
+                          <span class="wall-tbar"><b></b></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- C · today, with the cards as a rail -->
+                    <div class="wall-view wall-rail" data-view="today">
+                      <div class="wall-grid" style="--n:1;flex:1">
+                        <div class="wall-head">
+                          <span></span><span class="wall-now">wednesday 9 september</span>
+                        </div>
+                        <div class="wall-band">
+                          <div></div>
+                          <div>
+                            <span class="wall-allday">🎂 milo's party on saturday</span>
+                          </div>
+                        </div>
+                        <div class="wall-body">
+                          <div class="wall-axis" aria-hidden="true">
+                            <i style="top:0%">3</i><i style="top:16.6%">4</i><i style="top:33.3%"
+                              >5</i
+                            ><i style="top:50%">6</i><i style="top:66.6%">7</i><i style="top:83.3%"
+                              >8</i
+                            >
+                          </div>
+                          <div class="wall-col wall-now">
+                            <div class="wall-block wall-b-s" style="--t:0%;--h:14%">
+                              <b>dentist · greg</b><span class="wall-when">3:00 - 3:45</span>
+                            </div>
+                            <div class="wall-block wall-b-t" style="--t:25%;--h:15%">
+                              <b>piano lesson · amy</b><span class="wall-when">4:30 - 5:15</span>
+                            </div>
+                            <div class="wall-block wall-b-g" style="--t:34%;--h:16%">
+                              <b>football training · ollie</b><span class="wall-when"
+                                >5:00 - 6:00</span
+                              >
+                            </div>
+                            <div class="wall-block wall-b-o" style="--t:58%;--h:15%">
+                              <b>taco night</b><span class="wall-when">6:30 · greg cooking</span>
+                            </div>
+                            <div class="wall-block wall-b-p" style="--t:78%;--h:14%">
+                              <b>washing on</b><span class="wall-when">7:45</span>
+                            </div>
+                          </div>
+                          <div class="wall-nowline" style="--now:31%"></div>
+                        </div>
+                      </div>
+                      <div class="wall-cards">
+                        <div class="wall-card">
+                          <h4>chores &amp; lists</h4>
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
+                            ></span
+                          >
+                          <span class="wall-row"
+                            ><i class="wall-dot" style="background:#F15D22">O</i>tidy room<em>2</em
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card">
+                          <h4>to-dos</h4>
+                          <span class="wall-row"><i class="wall-tick"></i>book dentist</span>
+                          <span class="wall-row"
+                            ><i class="wall-tick wall-on"></i><s>swim kit</s></span
+                          >
+                        </div>
+                        <div class="wall-card">
+                          <h4>tonight</h4>
+                          <span class="wall-meal"
+                            ><span class="wall-glyph" aria-hidden="true">🌮</span>
+                            <span class="wall-meal-sub" style="min-width:0"
+                              ><b>taco night</b><span>greg's cooking</span></span
+                            ></span
+                          >
+                        </div>
+                        <div class="wall-card wall-dark wall-trip">
+                          <h4>the trip</h4>
+                          <b>lisbon, half term</b>
+                          <span class="wall-sub">amy, ollie, milo · 12-16 oct</span>
+                          <span class="wall-leg"
+                            ><i>LGW</i><span class="wall-arrow" aria-hidden="true">→</span><i
+                              >LIS</i
+                            >06:40</span
+                          >
+                          <span class="wall-tbar"><b></b></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- D · the chore board, a peer screen -->
+                    <div class="wall-view" data-view="jobs">
+                      <div class="wall-board">
+                        <div class="wall-bcols">
+                          <div class="wall-bcol">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#2C3E50">G</i>greg</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>bins out</s></span
+                            >
+                            <span class="wall-job"><i class="wall-tick"></i>book dentist</span>
+                            <span class="wall-stars">⭐</span>
+                          </div>
+                          <div class="wall-bcol wall-done">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#E67E22">A</i>amy</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>pack bags</s></span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>passports</s></span
+                            >
+                            <span class="wall-stars">⭐⭐</span>
+                          </div>
+                          <div class="wall-bcol">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#F15D22">O</i>ollie</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>tidy room</s></span
+                            >
+                            <span class="wall-job"><i class="wall-tick"></i>reading</span>
+                            <span class="wall-stars">⭐</span>
+                          </div>
+                          <div class="wall-bcol wall-done">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#7FB3D5">M</i>milo</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>feed cat</s></span
+                            >
+                            <span class="wall-stars">⭐</span>
+                          </div>
+                        </div>
+                        <div class="wall-prog">
+                          <i>5 of 7 done today 🫘</i>
+                          <div class="wall-bar-track"><b></b></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <span class="wall-cord" aria-hidden="true"></span>
+              <span class="wall-socket" aria-hidden="true"><i></i><i></i></span>
+            </div>
+          </div>
+
+          <div class="wall-underfoot">
+            <div class="wall-fam">
+              <svg
+                viewBox="0 0 380 182"
+                role="img"
+                aria-label="four beanies in woolly hats, holding hands under the wall"
+              >
+                <g class="wall-sway">
+                  <g fill="none" stroke-linecap="round" stroke-width="7">
+                    <path d="M92 116 Q100 126 107 128" stroke="#2C3E50"></path>
+                    <path d="M124 122 Q115 127 107 128" stroke="#F15D22"></path>
+                    <path d="M172 122 Q180 127 187 128" stroke="#F15D22"></path>
+                    <path d="M201 126 Q194 128 187 128" stroke="#7FB3D5"></path>
+                    <path d="M243 126 Q249 128 254 128" stroke="#7FB3D5"></path>
+                    <path d="M266 118 Q260 125 254 128" stroke="#E67E22"></path>
+                  </g>
+                  <g fill="#fdf1e6" stroke="rgb(44 62 80 / 18%)" stroke-width="1">
+                    <circle cx="107" cy="128" r="5.4"></circle>
+                    <circle cx="187" cy="128" r="4.9"></circle>
+                    <circle cx="254" cy="128" r="4.9"></circle>
+                  </g>
+                  <ellipse cx="58" cy="106" rx="37" ry="46" fill="#2C3E50"></ellipse>
+                  <ellipse cx="45" cy="88" rx="12" ry="16" fill="#fff" opacity=".08"></ellipse>
+                  <path d="M32 68 Q58 30 84 68 Z" fill="#E67E22"></path>
+                  <rect x="28" y="63" width="60" height="11" rx="5.5" fill="#d4711b"></rect>
+                  <circle cx="58" cy="32" r="7.5" fill="#E67E22"></circle>
+                  <g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+                    <path d="M44 105 Q49 99 54 105"></path>
+                    <path d="M62 105 Q67 99 72 105"></path>
+                    <path d="M46 116 Q58 127 70 116" stroke-width="3"></path>
+                  </g>
+                  <ellipse cx="36" cy="112" rx="5" ry="3.4" fill="#E67E22" opacity=".45"></ellipse>
+                  <ellipse cx="80" cy="112" rx="5" ry="3.4" fill="#E67E22" opacity=".45"></ellipse>
+                  <ellipse cx="148" cy="117" rx="28" ry="35" fill="#F15D22"></ellipse>
+                  <ellipse cx="139" cy="104" rx="9" ry="12" fill="#fff" opacity=".12"></ellipse>
+                  <path d="M128 89 Q148 57 168 89 Z" fill="#2C3E50"></path>
+                  <rect x="125" y="85" width="46" height="9" rx="4.5" fill="#22303d"></rect>
+                  <circle cx="148" cy="59" r="6" fill="#2C3E50"></circle>
+                  <circle cx="139" cy="113" r="5.2" fill="#fff"></circle>
+                  <circle cx="140.4" cy="114" r="2.5" fill="#2C3E50"></circle>
+                  <circle cx="157" cy="113" r="5.2" fill="#fff"></circle>
+                  <circle cx="158.4" cy="114" r="2.5" fill="#2C3E50"></circle>
+                  <path
+                    d="M132 105 Q136 101 141 103"
+                    fill="none"
+                    stroke="#c2400f"
+                    stroke-width="2"
+                    stroke-linecap="round"></path>
+                  <path d="M139 122 Q148 133 157 122 Z" fill="#7a2a0c"></path>
+                  <path d="M143 129 Q148 133 153 129 Z" fill="#e8746a"></path>
+                  <ellipse cx="222" cy="122" rx="24" ry="30" fill="#7FB3D5"></ellipse>
+                  <ellipse cx="214" cy="111" rx="8" ry="10" fill="#fff" opacity=".16"></ellipse>
+                  <path d="M205 99 Q222 71 239 99 Z" fill="#F15D22"></path>
+                  <rect x="202" y="95" width="40" height="8" rx="4" fill="#d4501a"></rect>
+                  <circle cx="222" cy="73" r="5.5" fill="#F15D22"></circle>
+                  <circle cx="214" cy="118" r="4.4" fill="#fff"></circle>
+                  <circle cx="215" cy="119" r="2.1" fill="#2C3E50"></circle>
+                  <path
+                    d="M226 118 Q230 114.5 234 118"
+                    fill="none"
+                    stroke="#2C3E50"
+                    stroke-width="2.2"
+                    stroke-linecap="round"></path>
+                  <path
+                    d="M215 126 Q222 133 229 126"
+                    fill="none"
+                    stroke="#2C3E50"
+                    stroke-width="2.4"
+                    stroke-linecap="round"></path>
+                  <ellipse cx="222" cy="132" rx="3.4" ry="2.6" fill="#e8746a"></ellipse>
+                  <ellipse cx="298" cy="108" rx="35" ry="44" fill="#E67E22"></ellipse>
+                  <ellipse cx="286" cy="92" rx="11" ry="15" fill="#fff" opacity=".12"></ellipse>
+                  <path d="M273 71 Q298 35 323 71 Z" fill="#AED6F1"></path>
+                  <rect x="270" y="66" width="56" height="10" rx="5" fill="#8fc0e0"></rect>
+                  <circle cx="298" cy="37" r="7" fill="#AED6F1"></circle>
+                  <g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round">
+                    <path d="M284 103 Q289 97 294 103"></path>
+                    <path d="M302 103 Q307 97 312 103"></path>
+                  </g>
+                  <path d="M287 114 Q298 130 309 114 Z" fill="#8f3f14"></path>
+                  <path d="M292 123 Q298 128 304 123 Z" fill="#e8746a"></path>
+                  <ellipse cx="274" cy="114" rx="5" ry="3.4" fill="#c25f10" opacity=".5"></ellipse>
+                  <ellipse cx="322" cy="114" rx="5" ry="3.4" fill="#c25f10" opacity=".5"></ellipse>
+                  <g
+                    font-family="Caveat Variable, Caveat, cursive"
+                    font-size="15"
+                    fill="rgb(44 62 80 / 72%)"
+                    text-anchor="middle">
+                    <text x="58" y="172">greg</text>
+                    <text x="148" y="172">ollie</text>
+                    <text x="222" y="172">milo</text>
+                    <text x="298" y="172">amy</text>
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <div class="mat"><span>oh hi, skylight friends 👋</span></div>
+          </div>
+        </div>
+
+        <div class="wall-switcher" role="group" aria-label="wall views">
+          <button type="button" data-go="days" aria-pressed="true">
+            <span class="wall-glyph" aria-hidden="true">▦</span>the week
+          </button>
+          <button type="button" data-go="lanes" aria-pressed="false">
+            <span class="wall-glyph" aria-hidden="true">👥</span>each bean
+          </button>
+          <button type="button" data-go="today" aria-pressed="false">
+            <span class="wall-glyph" aria-hidden="true">☀</span>today
+          </button>
+          <span class="wall-divider" aria-hidden="true"></span>
+          <button type="button" data-go="jobs" aria-pressed="false">
+            <span class="wall-glyph" aria-hidden="true">✅</span>the chore board
+          </button>
+        </div>
+        <p class="wall-caption">
+          4 views, laid out the way you want (or need). and your old ipad is thrilled to have a job
+          again.
+        </p>
+
+        <div class="btns">
+          <a
+            href={APP_URL}
+            data-cta="CTA: Create Pod"
+            data-cta-loc="welcome-skylight-hero"
+            class="btn btn-primary">start counting beans 🫘</a
+          >
+          <a href="#compare" class="btn btn-ghost">how it compares ↓</a>
+        </div>
+        <ul class="trust">
+          <li>🔒 end-to-end encrypted</li>
+          <li>📂 your file, your storage</li>
+          <li>🚫 no ads, ever</li>
+          <li>🆓 free while beanies is in beta</li>
+        </ul>
+      </div>
+    </header>
+
+    <section class="section" id="compare">
+      <div class="wrap">
+        <p class="kicker">side by side</p>
+        <h2 class="section-title">skylight vs beanies, honestly</h2>
+        <p class="section-subtitle">
+          We both do the same job. beanies does it on a screen you already own, and without ever
+          being able to read your family's week.
+        </p>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col"><span class="sr-only">feature</span></th>
+                <th scope="col" class="mk">🖼️ skylight</th>
+                <th scope="col" class="mk">🫘 beanies</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                ><th scope="row">hardware to buy</th><td class="warn"
+                  >{PRICE_15} for the 15in, {PRICE_MAX} for the 27in wall model</td
+                ><td class="good">none, use a tablet you already own</td></tr
+              >
+              <tr
+                ><th scope="row">subscription</th><td class="warn"
+                  >{PLUS_YEAR}/yr for meal planning, chore rewards and more</td
+                ><td class="good">free while beanies is in beta</td></tr
+              >
+              <tr
+                ><th scope="row">wall-mounted family calendar</th><td class="good"
+                  >✓ their screen</td
+                ><td class="good">✓ your screen, any size</td></tr
+              >
+              <tr
+                ><th scope="row">on everyone's phones too</th><td class="good">✓</td><td
+                  class="good">✓</td
+                ></tr
+              >
+              <tr
+                ><th scope="row">meal planning &amp; chore rewards</th><td class="meh"
+                  >on the paid plan</td
+                ><td class="good">✓ included</td></tr
+              >
+              <tr
+                ><th scope="row">family finances &amp; budgets</th><td class="meh">not offered</td
+                ><td class="good">✓ and never on the wall</td></tr
+              >
+              <tr
+                ><th scope="row">works with the wifi down</th><td class="meh">needs their cloud</td
+                ><td class="good">✓ local-first</td></tr
+              >
+              <tr
+                ><th scope="row">where your data lives</th><td class="meh">their cloud</td><td
+                  class="good">your own storage</td
+                ></tr
+              >
+              <tr
+                ><th scope="row">can the company read it?</th><td class="meh">yes</td><td
+                  class="good">no. can't. encrypted.</td
+                ></tr
+              >
+            </tbody>
+          </table>
+        </div>
+        <p class="section-subtitle" style="margin-top:22px;font-size:.82rem">
+          Skylight prices are list prices from <a
+            href="https://myskylight.com/products/the-skylight-calendar-2-classic-white-with-plus-plan"
+            target="_blank"
+            rel="noopener">skylight's own store</a
+          >, checked 9 September 2026. Retailers often run higher.
+        </p>
+      </div>
+    </section>
+
+    <div class="section-fade"></div>
+    <section class="section wall-notes">
+      <div class="wrap">
+        <p class="kicker">the sticky notes</p>
+        <h2 class="section-title">what comes up about skylight</h2>
+        <p class="section-subtitle">
+          Not my opinion, and not invented either. These are the points that recur in published
+          Skylight reviews, linked so you can read them yourself.
+        </p>
+
+        <div class="wall-notelist">
+          <div class="wall-pair">
+            <div class="wall-note" style="--r:-1.4deg">
+              "That by far was my biggest complaint when using this device."<cite
+                >Steven John, Forbes Vetted, on the {PLUS_YEAR}/year plan</cite
+              >
+            </div>
+            <div class="wall-answer">
+              <h3>nothing sits behind a plan</h3>
+              <p>
+                Calendar Plus gates meal planning, chore rewards, the photo screensaver and Magic
+                Import. With beanies, chores, meals, lists, travel and the whole wall are simply in
+                it.
+              </p>
+            </div>
+          </div>
+
+          <div class="wall-pair">
+            <div class="wall-note" style="--r:1.1deg">
+              "the screen is not really big enough to engage with from across the room, especially
+              when it relies on the touchscreen"<cite
+                >Adam Turner, GadgetGuy, June 2024, on the 15in</cite
+              >
+            </div>
+            <div class="wall-answer">
+              <h3>your screen, your size</h3>
+              <p>
+                A bigger Skylight fixes this, at {PRICE_MAX} for the 27in. Or mount the 13in iPad you
+                already have. The wall is built so a fifteen-minute event is still legible at 10
+                feet / 3 meters.
+              </p>
+            </div>
+          </div>
+
+          <div class="wall-pair">
+            <div class="wall-note" style="--r:-.8deg">
+              it has to stay plugged in, so wherever it goes needs to be near an outlet<cite
+                >a recurring note in Reviewed, GadgetGuy and owner reviews</cite
+              >
+            </div>
+            <div class="wall-answer">
+              <h3>you pick the wall first</h3>
+              <p>
+                Pick the tablet whose battery and cable suit the spot you actually want. It keeps
+                running unplugged when you need the socket back.
+              </p>
+            </div>
+          </div>
+
+          <div class="wall-pair">
+            <div class="wall-note" style="--r:1.6deg">
+              {PRICE_15} for the 15in Calendar 2, {PRICE_MAX} for the 27in Max, before the {
+                PLUS_YEAR
+              }/year plan<cite>skylight's own store, september 2026</cite>
+            </div>
+            <div class="wall-answer">
+              <h3>no hardware to buy</h3>
+              <p>
+                The old iPad in the drawer already works. A wall mount, if you want one, is the whole
+                shopping list.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="section-fade-to-story"></div>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="kicker">the beanie wall</p>
+        <h2 class="section-title">the whole family, on one screen</h2>
+        <p class="section-subtitle">
+          Not just a calendar. Everything that actually goes on in your house, on a screen the whole
+          family sees and can touch all day.
+        </p>
+        <div class="wall-features">
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">📅</div>
+            <h3>activities</h3>
+            <p>The whole week at a glance. No more "wait, when's football?"</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">✅</div>
+            <h3>chores</h3>
+            <p>Big ticks and gold stars. Turns out kids quite like winning.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">📝</div>
+            <h3>lists and to-dos</h3>
+            <p>Shared lists live on the wall. Kids only ever see their bit.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">✈️</div>
+            <h3>travel</h3>
+            <p>The next trip, with flights and dates. Answers breakfast's favorite question.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">🍽️</div>
+            <h3>meals</h3>
+            <p>What's for dinner, up on the wall. Nobody has to ask.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">🌙</div>
+            <h3>night mode</h3>
+            <p>Dims to a big clock at bedtime. Or stays on. Your call.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">🔒</div>
+            <h3>safe to touch</h3>
+            <p>Anyone can tick a chore. Nobody can delete your week.</p>
+          </div>
+          <div class="wall-feature">
+            <div class="wall-feature-glyph" aria-hidden="true">💰</div>
+            <h3>money stays off the wall</h3>
+            <p>Finances can't reach the wall. There's no setting to get that wrong.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-fade"></div>
+    <section class="section letter">
+      <div class="wrap narrow">
+        <p class="kicker">the part where i'm honest</p>
+        <h2 class="section-title">more expensive doesn't mean better</h2>
+        <p>
+          A purpose-built device isn't automatically the better device. The iPad in your drawer was a
+          flagship once. It very likely has a sharper screen, a faster chip and a better touch
+          response than a {PRICE_15} calendar appliance, and you already paid for it. Giving it a
+          second life on the wall isn't a compromise, it's a promotion.
+        </p>
+        <p>
+          What you do give up is the setup. Skylight arrives ready: no auto-lock to disable, no
+          Guided Access to configure, no notifications to silence. That's ten minutes of fiddling on
+          your side, once, and the setup helper walks you through all of it. After that the tablet
+          does one job and never interrupts you to announce a feature.
+        </p>
+        <div class="pull">
+          "having a comprehensive set of awesome family organization and finance planning related
+          features while also being fully private are two things that are no longer mutually
+          exclusive in the world of family software." - me, <a
+            href="https://dadmag.substack.com/p/vibe-coding-dad-of-three"
+            target="_blank"
+            rel="noopener">in an actual interview</a
+          >, sounding smarter than usual
+        </div>
+        <p>
+          Skylight gets credit for the idea. They got families to look up from six phones and at one
+          shared wall. We build on that, store your data privately and securely, and let you point it
+          at a screen you already own.
+        </p>
+      </div>
+    </section>
+    <div class="section-fade-to-dark"></div>
+
+    <section class="section dark">
+      <div class="wrap">
+        <p class="kicker section-label-light">have your cake, and eat it too</p>
+        <h2 class="section-title">private doesn't mean less anymore</h2>
+        <p class="section-subtitle">
+          the same three cards as the homepage security section, because the answer doesn't change.
+        </p>
+        <div class="cakegrid">
+          <div class="cakecard">
+            <h3>🙈 encrypted means encrypted</h3>
+            <p>
+              Most apps encrypt your data <span class="em">on their servers</span>, with their keys,
+              which is a security feature. beanies encrypts it
+              <span class="em">before it leaves your device</span>, with your key, which is a privacy
+              feature. I can't read it, sell it, or lose it, because I never had it.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>📂 one file, yours</h3>
+            <p>
+              Everything lives in a single encrypted <span class="em">.beanpod</span> file on your Google
+              Drive or device. Lose your PIN and your Recovery Kit? I can't help you. That's kinda the
+              whole point.
+            </p>
+          </div>
+          <div class="cakecard">
+            <h3>🤷 nothing to steal</h3>
+            <p>
+              Even if someone wanted to poke around our dark corner of the internet, there's nothing
+              there but code and app config. Good luck finding anything to leak.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <p class="kicker">getting started</p>
+        <h2 class="section-title">three steps and it's on the wall</h2>
+        <div class="boxes">
+          <div class="box">
+            <span class="tape">step 1</span>
+            <span class="emoji" aria-hidden="true">🫘</span>
+            <h3>create your beanpod</h3>
+            <p>
+              A few quick questions, about two minutes: where your family lives, your currency, and
+              who's in it. No account on my servers and no password to forget.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">step 2</span>
+            <span class="emoji" aria-hidden="true">🔑</span>
+            <h3>set up your pod</h3>
+            <p>
+              Pick a PIN, save your Recovery Kit, and add your beans. Bring your calendar across
+              while you're there, or just start fresh.
+            </p>
+          </div>
+          <div class="box">
+            <span class="tape">step 3</span>
+            <span class="emoji" aria-hidden="true">🔨</span>
+            <h3>hang it up</h3>
+            <p>
+              Mount the tablet, open beanies, turn on wall mode. The setup helper handles auto-lock,
+              Guided Access and orientation.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tight">
+      <div class="wrap">
+        <p class="kicker">fair questions</p>
+        <h2 class="section-title">things skylight folks actually ask</h2>
+        <details open>
+          <summary>do i need to buy anything?</summary>
+          <p>
+            No. Nothing at all beyond beanies itself, and beanies is free while we're in beta. If you
+            want the tablet to look tidy on the wall you could pick up a simple wall mount, but
+            that's optional and it's the whole shopping list. Any tablet with a browser works: iPad,
+            Android, Fire, the one with the cracked corner.
+          </p>
+        </details>
+        <details>
+          <summary>will the tablet fall asleep on me?</summary>
+          <p>
+            Wall mode holds the screen awake while it's on, and the setup helper walks you through
+            the two device settings that matter: auto-lock set to never, and Guided Access so a small
+            person can't wander into YouTube.
+          </p>
+        </details>
+        <details>
+          <summary>can the kids mess it up?</summary>
+          <p>
+            Not really. The wall is locked by default: anyone can tick their chores, nobody can
+            delete anything. Editing needs a grown-up's PIN, and it relocks itself afterwards.
+          </p>
+        </details>
+        <details>
+          <summary>can the kids see our money?</summary>
+          <p>
+            No. Finances are structurally excluded from the wall, whoever happens to be signed in.
+            There's no setting to get that wrong.
+          </p>
+        </details>
+        <details>
+          <summary>what if my wifi goes down?</summary>
+          <p>
+            The wall keeps showing your week. Everything is stored on the device, so it renders
+            offline and catches up when the connection comes back. It never goes blank.
+          </p>
+        </details>
+        <details>
+          <summary>okay but what if YOU shut down?</summary>
+          <p>
+            Your data is <em>always</em> yours. It's an encrypted file sitting on your own storage. Whatever
+            happens to me, it's still there, and it's still yours. Which is kind of the whole point.
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final">
+      <p class="kicker">the welcome mat is out</p>
+      <h2 class="final-title">every. bean. <em>counts.</em></h2>
+      <p class="section-subtitle">even the ones arriving from skylight.</p>
+      <a
+        href={APP_URL}
+        data-cta="CTA: Create Pod"
+        data-cta-loc="welcome-skylight-footer"
+        class="btn btn-primary">start counting beans 🫘</a
+      >
+      <p class="signoff">peace out, my beans.<br /><span class="g">greg</span></p>
+      <p class="ps">
+        ps. stuck getting it on the wall? come yell at me (nicely) on the <a href="/discord"
+          >discord</a
+        >.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<script>
+  /* The tablet cycles the four real wall views. It is the page's argument, so it
+     runs on its own, but the switcher is a real control: touch it and the page
+     stops deciding for you. Reduced motion holds it on the week. */
+  (function () {
+    const views = Array.from(document.querySelectorAll<HTMLElement>('.wall-view'));
+    const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.wall-switcher button'));
+    if (!views.length || !btns.length) return;
+
+    const order = ['days', 'lanes', 'today', 'jobs'];
+    let i = 0;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    function show(name: string) {
+      for (const v of views) {
+        if (v.dataset.view === name) v.setAttribute('data-on', '');
+        else v.removeAttribute('data-on');
+      }
+      for (const b of btns) b.setAttribute('aria-pressed', String(b.dataset.go === name));
+      i = order.indexOf(name);
+    }
+    function tick() {
+      show(order[(i + 1) % order.length]);
+    }
+    function start() {
+      if (!still.matches && !timer) timer = setInterval(tick, 4200);
+    }
+    function stop() {
+      if (timer) clearInterval(timer);
+      timer = null;
+    }
+
+    for (const b of btns) {
+      b.addEventListener('click', () => {
+        stop();
+        show(b.dataset.go ?? 'days');
+      });
+    }
+    /* Don't animate a screen nobody is looking at. */
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stop();
+      else start();
+    });
+    still.addEventListener('change', () => {
+      stop();
+      if (!still.matches) start();
+    });
+    start();
+  })();
+</script>
