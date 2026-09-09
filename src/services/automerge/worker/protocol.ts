@@ -90,6 +90,54 @@ export type LineageBasis =
   | { kind: 'user-file'; heads: string[] | null }
   | { kind: 'baseline'; heads: string[] | null };
 
+/**
+ * What `mergeRemoteEnvelope` answers — THE contract, declared once.
+ *
+ * ⚠️ IT WAS HAND-COPIED FIVE TIMES: the worker's return annotation, `docClient`'s
+ * declared return, a `MergeResult` local inside that same function,
+ * `MergeTerminusOutcome`, and a `merged` local in `syncService`. Five places to
+ * check when asking "what does a merge return?", and five chances to disagree — a
+ * field added to the worker and forgotten in `syncService`'s copy is dropped
+ * silently, because that copy is an annotation on a value that already has the
+ * field. This is that declaration; the two deliberately-LOOSER views below name it.
+ *
+ * The optional fields are optional for a reason worth keeping: **the presence of
+ * the field is itself the answer**. `replayed` only exists on a rebase, `carried`
+ * only on a scoped clean adopt. A consumer testing `carried !== undefined` is
+ * asking "was this that case?", which is why they are not defaulted to 0.
+ */
+export interface MergeOutcome {
+  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+  heads: Heads;
+  dirty: boolean;
+  changed: boolean;
+  remoteHeads: Heads;
+  /** How many ops a rebase replayed. Absent on every other action. */
+  replayed?: number;
+  /** Fields both sides wrote that could not be merged; the saved value stayed. */
+  conflicts?: number;
+  /**
+   * The policy asked for a rebase and it could not run, so this outcome is a
+   * fallback rather than the policy's own answer. Diagnostic only — nothing
+   * branches on it. `user-file` adopts only; every other context throws.
+   */
+  rebaseUnavailable?: true;
+  /**
+   * Entities carried across a clean lineage adopt (ADR-036 stage 6). **Present
+   * ⇔ this was an `adopt-remote` × `clean` adopt and the carry RAN TO
+   * COMPLETION**, so `0` means "the scope held, nothing was local-only" — not
+   * "the carry failed". Absent on every other action and context.
+   */
+  carried?: number;
+  /**
+   * The error CLASS name when the carry threw, in which case `carried` is ABSENT.
+   * Disjoint from `carried` on purpose: sharing `count: 0` between "nothing to
+   * carry" and "the carry broke" would make the telemetry unreadable without
+   * cross-referencing a second event.
+   */
+  carryFailed?: string;
+}
+
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─
 
 export type MutationOp =
