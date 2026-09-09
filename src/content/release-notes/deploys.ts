@@ -17,6 +17,86 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.09',
+    date: '2026-09-09',
+    month: '9 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'The beanie wall is here, recipes can be sent to anyone, and Google Drive stays connected.',
+      beanie:
+        'the beanie wall is here, recipes can be sent to anyone, and google drive stays connected.',
+    },
+    features: [
+      {
+        icon: '\u{1F4FA}',
+        title: { en: 'The beanie wall', beanie: 'the beanie wall' },
+        description: {
+          en: "Mount a spare tablet on the kitchen wall and beanies shows the family's week at a glance, with no sidebar, header or buttons in the way. Four views to switch between, and it keeps itself awake, so the answer to \u201Cwhat is happening today\u201D is just there on the wall.",
+          beanie:
+            "mount a spare tablet on the kitchen wall and beanies shows the family's week at a glance, with no sidebar, header or buttons in the way. four views to switch between, and it keeps itself awake, so the answer to \u201Cwhat is happening today\u201D is just there on the wall.",
+        },
+        tryItRoute: '/wall',
+        tryItLabel: { en: 'Open the wall', beanie: 'open the wall' },
+      },
+      {
+        icon: '\u{1F373}',
+        title: { en: 'Send a recipe to anyone', beanie: 'send a recipe to anyone' },
+        description: {
+          en: 'Share sits on the recipe itself, beside Edit, and one message goes to any app you like. Whoever receives it can read the whole recipe without an account, and keep it in their own cookbook in one tap. Recipes captured from a website can also be read again later.',
+          beanie:
+            'share sits on the recipe itself, beside edit, and one message goes to any app you like. whoever receives it can read the whole recipe without an account, and keep it in their own cookbook in one tap. recipes captured from a website can also be read again later.',
+        },
+        tryItRoute: '/pod/cookbook',
+        tryItLabel: { en: 'Open the cookbook', beanie: 'open the cookbook' },
+      },
+      {
+        icon: '\u{1F510}',
+        title: { en: 'Google Drive stays connected', beanie: 'google drive stays connected' },
+        description: {
+          en: 'The sign-in screen used to come back every few hours, on every device at once, because each one could throw away a working connection in favour of a stale one your other devices had shared. beanies now checks with Google before swapping, and keeps what works. Reconnecting also actually reconnects, rather than saying it did.',
+          beanie:
+            'the sign-in screen used to come back every few hours, on every device at once, because each one could throw away a working connection in favour of a stale one your other devices had shared. beanies now checks with google before swapping, and keeps what works. reconnecting also actually reconnects, rather than saying it did.',
+        },
+      },
+      {
+        icon: '\u{1F4BE}',
+        title: { en: 'Restore from Drive, in the app', beanie: 'restore from drive, in the app' },
+        description: {
+          en: 'The apps offered only Browse, and the file picker they need does not exist on a phone, so restoring your family file was web-only. You can now pick it straight from Google Drive on the iPhone and Android apps.',
+          beanie:
+            'the apps offered only browse, and the file picker they need does not exist on a phone, so restoring your family file was web-only. you can now pick it straight from google drive on the iphone and android apps.',
+        },
+      },
+      {
+        icon: '\u{1F4CB}',
+        title: { en: 'Copy a list to several beans', beanie: 'copy a list to several beans' },
+        description: {
+          en: 'Keeping the same chores or packing list for each child meant building it again every time. Copy a list to one bean or to several at once, and the whole thing comes with it.',
+          beanie:
+            'keeping the same chores or packing list for each child meant building it again every time. copy a list to one bean or to several at once, and the whole thing comes with it.',
+        },
+      },
+      {
+        icon: '\u{1F3E1}',
+        title: { en: 'Built for the long term', beanie: 'built for the long term' },
+        description: {
+          en: "beanies keeps every change your family has ever made, so any device can catch up from anywhere. That history only grows, and a family file that grows forever eventually gets slow to open. The owner can now tidy the family file down to what matters, from Settings, so your family's home keeps running smoothly for years and not just months. beanies tells you first if anyone is on an older version, and what it costs if they have not updated yet.",
+          beanie:
+            "beanies keeps every change your family has ever made, so any device can catch up from anywhere. that history only grows, and a family file that grows forever eventually gets slow to open. the owner can now tidy the family file down to what matters, from settings, so your family's home keeps running smoothly for years and not just months. beanies tells you first if anyone is on an older version, and what it costs if they have not updated yet.",
+        },
+      },
+      {
+        icon: '\u{1F527}',
+        title: { en: 'And a lot of smaller repairs', beanie: 'and a lot of smaller repairs' },
+        description: {
+          en: 'Invites sent from the iPhone app now open. Recovery-kit QR codes printed from iOS now scan. Prep time, cook time and servings get filled in far more often. Buttons no longer vanish under the cursor in dark mode. And when beanies cannot open your family file, it now tells you why and stays on screen instead of flashing a message that disappears.',
+          beanie:
+            'invites sent from the iphone app now open. recovery-kit qr codes printed from ios now scan. prep time, cook time and servings get filled in far more often. buttons no longer vanish under the cursor in dark mode. and when beanies cannot open your family file, it now tells you why and stays on screen instead of flashing a message that disappears.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.04',
     date: '2026-09-04',
     month: '4 september 2026',
