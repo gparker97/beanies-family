@@ -517,6 +517,21 @@ renders. There is no test on this predicate today, which is exactly how the bug 
 
 ### 5. Best-effort preservation on adopt — the item-4 fix
 
+> ⛔ **§5a WAS BUILT 2026-09-09 AND REVERTED ON REVIEW.** Its premise does not hold:
+> the design is scoped by `clean`, but `clean` proves only that WE hold nothing the
+> remote has not seen — not that the remote holds nothing we have not seen. So an
+> idle device resurrects every peer deletion it has not merged and republishes them.
+> Full analysis in `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` and
+> `docs/STATUS.md` (session 4). **§5b IS DONE** (the two regression tests). §5c went
+> with §5a.
+>
+> Two corrections to what is written below, independent of the revert:
+> `commitRemoteBaseline` is at `syncService.ts:2019`, not `:1981`; and the
+> `driveConnections` refresh-token evidence is `types/models.ts:1196`, not
+> `docOps.ts:817-824`. And the instruction to raise `lineageBlockError` on a failed
+> carry should NOT be followed if this is ever rebuilt — it would latch every device
+> on the propagation path.
+
 **Pass 2 correction.** The Pass 1 draft proposed attempting the rebase diff before a wholesale
 adopt. Provably a no-op for the case it was written for: `lineageContextFor` answers `clean`
 exactly when `headsEqual(basis.heads, headsOf(doc))` (`applyAndProject.ts:884`), and

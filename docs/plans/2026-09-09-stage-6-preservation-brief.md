@@ -3,7 +3,33 @@
 > Date: 2026-09-09
 > Parent plan: `docs/plans/2026-09-08-compaction-fallout-remediation.md` § 5
 > Investigation: `docs/investigations/2026-09-08-compaction-fallout.md` § "STAGE 6"
-> Status: **NOT STARTED. Deliberately.** Every other stage of the parent plan has shipped.
+> Status: ⛔ **BUILT 2026-09-09 AND REVERTED ON REVIEW. Do not rebuild from this
+> file.** Start from `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md`
+> (four review passes + the review that reverted it) and `docs/STATUS.md`'s session-4
+> block. §5b of the parent plan IS done and stays done.
+>
+> ⚠️ **THE PREMISE IN THIS BRIEF DOES NOT HOLD.** The design turns on "absent from
+> the compacted remote ⇒ this device created it", scoped by `clean`. But `clean` is
+> `headsEqual(basis.heads, headsOf(doc))` — our last-read baseline against our own
+> heads. It proves WE hold nothing the remote has not seen; it says nothing about what
+> the remote gained since. So any device that has merely not polled since a peer's
+> deletions reads `clean`, and the carry resurrects all of them and republishes them.
+> Trap 4 below accepts resurrection, but as a bounded false positive; it is actually
+> the common path and unbounded, and the brief never weighed the consequences
+> (denormalised balances with no recompute path, re-armed OS notifications, duplicate
+> Google Calendar events, member-scoped health data with unreachable dangling owners,
+> permanently broken photo tiles). All verified against the code — see STATUS.
+>
+> ⚠️ Two further claims in this brief were also wrong. (1) The "Its value went UP /
+> lever that makes that banner rare" argument in § "Why this is its own session" is
+> **FALSE**: `rebaseUnavailable` is set only inside the rebase branch, reachable only
+> from `adopt-remote × dirty` and `× user-file`, which are disjoint from the `× clean`
+> cell. It shrinks banner case 2 by zero. (2) The parent plan's instruction to raise
+> `lineageBlockError` when the carry throws should NOT be followed: it would latch
+> every device on the propagation path.
+>
+> ✅ **The "cheaper alternative" at the bottom of this file is now the leading
+> option.**
 
 ## Why this is its own session
 

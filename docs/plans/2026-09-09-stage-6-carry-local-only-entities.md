@@ -1131,6 +1131,75 @@ own those cells rather than in duplicated fixtures.
   pinned than before; dropped two integration tests that claimed renderer coverage
   they could not deliver; and split the work into two commits.
 
+## Outcome — BUILT, REVIEWED, REVERTED (2026-09-09)
+
+Implemented in full, all 7166 unit tests green, then **reverted on `/code-review max`**.
+The plan's four passes each improved it and none of them found the thing that killed
+it, which is worth recording as a lesson in its own right: every pass reviewed the
+mechanism, and the flaw was in the premise.
+
+### The finding
+
+The carry infers _"absent from the compacted remote ⇒ this device created it"_. That
+needs "the remote holds nothing we have not seen". **`clean` is not that.**
+`lineageContextFor` computes `headsEqual(basis.heads, headsOf(doc))` — our last-read
+Drive baseline against our own doc heads. It proves _we_ hold nothing the remote has
+not seen, and says nothing about what the remote gained since we last read it.
+
+`podLineage.ts`'s own gloss on the value — _"our document provably holds nothing the
+remote has not seen"_ — is exactly right, and exactly one direction short of what the
+carry needs.
+
+So **any device that has merely not polled since a peer's deletions reads `clean`**,
+and the carry re-adds all of them and republishes them (`dirty: true`). A phone in a
+pocket all day with no local edits is the textbook case, not an edge case.
+
+Trap 4 above DID accept resurrection. What it got wrong is magnitude (the common
+path, and unbounded) and consequences. All of these were verified against the code:
+
+- **Financial totals diverge with no healing path.** `account.balance`,
+  `goal.currentAmount` and loan principal are denormalised, and there is no
+  recompute-from-ledger anywhere in `src/`. "Delete it again" fires the reversal a
+  second time and moves the balance further from truth.
+- **OS push notifications re-arm** for resurrected todos/activities, before anyone
+  opens the app.
+- **Duplicate Google Calendar events**: `calendarEventLinks` is excluded but
+  `activities` is carried, and that link row is the idempotency key. The duplicate has
+  no link row, so beanies can never update or delete it.
+- **Member-scoped health data with dangling owners**: seven carried collections hold a
+  required `memberId` FK into the excluded `familyMembers`. A carried medication
+  becomes a daily non-completable "give <med> for Unknown member" with no UI route
+  able to delete it.
+- **Permanently broken photo tiles**: `gcOrphans` deletes the Drive bytes before the
+  record, and a carried host entity keeps the sweep from cleaning up.
+
+### What was kept
+
+- `MergeOutcome` declared once in `protocol.ts` instead of hand-copied five times.
+- **§5b**, which is independent of the carry and closes the 0.16 hole: that
+  `UnsupportedBeanpodVersionError` satisfies `isRemoteBlocker` without latching, and
+  that a save refused on it commits no remote baseline. That second assertion existed
+  nowhere.
+- The two false-comment corrections.
+
+### What a workable version needs
+
+A way to tell "this device created it" from "a peer deleted it", which the data model
+cannot currently express (`PodLineage` is `{ id, seq }`, no timestamp; no common
+ancestor to diff). Options, none chosen: a compaction timestamp to compare `createdAt`
+against; showing the user the diff instead of carrying silently; narrowing to
+collections with no denormalised total, external resource, notification or member FK
+(close to the empty set, which is itself the answer); or the brief's own cheaper
+alternative — tighten `compaction.olderVersion.notice` to state the consequence of not
+updating.
+
+### Separately true, and unaffected
+
+The brief's "lever that makes the lineage banner rare" claim is false regardless:
+`rebaseUnavailable` is set only inside the rebase branch, reachable only from
+`adopt-remote × dirty` and `× user-file`, disjoint from `× clean`. Struck in STATUS
+(both places) and corrected in `LineageBanner.vue`.
+
 ## Prompt Log
 
 ### Initial Prompt (2026-09-09)

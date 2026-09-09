@@ -4706,28 +4706,6 @@ const STRING_DEFS = {
     beanie:
       'two devices compacted your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
   },
-  // ADR-036 stage 6. Explicit `.one`/`.other`, chosen in TS by count because the
-  // caller is a service rather than a template. BOTH carry `{count}` so
-  // `fillTemplate` runs on every branch by one mechanism.
-  //
-  // ⚠️ NOT "items that were ONLY on this device". A carried entity may have been
-  // deleted on a peer and never merged here, in which case the carry resurrects
-  // it — so that phrasing would be false precisely in the case the user most
-  // needs to notice. The detail line tells them what to check instead, and
-  // "compacted" is the verb the rest of this surface already uses.
-  'podLineage.carriedLocalOnly.one': {
-    en: 'Kept {count} item from this device',
-    beanie: 'kept {count} item from this device',
-  },
-  'podLineage.carriedLocalOnly.other': {
-    en: 'Kept {count} items from this device',
-    beanie: 'kept {count} items from this device',
-  },
-  'podLineage.carriedLocalOnly.detail': {
-    en: 'Your family file was compacted on another device. Items added here were kept, so check anything that looks out of date.',
-    beanie:
-      'your family file was compacted on another device. items added here were kept, so check anything that looks out of date.',
-  },
   'podMerge.failedInline': {
     en: 'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
     beanie:

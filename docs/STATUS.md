@@ -2035,6 +2035,11 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Updated 2026-09-09 (session 4): stage 6 was built and REVERTED** — still open,
+> but do NOT rebuild it from the brief; see the session-4 block for why the premise
+> does not hold. The false banner justification that accompanied it is struck. §5b is
+> DONE. The remaining open items are unchanged.
+>
 > **Validated 2026-09-09 (session 3).** Every carried entry re-checked by
 > fingerprint. **Two dropped as shipped:** "decide on the web deploy (stages 4+5)"
 > (deployed today as 0.17.1) and "start from the auth-token-lifecycle brief"
@@ -2044,7 +2049,87 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
-### ⭐⭐ Session 2026-09-09 (3) — START HERE: STAGE 6 IS NEXT ⭐⭐
+### ⭐⭐ Session 2026-09-09 (4) — STAGE 6 BUILT, REVIEWED, AND REVERTED. Read this before rebuilding it. ⭐⭐
+
+> **Stage 6 was implemented in full, then reverted on review.** It is a DESIGN
+> problem, not a coding problem, and rebuilding it as specified will reproduce the
+> same outcome. Do not start from the brief; start from
+> `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` (four review passes)
+> and from the finding below.
+>
+> **What was kept** (commit `5811e94d`, plus this session's follow-ups):
+>
+> - The merge-outcome shape is declared ONCE (`MergeOutcome` in `protocol.ts`)
+>   instead of hand-copied five times. Type-only, independently good.
+> - **§5b is done and stays done:** two tests the 0.16 hole never had — that
+>   `UnsupportedBeanpodVersionError` satisfies `isRemoteBlocker` without latching,
+>   and that a save refused on it commits NO remote baseline. That second assertion
+>   existed nowhere and is the half that actually caused the 2026-09-08 loss.
+> - Two false comments corrected (`LineageBanner.vue`, `settingsStore.ts`).
+>
+> **What was reverted:** the carry itself, its composer, its telemetry, its toast and
+> its strings.
+>
+> ---
+>
+> ## ⛔ WHY IT WAS REVERTED — the premise does not hold
+>
+> The carry infers "absent from the compacted remote ⇒ this device created it".
+> That inference needs "the remote holds nothing we have not seen". **`clean` does
+> not mean that.** `lineageContextFor` computes
+> `headsEqual(basis.heads, headsOf(doc))`: our LAST-READ Drive baseline against our
+> OWN doc heads. It proves _we_ hold nothing the remote has not seen. It says
+> nothing about what the remote has gained since we last read it.
+>
+> So **any device that simply has not polled since a peer's deletions reads
+> `clean`** — a phone in a pocket all day, with no local edits, is the textbook
+> case — and the carry treats every one of those deletions as local-only, re-adds
+> them, and `dirty: true` republishes them to the whole family.
+>
+> Worked example: greg deletes 60 stale todos and compacts. His wife's phone made no
+> edits since morning, so it is `clean`, adopts, sees all 60 as local-only, carries
+> them back and publishes. The cleanup is undone fleet-wide and the toast cheerfully
+> says "Kept 60 items from this device".
+>
+> The brief DID accept resurrection ("a false positive costs a resurrected entity the
+> user can delete again"). What it got wrong is the magnitude — this is the common
+> path, not an edge case, and it is unbounded — and it never weighed these
+> consequences, all verified against the code:
+>
+> | consequence                                                                                                                                                                                                                                                                                                                                                                               | why "delete it again" does not cover it                                                    |
+> | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+> | **Financial totals diverge.** `account.balance` / `goal.currentAmount` / loan principal are DENORMALISED (`transactionsStore` patches them beside the write), and **no recompute-from-ledger exists anywhere in `src/`**. Carrying a transaction whose account is already in the compacted pod leaves ledger and balance disagreeing, and `dirty` publishes the inconsistency.            | Deleting it again fires the reversal a SECOND time, moving the balance further from truth. |
+> | **OS push notifications re-arm.** `useLocalNotifications` derives its schedule from the todo/activity stores, so a resurrected cancelled activity pushes a real reminder to every phone.                                                                                                                                                                                                  | The harm lands before anyone opens the app.                                                |
+> | **Duplicate Google Calendar events.** `calendarEventLinks` is excluded but `activities` is carried, and that link row IS the idempotency key — so the next reconcile inserts a SECOND real calendar event, and the first has no link row, so beanies can never update or delete it.                                                                                                       | Not reachable from beanies at all.                                                         |
+> | **Member-scoped health data with dangling owners.** `familyMembers` is excluded, but `allergies`, `medications`, `medicationLogs`, `memberNotes`, `favorites`, `sayings`, `milestones` all hold a required `memberId` FK. A carried medication renders as a daily non-completable "give <med> for Unknown member" critical item, and allergies are only reachable via `/pod/:memberId/…`. | No UI route can reach it to delete it.                                                     |
+> | **Broken photo tiles.** `gcOrphans` deletes the Drive bytes BEFORE the record, so a carried `PhotoAttachment` points at a 404. If its host entity was also carried, `collectReferencedPhotoIds` marks it referenced and the sweep never cleans it.                                                                                                                                        | Permanent.                                                                                 |
+>
+> ## What a workable stage 6 needs
+>
+> A way to distinguish "this device created it" from "a peer deleted it", which the
+> current data model cannot express: `PodLineage` is `{ id, seq }` with no timestamp,
+> and there is no common ancestor to diff. Options worth costing, none chosen:
+>
+> 1. **Carry only provably-new entities** — needs a creation marker comparable to the
+>    compaction, e.g. a compaction timestamp on `PodLineage` plus `createdAt`.
+> 2. **Show the user the diff and let them pick**, rather than carrying silently.
+> 3. **Narrow to collections with no denormalised total, no external resource, no
+>    notification and no member FK** — this is close to the empty set, which is
+>    itself the finding.
+> 4. **Do the cheap thing instead:** tighten `compaction.olderVersion.notice` to say
+>    what happens if members do NOT update. The brief already offers this as the
+>    cheaper alternative and it remains available.
+>
+> ## Also corrected in this session, and independent of all of the above
+>
+> **The "makes the lineage banner rare" justification was FALSE** and is struck in
+> both places it appeared in this file. `rebaseUnavailable` is set only inside the
+> rebase branch, reachable only from `adopt-remote × dirty` and `× user-file`; the
+> carry was scoped to `× clean`. Disjoint by construction, so stage 6 could not have
+> affected that banner at all. `LineageBanner.vue` carried the same false forward
+> claim and now says why it is false.
+
+### Session 2026-09-09 (3) — 0.17.1 deployed; stage 6 was next
 
 > **0.17.1 IS LIVE ON PROD WEB.** Deployed 2026-09-09 from `8a982f90`
 > (run 34320637942, `https://app.beanies.family`). Verified live: the bundle
@@ -2074,7 +2159,7 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >
 > ---
 >
-> ## ⭐ NEXT SESSION: STAGE 6, and nothing else first ⭐
+> ## ⭐ STAGE 6 — BUILT AND REVERTED 2026-09-09 (session 4). Read that block first. ⭐
 >
 > Read `docs/plans/2026-09-09-stage-6-preservation-brief.md` in full, then § 5 of
 > `docs/plans/2026-09-08-compaction-fallout-remediation.md`. It is the last
@@ -2094,9 +2179,19 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > the lineage banner's only exit, the other would have republished dead refresh
 > tokens that §1d then reads to heal.
 >
-> **Its value went UP:** the orange lineage banner only appears when the automatic
-> rebase could not run, and what stops the rebase is a missing baseline — exactly
-> what the stage-6 carry does not need. It is the lever that makes that banner rare.
+> ⚠️ **THAT "value went UP" CLAIM WAS FALSE, and it is struck** (2026-09-09,
+> session 4, when stage 6 was actually built). It read: _"the orange lineage banner
+> only appears when the automatic rebase could not run, and what stops the rebase is
+> a missing baseline, exactly what the stage-6 carry does not need. It is the lever
+> that makes that banner rare."_ It is not that lever and cannot be:
+> `rebaseUnavailable` is set in ONE place, inside `if (act === 'rebase')`, and
+> `rebase` is reached only from `adopt-remote × dirty` and `adopt-remote × user-file`
+> — whereas the carry is scoped to `adopt-remote × clean`. Disjoint by construction.
+> Stage 6 shrinks banner case 2 by ZERO. Its worth is the recoverability table in
+> `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` § Context and nothing
+> else. What WOULD shrink case 2 is a baseline-independent carry on the
+> `rebaseUnavailable` fallback itself; that is a different and larger change and has
+> NOT been decided.
 >
 > ---
 >
@@ -2219,10 +2314,9 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >
 > **Stage 6 is still not built, and that is greg's decision, made twice.** Its
 > ready-to-execute brief is `docs/plans/2026-09-09-stage-6-preservation-brief.md`.
-> Its value went UP this session: the orange lineage banner only appears when the
-> automatic rebase could not run, and what stops the rebase is a missing baseline —
-> which is exactly what the stage-6 carry does not need. It is the lever that makes
-> that banner rare.
+> ⚠️ Its "value went UP / lever that makes the banner rare" claim was FALSE and is
+> struck — see the correction in the session-3 block above. The carrying cell and the
+> banner-raising cells are disjoint by construction.
 >
 > **Still owed, in order:**
 >

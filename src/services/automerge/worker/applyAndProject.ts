@@ -20,13 +20,7 @@
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
-import {
-  guardLineage,
-  lineageBlockError,
-  isCleanCompactionAdopt,
-  isLineageRestore,
-  type LineageContext,
-} from '@/services/sync/podLineage';
+import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
 import type { PodLineage, DriveConnection } from '@/types/models';
 import { PayloadLoadError, LocalDocUnreadableError, CacheInitError } from '@/types/sync';
@@ -36,7 +30,6 @@ import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
   buildRebaseOps,
-  buildLocalOnlyCarryOps,
   // ⚠️ ONE NAME. This module used to import `applyMutation` TWICE — once aliased
   // as `applyMutationOp` and once bare — with each name used exactly once, so a
   // reader could not tell which was canonical.
@@ -856,44 +849,6 @@ function rebaseOntoRemote(
 }
 
 /**
- * Carry a stale device's local-only entities into the document being adopted
- * (ADR-036 stage 6).
- *
- * ⚠️ ONE MIGRATE, NOT TWO. Unlike `rebaseOntoRemote` above — which derives its own
- * `migrateDoc(remote)` — this takes the ALREADY-MIGRATED target, because a second
- * `migrateDoc` pass on every clean adopt in the fleet was explicitly rejected.
- * Reusing that same `target` on the failure path is safe ONLY because
- * `buildLocalOnlyCarryOps` emits `set` ops exclusively, so every throw lands
- * inside the `Automerge.change` and is rolled back. See the ⚠️ on that function.
- *
- * ⚠️ "JUST RE-MIGRATE ON FAILURE" IS NOT THE FIX IT LOOKS LIKE. `migrateDoc`
- * returns its input unchanged when nothing is missing, but calls `Automerge.change`
- * otherwise — so on a legacy remote a second call would throw on an input the
- * first call already progressed. There is no cheap fresh target here.
- *
- * ⚠️ IT NEVER THROWS, AND NEVER ASKS FOR A BLOCK. A carry is best-effort: falling
- * back to a plain adopt is exactly today's behaviour, so a failure loses nothing
- * relative to the status quo. Refusing instead would latch EVERY device on the
- * propagation path — `podLineage.ts` names that as the reason `clean` adopts
- * everywhere — and a compaction could then never reach a peer. The error CLASS is
- * returned rather than swallowed, so `adopt-carry-failed` can name it in
- * CloudWatch; the `console.warn` is the worker's only local channel.
- */
-function carryLocalOnly(
-  local: Doc,
-  target: Doc
-): { doc: Doc; carried: number } | { failed: string } {
-  try {
-    const ops = buildLocalOnlyCarryOps(local, target);
-    if (!ops.op) return { doc: target, carried: 0 };
-    return { doc: applyMutationOp(target, ops.op).doc, carried: ops.count };
-  } catch (e) {
-    console.warn('[applyAndProject] local-only carry failed — falling back to a plain adopt:', e);
-    return { failed: e instanceof Error ? e.name : 'UnknownError' };
-  }
-}
-
-/**
  * Replace the id segment of a document path with a placeholder.
  *
  * `driveConnections.greg@example.com.refreshToken` → `driveConnections.<id>.refreshToken`.
@@ -1063,20 +1018,6 @@ export async function mergeRemoteEnvelope(
    * `user-file` rebase fallback (`adopt-remote`, a NEWER file: nothing to mint).
    */
   let stampNewGeneration = false;
-  /**
-   * The local document to carry local-only entities from (ADR-036 stage 6), or
-   * null when this is not the scoped case.
-   *
-   * ⚠️ A `Doc` RATHER THAN A FLAG, so the wholesale branch below never needs a
-   * non-null assertion on `currentDoc` — which is legitimately null there on the
-   * first-load adopt.
-   *
-   * ⚠️ MUTUALLY EXCLUSIVE WITH `stampNewGeneration` BY CONSTRUCTION, not by care:
-   * that requires `lineageCtx === 'user-file'` and this requires `'clean'`, two
-   * different values of one variable. Pinned behaviourally by the restore test
-   * asserting `carried` is absent.
-   */
-  let carryFrom: Doc | null = null;
   let priorLineage: PodLineage | null = null;
   // `currentDoc` is non-null here by the assertion above; the check is kept as a
   // type narrowing, not as a second decision.
@@ -1086,19 +1027,7 @@ export async function mergeRemoteEnvelope(
     // Throws `PodLineageError` on a block; every caller between here and the
     // user dispatches on `isRemoteBlocker` FIRST, before any wrapping.
     const { action: act, verdict } = guardLineage(docLineage(remote), priorLineage, lineageCtx);
-    // ⚠️ BOTH CELLS ARE NAMED PREDICATES FROM `podLineage.ts`, beside the POLICY
-    // table whose meaning they encode. Hand-writing either as an inline `&&` here
-    // is the drift that module's comment exists to prevent, and `stampNewGeneration`
-    // was already doing it.
-    stampNewGeneration = act === 'adopt' && isLineageRestore(verdict, lineageCtx);
-    // ⚠️ SCOPED TO ONE CELL OF THREE. `act === 'adopt'` is reached from the two
-    // `user-file` cells as well, and those are the deliberate rollback route the
-    // lineage banner calls "the only exit there is". Scoping on the CELL rather
-    // than the action excludes them by construction, so nothing here can ever
-    // interfere with that exit. (The `publish-local` early return is just below
-    // this line, not above it — harmless, since `publish-local` implies
-    // `ours-newer` and so leaves this null.)
-    carryFrom = isCleanCompactionAdopt(verdict, lineageCtx) ? currentDoc : null;
+    stampNewGeneration = act === 'adopt' && verdict === 'ours-newer' && lineageCtx === 'user-file';
     if (act === 'publish-local') {
       // Our document is the newer lineage. Touch NOTHING — not the document,
       // not the cursors, not the cache. The caller keeps its own document and
@@ -1213,38 +1142,11 @@ export async function mergeRemoteEnvelope(
     // rebuilding here would destroy the history the restore exists to recover.
     // A throw inside the change leaves the old document installed.
     const adopted = migrateDoc(remote);
-    // ⚠️ STAGE 6: THE CARRY COMPOSES BEFORE THE INSTALL, so the "compose fully,
-    // install ONCE" invariant above still holds and a failure cannot leave a
-    // half-carried document installed.
-    //
-    // ⚠️ `carried` AND `carryFailed` ARE DISJOINT. `carried` present ⇔ the carry
-    // ran to completion (0 or more); `carryFailed` present ⇔ it threw, and
-    // `carried` stays absent. Setting `carried = 0` on failure was considered and
-    // rejected: it makes `count: 0` mean two different things, forcing a reader to
-    // cross-reference a second event at a different level to tell "nothing was
-    // local-only" from "the carry broke".
-    let carried: number | undefined;
-    let carryFailed: string | undefined;
-    let toInstall = adopted;
-    if (carryFrom) {
-      const res = carryLocalOnly(carryFrom, adopted);
-      if ('failed' in res) carryFailed = res.failed;
-      else {
-        toInstall = res.doc;
-        carried = res.carried;
-      }
-      // ⚠️ RELEASE THE PRE-ADOPT DOCUMENT NOW, not at the end of the function.
-      // It is otherwise reachable through `countEntities` + `pushProjection` ->
-      // `buildFullProjection`, which materializes the whole NEW document into
-      // plain JS — so peak would be old doc + new doc + full projection, on a
-      // path the OOM tiers exist to keep inside budget.
-      carryFrom = null;
-    }
     currentDoc = stampNewGeneration
-      ? Automerge.change(toInstall, (d) => {
+      ? Automerge.change(adopted, (d) => {
           (d as { podLineage?: PodLineage | null }).podLineage = nextLineage(priorLineage);
         })
-      : toInstall;
+      : adopted;
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
     const heads = headsOf(currentDoc);
     schedulePersist();
@@ -1274,11 +1176,6 @@ export async function mergeRemoteEnvelope(
       // Only ever true on the `user-file` fallback: this adopt is standing in
       // for a rebase that could not run, and the soak needs to see that.
       ...(rebaseUnavailable ? { rebaseUnavailable: true as const } : {}),
-      // Stage 6. Both absent on every action but a scoped clean adopt, so the
-      // PRESENCE of a field is itself the answer to "was this that case?" — the
-      // same convention `replayed` and `rebaseUnavailable` already use here.
-      ...(carried !== undefined ? { carried } : {}),
-      ...(carryFailed ? { carryFailed } : {}),
     };
   }
 

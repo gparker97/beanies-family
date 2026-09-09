@@ -13,8 +13,6 @@ import {
   compareLineage,
   lineageAction,
   guardLineage,
-  isCleanCompactionAdopt,
-  isLineageRestore,
   PodLineageError,
   type LineageVerdict,
   type LineageContext,
@@ -137,57 +135,5 @@ describe('guardLineage', () => {
     for (const ctx of ['clean', 'dirty', 'user-file'] as LineageContext[]) {
       expect(() => guardLineage(null, null, ctx)).not.toThrow();
     }
-  });
-});
-
-describe('the named cell predicates', () => {
-  // ⚠️ EXHAUSTIVE OVER ALL TWELVE CELLS, and that is the point of extracting
-  // them. `applyAndProject` used to hand-write `ours-newer x user-file` inline
-  // and stage 6 would have added a second inline cell beside it; two anonymous
-  // triples 900 lines from the table they read is how policy drifts. Moving them
-  // here is only an improvement if they end up MORE pinned than the expressions
-  // they replaced, which is what this table does.
-  const VERDICTS: LineageVerdict[] = ['same', 'adopt-remote', 'ours-newer', 'conflict'];
-  const CONTEXTS: LineageContext[] = ['clean', 'dirty', 'user-file'];
-
-  it('isCleanCompactionAdopt is true for EXACTLY adopt-remote x clean', () => {
-    const hits: string[] = [];
-    for (const verdict of VERDICTS) {
-      for (const ctx of CONTEXTS) {
-        if (isCleanCompactionAdopt(verdict, ctx)) hits.push(`${verdict}/${ctx}`);
-      }
-    }
-    expect(hits).toEqual(['adopt-remote/clean']);
-  });
-
-  it('isLineageRestore is true for EXACTLY ours-newer x user-file', () => {
-    const hits: string[] = [];
-    for (const verdict of VERDICTS) {
-      for (const ctx of CONTEXTS) {
-        if (isLineageRestore(verdict, ctx)) hits.push(`${verdict}/${ctx}`);
-      }
-    }
-    expect(hits).toEqual(['ours-newer/user-file']);
-  });
-
-  it('neither predicate covers the OTHER two adopt cells', () => {
-    // The whole reason stage 6 scopes on the CELL and not on `act === 'adopt'`:
-    // these two are the rollback route the banner calls "the only exit there is",
-    // and a guard that widened to any adopt could refuse the exit its own refusal
-    // raised. `conflict x user-file` must match NEITHER predicate.
-    expect(lineageAction('conflict', 'user-file')).toBe('adopt');
-    expect(isCleanCompactionAdopt('conflict', 'user-file')).toBe(false);
-    expect(isLineageRestore('conflict', 'user-file')).toBe(false);
-    // `ours-newer x user-file` also adopts, and is the restore — not a carry.
-    expect(lineageAction('ours-newer', 'user-file')).toBe('adopt');
-    expect(isCleanCompactionAdopt('ours-newer', 'user-file')).toBe(false);
-  });
-
-  it('the predicates agree with POLICY, so they cannot drift from it silently', () => {
-    // Each predicate claims a cell whose ACTION is `adopt`. If a future edit to
-    // POLICY changed either cell's action, the predicate would still return true
-    // while meaning something else — this is the assertion that catches it.
-    expect(lineageAction('adopt-remote', 'clean')).toBe('adopt');
-    expect(lineageAction('ours-newer', 'user-file')).toBe('adopt');
   });
 });
