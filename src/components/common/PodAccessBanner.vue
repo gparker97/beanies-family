@@ -21,7 +21,7 @@ import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
-import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { resolveErrorView } from '@/utils/structuredError';
 import { POD_ACCESS_ERRORS, type PodRecoveryAction } from '@/utils/podAccess';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -67,7 +67,25 @@ const handlers: Record<PodRecoveryAction, () => Promise<void>> = {
     await syncStore.verifyPodAccess();
   },
   reconnectAccount: async () => {
-    await reconnect();
+    // ⚠️ TWO BUGS LIVED IN THE TWO LINES THIS REPLACES.
+    //
+    // 1. The outcome was DISCARDED, so the Drive round-trip below fired on
+    //    `'redirecting'` and `'failed'` alike — against the access token
+    //    `reconnect()` had just invalidated. On native the WebView does NOT
+    //    unload (`Browser.open` resolves immediately), so `verifyPodAccess()`
+    //    really did run a Drive read on a nulled token while the user was still
+    //    on Google's consent screen: it 401s, re-raises `podAccessError` at
+    //    `critical` (paging #beanies-errors) and repaints this very banner.
+    //    "The page is leaving" is not a guard anywhere, and on native it is not
+    //    even true.
+    //
+    // 2. NO `loginHint`. This was the only reconnect call site without one, so
+    //    `tryReconnectSilently(undefined)` bailed at its per-account guard and
+    //    the beanpod-mirrored recovery this subsystem exists for was
+    //    unreachable — pushing the user to a consent screen every other call
+    //    site avoids. See CLAUDE.md § Cloud Auth UX.
+    const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
+    if (!reconnectSucceeded(outcome)) return;
     await syncStore.verifyPodAccess();
   },
   pickFamilyFile,

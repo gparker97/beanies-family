@@ -21,11 +21,10 @@
 import { ref, computed } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
-import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
+import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { useTranslation } from '@/composables/useTranslation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { isFlagEnabled } from '@/config/flags';
-import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
 import { startUnifiedReconnect } from '@/services/google/unifiedReconnect';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
@@ -161,15 +160,27 @@ export function useReconnectCoordinator() {
         // Single-feature group → delegate to the existing per-feature primitive.
         const feature = group.features[0]!;
         if (feature.kind === 'drive') {
-          // On a redirect surface the Drive reconnect navigates the page away and
-          // returns true; stop the loop so we never start a second consent mid-nav.
-          const redirecting = shouldUseRedirectAuth();
-          const ok = await driveReconnect(feature.email ?? undefined);
-          if (redirecting) {
+          // ⚠️ THE OUTCOME IS THE AUTHORITY, not `shouldUseRedirectAuth()`. This
+          // used to sample that predicate BEFORE the call and treat it as the
+          // redirect test — a second copy of the question, and a second chance
+          // to disagree with the answer. It does disagree exactly when it
+          // matters: on a redirect surface the silent path can RECOVER without
+          // navigating anywhere, and the stale predicate then abandoned the rest
+          // of the plan (leaving a second feature group unreconnected) and
+          // logged a redirect for a run that finished in place.
+          //
+          // ⚠️ AND `if (!ok)` WAS DEAD CODE. `driveReconnect` returns a string
+          // union; every arm is truthy, so a FAILED reconnect set no error and
+          // fell through to the success toast below — this prompt is mounted
+          // app-wide, so that is the surface most users meet.
+          const driveOutcome = await driveReconnect(feature.email ?? undefined);
+          if (driveOutcome === 'redirecting') {
             outcome = 'redirecting';
-            return;
+            return; // page is navigating away; nothing has been acquired yet
           }
-          if (!ok) reconnectError.value = t('reconnectPrompt.error');
+          if (!reconnectSucceeded(driveOutcome)) {
+            reconnectError.value = t('reconnectPrompt.error');
+          }
         } else {
           const result = await calendarStore.reconnect(feature.connectionId);
           if (result.status === 'redirecting') {

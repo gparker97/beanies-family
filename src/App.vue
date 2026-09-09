@@ -43,6 +43,7 @@ import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
 import LineageBanner from '@/components/common/LineageBanner.vue';
 import LocalDocUnreadableBanner from '@/components/common/LocalDocUnreadableBanner.vue';
+import PodUnreadableBanner from '@/components/common/PodUnreadableBanner.vue';
 // REVIEW-DEMO: sample-data banner for store-review demo sessions.
 import ReviewDemoBanner from '@/components/common/ReviewDemoBanner.vue';
 import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
@@ -1914,6 +1915,18 @@ watch(
 
     <!-- PWA banners -->
     <OfflineBanner />
+
+    <!-- ⚠️ OUTSIDE `v-if="showLayout"`, DELIBERATELY, and this placement is the
+         whole point of the component. The seven `decrypt` blockers latch sync off
+         for the session, and their only surface used to be a 4-second toast from
+         `BackgroundSyncBar` — which is mounted out here precisely BECAUSE the
+         in-layout banners (LineageBanner, LocalDocUnreadableBanner) cannot render
+         on a `noChrome` route. Mounting this one beside them instead would have
+         left Login, LoadPod, Join, CreatePod, OpenFromDrive, ShareTarget and
+         SharedRecipe with no surface at all: strictly worse than the toast it
+         replaces. In the flow slot, not the fixed toast stack, because
+         `ErrorBanner` renders inline and is not `position: fixed`. -->
+    <PodUnreadableBanner />
 
     <!-- Bottom-right toast stack -->
     <div

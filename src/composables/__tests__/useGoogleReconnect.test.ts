@@ -11,6 +11,19 @@ vi.mock('@/services/google/googleAuth', () => ({
   }),
 }));
 
+// ⚠️ MOCKED DELIBERATELY. Left unmocked, `tryReconnectSilently` reached into a
+// googleAuth factory that has no `isTokenValid`, threw inside its own try, and
+// was swallowed by its own catch — so it always returned false and the
+// `'recovered'` arm was exercised by nothing at all. A silent path that no test
+// can enter is a silent path no test can protect.
+const { tryReconnectSilently } = vi.hoisted(() => ({
+  tryReconnectSilently: vi.fn(async () => false),
+}));
+vi.mock('@/services/google/driveTokenRecovery', () => ({ tryReconnectSilently }));
+
+const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
+vi.mock('@/services/telemetry', () => ({ logEvent }));
+
 describe('useGoogleReconnect', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -92,17 +105,91 @@ describe('useGoogleReconnect', () => {
     expect(reconnectSucceeded(result)).toBe(false);
   });
 
-  it('drops the cached access token BEFORE trying the silent path', async () => {
-    // Without this a "reconnect" can reconnect nothing: when the grant was
-    // revoked on ANOTHER device the local token has not passed its own expiry,
-    // so `tryReconnectSilently` short-circuits on `isTokenValid()` and returns
-    // true without contacting Google. The caller then reports success and the
-    // next request 401s identically, forever.
+  it('reports `recovered` when the silent path restores the connection', async () => {
+    // The cheapest possible reconnect: no consent screen at all. Until the
+    // recovery module was mocked, no test could reach this arm.
+    tryReconnectSilently.mockResolvedValueOnce(true);
+    const { reconnect } = useGoogleReconnect();
+
+    const result = await reconnect();
+
+    expect(result).toBe('recovered');
+    expect(reconnectSucceeded(result)).toBe(true);
+    const { requestAccessToken } = await import('@/services/google/googleAuth');
+    expect(requestAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('counts EVERY outcome, including the redirect nobody was measuring', async () => {
+    // ⚠️ SIX SURFACES RAISE A RECONNECT and between them they emitted almost
+    // nothing: every redirect arm was silent, so a native user who dismissed the
+    // consent tab left no trace at all, and the success arms were counted on two
+    // of the six — so the reconnect success RATE was not measurable. Emitting in
+    // the composable makes it one number for all six.
+    const { shouldUseRedirectAuth } = await import('@/services/google/googleAuth');
+
+    const { reconnect } = useGoogleReconnect();
+    await reconnect();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ action: 'reconnect-reconnected' }),
+      })
+    );
+
+    logEvent.mockClear();
+    vi.mocked(shouldUseRedirectAuth).mockReturnValueOnce(true);
+    await reconnect();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({ action: 'reconnect-redirecting' }),
+      })
+    );
+
+    logEvent.mockClear();
+    tryReconnectSilently.mockResolvedValueOnce(true);
+    await reconnect();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ action: 'reconnect-recovered' }),
+      })
+    );
+  });
+
+  it('reports a FAILED reconnect at warn, with the reason attached', async () => {
+    const { requestAccessToken } = await import('@/services/google/googleAuth');
+    vi.mocked(requestAccessToken).mockRejectedValueOnce(new Error('popup_closed'));
+
+    const { reconnect } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(result).toBe('failed');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ action: 'reconnect-failed', detail: 'popup_closed' }),
+      })
+    );
+  });
+
+  it('does NOT destroy a working access token just because the button was pressed', async () => {
+    // ⚠️ THIS ASSERTION IS INVERTED FROM THE ONE IT REPLACES, on purpose.
+    //
+    // An earlier fix invalidated the cached token at the top of every reconnect,
+    // to stop `tryReconnectSilently` short-circuiting on `isTokenValid()` after a
+    // grant was revoked elsewhere. That is a real bug — but this button also
+    // renders for ANY `syncStore.error`, so pressing it on a non-auth failure
+    // threw away a token Google still accepted, and forcing the ladder to run
+    // every time pushed `consecutiveSilentRefreshFailures` toward the
+    // permanent-failure banner before the consent screen could open.
+    //
+    // The 401 is now observed where it arrives (`driveService.driveRequest`),
+    // which covers every consumer of `isTokenValid()` rather than this one
+    // button. See `driveService.test.ts`.
     const { invalidateAccessToken } = await import('@/services/google/googleAuth');
 
     const { reconnect } = useGoogleReconnect();
     await reconnect();
 
-    expect(invalidateAccessToken).toHaveBeenCalled();
+    expect(invalidateAccessToken).not.toHaveBeenCalled();
   });
 });

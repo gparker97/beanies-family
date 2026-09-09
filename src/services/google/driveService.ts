@@ -5,7 +5,7 @@
  * All functions require a valid access token from googleAuth.ts.
  */
 
-import { getGoogleAccountEmail, fetchGoogleUserEmail } from './googleAuth';
+import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
 import { isSafetyCopyName } from '@/constants/compaction';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -664,6 +664,33 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     } catch {
       message = `Drive API error ${status}`;
     }
+    // ─── 401: GOOGLE HAS JUST TOLD US THE TOKEN IS DEAD ──────────────────
+    //
+    // ⚠️ THIS IS THE ONLY PLACE THAT KNOWS IT, so it is the only place that can
+    // say so. `isTokenValid()` is a LOCAL CLOCK CHECK — it compares `expiresAt`
+    // and never contacts Google — so a grant revoked on another device kept
+    // reading as valid here for the rest of its local TTL. Roughly fifteen
+    // consumers trust that answer (`getValidToken`, `getValidTokenSilent`,
+    // `tryReconnectSilently`, `GoogleDriveProvider.isAuthenticated`, the redirect
+    // gate, the syncStore and four login surfaces), so every one of them went on
+    // handing out a token Google had already rejected. `tryReconnectSilently`
+    // returned true at its first line without acquiring anything, and the user
+    // was told "Reconnected" on a dead grant.
+    //
+    // It was fixed once at a single UI button by invalidating speculatively
+    // before every reconnect — which destroyed WORKING tokens when the button was
+    // pressed for a non-auth sync error, and drove the escalation counter toward
+    // a permanent-failure banner before the consent screen that would have fixed
+    // it could even open. Observing the 401 where it actually arrives fixes the
+    // class instead: it fires exactly when Google refuses, never otherwise.
+    //
+    // Every Drive call in the app goes through this function — it holds the only
+    // `fetch` in this module and the provider has none of its own — so there is
+    // no second door. Safe to call unconditionally: the refresh token is
+    // untouched, so the silent path still gets its chance, and the caller's own
+    // 401 arm (`attemptSilentRefresh`) installs a fresh token moments later.
+    if (status === 401) invalidateAccessToken();
+
     // 404 Not Found or 403 Forbidden both mean "the file isn't accessible to this
     // caller" — photoStore treats these identically (flags the photo as unresolved).
     if (status === 404 || status === 403) {

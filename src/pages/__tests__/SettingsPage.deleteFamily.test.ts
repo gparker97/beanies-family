@@ -16,6 +16,7 @@ const {
   deliverFileMock,
   deleteLocalFamilyMock,
   removeFamilyMock,
+  alertMock,
   deleteDriveFileMock,
   signOutMock,
   showToastMock,
@@ -35,6 +36,7 @@ const {
   ),
   deleteLocalFamilyMock: vi.fn(async () => {}),
   removeFamilyMock: vi.fn(async () => true),
+  alertMock: vi.fn(async () => {}),
   deleteDriveFileMock: vi.fn(async () => {}),
   signOutMock: vi.fn(async () => {}),
   showToastMock: vi.fn(),
@@ -54,7 +56,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), replace: replaceMock }),
 }));
 vi.mock('@/composables/useConfirm', () => ({
-  alert: vi.fn(async () => {}),
+  alert: alertMock,
   confirm: confirmMock,
 }));
 vi.mock('@/services/sync/capabilities', async (importOriginal) => ({
@@ -164,6 +166,20 @@ describe('SettingsPage — delete family export gate', () => {
     // nuisance. The asymmetry is why the gate proves deletion rather than
     // inferring it from intent or from session state.
     expect(removeFamilyMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT tell the user their data is gone from everywhere when the row stays', async () => {
+    // ⚠️ THE FAREWELL USED TO ASSERT "deleted from all systems" UNCONDITIONALLY,
+    // including on this — the DEFAULT — path, where the pod file and its registry
+    // row both survive by design. Keeping them is a defensible trade; telling the
+    // user the opposite is not, and it is the last thing the app ever says to
+    // them.
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(alertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'settings.deleteFamilyFarewellPartialMsg' })
+    );
   });
 
   it('gates the shared registry removal on the pod file actually being GONE', async () => {

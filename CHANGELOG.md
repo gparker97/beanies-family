@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Reconnecting no longer offers to open a file picker that this screen never uses**, and a reconnect that worked now says so in green rather than in the red used for things that went wrong.
 - **The Refresh button in the Google Drive file list works again.** It had been quietly changed to a version that could not ask for a new connection, so on an older list it did nothing at all and said nothing.
 - **Removing a family now only removes it from the beanies directory when the family's file was actually deleted.** Deciding from what you had asked for, rather than from what happened, meant a delete that failed part-way could still take the directory entry away while the file was sitting there.
-- **Tidying up your family file no longer refuses right after you create a pod or move it to a new place.**
+- **Tidying up your family file no longer refuses right after you move it to a new place.**
 
 ## 2026-09-08
 

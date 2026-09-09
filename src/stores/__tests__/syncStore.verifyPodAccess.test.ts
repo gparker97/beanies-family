@@ -236,7 +236,15 @@ vi.mock('@/services/google/googleAuth', () => ({
   isUserCancellation: () => false,
   tryGetSilentToken: (...a: unknown[]) =>
     (mockTryGetSilentToken as (...x: unknown[]) => Promise<string | null>)(...a),
-  TokenExpiredError: class TokenExpiredError extends Error {},
+  // ⚠️ SETS `name`, exactly as the real class does. A double that omits a field
+  // production guarantees is not a cheaper double, it is a wrong one — this one
+  // hid nothing only while the classifier used `instanceof`.
+  TokenExpiredError: class TokenExpiredError extends Error {
+    constructor(message?: string) {
+      super(message);
+      this.name = 'TokenExpiredError';
+    }
+  },
 }));
 
 vi.mock('@/services/google/driveService', () => ({
