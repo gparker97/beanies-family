@@ -247,7 +247,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
           "<strong>familyName</strong> \u2014 Your family's display name",
           '<strong>keyId</strong> \u2014 Key rotation identifier',
           '<strong>wrappedKeys</strong> \u2014 Per-member password-wrapped copies of the family key (older families)',
-          '<strong>recoveryKeys</strong> \u2014 Recovery-kit wrapped copies of the family key \u2014 how new families are unlocked (see <a href="/help/security/password-recovery">Your Recovery Kit</a>)',
+          '<strong>recoveryKeys</strong> \u2014 Recovery-kit wrapped copies of the family key \u2014 how new families are opened (see <a href="/help/security/password-recovery">Your Recovery Kit</a>)',
           '<strong>passkeyWrappedKeys</strong> \u2014 Per-passkey wrapped copies (for biometric login in the installed app)',
           '<strong>inviteKeys</strong> \u2014 Active invite link packages (24-hour expiry)',
           '<strong>encryptedPayload</strong> \u2014 Your actual data: IV + AES-GCM encrypted Automerge binary',
@@ -410,21 +410,21 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     category: 'security',
     title: 'Your Recovery Kit (and Other Ways Back In)',
     excerpt:
-      'Your recovery kit is the master key to your family\u2019s data. Learn how to store it, the recovery passphrase option, and every other way back in if a PIN or device is lost.',
+      'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the recovery passphrase option, and every other way back in if a PIN or device is lost.',
     icon: '\u{1F5DD}\uFE0F',
     readTime: 4,
     updatedDate: '2026-08-28',
     sections: [
       {
         type: 'heading',
-        content: 'The recovery kit is your master key',
+        content: 'The recovery kit is what gets you back in',
         level: 2,
         id: 'what-is-the-kit',
       },
       {
         type: 'paragraph',
         content:
-          'Day to day you sign in with your personal <strong>6-digit PIN</strong>, on any device where your family is set up. Behind that sits one master key: your family\u2019s <strong>recovery kit</strong> \u2014 a generated code you can save as a printable PDF with a QR code. If every device and every PIN were ever lost, the kit is the only way back into your family\u2019s data.',
+          'Day to day you sign in with your personal <strong>6-digit PIN</strong>, on any device where your family is set up. Behind that sits one family-wide way back in: your <strong>recovery kit</strong> \u2014 a generated code you can save as a printable PDF with a QR code. If every device and every PIN were ever lost, the kit is the only way back into your family\u2019s data.',
       },
       {
         type: 'paragraph',
@@ -556,7 +556,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'callout',
         content:
           'Biometrics and your PIN are for everyday convenience. If a device is lost or replaced, your <strong>recovery kit</strong> (or recovery passphrase) is what gets your family back in \u2014 see <a href="/help/security/password-recovery">Your Recovery Kit (and Other Ways Back In)</a>.',
-        title: 'Your recovery kit is the master key',
+        title: 'What the recovery kit is for',
         icon: '\u{1F5DD}\uFE0F',
       },
       {

@@ -115,21 +115,7 @@ export const useFamilyStore = defineStore('family', () => {
   // no-ops on an empty list (so the sign-out reset can't erase a good roster) and on a
   // missing active family (join/create flows before registration).
   watch(sortedMembers, (list) => {
-    void (async () => {
-      // Phase 4: snapshot whether the open envelope has any password wraps so the
-      // prove engine can suppress the password method for kit-born families on a
-      // cold device. Dynamic import avoids a familyStore↔syncStore import cycle;
-      // any failure leaves the flag unknown (safe default: password offered).
-      let envelopeHasPasswordWraps: boolean | undefined;
-      try {
-        const { useSyncStore } = await import('./syncStore');
-        const env = useSyncStore().envelope;
-        if (env) envelopeHasPasswordWraps = Object.keys(env.wrappedKeys ?? {}).length > 0;
-      } catch {
-        // leave unknown
-      }
-      await refreshRosterCache(list, envelopeHasPasswordWraps);
-    })();
+    void refreshRosterCache(list);
   });
 
   // Diagnostic: track permission changes on currentMember

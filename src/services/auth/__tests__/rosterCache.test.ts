@@ -80,26 +80,16 @@ describe('rosterCache', () => {
     ]);
   });
 
-  it('carries envelopeHasPasswordWraps; omission PRESERVES the stored value (review R2-F4)', async () => {
-    // Never stored + omitted → absent (unknown), not defaulted to false.
+  it('stores no credential fact at all', async () => {
+    // The roster cache used to carry `envelopeHasPasswordWraps`, with a
+    // read-preserve-rewrite dance to stop a snapshot fast-paint erasing it. Both are
+    // gone: what a family's envelope can be opened with is DERIVED from the envelope at
+    // the moment the question is asked. A cached credential fact that defaulted to
+    // "offer it anyway" is precisely what offered a password to a kit-born family.
     await refreshRosterCache([member({ id: 'a' })]);
-    let entry = await getRosterCache('fam-1');
-    expect('envelopeHasPasswordWraps' in entry!).toBe(false);
-
-    await refreshRosterCache([member({ id: 'a' })], false);
-    entry = await getRosterCache('fam-1');
-    expect(entry!.envelopeHasPasswordWraps).toBe(false);
-
-    // Omitted with a stored value → PRESERVED, never erased: the caller fires on
-    // snapshot fast-paints where the envelope isn't loaded yet, and wiping a
-    // kit-born family's `false` would re-offer a password that can never work.
-    await refreshRosterCache([member({ id: 'a' })]);
-    entry = await getRosterCache('fam-1');
-    expect(entry!.envelopeHasPasswordWraps).toBe(false);
-
-    await refreshRosterCache([member({ id: 'a' })], true);
-    entry = await getRosterCache('fam-1');
-    expect(entry!.envelopeHasPasswordWraps).toBe(true);
+    const entry = await getRosterCache('fam-1');
+    expect(entry).toBeTruthy();
+    expect(Object.keys(entry!)).toEqual(['familyId', 'familyName', 'members', 'cachedAt']);
   });
 
   it('filters pets out', async () => {

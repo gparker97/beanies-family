@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-09",
-    "translationCount": 4661
+    "translationCount": 4636
   },
   "translations": {
     "app.name": {
@@ -2051,11 +2051,6 @@
       "hash": "7ng9ta",
       "lastUpdated": "2026-02-24"
     },
-    "family.inviteSection.step2": {
-      "translation": "他们打开链接并选择密码",
-      "hash": "43g5kx",
-      "lastUpdated": "2026-02-24"
-    },
     "family.inviteSection.step3": {
       "translation": "他们已加入！他们现在可以使用自己的账号登录了",
       "hash": "978nw5",
@@ -2196,11 +2191,6 @@
       "hash": "jljuqj",
       "lastUpdated": "2026-03-03"
     },
-    "settings.security": {
-      "translation": "安全",
-      "hash": "grkjmo",
-      "lastUpdated": "2026-03-03"
-    },
     "password.enterPassword": {
       "translation": "输入密码",
       "hash": "etxder",
@@ -2252,24 +2242,9 @@
       "lastUpdated": "2026-02-24"
     },
     "password.decryptionError": {
-      "translation": "该密码未解锁Pod。如果您确定答案正确，请先让家庭成员打开Pod ，我们会在您下次登录时自动修复此问题。",
-      "hash": "qryp0o",
-      "lastUpdated": "2026-05-16"
-    },
-    "password.setAndContinue": {
-      "translation": "设置密码并继续",
-      "hash": "moas6g",
-      "lastUpdated": "2026-03-03"
-    },
-    "password.strongPasswordDescription": {
-      "translation": "选择强密码以保护您的数据文件。每次打开应用时，您都需要输入此密码。",
-      "hash": "ng22kf",
-      "lastUpdated": "2026-02-24"
-    },
-    "password.encryptedFileDescription": {
-      "translation": "此文件已加密。输入您的密码以解密和加载您的数据。",
-      "hash": "hbnawi",
-      "lastUpdated": "2026-02-24"
+      "translation": "该操作没有打开您的家庭文件。如果您确定答案正确，请先让家庭成员打开，我们会在您下次登录时自动修复此问题。",
+      "hash": "o3caal",
+      "lastUpdated": "2026-09-09"
     },
     "setup.yourName": {
       "translation": "您的名字",
@@ -2299,26 +2274,6 @@
     "auth.fillAllFields": {
       "translation": "请填写所有字段",
       "hash": "n7celo",
-      "lastUpdated": "2026-02-24"
-    },
-    "auth.passwordsDoNotMatch": {
-      "translation": "密码匹配不上",
-      "hash": "yop623",
-      "lastUpdated": "2026-02-24"
-    },
-    "auth.passwordMinLength": {
-      "translation": "密码必须至少为 8 个字符",
-      "hash": "hl3u3v",
-      "lastUpdated": "2026-02-24"
-    },
-    "auth.createPasswordPrompt": {
-      "translation": "为您的账号创建密码。您下次将使用此功能登录。",
-      "hash": "hssssq",
-      "lastUpdated": "2026-02-24"
-    },
-    "auth.createPasswordPlaceholder": {
-      "translation": "选择密码（最少8个字符）",
-      "hash": "4t6dwe",
       "lastUpdated": "2026-02-24"
     },
     "auth.createAndSignIn": {
@@ -2506,11 +2461,6 @@
       "hash": "mtvwgm",
       "lastUpdated": "2026-03-03"
     },
-    "auth.noMembersWithPassword": {
-      "translation": "还没有成员设置密码。请先完成入驻流程。",
-      "hash": "kbuga6",
-      "lastUpdated": "2026-02-24"
-    },
     "auth.fileLoadFailed": {
       "translation": "加载失败，点击重试",
       "hash": "7dqurh",
@@ -2534,21 +2484,6 @@
     "auth.signUpFailed": {
       "translation": "注册失败",
       "hash": "dir00v",
-      "lastUpdated": "2026-03-03"
-    },
-    "auth.createPassword": {
-      "translation": "创建密码",
-      "hash": "lnb1fm",
-      "lastUpdated": "2026-03-03"
-    },
-    "auth.confirmPassword": {
-      "translation": "确认密码",
-      "hash": "qbs2sb",
-      "lastUpdated": "2026-03-03"
-    },
-    "auth.confirmPasswordPlaceholder": {
-      "translation": "确认您的密码",
-      "hash": "7k2ifu",
       "lastUpdated": "2026-03-03"
     },
     "login.inviteTitle": {
@@ -2936,16 +2871,6 @@
       "hash": "7nwdn9",
       "lastUpdated": "2026-02-24"
     },
-    "join.setPasswordTitle": {
-      "translation": "选择",
-      "hash": "mjsnbj",
-      "lastUpdated": "2026-08-28"
-    },
-    "join.setPasswordSubtitle": {
-      "translation": "这款6位数PIN码仅供您使用，可在您的任何家庭设备上登录。",
-      "hash": "uoowrs",
-      "lastUpdated": "2026-08-28"
-    },
     "join.completing": {
       "translation": "正在加入您的家庭...",
       "hash": "f2iyzp",
@@ -3151,11 +3076,6 @@
       "hash": "pysjmj",
       "lastUpdated": "2026-08-28"
     },
-    "passkey.dekStale": {
-      "translation": "自生物识别设置以来，您的加密密钥已更改。请使用您的PIN码登录，然后在“设置”中重新注册生物识别。",
-      "hash": "dh43j1",
-      "lastUpdated": "2026-08-28"
-    },
     "passkey.prfFull": {
       "translation": "完全解锁",
       "hash": "aq2lzp",
@@ -3200,11 +3120,6 @@
       "translation": "尚未注册生物识别登录。",
       "hash": "lg3ggb",
       "lastUpdated": "2026-02-25"
-    },
-    "passkey.unsupported": {
-      "translation": "生物识别解锁在此设备上不可用。您的PIN码会为您登录。",
-      "hash": "dpey5z",
-      "lastUpdated": "2026-08-28"
     },
     "passkey.rename": {
       "translation": "重命名",
@@ -3785,11 +3700,6 @@
       "translation": "删除",
       "hash": "xskn2j",
       "lastUpdated": "2026-03-03"
-    },
-    "passkey.crossDeviceNoCache": {
-      "translation": "此生物识别已从另一台设备同步。使用您的密码登录一次，即可在此处启用密码。",
-      "hash": "etsrvg",
-      "lastUpdated": "2026-02-28"
     },
     "passkey.fileLoadError": {
       "translation": "无法加载您的数据文件。请使用您的PIN码登录。",
@@ -12552,9 +12462,9 @@
       "lastUpdated": "2026-09-04"
     },
     "loginV6.howThisWorks.bullet1": {
-      "translation": "AES-256加密。只有您的密码才能解锁。",
-      "hash": "vd92ee",
-      "lastUpdated": "2026-04-28"
+      "translation": "AES-256加密。只有您的家人才能打开它。",
+      "hash": "rx0ikg",
+      "lastUpdated": "2026-09-09"
     },
     "loginV6.howThisWorks.bullet2": {
       "translation": "无需跟踪。无需对您的财务状况进行分析。",
@@ -13017,9 +12927,9 @@
       "lastUpdated": "2026-05-03"
     },
     "transferOwnership.reauthNoCredential": {
-      "translation": "您需要设置密钥或密码才能转移所有权。打开设置→安全添加一个，然后重试。",
-      "hash": "sfh8f6",
-      "lastUpdated": "2026-05-03"
+      "translation": "您需要设置密钥或密码才能转移所有权。打开“设置” “→帐户和登录”以添加一个帐户，然后重试。",
+      "hash": "gqbxi",
+      "lastUpdated": "2026-09-09"
     },
     "transferOwnership.confirmTitle": {
       "translation": "确认赠送",
@@ -14117,9 +14027,9 @@
       "lastUpdated": "2026-05-15"
     },
     "resumeSetup.unlockPod": {
-      "translation": "解锁我的Pod",
-      "hash": "pbg1e5",
-      "lastUpdated": "2026-05-15"
+      "translation": "打开我的pod",
+      "hash": "mqpo3r",
+      "lastUpdated": "2026-09-09"
     },
     "resumeSetup.couldNotFindPod": {
       "translation": "我们无法自动加载您的Pod —请在下面选择它所在的位置。",
@@ -14300,86 +14210,6 @@
       "translation": "继续设置",
       "hash": "2wkclm",
       "lastUpdated": "2026-09-05"
-    },
-    "family.resetPassword.modalTitle": {
-      "translation": "重置{name}的密码",
-      "hash": "jg1pem",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.modalDescription": {
-      "translation": "设置新的临时密码。登录后， {name}可以在“设置” “→更改密码”下进行更改。",
-      "hash": "pq8iu1",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.warning": {
-      "translation": "与{name}私下共享此密码—任何拥有此密码的人都可以以他们的身份登录。",
-      "hash": "f7tb3y",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.submit": {
-      "translation": "重置密码",
-      "hash": "b4wo6k",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.success": {
-      "translation": "密码重置。与{name}共享新密码。",
-      "hash": "llsjxy",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.required": {
-      "translation": "请输入并确认新密码。",
-      "hash": "aq5ndf",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.mismatch": {
-      "translation": "密码不一致。",
-      "hash": "9sze77",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.notAuthenticated": {
-      "translation": "您的会话已过期。请重新登录并重试。",
-      "hash": "b4mbym",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.memberNotFound": {
-      "translation": "找不到该家庭成员。",
-      "hash": "bl2eds",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.cannotResetSelf": {
-      "translation": "从“设置” “→帐户和登录”更改您自己的个人识别码。",
-      "hash": "2u1tvh",
-      "lastUpdated": "2026-08-28"
-    },
-    "family.resetPassword.error.isPet": {
-      "translation": "宠物不需要PIN码。",
-      "hash": "aymd6",
-      "lastUpdated": "2026-08-28"
-    },
-    "family.resetPassword.error.cannotResetOwner": {
-      "translation": "Pod所有者在“设置”中更改自己的PIN。",
-      "hash": "8nn450",
-      "lastUpdated": "2026-08-28"
-    },
-    "family.resetPassword.error.notAuthorized": {
-      "translation": "您没有重置其他会员PIN码的权限。",
-      "hash": "xnujuy",
-      "lastUpdated": "2026-08-28"
-    },
-    "family.resetPassword.error.familyKeyMissing": {
-      "translation": "无法加载家庭密钥—请注销并重新登录，然后重试。",
-      "hash": "207vpj",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.wrapFailed": {
-      "translation": "无法重新包装帐户密钥。请重试。",
-      "hash": "cgyqoo",
-      "lastUpdated": "2026-05-16"
-    },
-    "family.resetPassword.error.updateFailed": {
-      "translation": "无法更新密码。未更改任何内容。请重试。",
-      "hash": "1d0sz5",
-      "lastUpdated": "2026-07-16"
     },
     "auth.signinHeal.unexpectedError": {
       "translation": "无法重新同步您的帐户密钥",
@@ -18576,16 +18406,6 @@
       "hash": "8rdlub",
       "lastUpdated": "2026-07-13"
     },
-    "passkey.errEnableFailed": {
-      "translation": "目前无法在此设备上设置生物识别解锁。您仍然可以使用PIN码登录。",
-      "hash": "sdt6p0",
-      "lastUpdated": "2026-08-28"
-    },
-    "passkey.errNotReadable": {
-      "translation": "您的设备无法完成此请求。请确保已设置设备生物识别（指纹或面部解锁） ，然后重试。",
-      "hash": "71aeia",
-      "lastUpdated": "2026-07-14"
-    },
     "passkey.errNotSupported": {
       "translation": "此设备目前无法使用生物识别解锁。您可以使用PIN码登录。",
       "hash": "mymgk6",
@@ -18595,11 +18415,6 @@
       "translation": "发生安全错误。请确保您使用的是安全(HTTPS)连接。",
       "hash": "8h63j",
       "lastUpdated": "2026-07-14"
-    },
-    "passkey.errGeneric": {
-      "translation": "生物识别解锁出错。您可以使用PIN码登录。",
-      "hash": "8phsk4",
-      "lastUpdated": "2026-08-28"
     },
     "biometric.cancelled": {
       "translation": "生物识别已取消。您可以使用密码登录。",
@@ -18656,11 +18471,6 @@
       "hash": "manrb8",
       "lastUpdated": "2026-07-16"
     },
-    "family.resetPassword.error.saveFailed": {
-      "translation": "无法保存新密码。没有任何更改—他们的当前密码仍然有效。请检查您的网络连接，然后重试。",
-      "hash": "ntzl07",
-      "lastUpdated": "2026-07-16"
-    },
     "changePassword.error.noConnection": {
       "translation": "您需要连接才能更改密码。请重新连接并重试。",
       "hash": "wcc9h9",
@@ -18669,21 +18479,6 @@
     "changePassword.error.rollbackFailed": {
       "translation": "出错了，我们无法完全撤消更改。为了安全起见，请退出并重新登录，然后重试。",
       "hash": "fw8m6q",
-      "lastUpdated": "2026-07-16"
-    },
-    "family.resetPassword.error.noConnection": {
-      "translation": "您需要连接才能重置他们的密码。请重新连接并重试。",
-      "hash": "gigom5",
-      "lastUpdated": "2026-07-16"
-    },
-    "family.resetPassword.error.rollbackFailed": {
-      "translation": "出错了，我们无法完全撤消更改。为了安全起见，请退出并重新登录，然后重试。",
-      "hash": "fw8m6q",
-      "lastUpdated": "2026-07-16"
-    },
-    "family.resetPassword.error.unexpected": {
-      "translation": "出错了。请重试。",
-      "hash": "dp1w0g",
       "lastUpdated": "2026-07-16"
     },
     "docWorker.updateFailed": {
@@ -20967,9 +20762,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitDescription": {
-      "translation": "一页备份密钥，可在忘记所有密码和PIN码时解锁您的家庭数据。将其保存在安全的地方—没有它，beanies无法恢复您的数据。",
-      "hash": "5p6pti",
-      "lastUpdated": "2026-08-28"
+      "translation": "一页恢复工具包，如果忘记了所有PIN码，可打开您的家庭数据。将其保存在安全的地方—没有它， Beanies无法恢复您的数据。",
+      "hash": "wqp8pm",
+      "lastUpdated": "2026-09-09"
     },
     "recovery.kitGenerate": {
       "translation": "创建恢复工具包",
@@ -21101,11 +20896,6 @@
       "hash": "t0jb3x",
       "lastUpdated": "2026-08-28"
     },
-    "recovery.kitEnterTitle": {
-      "translation": "输入您的救援码",
-      "hash": "94ee4t",
-      "lastUpdated": "2026-08-28"
-    },
     "recovery.kitEnterBody": {
       "translation": "键入恢复工具包中的代码（破折号为可选）。",
       "hash": "e3qnwm",
@@ -21122,9 +20912,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.unlock": {
-      "translation": "解锁",
-      "hash": "t1thuk",
-      "lastUpdated": "2026-08-28"
+      "translation": "我的家人",
+      "hash": "s1p8v6",
+      "lastUpdated": "2026-09-09"
     },
     "pin.invalidFormat": {
       "translation": "必须恰好是 6 位数",
@@ -21282,18 +21072,13 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.resetPinBody": {
-      "translation": "您已使用恢复密钥—设置一个新的6位数PIN码，以便从现在开始使用。",
-      "hash": "h3dpuu",
-      "lastUpdated": "2026-08-28"
+      "translation": "您正在使用康复工具包—请设置一个新的6位数PIN码，以便从现在开始使用。",
+      "hash": "q4nz0x",
+      "lastUpdated": "2026-09-09"
     },
     "recovery.resetPinAction": {
       "translation": "设置PIN码并登录",
       "hash": "sskmor",
-      "lastUpdated": "2026-08-28"
-    },
-    "recovery.passphraseHint": {
-      "translation": "您的密码—或您的家庭恢复密码（如果已设置）。",
-      "hash": "l5oe2p",
       "lastUpdated": "2026-08-28"
     },
     "recovery.passphraseRules": {
@@ -21367,9 +21152,9 @@
       "lastUpdated": "2026-08-28"
     },
     "setup.choosePinHint": {
-      "translation": "6位数PIN码可解锁您设备上的BEANS。您的恢复工具包（下一步）是主密钥。",
-      "hash": "podvur",
-      "lastUpdated": "2026-08-28"
+      "translation": "在已设置家庭成员的设备上， 6位数PIN会为您登录。您的恢复工具包（下一步）是让您使用全新工具包的原因。",
+      "hash": "oh5du0",
+      "lastUpdated": "2026-09-09"
     },
     "setup.kitStepIntro": {
       "translation": "您的家庭舱已准备就绪！最后一件事—将您的恢复工具包保存在安全的地方。",
@@ -21382,9 +21167,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitPromptBody": {
-      "translation": "您的恢复工具包是您家人数据的主密钥—如果每台设备和PIN都丢失了，这是唯一的回归方式。立即创建，并将其保存在安全的地方。",
-      "hash": "p539ov",
-      "lastUpdated": "2026-08-28"
+      "translation": "您的恢复工具包可以让您重新进入家人的数据—如果每台设备和PIN都丢失了，这是唯一的方法。立即创建，并将其保存在安全的地方。",
+      "hash": "1cyd1z",
+      "lastUpdated": "2026-09-09"
     },
     "loginFlow.recoveryOnlyBody": {
       "translation": "此设备上尚未设置登录方法—请使用您的恢复工具包、恢复密码或来自其他家庭设备的设备链接。",
@@ -21917,9 +21702,9 @@
       "lastUpdated": "2026-09-01"
     },
     "reauth.noCredential": {
-      "translation": "您需要先设置PIN或密码，然后才能执行此操作。打开设置→安全添加一个，然后重试。",
-      "hash": "fm9y3x",
-      "lastUpdated": "2026-09-01"
+      "translation": "您需要先设置PIN或密码，然后才能执行此操作。打开“设置” “→帐户和登录”以添加一个帐户，然后重试。",
+      "hash": "xkd79",
+      "lastUpdated": "2026-09-09"
     },
     "settings.clearDataFailed": {
       "translation": "无法清除您的数据。未删除任何内容，请稍后重试。",
@@ -22737,9 +22522,9 @@
       "lastUpdated": "2026-09-06"
     },
     "compaction.olderVersion.notice": {
-      "translation": "{list}上次在旧版本上打开的beanies。在紧凑之前，请他们更新beanies。",
-      "hash": "a2mhf5",
-      "lastUpdated": "2026-09-06"
+      "translation": "{list}上次在旧版本上打开的beanies。请先帮助他们更新到最新版本。如果您现在压缩，他们在现在到更新时间之间添加的任何内容都将丢失，并且无法恢复。",
+      "hash": "5z0abd",
+      "lastUpdated": "2026-09-09"
     },
     "compaction.why.devices": {
       "translation": "您的其他设备会自行切换到压缩文件。仍然使用较旧版本的设备在更新之前会停止同步，因此值得询问尚未更新的任何人来执行此操作。",
@@ -23309,6 +23094,96 @@
     "settings.deleteFamilyFarewellKeptFileMsg": {
       "translation": "您的家庭数据已从此设备中删除。您的家庭数据文件未受影响，正如您所选择的那样——您可以自行保留或删除它。我们很遗憾看到你离开——每一颗豆子都很重要。",
       "hash": "fqyc4e",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.notAuthenticated": {
+      "translation": "您的会话已过期。请重新登录并重试。",
+      "hash": "b4mbym",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.memberNotFound": {
+      "translation": "没找到那位家庭成员。",
+      "hash": "bl2eds",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.cannotResetSelf": {
+      "translation": "从“设置” “→帐户和登录”更改您自己的个人识别码。",
+      "hash": "2u1tvh",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.isPet": {
+      "translation": "宠物不需要PIN码。",
+      "hash": "aymd6",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.cannotResetOwner": {
+      "translation": "Pod所有者在“设置”中更改自己的PIN。",
+      "hash": "8nn450",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.notAuthorized": {
+      "translation": "您没有重置其他会员PIN码的权限。",
+      "hash": "xnujuy",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.familyKeyMissing": {
+      "translation": "无法加载家庭密钥—请注销并重新登录，然后重试。",
+      "hash": "207vpj",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.wrapFailed": {
+      "translation": "无法重新包装帐户密钥。请重试。",
+      "hash": "cgyqoo",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.updateFailed": {
+      "translation": "无法更新其PIN码。未更改任何内容。请重试。",
+      "hash": "wj14cd",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.saveFailed": {
+      "translation": "无法保存新PIN。没有任何变化—他们当前的PIN码仍然有效。请检查您的网络连接，然后重试。",
+      "hash": "qwviin",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.noConnection": {
+      "translation": "您需要连接才能重置他们的PIN码。请重新连接并重试。",
+      "hash": "nb3yin",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.rollbackFailed": {
+      "translation": "出错了，我们无法完全撤消更改。为了安全起见，请退出并重新登录，然后重试。",
+      "hash": "fw8m6q",
+      "lastUpdated": "2026-09-09"
+    },
+    "family.resetPin.error.unexpected": {
+      "translation": "出错了。请重试。",
+      "hash": "dp1w0g",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.passphraseLabel": {
+      "translation": "家庭恢复密码",
+      "hash": "8jlmmx",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.passphrasePlaceholder": {
+      "translation": "输入您的恢复密码",
+      "hash": "jsctcg",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.passphraseRequired": {
+      "translation": "请输入您的密码短语",
+      "hash": "p4xx6g",
+      "lastUpdated": "2026-09-09"
+    },
+    "join.setPinTitle": {
+      "translation": "选择",
+      "hash": "mjsnbj",
+      "lastUpdated": "2026-09-09"
+    },
+    "join.setPinSubtitle": {
+      "translation": "这款6位数PIN码仅供您使用，可在您的任何家庭设备上登录。",
+      "hash": "uoowrs",
       "lastUpdated": "2026-09-09"
     }
   }
