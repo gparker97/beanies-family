@@ -164,12 +164,6 @@ export interface RosterCacheEntry {
   familyName: string;
   /** Humans only, in roster order (adults oldest→youngest, then children). */
   members: RosterCacheMember[];
-  /**
-   * Phase 4: whether the envelope had ANY password wraps at cache time. False for
-   * a kit-born family — the prove engine's cold password probe keys on it (a
-   * password can never open a wrap-less envelope). Absent = unknown → offered.
-   */
-  envelopeHasPasswordWraps?: boolean;
   cachedAt: ISODateString;
 }
 

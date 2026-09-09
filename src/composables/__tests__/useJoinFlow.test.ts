@@ -848,7 +848,7 @@ describe('useJoinFlow', () => {
       familyMembers.push({ id: 'm1', requiresPassword: true, isPet: false, name: 'wife' });
 
       flow.handleSelectMember(familyMembers[0]! as never);
-      expect(flow.currentStep.value).toBe('set-password');
+      expect(flow.currentStep.value).toBe('set-pin');
       expect(flow.selectedMember.value?.id).toBe('m1');
 
       const ok = await flow.handleSubmitPin('482913');
@@ -875,7 +875,7 @@ describe('useJoinFlow', () => {
       const ok = await flow.handleSubmitPin('000000');
 
       expect(ok).toBe(false);
-      expect(flow.currentStep.value).toBe('set-password');
+      expect(flow.currentStep.value).toBe('set-pin');
       expect(flow.currentError.value?.code).toBe('FILE_DECRYPT_FAILED');
       expect(mockSyncStore.wrapFamilyKeyForMember).not.toHaveBeenCalled();
     });

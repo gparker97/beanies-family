@@ -54,7 +54,7 @@ export type JoinStep =
   | 'authenticating' // OAuth in flight (popup or redirect)
   | 'loading' // file fetch / Picker / decrypt / familyId validate
   | 'pick-member' // unclaimed-member grid
-  | 'set-password' // set-pin form (historical step name kept — one rename, many consumers)
+  | 'set-pin' // the invitee chooses their 6-digit PIN
   | 'link-ready' // Phase 4 device link: pod open — hand off to the standard login machine
   | 'joining'; // final commit
 
@@ -861,7 +861,7 @@ export function useJoinFlow() {
   function handleSelectMember(member: FamilyMember): void {
     selectedMember.value = member;
     clearError();
-    currentStep.value = 'set-password';
+    currentStep.value = 'set-pin';
   }
 
   /**
@@ -888,7 +888,7 @@ export function useJoinFlow() {
     });
     if (!ok) {
       // Step regresses so the user can retry from the same form.
-      currentStep.value = 'set-password';
+      currentStep.value = 'set-pin';
       return false;
     }
     return true;

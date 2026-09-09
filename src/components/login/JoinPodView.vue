@@ -255,7 +255,7 @@ const pinError = computed(() => {
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 function handleBack(): void {
-  if (flow.currentStep.value === 'set-password') {
+  if (flow.currentStep.value === 'set-pin') {
     flow.currentStep.value = 'pick-member';
     flow.selectedMember.value = null;
     pin.value = '';
@@ -617,14 +617,14 @@ onMounted(() => {
     <!-- STEP 3: Create Password                      -->
     <!-- ============================================ -->
     <template
-      v-else-if="flow.currentStep.value === 'set-password' || flow.currentStep.value === 'joining'"
+      v-else-if="flow.currentStep.value === 'set-pin' || flow.currentStep.value === 'joining'"
     >
       <div class="mb-6 text-center">
         <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
-          {{ t('join.setPasswordTitle') }}
+          {{ t('join.setPinTitle') }}
         </h2>
         <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
-          {{ t('join.setPasswordSubtitle') }}
+          {{ t('join.setPinSubtitle') }}
         </p>
       </div>
 

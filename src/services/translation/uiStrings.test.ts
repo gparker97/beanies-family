@@ -148,6 +148,9 @@ describe('uiStrings', () => {
       'setupProgress.error.',
       'inviteWizard.step1.faq.a1',
       'invite.shareEmail.error',
+      // Resetting another member's PIN is a credential surface: a euphemism here could
+      // have someone hand out the wrong secret, or think nothing changed when it did.
+      'family.resetPin.',
       'family.deleteConfirm',
       'family.deleteMember',
       'family.discardChanges',
@@ -177,5 +180,63 @@ describe('uiStrings', () => {
       }
       expect(bad, `beanie euphemism on an important surface:\n${bad.join('\n')}`).toEqual([]);
     });
+  });
+});
+
+describe('reset-PIN error keys cover the whole ResetError union', () => {
+  // `ResetMemberPinModal.vue` builds its key DYNAMICALLY —
+  // ``t(`family.resetPin.error.${result.error}`)`` — so a union member with no key
+  // renders the raw key string at the user, and no compiler or lint rule would catch it.
+  // Listed explicitly rather than derived: this is the pin, so adding a union member
+  // without its copy fails HERE.
+  const RESET_ERRORS = [
+    // RotateError
+    'familyKeyMissing',
+    'wrapFailed',
+    'updateFailed',
+    'saveFailed',
+    'noConnection',
+    'rollbackFailed',
+    // ResetError's own members
+    'notAuthenticated',
+    'memberNotFound',
+    'cannotResetSelf',
+    'isPet',
+    'cannotResetOwner',
+    'notAuthorized',
+  ] as const;
+
+  it.each(RESET_ERRORS)('has copy for %s', (code) => {
+    const key = `family.resetPin.error.${code}`;
+    expect(UI_STRINGS[key as UIStringKey], `missing ${key}`).toBeTruthy();
+  });
+
+  it('plus the modal-only "unexpected" fallback', () => {
+    expect(UI_STRINGS['family.resetPin.error.unexpected']).toBeTruthy();
+  });
+
+  it('no family.resetPassword.* key survives', () => {
+    const stale = Object.keys(UI_STRINGS).filter((k) => k.startsWith('family.resetPassword.'));
+    expect(stale, `stale reset-password keys:\n${stale.join('\n')}`).toEqual([]);
+  });
+
+  it('none of the reset-PIN copy still says "password"', () => {
+    const bad = Object.entries(UI_STRINGS)
+      .filter(([k]) => k.startsWith('family.resetPin.'))
+      .filter(([, v]) => /password/i.test(v))
+      .map(([k, v]) => `${k}: ${v}`);
+    expect(bad, `reset-PIN copy still naming a password:\n${bad.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('kit vocabulary', () => {
+  // The recovery kit had FIVE names in shipped copy: recovery kit, recovery code,
+  // recovery key, backup key, master key. Two survive by design — "Recovery Kit" is the
+  // artifact, "Recovery Code" is the code you type from it.
+  it('never says "recovery key", "backup key" or "master key"', () => {
+    const bad = Object.entries(UI_STRINGS)
+      .filter(([, v]) => /\b(recovery key|backup key|master key)\b/i.test(v))
+      .map(([k, v]) => `${k}: ${v}`);
+    expect(bad, `retired kit vocabulary:\n${bad.join('\n')}`).toEqual([]);
   });
 });

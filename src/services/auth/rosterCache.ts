@@ -14,10 +14,7 @@
 import type { FamilyMember, RosterCacheEntry, RosterCacheMember } from '@/types/models';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { getFamilyById } from '@/services/familyContext';
-import {
-  saveRosterCache,
-  getRosterCache,
-} from '@/services/indexeddb/repositories/rosterCacheRepository';
+import { saveRosterCache } from '@/services/indexeddb/repositories/rosterCacheRepository';
 import { toISODateString } from '@/utils/date';
 import { emitRosterRefreshFailed } from '@/services/telemetry/loginFlowEvents';
 
@@ -41,16 +38,7 @@ function toRosterMember(m: FamilyMember): RosterCacheMember {
  * active family or the list is empty: an empty write would erase a good roster during
  * the sign-out reset churn, which is exactly the moment the cache exists to survive.
  */
-export async function refreshRosterCache(
-  members: FamilyMember[],
-  /**
-   * Phase 4: whether the open envelope holds ANY password wraps (pass
-   * `Object.keys(envelope.wrappedKeys).length > 0`). Omit where the envelope
-   * isn't in reach — the stored value is left unknown, which the prove engine
-   * treats as "offer password" (the safe default).
-   */
-  envelopeHasPasswordWraps?: boolean
-): Promise<void> {
+export async function refreshRosterCache(members: FamilyMember[]): Promise<void> {
   const humans = members.filter((m) => !m.isPet);
   if (humans.length === 0) return;
 
@@ -59,24 +47,16 @@ export async function refreshRosterCache(
     if (!familyId) return;
     const family = await getFamilyById(familyId);
 
-    // "Omit = leave unknown" must mean PRESERVE, not erase (review R2-F4): the
-    // caller fires on every members mutation, including snapshot fast-paints where
-    // the envelope isn't loaded yet — a wholesale rebuild would durably wipe a
-    // kit-born family's stored `false` and re-offer a password that can never work.
-    let resolvedWrapsFlag = envelopeHasPasswordWraps;
-    if (resolvedWrapsFlag === undefined) {
-      try {
-        resolvedWrapsFlag = (await getRosterCache(familyId))?.envelopeHasPasswordWraps;
-      } catch {
-        // Preservation is best-effort; an unreadable prior entry stays unknown.
-      }
-    }
-
+    // NOTE: this used to also carry `envelopeHasPasswordWraps`, with a
+    // read-preserve-rewrite dance to stop a snapshot fast-paint erasing it. Both are
+    // gone: what a family's envelope can be opened with is now DERIVED from the
+    // envelope at the moment the question is asked, so a cache cannot answer it
+    // wrongly. A cached credential fact that defaulted to "offer it anyway" is the
+    // bug that work fixed; keeping the field as advisory would have kept the lie.
     const entry: RosterCacheEntry = {
       familyId,
       familyName: family?.name ?? '',
       members: humans.map(toRosterMember),
-      ...(resolvedWrapsFlag !== undefined ? { envelopeHasPasswordWraps: resolvedWrapsFlag } : {}),
       cachedAt: toISODateString(new Date()),
     };
     // TOCTOU guard: the active family can switch between the read above and this write

@@ -7,7 +7,7 @@
  *
  * Authorization is enforced in the store (`authStore.adminResetMemberPin` →
  * `assertCanResetMember`) via the `ResetError` closed union — every reject reason
- * maps onto a `family.resetPassword.error.<key>` translation (the keys are shared
+ * maps onto a `family.resetPin.error.<key>` translation (the keys are shared
  * with the retired password modal). No `if`/`else` ladder in this component.
  */
 import { ref, computed, watch } from 'vue';
@@ -67,7 +67,7 @@ watch(
 async function handleSave() {
   formError.value = null;
   if (!props.member) {
-    formError.value = t('family.resetPassword.error.memberNotFound');
+    formError.value = t('family.resetPin.error.memberNotFound');
     return;
   }
   if (!isValidPin(newPin.value)) {
@@ -100,10 +100,10 @@ async function handleSave() {
     // Closed-union `ResetError` → translated copy; a free-text error (thrown
     // message inside the store) renders as-is. `t()` yields undefined for unknown
     // keys (R2-F14) — never call string methods on it.
-    const known = t(`family.resetPassword.error.${result.error}` as never) as string | undefined;
+    const known = t(`family.resetPin.error.${result.error}` as never) as string | undefined;
     formError.value = known || String(result.error);
   } catch (e) {
-    formError.value = t('family.resetPassword.error.unexpected');
+    formError.value = t('family.resetPin.error.unexpected');
     reportError({
       surface: 'reset-member-pin',
       message: 'adminResetMemberPin threw',

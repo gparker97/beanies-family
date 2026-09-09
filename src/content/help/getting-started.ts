@@ -6,7 +6,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     category: 'getting-started',
     title: 'Creating Your First Pod',
     excerpt:
-      'Set up your family pod in minutes. Create your account, set a password, and start tracking your family finances.',
+      'Set up your family pod in minutes. Choose a PIN, save your recovery kit, and start tracking your family finances.',
     icon: '\u{1F331}',
     readTime: 3,
     popular: true,
@@ -36,7 +36,8 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> and click <strong>Create a New Family</strong>',
           'Enter your family name, your name, and your email address',
           'Connect where your pod lives \u2014 Google Drive (recommended) or a local file',
-          'Set a strong password to finish \u2014 this encrypts your pod file (entered once, after connecting)',
+          'Choose a 6-digit PIN \u2014 this is how you sign in on devices where your family is already set up',
+          'Save your recovery kit when beanies shows it \u2014 this is what gets you in on a brand-new device',
           'Add your family members so they\u2019re ready to assign to accounts and activities',
           "Your pod is created! You'll land in the Family Nook",
         ],
@@ -44,8 +45,8 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'Your password is the only way to unlock your pod. There is no password recovery \u2014 we never see or store your password. Write it down somewhere safe.',
-        title: 'Remember your password',
+          'Your PIN signs you in on devices where your family is already set up. It cannot open your family file on a brand-new device \u2014 only your recovery kit can. Save the kit somewhere safe: we never see or store it, so if every device is lost and the kit is gone, nobody can open your data.',
+        title: 'Your PIN and your recovery kit do different jobs',
         icon: '\u26A0\uFE0F',
       },
       {
@@ -96,7 +97,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'Click <strong>Add to Family</strong>',
           "Enter the new member's name, email, and role",
           'Copy the invite link and send it to them securely',
-          "They open the link, set their own password, and they're in!",
+          "They open the link, choose their own 6-digit PIN, and they're in!",
         ],
       },
       {
@@ -234,7 +235,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "On a new device, click <strong>Load Existing Family</strong> on the login page, connect your Google account, and select your pod file. Enter your password to decrypt and you're back in.",
+          'On a new device, click <strong>Load Existing Family</strong> on the login page, connect your Google account, and select your pod file. Enter your recovery code to open it, then choose a PIN for that device.',
       },
     ],
   },
@@ -262,7 +263,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Your pod stays encrypted the whole time — same password, same family key. Moving it just copies the encrypted <code>.beanpod</code> file to the new spot and starts saving there. Nothing is decrypted, re-uploaded in the clear, or exposed.',
+          'Your pod stays encrypted the whole time — same family key, same way in. Moving it just copies the encrypted <code>.beanpod</code> file to the new spot and starts saving there. Nothing is decrypted, re-uploaded in the clear, or exposed.',
       },
       {
         type: 'callout',
@@ -555,7 +556,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Launch the app from its new icon and sign in with your Google account. If you already have a family pod, choose <strong>Load Existing Family</strong> and pick your <code>.beanpod</code> file from Google Drive. Enter your password and you\u2019re in.',
+          'Launch the app from its new icon and sign in with your Google account. If you already have a family pod, choose <strong>Load Existing Family</strong> and pick your <code>.beanpod</code> file from Google Drive. Enter your recovery code and you\u2019re in.',
       },
       {
         type: 'heading',
