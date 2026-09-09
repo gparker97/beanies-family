@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-09
 
+### Changed
+
+- **Before tidying up your family file, beanies now tells you what it costs if someone has not updated yet.** It used to say only "ask them to update beanies before you compact", so the owner clicked past a mild suggestion with no idea what was at stake. It now names the people who are behind and says plainly that anything they add between now and updating will be lost and cannot be recovered. It is still your choice, not a refusal.
+- **Devices below version 0.17 are now asked to update.** A device that old cannot read a tidied-up family file but will write over it anyway, and anything created on it in between cannot be recovered.
+
 ### Fixed
 
 - **Choosing an older copy of your family file no longer leaves you stuck.** If you picked a saved copy from before your family file was last tidied up, and that copy was old enough to predate part of what beanies now stores, beanies could fail to open it and refuse to go any further, with no way forward from the one screen that is supposed to offer one. It opens the copy now.
