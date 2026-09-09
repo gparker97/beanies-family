@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-09
 
+### Fixed
+
+- **beanies no longer asks for a password your family has never had.** Signing in to a new family on a second device offered "use password instead" next to the recovery code. No password had ever been set, and for a family created recently none can be: the recovery kit is the only way in on a device that has not seen your family before. Choosing it led to a dead end with a developer error message in English. That option now appears only when a password can actually open your family file, which for older families it still does, exactly as before.
+- **Your PIN is now described honestly.** A PIN signs you in on devices where your family is already set up. It cannot open your family file on a brand-new device, which is what the recovery kit is for. The app and the help centre said otherwise in several places.
+- **A recovery passphrase set on one device is now seen by the others.** It was written correctly but a second device kept reading the copy of your family file it had already fetched, so the phrase appeared not to work.
+- **If you have a recovery passphrase, beanies now asks for the passphrase**, in its own clearly labelled box, instead of a single box captioned "your password, or your family recovery passphrase, if one was set". Getting it wrong returns you to the passphrase, not to a password form.
+- **Error messages on the sign-in screen are now written for people.** Several failures showed raw developer text in English regardless of your language.
+- **A family whose only way in is a recovery passphrase can now use it.** Such a family was shown a Recovery Code box instead, for a kit they do not have.
+- **Resetting a family member's PIN now calls it a PIN throughout.** Some of that screen's messages still called it a password.
+
+### Changed
+
+- **The recovery kit is called the recovery kit everywhere.** It had also been described as a recovery key, a backup key and a master key, which read as four different things.
+- **The help centre no longer describes the old password sign-in.** The guide for setting up a family still walked new families through choosing a password and warned them it was the only way in, which had not been true since PINs replaced passwords.
+
 ### Changed
 
 - **Before tidying up your family file, beanies now tells you what it costs if someone has not updated yet.** It used to say only "ask them to update beanies before you compact", so the owner clicked past a mild suggestion with no idea what was at stake. It now names the people who are behind and says plainly that anything they add between now and updating will be lost and cannot be recovered. It is still your choice, not a refusal.

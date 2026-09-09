@@ -32,7 +32,7 @@ import { reportError } from '@/utils/errorReporter';
 import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
-import { envelopeCapabilities } from '@/services/sync/fileSync';
+import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -128,6 +128,27 @@ const caps = computed(() => {
 });
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
 const hasRecoveryKits = computed(() => !!caps.value?.kit);
+/**
+ * The secret field on this screen feeds `tryUnwrapFamilyKey`, which tries the member
+ * password wraps and THEN the recovery passphrase — so one field serves both, and the
+ * label must name whichever this envelope can actually accept.
+ *
+ * ⚠️ This is why the kit form's back button may not be gated on `caps.password` alone.
+ * A passphrase-only family is routed to the kit form, and that button is its only way to
+ * a field it can type into; hiding it left such a family unable to open its file at all.
+ */
+const secretIsPassphrase = computed(
+  () => !!caps.value && !caps.value.password && caps.value.passphrase
+);
+/**
+ * True when nothing in this envelope can open it — no password wrap, no kit, no
+ * passphrase. Only reachable from a hand-edited or truncated file, since a family always
+ * gets a kit at birth. The screen then shows the honest message and NO credential field:
+ * a box the person cannot possibly fill is the defect this whole change removes.
+ */
+const nothingCanOpenIt = computed(
+  () => !!caps.value && coldCredentialSurface(caps.value) === 'none'
+);
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -371,8 +392,13 @@ async function handlePendingPassword(
     // ⚠️ Keyed on `!c.password`, NOT on `envelopeNeedsRecovery`. That predicate is FALSE
     // for an envelope with no wraps of any kind, so keying on it let exactly that
     // envelope fall through to a password form and throw a crypto error on submit.
-    if (c.kit || c.passphrase) {
+    const surface = coldCredentialSurface(c);
+    if (surface === 'kit') {
       showKitEntry.value = true;
+    } else if (surface === 'secret') {
+      // A passphrase-only family lands here: the kit form would ask for a code they do
+      // not have. `secretIsPassphrase` labels the field for them.
+      showKitEntry.value = false;
     } else {
       // No password, no kit, no passphrase: nothing can open this file. Say so rather
       // than offering a Recovery Code field over an envelope with no kit wraps — that is
@@ -414,9 +440,17 @@ onMounted(async () => {
  * an offline device still reaches the kit form. Never silent — a failure is reported.
  */
 async function refreshStaleEnvelope(): Promise<void> {
+  const pending = syncStore.pendingEncryptedFile;
   const before = caps.value;
-  const stagedFamily = syncStore.pendingEncryptedFile?.envelope?.familyId;
-  if (!before || !stagedFamily || stagedFamily !== familyContextStore.activeFamilyId) return;
+  if (!pending || !before) return;
+  // Same family only — the configured handle "may still point to the previous family's
+  // file" (see the caller), which is the reason that short-circuit exists.
+  if (pending.envelope?.familyId !== familyContextStore.activeFamilyId) return;
+  // ⚠️ And ONLY for a file we fetched from the configured provider. A file the USER
+  // picked (the /open "Open with" gesture, a drop, the OS picker) carries a `fileHandle`
+  // or a `provider`; re-reading over it would silently swap the bytes they deliberately
+  // chose — say, a good local copy after a bad Drive sync — for the provider's.
+  if (pending.fileHandle || pending.provider) return;
 
   try {
     await syncStore.loadFromFile();
@@ -1239,7 +1273,15 @@ async function handleDriveRefresh() {
       </div>
 
       <!-- Password form -->
-      <form v-if="!showKitEntry" class="mt-6" @submit.prevent="handleDecrypt">
+      <!-- Nothing can open this file: the honest message, and no field to fill. -->
+      <div
+        v-if="nothingCanOpenIt && formError"
+        class="dark:text-danger-lift mt-6 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
+      >
+        {{ formError }}
+      </div>
+
+      <form v-if="!showKitEntry && !nothingCanOpenIt" class="mt-6" @submit.prevent="handleDecrypt">
         <div
           v-if="formError"
           class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
@@ -1249,9 +1291,13 @@ async function handleDriveRefresh() {
 
         <BaseInput
           v-model="decryptPassword"
-          :label="t('password.password')"
+          :label="secretIsPassphrase ? t('recovery.passphraseLabel') : t('password.password')"
           type="password"
-          :placeholder="t('password.enterPasswordPlaceholder')"
+          :placeholder="
+            secretIsPassphrase
+              ? t('recovery.passphrasePlaceholder')
+              : t('password.enterPasswordPlaceholder')
+          "
           required
         />
 
@@ -1336,12 +1382,12 @@ async function handleDriveRefresh() {
              password can actually open this envelope. Nobody is stranded without it: the
              screen-level Back above the decrypt block is always present. -->
         <button
-          v-if="caps?.password"
+          v-if="caps?.password || caps?.passphrase"
           type="button"
           class="dark:text-ink-soft dark:hover:text-ink mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
           @click="closeKitEntry"
         >
-          {{ t('passkey.usePassword') }}
+          {{ secretIsPassphrase ? t('recovery.usePassphraseLink') : t('passkey.usePassword') }}
         </button>
       </form>
 

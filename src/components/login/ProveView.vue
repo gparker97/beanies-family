@@ -218,7 +218,7 @@ function switchLabel(method: ActiveKind): string {
     case 'password':
       return t('passkey.usePassword');
     case 'passphrase':
-      return t('recovery.passphraseSet');
+      return t('recovery.usePassphraseLink');
     case 'invite-needed':
       // Unreachable at runtime — NON_SWITCHABLE filters it out of the switch links —
       // but present in ActiveKind, so the compiler requires it. Deliberately not the

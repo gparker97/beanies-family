@@ -250,6 +250,34 @@ export function envelopeCapabilities(envelope: BeanpodFileV4): EnvelopeCapabilit
   };
 }
 
+/**
+ * Which credential surface to put in front of someone holding this envelope, cold.
+ *
+ * Extracted from `LoadPodView` because getting it wrong is invisible from the code that
+ * renders it: routing `kit || passphrase` to the kit form put a Recovery Code field in
+ * front of a passphrase-only family that has no code, and gating the way out on
+ * `password` alone then left them unable to open their file at all. Three branches, and
+ * two of them were wrong at different times — so the decision lives here, with a test.
+ */
+export type ColdCredentialSurface =
+  /** Type a secret: a member password, or the family recovery passphrase. */
+  | 'secret'
+  /** Redeem a recovery-kit code. */
+  | 'kit'
+  /** Nothing can open this file — say so rather than offering an impossible field. */
+  | 'none';
+
+export function coldCredentialSurface(caps: EnvelopeCapabilities): ColdCredentialSurface {
+  // A password is typed, so it wins: the kit is offered alongside via its own link.
+  if (caps.password) return 'secret';
+  // A code beats a passphrase when both exist, because the kit form links back to the
+  // secret field but not the reverse.
+  if (caps.kit) return 'kit';
+  // Passphrase but no kit: the kit form would ask for a code this family does not have.
+  if (caps.passphrase) return 'secret';
+  return 'none';
+}
+
 export interface EnvelopeCapabilities {
   /** Legacy per-member password wraps exist (`wrappedKeys`). */
   password: boolean;

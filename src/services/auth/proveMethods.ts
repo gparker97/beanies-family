@@ -297,10 +297,18 @@ export async function resolveProveMethods(ctx: ProveContext): Promise<ProveMetho
   // Which cold offers the fail-closed rule withheld. Computed HERE from `ctx` and the
   // resolved list, not inside a probe — probes stay free of telemetry per the module
   // contract, same as `prfWithheld` above.
+  //
+  // Counts ONLY suppression the ENVELOPE caused. A PIN-only member on a kit-born family
+  // has no password either way (`hasPassword === false` returns null from the probe
+  // before the envelope is consulted), and counting that would inflate the rate with the
+  // commonest case in the app and make the signal useless for the thing it measures.
   const suppressed = ctx.podOpen
     ? []
     : (['password', 'passphrase'] as const).filter(
-        (k) => !coldEnvelopeHas(ctx, k) && !methods.some((m) => m.kind === k)
+        (k) =>
+          !coldEnvelopeHas(ctx, k) &&
+          !methods.some((m) => m.kind === k) &&
+          (k !== 'password' || ctx.hasPassword !== false)
       );
 
   emitProveMethodsResolved({

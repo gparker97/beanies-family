@@ -38,11 +38,24 @@ export type StageOutcome =
        * three of which need the instance, not a classification of it.
        */
       payload?: PayloadLoadError;
+      /**
+       * The original exception for anything that is NOT a payload failure. Carried
+       * because the wrapper reports it: classifying an error and then discarding it
+       * leaves a CloudWatch entry with no message and no stack, which is the opposite
+       * of the point.
+       */
+      cause?: unknown;
     };
 
-/** `loadFromFile`'s failure reasons → the machine's transport vocabulary. */
+/**
+ * `loadFromFile`'s failure reasons → the machine's transport vocabulary.
+ *
+ * No `'permission'` case on purpose: that is decided by the `needsPermission` check
+ * above, and `loadFromFile` never returns it (`reason?: 'auth' | 'not-found' | 'error'`).
+ * A branch for it would read as a handled case that is in fact unreachable, and would
+ * hide the gap if that union ever grew one.
+ */
 function classifyLoadFailure(reason?: string): StageFailReason {
-  if (reason === 'permission') return 'permission';
   if (reason === 'auth') return 'auth';
   if (reason === 'not-found' || reason === 'file-not-found') return 'not-found';
   return 'error';
@@ -79,6 +92,6 @@ export async function stagePendingFile(alreadyOpen: boolean): Promise<StageOutco
     if (e instanceof PayloadLoadError) {
       return { ok: false, reason: 'error', payload: e };
     }
-    return { ok: false, reason: 'error' };
+    return { ok: false, reason: 'error', cause: e };
   }
 }
