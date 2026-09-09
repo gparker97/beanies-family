@@ -2058,23 +2058,31 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > sustainably so those phases are part of the skill rather than retyped each time.
 > Keep the four-pass plan discipline intact; the new phases come AFTER Phase 4/5.
 >
-> **1. The password / passphrase confusion in the app** (greg's direction, 2026-09-09).
-> The app uses both words and users cannot tell what is being asked for. Not yet
-> scoped — start by inventorying every surface that says "password" or "passphrase"
-> (`uiStrings.ts` is the place to start, plus the login/recovery/PIN flows) and work
-> out which concept each one actually means.
+> **1. Verify the credential fix in a BROWSER** (2026-09-09 session 5). The
+> password/passphrase work is CODE-COMPLETE and pushed, and **none of it is visually
+> verified** — `docs/lessons.md` is explicit that green tests have hidden real defects on
+> exactly this surface. The full testing plan was printed to greg in session 5; the three
+> that matter most:
 >
-> ⚠️ **START WITH THIS FACT: passwords were RETIRED in 0.13R2 (2026-08-28)**, replaced
-> by a per-member 6-digit PIN plus the family Recovery Kit, and browser passkeys were
-> deleted. So most surviving "password" wording is probably **leftover from before
-> that change** rather than a live password system, and the fix may be largely a copy
-> and terminology job rather than an auth change. Confirm that before designing
-> anything. Two breadcrumbs found while sweeping:
-> `src/stores/__tests__/passwordCache.test.ts:230` still carries
-> `TODO: Rewrite for V4 format` (about `decryptPendingFile` now using CryptoKey +
-> PBKDF2), and a `passwordHash` still exists in the Automerge doc alongside the
-> envelope's `wrappedKeys` - worth checking which of the two is actually load-bearing
-> now, since the join flow historically needed both.
+> - **The reported repro**: create a family with a PIN in session A, open session B —
+>   it must ask for the Recovery Code and offer **no** password option; then set a
+>   passphrase in A and confirm B accepts it **without clearing data**.
+> - **A LEGACY family** (a pre-0.13R2 `.beanpod` with `wrappedKeys`), cold, no roster
+>   cache: the password field must still appear and still work. This is the regression
+>   risk, and it is untested. Also with a dead Drive token: it must reach the RECONNECT
+>   panel, not a recovery terminal with the password silently withdrawn.
+> - **A passphrase-only family**: must get a passphrase field, never a Recovery Code box.
+>   This is the regression `/code-review` caught — gating the kit form's escape on
+>   `caps.password` had left such a family unable to open its file at all.
+>
+> Then Chinese (two CTAs were hand-fixed after the pipeline broke them), dark mode and
+> Large reading mode on ProveView / LoadPodView / RecoverySettings / ResetMemberPinModal,
+> and — after a deploy — the new `login-flow` telemetry in CloudWatch
+> (`prove_methods_resolved` carrying `+suppressed:password`, `envelope_capabilities_unknown`,
+> `envelope_capabilities_changed`). **Nothing from session 5 is deployed.**
+>
+> ⚠️ Not reachable without a hand-edited envelope, so untested by anyone: the degenerate
+> "nothing can open this file" terminal (`coldCredentialSurface` → `'none'`).
 >
 > **2. Raise the update floor 0.17 → 0.18** once 0.18 is live on BOTH stores (~half a
 > day after the 2026-09-09 submission; check App Store Connect and Play). Edit
@@ -2089,6 +2097,106 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > stage 6 unimplemented (no `carryLocalOnly`/`localOnlyEntities` symbol anywhere
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
+
+### ⭐⭐ Session 2026-09-09 (5) — THE CREDENTIAL-OFFER FIX. Pushed, NOT deployed, NOT browser-verified. ⭐⭐
+
+> **Last updated:** 2026-09-09 (SESSION 5 — **beanies stops offering a credential the family file cannot be opened with.** `427c34fa` → `f04540e8` → `f77afd8c` → `3b2876ee` on `main`, PUSHED. **Nothing deployed.**)
+>
+> **The report.** greg created a family with a PIN, opened a second browser session, and was
+> asked for the recovery code **with "use password instead" beside it**. No password had ever
+> been set, and for a kit-born family none can be: `syncStore.ts` states the envelope's only
+> wrap at birth is the recovery kit's. Setting a recovery passphrase in Settings and trying it
+> in the second session then produced `No wrapped keys in beanpod file — cannot unlock`.
+>
+> ⭐ **PASS 4 FALSIFIED THE PLAN'S CENTRAL PREMISE, and that is the lesson of this session.**
+> Three passes had reviewed a root cause that was real but was **not the bug greg hit**: a
+> fail-open tri-state in `proveMethods.ts` where `envelopeHasPasswordWraps === null` meant
+> "offer a password anyway". A fresh browser session never reaches `ProveView` at all —
+> `buildPeople` returns `null` with no roster cache, so `LoginPage` routes to the bootstrap
+> surface. The button greg clicked is `LoadPodView.vue`'s kit-form back button, which rendered
+> `t('passkey.usePassword')` **unconditionally**. The tri-state is a real but **LATENT** second
+> instance of the same mistake, which fires the moment a device does have a roster cache. Both
+> are fixed; the plan was rewritten so commit 1 carried the `LoadPodView` half.
+>
+> ⚠️ **PASS 4 ALSO STOPPED A SECURITY REGRESSION.** The plan put two new typed unlock errors in
+> `types/sync.ts` beside `RemoteBlocker`. `isRemoteBlocker` is a **duck-type** on `blockCode` +
+> `inlineMessageKey`, and `decryptPendingFile` tests it **before** the credential check — so an
+> unlock error carrying those two field names would have called `notePodUnopenable` and set
+> `LoadPodView`'s `podUnopenableHere` on a **single mistyped password**, closing the form for the
+> rest of the session. There is now ONE `UnlockFailedError` in `fileSync.ts`, with a deliberately
+> differently-named `messageKey` field, and a test asserting `isRemoteBlocker` rejects it.
+>
+> ⚠️ **PASS 3 STOPPED TWO MORE.** Deleting the five duplicate `family.resetPassword.*` chrome
+> keys **by line range** would have taken `auth.passwordRotation.savingLabel` with them — it sits
+> at `uiStrings.ts:2239`, between them, and is live on the password-change flow. And the
+> recovery-route re-read, written unconditionally, could adopt the **previous family's file**;
+> `LoadPodView.vue:384` documents exactly why that short-circuit exists.
+>
+> **The structural change.** Capabilities are **DERIVED** from the envelope the store already
+> holds, never cached — which deletes the memo, both invalidation rules, and the correctness
+> dependency on a `caps_changed` event (now a diagnostic only). The derivation is family-checked,
+> because `loadFromFile()` mutates `pendingEncryptedFile` globally and an A-fetch resolving after
+> a switch to B would otherwise decide B's offers. `ensureStaged` was SPLIT: it dispatches
+> `OPEN_FAILED`, and `transition()` swallows that from any state but `opening`/`prove`, so
+> calling it earlier would have failed **silently** while poisoning `proveError` for the later
+> real attempt. The new `stagePendingFile` service is pure I/O.
+>
+> ⭐ **`/code-review high` FOUND A REGRESSION THIS WORK INTRODUCED**, plus nine other real
+> findings. Gating the kit form's "Use password instead" on `caps.password` removed the ONLY
+> working route for a **passphrase-only** family: they are routed to a kit form that redeems a
+> code they do not have, and that button was their way to a field they could type into
+> (`tryUnwrapFamilyKey` tries member wraps and THEN the passphrase). The routing decision now
+> lives in `coldCredentialSurface()` in `fileSync.ts` — a pure function with a test, because two
+> different branches of it were wrong at two different times and neither was visible from the
+> component that renders it.
+>
+> Also from the review: the passphrase switch link read **"Set Passphrase"** (the Settings ACTION
+> button), telling a locked-out person to create one; an 8s stage timeout was reported as an open
+> failure, so a large `.beanpod` on mobile data pushed people to an error screen for a download
+> that was still working (a timeout is not evidence of failure — backstop is now 20s and it
+> withdraws only the envelope-dependent offers); the staging exception was classified then
+> **discarded**, so its CloudWatch report carried no message and no stack; the suppression counter
+> counted PIN-only members, inflating it with the commonest case in the app; `lastAttempted` was
+> never cleared on a non-password attempt, so a PIN failure could restore the passphrase pane with
+> a PIN error above it; and `completeAutoLoad` still keyed on `envelopeNeedsRecovery` — one of the
+> three call sites `fileSync`'s own comment names. All three now use the capability, and that
+> predicate has **no callers left** outside its own definition.
+>
+> ⚠️ **TWO CHINESE STRINGS WERE BROKEN BY THE REGENERATED TRANSLATION**, and only caught by
+> reading the output: `recovery.unlock` came back as 我的家人 ("My Family") with the verb dropped
+> — it is the primary CTA on **both** the kit form and the new passphrase form — and
+> `join.setPinTitle` was truncated to the bare verb 选择 ("Choose"). A third mistranslated "a
+> brand-new one" as a new KIT rather than a new DEVICE, inverting the distinction the whole change
+> exists to make. Hand-fixed; the pipeline is hash-keyed so they survive.
+>
+> **Vocabulary and docs.** The recovery kit had FIVE names in shipped copy (recovery kit, recovery
+> code, recovery key, backup key, master key); two survive by design and a test pins the rest out.
+> `family.resetPassword.*` consolidated into `family.resetPin.*`, with a table test over the
+> `ResetError` union because `ResetMemberPinModal` builds that key **dynamically** and a missing
+> member renders the raw key. 20 orphaned legacy strings deleted after **re-deriving** the list by
+> bare-string grep — which is what kept `transferOwnership.reauthNoCredential`, live but passed as
+> a string prop with no `t()` call anywhere. `getting-started.ts` was teaching the retired password
+> create flow to every new family ("Your password is the only way to unlock your pod"); it now
+> states the distinction the bug turned on. `security.ts` keeps its `password-recovery` slug (no
+> redirect mechanism exists, two internal inbound links).
+>
+> `envelopeHasPasswordWraps` is gone from `rosterCache`, `RosterCacheEntry` and `familyStore`'s
+> watcher, taking a bare `catch {}` with it.
+>
+> **Gates:** 7198 tests, `type-check`, `lint`, `security:lint` green; `npm run translate`
+> round-trips (4637 strings, 43 stale removed).
+>
+> ⏳ **OWED — and none of it is CI-checkable:** every browser check in the testing plan (item 1 of
+> NEXT SESSION), especially the LEGACY-family regression case, which is the one this change could
+> hurt and the one nobody has run. Plus the CloudWatch watch after a deploy. **Nothing is
+> deployed.**
+>
+> **ALSO THIS SESSION:** greg confirmed a compacted beanpod opens on the **Samsung Tab A7** — the
+> compaction acceptance criterion is MET and both OWED lines are struck; do not carry it forward.
+> Branch sweep: 14 remote branches, ALL backing open PRs (12 dependabot, 2 bot-sync), all KEPT.
+> Bot-PR backlog is now **14** and wants a `/review-dependabot-prs` pass.
+>
+> Plan: `docs/plans/2026-09-09-credential-vocabulary-and-offer-correctness.md`
 
 ### ⭐⭐ Session 2026-09-09 (4) — 0.18 SHIPPED TO ALL THREE SURFACES. Stage 6 built, reviewed and REVERTED. ⭐⭐
 

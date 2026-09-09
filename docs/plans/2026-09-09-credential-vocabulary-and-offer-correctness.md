@@ -519,3 +519,43 @@ All events are added as typed functions in `src/services/telemetry/loginFlowEven
 > at the same time, i've now typed this prompt multiple times. i think what we should do once done is use /skill-creator:skill-creator to extend the beanies-plan skill properly and in a sustainable way to include both implementation and code review and revision/fixes. we can do that after this session
 
 </details>
+
+---
+
+## Outcome (2026-09-09, session 5)
+
+**Implemented and pushed; NOT deployed and NOT browser-verified.**
+
+Commits: `f04540e8` (correctness) → `f77afd8c` (vocabulary, docs, hygiene) → `3b2876ee`
+(code-review fixes). The three-commit sequencing held, except that commit 2's `ProveView`
+passphrase form was pulled forward into commit 1: leaving an active passphrase probe with
+no form to render would have been exactly the broken intermediate state the sequencing
+exists to prevent.
+
+**What the passes were worth.** Pass 3 stopped two changes that would have broken working
+code (the line-range key deletion taking `auth.passwordRotation.savingLabel`; the
+unconditional re-read adopting the previous family's file). Pass 4 falsified the central
+premise — the reported bug is on `LoadPodView`, not `ProveView` — and stopped a security
+regression where `isRemoteBlocker`'s duck-type would have latched the session breaker on
+one mistyped password.
+
+**What the review was worth.** `/code-review high` found a regression this work
+introduced: gating the kit form's escape on `caps.password` left a passphrase-only family
+unable to open its file at all. Answered structurally with `coldCredentialSurface()`, a
+pure tested function, rather than another branch in the component — two different branches
+of that decision had by then been wrong at two different times.
+
+**Deviations from the plan, all deliberate:**
+
+- `UnlockFailedError` is ONE class in `fileSync.ts`, not two in `types/sync.ts` (Pass 4).
+- `decryptPendingFile` gained `errorKey`; `error` keeps its `'Incorrect password'` literal,
+  which three callers branch on.
+- The stage timeout is 20s and a timeout no longer dispatches `OPEN_FAILED` — a timeout is
+  not evidence of failure (review finding 4).
+- `password.decryptionError` was made credential-NEUTRAL. It is now rendered for a wrong
+  passphrase too, and `tryUnwrapFamilyKey` cannot know which was typed.
+- Two Chinese strings were hand-fixed after the pipeline broke them.
+
+**Still owed:** every browser check in the Testing Plan above, especially the LEGACY-family
+case (9) — the one this change could plausibly hurt, and the one nobody has run. Plus the
+CloudWatch verification, which needs a deploy.
