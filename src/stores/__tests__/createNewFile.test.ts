@@ -886,6 +886,72 @@ describe('pod creation: full end-to-end flow', () => {
       expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
       expect(vi.mocked(slackNotify)).toHaveBeenCalled();
     });
+
+    it('sends the ROSTER owner as the owner, and the signed-in member as the writer', async () => {
+      // ⚠️ THE SEMANTIC CHANGE THE WHOLE REGISTRY LADDER EXISTS FOR. Both fields
+      // used to be `authStore.currentUser`, so "the owner is whoever is writing"
+      // was baked into the wire — which is how a member device came to stamp
+      // itself owner on a row the registry had just lost.
+      //
+      // On a fresh pod the two happen to be the same person, and that is exactly
+      // what makes the wire change a no-op to deploy. What is pinned here is
+      // where each value COMES FROM, not that they differ.
+      const registryService = await import('@/services/registry/registryService');
+      const familyStore = useFamilyStore();
+
+      await createPod();
+
+      const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+      const rosterOwner = familyStore.members.find((m) => m.role === 'owner');
+
+      expect(rosterOwner).toBeDefined();
+      expect(entry.ownerMemberId).toBe(rosterOwner!.id);
+      expect(entry.ownerEmail).toBe(rosterOwner!.email ?? null);
+      // Present even when it equals the owner — the server's compatibility
+      // fallback tests PRESENCE, so an absent field means "pre-split client".
+      expect('writerMemberId' in entry).toBe(true);
+    });
+
+    it('a MEMBER device names the owner as owner, and only itself as writer', async () => {
+      // ⚠️ THE ASSERTION ABOVE CANNOT FAIL ON ITS OWN, and saying so is the point
+      // of this one. On a fresh pod the signed-in member IS the roster owner, so
+      // session-sourced and roster-sourced fields are the same value and the old
+      // code passes it. This test makes them DIFFERENT, which is the case that
+      // actually happened: a member device writing to a row the registry had just
+      // lost, stamping itself as the family's owner.
+      const registryService = await import('@/services/registry/registryService');
+      const familyStore = useFamilyStore();
+      const authStore = useAuthStore();
+
+      await createPod();
+      const owner = familyStore.members.find((m) => m.role === 'owner')!;
+
+      // A second member, signed in on this device.
+      const member = await familyStore.createMember({
+        name: 'Mary',
+        email: 'mary@example.com',
+        gender: 'other',
+        ageGroup: 'adult',
+        role: 'member',
+        color: '#3b82f6',
+        requiresPassword: true,
+      });
+      expect(member).not.toBeNull();
+      authStore.currentUser = {
+        ...(authStore.currentUser as NonNullable<typeof authStore.currentUser>),
+        memberId: member!.id,
+        email: 'mary@example.com',
+      };
+
+      vi.mocked(registryService.registerFamily).mockClear();
+      useSyncStore().ensureRegistered();
+
+      const [, entry] = vi.mocked(registryService.registerFamily).mock.calls.at(-1)!;
+      expect(entry.ownerMemberId).toBe(owner.id);
+      expect(entry.ownerEmail).toBe(owner.email ?? null);
+      expect(entry.writerMemberId).toBe(member!.id);
+      expect(entry.ownerMemberId).not.toBe(entry.writerMemberId);
+    });
   });
 });
 

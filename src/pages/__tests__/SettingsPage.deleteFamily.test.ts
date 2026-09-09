@@ -198,7 +198,10 @@ describe('SettingsPage — delete family export gate', () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/pages/SettingsPage.vue', 'utf8');
 
-    const call = source.indexOf('await removeFamily(familyId)');
+    // Matched loosely: the call gained a `writerMemberId` argument and wrapped
+    // across lines, and an assertion pinned to one formatting of it is an
+    // assertion that breaks on `prettier --write` rather than on a regression.
+    const call = source.search(/await removeFamily\(\s*familyId/);
     expect(call, 'removeFamily call not found').toBeGreaterThan(-1);
 
     const gate = source.lastIndexOf('if (podFileDeleted) {', call);

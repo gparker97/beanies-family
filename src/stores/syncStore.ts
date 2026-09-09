@@ -2513,13 +2513,42 @@ export const useSyncStore = defineStore('sync', () => {
     const ctx = useFamilyContextStore();
     const authStore = useAuthStore();
     const provider = syncService.getProvider();
+    // The family's own answer to "who owns this pod", read from the shared
+    // document. `useFamilyStore()` is already used below for `memberCount`, so
+    // this adds no coupling the payload did not already have.
+    const rosterOwner = useFamilyStore().owner;
     return {
       provider: overrides.provider ?? storageProviderType.value ?? 'local',
       fileId: overrides.fileId ?? provider?.getFileId() ?? null,
       displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
       familyName: ctx.activeFamilyName ?? null,
-      ownerEmail: authStore.currentUser?.email ?? null,
-      ownerMemberId: authStore.currentUser?.memberId ?? null,
+      // ─── THE OWNER COMES FROM THE POD ROSTER, NOT FROM THIS SESSION ────
+      //
+      // These two fields used to be `authStore.currentUser`, i.e. whoever was
+      // signed in on the device making the write. That is what let a member
+      // device stamp itself owner on a row the registry had just lost, and it is
+      // how greg's pod came to report an owner it never had. The roster is the
+      // family's own answer to "who owns this", the same one every device
+      // computes from the shared document, so every device now sends the SAME
+      // value and no device can nominate itself.
+      //
+      // ⚠️ NULL WHEN THERE IS NO RESOLVABLE ROSTER OWNER — never a fallback to
+      // the session. The Lambda preserves both fields when they arrive null or
+      // absent (`existing.x ?? body.x ?? null`), so a device that cannot see the
+      // roster (doc not loaded yet, a background write mid-boot) leaves the
+      // stored values exactly as they were. Substituting the local session there
+      // would reintroduce the whole defect on precisely the paths least able to
+      // judge it.
+      ownerEmail: rosterOwner?.email ?? null,
+      ownerMemberId: rosterOwner?.id ?? null,
+      // WHO IS WRITING, and the only thing the server's pointer guard consults.
+      // Distinct from the owner above from this release onward; identical to it
+      // whenever the owner is the one at the keyboard.
+      //
+      // `?? null`, never left undefined: the server's compatibility fallback
+      // tests PRESENCE, so an omitted field means "a client from before the
+      // split" and would silently take the legacy path forever.
+      writerMemberId: authStore.currentUser?.memberId ?? null,
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),

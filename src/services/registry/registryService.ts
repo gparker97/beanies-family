@@ -25,6 +25,24 @@ export interface RegistryWriteResult {
  * lives on the write payload only, never on `RegistryEntry`.
  */
 export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'> & {
+  /**
+   * The signed-in member on the device MAKING this write, or null when nobody is
+   * signed in. Transient like the two flags below — never stored.
+   *
+   * ⚠️ REQUIRED, NOT OPTIONAL, AND THE SERVER READS ITS PRESENCE. `ownerMemberId`
+   * used to carry double duty: the client sent the signed-in member's id AS the
+   * owner, so "the owner is whoever is writing" was baked into the wire and a
+   * member device writing to a row the registry had just lost stamped itself
+   * owner. The two are now separate questions, and the Lambda's pointer guard
+   * asks this one.
+   *
+   * It must be present on every write even when null. The server distinguishes
+   * ABSENT (a client from before the split, judged on `ownerMemberId` for
+   * compatibility) from PRESENT-AND-NULL (a current client with nobody signed in,
+   * which must NOT be able to move the pointer). Optional here would let a caller
+   * silently take the compatibility path forever.
+   */
+  writerMemberId: string | null;
   isLoginEvent?: boolean;
   /**
    * Transient, like `isLoginEvent` — never stored. Marks the ONE write that
@@ -43,8 +61,16 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
 
-async function request(method: string, familyId: string, body?: object): Promise<Response> {
-  const res = await fetch(`${API_URL}/family/${familyId}`, {
+async function request(
+  method: string,
+  familyId: string,
+  body?: object,
+  query?: Record<string, string>
+): Promise<Response> {
+  // Built with `URLSearchParams` rather than string concatenation so a value can
+  // never terminate the path, and so `familyId` keeps meaning only the family id.
+  const qs = query ? `?${new URLSearchParams(query).toString()}` : '';
+  const res = await fetch(`${API_URL}/family/${familyId}${qs}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -137,6 +163,19 @@ export async function registerFamily(
     return await registerFamilyOrThrow(familyId, entry);
   } catch (err) {
     console.warn('[registry] registerFamily failed — registry unavailable', err);
+    // ⚠️ COUNTED, EVEN THOUGH IT IS SWALLOWED BY DESIGN. This is the write every
+    // background sync, country change and Drive connect makes, and its failure
+    // was console-only — so "the registry is rejecting our writes" was invisible
+    // fleet-wide, and the investigation had to reconstruct it from Lambda logs.
+    // Swallowing the failure for the CALLER is the contract; hiding it from the
+    // firehose was never part of it.
+    logEvent({
+      level: 'warn',
+      surface: 'registry',
+      message: 'family register failed — registry unavailable',
+      context: { action: 'put-failed' },
+      error: err,
+    });
     return null; // swallowed a failure — the caller learns nothing about the pointer
   }
 }
@@ -172,7 +211,36 @@ export async function registerFamilyOrThrow(
   // between the server hotfix and the client shipping — must not generate false
   // `critical` reports. Only an explicit `false` is a refusal.
   const parsed = (await res.json().catch(() => ({}))) as { pointerAccepted?: boolean };
-  return { pointerAccepted: parsed?.pointerAccepted !== false };
+  const pointerAccepted = parsed?.pointerAccepted !== false;
+
+  // The success path too, and deliberately: a counter that only fires on failure
+  // cannot give you a RATE. `count` says where the owner fields came from — 1
+  // from the pod roster, 0 when no roster owner was resolvable and the fields
+  // were left for the server to preserve. Once the roster-sourced owner is in
+  // the field, a `count: 0` that stays high means devices are writing before the
+  // document is loaded, which is the thing worth knowing.
+  logEvent({
+    level: 'info',
+    surface: 'registry',
+    message: 'family registered',
+    context: { action: 'put', count: entry.ownerMemberId ? 1 : 0 },
+  });
+
+  if (!pointerAccepted) {
+    // Boring for a member device — every one of them sends pointer fields on
+    // every login because the payload is uniform — and DATA AT RISK when the
+    // caller meant to re-point. The caller distinguishes those two; this counts
+    // both, so the ratio is visible. It should fall to near zero for owner
+    // devices once the owner fields come from the roster.
+    logEvent({
+      level: 'warn',
+      surface: 'registry',
+      message: 'registry refused the canonical pointer',
+      context: { action: 'refused' },
+    });
+  }
+
+  return { pointerAccepted };
 }
 
 /**
@@ -192,11 +260,23 @@ export async function registerFamilyOrThrow(
  * false. `features.registry` off returns true: there is no row to remove, so
  * nothing failed.
  */
-export async function removeFamily(familyId: string): Promise<boolean> {
+export async function removeFamily(
+  familyId: string,
+  writerMemberId: string | null
+): Promise<boolean> {
   if (!features.registry) return true;
 
   try {
-    const res = await request('DELETE', familyId);
+    // A QUERY PARAMETER, not a body. A body on DELETE is legal and is dropped by
+    // enough intermediaries to be a bad bet. The server validates it as a UUID,
+    // logs a mismatch, and in this release still performs the delete — that warn
+    // is the measurement that decides when it may start refusing.
+    const res = await request(
+      'DELETE',
+      familyId,
+      undefined,
+      writerMemberId ? { writerMemberId } : undefined
+    );
     if (!res.ok) {
       console.warn(`[registry] removeFamily refused — HTTP ${res.status}`);
       logEvent({

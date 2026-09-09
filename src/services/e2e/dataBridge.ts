@@ -57,11 +57,23 @@ export function initDataBridge(): void {
     /**
      * E2E afterEach cleanup hook — removes the active family from the registry.
      * Fire-and-forget. Returns the familyId that was deleted (or null).
+     *
+     * ⚠️ SENDS A WRITER ID EVEN THOUGH IT HAS NO MEMBER CONTEXT, and it must.
+     * The server's DELETE ladder only warns today, but when it starts refusing,
+     * a teardown hook that sends nothing would be refused on every run — and
+     * because this is fire-and-forget, nothing would say so. Every E2E run would
+     * silently stop cleaning up after itself.
+     *
+     * The owner id from the local family record is the right value: this hook
+     * deletes the family it just created, so its owner IS the authority the
+     * server is about to check. Null when the record cannot be read, which is
+     * honest — the server then logs a mismatch rather than being lied to.
      */
     async cleanupActiveFamily(): Promise<string | null> {
       const id = getActiveFamilyId();
       if (!id) return null;
-      await removeFamily(id);
+      const owner = projectionList('familyMembers').find((m) => m.role === 'owner');
+      await removeFamily(id, owner?.id ?? null);
       return id;
     },
 
