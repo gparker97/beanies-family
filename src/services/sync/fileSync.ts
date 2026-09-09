@@ -12,6 +12,7 @@ import { generateUUID } from '@/utils/id';
 import { APP_VERSION } from '@/constants/appVersion';
 import type { PodLineage } from '@/types/models';
 import { UnsupportedBeanpodVersionError } from '@/types/sync';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import type {
   BeanpodFileV4,
   BeanpodVersion,
@@ -215,15 +216,73 @@ export async function unwrapWrappedKey(
  * True for a kit-born family (created password-free — `wrappedKeys` empty from birth,
  * a recovery kit and/or passphrase is the only way in from cold). Callers that would
  * otherwise offer a password prompt (pending-file decrypt, LoadPodView bootstrap, the
- * resume-setup auto-load) MUST check this first and route to the kit/passphrase
- * surfaces — a password can never succeed against such an envelope, and
- * `tryUnwrapFamilyKey` would throw its "No wrapped keys" error.
+ * resume-setup auto-load) MUST key on `!envelopeCapabilities(env).password` rather
+ * than on this predicate — a password can never succeed against such an envelope, and
+ * `tryUnwrapFamilyKey` would throw `UnlockFailedError('no-candidates')`. This predicate
+ * is narrower: it is the "kit-born" LABEL, and it is FALSE for an envelope with no wraps
+ * of any kind, which is exactly the case that used to fall through to a password form.
  */
 export function envelopeNeedsRecovery(envelope: BeanpodFileV4): boolean {
-  return (
-    Object.keys(envelope.wrappedKeys).length === 0 &&
-    (Object.keys(envelope.recoveryKeys ?? {}).length > 0 || !!envelope.recoveryPassphrase)
-  );
+  const c = envelopeCapabilities(envelope);
+  return !c.password && (c.kit || c.passphrase);
+}
+
+/**
+ * What a given envelope can ACTUALLY be opened with. Derived from the envelope only —
+ * never from a cache, a default, or a guess.
+ *
+ * This is the single answer every credential-offer decision consults, so an offer that
+ * cannot possibly succeed can never be rendered. Before this existed the answer was
+ * cached on the roster entry as a `boolean | null` that defaulted to "offer it anyway",
+ * which is how a kit-born family came to be shown "use password instead" against an
+ * envelope with no password wrap at all.
+ *
+ * NOTE the asymmetry with `envelopeNeedsRecovery`: an envelope with NO wraps of any kind
+ * reports every capability false and `envelopeNeedsRecovery` false. Offer sites must key
+ * on `!caps.password`, NOT on `envelopeNeedsRecovery`, or that envelope falls through to
+ * a password form. See `LoadPodView.handlePendingPassword`.
+ */
+export function envelopeCapabilities(envelope: BeanpodFileV4): EnvelopeCapabilities {
+  return {
+    password: Object.keys(envelope.wrappedKeys ?? {}).length > 0,
+    passphrase: !!envelope.recoveryPassphrase,
+    kit: Object.keys(envelope.recoveryKeys ?? {}).length > 0,
+  };
+}
+
+export interface EnvelopeCapabilities {
+  /** Legacy per-member password wraps exist (`wrappedKeys`). */
+  password: boolean;
+  /** The optional family recovery-passphrase wrap exists. */
+  passphrase: boolean;
+  /** At least one recovery-kit wrap exists. */
+  kit: boolean;
+}
+
+/**
+ * Why `tryUnwrapFamilyKey` could not produce a family key.
+ *
+ * ⚠️ MUST NOT implement `RemoteBlocker`, and MUST NOT carry `blockCode` or
+ * `inlineMessageKey`. `isRemoteBlocker` (`types/sync.ts:282`) duck-types on exactly
+ * those two field names, and `decryptPendingFile` (`syncStore.ts:2297`) tests it
+ * BEFORE the credential check — an unlock failure carrying them would latch the
+ * session breaker via `notePodUnopenable` and set `LoadPodView`'s
+ * `podUnopenableHere`, so a single mistyped password would close the form for the
+ * rest of the session. The message field is deliberately named `messageKey`.
+ *
+ * This is also why the class lives here and not beside `RemoteBlocker`: the next
+ * reader who adds an error next to that interface will make it implement it.
+ */
+export class UnlockFailedError extends Error {
+  readonly reason: 'no-candidates' | 'incorrect-secret';
+  readonly messageKey: UIStringKey;
+
+  constructor(reason: 'no-candidates' | 'incorrect-secret', messageKey: UIStringKey) {
+    super(reason);
+    this.name = 'UnlockFailedError';
+    this.reason = reason;
+    this.messageKey = messageKey;
+  }
 }
 
 export async function tryUnwrapFamilyKey(
@@ -233,7 +292,7 @@ export async function tryUnwrapFamilyKey(
   const entries = Object.entries(envelope.wrappedKeys);
 
   if (entries.length === 0 && !envelope.recoveryPassphrase) {
-    throw new Error('No wrapped keys in beanpod file — cannot unlock');
+    throw new UnlockFailedError('no-candidates', 'loginFlow.recoveryOnlyBody');
   }
 
   let familyKey: CryptoKey | null = null;
@@ -257,7 +316,7 @@ export async function tryUnwrapFamilyKey(
     }
   }
 
-  throw new Error('Incorrect password');
+  throw new UnlockFailedError('incorrect-secret', 'password.decryptionError');
 }
 
 /**

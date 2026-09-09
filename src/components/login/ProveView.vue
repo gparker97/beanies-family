@@ -37,15 +37,24 @@ const props = defineProps<{
    * so this screen offers SET-A-NEW-PIN instead of demanding forgotten credentials.
    */
   recoveryMode?: boolean;
-  /** The staged envelope carries a recovery passphrase — hint it under the password. */
-  hasPassphrase?: boolean;
+  /**
+   * The credential the last attempt used. On a failed attempt the machine REMOUNTS this
+   * component, so without it a mistyped passphrase reopens the password form.
+   */
+  lastAttempted?: 'password' | 'passphrase' | null;
 }>();
 
 const emit = defineEmits<{
   biometric: [];
   'tap-through': [];
   pin: [pin: string];
-  password: [password: string];
+  /**
+   * A typed secret plus WHICH credential it is. The kind is explicit because the
+   * passphrase reuses this event: without it every passphrase attempt would be recorded
+   * as a legacy-password attempt in the prove funnel, and the two have very different
+   * meanings (one is a retiring mechanism, the other the family-wide recovery route).
+   */
+  password: [password: string, kind: 'password' | 'passphrase'];
   /** The user moved past an offered stronger method (telemetry). */
   'fell-back': [];
   /** Cold-path escape: redeem a recovery kit instead. */
@@ -68,12 +77,20 @@ const offered = computed<MethodKind[]>(() => props.methods.map((m) => m.kind));
  */
 type ActiveKind = MethodKind | 'reset-pin';
 const firstNonRecovery = props.methods.find((m) => m.kind !== 'recovery')?.kind;
-const activeMethod = ref<ActiveKind>(
-  props.recoveryMode
-    ? 'reset-pin'
+/**
+ * The credential to restore after a failed attempt: the one actually used, not a
+ * hardcoded 'password'. Falls back to today's rule when that method is no longer offered
+ * — which is exactly the passphrase-accepted round trip, where the pod is now open and
+ * the passphrase is correctly withdrawn.
+ */
+const retryTarget =
+  props.error && props.lastAttempted && props.methods.some((m) => m.kind === props.lastAttempted)
+    ? props.lastAttempted
     : props.error && props.methods.some((m) => m.kind === 'password')
       ? 'password'
-      : (firstNonRecovery ?? 'recovery')
+      : null;
+const activeMethod = ref<ActiveKind>(
+  props.recoveryMode ? 'reset-pin' : (retryTarget ?? firstNonRecovery ?? 'recovery')
 );
 const resetPin = ref('');
 const resetPinConfirm = ref('');
@@ -92,6 +109,11 @@ function handleResetPinSubmit() {
 }
 
 const password = ref('');
+/**
+ * The passphrase binds its OWN ref, deliberately not `password`. Sharing one would carry
+ * a typed secret across a form switch and re-emit it under the wrong kind.
+ */
+const passphrase = ref('');
 const pinValue = ref('');
 const localError = ref<string | null>(null);
 const pinInputRef = ref<InstanceType<typeof PinInput> | null>(null);
@@ -193,9 +215,20 @@ function switchLabel(method: ActiveKind): string {
       return `${t('loginV6.signInAs')} ${props.person.name}`;
     case 'recovery':
       return t('recovery.useKitLink');
-    default:
+    case 'password':
       return t('passkey.usePassword');
+    case 'passphrase':
+      return t('recovery.passphraseSet');
+    case 'invite-needed':
+      // Unreachable at runtime — NON_SWITCHABLE filters it out of the switch links —
+      // but present in ActiveKind, so the compiler requires it. Deliberately not the
+      // default: a `default` here returned "Use password" for EVERY unhandled kind,
+      // which is how a passphrase link would have been labelled "Use password".
+      return t('loginFlow.inviteNeededBody');
   }
+  // Exhaustiveness: a new method kind is now a COMPILE error, not a mislabelled link.
+  const unreachable: never = method;
+  return unreachable;
 }
 
 function handleSubmit() {
@@ -204,7 +237,19 @@ function handleSubmit() {
     localError.value = t('auth.enterPassword');
     return;
   }
-  emit('password', password.value);
+  emit('password', password.value, 'password');
+}
+
+function handlePassphraseSubmit() {
+  localError.value = null;
+  if (!passphrase.value) {
+    // Its own message. Reusing `auth.enterPassword` would make the passphrase form say
+    // "Enter your password", which is the exact two-concepts-one-field confusion this
+    // whole change exists to remove.
+    localError.value = t('recovery.passphraseRequired');
+    return;
+  }
+  emit('password', passphrase.value, 'passphrase');
 }
 </script>
 
@@ -345,8 +390,13 @@ function handleSubmit() {
         </p>
       </div>
 
-      <!-- Password (legacy members) -->
-      <form v-else @submit.prevent="handleSubmit">
+      <!--
+        Password (legacy members). `v-else-if`, NOT `v-else`: as a catch-all this branch
+        rendered a password form for any kind nobody had handled, which is the same
+        defect as switchLabel's old `default`. An unhandled kind now renders no pane, and
+        the always-present recovery link below is the guaranteed way forward.
+      -->
+      <form v-else-if="activeMethod === 'password'" @submit.prevent="handleSubmit">
         <BaseInput
           v-model="password"
           :label="t('auth.password')"
@@ -354,12 +404,27 @@ function handleSubmit() {
           :placeholder="t('auth.enterYourPassword')"
           required
         />
-        <p v-if="hasPassphrase && !podOpen" class="dark:text-ink-faint mt-2 text-xs text-gray-400">
-          {{ t('recovery.passphraseHint') }}
-        </p>
-
         <BaseButton type="submit" class="mt-4 w-full" :disabled="isBusy">
           {{ isBusy ? t('auth.signingIn') : `${t('loginV6.signInAs')} ${person.name}` }}
+        </BaseButton>
+      </form>
+
+      <!--
+        Family recovery passphrase. Offered by the prove ENGINE (a probe), never by this
+        view deciding for itself — `proveMethods.ts` is the single decision point, and the
+        previous architecture's three disagreeing copies are why. It opens the pod without
+        identifying anyone, so `runOpening` routes the success to recovery mode.
+      -->
+      <form v-else-if="activeMethod === 'passphrase'" @submit.prevent="handlePassphraseSubmit">
+        <BaseInput
+          v-model="passphrase"
+          :label="t('recovery.passphraseLabel')"
+          type="password"
+          :placeholder="t('recovery.passphrasePlaceholder')"
+          required
+        />
+        <BaseButton type="submit" class="mt-4 w-full" :disabled="isBusy">
+          {{ isBusy ? t('auth.signingIn') : t('recovery.unlock') }}
         </BaseButton>
       </form>
 

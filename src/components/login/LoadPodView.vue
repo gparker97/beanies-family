@@ -15,6 +15,7 @@ import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import {
   getGoogleAccountEmail,
@@ -28,13 +29,15 @@ import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { classifyDriveFailure } from '@/utils/podAccess';
 import { reportError } from '@/utils/errorReporter';
+import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
-import { envelopeNeedsRecovery } from '@/services/sync/fileSync';
+import { envelopeCapabilities } from '@/services/sync/fileSync';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+const familyContextStore = useFamilyContextStore();
 const authStore = useAuthStore();
 
 const props = defineProps<{
@@ -114,10 +117,17 @@ async function handleKitPhotoPicked(event: Event) {
   }
 }
 const kitCodeInput = ref('');
+/**
+ * What the pending envelope can actually be opened with. ONE derivation for this whole
+ * screen — the kit form, the password affordance and the degenerate terminal all read it,
+ * so they cannot disagree about the same envelope.
+ */
+const caps = computed(() => {
+  const env = syncStore.pendingEncryptedFile?.envelope;
+  return env ? envelopeCapabilities(env) : null;
+});
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
-const hasRecoveryKits = computed(
-  () => Object.keys(syncStore.pendingEncryptedFile?.envelope?.recoveryKeys ?? {}).length > 0
-);
+const hasRecoveryKits = computed(() => !!caps.value?.kit);
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -356,9 +366,21 @@ async function handlePendingPassword(
   // form (or the kit form) here is a retype loop with the honest message
   // wiped by the first submit. Leave the message on screen instead.
   if (podUnopenableHere.value) return;
-  const pendingEnv = syncStore.pendingEncryptedFile?.envelope;
-  if (pendingEnv && envelopeNeedsRecovery(pendingEnv)) {
-    showKitEntry.value = true;
+  const c = caps.value;
+  if (c && !c.password) {
+    // ⚠️ Keyed on `!c.password`, NOT on `envelopeNeedsRecovery`. That predicate is FALSE
+    // for an envelope with no wraps of any kind, so keying on it let exactly that
+    // envelope fall through to a password form and throw a crypto error on submit.
+    if (c.kit || c.passphrase) {
+      showKitEntry.value = true;
+    } else {
+      // No password, no kit, no passphrase: nothing can open this file. Say so rather
+      // than offering a Recovery Code field over an envelope with no kit wraps — that is
+      // the same impossible offer, relocated. Only reachable from a hand-edited or
+      // truncated file (a kit-born family always carries a kit at birth), which is
+      // precisely why nothing used to handle it.
+      formError.value = t('loginFlow.recoveryOnlyBody');
+    }
   }
   showDecryptModal.value = true;
 }
@@ -375,6 +397,54 @@ onMounted(async () => {
   }
 });
 
+/**
+ * Re-read the staged envelope before deciding what to offer, so a recovery credential
+ * added on ANOTHER device is visible here.
+ *
+ * The bug this closes: set a recovery passphrase on device A, and device B — holding an
+ * envelope staged before that write — was told "no wrapped keys" and had no way in. The
+ * short-circuit above never re-fetches.
+ *
+ * ⚠️ ONLY when the configured handle points at the SAME family. That short-circuit exists
+ * because the handle "may still point to the previous family's file", so an unconditional
+ * re-read could replace a file the user explicitly opened (the /open "Open with" gesture)
+ * with the configured family's one. Do not delete the reason along with the branch.
+ *
+ * Best-effort by design: on failure we keep the envelope we already have and carry on, so
+ * an offline device still reaches the kit form. Never silent — a failure is reported.
+ */
+async function refreshStaleEnvelope(): Promise<void> {
+  const before = caps.value;
+  const stagedFamily = syncStore.pendingEncryptedFile?.envelope?.familyId;
+  if (!before || !stagedFamily || stagedFamily !== familyContextStore.activeFamilyId) return;
+
+  try {
+    await syncStore.loadFromFile();
+  } catch (e) {
+    // `loadFromFile` throws the latched remote blocker. Keeping the staged envelope is
+    // the right fallback — it is what we would have used anyway — but the fact that the
+    // refresh failed must not vanish, or a stale-credential report is undiagnosable.
+    reportError({
+      surface: 'login-flow',
+      message: 'recovery-route envelope refresh failed — using the staged envelope',
+      error: e,
+      severity: 'warning',
+      context: { action: 'caps_refresh_failed' },
+    });
+    return;
+  }
+
+  const after = caps.value;
+  if (
+    after &&
+    (after.password !== before.password ||
+      after.passphrase !== before.passphrase ||
+      after.kit !== before.kit)
+  ) {
+    emitEnvelopeCapabilitiesChanged({ before, after });
+  }
+}
+
 async function autoLoadFile() {
   isLoadingFile.value = true;
   formError.value = null;
@@ -385,6 +455,7 @@ async function autoLoadFile() {
     // a biometric fallback), go straight to decrypt flow instead of re-reading from
     // the configured handle — which may still point to the previous family's file.
     if (syncStore.hasPendingEncryptedFile) {
+      await refreshStaleEnvelope();
       await handlePendingPassword(syncStore.fileName);
       isLoadingFile.value = false;
       return;
@@ -696,7 +767,10 @@ async function handleDecrypt() {
       if (!(result.payloadError instanceof PayloadLoadError && result.payloadError.keyMayBeWrong))
         podUnopenableHere.value = true;
     } else {
-      formError.value = result.error ?? t('password.decryptionError');
+      // The typed key, never `result.error` — that is a developer-facing string (it used
+      // to render 'No wrapped keys in beanpod file — cannot unlock' at a non-English
+      // user). `error` still carries it for the callers that BRANCH on it.
+      formError.value = t(result.errorKey ?? 'password.decryptionError');
     }
   } catch {
     formError.value = t('password.decryptionError');
@@ -1256,7 +1330,13 @@ async function handleDriveRefresh() {
         >
           {{ t('recovery.unlock') }}
         </BaseButton>
+        <!-- ⚠️ Gated. This button was unconditional, and on a kit-born family it offered
+             "Use password instead" over an envelope with NO password wrap — the reported
+             bug. It is the way BACK to a password form, so it may only appear when a
+             password can actually open this envelope. Nobody is stranded without it: the
+             screen-level Back above the decrypt block is always present. -->
         <button
+          v-if="caps?.password"
           type="button"
           class="dark:text-ink-soft dark:hover:text-ink mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
           @click="closeKitEntry"
