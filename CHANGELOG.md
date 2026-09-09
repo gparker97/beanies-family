@@ -27,7 +27,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Deleting your family now says what actually happened.** It used to say your data was gone from everywhere even when you had chosen to keep your family data file, and a first attempt to fix that swung the other way and reported a failure when nothing had failed. There are three endings now, and the one you get is the true one.
 - **Deleting a family really is final.** Another device writing to it afterwards could quietly bring it back, and bring its name and your newsletter choice back with it.
 - **The message about changes that could not be combined now says what happened, and offers one way on.** It called compaction "reorganised", a word the app uses nowhere else, and led with "Export my changes" — which reads like a rescue but produces a copy that cannot be merged back in. It now says beanies could not work out which changes were missing and did not guess, puts the way forward first, and offers the copy as something to read.
-- **A device signed in to the wrong Google account is no longer told it reconnected.** It could not reach the family file, and beanies had no way to notice because it was only checking its own clock.
 
 ## 2026-09-08
 

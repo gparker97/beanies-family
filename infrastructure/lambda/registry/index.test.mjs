@@ -1066,30 +1066,40 @@ describe('registry PUT — a deleted family with NO recorded owner', () => {
     deletedAt: '2026-09-09T00:00:00.000Z',
   };
 
-  it('refuses a stranger, writes nothing, and stays deleted', async () => {
+  it('lets the REAL OWNER restore an ownerless deleted family', async () => {
+    // ⚠️ THE BRICK THIS PREVENTS, and the first cut of the guard caused it.
+    // Requiring a KNOWN owner to write meant a family whose owner fields were
+    // never stamped — a background register mid-boot sends both null — could not
+    // be restored by anyone at all once deleted: the tombstone never lifted, GET
+    // kept 404ing, and the client was told 200 success so restore never learned
+    // its recovery anchor had been refused. Only a manual DynamoDB edit healed it.
     const { res, item } = await put(
       {
         provider: 'google_drive',
-        fileId: 'MEMBER-COPY',
-        familyName: 'The Parkers',
-        subscribeNewsletter: true,
-        writerMemberId: M_B,
-        writerEmail: 'member@example.com',
+        fileId: 'RESTORED',
+        ownerMemberId: M_A,
+        writerMemberId: M_A,
       },
       ORPHAN_TOMB
     );
-    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
-    expect(item).toBeNull();
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.deletedAt).toBeUndefined();
+    expect(item.fileId).toBe('RESTORED');
+    expect(item.createdAt).toBe('2025-03-01T00:00:00.000Z');
   });
 
-  it('does NOT let the reviver take the write-once owner field', async () => {
-    // `ownerMemberId` is permanent and there is no in-app route back, so a
-    // stranger stamping it is worse than the revival itself.
-    const { item } = await put(
-      { provider: 'local', ownerMemberId: M_B, writerMemberId: M_B },
+  it('falls open for an ownerless row, exactly as a LIVE ownerless row does', async () => {
+    // ⚠️ AN ACCEPTED TRADE, written down so it is not mistaken for an oversight.
+    // A family with no recorded owner has no authority to check against, so the
+    // pointer guard already lets its first writer through everywhere else.
+    // Refusing everyone on a DELETED ownerless row is strictly worse: it bricks
+    // the row for its real owner too. The refusal below is for rows that DO have
+    // a recorded owner, which is every row a current client creates.
+    const { res } = await put(
+      { provider: 'google_drive', fileId: 'ANY', writerMemberId: M_B },
       ORPHAN_TOMB
     );
-    expect(item).toBeNull();
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
   });
 
   it('still falls open for a LIVE legacy row with no owner recorded', async () => {
@@ -1114,6 +1124,20 @@ describe('registry PUT — an empty string never latches a write-once identity',
     const { item } = await put({ provider: 'local', ownerEmail: '', ownerMemberId: '' }, {});
     expect(item.ownerEmail).toBeNull();
     expect(item.ownerMemberId).toBeNull();
+  });
+
+  it('REPAIRS a row already poisoned with an empty string', async () => {
+    // ⚠️ PREVENTION WAS NOT ENOUGH. Deployed clients sent `''`, so such rows
+    // exist — and `'' ?? x` is `''`, so the write-once merge preserved it even
+    // when the real owner later sent a genuine address. The legacy tier reads
+    // `!existing.ownerEmail` as TRUE for `''`, so the row fell open for every
+    // writer, permanently, with no route back.
+    const { item } = await put(
+      { provider: 'local', ownerEmail: 'owner@example.com', ownerMemberId: M_A },
+      { ownerEmail: '', ownerMemberId: '' }
+    );
+    expect(item.ownerEmail).toBe('owner@example.com');
+    expect(item.ownerMemberId).toBe(M_A);
   });
 
   it('still preserves a real stored ownerEmail', async () => {

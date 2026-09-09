@@ -215,16 +215,22 @@ export async function handler(event) {
       // So: nothing to merge, nothing to write. The family is deleted, and the
       // caller gets the same success a write to a deleted row has always got.
       //
-      // ⚠️ AND `isOwner` ALONE IS NOT ENOUGH, because its third tier FALLS OPEN.
-      // `isOwner` is `existing.ownerMemberId ? … : !existing.ownerEmail || …`, so
-      // a row with NEITHER owner field answers true for every writer. That is the
-      // right default for a live legacy row and catastrophic for a deleted one:
-      // any device revived the family AND took the write-once owner field, which
-      // has no route back. Such tombstones are reachable — the client sends both
-      // owner fields null when the roster is not loaded (a background write
-      // mid-boot), which is the very path this guard's trigger names.
+      // ⚠️ `ownerKnown` GATES THE REFUSAL, NOT THE WRITE, and the first cut had
+      // it the other way round. Requiring a KNOWN owner in order to write BRICKED
+      // the row: a family whose owner fields were never stamped — a background
+      // register mid-boot sends both null — could not be restored once deleted by
+      // ANYONE, its real owner included. The tombstone never lifted, GET kept
+      // 404ing, and the client was told 200 success so restore never learned its
+      // recovery anchor had been refused. Only a manual DynamoDB edit healed it.
+      //
+      // So an ownerless tombstone falls open exactly as an ownerless LIVE row
+      // does. That is the trade the pointer guard already makes everywhere else,
+      // and it is the right one here too: a family with no recorded owner has no
+      // authority to check a writer against, and refusing everyone is strictly
+      // worse than admitting the first writer — which is the state the row was
+      // already in before it was deleted.
       const ownerKnown = !!existing.ownerMemberId || !!existing.ownerEmail;
-      if (existing.deletedAt && !(ownerKnown && isOwner)) {
+      if (existing.deletedAt && ownerKnown && !isOwner) {
         // Rule 1: a security-relevant branch says why. Without this the rate of
         // devices writing to deleted families is unobservable — which is exactly
         // the signal that would have caught the resurrection this branch fixes.
@@ -232,7 +238,6 @@ export async function handler(event) {
         console.warn(
           '[registry] write to a deleted family refused',
           familyId,
-          ownerKnown ? 'owner-known' : 'no-recorded-owner',
           String(writerMemberId ?? '').slice(-6) || 'no-writer-id'
         );
         return response(200, { success: true, pointerAccepted: false }, event);
@@ -282,7 +287,14 @@ export async function handler(event) {
         // which is why the guard is here and not only in the client — would latch
         // permanently, and the legacy pointer tier reads `!existing.ownerEmail`
         // as TRUE, falling open for every writer on that row forever.
-        ownerEmail: existing.ownerEmail ?? (body.ownerEmail || null) ?? null,
+        // ⚠️ `||` ON BOTH SIDES. Guarding only the body prevents NEW poisoning and
+        // leaves rows already holding `''` broken forever: `'' ?? x` is `''`, so
+        // the write-once merge preserved it even when the real owner later sent a
+        // genuine address — and the legacy pointer tier reads `!existing.ownerEmail`
+        // as TRUE for `''`, falling open for every writer on that row. Deployed
+        // clients did send empty strings, so such rows exist; this repairs them
+        // rather than only preventing new ones.
+        ownerEmail: existing.ownerEmail || body.ownerEmail || null,
         // Write-once, and the real pointer authority. Stamped on a row's first
         // accepted write — including the first write by the owner of a legacy
         // email-only row, which upgrades that row off the mutable email.
@@ -297,8 +309,10 @@ export async function handler(event) {
         //
         // The tier-2 comment above already says what this should be: stamp "the
         // first time its OWNER writes".
-        ownerMemberId:
-          existing.ownerMemberId ?? (isOwner ? body.ownerMemberId || null : null) ?? null,
+        // Same repair as `ownerEmail` above: a stored `''` was falsy at tier 1 (so
+        // the guard never engaged) yet non-nullish at the merge (so it never
+        // healed). `||` on both sides lets a real id land later.
+        ownerMemberId: existing.ownerMemberId || (isOwner ? body.ownerMemberId || null : null),
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
