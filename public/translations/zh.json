@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-09",
-    "translationCount": 4637
+    "translationCount": 4640
   },
   "translations": {
     "app.name": {
@@ -23189,6 +23189,21 @@
     "recovery.usePassphraseLink": {
       "translation": "使用我的恢复密码",
       "hash": "iiktsq",
+      "lastUpdated": "2026-09-09"
+    },
+    "loginV6.unlockSubtitlePassphrase": {
+      "translation": "输入您的家庭恢复密码，我们将找到您的账号",
+      "hash": "al9pzf",
+      "lastUpdated": "2026-09-09"
+    },
+    "loginV6.unlockFooterPassphrase": {
+      "translation": "此恢复密码可解密您的本地数据。我们不会存储或恢复它。",
+      "hash": "mepn2r",
+      "lastUpdated": "2026-09-09"
+    },
+    "loginV6.unlockNoAccessTitle": {
+      "translation": "无法登录此家庭？",
+      "hash": "q7lrbx",
       "lastUpdated": "2026-09-09"
     }
   }

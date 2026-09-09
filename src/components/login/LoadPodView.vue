@@ -33,6 +33,7 @@ import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowE
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -149,6 +150,22 @@ const secretIsPassphrase = computed(
 const nothingCanOpenIt = computed(
   () => !!caps.value && coldCredentialSurface(caps.value) === 'none'
 );
+/**
+ * The line under the heading, or `null` when this surface should carry none.
+ *
+ * ⚠️ This was the unconditional `loginV6.unlockSubtitle`, "Enter your password and
+ * we'll find your account" — rendered above a Recovery Code box on a kit-born family,
+ * above a passphrase field, and above the "nothing can open this file" terminal. Naming
+ * a credential the envelope cannot accept is the exact defect this change exists to
+ * remove, so the subtitle is derived from the same capabilities as the field below it.
+ *
+ * The kit form and the degenerate terminal each state their own case immediately above
+ * the field, so a second line there would only repeat them.
+ */
+const unlockSubtitleKey = computed<UIStringKey | null>(() => {
+  if (nothingCanOpenIt.value || showKitEntry.value) return null;
+  return secretIsPassphrase.value ? 'loginV6.unlockSubtitlePassphrase' : 'loginV6.unlockSubtitle';
+});
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -1267,8 +1284,8 @@ async function handleDriveRefresh() {
               : t('loginV6.unlockTitle')
           }}
         </h3>
-        <p class="mt-1 text-xs opacity-40">
-          {{ t('loginV6.unlockSubtitle') }}
+        <p v-if="unlockSubtitleKey" class="dark:text-ink-faint mt-1 text-xs text-gray-500">
+          {{ t(unlockSubtitleKey) }}
         </p>
       </div>
 
@@ -1320,13 +1337,19 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockMemberCount').replace('{count}', String(pendingMemberCount)) }}
         </p>
 
-        <p class="mt-2 text-center text-xs opacity-30">
-          {{ t('loginV6.unlockFooter') }}
+        <p class="dark:text-ink-faint mt-2 text-center text-xs text-gray-400">
+          {{ secretIsPassphrase ? t('loginV6.unlockFooterPassphrase') : t('loginV6.unlockFooter') }}
         </p>
       </form>
 
-      <!-- Recovery-kit entry (Phase 3): swaps in for the password form -->
-      <form v-else class="mt-6" @submit.prevent="handleKitRedeem">
+      <!-- Recovery-kit entry (Phase 3): swaps in for the password form.
+           ⚠️ `v-else-if`, NOT a bare `v-else`. The secret form above is gated on
+           `!nothingCanOpenIt`, so a bare `v-else` handed the degenerate envelope
+           straight to THIS form — a Recovery Code field over a file with no kit
+           wraps, which is the same impossible offer this change exists to remove,
+           merely relocated. It also rendered `formError` a second time beneath
+           the honest message. -->
+      <form v-else-if="!nothingCanOpenIt" class="mt-6" @submit.prevent="handleKitRedeem">
         <div
           v-if="formError"
           class="dark:text-danger-lift mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20"
@@ -1417,8 +1440,14 @@ async function handleDriveRefresh() {
           </svg>
         </div>
         <div class="flex-1">
+          <!-- ⚠️ Capability-gated for the same reason as the subtitle: this card greets
+               anyone who opened someone else's `.beanpod`, and "Don't have the password?"
+               names a credential a kit-born or passphrase-only family has never had. The
+               body below is about asking for an invite either way. -->
           <p class="text-secondary-500 dark:text-ink text-sm font-bold">
-            {{ t('loginV6.unlockNoPasswordTitle') }}
+            {{
+              caps?.password ? t('loginV6.unlockNoPasswordTitle') : t('loginV6.unlockNoAccessTitle')
+            }}
           </p>
           <p class="text-secondary-500/70 dark:text-ink-soft mt-1 text-xs leading-relaxed">
             {{ t('loginV6.unlockNoPasswordHint') }}
