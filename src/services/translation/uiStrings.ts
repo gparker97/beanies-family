@@ -4599,10 +4599,21 @@ const STRING_DEFS = {
   // The standing notice in Settings and the confirm's detail, composed ONCE in
   // `usePodHealth`. Names people, never versions (absent on exactly those
   // rows) and never devices (beanies has no per-device identity).
+  // ⚠️ IT MUST STATE THE CONSEQUENCE, not just the request. This used to read
+  // "Ask them to update beanies before you compact." and stopped there, so the
+  // owner clicked past a soft advisory with no idea what it cost. That advisory
+  // was the only thing standing between a family and the 2026-09-08 loss: a
+  // device below the floor cannot read a compacted pod but writes over it anyway,
+  // and anything created on it in the meantime is NOT recoverable. Deliberately
+  // still a choice rather than a refusal (the owner may have a good reason, and a
+  // hard stop would block a legitimate compaction) - but an informed one.
+  //
+  // ⚠️ REAL NOUNS IN THE `beanie` VALUE. This is a data-loss surface, so "data",
+  // "device" and "update" stay; only the case drops. See CLAUDE.md § Beanie mode.
   'compaction.olderVersion.notice': {
-    en: '{list} last opened beanies on an older version. Ask them to update beanies before you compact.',
+    en: '{list} last opened beanies on an older version. Please help them update to the latest version first. If you compact now, anything they add between now and when they update will be lost, and it cannot be recovered.',
     beanie:
-      '{list} last opened beanies on an older version. ask them to update beanies before you compact.',
+      '{list} last opened beanies on an older version. please help them update to the latest version first. if you compact now, anything they add between now and when they update will be lost, and it cannot be recovered.',
   },
   'compaction.refused.no-envelope': {
     en: 'beanies could not find your family file details. Reload and try again.',
