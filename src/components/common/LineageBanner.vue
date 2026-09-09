@@ -29,15 +29,16 @@
  * So the copy says beanies could not work out which changes are missing, rather
  * than implying it never tried.
  *
- * ⚠️ STAGE 6 DID NOT SHRINK CASE 2, and this comment used to claim it would.
- * `rebaseUnavailable` is set only inside `if (act === 'rebase')`, and `rebase` is
- * reached only from `adopt-remote × dirty` and `adopt-remote × user-file` — whereas
- * the stage-6 carry is scoped to `adopt-remote × clean`. The two are DISJOINT by
- * construction, so the carry cannot make this banner rarer. What WOULD shrink case
- * 2 is a baseline-independent carry on this fallback itself, converting the block
- * into adopt-plus-carry; that trades away the "your work is still yours" promise
- * for edits to shared entities, so it needs its own decision and has not been
- * made. See `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` § Context.
+ * ⚠️ THIS COMMENT USED TO CLAIM stage 6 "would shrink case 2 further by carrying
+ * local-only entities across". THAT IS FALSE, and it is worth knowing why so
+ * nobody re-derives it. `rebaseUnavailable` is set in exactly one place, inside
+ * `if (act === 'rebase')`, and `rebase` is reached only from `adopt-remote x dirty`
+ * and `adopt-remote x user-file`. The stage-6 carry was scoped to
+ * `adopt-remote x clean`. The cells are DISJOINT, so that carry could not affect
+ * this banner at all. What would shrink case 2 is a baseline-independent carry on
+ * this fallback itself; that has not been designed or decided. See
+ * `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` for the full
+ * analysis and for why the first attempt was reverted.
  *
  * ⚠️ TWO VERDICTS, TWO PIECES OF COPY. Case 1 is not recoverable by the person
  * sitting there, and offering the adopt would invite them to discard one of two
