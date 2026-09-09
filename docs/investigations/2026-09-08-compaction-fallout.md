@@ -688,6 +688,15 @@ neutered rather than tightened, on every family, for as long as the client is
 ahead of the server. Deploy `f9e3bda6`'s Lambda, confirm it in prod, then ship the
 web bundle.
 
+**Offered, not done: drop `dynamodb:DeleteItem` from the registry Lambda's IAM
+policy** (`infrastructure/modules/registry/main.tf:80`). The tombstone is a
+`PutItem`, so the permission is now unused, and removing it would make a hard
+delete structurally impossible rather than merely absent from the code — which is
+the same "make loss impossible" argument stage 2 rests on. It was NOT done because
+it creates a cross-system ordering constraint the plan spent Pass 3 removing: the
+Terraform apply must follow the Lambda code deploy, or the old code's DeleteItem
+502s. Worth doing as its own small change once the Lambda is live.
+
 ⚠️ **STILL OWED: greg's row `ae92950b`.** Both owner fields were deliberately
 NULLed by hand and the row is re-claimable by whichever device writes next. Once
 the Lambda AND the client are both live, re-check `ownerMemberId`: it should be
