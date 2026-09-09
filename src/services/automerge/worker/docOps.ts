@@ -854,6 +854,151 @@ export function buildRebaseOps(
 }
 
 /**
+ * Which collections may be carried across a lineage adopt (ADR-036 stage 6).
+ *
+ * ⚠️ `false` IS NOT A DEFAULT. Every entry is a decision, and because this is a
+ * TOTAL `Record<CollectionName, …>`, adding a collection to `FamilyDocument`
+ * without deciding is a compile error. An allowlist ARRAY would have been the
+ * wrong shape, and we know that from experience: `preserveLocalKeyDicts` in
+ * `envelopeMerge.ts` carries the note that "its shape SILENTLY DROPS any dict it
+ * doesn't name". Silence is the failure mode a total map removes.
+ *
+ * ⚠️ TWO RULES FOR WHOEVER ADDS COLLECTION #30:
+ *
+ *  1. A new `true` entry requires checking the entity holds **no credential,
+ *     token, or address**. `DriveConnection.refreshToken` and
+ *     `CalendarConnection.refreshToken` (`types/models.ts`) are why two of the
+ *     `false` entries below exist, and `DriveConnection.id` is the account EMAIL.
+ *  2. `notificationReads` is `Record<string, Record<string, string>>` — a
+ *     two-level map, not an entity map. Flipping it to `true` would `set` a whole
+ *     per-member dict wholesale. The type cannot catch that.
+ */
+const CARRY_LOCAL_ONLY: Record<CollectionName, boolean> = {
+  // ── User work. This is the thing being rescued: a new entity created on a
+  //    device stale enough that the wholesale adopt would otherwise discard it.
+  accounts: true,
+  transactions: true,
+  assets: true,
+  goals: true,
+  budgets: true,
+  recurringItems: true,
+  todos: true,
+  lists: true,
+  activities: true,
+  vacations: true,
+  photos: true,
+  favorites: true,
+  sayings: true,
+  memberNotes: true,
+  allergies: true,
+  medications: true,
+  medicationLogs: true,
+  milestones: true,
+  recipes: true,
+  cookLogs: true,
+  mealPlans: true,
+  emergencyContacts: true,
+  // Write-once cycle history (never patched, deleted wholesale by the retention
+  // sweep), so there is no delete-vs-update resurrection hazard. Real user record.
+  listCycles: true,
+
+  // ── NEVER carried. Each of these is a security or correctness decision.
+  //
+  // Holds a REFRESH TOKEN, and is keyed on the account email. §1d also READS
+  // remote driveConnections to heal a device, so carrying a dead one would
+  // republish it fleet-wide — the exact bug that motivated the parent plan,
+  // rebuilt out of this plan's own parts.
+  driveConnections: false,
+  // Also holds a refresh token, and carries `needs_reconnect`, which is on record
+  // as a cross-device amplifier.
+  calendarConnections: false,
+  // A resurrected member feeds `normalizeRoles` owner promotion AND the
+  // roster-sourced owner lookup, which is live. Never rebuild a roster by accident.
+  familyMembers: false,
+  // Device/sync bookkeeping, not user work.
+  calendarEventLinks: false,
+  notificationReads: false,
+  // Bookkeeping keyed on `connectionId` into the EXCLUDED calendarConnections, so
+  // a carried ack is incoherent by construction. And it SUPPRESSES a
+  // scheduling-clash warning: re-asking costs a tap, wrongly silencing it could
+  // cost a missed clash.
+  overlapAcknowledgments: false,
+};
+
+/**
+ * Ops that re-add entities present locally and absent from the target.
+ *
+ * Baseline-independent: it compares the two DOCUMENTS, never a heads baseline,
+ * which is the whole point — on the case this exists for, the baseline is the
+ * thing that LIED. A 0.16 device could not read a compacted pod but wrote over it
+ * anyway and committed a baseline stamped with its own heads, so the heads
+ * compared equal, the context read `clean`, and the wholesale adopt discarded
+ * everything that had only ever existed on that device.
+ *
+ * ⚠️ ADDITIVE ONLY. Every id written is absent from the target by construction,
+ * so there is nothing to overwrite: no deletes, no field merges, no conflict
+ * resolution, and therefore no way to destroy a value the family has already
+ * saved. That is what makes it safe to run without a common ancestor.
+ *
+ * ⚠️ IT EMITS `set` OPS ONLY, AND THE CALLER'S ATOMICITY DEPENDS ON THAT.
+ * `applyMutation`'s rollback protects its input only for a throw INSIDE the
+ * `Automerge.change` callback. On SUCCESS, Automerge marks the input document
+ * OUTDATED — so a throw AFTER the commit would leave the caller installing an
+ * outdated document, and every later mutation in the session would fail with
+ * "Attempting to change an outdated document". That is unreachable today
+ * precisely because this emits only `set`: `deltaFor`'s `set` case just pushes
+ * `op.entity` and cannot throw, whereas its `patch`/`increment` case calls
+ * `toPlain` post-commit and can. **Adding a `patch` op here is a CORRECTNESS
+ * change, not an optimisation.**
+ *
+ * ⚠️ FALSE POSITIVES ARE EXPECTED. An entity deleted on a peer and never merged
+ * here reads as local-only and will be resurrected. That is the accepted trade:
+ * a resurrected entity is recoverable (the user deletes it again), whereas silent
+ * loss is not, and refusing would latch every device on the propagation path so a
+ * compaction could never reach a peer.
+ */
+export function buildLocalOnlyCarryOps(
+  local: Doc,
+  target: Doc
+): { op: MutationOp | null; count: number } {
+  const ops: MutationOp[] = [];
+  // ⚠️ ITERATE `COLLECTION_NAMES`, NOT `Object.keys(local)`. This is what makes it
+  // structurally impossible to touch `settings` or `podLineage`: `MutationOp`'s
+  // `collection` is typed `CollectionName`, which excludes the singletons, and
+  // this loop can only ever produce names from that list. Same belt
+  // `buildRebaseOps` documents for the same reason.
+  for (const collection of COLLECTION_NAMES) {
+    if (!CARRY_LOCAL_ONLY[collection]) continue;
+    const localColl = (local[collection] ?? {}) as AnyRecord;
+    const targetColl = (target[collection] ?? {}) as AnyRecord;
+    for (const id of Object.keys(localColl)) {
+      // ⚠️ SKIP BEFORE YOU CLONE. `toPlain` is a `JSON.parse(JSON.stringify())`
+      // DEEP CLONE, so testing the target first means we clone only what we
+      // actually carry. This is the same and only reason `materializeCollection`
+      // is not used here: it clones every entity in the collection up front,
+      // including the overwhelming majority present in the target that we discard
+      // — a deep clone of the family's whole document on every clean adopt, to
+      // carry nothing.
+      //
+      // ⚠️ AND THE REASON IS *NOT* LAZY MATERIALIZATION. `Automerge.load`
+      // materializes the whole document into plain JS at load time and
+      // `docInitOpts` sets no `patchCallback`, so `localColl[id]` is an ordinary
+      // property read. Reordering saves a deep clone, not a materialize.
+      if (targetColl[id] !== undefined) continue;
+      // No `undefined` guard: `Object.keys` guarantees the key is present. Unlike
+      // `buildRebaseOps` — which walks a DIFF SCAN, where a deleted id
+      // legitimately reads `undefined` — this loop cannot see one.
+      ops.push({ op: 'set', collection, id, entity: toPlain(localColl[id]) });
+    }
+  }
+  // Two different empty answers are NOT needed here, unlike `buildRebaseOps`:
+  // this composer cannot fail to compose, so there is no `null` return. `count: 0`
+  // means "nothing was local-only", which is a successful carry of nothing.
+  if (ops.length === 0) return { op: null, count: 0 };
+  return { op: ops.length === 1 ? ops[0]! : { op: 'batch', ops }, count: ops.length };
+}
+
+/**
  * A THREE-WAY field merge: what did the peer change, that the compactor did not?
  *
  * ⚠️ IT IS THREE-WAY, AND A TWO-WAY DIFF HERE SILENTLY REVERTS SAVED DATA. The

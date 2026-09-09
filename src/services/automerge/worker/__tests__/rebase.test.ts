@@ -15,6 +15,7 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import { PodLineageError } from '@/services/sync/podLineage';
+import { COLLECTION_NAMES } from '@/types/automerge';
 
 // An ESM namespace property is not configurable, so `vi.spyOn(Automerge, …)`
 // throws. Mock the module and drive it through a hook — the same shape
@@ -76,6 +77,53 @@ async function envelopeFor(doc: Automerge.Doc<Doc>, key: CryptoKey) {
     inviteKeys: {},
     encryptedPayload: bufferToBase64(await encryptPayload(key, Automerge.save(doc))),
   };
+}
+
+/**
+ * A fixture seeded with EVERY collection, so `migrateDoc` is a genuine no-op.
+ *
+ * ⚠️ TWO STAGE-6 TESTS ARE BROKEN WITHOUT IT, and both fail in ways that look
+ * like the feature is wrong rather than the fixture:
+ *
+ *  1. `base()` declares 4 of the 29 collections, so `migrateDoc` emits a real
+ *     `Automerge.change` on every adopt. The install branch calls it OUTSIDE any
+ *     try/catch, so the `changeHook` throw-test never reaches the carry — the
+ *     whole merge rejects first.
+ *  2. `dirty` is `!headsEqual(remoteHeads, heads)` with `remoteHeads` captured
+ *     PRE-migrate, so a migrating fixture reports `dirty: true` on the carry path
+ *     AND the carry-nothing path — making the assertion that the rescue reaches
+ *     Drive prove nothing at all.
+ *
+ * Preferred over a `skipCalls` counter on `changeHook`, which would make the
+ * tests depend on Automerge's internal call ordering.
+ */
+function fullBase(): Automerge.Doc<Doc> {
+  const seed: Doc = { settings: { baseCurrency: 'GBP', theme: 'light' } };
+  for (const name of COLLECTION_NAMES) seed[name] = {};
+  return Automerge.from<Doc>(seed);
+}
+
+/**
+ * The heads the worker ACTUALLY holds, read back rather than recomputed.
+ *
+ * `loadSnapshot` runs `loadDoc` -> `migrateDoc`, which can move the heads, so
+ * deriving them from the fixture instead is what makes a nominally-clean device
+ * read as `dirty` and silently rebase instead of adopting. (Depends on
+ * `exportSnapshot` being DEV-only, which holds under vitest.)
+ */
+function workerHeads(): string[] {
+  return Automerge.getHeads(Automerge.load(ap.exportSnapshot().binary));
+}
+
+/** Install `doc` as the worker's document and return the basis for a CLEAN adopt. */
+function installedCleanBasis(doc: Automerge.Doc<Doc>) {
+  ap.loadSnapshot(Automerge.save(doc));
+  return { kind: 'baseline' as const, heads: workerHeads() };
+}
+
+/** The worker's document, as plain JS. */
+function workerDoc(): Doc {
+  return Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as Doc;
 }
 
 let key: CryptoKey;
@@ -802,6 +850,9 @@ describe('a restore is a lineage event', () => {
       heads: Automerge.getHeads(compacted),
     });
     expect(res.action).toBe('adopted');
+    // Stage 6: this cell is OUTSIDE the carry's scope, and must stay that way —
+    // it is the rollback route the banner calls "the only exit there is".
+    expect(res.carried).toBeUndefined();
     const after = lineageOf();
     expect(after?.seq).toBe(2);
     expect(after?.id).not.toBe('L-1');
@@ -862,6 +913,9 @@ describe('a restore is a lineage event', () => {
       }
     );
     expect(res.action).toBe('adopted');
+    // Stage 6: this cell is OUTSIDE the carry's scope, and must stay that way —
+    // it is the rollback route the banner calls "the only exit there is".
+    expect(res.carried).toBeUndefined();
     expect(lineageOf()).toEqual({ id: 'L-theirs', seq: 1 });
   });
 
@@ -875,6 +929,157 @@ describe('a restore is a lineage event', () => {
       kind: 'no-local-document',
     });
     expect(res.action).toBe('adopted');
+    // Stage 6: a first-load adopt has no local document to carry FROM.
+    expect(res.carried).toBeUndefined();
     expect(lineageOf()).toBeUndefined();
+  });
+});
+
+describe('stage 6 — a stale device keeps the items only it has', () => {
+  /**
+   * ⚠️ EVERY TEST HERE ASSERTS `action === 'adopted'`. Reaching
+   * `adopt-remote x clean` needs the basis heads to equal the heads the WORKER
+   * holds; get that wrong and the context reads `dirty`, the policy rebases, and
+   * the test passes while exercising the wrong cell entirely.
+   */
+  it("carries mary's todo across the adopt, and marks it for publishing", async () => {
+    // The case this whole change exists for. Her phone was on 0.16: it could not
+    // read the compacted pod but wrote over it anyway and committed a baseline
+    // stamped with its OWN heads. So the heads compare equal, the context is
+    // `clean`, and today's wholesale adopt discards the todo she added.
+    const stale = Automerge.change(fullBase(), (d) => {
+      (d.todos as Coll).marys = { id: 'marys', title: 'only on this phone' };
+    });
+    const basis = installedCleanBasis(stale);
+    const remote = compact(fullBase(), 'L-NEW');
+
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', basis);
+
+    expect(res.action).toBe('adopted');
+    expect(res.carried).toBe(1);
+    expect(res.carryFailed).toBeUndefined();
+    const doc = workerDoc();
+    // Adopted the remote's lineage...
+    expect(doc.podLineage).toEqual({ id: 'L-NEW', seq: 1 });
+    // ...and kept her todo anyway.
+    expect((doc.todos as Coll).marys).toMatchObject({ title: 'only on this phone' });
+    // ⚠️ THE OTHER HALF OF THE FEATURE. The carry moves the heads past the
+    // unmigrated remote's, so `dirty` flips true and the caller's `if (dirty)`
+    // publishes the rescue. Without this the todo lives on one device and dies
+    // with the next cache clear.
+    expect(res.dirty).toBe(true);
+  });
+
+  it('is byte-identical to a plain adopt when there is nothing local-only', async () => {
+    // Anti-vacuity for the test above: on the all-29 fixture a carry-nothing
+    // adopt must NOT be dirty, which is what makes `dirty === true` there mean
+    // "the carry moved us" rather than "migrateDoc moved us".
+    const basis = installedCleanBasis(fullBase());
+    const remote = compact(
+      Automerge.change(fullBase(), (d) => {
+        (d.todos as Coll).theirs = { id: 'theirs', title: 'from the family' };
+      }),
+      'L-NEW'
+    );
+
+    const res = await ap.mergeRemoteEnvelope(await envelopeFor(remote, key), 'fam', basis);
+
+    expect(res.action).toBe('adopted');
+    expect(res.carried).toBe(0);
+    expect(res.dirty).toBe(false);
+    expect(workerDoc().todos).toEqual({ theirs: { id: 'theirs', title: 'from the family' } });
+  });
+
+  it('resurrects an entity a peer deleted, and that is INTENDED', async () => {
+    // Deletes are unattributable without a common ancestor, so anything deleted
+    // on a peer and never merged here reads as local-only and comes back. Pinned
+    // as intended so nobody later "fixes" it: a resurrected entity is recoverable
+    // (the user deletes it again), whereas the alternatives are silent loss or a
+    // device that cannot un-latch.
+    const stale = Automerge.change(fullBase(), (d) => {
+      (d.todos as Coll).deletedOnPeer = { id: 'deletedOnPeer', title: 'they binned this' };
+    });
+    const basis = installedCleanBasis(stale);
+
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(compact(fullBase(), 'L-NEW'), key),
+      'fam',
+      basis
+    );
+
+    expect(res.carried).toBe(1);
+    expect((workerDoc().todos as Coll).deletedOnPeer).toBeDefined();
+  });
+
+  it('never carries credentials or the roster, even on the scoped path', async () => {
+    // The integration counterpart to the composer's security tests: proves the
+    // exclusions survive the real adopt, not just the pure function.
+    const stale = Automerge.change(fullBase(), (d) => {
+      (d.driveConnections as Coll)['a@b.com'] = {
+        id: 'a@b.com',
+        accountEmail: 'a@b.com',
+        refreshToken: 'SECRET-TOKEN',
+      };
+      (d.familyMembers as Coll).ghost = { id: 'ghost', name: 'Removed Member', role: 'owner' };
+      (d.todos as Coll).real = { id: 'real', title: 'user work' };
+    });
+    const basis = installedCleanBasis(stale);
+
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(compact(fullBase(), 'L-NEW'), key),
+      'fam',
+      basis
+    );
+
+    expect(res.carried).toBe(1); // the todo, and only the todo
+    const doc = workerDoc();
+    expect(doc.driveConnections).toEqual({});
+    expect(doc.familyMembers).toEqual({});
+    expect((doc.todos as Coll).real).toBeDefined();
+  });
+
+  it('falls back to a plain adopt when the carry throws, and never blocks', async () => {
+    // Requirement 5. A deterministic throw here must NOT latch: `adopt-remote x
+    // clean` is the cell a compaction propagates through, so refusing would strand
+    // the whole fleet and no compaction could ever reach a peer. Losing the carry
+    // is exactly today's behaviour; losing propagation is not.
+    const stale = Automerge.change(fullBase(), (d) => {
+      (d.todos as Coll).atRisk = { id: 'atRisk', title: 'would have been carried' };
+    });
+    const basis = installedCleanBasis(stale);
+    const envelope = await envelopeFor(compact(fullBase(), 'L-NEW'), key);
+    // `fullBase()` makes `migrateDoc` a no-op, so the ONLY `Automerge.change` left
+    // in the install path is the carry's own `applyMutation`.
+    changeHook.throws = new RangeError('boom');
+
+    const res = await ap.mergeRemoteEnvelope(envelope, 'fam', basis);
+
+    expect(res.action).toBe('adopted');
+    expect(res.carryFailed).toBe('RangeError');
+    expect(res.carried).toBeUndefined(); // disjoint from carryFailed
+    // The remote landed intact — the failure cost the carry, nothing else.
+    expect(workerDoc().podLineage).toEqual({ id: 'L-NEW', seq: 1 });
+  });
+
+  it('does not carry on adopt-remote x DIRTY — that cell rebases instead', async () => {
+    // The scope's other edge. A device with an HONEST baseline reads `dirty`, and
+    // the policy replays its work rather than adopting over it — path A, which
+    // already worked and which this change must not touch. So: no carry here.
+    ap.loadSnapshot(Automerge.save(fullBase()));
+    const honestBaseline = workerHeads();
+    // Move past that baseline, the way an offline edit does.
+    ap.mutate({ op: 'set', collection: 'todos', id: 'x', entity: { id: 'x', title: 'offline' } });
+
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(compact(fullBase(), 'L-NEW'), key),
+      'fam',
+      { kind: 'baseline', heads: honestBaseline }
+    );
+
+    expect(res.action).toBe('rebased');
+    expect(res.carried).toBeUndefined();
+    expect(res.carryFailed).toBeUndefined();
+    // The rebase, not the carry, is what preserved it.
+    expect((workerDoc().todos as Coll).x).toBeDefined();
   });
 });
