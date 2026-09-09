@@ -23,6 +23,7 @@ import {
   getGoogleAccountEmail,
   setGoogleAccountEmail,
   TokenExpiredError,
+  invalidateAccessToken,
 } from '@/services/google/googleAuth';
 import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
 import {
@@ -166,6 +167,15 @@ export class GoogleDriveProvider implements StorageProvider {
       message: 'Drive 404 with an account mismatch — surfacing reconnect for the bound account',
       context: { http_status: 404, action: 'reconnect-required' },
     });
+    // ⚠️ DROP THE CACHED ACCESS TOKEN, because THIS is where we learn the
+    // session cannot reach the file. `isTokenValid()` is a local clock check
+    // that never contacts Google, so without this the token stays "valid" for
+    // up to an hour — and `tryReconnectSilently` then returns true at its first
+    // line without acquiring anything, so the reconnect the line below raises
+    // reports success, clears the banner, and fails identically on the next op.
+    // A 404 plus an account mismatch is an OBSERVATION that the connection is
+    // wrong; the 401 handler in `driveService` covers the other one.
+    invalidateAccessToken();
     throw new TokenExpiredError(
       `Drive session account (${getGoogleAccountEmail()}) does not match this file's bound account (${this.accountEmail}) — reconnect required`
     );

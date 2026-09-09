@@ -62,16 +62,25 @@ async function tryAgain(): Promise<void> {
   try {
     const outcome = await syncStore.backgroundSyncFromFile(undefined, { manual: true });
     const { toast } = presentRefreshOutcome(outcome);
-    // ⚠️ A FALLBACK IS REQUIRED, and this component is why. `presentRefreshOutcome`
-    // returns NOTHING for the network and decrypt outcomes, on the explicit
-    // premise that "BackgroundSyncBar already toasts" — a premise this banner's
-    // own arrival made false, because the bar now suppresses that toast for
-    // exactly the latched `decrypt` kinds this component owns. And
-    // `'decrypt-failed'` is the outcome a retry here will MOST often produce: the
-    // latch half-opens, the read fails identically, and it re-latches. Without
-    // this the button would flicker `busy` and say nothing at all.
+    // ⚠️ ONE OUTCOME, NOT A BLANKET `else`. `presentRefreshOutcome` returns
+    // nothing for THREE outcomes and they need three different answers:
+    //
+    //   'decrypt-failed'    — its premise ("BackgroundSyncBar already toasts")
+    //                         is exactly what this banner's arrival made false,
+    //                         since the bar now suppresses that toast. It is also
+    //                         the outcome a retry here will MOST often produce.
+    //                         So this is the one we speak for.
+    //   'network-failed'    — the kind becomes 'network', which is NOT bannered,
+    //                         so the bar is NOT suppressed and toasts already. A
+    //                         fallback here would double it, both blaming the
+    //                         device for a dropped connection.
+    //   'skipped-in-flight' — no work was done and a sync is running that may
+    //                         well succeed. Claiming a failure would be a lie.
+    //
+    // The message is the RETRY's own, not a repeat of the banner title sitting
+    // directly above it.
     if (toast) showToast(toast.type, t(toast.key));
-    else showToast('warning', t('sync.podUnopenable'));
+    else if (outcome === 'decrypt-failed') showToast('warning', t('sync.retryFailedStillBlocked'));
   } catch (e) {
     // Classified, never a bare `catch {}` — CLAUDE.md § Observability rule 2.
     logEvent({

@@ -2554,7 +2554,13 @@ export const useSyncStore = defineStore('sync', () => {
       // (rows predating `ownerMemberId`) compares emails, and it must compare
       // this one — `ownerEmail` above is now the roster owner's, which every
       // device sends identically and which would therefore match for everyone.
-      writerEmail: authStore.currentUser?.email ?? null,
+      // `||`, NOT `??`. Three session-creation paths deliberately set `email: ''`
+      // (passkey sign-in fills it only after the file decrypts), and `'' ?? null`
+      // is `''` — which passes the server's PRESENCE test but fails its
+      // `normEmail` check, so a legacy row's real owner would be refused their
+      // own pointer. Null is the honest answer: we do not know this writer's
+      // email yet, so do not claim one.
+      writerEmail: authStore.currentUser?.email || null,
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),
@@ -4394,6 +4400,23 @@ export const useSyncStore = defineStore('sync', () => {
     clearQueue();
   }
 
+  /**
+   * Replace the pod's error sentence with copy the user can actually read.
+   *
+   * ⚠️ EXISTS BECAUSE `error` IS A RAW EXCEPTION CHANNEL. It mirrors the
+   * service's `lastError`, which on the Drive paths is an untranslated developer
+   * string sometimes carrying two email addresses — and the amber slab that
+   * renders it is also the ONLY host of the Reconnect Drive and Force Save
+   * buttons. So a caller faced with "show a raw string" or "clear the slab and
+   * delete the user's recovery buttons" had no good option. This is the third:
+   * keep the slab, translate the sentence.
+   *
+   * Callers pass a TRANSLATED string. Never an exception message.
+   */
+  function setTranslatedError(message: string): void {
+    error.value = message;
+  }
+
   function clearError(): void {
     error.value = null;
   }
@@ -6071,6 +6094,7 @@ export const useSyncStore = defineStore('sync', () => {
     resumeFilePolling,
     resetState,
     clearError,
+    setTranslatedError,
     ensureRegistered,
     // Passkey secrets
     passkeySecrets,

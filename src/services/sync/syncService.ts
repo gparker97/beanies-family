@@ -2276,8 +2276,11 @@ export async function readRemoteDriveConnections(): Promise<DriveConnection[] | 
       level: 'info',
       surface: 'drive-token-silent-reconnect',
       message: 'remote beanpod read failed during token recovery',
+      // A DIFFERENT `action` from the caller's `remote-read-unavailable`, which
+      // fires for the same attempt: sharing it would double-count the exact
+      // ratio step 3 is judged on. This one says WHY the read could not run.
       context: {
-        action: 'remote-read-unavailable',
+        action: 'remote-read-threw',
         error_code: e instanceof Error ? e.name : 'unknown',
       },
       error: e instanceof Error ? e : undefined,

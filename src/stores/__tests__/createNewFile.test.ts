@@ -951,6 +951,34 @@ describe('pod creation: full end-to-end flow', () => {
       expect(entry.ownerEmail).toBe(owner.email ?? null);
       expect(entry.writerMemberId).toBe(member!.id);
       expect(entry.ownerMemberId).not.toBe(entry.writerMemberId);
+      // ⚠️ AND THE EMAIL HALF, which is what the server's LEGACY pointer tier
+      // compares. Sending the roster owner's address there — as `ownerEmail` now
+      // legitimately does — would have matched for every device on every legacy
+      // row, letting any member re-point one.
+      expect(entry.writerEmail).toBe('mary@example.com');
+      expect(entry.ownerEmail).toBe(owner.email ?? null);
+      expect(entry.writerEmail).not.toBe(entry.ownerEmail);
+    });
+
+    it('sends writerEmail as NULL when the session has none yet', async () => {
+      // Passkey sign-in creates a session with `email: ''` and fills it only
+      // after the file decrypts. `'' ?? null` is `''`, which passes the server's
+      // presence test and then fails its `normEmail` check — refusing a legacy
+      // row's real owner their own pointer. `|| null` is the honest answer.
+      const registryService = await import('@/services/registry/registryService');
+      const authStore = useAuthStore();
+
+      await createPod();
+      authStore.currentUser = {
+        ...(authStore.currentUser as NonNullable<typeof authStore.currentUser>),
+        email: '',
+      };
+
+      vi.mocked(registryService.registerFamily).mockClear();
+      useSyncStore().ensureRegistered();
+
+      const [, entry] = vi.mocked(registryService.registerFamily).mock.calls.at(-1)!;
+      expect(entry.writerEmail).toBeNull();
     });
   });
 });

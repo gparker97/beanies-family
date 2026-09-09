@@ -5,11 +5,7 @@
  * All functions require a valid access token from googleAuth.ts.
  */
 
-import {
-  getGoogleAccountEmail,
-  fetchGoogleUserEmail,
-  invalidateAccessTokenIfCurrent,
-} from './googleAuth';
+import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
 import { isSafetyCopyName } from '@/constants/compaction';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -693,10 +689,16 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     // no second door. Safe to call unconditionally: the refresh token is
     // untouched, so the silent path still gets its chance, and the caller's own
     // 401 arm (`attemptSilentRefresh`) installs a fresh token moments later.
-    // Compare-and-clear against the token THIS request carried: concurrent Drive
-    // calls mean a late 401 from a superseded token would otherwise wipe the
-    // fresh one an earlier 401's recovery just installed.
-    if (status === 401) invalidateAccessTokenIfCurrent(token);
+    // ⚠️ UNCONDITIONAL, AND A COMPARE-AND-CLEAR VARIANT WAS TRIED AND REVERTED.
+    // Clearing only when the cached token still equals the one that failed looks
+    // safer under concurrency, but it gets the important case backwards: Google's
+    // revocation kills EVERY token of the (user, client_id) grant at once, so a
+    // late 401 from a superseded token means the replacement is dead too — and
+    // skipping the clear then leaves `isTokenValid()` blessing it for up to an
+    // hour, which is the "Reconnected on a dead grant" loop this hook exists to
+    // break. The cost of the opposite mistake is one redundant refresh, which
+    // succeeds if the grant is live.
+    if (status === 401) invalidateAccessToken();
 
     // 404 Not Found or 403 Forbidden both mean "the file isn't accessible to this
     // caller" — photoStore treats these identically (flags the photo as unresolved).
