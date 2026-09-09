@@ -64,6 +64,24 @@ function blockAdoptRemote(): void {
 
 const labels = (w: ReturnType<typeof mount>) => w.findAll('button').map((b) => b.text());
 
+/**
+ * Find a button by what it SAYS, not by where it sits.
+ *
+ * ⚠️ EVERY CLICK IN THIS FILE USED A POSITIONAL INDEX, so reordering the actions
+ * — putting the way forward first, where it belongs — broke eight tests that
+ * have nothing to do with ordering. A test that fails when the buttons are
+ * merely rearranged is testing the layout by accident. `t` is stubbed to return
+ * the key, so the "label" here is the key and stays stable across wording edits.
+ */
+function btn(w: ReturnType<typeof mount>, key: string) {
+  const found = w.findAll('button').find((b) => b.text() === key);
+  if (!found) throw new Error(`no button labelled ${key}; saw: ${labels(w).join(', ')}`);
+  return found;
+}
+const ADOPT = 'podLineage.useFileCta';
+const EXPORT = 'podLineage.bannerCta';
+const DISMISS = 'action.dismiss';
+
 describe('LineageBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -93,7 +111,10 @@ describe('LineageBanner', () => {
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain('podLineage.bannerTitle');
     expect(banner.text()).toContain('podLineage.bannerMessage');
-    expect(labels(w)).toEqual(['podLineage.bannerCta', 'podLineage.useFileCta', 'action.dismiss']);
+    // ⚠️ THE WAY FORWARD FIRST. Saving a copy used to lead, which framed the two
+    // as a choice — and a saved copy cannot be merged back, so only one of them
+    // goes anywhere.
+    expect(labels(w)).toEqual([ADOPT, EXPORT, DISMISS]);
   });
 
   it('shows the CONFLICT copy and offers NO discard on a conflict', () => {
@@ -112,7 +133,7 @@ describe('LineageBanner', () => {
   it('routes the export CTA to the Settings family-data modal', async () => {
     blockAdoptRemote();
     const w = mount(LineageBanner);
-    await w.findAll('button')[0].trigger('click');
+    await btn(w, EXPORT).trigger('click');
     expect(pushMock).toHaveBeenCalledWith({ path: '/settings', query: { open: 'family-data' } });
   });
 
@@ -120,7 +141,7 @@ describe('LineageBanner', () => {
     blockAdoptRemote();
     confirmMock.mockResolvedValue(false);
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
+    await btn(w, ADOPT).trigger('click');
     expect(confirmMock).toHaveBeenCalled();
     expect(holder.store.useRemoteFileOverLocalDocument).not.toHaveBeenCalled();
   });
@@ -128,7 +149,7 @@ describe('LineageBanner', () => {
   it('adopts the family file once the person confirms', async () => {
     blockAdoptRemote();
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
+    await btn(w, ADOPT).trigger('click');
     await vi.waitFor(() =>
       expect(toastMock).toHaveBeenCalledWith('success', 'podLineage.useFileDone')
     );
@@ -140,7 +161,7 @@ describe('LineageBanner', () => {
     blockAdoptRemote();
     holder.store.useRemoteFileOverLocalDocument.mockResolvedValue(false);
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
+    await btn(w, ADOPT).trigger('click');
     await vi.waitFor(() =>
       expect(toastMock).toHaveBeenCalledWith('error', 'podLineage.useFileFailed')
     );
@@ -149,7 +170,7 @@ describe('LineageBanner', () => {
   it('persists until the person dismisses it', async () => {
     blockAdoptRemote();
     const w = mount(LineageBanner);
-    await w.findAll('button')[2].trigger('click');
+    await btn(w, DISMISS).trigger('click');
     expect(w.find('[role="status"]').exists()).toBe(false);
   });
 
@@ -183,7 +204,7 @@ describe('LineageBanner', () => {
     // `watch(blocked, …)` left the rewritten suite green.
     blockAdoptRemote();
     const w = mount(LineageBanner);
-    await w.findAll('button')[2].trigger('click');
+    await btn(w, DISMISS).trigger('click');
     expect(w.find('[role="status"]').exists()).toBe(false);
 
     // The latch clears (a successful read), then a new block arrives.
@@ -209,8 +230,12 @@ describe('LineageBanner', () => {
       })
     );
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
-    await w.findAll('button')[1].trigger('click');
+    // The SAME element twice — after the first click its label becomes
+    // `useFileBusy`, so re-finding it by label would miss the very button the
+    // second click has to land on.
+    const adopt = btn(w, ADOPT);
+    await adopt.trigger('click');
+    await adopt.trigger('click');
     allow(true);
     for (let i = 0; i < 5; i++) await Promise.resolve();
     await w.vm.$nextTick();
@@ -227,7 +252,7 @@ describe('LineageBanner', () => {
     blockAdoptRemote();
     holder.store.useRemoteFileOverLocalDocument.mockRejectedValue(new Error('boom'));
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
+    await btn(w, ADOPT).trigger('click');
     await vi.waitFor(() =>
       expect(toastMock).toHaveBeenCalledWith('error', 'podLineage.useFileFailed')
     );
@@ -245,15 +270,16 @@ describe('LineageBanner', () => {
       })
     );
     const w = mount(LineageBanner);
-    await w.findAll('button')[1].trigger('click');
+    await btn(w, ADOPT).trigger('click');
     await vi.waitFor(() => expect(holder.store.useRemoteFileOverLocalDocument).toHaveBeenCalled());
     await w.vm.$nextTick();
 
-    const buttons = w.findAll('button');
-    expect(buttons[0].attributes('disabled')).toBeDefined();
-    expect(buttons[1].attributes('disabled')).toBeDefined();
-    expect(buttons[1].attributes('aria-busy')).toBe('true');
-    expect(buttons[1].text()).toBe('podLineage.useFileBusy');
+    // Both actions, whichever order they sit in: navigating away mid-adopt is
+    // how a half-applied recovery gets its second half skipped.
+    expect(btn(w, EXPORT).attributes('disabled')).toBeDefined();
+    const adopting = w.findAll('button').find((b) => b.text() === 'podLineage.useFileBusy')!;
+    expect(adopting.attributes('disabled')).toBeDefined();
+    expect(adopting.attributes('aria-busy')).toBe('true');
     release(true);
   });
 
