@@ -22577,8 +22577,8 @@
       "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileConfirmMessage": {
-      "translation": "此设备将采用家庭文件的当前状态，在此处所做但从未同步过去的更改将被永久放弃。事先保存的副本可以查看，但之后无法再合并回去。",
-      "hash": "4zttn2",
+      "translation": "我们尝试过了，但无法将此设备上的数据与您的家庭文件合并。此设备上的数据将被替换为您家庭文件中的内容，请确认以继续。如果需要，您可以先备份本设备上的数据。",
+      "hash": "qkieei",
       "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileConfirmAction": {

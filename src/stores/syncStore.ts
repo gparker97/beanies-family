@@ -2540,8 +2540,14 @@ export const useSyncStore = defineStore('sync', () => {
       // stored values exactly as they were. Substituting the local session there
       // would reintroduce the whole defect on precisely the paths least able to
       // judge it.
-      ownerEmail: rosterOwner?.email ?? null,
-      ownerMemberId: rosterOwner?.id ?? null,
+      // ⚠️ `||`, NOT `??`, AND THIS ONE IS THE DANGEROUS HALF. The server latches
+      // `ownerEmail` WRITE-ONCE (`existing.ownerEmail ?? body.ownerEmail`), and
+      // `''` is not nullish — so once an empty string lands from a roster owner
+      // whose email is not filled in yet, it is permanent. Its legacy pointer
+      // tier then reads `!existing.ownerEmail` as TRUE forever, falling open for
+      // every writer, with no route back.
+      ownerEmail: rosterOwner?.email || null,
+      ownerMemberId: rosterOwner?.id || null,
       // WHO IS WRITING, and the only thing the server's pointer guard consults.
       // Distinct from the owner above from this release onward; identical to it
       // whenever the owner is the one at the keyboard.
@@ -2554,12 +2560,13 @@ export const useSyncStore = defineStore('sync', () => {
       // (rows predating `ownerMemberId`) compares emails, and it must compare
       // this one — `ownerEmail` above is now the roster owner's, which every
       // device sends identically and which would therefore match for everyone.
-      // `||`, NOT `??`. Three session-creation paths deliberately set `email: ''`
-      // (passkey sign-in fills it only after the file decrypts), and `'' ?? null`
-      // is `''` — which passes the server's PRESENCE test but fails its
-      // `normEmail` check, so a legacy row's real owner would be refused their
-      // own pointer. Null is the honest answer: we do not know this writer's
-      // email yet, so do not claim one.
+      // `||`, NOT `??`, for the same reason as `ownerEmail` above — though on
+      // THIS field it changes no server outcome today: `''` and `null` both fail
+      // the server's `normEmail` check, so both refuse the pointer identically.
+      // It is here for consistency and because `writerEmail` should never carry a
+      // string that claims to be an address and is not. Three session-creation
+      // paths set `email: ''` (passkey sign-in fills it only after the file
+      // decrypts).
       writerEmail: authStore.currentUser?.email || null,
       subscribeNewsletter: authStore.newsletterOptIn ?? null,
       country: useSettingsStore().country ?? null,
@@ -3656,6 +3663,20 @@ export const useSyncStore = defineStore('sync', () => {
     // automatic tick must never do this — that is the download storm the latch
     // exists to stop — and without it the latch was write-only, since both of
     // its automatic clear sites now sit behind the guards that read it.
+    // ⚠️ AND IT MUST NOT DISARM THE BREAKER FOR AN ATTEMPT THAT WILL NOT RUN.
+    // This used to sit above the in-flight check below, so a manual tap that
+    // landed while a background sync happened to be running destroyed the latch
+    // AND cleared the report throttle, then returned `skipped-in-flight` having
+    // read nothing. The next automatic tick sailed through the guard it had just
+    // disarmed, re-downloaded the whole pod, re-hit the same allocation and filed
+    // a fresh critical report — the exact download storm the latch exists to
+    // stop, reachable in one tap. Half-open the breaker only for an attempt that
+    // is actually about to happen.
+    if (isBackgroundSyncing.value && opts?.manual) {
+      endOpen('open-complete', openToken, { detailSuffix: 'sync-already-in-flight' });
+      logManualRefreshOutcome('skipped-in-flight');
+      return 'skipped-in-flight';
+    }
     if (opts?.manual) syncService.retryAfterRemoteBlock();
     if (remoteUnreadable()) {
       // Close the open cycle and log the outcome like every other terminal —
@@ -4398,23 +4419,6 @@ export const useSyncStore = defineStore('sync', () => {
     showSaveFailureBanner.value = false;
     pendingEncryptedFile.value = null;
     clearQueue();
-  }
-
-  /**
-   * Replace the pod's error sentence with copy the user can actually read.
-   *
-   * ⚠️ EXISTS BECAUSE `error` IS A RAW EXCEPTION CHANNEL. It mirrors the
-   * service's `lastError`, which on the Drive paths is an untranslated developer
-   * string sometimes carrying two email addresses — and the amber slab that
-   * renders it is also the ONLY host of the Reconnect Drive and Force Save
-   * buttons. So a caller faced with "show a raw string" or "clear the slab and
-   * delete the user's recovery buttons" had no good option. This is the third:
-   * keep the slab, translate the sentence.
-   *
-   * Callers pass a TRANSLATED string. Never an exception message.
-   */
-  function setTranslatedError(message: string): void {
-    error.value = message;
   }
 
   function clearError(): void {
@@ -6094,7 +6098,6 @@ export const useSyncStore = defineStore('sync', () => {
     resumeFilePolling,
     resetState,
     clearError,
-    setTranslatedError,
     ensureRegistered,
     // Passkey secrets
     passkeySecrets,
