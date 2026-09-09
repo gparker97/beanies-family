@@ -486,3 +486,330 @@ describe('registry PUT — pointer authority is ownerMemberId, not the editable 
     expect(item.ownerEmail).toBe('whoever@example.com');
   });
 });
+
+/**
+ * Drive a DELETE through the handler. `existing` is the row already in the
+ * table (null = no row). Returns the unmarshalled Item the handler tried to
+ * Put — a DELETE is a tombstone write, not a DeleteItem, since 2026-09-09.
+ */
+async function del(existing = null, queryStringParameters = undefined) {
+  sendMock.mockReset();
+  sendMock.mockImplementation((command) => {
+    const kind = command.constructor.name;
+    if (kind === 'GetItemCommand') {
+      return Promise.resolve({ Item: existing ? marshall(existing) : undefined });
+    }
+    return Promise.resolve({});
+  });
+
+  const res = await handler({
+    headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+    pathParameters: { familyId: FAMILY_ID },
+    requestContext: { http: { method: 'DELETE' } },
+    ...(queryStringParameters ? { queryStringParameters } : {}),
+  });
+
+  const putCall = sendMock.mock.calls.find((c) => c[0].constructor.name === 'PutItemCommand');
+  return { res, item: putCall ? unmarshall(putCall[0].input.Item) : null };
+}
+
+/** Drive a GET through the handler. */
+async function get(existing = null) {
+  sendMock.mockReset();
+  sendMock.mockImplementation(() =>
+    Promise.resolve({ Item: existing ? marshall(existing) : undefined })
+  );
+  const res = await handler({
+    headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+    pathParameters: { familyId: FAMILY_ID },
+    requestContext: { http: { method: 'GET' } },
+  });
+  return { res, body: JSON.parse(res.body) };
+}
+
+/** Every GetItemCommand the last call issued, with its input. */
+function getCommands() {
+  return sendMock.mock.calls
+    .map((c) => c[0])
+    .filter((c) => c.constructor.name === 'GetItemCommand');
+}
+
+const M_A = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+const M_B = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+
+describe('registry — strongly consistent reads', () => {
+  it('reads the row consistently on GET', async () => {
+    await get({ provider: 'local' });
+    expect(getCommands()[0].input.ConsistentRead).toBe(true);
+  });
+
+  it('reads the row consistently on PUT, because a stale miss clobbers write-once fields', async () => {
+    await put({ provider: 'local' }, { createdAt: '2025-01-01T00:00:00.000Z' });
+    expect(getCommands()[0].input.ConsistentRead).toBe(true);
+  });
+
+  it('reads the row consistently on DELETE', async () => {
+    await del({ provider: 'local', createdAt: '2025-01-01T00:00:00.000Z' });
+    expect(getCommands()[0].input.ConsistentRead).toBe(true);
+  });
+});
+
+describe('registry DELETE — tombstone, not a drop', () => {
+  const LIVE = {
+    createdAt: '2025-03-01T00:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    country: 'SG',
+    signupPlatform: 'ios',
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    displayPath: '/beanies/pod.beanpod',
+    familyName: 'The Parkers',
+    subscribeNewsletter: true,
+    lastLoginAt: '2026-09-01',
+    memberCount: 5,
+    beanpodSizeKb: 350,
+  };
+
+  it('keeps identity and provenance so a re-registration is a restore', async () => {
+    const { res, item } = await del(LIVE, { writerMemberId: M_A });
+    expect(res.statusCode).toBe(200);
+    expect(item.createdAt).toBe('2025-03-01T00:00:00.000Z');
+    expect(item.ownerMemberId).toBe(M_A);
+    expect(item.ownerEmail).toBe('owner@example.com');
+    expect(item.country).toBe('SG');
+    expect(item.signupPlatform).toBe('ios');
+    expect(item.deletedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('drops the pointer, the activity signals and the family content', async () => {
+    // A stale pointer is worse than none; activity signals would keep a deleted
+    // family alive in the metrics; the name and the marketing consent are the
+    // things the user actually asked to be rid of.
+    const { item } = await del(LIVE, { writerMemberId: M_A });
+    for (const gone of [
+      'provider',
+      'fileId',
+      'displayPath',
+      'familyName',
+      'subscribeNewsletter',
+      'lastLoginAt',
+      'memberCount',
+      'beanpodSizeKb',
+    ]) {
+      expect(item[gone]).toBeUndefined();
+    }
+  });
+
+  it('writes nothing at all when there is no row to tombstone', async () => {
+    const { res, item } = await del(null, { writerMemberId: M_A });
+    expect(res.statusCode).toBe(200);
+    expect(item).toBeNull();
+  });
+
+  it('never issues a DeleteItemCommand', async () => {
+    await del(LIVE, { writerMemberId: M_A });
+    expect(sendMock.mock.calls.some((c) => c[0].constructor.name === 'DeleteItemCommand')).toBe(
+      false
+    );
+  });
+});
+
+describe('registry GET — a tombstoned row is gone', () => {
+  it('returns 404 for a tombstoned row', async () => {
+    const { res, body } = await get({
+      createdAt: '2025-03-01T00:00:00.000Z',
+      ownerMemberId: M_A,
+      deletedAt: '2026-09-09T00:00:00.000Z',
+    });
+    expect(res.statusCode).toBe(404);
+    expect(body.error).toBe('Family not found');
+  });
+
+  it('still returns a live row', async () => {
+    const { res, body } = await get({ provider: 'google_drive', fileId: 'FILE-1' });
+    expect(res.statusCode).toBe(200);
+    expect(body.fileId).toBe('FILE-1');
+  });
+});
+
+describe('registry PUT — restoring a tombstoned row', () => {
+  const TOMB = {
+    createdAt: '2025-03-01T00:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    signupPlatform: 'ios',
+    deletedAt: '2026-09-09T00:00:00.000Z',
+  };
+
+  it('restores the original identity rather than inventing a new one', async () => {
+    // This is the whole point of the tombstone: before it, a delete followed by
+    // any member's write recreated the row with that member stamped as owner.
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'FILE-2',
+        ownerMemberId: M_A,
+        writerMemberId: M_A,
+        isSignupEvent: true,
+        signupPlatform: 'web',
+      },
+      TOMB
+    );
+    expect(item.createdAt).toBe('2025-03-01T00:00:00.000Z');
+    expect(item.ownerMemberId).toBe(M_A);
+    // Signed up on iOS then re-registered from a browser: still iOS.
+    expect(item.signupPlatform).toBe('ios');
+  });
+
+  it('clears deletedAt, so the row is live again', async () => {
+    const { item } = await put(
+      { provider: 'google_drive', fileId: 'FILE-2', ownerMemberId: M_A, writerMemberId: M_A },
+      TOMB
+    );
+    expect(item.deletedAt).toBeUndefined();
+  });
+
+  it('still refuses a non-owner the pointer on a tombstoned row', async () => {
+    // Deleting a family does not relinquish ownership of its id.
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MEMBER-COPY', ownerMemberId: M_A, writerMemberId: M_B },
+      TOMB
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBeNull();
+  });
+});
+
+describe('registry PUT — the guard asks the WRITER, not the claimed owner', () => {
+  const OWNED = { ownerMemberId: M_A, provider: 'google_drive', fileId: 'ORIGINAL' };
+
+  it('accepts a pre-split client that sends only its own id as ownerMemberId', async () => {
+    // Compatibility: every client deployed before the split sends its session id
+    // in `ownerMemberId`. Without the presence fallback, this deploy refuses the
+    // pointer for the entire fleet at once.
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MOVED', ownerMemberId: M_A },
+      OWNED
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.fileId).toBe('MOVED');
+  });
+
+  it('refuses a pre-split member device, exactly as before', async () => {
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MEMBER-COPY', ownerMemberId: M_B },
+      OWNED
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('accepts the owner when the roster owner and the writer are the same person', async () => {
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MOVED', ownerMemberId: M_A, writerMemberId: M_A },
+      OWNED
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.fileId).toBe('MOVED');
+  });
+
+  it('REFUSES a member device even though it sends the correct roster owner', async () => {
+    // The guard survives sourcing `ownerMemberId` from the roster. Every device
+    // holding the decrypted pod can compute the roster owner, so if that value
+    // were the credential, the guard would be worth nothing.
+    const { res, item } = await put(
+      { provider: 'google_drive', fileId: 'MEMBER-COPY', ownerMemberId: M_A, writerMemberId: M_B },
+      OWNED
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('REFUSES a current client with no signed-in member, despite a matching ownerMemberId', async () => {
+    // The reason the fallback tests PRESENCE and not nullishness. With `??`, an
+    // explicit null here would fall back to `ownerMemberId` — the roster owner —
+    // and hand the guard's own answer to an unauthenticated writer.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'ANON-COPY',
+        ownerMemberId: M_A,
+        writerMemberId: null,
+      },
+      OWNED
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item.fileId).toBe('ORIGINAL');
+  });
+
+  it('does not stamp the WRITER as owner on a row that has no owner yet', async () => {
+    // `ownerMemberId` is the owner claim; `writerMemberId` is only ever the
+    // permission question. A fall-open row must record the claimed owner.
+    const { item } = await put(
+      { provider: 'google_drive', fileId: 'FIRST', ownerMemberId: M_A, writerMemberId: M_B },
+      { provider: 'local' }
+    );
+    expect(item.ownerMemberId).toBe(M_A);
+  });
+});
+
+describe('registry DELETE — the ladder measures, it does not enforce', () => {
+  const OWNED = { createdAt: '2025-03-01T00:00:00.000Z', ownerMemberId: M_A };
+  let warn;
+
+  beforeEach(() => {
+    // `spyOn` on an already-spied method hands back the SAME spy, so without the
+    // clear the call history accumulates across tests in this block and the
+    // "is silent" assertion reads three earlier tests' warns as its own.
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warn.mockClear();
+  });
+
+  it('warns when the caller sends no writer id, and deletes anyway', async () => {
+    const { res, item } = await del(OWNED);
+    expect(warn).toHaveBeenCalledWith(
+      '[registry] delete would be refused',
+      FAMILY_ID,
+      'no-writer-id',
+      M_A.slice(-6)
+    );
+    expect(res.statusCode).toBe(200);
+    expect(item.deletedAt).toBeTruthy();
+  });
+
+  it('warns on a writer who is not the owner, and deletes anyway', async () => {
+    const { res, item } = await del(OWNED, { writerMemberId: M_B });
+    expect(warn).toHaveBeenCalledWith(
+      '[registry] delete would be refused',
+      FAMILY_ID,
+      M_B.slice(-6),
+      M_A.slice(-6)
+    );
+    expect(res.statusCode).toBe(200);
+    expect(item.deletedAt).toBeTruthy();
+  });
+
+  it('treats a malformed writer id as absent', async () => {
+    await del(OWNED, { writerMemberId: 'not-a-uuid' });
+    expect(warn).toHaveBeenCalledWith(
+      '[registry] delete would be refused',
+      FAMILY_ID,
+      'no-writer-id',
+      M_A.slice(-6)
+    );
+  });
+
+  it('is silent when the owner deletes their own family', async () => {
+    const { item } = await del(OWNED, { writerMemberId: M_A });
+    expect(warn).not.toHaveBeenCalled();
+    expect(item.deletedAt).toBeTruthy();
+  });
+
+  it('logs id TAILS only — never a full member id', async () => {
+    await del(OWNED, { writerMemberId: M_B });
+    const logged = warn.mock.calls[0].join(' ');
+    expect(logged).not.toContain(M_A);
+    expect(logged).not.toContain(M_B);
+  });
+});

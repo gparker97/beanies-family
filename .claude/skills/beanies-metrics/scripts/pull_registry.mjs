@@ -107,17 +107,43 @@ function tally(items, keyFn) {
   return Object.fromEntries([...m.entries()].sort((a, b) => b[1] - a[1]));
 }
 
+/**
+ * Scan the registry, EXCLUDING tombstoned rows.
+ *
+ * The Lambda stopped hard-deleting on 2026-09-09: a DELETE now keeps the row's
+ * identity attributes and stamps `deletedAt`, so a family that later
+ * re-registers gets its own `createdAt` and owner back instead of being
+ * recreated with whichever member happened to write next. The registry API
+ * reports those rows as 404, so nothing in the app can see them.
+ *
+ * A raw scan can, which is why the filter lives HERE rather than at the two
+ * call sites below: without it every deleted family would count as a live one
+ * forever, inflating the family total and permanently parking itself in the
+ * churned bucket. Any future reader of this scan inherits the exclusion instead
+ * of having to remember it.
+ */
 async function scanAll() {
   const client = new DynamoDBClient({ region: REGION });
   const rows = [];
+  let tombstoned = 0;
   let ExclusiveStartKey;
   do {
     const out = await client.send(
       new ScanCommand({ TableName: TABLE, ExclusiveStartKey }),
     );
-    for (const item of out.Items || []) rows.push(unmarshall(item));
+    for (const item of out.Items || []) {
+      const row = unmarshall(item);
+      if (row.deletedAt) {
+        tombstoned++;
+        continue;
+      }
+      rows.push(row);
+    }
     ExclusiveStartKey = out.LastEvaluatedKey;
   } while (ExclusiveStartKey);
+  if (tombstoned) {
+    console.error(`[registry] excluded ${tombstoned} tombstoned row(s) from the scan`);
+  }
   return rows;
 }
 
