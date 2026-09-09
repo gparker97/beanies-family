@@ -37,7 +37,7 @@ describe('deleteLocalFamily and the shared registry row', () => {
     const source = readFileSync('src/pages/SettingsPage.vue', 'utf8');
     // The one place allowed to remove it. Awaited and surfaced, because the user
     // is simultaneously being told their family is gone from everywhere.
-    expect(source).toContain('await removeFamily(familyId)');
+    expect(source).toMatch(/await removeFamily\(\s*familyId/);
     expect(source).toContain('registryRemoved');
   });
 

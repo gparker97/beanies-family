@@ -1460,7 +1460,10 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     //    `critical` nothing pages and nothing renders, and the user is about to
     //    be told their family is gone from everywhere.
     if (podFileDeleted) {
-      const registryRemoved = await removeFamily(familyId);
+      // The signed-in member, so the server can tell an owner-initiated deletion
+      // from any other. It only warns today; the rate of that warn is what
+      // decides when it may start refusing.
+      const registryRemoved = await removeFamily(familyId, authStore.currentUser?.memberId ?? null);
       if (!registryRemoved) {
         kept.push('registry-row');
         reportError({
