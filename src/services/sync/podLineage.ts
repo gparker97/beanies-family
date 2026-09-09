@@ -181,47 +181,6 @@ export function lineageAction(verdict: LineageVerdict, ctx: LineageContext): Lin
   return POLICY[verdict][ctx];
 }
 
-/**
- * THE cell a compaction propagates through: a peer taking a newer lineage while
- * able to prove it holds nothing unsynced.
- *
- * ⚠️ WHY THIS IS A NAMED PREDICATE AND NOT AN INLINE `&&`. The module comment
- * above says it: "A switch at each of the three consumers would be the same
- * policy written three times, drifting independently the first time a fifth
- * verdict or a fourth context appears." The worker had already broken that once
- * by hand-writing `ours-newer × user-file` inline; a second hand-written cell
- * beside it would be the drift this module exists to prevent. Both now live here,
- * beside the table whose meaning they encode, and `podLineage.test.ts` pins each
- * to exactly one of the twelve cells.
- *
- * Be honest about what this does NOT buy: a `(verdict, ctx) => boolean` gives no
- * more compile-time protection against a fifth verdict than the inline chain did.
- * The gains are co-location and testability, not type safety.
- *
- * ⚠️ IT IS NOT `lineageAction(...) === 'adopt'`, AND THAT IS THE WHOLE POINT.
- * `adopt` is reached from THREE cells: this one, plus the two `user-file` cells
- * that are the deliberate rollback route the banner calls "the only exit there
- * is". A consumer that widens to any `adopt` and then REFUSES something would
- * refuse the exit offered by the banner its own refusal raised.
- */
-export function isCleanCompactionAdopt(verdict: LineageVerdict, ctx: LineageContext): boolean {
-  return verdict === 'adopt-remote' && ctx === 'clean';
-}
-
-/**
- * The RESTORE: a human chose a file whose lineage is OLDER than what this device
- * holds — the pre-compaction safety copy.
- *
- * The one cell that must mint a NEW lineage generation, because adopting the old
- * one as-is leaves every peer reading `ours-newer`, republishing, and undoing the
- * restore within one poll. Deliberately NOT `conflict × user-file`, which also
- * adopts: there a human resolved a concurrent compaction, and adopting the chosen
- * id IS the resolution.
- */
-export function isLineageRestore(verdict: LineageVerdict, ctx: LineageContext): boolean {
-  return verdict === 'ours-newer' && ctx === 'user-file';
-}
-
 const WHY: Record<LineageVerdict, string> = {
   same: 'same lineage',
   'adopt-remote': 'the remote pod has been compacted and this device has unsaved changes',
