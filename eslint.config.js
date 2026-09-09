@@ -389,7 +389,21 @@ export default [
           patterns: [
             {
               group: ['**/podLineage', '**/podLineage.ts'],
-              importNames: ['guardLineage', 'compareLineage', 'lineageAction'],
+              // ⚠️ THE PREDICATES ARE ON THIS LIST TOO. `isCleanCompactionAdopt`
+              // and `isLineageRestore` read the POLICY table, so importing one on
+              // main is re-deriving lineage policy outside the worker — the thing
+              // ADR-036 exists to prevent, just spelled differently. Nothing
+              // imports them today, so this is hardening rather than a fix; it is
+              // here because the rule's stated scope is "the guard's legitimate
+              // home is the WORKER and nowhere else", and a policy export sitting
+              // outside that scope would quietly contradict it.
+              importNames: [
+                'guardLineage',
+                'compareLineage',
+                'lineageAction',
+                'isCleanCompactionAdopt',
+                'isLineageRestore',
+              ],
               message:
                 'The lineage guard runs in the worker (applyAndProject.mergeRemoteEnvelope) — the only place BOTH documents exist. Pass a LineageBasis instead of comparing envelopes here; see ADR-036.',
             },

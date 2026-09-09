@@ -1239,3 +1239,115 @@ describe('docClient — worker crash notification policy', () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 });
+
+describe('docClient — stage 6 local-only carry reporting', () => {
+  /**
+   * ⚠️ REPORTED FROM THE MERGE WRAPPER, NOT `logMergeTerminus`. All three carrying
+   * paths happen to log a terminus today, but that is scoping by inspection — an
+   * eighth `mergeRemoteEnvelope` call site would silently lose the event and the
+   * toast. These tests drive `mergeRemoteEnvelope` directly for that reason.
+   */
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  const mergeWith = async (extra: Record<string, unknown>) => {
+    const w = new FakeWorker();
+    setWorkerFactory(() => w);
+    w.responder = (req) => ({
+      cid: req.cid,
+      ok: true,
+      result: {
+        action: 'adopted',
+        heads: [],
+        remoteHeads: [],
+        dirty: false,
+        changed: true,
+        ...extra,
+      },
+    });
+    return mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+      kind: 'baseline',
+      heads: ['h1'],
+    });
+  };
+
+  it('reports the count and shows ONE toast naming it', async () => {
+    await mergeWith({ carried: 3 });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        surface: 'pod-lineage',
+        context: expect.objectContaining({
+          action: 'adopt-carried-local-only',
+          count: 3,
+          family_id: 'fam-1',
+        }),
+      })
+    );
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(showToast).mock.calls[0]![1]).toContain('3');
+  });
+
+  it('reports the ZERO case but shows no toast', async () => {
+    // ⚠️ THE EVENT IS ITS OWN DENOMINATOR. Emitting only on a non-zero carry would
+    // make the carry RATE unmeasurable — `adopted` is a poor denominator because
+    // it also counts first-load adopts and both `user-file` adopts.
+    await mergeWith({ carried: 0 });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-lineage',
+        context: expect.objectContaining({ action: 'adopt-carried-local-only', count: 0 }),
+      })
+    );
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('uses the singular copy for exactly one item', async () => {
+    await mergeWith({ carried: 1 });
+    const title = vi.mocked(showToast).mock.calls[0]![1];
+    expect(title).toBe('Kept 1 item from this device');
+    expect(title).not.toContain('items');
+  });
+
+  it('names the error class on a failed carry, at warn, with no toast', async () => {
+    // A failed carry lost nothing relative to today, and there is no action the
+    // user could take — so it is a `warn` for CloudWatch, not an alarm for them.
+    await mergeWith({ carryFailed: 'RangeError' });
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'pod-lineage',
+        context: expect.objectContaining({
+          action: 'adopt-carry-failed',
+          error_code: 'RangeError',
+          family_id: 'fam-1',
+        }),
+      })
+    );
+    expect(showToast).not.toHaveBeenCalled();
+    // Disjoint: a failure must not also claim a completed carry of zero.
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ action: 'adopt-carried-local-only' }),
+      })
+    );
+  });
+
+  it('says nothing at all on a merge that was never in the carry scope', async () => {
+    // Anti-vacuity: an unconditional emit would make every test above pass while
+    // poisoning the metric with every ordinary merge in the fleet.
+    await mergeWith({ action: 'merged' });
+
+    expect(showToast).not.toHaveBeenCalled();
+    for (const action of ['adopt-carried-local-only', 'adopt-carry-failed']) {
+      expect(logEvent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ context: expect.objectContaining({ action }) })
+      );
+    }
+  });
+});

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { ExportedPayload } from '@/services/automerge/worker/protocol';
 import * as docClient from '@/services/automerge/worker/docClient';
+import * as fileSync from '../fileSync';
+import { UnsupportedBeanpodVersionError } from '@/types/sync';
 import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
 
 // Must reset modules between tests to clear module-level state
@@ -157,6 +159,34 @@ describe('syncService — save failure tracking', () => {
       expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
         encodeBaselinePayload('ver:9', headsFingerprint(['h-uploaded']))
       );
+    });
+
+    it('commits NO baseline when the remote is from a NEWER beanies (§5b)', async () => {
+      // ⚠️ THE ASSERTION NO OTHER TEST MAKES. Refusal tests elsewhere check "no
+      // write" and "result false"; none checks that the BASELINE was not learned.
+      // That is the half that actually caused the 2026-09-08 loss: a 0.16 client
+      // could not read the compacted pod, wrote over it anyway, and committed a
+      // baseline stamped with its OWN heads. Every peer then compared heads equal,
+      // read `clean`, and adopted wholesale over its own unsynced work.
+      //
+      // ⚠️ INJECT AT `parseBeanpodV4`, NOT AT `mergeRemoteEnvelope`. This error is
+      // raised BEFORE the worker boundary and `types/sync.ts` records that it never
+      // crosses it — injecting there would pin an unreachable state. And `read`
+      // must return content: `okProvider`'s bare `vi.fn()` resolves `undefined`, so
+      // `fetchAndMergeRemote` returns early and the test would pass vacuously with
+      // both "not called" assertions true because nothing ever ran.
+      const provider = okProvider({ revision: 'ver:9' });
+      provider.read = vi.fn().mockResolvedValue('{"version":"6.0"}');
+      vi.mocked(fileSync.parseBeanpodV4).mockImplementationOnce(() => {
+        throw new UnsupportedBeanpodVersionError('6.0', 'test-family');
+      });
+      syncService.setProvider(provider);
+
+      const result = await syncService.save();
+
+      expect(result).toBe(false);
+      expect(provider.write).not.toHaveBeenCalled();
+      expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
     });
 
     /**

@@ -333,10 +333,11 @@ export const useSettingsStore = defineStore('settings', () => {
           level: 'info',
           surface: 'exchange-rate-rebase',
           message: 'refetched exchange rates for a new base currency',
-          // `count` is deliberately NOT sent: it is not in ALLOWED_CONTEXT_KEYS, and
-          // adding a key obliges a store-privacy declaration update (CLAUDE.md) that a
-          // rate tally does not justify. The success/failure split plus the pair is
-          // what a rate alert needs.
+          // `count` is deliberately NOT sent: the success/failure split plus the pair
+          // is what a rate alert needs, and a rate tally does not earn a field.
+          // (This comment used to say `count` was not in ALLOWED_CONTEXT_KEYS. It was
+          // added 2026-09-02, so that reason is stale — but the choice stands on its
+          // own, and no store-privacy declaration update is implied either way.)
           context: { action: 'rebase-ok', detail: `${previous ?? 'unknown'}->${next}` },
         });
         return;

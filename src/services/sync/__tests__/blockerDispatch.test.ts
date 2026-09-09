@@ -19,6 +19,7 @@ import {
   PayloadTooLargeError,
   CorruptPayloadError,
   RemoteMergeError,
+  UnsupportedBeanpodVersionError,
 } from '@/types/sync';
 import { PodLineageError } from '../podLineage';
 
@@ -38,6 +39,22 @@ describe('isRemoteBlocker', () => {
     for (const v of [undefined, null, 0, 'str', {}, { blockCode: 'merge' }]) {
       expect(isRemoteBlocker(v)).toBe(false);
     }
+  });
+
+  it('covers UnsupportedBeanpodVersionError, WITHOUT latching (§5b tripwire)', () => {
+    // ⚠️ THIS IS THE 0.16 HOLE, HELD OPEN BY A TEST. A 0.16 client could not READ
+    // a compacted 5.0 pod but its save path wrote over it anyway and committed a
+    // baseline stamped with its own heads — the lie that made every peer read
+    // `clean` and adopt over its own unsynced work. `doSave` refuses today only
+    // because this class satisfies `isRemoteBlocker` transitively, via
+    // PayloadLoadError's getters. Nothing else pins that, so a refactor of the
+    // error hierarchy could silently re-open it.
+    const err = new UnsupportedBeanpodVersionError('6.0');
+    expect(isRemoteBlocker(err)).toBe(true);
+    // And it must NOT latch: `step` is 'parse', so the breaker stays clear and the
+    // device retries once the file is readable again. Refusing the save and
+    // latching the session are different things, and only the first is wanted.
+    expect(err.latches).toBe(false);
   });
 
   it('is structural, so a FUTURE blocker is covered without touching this list', () => {
