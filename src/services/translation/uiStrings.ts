@@ -4635,49 +4635,71 @@ const STRING_DEFS = {
       "beanies keeps a record of every change to your family file. over time that record makes the file bigger and slower to open, especially on older phones and tablets. compacting removes the record and keeps everything you've added.",
   },
   'podLineage.bannerTitle': {
-    en: 'Some changes on this device are waiting',
-    beanie: 'some changes on this device are waiting',
+    en: 'Some changes here were never saved',
+    beanie: 'some changes here were never saved',
   },
+  // ⚠️ SAYS THERE IS ONE WAY ON, BECAUSE THERE IS. The old copy read as a menu —
+  // "export those changes first if you want to keep them, then choose Use the
+  // family file" — which invited the reader to weigh two options when only one
+  // of them goes anywhere. It also called compaction "reorganised", a word the
+  // app uses nowhere else; the person who ran it saw "Compact your family file?".
+  //
+  // And it did not say WHY. beanies normally combines a straggler's changes into
+  // the compacted file on its own; this banner only appears when it tried and
+  // could not tell which changes were missing. Saying so is the difference
+  // between "beanies gave up on me" and "beanies refused to guess with my data".
   'podLineage.bannerMessage': {
-    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Nothing has been lost. Export those changes first if you want to keep them, then choose Use the family file.',
+    en: 'Your family file was compacted on another device. beanies could not work out which changes on this device never reached it, so it has not guessed. Carrying on takes the family file, and those changes are let go. You can save a copy first to read, though it cannot be added back in.',
     beanie:
-      'your family file was reorganised on another device, and this one still has changes that were never saved to it. nothing has been lost. export those changes first if you want to keep them, then choose use the family file.',
+      'your family file was compacted on another device. beanies could not work out which changes on this device never reached it, so it has not guessed. carrying on takes the family file, and those changes are let go. you can save a copy first to read, though it cannot be added back in.',
   },
-  'podLineage.bannerCta': { en: 'Export my changes', beanie: 'export my changes' },
+  // NOT "Export my changes", which read like a rescue. An export of this device's
+  // copy cannot be merged back into the family file afterwards — the confirm has
+  // always admitted that — so the honest offer is a copy to READ.
+  'podLineage.bannerCta': { en: 'Save a copy to read', beanie: 'save a copy to read' },
   'podLineage.conflictTitle': {
     en: 'Your family file needs a hand',
     beanie: 'your family file needs a hand',
   },
-  'podLineage.useFileCta': { en: 'Use the family file', beanie: 'use the family file' },
+  // "Use the family file" read as one option among equals, when it is the only
+  // way forward. "Carry on with" names it as the way forward instead. Shared with
+  // `LocalDocUnreadableBanner`, where it reads the same way.
+  'podLineage.useFileCta': {
+    en: 'Carry on with the family file',
+    beanie: 'carry on with the family file',
+  },
   'podLineage.useFileBusy': { en: 'Opening…', beanie: 'opening…' },
   'podLineage.useFileDone': {
-    en: 'This device is now on the reorganised family file.',
-    beanie: 'this device is now on the reorganised family file.',
+    en: 'This device is now on the family file.',
+    beanie: 'this device is now on the family file.',
   },
   'podLineage.useFileConfirmTitle': {
-    en: 'Use the family file?',
-    beanie: 'use the family file?',
+    en: 'Carry on with the family file?',
+    beanie: 'carry on with the family file?',
   },
   'podLineage.useFileConfirmMessage': {
-    en: 'This device will take the reorganised family file, and the changes made here that were never saved to it will be let go for good. Export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
+    en: 'This device will take the family file as it now stands, and the changes made here that never reached it will be let go for good. A copy saved first can be read, but it cannot be added back in later.',
     beanie:
-      'this device will take the reorganised family file, and the changes made here that were never saved to it will be let go for good. export them first if you want a copy to look at, but note that a copy cannot be added back in later.',
+      'this device will take the family file as it now stands, and the changes made here that never reached it will be let go for good. a copy saved first can be read, but it cannot be added back in later.',
   },
-  'podLineage.useFileConfirmAction': { en: 'Use the family file', beanie: 'use the family file' },
+  'podLineage.useFileConfirmAction': {
+    en: 'Carry on with the family file',
+    beanie: 'carry on with the family file',
+  },
   'podLineage.useFileFailed': {
     en: 'beanies could not finish opening the family file. Check your connection and try again.',
     beanie:
       'beanies could not finish opening the family file. check your connection and try again.',
   },
   'podLineage.unsyncedInline': {
-    en: 'Your family file was reorganised on another device, and this one still has changes that were never saved to it. Export them from Settings if you want to keep them, then choose Use the family file.',
+    en: 'Your family file was compacted on another device, and beanies could not work out which changes on this device never reached it. Carrying on takes the family file and lets those changes go.',
     beanie:
-      'your family file was reorganised on another device, and this one still has changes that were never saved to it. export them from settings if you want to keep them, then choose use the family file.',
+      'your family file was compacted on another device, and beanies could not work out which changes on this device never reached it. carrying on takes the family file and lets those changes go.',
   },
   'podLineage.conflictInline': {
-    en: 'Two devices reorganised your family file at the same time. beanies cannot safely pick between them. Please contact support@beanies.family before making more changes.',
+    en: 'Two devices compacted your family file at the same time. beanies cannot safely pick between them. Please contact support@beanies.family before making more changes.',
     beanie:
-      'two devices reorganised your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
+      'two devices compacted your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
   },
   'podMerge.failedInline': {
     en: 'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
@@ -4696,9 +4718,9 @@ const STRING_DEFS = {
   // thing the user most needs: nothing has been replaced, their work is still
   // here. The two exits are named in order of likelihood.
   'podLocalUnreadable.inline': {
-    en: 'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies is open in another tab or window. Close the others and reload this page. If the message stays, choose "Use the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
+    en: 'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies is open in another tab or window. Close the others and reload this page. If the message stays, choose "Carry on with the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
     beanie:
-      'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "use the family file" below (changes made only on this device will be let go), or export your data from settings and contact support@beanies.family.',
+      'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "carry on with the family file" below (changes made only on this device will be let go), or export your data from settings and contact support@beanies.family.',
   },
   // The banner heading for the above. Short — the sentence does the work.
   'podLocalUnreadable.title': {

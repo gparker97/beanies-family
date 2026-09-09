@@ -12,12 +12,29 @@
  * `DurabilityBanner` / `SaveFailureBanner` / `PodAccessBanner`, bound to flags
  * that already exist — no new store state beyond the message KEY.
  *
- * ⚠️ TWO VERDICTS, TWO PIECES OF COPY. `adopt-remote` is recoverable by the
- * person sitting there; `conflict` (two devices compacted at the same moment)
- * is not, and offering "Use the family file" would invite them to discard one
- * of two equally-valid reorganisations. The banner branches on the store's
- * message KEY rather than on rendered prose, which changes with every wording
- * edit and every language.
+ * ⚠️ WHEN THIS ACTUALLY APPEARS, because the obvious reading is wrong. Coming
+ * online after another device compacted does NOT normally raise this banner:
+ * `POLICY['adopt-remote']` has no `block` cell at all — a clean device adopts,
+ * and a device with unsaved work REBASES, replaying that work onto the compacted
+ * file automatically. This banner means one of exactly two things:
+ *
+ *   1. `conflict` — two devices compacted at the same moment. Nothing can pick
+ *      between them, so there is no "use the family file" to offer.
+ *   2. The rebase was ATTEMPTED AND COULD NOT RUN (`rebaseUnavailable`), which
+ *      happens when this device has no committed remote baseline, or one its own
+ *      history does not contain. Without that, "which changes never reached the
+ *      file" has no answer, and replaying blind would emit the whole local
+ *      document over the compacted one — undoing the compaction.
+ *
+ * So the copy says beanies could not work out which changes are missing, rather
+ * than implying it never tried. `docs/plans/2026-09-09-stage-6-preservation-brief.md`
+ * would shrink case 2 further by carrying local-only entities across.
+ *
+ * ⚠️ TWO VERDICTS, TWO PIECES OF COPY. Case 1 is not recoverable by the person
+ * sitting there, and offering the adopt would invite them to discard one of two
+ * equally-valid compactions. The banner branches on the store's message KEY
+ * rather than on rendered prose, which changes with every wording edit and every
+ * language.
  *
  * ⚠️ AND THE RECOVERY HAS TO ACTUALLY WORK. The first version told the user to
  * export and reload. A reload re-opens the same cached document against the
@@ -73,11 +90,16 @@ function goToExport(): void {
     <template #title>{{ title }}</template>
     <template #message>{{ message }}</template>
     <template #actions>
-      <BannerActionButton v-if="!isConflict" :busy="busy" @click="goToExport">
-        {{ t('podLineage.bannerCta') }}
-      </BannerActionButton>
+      <!-- ⚠️ THE WAY FORWARD LEADS. These used to be the other way round, with
+           "Export my changes" first, which framed the two as a choice — and only
+           one of them goes anywhere. Saving a copy is genuinely secondary: it
+           cannot be merged back afterwards, so it is something to READ, not a
+           rescue. `subtle` says that without a sentence. -->
       <BannerActionButton v-if="!isConflict" :busy="busy" @click="useTheFamilyFile">
         {{ busy ? t('podLineage.useFileBusy') : t('podLineage.useFileCta') }}
+      </BannerActionButton>
+      <BannerActionButton v-if="!isConflict" subtle :busy="busy" @click="goToExport">
+        {{ t('podLineage.bannerCta') }}
       </BannerActionButton>
       <BannerActionButton subtle @click="dismissed = true">
         {{ t('action.dismiss') }}

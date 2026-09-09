@@ -22467,14 +22467,14 @@
       "lastUpdated": "2026-09-05"
     },
     "podLineage.unsyncedInline": {
-      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。如果要保留它们，请从“设置”中导出，然后选择“使用家庭文件”。",
-      "hash": "kxitrb",
-      "lastUpdated": "2026-09-06"
+      "translation": "您的家庭文件已在另一台设备上压缩，beanies 无法判断此设备上的哪些更改从未同步过去。继续将采用家庭文件，这些更改会被放弃。",
+      "hash": "abd7xf",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.conflictInline": {
-      "translation": "两台设备同时重组了您的家庭文件。beanies无法安全地在它们之间进行选择。在进行更多更改之前，请联系support@beanies.family。",
-      "hash": "cnv0j7",
-      "lastUpdated": "2026-09-05"
+      "translation": "两个设备同时压缩了您的家庭文件。beanies无法安全地在它们之间进行选择。在进行更多更改之前，请联系support@beanies.family。",
+      "hash": "8oltw2",
+      "lastUpdated": "2026-09-09"
     },
     "resumeSetup.podLineageBlocked": {
       "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。什么都没有丢失，但两者不能在这里结合，重新加载不会改变这一点。在此设备上进行更多更改之前，请联系support@beanies.family。",
@@ -22547,19 +22547,19 @@
       "lastUpdated": "2026-09-06"
     },
     "podLineage.bannerTitle": {
-      "translation": "此设备上的某些更改正在等待",
-      "hash": "dpz4jj",
-      "lastUpdated": "2026-09-06"
+      "translation": "此设备上的部分更改从未保存",
+      "hash": "52m4dh",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.bannerMessage": {
-      "translation": "您的家庭文件已在另一台设备上重组，此设备仍有从未保存的更改。没有任何东西丢失。如果要保留这些更改，请先导出，然后选择使用家庭文件。",
-      "hash": "fspiwb",
-      "lastUpdated": "2026-09-06"
+      "translation": "您的家庭文件已在另一台设备上压缩。beanies 无法判断此设备上的哪些更改从未同步过去，因此没有妄加猜测。继续将采用家庭文件，这些更改会被放弃。您可以先保存一份副本查看，但它无法再合并回去。",
+      "hash": "hswvie",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.bannerCta": {
-      "translation": "导出我的更改",
-      "hash": "k4qzvf",
-      "lastUpdated": "2026-09-06"
+      "translation": "保存副本以阅读",
+      "hash": "b7irw2",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.conflictTitle": {
       "translation": "您的家庭文件需要帮忙",
@@ -22567,24 +22567,24 @@
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileCta": {
-      "translation": "使用家庭文件",
-      "hash": "6zwyeo",
-      "lastUpdated": "2026-09-06"
+      "translation": "继续使用家庭文件",
+      "hash": "kiz2y3",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileConfirmTitle": {
-      "translation": "使用家庭文件？",
-      "hash": "3u1gnl",
-      "lastUpdated": "2026-09-06"
+      "translation": "继续使用家庭文件吗？",
+      "hash": "2xsydo",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileConfirmMessage": {
-      "translation": "此设备将接受重组的家庭文件，此处所做的从未保存的更改将被永久放弃。如果您希望查看副本，请先导出它们，但请注意，稍后无法重新添加副本。",
-      "hash": "71op3",
-      "lastUpdated": "2026-09-06"
+      "translation": "此设备将采用家庭文件的当前状态，在此处所做但从未同步过去的更改将被永久放弃。事先保存的副本可以查看，但之后无法再合并回去。",
+      "hash": "4zttn2",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileConfirmAction": {
-      "translation": "使用家庭文件",
-      "hash": "6zwyeo",
-      "lastUpdated": "2026-09-06"
+      "translation": "继续使用家庭文件",
+      "hash": "kiz2y3",
+      "lastUpdated": "2026-09-09"
     },
     "podLineage.useFileFailed": {
       "translation": "beanies无法完成打开家庭文件。请检查您的网络连接，然后重试。",
@@ -22607,14 +22607,14 @@
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileBusy": {
-      "translation": "开洞",
+      "translation": "正在打开…",
       "hash": "79l2qa",
       "lastUpdated": "2026-09-06"
     },
     "podLineage.useFileDone": {
-      "translation": "此设备现在位于重组后的家庭文件中。",
-      "hash": "qhg4op",
-      "lastUpdated": "2026-09-06"
+      "translation": "此设备现已使用家庭文件。",
+      "hash": "f8w75e",
+      "lastUpdated": "2026-09-09"
     },
     "compaction.why.record": {
       "translation": "beanies会记录过去的更改，以便您的设备在脱机后可以互相追赶。一旦他们都赶上了，就不需要记录了。",
@@ -22792,9 +22792,9 @@
       "lastUpdated": "2026-09-07"
     },
     "podLocalUnreadable.inline": {
-      "translation": "beanies无法打开此设备自己的家庭数据副本，因此尚未替换为家庭文件。您尚未保存的任何内容仍在此处。这通常意味着在另一个选项卡或窗口中打开了beanies。关闭其他页面并重新加载此页面。如果消息保持不变，请选择下面的“使用家庭文件” （仅在此设备上进行的更改将被放弃） ，或从“设置”中导出您的数据并联系support@beanies.family。",
-      "hash": "vkj0ky",
-      "lastUpdated": "2026-09-07"
+      "translation": "beanies无法打开此设备自己的家庭数据副本，因此尚未替换为家庭文件。您尚未保存的任何内容仍在此处。这通常意味着在另一个选项卡或窗口中打开了Beanies。关闭其他页面并重新加载此页面。如果消息保持不变，请选择下面的“继续使用家庭文件” （仅在此设备上进行的更改将被放弃） ，或从“设置”中导出您的数据并联系support@beanies.family。",
+      "hash": "tz1jpz",
+      "lastUpdated": "2026-09-09"
     },
     "podLocalUnreadable.title": {
       "translation": "无法打开此设备的副本",
