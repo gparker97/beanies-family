@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-09
 
+### Added
+
+- **A page for people coming from Skylight**, at `/from/skylight`. It shows the beanie wall running on a mounted tablet, with the four real views, and compares the two honestly: Skylight's 15in is $299.99 and the 27in wall model is $599.99 before the $79 a year plan, against a tablet you already own.
+
+### Changed
+
+- **The switching pages now say "free while beanies is in beta"** rather than "free (for now)", on the Maple, Cozi and Skylight pages and the switching hub.
+
 ### Fixed
 
 - **beanies no longer loses a working Google connection to a stale one shared by your other devices.** Each device keeps a copy of the connection in your family file so the others can borrow it and stay signed in. beanies used to install a borrowed copy before checking whether it still worked, decide from the copy's age which one to keep, and then throw away the working connection it already had when Google turned the borrowed one down. Since the copy is shared, every device did the same thing, which is why the sign-in screen kept coming back every few hours on all of them. beanies now asks Google first and keeps what it has unless Google accepts the replacement, so a stale copy costs nothing. A device that has no connection of its own still borrows one exactly as before.

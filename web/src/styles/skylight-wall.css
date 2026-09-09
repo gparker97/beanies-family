@@ -1,0 +1,1013 @@
+/**
+ * The kitchen-wall scene for /from/skylight.
+ *
+ * WHY THIS IS A SEPARATE SHEET rather than more of `switch-page.css`: the other
+ * two switching pages share a doorway-and-welcome-mat scene, and everything they
+ * need is already on that sheet. This page's argument is a DIFFERENT picture -- a
+ * tablet on a wall, running the real Beanie Wall -- and it is used by exactly one
+ * page. Keeping it here means /from/maple and /from/cozi do not download a time
+ * grid they never render.
+ *
+ * WHAT IT DELIBERATELY DOES NOT REDEFINE. `switch-page.css` is imported first and
+ * owns the furniture: `.hero`, `.sub`, `.btns`, `.btn`, `.trust`, `.kicker`,
+ * `.section-title`, `.section-subtitle`, `.tablewrap`, `table`, `.mk/.good/.meh/
+ * .warn`, `.boxes`, `.box`, `.tape`, `.cakegrid`, `.letter`, `.pull`, `.final`,
+ * `.signoff`, `.mat`, `details`. The welcome mat in particular is REUSED, not
+ * re-cut: it is already the right wood, angle and shadow.
+ *
+ * Every class here is prefixed `wall-` and namespaced under `.welcome-page`, for
+ * the same two reasons the shared sheet gives: a page-level CSS import is global
+ * in Astro, and a bare `.screen` or `.stage` would be a collision waiting to
+ * happen. Kebab-case only (stylelint's `selector-class-pattern` rejects `__` and
+ * `--`), and rules are ordered so specificity ascends per selector target to
+ * satisfy `no-descending-specificity`.
+ *
+ * The scene mirrors the SHIPPED wall (`src/pages/BeanieWallPage.vue`): a
+ * continuous time grid with an hour axis, an all-day band and a now-line; the
+ * four peripheral cards; and the chore board as a PEER behind a divider rather
+ * than a fourth calendar layout. The view names are the product's own
+ * (`wall.view.*` in `uiStrings.ts`). If the wall's layout changes, this changes.
+ */
+
+.welcome-page {
+  /* the room: the only tokens this sheet adds, and they exist for the scene */
+  --plaster: #f1e9e0;
+  --plaster-lit: #f7f1ea;
+  --wall-floor-tone: #e3d5c6;
+  --wood: #e0ab74;
+  --wood-dark: #c1874c;
+  --note: #fff8d8;
+  --note-edge: #f2e4a8;
+  --note-ink: #6b5a1e;
+  --hair: rgb(44 62 80 / 9%);
+  --hair-soft: rgb(44 62 80 / 5%);
+  --soft-green: #27ae60;
+}
+
+/* ── the room ─────────────────────────────────────────────────────────── */
+
+.welcome-page .wall-room {
+  border-radius: 24px 24px 0 0;
+  margin: 46px auto 0;
+  max-width: 940px;
+  overflow: hidden;
+}
+
+.welcome-page .wall-face {
+  background: radial-gradient(620px 300px at 50% 22%, var(--plaster-lit), var(--plaster) 72%);
+  padding: 52px 24px 118px;
+  position: relative;
+}
+
+.welcome-page .wall-shelf {
+  font-size: 1.45rem;
+  line-height: 1;
+  position: absolute;
+  right: 3%;
+  text-align: center;
+  top: 64px;
+  width: 104px;
+}
+
+.welcome-page .wall-plank {
+  background: linear-gradient(var(--wood), var(--wood-dark));
+  border-radius: 3px;
+  box-shadow: 0 5px 10px rgb(44 62 80 / 16%);
+  height: 7px;
+  margin-top: 3px;
+}
+
+/* ── the mounted tablet ───────────────────────────────────────────────── */
+
+.welcome-page .wall-mount {
+  margin: 0 auto;
+  position: relative;
+  width: min(660px, 100%);
+  z-index: 2;
+}
+
+.welcome-page .wall-mount::before {
+  background: linear-gradient(180deg, #3a4a58, #2b3845);
+  border-radius: 26px;
+  box-shadow: 0 30px 50px -12px rgb(44 62 80 / 45%);
+  content: '';
+  inset: -9px -9px -14px;
+  position: absolute;
+}
+
+.welcome-page .wall-mount::after {
+  background: rgb(44 62 80 / 18%);
+  border-radius: 50%;
+  bottom: -22px;
+  content: '';
+  filter: blur(9px);
+  height: 16px;
+  left: 8%;
+  position: absolute;
+  right: 8%;
+}
+
+.welcome-page .wall-tablet {
+  background: #1f2d3a;
+  border-radius: 20px;
+  box-shadow: 0 2px 0 rgb(255 255 255 / 12%) inset;
+  padding: 11px;
+  position: relative;
+}
+
+.welcome-page .wall-cam {
+  background: #42555f;
+  border-radius: 50%;
+  height: 5px;
+  margin: 0 auto 7px;
+  width: 5px;
+}
+
+.welcome-page .wall-screen {
+  aspect-ratio: 16 / 10;
+  background: var(--cloud-white);
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  padding: 9px 10px 10px;
+  text-align: left;
+}
+
+.welcome-page .wall-cord {
+  background: linear-gradient(rgb(44 62 80 / 30%), rgb(44 62 80 / 22%));
+  border-radius: 0 0 2px 2px;
+  height: 58px;
+  position: absolute;
+  right: 16%;
+  top: 100%;
+  width: 3px;
+  z-index: 1;
+}
+
+.welcome-page .wall-socket {
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgb(44 62 80 / 18%);
+  display: grid;
+  gap: 4px;
+  grid-auto-flow: column;
+  height: 30px;
+  margin-right: -11.5px;
+  place-items: center;
+  position: absolute;
+  right: 16%;
+  top: calc(100% + 58px);
+  width: 26px;
+}
+
+.welcome-page .wall-socket i {
+  background: rgb(44 62 80 / 42%);
+  border-radius: 1px;
+  height: 9px;
+  width: 3px;
+}
+
+/* ── the wall UI ──────────────────────────────────────────────────────── */
+
+.welcome-page .wall-bar {
+  align-items: center;
+  display: flex;
+  flex: none;
+  justify-content: space-between;
+}
+
+.welcome-page .wall-bar b {
+  color: var(--deep-slate);
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.8rem;
+}
+
+.welcome-page .wall-stamp {
+  align-items: center;
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  display: flex;
+  font-size: 0.56rem;
+  gap: 4px;
+}
+
+.welcome-page .wall-stamp i {
+  background: var(--soft-green);
+  border-radius: 50%;
+  flex: none;
+  height: 5px;
+  width: 5px;
+}
+
+.welcome-page .wall-stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.welcome-page .wall-view {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 0.45s ease;
+}
+
+.welcome-page .wall-view[data-on] {
+  opacity: 1;
+}
+
+.welcome-page .wall-view.wall-rail {
+  flex-direction: row;
+}
+
+/* ── the time grid ────────────────────────────────────────────────────── */
+
+.welcome-page .wall-grid {
+  background: #fff;
+  border-radius: 9px;
+  box-shadow: 0 1px 5px rgb(44 62 80 / 7%);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.welcome-page .wall-head,
+.welcome-page .wall-band,
+.welcome-page .wall-body {
+  display: grid;
+  grid-template-columns: 20px repeat(var(--n), 1fr);
+}
+
+.welcome-page .wall-head {
+  border-bottom: 1px solid var(--hair);
+  flex: none;
+}
+
+.welcome-page .wall-head span {
+  border-left: 1px solid var(--hair-soft);
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.47rem;
+  letter-spacing: 0.05em;
+  min-width: 0;
+  padding: 3px 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.welcome-page .wall-head span:first-child {
+  border-left: 0;
+}
+
+.welcome-page .wall-head span.wall-now {
+  background: rgb(241 93 34 / 7%);
+  color: var(--heritage-orange);
+  font-weight: 700;
+}
+
+.welcome-page .wall-head span.wall-who {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  font-size: 0.5rem;
+  font-weight: 700;
+  gap: 3px;
+  justify-content: center;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.welcome-page .wall-band {
+  background: rgb(44 62 80 / 2%);
+  border-bottom: 1px solid var(--hair);
+  flex: none;
+  min-height: 15px;
+}
+
+.welcome-page .wall-band > * {
+  border-left: 1px solid var(--hair-soft);
+  min-width: 0;
+  padding: 2px;
+}
+
+.welcome-page .wall-band > *:first-child {
+  border-left: 0;
+}
+
+.welcome-page .wall-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.welcome-page .wall-axis {
+  position: relative;
+}
+
+.welcome-page .wall-axis i {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.42rem;
+  font-style: normal;
+  position: absolute;
+  right: 2px;
+  transform: translateY(-3px);
+}
+
+.welcome-page .wall-col {
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 calc(100% / 6 - 1px),
+    var(--hair-soft) calc(100% / 6 - 1px) calc(100% / 6)
+  );
+  border-left: 1px solid var(--hair-soft);
+  min-width: 0;
+  position: relative;
+}
+
+.welcome-page .wall-col.wall-now {
+  background:
+    linear-gradient(rgb(241 93 34 / 5%), rgb(241 93 34 / 5%)),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(100% / 6 - 1px),
+      var(--hair-soft) calc(100% / 6 - 1px) calc(100% / 6)
+    );
+}
+
+.welcome-page .wall-block {
+  background: var(--bg, rgb(241 93 34 / 13%));
+  border-left: 2.5px solid var(--bd, var(--heritage-orange));
+  border-radius: 4px;
+  color: var(--deep-slate);
+  font-size: 0.46rem;
+  height: var(--h);
+  left: 2px;
+  line-height: 1.25;
+  overflow: hidden;
+  padding: 1px 3px;
+  position: absolute;
+  right: 2px;
+  top: var(--t);
+}
+
+.welcome-page .wall-block b {
+  display: block;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-page .wall-block .wall-when {
+  color: var(--muted-text);
+  display: block;
+  font-size: 0.42rem;
+}
+
+.welcome-page .wall-allday {
+  background: rgb(174 214 241 / 45%);
+  border-radius: 3px;
+  color: var(--deep-slate);
+  display: block;
+  font-size: 0.44rem;
+  overflow: hidden;
+  padding: 1px 3px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-page .wall-nowline {
+  border-top: 1.5px solid var(--heritage-orange);
+  height: 0;
+  left: 20px;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: var(--now, 46%);
+  z-index: 3;
+}
+
+.welcome-page .wall-nowline::before {
+  background: var(--heritage-orange);
+  border-radius: 50%;
+  content: '';
+  height: 6px;
+  left: -3px;
+  position: absolute;
+  top: -3.5px;
+  width: 6px;
+}
+
+/* block hues, matching the app's category tints */
+.welcome-page .wall-b-o {
+  --bd: #f15d22;
+  --bg: rgb(241 93 34 / 13%);
+}
+
+.welcome-page .wall-b-s {
+  --bd: #5b9bd5;
+  --bg: rgb(174 214 241 / 45%);
+}
+
+.welcome-page .wall-b-g {
+  --bd: #27ae60;
+  --bg: rgb(39 174 96 / 13%);
+}
+
+.welcome-page .wall-b-t {
+  --bd: #e67e22;
+  --bg: rgb(230 126 34 / 15%);
+}
+
+.welcome-page .wall-b-p {
+  --bd: #9b59b6;
+  --bg: rgb(155 89 182 / 13%);
+}
+
+/* ── the peripheral cards ─────────────────────────────────────────────── */
+
+.welcome-page .wall-cards {
+  display: grid;
+  flex: none;
+  gap: 5px;
+  grid-template-columns: 1.5fr 1.1fr 1fr 1.15fr;
+  height: 74px;
+}
+
+.welcome-page .wall-rail .wall-cards {
+  flex: none;
+  grid-auto-rows: 1fr;
+  grid-template-columns: 1fr;
+  height: auto;
+  width: 34%;
+}
+
+.welcome-page .wall-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgb(44 62 80 / 7%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 5px 6px;
+}
+
+.welcome-page .wall-card h4 {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  flex: none;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.45rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.welcome-page .wall-card.wall-dark {
+  background: linear-gradient(160deg, #2f4256, #243342);
+  box-shadow: 0 2px 8px rgb(44 62 80 / 22%);
+}
+
+.welcome-page .wall-card.wall-dark h4 {
+  color: rgb(174 214 241 / 75%);
+}
+
+.welcome-page .wall-row {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  font-size: 0.47rem;
+  gap: 3px;
+  min-width: 0;
+}
+
+.welcome-page .wall-row em {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  flex: none;
+  font-style: normal;
+  margin-left: auto;
+}
+
+.welcome-page .wall-row s {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+}
+
+.welcome-page .wall-dot {
+  border-radius: 50%;
+  color: #fff;
+  display: grid;
+  flex: none;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.38rem;
+  font-weight: 700;
+  height: 11px;
+  place-items: center;
+  width: 11px;
+}
+
+.welcome-page .wall-tick {
+  border: 1.4px solid rgb(44 62 80 / 22%);
+  border-radius: 50%;
+  flex: none;
+  height: 9px;
+  width: 9px;
+}
+
+.welcome-page .wall-tick.wall-on {
+  background: var(--soft-green);
+  border-color: var(--soft-green);
+  position: relative;
+}
+
+.welcome-page .wall-tick.wall-on::after {
+  border: solid #fff;
+  border-width: 0 1.4px 1.4px 0;
+  content: '';
+  height: 5px;
+  left: 2.4px;
+  position: absolute;
+  top: 0.6px;
+  transform: rotate(42deg);
+  width: 2.4px;
+}
+
+.welcome-page .wall-meal {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+
+.welcome-page .wall-meal .wall-glyph {
+  flex: none;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.welcome-page .wall-meal b {
+  display: block;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-page .wall-meal .wall-meal-sub {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  display: block;
+  font-size: 0.44rem;
+}
+
+.welcome-page .wall-trip b {
+  color: #fff;
+  display: block;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.welcome-page .wall-trip .wall-sub {
+  color: #bdc3c7;
+  display: block;
+  font-size: 0.42rem;
+  margin-bottom: 2px;
+}
+
+.welcome-page .wall-leg {
+  align-items: center;
+  color: #dfe6ec;
+  display: flex;
+  font-size: 0.44rem;
+  gap: 3px;
+}
+
+.welcome-page .wall-leg i {
+  color: #fff;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.welcome-page .wall-leg .wall-arrow {
+  color: var(--sky-silk, #aed6f1);
+  opacity: 0.85;
+}
+
+.welcome-page .wall-leg .wall-ref {
+  color: #9fb3c4;
+  margin-left: auto;
+}
+
+.welcome-page .wall-tbar {
+  background: rgb(255 255 255 / 20%);
+  border-radius: 2px;
+  height: 4px;
+  margin-top: auto;
+  overflow: hidden;
+}
+
+.welcome-page .wall-tbar > b {
+  background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta, #e67e22));
+  border-radius: 2px;
+  display: block;
+  height: 100%;
+  width: 66%;
+}
+
+/* ── the chore board, a peer screen ───────────────────────────────────── */
+
+.welcome-page .wall-board {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+}
+
+.welcome-page .wall-bcols {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  grid-template-columns: repeat(4, 1fr);
+  min-height: 0;
+}
+
+.welcome-page .wall-bcol {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgb(44 62 80 / 7%);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px;
+}
+
+.welcome-page .wall-bcol.wall-done {
+  box-shadow:
+    0 0 0 2px var(--soft-green),
+    0 1px 5px rgb(44 62 80 / 7%);
+}
+
+.welcome-page .wall-bcol .wall-who {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  flex: none;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.52rem;
+  font-weight: 700;
+  gap: 4px;
+}
+
+.welcome-page .wall-job {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  font-size: 0.47rem;
+  gap: 4px;
+}
+
+.welcome-page .wall-job s {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+}
+
+.welcome-page .wall-stars {
+  flex: none;
+  font-size: 0.5rem;
+  letter-spacing: 1px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.welcome-page .wall-prog {
+  background: #fff;
+  border-radius: 7px;
+  box-shadow: 0 1px 5px rgb(44 62 80 / 7%);
+  flex: none;
+  padding: 4px 8px;
+}
+
+.welcome-page .wall-prog i {
+  color: var(--faint-text, rgb(44 62 80 / 40%));
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.5rem;
+  font-style: normal;
+}
+
+.welcome-page .wall-bar-track {
+  background: rgb(44 62 80 / 8%);
+  border-radius: 3px;
+  height: 5px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+
+.welcome-page .wall-bar-track > b {
+  background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta, #e67e22));
+  border-radius: 3px;
+  display: block;
+  height: 100%;
+  width: 72%;
+}
+
+/* ── the floor, and the family under the wall ─────────────────────────── */
+
+.welcome-page .wall-underfoot {
+  background: linear-gradient(180deg, var(--wall-floor-tone), #d8c8b6);
+  box-shadow: 0 -1px 0 rgb(44 62 80 / 6%);
+  padding: 0 24px 26px;
+  position: relative;
+}
+
+.welcome-page .wall-fam {
+  display: flex;
+  justify-content: center;
+  margin-top: -46px;
+  position: relative;
+  z-index: 3;
+}
+
+.welcome-page .wall-fam svg {
+  height: auto;
+  overflow: visible;
+  width: min(430px, 86%);
+}
+
+.welcome-page .wall-sway {
+  animation: wall-sway 6s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+@keyframes wall-sway {
+  0%,
+  100% {
+    transform: rotate(-1.1deg);
+  }
+
+  50% {
+    transform: rotate(1.1deg);
+  }
+}
+
+/* ── the view switcher ────────────────────────────────────────────────── */
+
+.welcome-page .wall-switcher {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 26px auto 0;
+}
+
+.welcome-page .wall-switcher button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgb(44 62 80 / 10%);
+  border-radius: 14px;
+  color: var(--muted-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  gap: 7px;
+  padding: 7px 15px;
+  transition:
+    background 0.18s,
+    color 0.18s;
+}
+
+.welcome-page .wall-switcher button .wall-glyph {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.welcome-page .wall-switcher button[aria-pressed='true'] {
+  background: var(--deep-slate);
+  border-color: var(--deep-slate);
+  color: #fff;
+}
+
+.welcome-page .wall-divider {
+  background: rgb(44 62 80 / 14%);
+  height: 22px;
+  margin: 0 4px;
+  width: 1px;
+}
+
+.welcome-page .wall-caption {
+  color: var(--muted-text);
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.28rem;
+  margin: 16px auto 0;
+  max-width: 640px;
+  text-align: center;
+}
+
+/* ── the hero, centred ───────────────────────────────────────────────────
+   maple and cozi run a two-column hero (copy left, doorway right). This page's
+   argument is one wide picture, so the column is single and centred. The
+   breadcrumbs stay left: a centred breadcrumb trail reads as decoration. */
+
+.welcome-page .wall-hero {
+  text-align: center;
+}
+
+.welcome-page .wall-hero nav {
+  text-align: left;
+}
+
+.welcome-page .wall-hero .sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.welcome-page .wall-hero .btns,
+.welcome-page .wall-hero .trust {
+  justify-content: center;
+}
+
+/* ── the sticky notes ─────────────────────────────────────────────────── */
+
+.welcome-page .wall-notes {
+  background: var(--plaster);
+}
+
+.welcome-page .wall-notelist {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0 auto;
+  max-width: 840px;
+}
+
+.welcome-page .wall-pair {
+  align-items: center;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: 288px 1fr;
+}
+
+.welcome-page .wall-note {
+  background: var(--note);
+  border: 1px solid var(--note-edge);
+  border-radius: 3px;
+  box-shadow: 0 6px 16px rgb(44 62 80 / 12%);
+  color: var(--note-ink);
+  font-family: 'Caveat Variable', Caveat, Outfit, cursive;
+  font-size: 1.2rem;
+  line-height: 1.4;
+  padding: 15px 17px;
+  transform: rotate(var(--r, -1.2deg));
+}
+
+.welcome-page .wall-note cite {
+  color: rgb(107 90 30 / 68%);
+  display: block;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 0.66rem;
+  font-style: normal;
+  margin-top: 7px;
+}
+
+.welcome-page .wall-answer h3 {
+  color: var(--deep-slate);
+  font-size: 1.06rem;
+  margin: 0 0 3px;
+}
+
+.welcome-page .wall-answer p {
+  color: var(--muted-text);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+/* ── what's on the wall ───────────────────────────────────────────────── */
+
+.welcome-page .wall-features {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  margin: 0 auto;
+  max-width: 940px;
+}
+
+.welcome-page .wall-feature {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+  padding: 22px;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.welcome-page .wall-feature:hover {
+  box-shadow: 0 8px 32px rgb(44 62 80 / 10%);
+  transform: translateY(-2px);
+}
+
+.welcome-page .wall-feature-glyph {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.welcome-page .wall-feature h3 {
+  font-size: 1.02rem;
+  margin: 10px 0 5px;
+}
+
+.welcome-page .wall-feature p {
+  color: var(--muted-text);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ── responsive ───────────────────────────────────────────────────────── */
+
+@media (width <= 980px) {
+  .welcome-page .wall-shelf,
+  .welcome-page .wall-cord,
+  .welcome-page .wall-socket {
+    display: none;
+  }
+}
+
+@media (width <= 820px) {
+  .welcome-page .wall-cards {
+    grid-auto-rows: 56px;
+    grid-template-columns: 1fr 1fr;
+    height: auto;
+  }
+
+  .welcome-page .wall-card:nth-child(n + 3) {
+    display: none;
+  }
+
+  .welcome-page .wall-view.wall-rail {
+    flex-direction: column;
+  }
+
+  .welcome-page .wall-rail .wall-cards {
+    grid-auto-rows: 52px;
+    grid-template-columns: 1fr 1fr;
+    width: auto;
+  }
+}
+
+@media (width <= 740px) {
+  .welcome-page .wall-pair {
+    gap: 12px;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (width <= 620px) {
+  .welcome-page .wall-head,
+  .welcome-page .wall-band,
+  .welcome-page .wall-body {
+    grid-template-columns: 20px repeat(4, 1fr);
+  }
+
+  .welcome-page .wall-head span:nth-child(n + 6),
+  .welcome-page .wall-band > *:nth-child(n + 6),
+  .welcome-page .wall-body .wall-col:nth-child(n + 6) {
+    display: none;
+  }
+
+  .welcome-page .wall-bcols {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .welcome-page .wall-bcol:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-page .wall-sway {
+    animation: none;
+  }
+
+  .welcome-page .wall-view,
+  .welcome-page .wall-feature,
+  .welcome-page .wall-switcher button {
+    transition: none;
+  }
+}

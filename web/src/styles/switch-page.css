@@ -399,6 +399,13 @@
   color: var(--deep-slate);
   font-size: clamp(1.7rem, 3.6vw, 2.4rem);
   font-weight: 800;
+
+  /* Headings get NO line-height from global.css (it sets font-family only), so
+     without this they inherit the body's ~1.65 and a wrapped title opens a gulf
+     between its two lines. Invisible on a one-line title, which is why it
+     survived: every title on /from/maple and /from/cozi happens to fit on one
+     line, and it first showed on a two-line title in the narrow letter column. */
+  line-height: 1.15;
   margin: 0.4rem 0 0.6rem;
   text-align: center;
   text-wrap: balance;
