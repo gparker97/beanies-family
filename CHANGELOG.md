@@ -30,6 +30,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Everything above is now live on the web, as release 0.17.1.** The iPhone and Android apps are not included in this release, so they stay on 0.17 for now.
 - **Developer-facing:** the `older-token-declined` telemetry action is retired with the age heuristic it reported on (one producer, no consumers). Adopting a mirrored Drive token now emits `candidate-accepted` / `candidate-refused` / `candidate-unverified-kept-local` / `candidate-unverified-adopted` on the new `drive-token-adopt` surface, and a superseded `invalid_grant` emits `permanent-failure-superseded` on `google-token-lifecycle`. No new telemetry context keys, so no store-declaration change.
 
 ## 2026-09-08
