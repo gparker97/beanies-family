@@ -628,7 +628,7 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
-> **Last updated:** 2026-09-09 (SESSION 3 — **THE RE-CONSENT STORM'S LAST CAUSE, FIXED AND DEPLOYED AS 0.17.1.** `15247eae` (fix) + `8a982f90` (release) on `main`, DEPLOYED to prod web via run 34320637942. Apps and the Astro site deliberately NOT shipped.)
+> **Last updated:** 2026-09-09 (SESSION 3 — **THE RE-CONSENT STORM'S LAST CAUSE, FIXED AND DEPLOYED AS 0.17.1; PLUS `/from/skylight` BUILT AND THE ASTRO SITE DEPLOYED.** `15247eae` (fix) + `8a982f90` (release) on `main`, DEPLOYED to prod web via run 34320637942. Apps and the Astro site deliberately NOT shipped.)
 >
 > A mirrored Drive refresh token was installed into IndexedDB and primed into memory **before anything asked Google about it**, with candidates chosen by comparing `issuedAt`. Two probes against the real code, using a faithful `attemptSilentRefresh` double that clears the store on `invalid_grant` as the permanent branch does, reproduced both halves: `tryReconnectSilently` let a dead **unknown-age** copy (`issuedAt: null`, a live legacy shape the age guard could not refuse) displace a good token, and the resulting `invalid_grant` then CLEARED the store, so the device ended its "recovery" holding **nothing**; and `reconcileDriveTokenWithDoc`, on the cold-start path, overwrote a good local token with a newer-but-dead doc copy while issuing **zero exchanges**. Because the mirror is shared and #62 deliberately converges every device onto it, each device met the same dead token and each was pushed to a consent screen — greg's "grants seem to be lost across devices, every few hours".
 >
@@ -641,6 +641,42 @@
 > ⭐ **Verified in a real browser against REAL IndexedDB** — the unit tests mock `fileHandleStore` wholesale, so what actually lands on disk had never been exercised, and that is the whole subject of the fix. 8/8 checks passed (refused candidate leaves `GOOD-LOCAL` intact; accepted candidate persists its **own** `issuedAt: 4242`, not `Date.now()`). Then the pre-fix behaviour was reinstated in the live browser and IndexedDB ended up holding `DEAD-MIRRORED-COPY` where `MY-GOOD-TOKEN` had been — the storm reproduced end-to-end and then closed. Prod smoke run after deploy: renders, **zero console errors**, real `VITE_BUILD_SHA` (not `dev`).
 >
 > Plan (with the full code-review disposition): `docs/plans/2026-09-09-adopt-only-a-token-google-accepted.md`. Investigation updated with root cause 6.
+>
+> **ALSO THIS SESSION — `/from/skylight` is live.** The third switching page, built
+> from greg's mockup. The hub already carried a skylight entry with `href: null`
+> and `switch-page.css`'s header already named this page as pending "when the
+> tablet weekly view ships" — it has, so this filled both in. The scene is faithful
+> to the shipped wall rather than decorative: the four switcher labels are the
+> real `wall.view.*` strings and the jobs board sits behind a divider as a PEER of
+> the calendar, exactly as `wallViews.ts` defines it.
+>
+> ⚠️ **THE FACT-CHECK WAS THE MAIN WORK AND IT CHANGED THE PAGE.** The mockup
+> carried six lines presented as "the reviewers' own words". Verified: one was
+> verbatim, two were recast from real reviews, one was a real number cited to the
+> wrong place, and **two could not be substantiated at all** — a sync-lag claim
+> ("sometimes an hour") contradicted by Skylight's own docs and every dated
+> review, and a line attributed to _Skylight itself_ that appears nowhere in ~45
+> of their release notes. Both were cut. A "1.6m cable" claim was also cut (it
+> traces to a 2024 review of the gen-1 unit; current specs contradict it).
+> **Pricing was undercutting our own argument**: the mockup said "$250 to $280",
+> the real list is **$299.99** for the 15in Calendar 2 and **$599.99** for the 27in
+> Max — the wall-mounted model, so the right comparison for a page about walls.
+> Cited to Skylight's own store because retailers run $20-$40 ABOVE it. **Do not
+> assert** that Plus doubled from $39: no Skylight-owned source supports it (that
+> $39 is _Frame_ Plus, a different line).
+>
+> The pop-ups note was then **restored** when greg supplied a Reddit thread the
+> automated check could not fetch (Reddit blocks it here, and it correctly
+> reported "unverified" rather than guessing). It is written honestly: the
+> most-upvoted comment in that thread LIKES the pop-ups, so the claim is that
+> owners are asking for an opt-out that does not exist, not that owners hate them.
+> beanies' side of that row was then softened from "never" to "nothing today, and
+> an opt-out if that ever changes" — an absolute promise about a product that does
+> not exist yet is the one claim on that page we could have been caught breaking.
+>
+> DRY: the page reuses `switch-page.css` for all its furniture and even the
+> welcome mat; `skylight-wall.css` holds only the scene, so maple and cozi never
+> download a time grid they do not render.
 
 > **Last updated:** 2026-09-08 (SESSION 4 — **THE 0.17 DEPLOY: THE WHOLE BACKLOG SHIPS, AND THE SECRETS GATE STOPS READING OUR COMMENTS AS CREDENTIALS. On `main` as `4d0c01f5` + `36a76042`, DEPLOYED to prod, TestFlight and Play open testing.**)
 >
@@ -2023,11 +2059,18 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > ordering rule was satisfied (the Lambda went first on 2026-09-09 and was
 > verified against all eight behaviours).
 >
-> **NOT deployed, deliberately:** the Astro marketing site (its only pending change
-> is an inert `reason` comment in `web/public/min-app-version.json`;
-> `promptBelowVersion` is `0.16` both locally and live, so deploying it would change
-> nothing a user sees) and both mobile apps (greg said skip them "for now" — note
-> that means store users are still on 0.17 and do NOT have the auth fix).
+> **THE ASTRO SITE IS ALSO DEPLOYED** (run 34326387307, from `e65405cd`), carrying
+> the new `/from/skylight` page, the "free while beanies is in beta" wording on
+> maple/cozi/the hub, and a `.section-title` line-height fix. Verified live: all
+> three `/from` cards now render as live (skylight's coming-soon card is gone),
+> 4 wall views, 5 notes, 10 table rows, no overflow at 1280 or 390, zero console
+> errors. ⚠️ **`min-app-version.json` rode along with that deploy and its
+> `promptBelowVersion` is STILL `0.16`**, unchanged from what was already live —
+> only its explanatory `reason` comment differs, so no native user was prompted.
+>
+> **NOT deployed, deliberately: both mobile apps.** greg said skip them "for now",
+> which means **store and TestFlight users are still on 0.17 and do NOT have the
+> auth fix**. A signed release is manual and review-gated.
 >
 > ---
 >
