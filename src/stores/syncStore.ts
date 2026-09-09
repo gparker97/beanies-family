@@ -298,6 +298,29 @@ export const BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncErrorKind>> = 
   Object.values(BLOCKER_BANNER_KIND)
 );
 
+/**
+ * Which blocker kinds have a banner that renders on EVERY route.
+ *
+ * It lives beside `BLOCKER_BANNER_KIND` on purpose: "which kind is this" and
+ * "which surface owns it" are the same question asked twice, and answering them
+ * in two files is how they drift.
+ *
+ * `BackgroundSyncBar` reads this to decide whether to stay quiet. Only `decrypt`
+ * is here, and the two omissions are decisions rather than oversights:
+ * `LineageBanner` and `LocalDocUnreadableBanner` are mounted INSIDE
+ * `<div v-if="showLayout">`, so they render on no `noChrome` route — Login,
+ * LoadPod, Join, CreatePod, OpenFromDrive, ShareTarget, SharedRecipe. Removing
+ * their toast would take the only surface those two have on that whole route
+ * class. `PodUnreadableBanner` is mounted outside the layout, which is what earns
+ * it a place here.
+ *
+ * When either of those banners moves out of the layout, it is one entry in this
+ * set — with the reason written next to it.
+ */
+export const BANNERED_BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncErrorKind>> = new Set([
+  'decrypt',
+]);
+
 export const useSyncStore = defineStore('sync', () => {
   // State
   const isInitialized = ref(false);
@@ -844,8 +867,13 @@ export const useSyncStore = defineStore('sync', () => {
    * migration flow (`migrateStorage`) captures the previous provider and
    * re-installs it on failure.
    *
-   * Shared by `migrateStorage` and the create flow — keeps
-   * the "install this provider" sequence in one place.
+   * ⚠️ EXACTLY TWO CALLERS: `migrateStorage` and `restorePreviousProvider` (its
+   * rollback). This comment used to say "shared by `migrateStorage` and the
+   * create flow" and it was wrong — `createNewFile` does not come through here at
+   * all, so nothing on this path can affect pod creation. The claim mattered:
+   * the settings reorder below was described, in the code and in the CHANGELOG,
+   * as fixing a false compaction refusal "straight after creating a pod", which
+   * it cannot do.
    */
   async function installProvider(
     provider: StorageProvider,
@@ -869,13 +897,20 @@ export const useSyncStore = defineStore('sync', () => {
       // first-sight revision (no matching baseline yet) and false-block with "File
       // has newer data", reliably failing every migration (and it depended on a
       // clock quirk even pre-#61). We own this file; write our data to it.
-      // ⚠️ BEFORE THE SAVE, NOT AFTER, and the order is the whole fix. Written
-      // afterwards this landed a `setSettings` mutate — a whole-object replace,
-      // so it advances the heads even for an identical value — PAST the sync
-      // baseline `syncNow(true)` had just committed. A compaction attempted
-      // straight after creating a pod or migrating storage then read not-level
-      // and refused with "some changes have not reached the cloud yet", the same
-      // false refusal `lastSyncTimestamp` caused at the other end of this file.
+      // ⚠️ BEFORE THE SAVE, NOT AFTER. Written afterwards this landed a
+      // `setSettings` mutate — a whole-object replace, so it advances the heads
+      // even for an identical value — PAST the sync baseline `syncNow(true)` had
+      // just committed. A compaction attempted straight after MIGRATING STORAGE
+      // then read not-level and refused with "some changes have not reached the
+      // cloud yet", the same false refusal `lastSyncTimestamp` caused at the
+      // other end of this file.
+      //
+      // ⚠️ MIGRATING, not creating: see this function's header. And this fixes
+      // ONE writer of that class, not the class — four sibling `saveSettings`
+      // calls in this file still write after a load commits a baseline. The real
+      // fix is the one the investigation records: device-local sync bookkeeping
+      // does not belong in the SHARED document at all. That is a schema change
+      // and is deliberately not made here.
       //
       // These values depend only on the `provider` installed above, so there is
       // nothing to wait for: writing them first means the forced save CARRIES
@@ -890,6 +925,20 @@ export const useSyncStore = defineStore('sync', () => {
         },
         { preserveTimestamp: true }
       );
+
+      // ⚠️ THE SETTINGS WRITE ABOVE ARMS A DEBOUNCED SAVE, AND NOTHING CANCELLED
+      // IT. `saveSettings` is a mutate, so it runs
+      // `localChangeHandler → triggerDebouncedSave` and queues a full save ~2s
+      // out. `syncNow` calls `syncService.save()` DIRECTLY (not `saveNow`, which
+      // cancels first), so on a several-MB pod over a slow link the debounce
+      // fired during the forced upload, queued on the save mutex, and started a
+      // second whole fetch-merge-decrypt-re-upload the instant the first landed.
+      //
+      // Safe to cancel, unlike the cases `cancelPendingSave`'s own contract warns
+      // about: those drop an intent that nothing else will honour, whereas here
+      // the forced save on the very next line writes the entire document
+      // including the settings just written. Superseded, not lost.
+      syncService.cancelPendingSave();
 
       const ok = await syncNow(true);
       if (!ok) {
@@ -5035,25 +5084,34 @@ export const useSyncStore = defineStore('sync', () => {
       // syncService.load() would add. Mirrors the idiom used in the
       // reload-if-changed catch above. The reconnect flow branches on this
       // `reason` to fall back to the file picker when the known file is gone.
-      const status = e instanceof DriveApiError ? e.status : undefined;
       // ⚠️ `'auth'` IS REACHABLE NOW, and was not before. The declared union has
       // always carried it, but nothing here produced it, so the Settings restore
       // could not tell "reconnect and retry" from "this file is broken" and sent
       // a plain token lapse to the generic import-failed dead end.
       //
-      // ⚠️ THROUGH `classifyDriveFailure`, NOT a local `instanceof` ladder. An
-      // earlier cut wrote its own, which (a) duplicated a classifier this module
-      // already imports and calls twice elsewhere, guaranteeing the two drift,
-      // and (b) needed `TokenExpiredError` to be a real class in every test's
-      // googleAuth mock factory — it is absent from sixteen of them, so the first
-      // test to reach this catch would have died on
-      // `instanceof undefined`, converting a classified result into an unhandled
-      // throw. The shared helper covers both shapes that mean "reconnect":
-      // a `TokenExpiredError`, and the 401 a grant revoked on ANOTHER device
-      // produces (the local `isTokenValid()` check cannot see that one).
+      // ⚠️ ONE CLASSIFIER ANSWERS BOTH QUESTIONS. An earlier cut ran
+      // `classifyDriveFailure` for the auth arm and then hand-rolled
+      // `status === 404` for the not-found arm, INSIDE THE SAME TERNARY — the
+      // exact "two answers to one question, guaranteed to drift" hazard the
+      // helper was adopted to remove, reintroduced one line below the comment
+      // that named it.
+      //
+      // The status is still reported (callers log it) but no longer decides
+      // anything, and it is read duck-typed: `e instanceof DriveApiError` binds
+      // this catch to a class identity that a mocked `driveService` does not
+      // provide, which is the same trap `classifyDriveFailure` had to be freed
+      // from. See `podAccess.driveStatusOf`.
+      const status =
+        typeof (e as { status?: unknown })?.status === 'number'
+          ? (e as { status: number }).status
+          : undefined;
       const failure = classifyDriveFailure(e);
       const reason: 'auth' | 'not-found' | 'error' =
-        failure === 'CONSENT_EXPIRED' ? 'auth' : status === 404 ? 'not-found' : 'error';
+        failure === 'CONSENT_EXPIRED'
+          ? 'auth'
+          : failure === 'FILE_NOT_FOUND'
+            ? 'not-found'
+            : 'error';
       return { success: false, reason, status, payloadError: blocker };
     } finally {
       // Only restore to idle if WE set it — otherwise a caller that wrapped

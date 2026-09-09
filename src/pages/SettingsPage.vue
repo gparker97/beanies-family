@@ -756,7 +756,7 @@ async function openDriveRestorePicker(): Promise<void> {
         // ⚠️ NOT `importError`. That renders in an Alert Red slab, and Red is
         // reserved for destructive confirmations and hard validation errors, so
         // painting a SUCCESS sentence there says the opposite of what it means.
-        showToast('success', t('googleDrive.reconnected'));
+        showToast('success', t('settings.reconnectedTryAgain'));
         return;
       }
       // `drivePickerAuth`, not `drivePickerFailed`: this flow deliberately never
@@ -813,7 +813,24 @@ async function handleDriveRestoreSelected(payload: {
       context: { action: 'restore-needs-reconnect' },
     });
     const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
-    if (outcome === 'redirecting') return;
+
+    // ⚠️ THE REDIRECT ARM USED TO RETURN ABOVE THE `clearError()` BELOW, so it
+    // was the ONE path that kept the raw exception string the clear exists to
+    // remove — and it emitted nothing. On native the WebView does not unload, so
+    // the user dismisses the custom tab and lands back on a Settings page showing
+    // a developer string like `DriveApiError:401:…`, the picker closed, the
+    // restore abandoned, and no trace in CloudWatch.
+    if (outcome === 'redirecting') {
+      syncStore.clearError();
+      logEvent({
+        level: 'info',
+        surface: 'pod-load-failure',
+        message: 'drive restore reconnect redirected to Google',
+        context: { action: 'reconnect-redirecting' },
+      });
+      return;
+    }
+
     const reconnected = reconnectSucceeded(outcome);
     if (reconnected) await syncStore.handleGoogleReconnected();
     logEvent({
@@ -822,16 +839,27 @@ async function handleDriveRestoreSelected(payload: {
       message: reconnected ? 'drive restore reconnected' : 'drive restore reconnect failed',
       context: { action: reconnected ? 'reconnect-ok' : 'reconnect-failed' },
     });
-    // `loadFromGoogleDrive`'s catch put the raw exception message into
-    // `syncStore.error`, which renders as its own amber slab. Left alone the user
-    // would read a developer string and a reconnect result at the same time,
-    // disagreeing about what just happened.
-    syncStore.clearError();
+
     if (reconnected) {
-      showToast('success', t('googleDrive.reconnected'));
+      // `loadFromGoogleDrive`'s catch put the raw exception message into
+      // `syncStore.error`, which renders as its own amber slab. On THIS arm it is
+      // stale — the thing it describes has just been fixed — so leaving it would
+      // show a failure and a success at once.
+      syncStore.clearError();
+      showToast('success', t('settings.reconnectedTryAgain'));
       return;
     }
-    importError.value = t('settings.drivePickerAuth');
+
+    // ⚠️ AND ON THIS ARM WE MUST NOT CLEAR, which is the opposite of what an
+    // earlier cut did. That amber slab is the ONLY host of the Reconnect Drive
+    // button, the Force Save button, and the `reconnectError` line naming the
+    // actual cause. Clearing it and then setting `importError` to "beanies needs
+    // you to reconnect your Google account" instructed the user to do the one
+    // thing the UI had just removed, with the reason deleted alongside it.
+    //
+    // No `importError` either: the slab already carries the failure and its
+    // recovery, and adding a second red slab beside it recreates the
+    // two-disagreeing-messages problem in the other direction.
     return;
   }
 
@@ -1326,6 +1354,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     // cannot prove the file is gone, the row stays and we say so.
     let podFileDeleted = false;
 
+    // Everything this deletion could NOT prove it removed. It drives two things
+    // that were both missing: the farewell copy (which asserted "deleted from
+    // all systems" unconditionally, including on the paths that deliberately
+    // keep the row) and the firehose (which said nothing at all, so a report of
+    // "my file is still there" could not be triaged without the device).
+    const kept: string[] = [];
+
     // 2. Delete Drive file if requested
     if (wantDeleteDrive.value) {
       // ⚠️ THE SAFETY COPY GOES FIRST. `deleteAux` resolves the copy's folder by
@@ -1359,14 +1394,31 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           // The ONLY place this is set. The delete returned, so the file is gone.
           podFileDeleted = true;
         }
-        // ⚠️ NO `else` ARM. An earlier cut set the flag here on the reasoning
-        // that a missing binding means no file is bound. `getProviderConfig`
-        // never throws — it catches an IndexedDB read failure, falls back to the
-        // localStorage mirror, and returns null when that is absent too (private
-        // window, cleared site data, iOS storage eviction). So "no config" is
-        // usually "we cannot read the config", not "there is no file", and
-        // treating it as the latter removed the row with the pod untouched and
-        // nothing reported. Silence here is correct: the row stays.
+        // ⚠️ NO `else` ARM SETTING THE FLAG. An earlier cut set it here on the
+        // reasoning that a missing binding means no file is bound.
+        // `getProviderConfig` never throws — it catches an IndexedDB read
+        // failure, falls back to the localStorage mirror, and returns null when
+        // that is absent too (private window, cleared site data, iOS storage
+        // eviction). So "no config" is usually "we cannot read the config", not
+        // "there is no file", and treating it as the latter removed the row with
+        // the pod untouched.
+        //
+        // But SILENCE here was not correct, and that is the part this fixes. The
+        // user asked for erasure; on this branch their encrypted pod is still in
+        // Drive and the farewell used to tell them otherwise, with nothing in
+        // CloudWatch to find it by. Keeping the row is the decision; saying so is
+        // the obligation.
+        else {
+          logEvent({
+            level: 'warn',
+            surface: 'pod-access',
+            message: 'pod file kept during a family deletion — no readable Drive binding',
+            context: {
+              action: 'delete-family',
+              error_code: config ? 'provider-not-drive' : 'provider-config-unreadable',
+            },
+          });
+        }
       } catch (e) {
         // Same class as the safety copy above, and it was console-only while
         // its neighbour reported. The user is about to be told their data is
@@ -1379,6 +1431,8 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           context: { action: 'delete-family', error_code: 'pod-delete-failed' },
         });
       }
+      // The user ASKED for the pod to go and we cannot say that it did.
+      if (!podFileDeleted) kept.push('pod-file');
     }
 
     // 3. Remove the SHARED registry row — ONLY when the pod file is going too.
@@ -1408,6 +1462,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     if (podFileDeleted) {
       const registryRemoved = await removeFamily(familyId);
       if (!registryRemoved) {
+        kept.push('registry-row');
         reportError({
           surface: 'registry',
           severity: 'critical',
@@ -1415,6 +1470,21 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           context: { action: 'delete-family', error_code: 'registry-delete-failed' },
         });
       }
+    } else {
+      // ⚠️ THE SKIP IS A DECISION AND IT HAS TO BE COUNTED. This is the DEFAULT
+      // path, not an edge: the checkbox above is opt-in, and for a local-file
+      // family it is never even rendered — so an ordinary Delete Family leaves
+      // the shared row standing, resolvable, and counted in the founder metrics
+      // forever. That is the deliberate trade (see `podFileDeleted`'s
+      // declaration), but it was invisible, and its rate is exactly what decides
+      // whether the trade is still the right one.
+      kept.push('registry-row');
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: 'registry row kept during a family deletion — the pod file survives',
+        context: { action: 'delete-family', error_code: 'registry-kept-file-survives' },
+      });
     }
 
     // 4. Delete local family (IndexedDB, passkeys, file handles, local registry).
@@ -1445,9 +1515,16 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     resetAllAppStores();
 
     // 7. Farewell
+    // ⚠️ DO NOT SAY "deleted from all systems" WHEN IT WAS NOT. The unconditional
+    // message was false on every path that keeps the row — which is the default
+    // one — and false again whenever the Drive delete could not run. A farewell
+    // that lies about a deletion is the worst place in the app to be wrong, and
+    // it left the user with nothing to act on.
     await showAlert({
       title: 'settings.deleteFamilyFarewellTitle',
-      message: 'settings.deleteFamilyFarewellMsg',
+      message: kept.length
+        ? 'settings.deleteFamilyFarewellPartialMsg'
+        : 'settings.deleteFamilyFarewellMsg',
     });
 
     // 7. Redirect

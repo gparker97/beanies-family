@@ -27,8 +27,9 @@
  * on a load path again.
  */
 
-import { DriveApiError } from '@/services/google/driveService';
-import { TokenExpiredError } from '@/services/google/googleAuth';
+// ⚠️ NO `DriveApiError` / `TokenExpiredError` IMPORT, DELIBERATELY. Importing
+// either would drag this module's classification back onto class identities that
+// 29 test mock factories do not provide — see `driveStatusOf` below.
 import { PayloadLoadError, payloadErrorKind, type PayloadErrorKind } from '@/types/sync';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 
@@ -167,6 +168,40 @@ const VERSION_CODE_FOR_KIND = {
  * rather than a critical: no arm of the verification mutates anything, so failing
  * closed buys no safety and would only manufacture false pages.
  */
+/**
+ * ⚠️ DUCK-TYPED, NOT `instanceof`, AND THAT IS THE POINT OF THIS PAIR.
+ *
+ * `classifyDriveFailure` is called from load and refresh paths all over the app,
+ * including components whose tests replace `@/services/google/googleAuth`
+ * wholesale. TWENTY-NINE of those factories export no `TokenExpiredError`, so
+ * `e instanceof TokenExpiredError` evaluates `instanceof undefined` and dies with
+ * "Right-hand side of instanceof is not callable" — thrown from a module the test
+ * author never touched, in a test that has nothing to do with auth.
+ *
+ * That hazard was the stated reason for moving this classification OUT of
+ * `syncStore` and into a shared helper. Moving it relocated the hazard rather
+ * than removing it. Reading a `name` and a `status` removes it: neither depends
+ * on a class identity surviving a mock factory. Same reasoning as
+ * `isRemoteBlocker`, which CLAUDE.md records as duck-typed by design.
+ */
+function driveStatusOf(e: unknown): number | null {
+  const status = (e as { status?: unknown } | null | undefined)?.status;
+  return typeof status === 'number' ? status : null;
+}
+
+function isTokenExpiredError(e: unknown): boolean {
+  const err = e as { name?: unknown; message?: unknown } | null | undefined;
+  if (err?.name === 'TokenExpiredError') return true;
+  // The MESSAGE contract, not a second rule: `TokenExpiredError`'s own
+  // doc-comment declares "the message must contain 'silent refresh failed'" and
+  // `syncStore.isAuthTransientSyncError` already classifies on exactly that
+  // regex. Accepting it here means a test double that forgets `name` — or the
+  // explicit-message variant `googleDriveProvider.read()` throws — still
+  // classifies, instead of silently degrading to VERIFY_UNAVAILABLE and sending
+  // a token lapse to an endless retry.
+  return typeof err?.message === 'string' && /silent refresh failed/i.test(err.message);
+}
+
 export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
   // ⚠️ FIRST, above the `navigator.onLine` check. A typed, definite
   // classification must outrank ambient network state, or a connection blip
@@ -183,14 +218,28 @@ export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
     const versionCode = VERSION_CODE_FOR_KIND[payloadErrorKind(e)];
     if (versionCode) return versionCode;
   }
+  // ⚠️ AN HTTP STATUS OUTRANKS `navigator.onLine`, AND THAT IS A PROOF, NOT A
+  // PREFERENCE. Receiving a status means the request REACHED Google and Google
+  // answered, so `onLine === false` is provably wrong in this branch. It used to
+  // sit below, which mattered most for 401: the browser reporting offline
+  // (routinely and wrongly, in Capacitor and Android WebViews) sent a real
+  // consent expiry to `OFFLINE`, and every caller that branches on auth — the
+  // Drive restore among them — fell through to a generic dead end instead of
+  // offering the reconnect that fixes it.
+  const status = driveStatusOf(e);
+  if (status === 401) return 'CONSENT_EXPIRED';
+  if (status === 403) return 'PERMISSION_DENIED';
+  if (status === 404) return 'FILE_NOT_FOUND';
+
   // `typeof` guard so this module stays importable outside a DOM (worker/SSR/unit).
+  //
+  // Above `TokenExpiredError` DELIBERATELY, unlike the statuses. That error is
+  // thrown when a silent refresh could not complete, and the ordinary reason it
+  // could not is that the network was gone — so unlike a status it carries no
+  // proof of connectivity, and when we genuinely are offline "you are offline" is
+  // both true and the more useful of the two messages.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'OFFLINE';
-  if (e instanceof TokenExpiredError) return 'CONSENT_EXPIRED';
-  if (e instanceof DriveApiError) {
-    if (e.status === 401) return 'CONSENT_EXPIRED';
-    if (e.status === 403) return 'PERMISSION_DENIED';
-    if (e.status === 404) return 'FILE_NOT_FOUND';
-  }
+  if (isTokenExpiredError(e)) return 'CONSENT_EXPIRED';
   return 'VERIFY_UNAVAILABLE'; // 408 timeout, 5xx, unknown — never silent
 }
 

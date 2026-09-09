@@ -6,7 +6,7 @@
  * from Google Drive in the background. Fires a toast on error.
  */
 import { ref, watch } from 'vue';
-import { useSyncStore } from '@/stores/syncStore';
+import { useSyncStore, BANNERED_BLOCKER_KINDS } from '@/stores/syncStore';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -38,12 +38,27 @@ watch(
   () => syncStore.backgroundSyncError,
   (err) => {
     if (!err || syncStore.backgroundSyncErrorKind === 'auth-transient') return;
+
+    // ⚠️ THIS COMMENT USED TO SAY THIS TOAST WAS THE ONLY PLACE ANY OF IT
+    // REACHED THE USER. That is now false for `decrypt`, which has
+    // `PodUnreadableBanner`, and still TRUE for `lineage` and
+    // `local-unreadable`, whose banners are mounted inside the layout and so
+    // render on no `noChrome` route.
+    //
+    // Suppress only when a banner is ACTUALLY up — never on the kind alone. The
+    // `kind &&` is required rather than cosmetic: `backgroundSyncErrorKind` is
+    // nullable, and two paths ("password may have changed", and a rotated key)
+    // set `backgroundSyncErrorKind = 'decrypt'` WITHOUT `podUnopenable`, which
+    // `notePodUnopenable` declines to latch. The banner's gate is
+    // `podUnopenable && kind === 'decrypt'`, so neither of those gets one — and
+    // suppressing on kind alone would take their only surface away.
+    const kind = syncStore.backgroundSyncErrorKind;
+    if (syncStore.podUnopenable && kind && BANNERED_BLOCKER_KINDS.has(kind)) return;
+
     // The store resolves a SPECIFIC translated message for a pod that cannot be
     // opened at all ("this device ran out of memory…"). Showing the generic
     // "using cached data" line over it would be the same toast a flaky network
-    // produces, with no hint that sync has just latched off for the session —
-    // and the bar itself is a 3px strip with no text node, so this toast is the
-    // ONLY place any of it reaches the user.
+    // produces, with no hint that sync has just latched off for the session.
     showToast(
       'warning',
       syncStore.podUnopenable ? t('sync.podUnopenable') : t('sync.backgroundError'),

@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted shared state + mock fns so the vi.mock factories can reference them.
 const h = vi.hoisted(() => ({
-  driveReconnect: vi.fn(async () => true),
+  // ⚠️ A REAL `ReconnectOutcome`, NOT `true`. This mock returned the retired
+  // boolean long after `reconnect()` widened to a string union, which is what
+  // made the coordinator's `if (!ok)` structurally uncatchable: every arm of the
+  // real union is truthy, so a FAILED reconnect silently took the success path
+  // and this suite still passed. A mock that lies about its contract is worse
+  // than no mock — it converts a live defect into green CI.
+  driveReconnect: vi.fn(async (): Promise<ReconnectOutcome> => 'reconnected'),
   calReconnect: vi.fn(async () => ({ status: 'connected' as const })),
   startUnified: vi.fn(async () => 'connected' as const),
   showToast: vi.fn(),
@@ -21,13 +27,20 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/stores/syncStore', () => ({ useSyncStore: () => h.syncState }));
 vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => h.calState }));
-vi.mock('@/composables/useGoogleReconnect', () => ({
-  useGoogleReconnect: () => ({
-    reconnect: h.driveReconnect,
-    reconnectError: { value: null },
-    isReconnecting: { value: false },
-  }),
-}));
+vi.mock('@/composables/useGoogleReconnect', async (importOriginal) => {
+  // `reconnectSucceeded` is the REAL predicate: it is pure, and it is the thing
+  // the coordinator is supposed to use instead of a truthiness test. Stubbing it
+  // would test the stub.
+  const actual = await importOriginal<typeof import('@/composables/useGoogleReconnect')>();
+  return {
+    ...actual,
+    useGoogleReconnect: () => ({
+      reconnect: h.driveReconnect,
+      reconnectError: { value: null },
+      isReconnecting: { value: false },
+    }),
+  };
+});
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
@@ -38,6 +51,8 @@ vi.mock('@/composables/useToast', () => ({ showToast: h.showToast }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 import { useReconnectCoordinator } from '../useReconnectCoordinator';
+import type { ReconnectOutcome } from '@/composables/useGoogleReconnect';
+import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
 
 function setDrive(down: boolean, email: string | null = null) {
   h.syncState.showGoogleReconnect = down;
@@ -171,5 +186,58 @@ describe('useReconnectCoordinator', () => {
     await c.reconnectAll();
     expect(h.showToast).not.toHaveBeenCalled();
     expect(h.startUnified).not.toHaveBeenCalled();
+  });
+
+  // ── The outcome arms. This prompt is mounted app-wide, so a wrong answer here
+  //    is the one most users see. Each of these fails if the code goes back to
+  //    testing the outcome for truthiness.
+  it('a FAILED Drive reconnect reports an error and never claims success', async () => {
+    // The defect: `if (!ok)` against a string union is dead code, so a failed
+    // reconnect set no error and fell straight through to the success toast —
+    // "Reconnected" in green over a dead grant, with the banner still up.
+    setDrive(true, 'a@example.com');
+    h.driveReconnect.mockResolvedValueOnce('failed');
+    const c = useReconnectCoordinator();
+
+    await c.reconnectAll();
+
+    expect(c.reconnectError.value).toBe('reconnectPrompt.error');
+    expect(h.showToast).not.toHaveBeenCalled();
+  });
+
+  it('a REDIRECTING Drive reconnect stops the plan and claims nothing', async () => {
+    // Nothing has been acquired yet — the page is on its way to Google. Running
+    // on would start a second consent mid-navigation.
+    setDrive(true, 'a@example.com');
+    setCalendar([{ id: 'c1', accountEmail: 'other@example.com' }]);
+    h.driveReconnect.mockResolvedValueOnce('redirecting');
+    const c = useReconnectCoordinator();
+
+    await c.reconnectAll();
+
+    expect(h.calState.reconnect).not.toHaveBeenCalled();
+    expect(h.showToast).not.toHaveBeenCalled();
+  });
+
+  it('a SILENT recovery finishes the whole plan — the redirect predicate is not the authority', async () => {
+    // ⚠️ THE REGRESSION THIS PINS. The redirect test used to be
+    // `shouldUseRedirectAuth()`, sampled BEFORE the call. On a redirect surface
+    // the silent path can recover in place, and the stale predicate then
+    // abandoned the remaining group and logged a redirect for a run that never
+    // navigated. `'recovered'` is the arm that exposes it.
+    setDrive(true, 'a@example.com');
+    setCalendar([{ id: 'c1', accountEmail: 'other@example.com' }]);
+    h.driveReconnect.mockResolvedValueOnce('recovered');
+    // Arm the trap: on a redirect SURFACE with a silent RECOVERY, the retired
+    // predicate and the real outcome disagree. If anyone reinstates
+    // `shouldUseRedirectAuth()` as the test, this returns early and the calendar
+    // group below is never reconnected.
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(true);
+    const c = useReconnectCoordinator();
+
+    await c.reconnectAll();
+
+    expect(h.calState.reconnect).toHaveBeenCalledTimes(1);
+    expect(h.showToast).toHaveBeenCalledWith('success', 'reconnectPrompt.reconnected');
   });
 });
