@@ -719,7 +719,7 @@ async function handleStartOver() {
           :is-busy="flowBusy"
           :pod-open="familyStore.members.length > 0"
           :recovery-mode="flow.recoveryMode.value"
-          :has-passphrase="!!syncStore.pendingEncryptedFile?.envelope?.recoveryPassphrase"
+          :last-attempted="flow.lastAttempted.value"
           @biometric="flow.onBiometric"
           @tap-through="flow.onTapThrough"
           @pin="flow.onPinSubmit"

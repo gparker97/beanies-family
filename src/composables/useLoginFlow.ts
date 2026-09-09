@@ -21,11 +21,14 @@ import {
   transition,
   type LoginFlowEvent,
   type LoginFlowState,
-  type OpenFailReason,
   type PersonCard,
   type PersonSource,
 } from '@/services/auth/loginFlow';
-import { isChildMember, resolveProveMethods } from '@/services/auth/proveMethods';
+import {
+  isChildMember,
+  resolveProveMethods,
+  type CapabilityState,
+} from '@/services/auth/proveMethods';
 import { useBiometricSignIn } from '@/composables/useBiometricSignIn';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -39,6 +42,7 @@ import {
   emitOpenFetchRecovery,
   emitProveOutcome,
   emitRosterFallbackUsed,
+  emitEnvelopeCapabilitiesUnknown,
 } from '@/services/telemetry/loginFlowEvents';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import {
@@ -49,7 +53,9 @@ import {
 } from '@/services/auth/deviceUnlock';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { envelopeNeedsRecovery } from '@/services/sync/fileSync';
+import { envelopeNeedsRecovery, envelopeCapabilities } from '@/services/sync/fileSync';
+import { stagePendingFile, type StageOutcome } from '@/services/auth/stagePendingFile';
+import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 
@@ -65,6 +71,11 @@ export interface UseLoginFlow {
    * the kit/passphrase redeem paths; cleared on sign-in and on leaving the flow.
    */
   recoveryMode: Ref<boolean>;
+  /**
+   * Which credential the last attempt used, so the prove screen can restore the form the
+   * user was on after the machine remounts it. `null` before any attempt.
+   */
+  lastAttempted: Ref<'password' | 'passphrase' | null>;
   /**
    * Enter the flow for a family. Returns false when this device has NO person list at
    * all (no open pod, no roster, no credential records) — the caller falls back to the
@@ -124,6 +135,14 @@ export function useLoginFlow(opts: {
   let pendingPassword: string | null = null;
   /** The prove screen's fallbackDepth captured with the password (telemetry fidelity). */
   let pendingProveDepth = 0;
+  /**
+   * WHICH credential the pending secret is. A `ref`, not a closure local, because
+   * `ProveView` remounts on every failed attempt (`LoginPage` renders it under a
+   * `v-else-if`) and must restore the form the user was actually using — the mount rule
+   * hardcoded `'password'`, so a mistyped passphrase bounced the user to a password
+   * field with the passphrase error above it.
+   */
+  const lastAttempted = ref<'password' | 'passphrase' | null>(null);
 
   function dispatch(event: LoginFlowEvent): void {
     const next = transition(state.value, event);
@@ -134,10 +153,74 @@ export function useLoginFlow(opts: {
 
   const podOpen = () => familyStore.members.length > 0;
 
-  // Phase 4: whether the family's envelope holds ANY password wraps — roster-carried
-  // when cold (kit-born families store `false`), read live when warm. Feeds the prove
-  // engine's conditional password probe; `null` = unknown → password stays offered.
-  const envelopeHasPasswordWraps = ref<boolean | null>(null);
+  /**
+   * How long the prove screen will wait for the envelope before deciding without it.
+   * `loginFlow.ts:16-22` states the machine's inversion — prove first, THEN open — and a
+   * prove screen that blocks indefinitely on a Drive round-trip inverts it. On timeout
+   * the offer fails closed and the reconnect route is dispatched, so waiting longer buys
+   * nothing a retry would not.
+   */
+  const STAGE_FOR_PROVE_TIMEOUT_MS = 8000;
+
+  /**
+   * Dedupe of the in-flight stage fetch, TAGGED with the family it belongs to.
+   *
+   * A closure local like `pendingPassword` and `stagedPayloadFailure`, never
+   * module-level: `useLoginFlow()` is a factory and `ProveView` mounts under a
+   * `v-else-if`, so module lifetime would outlive the flow and leak across instances.
+   *
+   * The tag is a GUARD, not an optimisation. `loadFromFile()` mutates
+   * `pendingEncryptedFile` globally and `startForFamily` is re-entrant from the family
+   * picker, so an A-fetch resolving after a switch to B must never be awaited as B's.
+   */
+  let stageInFlight: { familyId: string; promise: Promise<StageOutcome> } | null = null;
+
+  /**
+   * What the family's envelope can be opened with, RIGHT NOW.
+   *
+   * ⚠️ DERIVED, NEVER CACHED. The store holds exactly one envelope — live when the pod
+   * is open, staged when it is not — so there is nothing to invalidate and nothing that
+   * can go stale behind a re-read. Caching this is what the predecessor did, and it
+   * needed a memo, two invalidation rules and a telemetry event to detect its own
+   * staleness; all three disappear here.
+   *
+   * ⚠️ FAMILY-CHECKED, and the check is a guard rather than an optimisation.
+   * `loadFromFile()` mutates `pendingEncryptedFile` GLOBALLY, so an A-fetch that resolves
+   * after a switch to B re-populates it AFTER `resetState()` has run. `stageInFlight`'s
+   * tag guards which promise is AWAITED; only this guards which envelope is READ. Same
+   * class `rosterCache.ts:83` guards ("a cross-household privacy leak on a shared
+   * device").
+   */
+  function currentCapabilities(familyId: string): CapabilityState {
+    const env = syncStore.envelope ?? syncStore.pendingEncryptedFile?.envelope;
+    return env && env.familyId === familyId
+      ? { known: true, capabilities: envelopeCapabilities(env) }
+      : { known: false, reason: 'not-staged' };
+  }
+
+  /**
+   * Start staging for `familyId` without awaiting, so the fetch overlaps with the user
+   * reading the person picker. Idempotent per family.
+   */
+  function beginStage(familyId: string): void {
+    const entry = {
+      familyId,
+      promise: stagePendingFile(podOpen()).catch(
+        () => ({ ok: false, reason: 'error' }) as StageOutcome
+      ),
+    };
+    stageInFlight = entry;
+    void entry.promise.then((o) => {
+      // A FAILED stage is never memoized: `prove-loading` is re-entered on a wrong
+      // credential and on RECOVERY_RETRY after the user has just reconnected Drive, and
+      // caching one transient failure would strip a legacy family's password offer for
+      // the whole session — un-fixable by the reconnect panel that exists for it.
+      //
+      // Identity, not truthiness: a slow A-stage settling after B replaced the slot must
+      // not clear B's entry, or the tag stops meaning anything.
+      if (!o.ok && stageInFlight === entry) stageInFlight = null;
+    });
+  }
 
   // ── People-list resolution (roster → credential records → bootstrap) ──────────
 
@@ -146,8 +229,6 @@ export function useLoginFlow(opts: {
   ): Promise<{ people: PersonCard[]; source: PersonSource } | null> {
     // 1. Pod already open: the live roster, photos included.
     if (podOpen()) {
-      const env = syncStore.envelope;
-      envelopeHasPasswordWraps.value = env ? Object.keys(env.wrappedKeys ?? {}).length > 0 : null;
       const people: PersonCard[] = familyStore.sortedHumans.map((m) => ({
         id: m.id,
         name: m.name,
@@ -165,7 +246,6 @@ export function useLoginFlow(opts: {
     try {
       const entry = await getRosterCache(familyId);
       if (entry && entry.members.length > 0) {
-        envelopeHasPasswordWraps.value = entry.envelopeHasPasswordWraps ?? null;
         return { people: entry.members, source: 'roster' };
       }
     } catch (e) {
@@ -183,7 +263,6 @@ export function useLoginFlow(opts: {
       const keys = await resolveDeviceKeys(familyId);
       if (keys.length > 0) {
         emitRosterFallbackUsed();
-        envelopeHasPasswordWraps.value = null;
         const people: PersonCard[] = keys.map((k) => ({
           id: k.memberId,
           name: k.memberName || k.label,
@@ -278,6 +357,11 @@ export function useLoginFlow(opts: {
         const pendingIsThisFamily = syncStore.pendingEncryptedFile?.envelope?.familyId === familyId;
         await familyContextStore.switchFamily(familyId);
         familyStore.resetState();
+        // Drop any in-flight stage for the family we are leaving, for the same reason
+        // the resident members are cleared: family A's fetch must not decide family B's
+        // offers. `currentCapabilities` family-checks the RESULT as well, because
+        // clearing a variable cannot cancel a promise or unwind its store write.
+        stageInFlight = null;
         if (!pendingIsThisFamily) {
           syncStore.resetState();
           await syncStore.initialize();
@@ -297,6 +381,10 @@ export function useLoginFlow(opts: {
         people: built.people,
         source: built.source,
       });
+      // Start staging the envelope NOW, unawaited, so the fetch overlaps with the user
+      // reading the picker. `prove-loading` awaits it before resolving the offer list, so
+      // no race is possible — this only decides whether the wait is felt.
+      if (!podOpen()) beginStage(familyId);
       return true;
     } catch (e) {
       // Review F12: an IndexedDB/initialize throw here used to escape into the caller's
@@ -362,6 +450,30 @@ export function useLoginFlow(opts: {
       const liveMember = podOpen()
         ? familyStore.members.find((m) => m.id === livePerson.id)
         : undefined;
+
+      // Await the stage started at START, so the offer decision has the envelope rather
+      // than a default. Bounded: `loginFlow.ts:16-22` states the machine's inversion —
+      // prove first, THEN open — and a prove screen that blocks indefinitely on a Drive
+      // round-trip inverts it. Only awaited when the tag matches this family.
+      let stage: StageOutcome = { ok: true };
+      if (!podOpen()) {
+        if (stageInFlight?.familyId !== s.familyId) beginStage(s.familyId);
+        // `raceTimeout` RESOLVES to undefined on timeout rather than throwing, so the
+        // `??` is the timeout branch — not a defensive default.
+        stage = (await raceTimeout(stageInFlight!.promise, STAGE_FOR_PROVE_TIMEOUT_MS)) ?? {
+          ok: false,
+          reason: 'error',
+        };
+      }
+      // One derivation for both temperatures: warm, `syncStore.envelope` is live; cold,
+      // the stage just populated `pendingEncryptedFile`. A failed stage is reported as
+      // `stage-failed` rather than `not-staged` so CloudWatch can tell "we tried and
+      // failed" from "we never tried" — they look identical from the offer list alone.
+      const derived = currentCapabilities(s.familyId);
+      const envelope: CapabilityState =
+        derived.known || stage.ok ? derived : { known: false, reason: 'stage-failed' };
+      if (!envelope.known) emitEnvelopeCapabilitiesUnknown(envelope.reason);
+
       const methods = await resolveProveMethods({
         familyId: s.familyId,
         memberId: livePerson.id,
@@ -373,7 +485,7 @@ export function useLoginFlow(opts: {
         hasPin: liveMember !== undefined ? !!liveMember.pinHash : null,
         hasPassword:
           liveMember !== undefined ? !!liveMember.passwordHash : (livePerson.hasPassword ?? null),
-        envelopeHasPasswordWraps: envelopeHasPasswordWraps.value,
+        envelope,
         rosterSource: s.source,
       });
       // The machine drops stale events itself, but avoid dispatching for a superseded
@@ -382,6 +494,13 @@ export function useLoginFlow(opts: {
       if (cur.kind === 'prove-loading' && cur.person.id === s.person.id) {
         // The event carries the LIVE re-projection so the prove screen renders truth.
         dispatch({ type: 'METHODS_RESOLVED', methods, person: livePerson });
+        // A failed stage means the same thing here as it does when a credential is
+        // submitted, so it must not route somewhere different. `ensureStaged()` already
+        // dispatches OPEN_FAILED for every ok:false reason; failing EARLIER is not a
+        // different fact. This is what preserves "no behaviour change for legacy
+        // families": one with a dead Drive token reaches the reconnect panel a step
+        // sooner, rather than a recovery terminal with its password silently withdrawn.
+        if (!stage.ok) dispatch({ type: 'OPEN_FAILED', reason: stage.reason });
       }
       return;
     }
@@ -400,6 +519,7 @@ export function useLoginFlow(opts: {
     }
     if (s.kind === 'idle') {
       pendingPassword = null;
+      lastAttempted.value = null;
       recoveryMode.value = false;
       opts.onExit();
     }
@@ -409,12 +529,6 @@ export function useLoginFlow(opts: {
 
   function currentProve(): Extract<LoginFlowState, { kind: 'prove' }> | null {
     return state.value.kind === 'prove' ? state.value : null;
-  }
-
-  function classifyLoadFailure(reason?: string): Exclude<OpenFailReason, 'wrong-password'> {
-    if (reason === 'auth') return 'auth';
-    if (reason === 'not-found' || reason === 'file-not-found') return 'not-found';
-    return 'error';
   }
 
   /**
@@ -427,57 +541,49 @@ export function useLoginFlow(opts: {
     // value left by an earlier biometric attempt mislabelled a later, unrelated
     // funnel outcome — a network outage reported as 'corrupted'.
     stagedPayloadFailure = null;
-    if (podOpen() || syncStore.hasPendingEncryptedFile) return true;
-    if (!syncStore.isConfigured) {
-      // No provider and no open pod: this family cannot be opened from here.
-      dispatch({ type: 'OPEN_FAILED', reason: 'not-found' });
-      return false;
-    }
-    if (syncStore.needsPermission) {
-      dispatch({ type: 'OPEN_FAILED', reason: 'permission' });
-      return false;
-    }
-    try {
-      const result = await syncStore.loadFromFile();
-      if (result.success || result.needsPassword) return true;
-      dispatch({ type: 'OPEN_FAILED', reason: classifyLoadFailure(result.reason) });
-      return false;
-    } catch (e) {
-      // A payload failure is not a staging problem. Filed as
-      // `stage_failed`/`warning` it is invisible to every `pod-load-*` filter,
-      // and the user gets a generic open failure with none of the honest copy —
-      // on the step that runs BEFORE the prove screen.
-      if (e instanceof PayloadLoadError) {
-        stagedPayloadFailure = payloadErrorKind(e);
-        // INLINE, not the fatal overlay. All three callers run with a screen the
-        // user is looking at — `onBiometric` and `onPinSubmit` after they have
-        // acted, `runOpening` mid-open — so a `fixed inset-0 z-[300]` panel
-        // would land on top of it. And `OPEN_FAILED` must still dispatch or
-        // `runOpening` returns with the machine stuck in 'opening', which
-        // renders LoginPage's bare spinner with nothing left to dispatch.
-        //
-        // The retry loop that motivated the overlay is closed at the source
-        // instead: `syncService` latches the unreadable remote, so a
-        // `RECOVERY_RETRY` short-circuits rather than re-downloading.
-        proveError.value = t(payloadErrorMessageKey(e));
-        reportPayloadFailure(e, {
-          source: 'boot',
-          fileId: syncStore.driveFileId ?? null,
-          familyId: familyContextStore.activeFamilyId,
-        });
-        dispatch({ type: 'OPEN_FAILED', reason: 'error' });
-        return false;
-      }
-      reportError({
-        surface: 'login-flow',
-        message: 'staging the pod file for prove failed',
-        error: e,
-        severity: 'warning',
-        context: { action: 'stage_failed' },
+
+    const outcome = await stagePendingFile(podOpen());
+    if (outcome.ok) return true;
+
+    // A payload failure is not a staging problem. Filed as `stage_failed`/`warning`
+    // it is invisible to every `pod-load-*` filter, and the user gets a generic open
+    // failure with none of the honest copy — on the step that runs BEFORE the prove
+    // screen.
+    if (outcome.payload) {
+      stagedPayloadFailure = payloadErrorKind(outcome.payload);
+      // INLINE, not the fatal overlay. All three callers run with a screen the
+      // user is looking at — `onBiometric` and `onPinSubmit` after they have
+      // acted, `runOpening` mid-open — so a `fixed inset-0 z-[300]` panel
+      // would land on top of it. And `OPEN_FAILED` must still dispatch or
+      // `runOpening` returns with the machine stuck in 'opening', which
+      // renders LoginPage's bare spinner with nothing left to dispatch.
+      //
+      // The retry loop that motivated the overlay is closed at the source
+      // instead: `syncService` latches the unreadable remote, so a
+      // `RECOVERY_RETRY` short-circuits rather than re-downloading.
+      proveError.value = t(payloadErrorMessageKey(outcome.payload));
+      reportPayloadFailure(outcome.payload, {
+        source: 'boot',
+        fileId: syncStore.driveFileId ?? null,
+        familyId: familyContextStore.activeFamilyId,
       });
       dispatch({ type: 'OPEN_FAILED', reason: 'error' });
       return false;
     }
+
+    // 'error' is the only reason that is genuinely unexpected; the other three are
+    // ordinary transport states the machine renders a panel for.
+    if (outcome.reason === 'error') {
+      reportError({
+        surface: 'login-flow',
+        message: 'staging the pod file for prove failed',
+        error: new Error('stage failed'),
+        severity: 'warning',
+        context: { action: 'stage_failed' },
+      });
+    }
+    dispatch({ type: 'OPEN_FAILED', reason: outcome.reason });
+    return false;
   }
 
   function onPickPerson(person: PersonCard): void {
@@ -784,11 +890,12 @@ export function useLoginFlow(opts: {
     }
   }
 
-  function onPasswordSubmit(password: string): void {
+  function onPasswordSubmit(password: string, kind: 'password' | 'passphrase' = 'password'): void {
     const s = currentProve();
     if (!s || isBusy.value) return;
     proveError.value = null;
     pendingPassword = password;
+    lastAttempted.value = kind;
     pendingProveDepth = s.fallbackDepth;
     dispatch({ type: 'PASSWORD_SUBMITTED', memberId: s.person.id });
   }
@@ -838,7 +945,7 @@ export function useLoginFlow(opts: {
               pendingPassword = null;
               proveError.value = t('loginFlow.recoveryOnlyBody');
               emitProveOutcome({
-                method: 'password',
+                method: lastAttempted.value ?? 'password',
                 ok: false,
                 errorCode: 'needs-recovery',
                 fallbackDepth: pendingProveDepth,
@@ -861,7 +968,7 @@ export function useLoginFlow(opts: {
               recoveryMode.value = true;
               proveError.value = t('recovery.passphraseAcceptedProve');
               emitProveOutcome({
-                method: 'password',
+                method: lastAttempted.value ?? 'password',
                 ok: false,
                 errorCode: 'recovery-passphrase',
                 fallbackDepth: pendingProveDepth,
@@ -906,7 +1013,7 @@ export function useLoginFlow(opts: {
                     familyId: familyContextStore.activeFamilyId,
                   });
                 emitProveOutcome({
-                  method: 'password',
+                  method: lastAttempted.value ?? 'password',
                   ok: false,
                   errorCode: payloadKind,
                   fallbackDepth: pendingProveDepth,
@@ -915,9 +1022,11 @@ export function useLoginFlow(opts: {
                 return;
               }
               pendingPassword = null;
-              proveError.value = dec.error ?? t('password.decryptionError');
+              // The typed key, never `dec.error` — that is a developer-facing string and
+              // rendering it put raw crypto internals on the login gate in English.
+              proveError.value = t(dec.errorKey ?? 'password.decryptionError');
               emitProveOutcome({
-                method: 'password',
+                method: lastAttempted.value ?? 'password',
                 ok: false,
                 errorCode: 'wrong-password',
                 fallbackDepth: pendingProveDepth,
@@ -930,7 +1039,7 @@ export function useLoginFlow(opts: {
         }
         const result = await authStore.signIn(memberId, password);
         emitProveOutcome({
-          method: 'password',
+          method: lastAttempted.value ?? 'password',
           ok: result.success,
           errorCode: result.success ? undefined : 'wrong-password',
           fallbackDepth: pendingProveDepth,
@@ -1051,6 +1160,7 @@ export function useLoginFlow(opts: {
     startForFamily,
     tryCachedKeyDecrypt,
     dispatch,
+    lastAttempted,
     onPickPerson,
     onBiometric,
     onTapThrough,

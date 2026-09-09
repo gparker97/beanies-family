@@ -5005,9 +5005,21 @@ const STRING_DEFS = {
     beanie: "you're in with your recovery key — set a fresh 6-digit pin to use from now on.",
   },
   'recovery.resetPinAction': { en: 'Set PIN & Sign In', beanie: 'set pin & sign in' },
-  'recovery.passphraseHint': {
-    en: 'Your password — or your family recovery passphrase, if one was set.',
-    beanie: 'your password — or your family recovery passphrase, if one was set.',
+  // ⚠️ `recovery.passphraseHint` was deleted here. It read "Your password — or your
+  // family recovery passphrase, if one was set." and sat under a SINGLE input, so one
+  // field named two different credentials. The passphrase now has its own labelled form,
+  // offered only when the envelope proves a passphrase exists.
+  'recovery.passphraseLabel': {
+    en: 'Family Recovery Passphrase',
+    beanie: 'family recovery passphrase',
+  },
+  'recovery.passphrasePlaceholder': {
+    en: 'Enter your recovery passphrase',
+    beanie: 'enter your recovery passphrase',
+  },
+  'recovery.passphraseRequired': {
+    en: 'Please enter your recovery passphrase.',
+    beanie: 'please enter your recovery passphrase.',
   },
   'recovery.passphraseAcceptedProve': {
     en: 'Recovery passphrase accepted — your family data is open. Now confirm who you are to sign in.',

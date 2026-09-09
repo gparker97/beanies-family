@@ -34,12 +34,63 @@ export function emitProveMethodsResolved(payload: {
    * many users still lean on the deleted PRF path.
    */
   prfWithheld?: boolean;
+  /**
+   * Cold credential offers withheld because the envelope could not prove they would
+   * work (`'password'` / `'passphrase'`). The counter that says the fail-closed rule is
+   * doing something — a non-zero rate alongside zero unlock failures is the fix working.
+   */
+  suppressed?: string[];
+  /** Whether the envelope's capabilities were readable at decision time. */
+  capsKnown?: boolean;
 }): void {
+  const suppressed = payload.suppressed?.length
+    ? payload.suppressed.map((k) => `+suppressed:${k}`).join('')
+    : '';
+  const caps =
+    payload.capsKnown === undefined ? '' : `+caps:${payload.capsKnown ? 'known' : 'unknown'}`;
   emit('info', 'prove_methods_resolved', {
     action: 'resolved',
-    detail: (payload.methods.join(',') || 'none') + (payload.prfWithheld ? '+prf-withheld' : ''),
+    detail:
+      (payload.methods.join(',') || 'none') +
+      (payload.prfWithheld ? '+prf-withheld' : '') +
+      suppressed +
+      caps,
     kind: payload.rosterSource,
     ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+  });
+}
+
+/**
+ * The envelope's capabilities could not be read, so every credential-specific offer
+ * failed closed. Distinguishes "we never tried" from "we tried and it failed" — without
+ * it the fail-closed path is invisible and looks identical to a family that genuinely
+ * has no password.
+ */
+export function emitEnvelopeCapabilitiesUnknown(reason: 'not-staged' | 'stage-failed'): void {
+  emit('warn', 'envelope_capabilities_unknown', {
+    action: 'caps_unknown',
+    error_code: reason,
+  });
+}
+
+/**
+ * A re-read changed what the envelope can be opened with — i.e. a credential written on
+ * another device was not visible here until now. A DIAGNOSTIC, not a correctness
+ * mechanism: capabilities are derived, so the re-read is already reflected.
+ *
+ * ⚠️ `detail` carries THREE BOOLEANS and nothing else. No kit ids, no member ids, no
+ * family id, no counts. This surface fires pre-auth and `detail` is unstructured, so the
+ * encoding is fixed here and must not grow a field.
+ */
+export function emitEnvelopeCapabilitiesChanged(payload: {
+  before: { password: boolean; passphrase: boolean; kit: boolean };
+  after: { password: boolean; passphrase: boolean; kit: boolean };
+}): void {
+  const enc = (c: { password: boolean; passphrase: boolean; kit: boolean }) =>
+    `p${+c.password}f${+c.passphrase}k${+c.kit}`;
+  emit('warn', 'envelope_capabilities_changed', {
+    action: 'caps_changed',
+    detail: `${enc(payload.before)}->${enc(payload.after)}`,
   });
 }
 

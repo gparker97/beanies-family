@@ -19,14 +19,20 @@
  * resolved event, never as a method), deviceUnlock PIN, tap-through (credential-less
  * member on an open pod — returning EITHER `tap-through` for a child OR the
  * `invite-needed` explanation for an adult, because both answer the same single
- * question and must never be able to disagree), and password (LEGACY members only —
+ * question and must never be able to disagree), password (LEGACY members only —
  * suppressed for PIN-only members and for kit-born families cold, where no password
- * wrap exists).
+ * wrap exists), and the family recovery passphrase (cold only, when the envelope
+ * carries one).
+ *
+ * The two credential probes share ONE cold gate, `coldEnvelopeHas`, which fails CLOSED
+ * on an unreadable envelope. That is the whole point of the `CapabilityState` type: its
+ * predecessor was a `boolean | null` that defaulted to "offer it anyway".
  * The unconditional terminal is now `recovery` (kit / passphrase / bootstrap), so
  * the never-blank guarantee no longer rests on the retiring password method.
  */
 
 import type { AgeGroup, PasskeyRegistration } from '@/types/models';
+import type { EnvelopeCapabilities } from '@/services/sync/fileSync';
 import { resolveDeviceKeys } from '@/services/auth/passkeyService';
 import { getPinUnlockRecord, removePinUnlock } from '@/services/auth/deviceUnlock';
 import { isNative } from '@/services/sync/capabilities';
@@ -85,13 +91,39 @@ export interface ProveContext {
    */
   hasPassword: boolean | null;
   /**
-   * Phase 4: whether the envelope holds ANY password wraps (roster-carried; false
-   * for kit-born families). Consulted only COLD — a password can never open a
-   * wrap-less envelope. `null` = unknown → offered.
+   * What the family's envelope can ACTUALLY be opened with, derived from the envelope
+   * itself. Consulted only COLD — warm, the caller already holds the decrypted doc.
+   *
+   * ⚠️ Required and non-optional so the compiler points at every construction site.
+   * Its predecessor was a `boolean | null` carried on the roster cache where `null`
+   * meant "offer it anyway", so a device with no cache offered a password against a
+   * kit-born envelope that had no password wrap. `known: false` now fails CLOSED.
    */
-  envelopeHasPasswordWraps: boolean | null;
+  envelope: CapabilityState;
   /** Where the person list came from — carried through to telemetry only. */
   rosterSource: 'roster' | 'credential-records' | 'open-pod';
+}
+
+/**
+ * Whether we know what the envelope can be opened with. The `known: false` arm is the
+ * honest third state: it means "we could not read the envelope", NOT "there is nothing
+ * there". It fails closed for every credential-specific offer while the unconditional
+ * `recovery` terminal still guarantees a way forward.
+ */
+export type CapabilityState =
+  | { known: true; capabilities: EnvelopeCapabilities }
+  | { known: false; reason: 'not-staged' | 'stage-failed' };
+
+/**
+ * Cold-path capability gate — the fail-closed rule, defined exactly once.
+ *
+ * A credential is offered from cold ONLY when the envelope PROVES it can work. Unknown
+ * fails CLOSED: an offer that cannot succeed is worse than one that is absent, because
+ * the user spends their attempt on it and lands on a crypto error. Warm callers never
+ * ask — they already hold the doc.
+ */
+function coldEnvelopeHas(ctx: ProveContext, cap: keyof EnvelopeCapabilities): boolean {
+  return ctx.envelope.known && ctx.envelope.capabilities[cap];
 }
 
 export type ProveMethod =
@@ -120,6 +152,13 @@ export type ProveMethod =
    */
   | { kind: 'password' }
   /**
+   * The family recovery PASSPHRASE (Phase 3), offered cold and only when the envelope
+   * proves one exists. It identifies NO member — `decryptPendingFile` returns
+   * `viaRecoveryPassphrase` and `runOpening` routes that to `recoveryMode` — so it
+   * opens the pod without signing anyone in.
+   */
+  | { kind: 'passphrase' }
+  /**
    * The unconditional bootstrap/recovery terminal (Phase 4): recovery kit,
    * passphrase, device link, or re-bootstrap. Appended outside the probe loop —
    * the never-blank guarantee.
@@ -134,6 +173,10 @@ type Probe = {
 /**
  * Ordered probes. Each returns its method or null — no try/catch, no logging, no
  * fallbacks of its own (the loop owns all of that).
+ *
+ * ⚠️ ARRAY ORDER IS THE OFFER ORDER. `ProveView` renders the first non-recovery entry
+ * as the active pane (`ProveView.vue:70`) and the rest as switch links in this order
+ * (`:159-166`). Reordering this array is a UI change, not a refactor.
  */
 const PROBES: Probe[] = [
   {
@@ -190,10 +233,19 @@ const PROBES: Probe[] = [
     // cold against a kit-born envelope, where no password wrap exists to unwrap.
     run: async (ctx) => {
       if (ctx.hasPassword === false) return null;
-      if (ctx.podOpen && ctx.hasPin === true) return null;
-      if (!ctx.podOpen && ctx.envelopeHasPasswordWraps === false) return null;
-      return { kind: 'password' };
+      if (ctx.podOpen) return ctx.hasPin === true ? null : { kind: 'password' };
+      return coldEnvelopeHas(ctx, 'password') ? { kind: 'password' } : null;
     },
+  },
+  {
+    name: 'passphrase',
+    // The family recovery passphrase: family-wide, COLD ONLY (warm, the pod is already
+    // open and there is nothing left to unwrap). Ordered after `password` so a legacy
+    // member's own credential stays the active pane and the passphrase is the switch
+    // link, matching `tryUnwrapFamilyKey`, which tries member wraps before the
+    // passphrase so an identical phrase can never shadow a member's password.
+    run: async (ctx) =>
+      !ctx.podOpen && coldEnvelopeHas(ctx, 'passphrase') ? { kind: 'passphrase' } : null,
   },
 ];
 
@@ -242,11 +294,22 @@ export async function resolveProveMethods(ctx: ProveContext): Promise<ProveMetho
   // design — the never-blank guarantee no longer rests on the retiring password.
   methods.push({ kind: 'recovery' });
 
+  // Which cold offers the fail-closed rule withheld. Computed HERE from `ctx` and the
+  // resolved list, not inside a probe — probes stay free of telemetry per the module
+  // contract, same as `prfWithheld` above.
+  const suppressed = ctx.podOpen
+    ? []
+    : (['password', 'passphrase'] as const).filter(
+        (k) => !coldEnvelopeHas(ctx, k) && !methods.some((m) => m.kind === k)
+      );
+
   emitProveMethodsResolved({
     methods: methods.map((m) => m.kind),
     rosterSource: ctx.rosterSource,
     errorCode: firstErrorCode,
     prfWithheld,
+    suppressed,
+    capsKnown: ctx.podOpen ? undefined : ctx.envelope.known,
   });
 
   return methods;

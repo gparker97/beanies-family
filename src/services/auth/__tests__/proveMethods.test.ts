@@ -43,6 +43,14 @@ function reg(memberId: string): PasskeyRegistration {
   };
 }
 
+/** A KNOWN capability state; anything unnamed is false — the fail-closed direction. */
+function caps(c: { password?: boolean; passphrase?: boolean; kit?: boolean }) {
+  return {
+    known: true as const,
+    capabilities: { password: !!c.password, passphrase: !!c.passphrase, kit: !!c.kit },
+  };
+}
+
 function ctx(overrides: Partial<ProveContext> = {}): ProveContext {
   return {
     familyId: 'fam-1',
@@ -53,7 +61,12 @@ function ctx(overrides: Partial<ProveContext> = {}): ProveContext {
     isChild: false,
     hasPin: null,
     hasPassword: null,
-    envelopeHasPasswordWraps: null,
+    // Default: a LEGACY family whose envelope carries password wraps. These fixtures
+    // predate the capability change and are about biometric/PIN/tap-through ordering, so
+    // the default keeps them testing what they mean to. The fail-closed behaviour on an
+    // UNKNOWN or kit-born envelope is pinned explicitly by its own tests below — it is
+    // deliberately not smuggled in as a fixture default.
+    envelope: caps({ password: true }),
     rosterSource: 'roster',
     ...overrides,
   };
@@ -216,16 +229,72 @@ describe('resolveProveMethods', () => {
 
     it('suppresses password COLD against a kit-born envelope (no password wraps)', async () => {
       const methods = await resolveProveMethods(
-        ctx({ podOpen: false, envelopeHasPasswordWraps: false })
+        ctx({ podOpen: false, envelope: caps({ kit: true }) })
       );
       expect(methods.map((m) => m.kind)).toEqual(['recovery']);
     });
 
-    it('offers password COLD when both hasPassword and envelope wraps are unknown', async () => {
+    it('suppresses password COLD when capabilities are UNKNOWN (fails closed)', async () => {
+      // The regression this change exists for. The predecessor tri-state defaulted to
+      // "offer it anyway", so a device with no roster cache showed "use password instead"
+      // on a family that had never had one and never could.
       const methods = await resolveProveMethods(
-        ctx({ podOpen: false, hasPassword: null, envelopeHasPasswordWraps: null })
+        ctx({ podOpen: false, hasPassword: null, envelope: { known: false, reason: 'not-staged' } })
+      );
+      expect(methods.map((m) => m.kind)).toEqual(['recovery']);
+    });
+
+    it('offers password COLD when the envelope PROVES a password wrap exists', async () => {
+      const methods = await resolveProveMethods(
+        ctx({ podOpen: false, hasPassword: null, envelope: caps({ password: true }) })
       );
       expect(methods.map((m) => m.kind)).toEqual(['password', 'recovery']);
+    });
+
+    it('offers the passphrase COLD only when the envelope carries one', async () => {
+      const withPhrase = await resolveProveMethods(
+        ctx({ podOpen: false, hasPassword: false, envelope: caps({ passphrase: true }) })
+      );
+      expect(withPhrase.map((m) => m.kind)).toEqual(['passphrase', 'recovery']);
+
+      const without = await resolveProveMethods(
+        ctx({ podOpen: false, hasPassword: false, envelope: caps({ kit: true }) })
+      );
+      expect(without.map((m) => m.kind)).toEqual(['recovery']);
+    });
+
+    it('never offers the passphrase WARM — the pod is already open', async () => {
+      const methods = await resolveProveMethods(
+        ctx({
+          podOpen: true,
+          hasCredential: true,
+          hasPassword: false,
+          hasPin: true,
+          envelope: caps({ passphrase: true }),
+        })
+      );
+      expect(methods.map((m) => m.kind)).not.toContain('passphrase');
+    });
+
+    it('orders a legacy cold family password BEFORE passphrase (ProveView reads this order)', async () => {
+      const methods = await resolveProveMethods(
+        ctx({ podOpen: false, envelope: caps({ password: true, passphrase: true }) })
+      );
+      expect(methods.map((m) => m.kind)).toEqual(['password', 'passphrase', 'recovery']);
+    });
+
+    it('never returns an empty list, whatever the capabilities say', async () => {
+      for (const envelope of [
+        { known: false, reason: 'not-staged' } as const,
+        { known: false, reason: 'stage-failed' } as const,
+        caps({}),
+        caps({ password: true, passphrase: true, kit: true }),
+      ]) {
+        const methods = await resolveProveMethods(
+          ctx({ podOpen: false, hasPassword: false, envelope })
+        );
+        expect(methods.length).toBeGreaterThan(0);
+      }
     });
 
     it('suppresses password when the member verifiably has none', async () => {
@@ -243,6 +312,33 @@ describe('resolveProveMethods', () => {
       rosterSource: 'credential-records',
       errorCode: undefined,
       prfWithheld: false,
+      // Cold with a password-capable envelope: the passphrase is the only withheld
+      // offer, and capabilities were readable.
+      suppressed: ['passphrase'],
+      capsKnown: true,
     });
+  });
+
+  it('reports every cold offer it suppressed, and whether capabilities were readable', async () => {
+    // The counter that proves the fail-closed rule is doing something. Without a
+    // denominator on the success path a suppression rate is unmeasurable, which is why
+    // this rides the resolved event rather than firing only on failure.
+    await resolveProveMethods(
+      ctx({ podOpen: false, envelope: { known: false, reason: 'stage-failed' } })
+    );
+    expect(emitProveMethodsResolved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        methods: ['recovery'],
+        suppressed: ['password', 'passphrase'],
+        capsKnown: false,
+      })
+    );
+  });
+
+  it('reports no suppression WARM — the envelope is not consulted with the pod open', async () => {
+    await resolveProveMethods(ctx({ podOpen: true, hasCredential: true, hasPin: true }));
+    expect(emitProveMethodsResolved).toHaveBeenCalledWith(
+      expect.objectContaining({ suppressed: [], capsKnown: undefined })
+    );
   });
 });
