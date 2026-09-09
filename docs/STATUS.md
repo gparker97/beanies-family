@@ -628,6 +628,20 @@
 >
 > Plan: `docs/plans/2026-07-09-drive-refresh-token-telemetry-and-calendar-storm.md`. Lesson: `docs/lessons.md` → "Get the cheapest discriminating observation before proposing a mechanism".
 
+> **Last updated:** 2026-09-09 (SESSION 3 — **THE RE-CONSENT STORM'S LAST CAUSE, FIXED AND DEPLOYED AS 0.17.1.** `15247eae` (fix) + `8a982f90` (release) on `main`, DEPLOYED to prod web via run 34320637942. Apps and the Astro site deliberately NOT shipped.)
+>
+> A mirrored Drive refresh token was installed into IndexedDB and primed into memory **before anything asked Google about it**, with candidates chosen by comparing `issuedAt`. Two probes against the real code, using a faithful `attemptSilentRefresh` double that clears the store on `invalid_grant` as the permanent branch does, reproduced both halves: `tryReconnectSilently` let a dead **unknown-age** copy (`issuedAt: null`, a live legacy shape the age guard could not refuse) displace a good token, and the resulting `invalid_grant` then CLEARED the store, so the device ended its "recovery" holding **nothing**; and `reconcileDriveTokenWithDoc`, on the cold-start path, overwrote a good local token with a newer-but-dead doc copy while issuing **zero exchanges**. Because the mirror is shared and #62 deliberately converges every device onto it, each device met the same dead token and each was pushed to a consent screen — greg's "grants seem to be lost across devices, every few hours".
+>
+> ⭐ **Three earlier fixes failed by trying to GUESS which token was better from `issuedAt`** ("strictly newer", "provably older", a rollback). Age was never the question: `issuedAt: number | null` is a documented live shape on both sides, so unknown age is not evidence of staleness. The fix asks the only authority. `googleAuth.tryCandidateRefreshToken` exchanges a candidate and installs it **only if Google accepts**, committing through the **existing** `commitAcquiredToken` chokepoint — the first plan draft hand-rolled that commit and would have re-implemented it **minus its post-persist rollback**, leaking a live credential into a torn-down session. A refused candidate now mutates nothing and advances **neither failure counter**, which matters because those counters raise the reconnect surface and reconnecting is what forces the consent.
+>
+> ⚠️ **The primitive is a second writer of `currentRefreshToken` outside the `pendingSilentRefresh` dedup**, and the permanent branch destroyed whatever was _current_ rather than what Google _refused_ — so an in-flight ladder resolving after a successful adopt would have deleted the credential Google had just accepted. Closed with a token-**identity** guard: +9 lines, **zero changed lines** in the destructive body. ⚠️ **The probe was taken off the cold-start path entirely**: `reconcileDriveTokenForMember` is AWAITED before `setupAutoSync()`/`markPodCreated()`, and a probe is bounded only by the 15s OAuth fetch timeout, so reconcile now adopts **only when the device has no token at all** — probe 2 becomes structurally impossible and `isStrictlyNewer` drops out of that branch. `restoreLocalFromDoc` was KEPT (not renamed) as the blind-write arm, because its epoch check re-evaluates **at write time** and a sign-out mid-probe is indistinguishable from a network transient.
+>
+> **Four plan passes + `/code-review high`, each of which caught a would-be regression**, including an acceptance criterion that **could not fail** (it asserted `consecutiveFailures`, which the transient-exhaustion branch reports but never increments) and a stale-snapshot window where a token minted _during_ the probe could still be overwritten. **Four guards verified by revert-and-watch-it-fail.** 7135 unit tests, type-check, lint, and all four CI workflows green.
+>
+> ⭐ **Verified in a real browser against REAL IndexedDB** — the unit tests mock `fileHandleStore` wholesale, so what actually lands on disk had never been exercised, and that is the whole subject of the fix. 8/8 checks passed (refused candidate leaves `GOOD-LOCAL` intact; accepted candidate persists its **own** `issuedAt: 4242`, not `Date.now()`). Then the pre-fix behaviour was reinstated in the live browser and IndexedDB ended up holding `DEAD-MIRRORED-COPY` where `MY-GOOD-TOKEN` had been — the storm reproduced end-to-end and then closed. Prod smoke run after deploy: renders, **zero console errors**, real `VITE_BUILD_SHA` (not `dev`).
+>
+> Plan (with the full code-review disposition): `docs/plans/2026-09-09-adopt-only-a-token-google-accepted.md`. Investigation updated with root cause 6.
+
 > **Last updated:** 2026-09-08 (SESSION 4 — **THE 0.17 DEPLOY: THE WHOLE BACKLOG SHIPS, AND THE SECRETS GATE STOPS READING OUR COMMENTS AS CREDENTIALS. On `main` as `4d0c01f5` + `36a76042`, DEPLOYED to prod, TestFlight and Play open testing.**)
 >
 > **What shipped.** `0.17` carried the entire **156-commit backlog** since `c3a6be98` (0.16, 2026-09-04) — the review close-out, the lockout/refusal fixes, the native update gate, the beanie wall, the dark-mode sweep, OOM Tiers 1-3, recipe share + re-fetch, list copy, and the concurrent session's form-modal fix (`f679e7e3`). Four surfaces, all green: Astro site (1m37s), Vue prod (26m14s), **iOS → TestFlight** (4m16s, 192 commits behind before this), **Android → `beta`/open testing** (4m45s, auto-submitted for Google review). `APP_VERSION` 0.16 → 0.17. **No release note, deliberately** — greg's call while the apps are in testing rather than production; it is OWED at promotion. `promptBelowVersion` stays `0.16`, so the new update gate prompts nobody yet, but the Astro deploy did put `min-app-version.json` on the apex for the first time, so the floor is now readable at all.
@@ -1985,8 +1999,156 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-### ⭐⭐ Session 2026-09-09 (2) — READ THIS BLOCK FIRST ⭐⭐
+> **Validated 2026-09-09 (session 3).** Every carried entry re-checked by
+> fingerprint. **Two dropped as shipped:** "decide on the web deploy (stages 4+5)"
+> (deployed today as 0.17.1) and "start from the auth-token-lifecycle brief"
+> (defect 5 fixed and deployed). Re-confirmed still OPEN by fingerprint:
+> `dynamodb:DeleteItem` still at `infrastructure/modules/registry/main.tf:80`;
+> stage 6 unimplemented (no `carryLocalOnly`/`localOnlyEntities` symbol anywhere
+> in `src/`); `provablyOlder` gone from the code (only a historical mention in a
+> comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
+### ⭐⭐ Session 2026-09-09 (3) — START HERE: STAGE 6 IS NEXT ⭐⭐
+
+> **0.17.1 IS LIVE ON PROD WEB.** Deployed 2026-09-09 from `8a982f90`
+> (run 34320637942, `https://app.beanies.family`). Verified live: the bundle
+> carries `VITE_BUILD_SHA: "8a982f90c5bef454bbff79b15e42d18aee4d437b"` (a real CI
+> build, not `dev`), `APP_VERSION` reads `0.17.1`, the `drive-token-adopt` surface
+> and the `candidate-accepted` / `candidate-refused` / `permanent-failure-superseded`
+> actions are all present, and a Playwright smoke run against prod rendered with
+> **zero console errors**.
+>
+> **This deploy carried the whole 31-commit backlog**, so the stage-2 soak is over
+> and stages 4 + 5 are now live alongside the auth fix. The Lambda-then-web
+> ordering rule was satisfied (the Lambda went first on 2026-09-09 and was
+> verified against all eight behaviours).
+>
+> **NOT deployed, deliberately:** the Astro marketing site (its only pending change
+> is an inert `reason` comment in `web/public/min-app-version.json`;
+> `promptBelowVersion` is `0.16` both locally and live, so deploying it would change
+> nothing a user sees) and both mobile apps (greg said skip them "for now" — note
+> that means store users are still on 0.17 and do NOT have the auth fix).
+>
+> ---
+>
+> ## ⭐ NEXT SESSION: STAGE 6, and nothing else first ⭐
+>
+> Read `docs/plans/2026-09-09-stage-6-preservation-brief.md` in full, then § 5 of
+> `docs/plans/2026-09-08-compaction-fallout-remediation.md`. It is the last
+> unshipped stage of the compaction-fallout plan and it is greg's decision, made
+> three times, that it gets its own fresh session.
+>
+> **What it is:** carry local-only entities across a clean adopt, so a NEW item
+> created on a straggler device (mary's vanished todo) survives instead of being
+> discarded by the wholesale adopt. That is the entire benefit and it shrinks as
+> the fleet updates. Edits and deletions can never be recovered — compaction builds
+> a fresh document from a snapshot, so there is no common ancestor and a true
+> three-way merge is impossible.
+>
+> **Why it is delicate:** it touches `applyAndProject`'s adopt path, the
+> highest-risk code in the plan, and passes 3 and 4 of the parent plan EACH found a
+> serious defect in an earlier draft of this exact change — one would have closed
+> the lineage banner's only exit, the other would have republished dead refresh
+> tokens that §1d then reads to heal.
+>
+> **Its value went UP:** the orange lineage banner only appears when the automatic
+> rebase could not run, and what stops the rebase is a missing baseline — exactly
+> what the stage-6 carry does not need. It is the lever that makes that banner rare.
+>
+> ---
+>
+> ## After stage 6 — the rest of the fixes, in priority order
+>
+> **1. The auth brief's six remaining defects.**
+> `docs/plans/2026-09-09-auth-token-lifecycle-brief.md`. Defect 5 (adopt writes
+> before validating) is **DONE and deployed**; strike it from that file when you
+> next touch it. Still open, and the brief has the mechanism of each prior failed
+> fix for all of them:
+>
+> - **1.** A 404 + account mismatch on `write()` discards the user's edit
+>   (`reconnectIfAccountMismatch()` throws past the arm that queues). Note the
+>   suggested shape — `enqueueOfflineSave(content)` as the FIRST statement of the
+>   catch — must be checked against the `enqueueSeq` interaction before adopting,
+>   because round 7's version of this flipped `flushQueue` from `declined` to
+>   `requeued` and disabled the `critical` page.
+> - **2.** The 401 arm's in-catch retry can throw past every queueing arm below it.
+> - **3.** An account mismatch reports a SUCCESSFUL reconnect (`tryReconnectSilently`
+>   returns true from `fromLocalToken` after refreshing the wrong account's grant).
+>   `getVerifiedGoogleAccountEmail()` exists precisely because the plain getter can
+>   hold a primed guess.
+> - **4.** `accountMismatch()` and `matchesBoundAccount()` normalize differently
+>   (raw `!==` vs trim + lowercase), so case drift raises a banner the recovery
+>   then clears.
+> - **6.** The metadata probe does not classify its 404. ⚠️ **Fix the poll's STOP
+>   condition first**, then the classifier — round 7 did it the other way and caused
+>   an ~18 req/min poll storm, invisible in CloudWatch because the reason never
+>   changed.
+> - **7.** Strategy 3 (`fromRemoteDocCopy`) may be structurally unreachable: its
+>   stated precondition is "the cached access token is still live", but
+>   `tryReconnectSilently` returns at its first line whenever `isTokenValid()`.
+>   Decide it with the `healed-from-remote` counter over a release, then delete the
+>   strategy or fix its entry condition. Do not defend it by argument.
+>
+> **2. Two follow-ups this session's fix deliberately did NOT bundle** (mechanism
+> written into `docs/plans/2026-09-09-adopt-only-a-token-google-accepted.md` §
+> "Code review — findings and disposition"):
+>
+> - **`mirrorLocalToDoc` still writes an unvalidated token UP into the shared doc**,
+>   chosen by `issuedAt`. A device holding a token Google has already killed, whose
+>   `issuedAt` happens to be newer, can overwrite the family's live shared copy.
+>   Pre-existing and unchanged by this session (only the READ side was in scope);
+>   any consent repairs the entry via the B2 mirror. Fixing it means probing on the
+>   write path too.
+> - **A narrow IndexedDB ordering race** survives the new token-identity guard: if a
+>   concurrent adopt's `storeGoogleRefreshToken` put resolves DURING the permanent
+>   branch's `await clearGoogleRefreshToken(...)`, the accepted token is removed
+>   from IDB while memory keeps it, so the session works but the next cold start has
+>   none. Needs a compare-and-delete primitive in `fileHandleStore`; the guard
+>   cannot close it because there is no await between the identity check and the
+>   delete call.
+>
+> Also documented at the call site, accepted rather than fixed: on the blind-adopt
+> path a straggler can now exceed the 30s `SELF_RECOVERY_TIMEOUT_MS` (up to 15s
+> probe + 22.5s ladder), costing a **banner flash**, not a forced consent.
+>
+> **3. Registry ops, now unblocked.** Both halves are live, so these are actionable
+> for the first time:
+>
+> - **Re-verify `ownerMemberId` on greg's registry row `ae92950b`.** Both owner
+>   fields were hand-NULLed and the row is re-claimable by whichever device writes
+>   next. It should now be greg's roster-owner id; if a pre-stage-5 device reclaimed
+>   it with something else, NULL it again and let a current client stamp it.
+> - **Drop `dynamodb:DeleteItem`** from the registry Lambda's IAM policy
+>   (`infrastructure/modules/registry/main.tf:80` — verified still present). Unused
+>   since the tombstone, and the Terraform apply must FOLLOW the Lambda code deploy,
+>   which it now does.
+> - **Watch CloudWatch** for `[registry] delete would be refused` and
+>   `[registry] write to a deleted family refused`. §2d-ii (enforcing the DELETE 403) stays gated on that first line being quiet for real families for a full
+>   release cycle.
+> - **New this session — watch the `drive-token-adopt` surface.** `candidate-refused`
+>   rising with `error_code: invalid_grant` across distinct devices in one family is
+>   the poisoned-mirror fingerprint; rising with an `HTTP 4xx` `error_code` on the
+>   `candidate-unverified-*` events is a proxy defect, not a dead grant.
+>   `candidate-accepted` is the success denominator.
+>
+> **4. Standing gates, unchanged.**
+>
+> - `promptBelowVersion` stays `0.16` until 0.17 is live on BOTH stores.
+> - **The apps are behind.** Store/TestFlight users are on 0.17 and do not have the
+>   auth fix. A signed release is manual and review-gated.
+>
+> **5. `jojo` is stopped and disabled** at greg's request until Thursday
+> (2026-09-10, i.e. tomorrow). Restore with
+> `systemctl --user enable --now jojo.service`.
+
+### Session 2026-09-09 (2) — superseded by session 3 above (kept for the record)
+
+> ⚠️ **SUPERSEDED 2026-09-09 (session 3): everything below is now DEPLOYED.** The
+> web bundle shipped as 0.17.1, so the "do not deploy yet" holds and the
+> "unpushed" claim are both historical. The auth revert this block describes was
+> the right call and its brief's defect 5 has since been fixed. Kept because the
+> stage table, the deploy-order reasoning and the ops items are still the record.
+>
 > **STAGE 2 IS DEPLOYED TO PROD. Everything else is on `main`, UNDEPLOYED and UNPUSHED.**
 >
 > The registry Lambda was applied 2026-09-09 (`terraform apply`, account
