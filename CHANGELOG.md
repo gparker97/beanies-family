@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-10
+
+### Fixed
+
+- **The sign-in screen no longer mentions a password your family has never had.** The line under the heading, the note under the field and the "don't have the password?" card all said "password" regardless of how your family actually opens its file. A family that signs in with a recovery passphrase is now told about the passphrase, and one that uses a recovery kit is not told about a password at all.
+- **A family file that nothing can open now says so and stops there**, instead of also offering a Recovery Code box for a kit it does not have, with the explanation printed twice above it.
+
 ## 2026-09-09
 
 ### Fixed
