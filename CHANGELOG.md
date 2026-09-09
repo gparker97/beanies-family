@@ -24,8 +24,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Deleting your family no longer claims more than it did.** The goodbye message said your data had been removed from all systems even when part of it could not be, which is the default when you keep your family data file.
 - **Reconnecting from the Restore screen keeps the Reconnect button on screen** when it does not work, instead of removing it and then telling you to reconnect. A reconnect that works there no longer says your data was saved, because nothing was saved and the restore still needs starting again.
 - **Moving your family file to a new place no longer uploads it twice.**
-- **A message about your family file that you dismiss no longer takes the last warning with it.** Dismissing it left nothing at all to tell you sync had stopped for the rest of the session.
-- **Deleting your family says "goodbye", not "something went wrong", when nothing went wrong.** Keeping your family data file is the normal choice, and it was being reported as a failure to remove it.
+- **Deleting your family now says what actually happened.** It used to say your data was gone from everywhere even when you had chosen to keep your family data file, and a first attempt to fix that swung the other way and reported a failure when nothing had failed. There are three endings now, and the one you get is the true one.
+- **Deleting a family really is final.** Another device writing to it afterwards could quietly bring it back, and bring its name and your newsletter choice back with it.
+- **A device signed in to the wrong Google account is no longer told it reconnected.** It could not reach the family file, and beanies had no way to notice because it was only checking its own clock.
 
 ## 2026-09-08
 
