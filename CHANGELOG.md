@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-09
 
+### Fixed
+
+- **Choosing an older copy of your family file no longer leaves you stuck.** If you picked a saved copy from before your family file was last tidied up, and that copy was old enough to predate part of what beanies now stores, beanies could fail to open it and refuse to go any further, with no way forward from the one screen that is supposed to offer one. It opens the copy now.
+
 ### Added
 
 - **A page for people coming from Skylight**, at `/from/skylight`. It shows the beanie wall running on a mounted tablet, with the four real views, and compares the two honestly: Skylight's 15in is $299.99 and the 27in wall model is $599.99 before the $79 a year plan, against a tablet you already own.
