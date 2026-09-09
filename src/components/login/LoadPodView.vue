@@ -142,6 +142,49 @@ const secretIsPassphrase = computed(
   () => !!caps.value && !caps.value.password && caps.value.passphrase
 );
 /**
+ * Every string that names the secret this screen is asking for, chosen ONCE.
+ *
+ * `tryUnwrapFamilyKey` (`fileSync.ts:320-343`) tries the member password wraps and THEN
+ * the recovery passphrase, so a family that has both can type EITHER into this one box.
+ * Labelling it "Password" was accurate but not generous: it made the passphrase a secret
+ * feature on the one surface where it silently works.
+ *
+ * ⚠️ Derived as a set rather than branched per render site. The label, placeholder,
+ * subtitle, reassurance and the kit form's way back all have to agree about which
+ * credential is on offer, and they previously disagreed — the footer still said
+ * "this password" under a field labelled as a passphrase. One source, five consumers.
+ */
+const secretField = computed(() => {
+  const c = caps.value;
+  if (c?.password && c.passphrase) {
+    return {
+      subtitle: 'loginV6.unlockSubtitleEither',
+      label: 'recovery.secretEitherLabel',
+      placeholder: 'recovery.secretEitherPlaceholder',
+      footer: 'loginV6.unlockFooterEither',
+      switchLabel: 'recovery.useSecretEitherLink',
+    } as const;
+  }
+  if (secretIsPassphrase.value) {
+    return {
+      subtitle: 'loginV6.unlockSubtitlePassphrase',
+      label: 'recovery.passphraseLabel',
+      placeholder: 'recovery.passphrasePlaceholder',
+      footer: 'loginV6.unlockFooterPassphrase',
+      switchLabel: 'recovery.usePassphraseLink',
+    } as const;
+  }
+  // Password-only, and the fallback when capabilities are unknown: the wording this
+  // screen has always used.
+  return {
+    subtitle: 'loginV6.unlockSubtitle',
+    label: 'password.password',
+    placeholder: 'password.enterPasswordPlaceholder',
+    footer: 'loginV6.unlockFooter',
+    switchLabel: 'passkey.usePassword',
+  } as const;
+});
+/**
  * True when nothing in this envelope can open it — no password wrap, no kit, no
  * passphrase. Only reachable from a hand-edited or truncated file, since a family always
  * gets a kit at birth. The screen then shows the honest message and NO credential field:
@@ -162,10 +205,9 @@ const nothingCanOpenIt = computed(
  * The kit form and the degenerate terminal each state their own case immediately above
  * the field, so a second line there would only repeat them.
  */
-const unlockSubtitleKey = computed<UIStringKey | null>(() => {
-  if (nothingCanOpenIt.value || showKitEntry.value) return null;
-  return secretIsPassphrase.value ? 'loginV6.unlockSubtitlePassphrase' : 'loginV6.unlockSubtitle';
-});
+const unlockSubtitleKey = computed<UIStringKey | null>(() =>
+  nothingCanOpenIt.value || showKitEntry.value ? null : secretField.value.subtitle
+);
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -1308,13 +1350,9 @@ async function handleDriveRefresh() {
 
         <BaseInput
           v-model="decryptPassword"
-          :label="secretIsPassphrase ? t('recovery.passphraseLabel') : t('password.password')"
+          :label="t(secretField.label)"
           type="password"
-          :placeholder="
-            secretIsPassphrase
-              ? t('recovery.passphrasePlaceholder')
-              : t('password.enterPasswordPlaceholder')
-          "
+          :placeholder="t(secretField.placeholder)"
           required
         />
 
@@ -1338,7 +1376,7 @@ async function handleDriveRefresh() {
         </p>
 
         <p class="dark:text-ink-faint mt-2 text-center text-xs text-gray-400">
-          {{ secretIsPassphrase ? t('loginV6.unlockFooterPassphrase') : t('loginV6.unlockFooter') }}
+          {{ t(secretField.footer) }}
         </p>
       </form>
 
@@ -1410,7 +1448,7 @@ async function handleDriveRefresh() {
           class="dark:text-ink-soft dark:hover:text-ink mt-3 w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700"
           @click="closeKitEntry"
         >
-          {{ secretIsPassphrase ? t('recovery.usePassphraseLink') : t('passkey.usePassword') }}
+          {{ t(secretField.switchLabel) }}
         </button>
       </form>
 
@@ -1446,7 +1484,9 @@ async function handleDriveRefresh() {
                body below is about asking for an invite either way. -->
           <p class="text-secondary-500 dark:text-ink text-sm font-bold">
             {{
-              caps?.password ? t('loginV6.unlockNoPasswordTitle') : t('loginV6.unlockNoAccessTitle')
+              caps?.password && !caps.passphrase
+                ? t('loginV6.unlockNoPasswordTitle')
+                : t('loginV6.unlockNoAccessTitle')
             }}
           </p>
           <p class="text-secondary-500/70 dark:text-ink-soft mt-1 text-xs leading-relaxed">
