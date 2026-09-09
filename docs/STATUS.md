@@ -2035,10 +2035,44 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-> **Updated 2026-09-09 (session 4): stage 6 was built and REVERTED** — still open,
-> but do NOT rebuild it from the brief; see the session-4 block for why the premise
-> does not hold. The false banner justification that accompanied it is struck. §5b is
-> DONE. The remaining open items are unchanged.
+> **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
+> **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
+> `infrastructure/modules/registry/main.tf:80`; `jojo` still `inactive` + `disabled`
+> (restore due 2026-09-10). Verified DONE and already marked so: auth defect 5 (the
+> `candidate-accepted` / `candidate-refused` actions are live in
+> `driveTokenRecovery.ts`). Verified the stage-6 REVERT is clean: no
+> `buildLocalOnlyCarryOps` / `CARRY_LOCAL_ONLY` / `carryLocalOnly` symbol anywhere in
+> `src/`.
+>
+> **Two corrections:** (1) **stage 6 is still open but must NOT be rebuilt from the
+> brief** — its premise is disproved, see the session-4 block; §5b of it IS done and
+> stays done. (2) The "makes the lineage banner rare" justification is struck in both
+> places it appeared below.
+>
+> ### ⭐ NEXT SESSION STARTS HERE ⭐
+>
+> **1. The password / passphrase confusion in the app** (greg's direction, 2026-09-09).
+> The app uses both words and users cannot tell what is being asked for. Not yet
+> scoped — start by inventorying every surface that says "password" or "passphrase"
+> (`uiStrings.ts` is the place to start, plus the login/recovery/PIN flows) and work
+> out which concept each one actually means.
+>
+> ⚠️ **START WITH THIS FACT: passwords were RETIRED in 0.13R2 (2026-08-28)**, replaced
+> by a per-member 6-digit PIN plus the family Recovery Kit, and browser passkeys were
+> deleted. So most surviving "password" wording is probably **leftover from before
+> that change** rather than a live password system, and the fix may be largely a copy
+> and terminology job rather than an auth change. Confirm that before designing
+> anything. Two breadcrumbs found while sweeping:
+> `src/stores/__tests__/passwordCache.test.ts:230` still carries
+> `TODO: Rewrite for V4 format` (about `decryptPendingFile` now using CryptoKey +
+> PBKDF2), and a `passwordHash` still exists in the Automerge doc alongside the
+> envelope's `wrappedKeys` - worth checking which of the two is actually load-bearing
+> now, since the join flow historically needed both.
+>
+> **2. Raise the update floor 0.17 → 0.18** once 0.18 is live on BOTH stores (~half a
+> day after the 2026-09-09 submission; check App Store Connect and Play). Edit
+> `web/public/min-app-version.json` AND run `deploy-web.yml` — the file reaches users
+> only through the Astro deploy, so an edit alone publishes nothing.
 >
 > **Validated 2026-09-09 (session 3).** Every carried entry re-checked by
 > fingerprint. **Two dropped as shipped:** "decide on the web deploy (stages 4+5)"
@@ -2049,7 +2083,47 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
-### ⭐⭐ Session 2026-09-09 (4) — STAGE 6 BUILT, REVIEWED, AND REVERTED. Read this before rebuilding it. ⭐⭐
+### ⭐⭐ Session 2026-09-09 (4) — 0.18 SHIPPED TO ALL THREE SURFACES. Stage 6 built, reviewed and REVERTED. ⭐⭐
+
+> ## ✅ RELEASE 0.18 IS DEPLOYED AND VERIFIED
+>
+> | surface                            | state                                                                      | evidence                                                                                                                                                                                      |
+> | ---------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+> | **Vue app** (`app.beanies.family`) | **LIVE**                                                                   | `APP_VERSION` 0.18, bundle carries `VITE_BUILD_SHA: "3127e20e…"` (a real CI build, not `dev`). Verified by fetching the live bundle.                                                          |
+> | **Astro site** (`beanies.family`)  | **LIVE**                                                                   | run 34343183858                                                                                                                                                                               |
+> | **Update floor**                   | **LIVE at 0.17**                                                           | `min-app-version.json` raised 0.16 → 0.17 and confirmed serving from the apex                                                                                                                 |
+> | **Android 0.18**                   | uploaded to Play **beta / open testing**, auto-submitted for Google review | run 34344183004                                                                                                                                                                               |
+> | **iOS 0.18**                       | **submitted to the App Store**, `appstore-automatic`                       | run 34344216627 — log confirms `submit_for_review: true`, `automatic_release: true`, `MARKETING_VERSION=0.18`, build 68. Apple review ~1-3 days, then it auto-releases with no further click. |
+>
+> `main-ci` and `security` both green on `3127e20e`. Release note `2026.09.09`
+> (spotlight, 7 cards): beanie wall, send a recipe to anyone, Google Drive stays
+> connected, restore from Drive in the app, copy a list to several beans, built for
+> the long term (compaction), and smaller repairs. **Dark mode is deliberately NOT
+> repeated** — the `2026.09.04` note already covers it and native users updating
+> from 0.16 see that entry in the same drawer.
+>
+> ⚠️ **THE ONE FOLLOW-UP THIS RELEASE OWES:** raise the floor 0.17 → 0.18 once 0.18
+> is live on **both** stores (~half a day after submission). It needs BOTH an edit to
+> `web/public/min-app-version.json` AND a `deploy-web.yml` run, because that file
+> reaches users only through the Astro deploy. Do NOT raise it to a version that is
+> merely submitted; that was the 2026-09-08 mistake.
+
+### The compaction gap: fixed by PREVENTION, not recovery
+
+> This is what shipped instead of stage 6, and it is the better fix. The whole
+> 2026-09-08 loss needed two things at once: an owner compacting, AND a member below
+> the floor. Both are decidable at the moment of compaction, before any lying
+> baseline exists. Stage 6 tried to recover afterwards from the riskiest code in the
+> app; this prevents it in one string.
+>
+> `compaction.olderVersion.notice` used to read _"Ask them to update beanies before
+> you compact."_ and stop there, so the owner clicked past a mild suggestion with no
+> idea what was at stake. That soft advisory was the only thing standing between a
+> family and the loss. It now names who is behind and says plainly that anything they
+> add between now and updating will be lost and cannot be recovered.
+>
+> **Still a choice, not a refusal** (greg's call, and the right one): the owner may
+> have a good reason, and a hard stop would block a legitimate compaction.
 
 > **Stage 6 was implemented in full, then reverted on review.** It is a DESIGN
 > problem, not a coding problem, and rebuilding it as specified will reproduce the
