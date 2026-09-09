@@ -2216,89 +2216,65 @@ const STRING_DEFS = {
     en: "{name}'s new PIN works on every family device. Their old PIN stops working on this device right away — other devices update the next time the family data syncs.",
     beanie: "{name}'s new pin works on every family device.",
   },
-  'family.resetPassword.modalTitle': {
-    en: 'Reset password for {name}',
-    beanie: 'reset password for {name}',
-  },
-  'family.resetPassword.modalDescription': {
-    en: 'Set a new temporary password. {name} can change it under Settings → Change Password after they sign in.',
-    beanie:
-      'set a new temporary password. {name} can change it under settings → change password after they sign in.',
-  },
-  'family.resetPassword.warning': {
-    en: 'Share this password with {name} privately — anyone with it can sign in as them.',
-    beanie: 'share this password with {name} privately — anyone with it can sign in as them.',
-  },
-  'family.resetPassword.submit': { en: 'Reset password', beanie: 'reset password' },
-  'family.resetPassword.success': {
-    en: 'Password reset. Share the new password with {name}.',
-    beanie: 'password reset. share the new password with {name}.',
-  },
+  // The five `family.resetPassword.*` chrome keys were deleted here: the modal already
+  // rendered `family.resetPin.*` for its title, description, warning, submit and success.
   // Shared spinner label while a password change/reset blocks on the durable
   // Drive save (BeanieFormModal `submitting-label`). Used by both rotation modals.
   'auth.passwordRotation.savingLabel': {
     en: 'Saving your new password…',
     beanie: 'saving your new password…',
   },
-  'family.resetPassword.error.required': {
-    en: 'Please enter and confirm a new password.',
-    beanie: 'please enter and confirm a new password.',
-  },
-  'family.resetPassword.error.mismatch': {
-    en: 'Passwords do not match.',
-    beanie: 'passwords do not match.',
-  },
-  'family.resetPassword.error.notAuthenticated': {
+  'family.resetPin.error.notAuthenticated': {
     en: 'Your session has expired. Sign in again and try.',
     beanie: 'your session has expired. sign in again and try.',
   },
-  'family.resetPassword.error.memberNotFound': {
+  'family.resetPin.error.memberNotFound': {
     en: "Couldn't find that family member.",
     beanie: "couldn't find that family member.",
   },
-  'family.resetPassword.error.cannotResetSelf': {
+  'family.resetPin.error.cannotResetSelf': {
     en: 'Change your own PIN from Settings → Account & Sign-In.',
     beanie: 'change your own pin from settings → account & sign-in.',
   },
-  'family.resetPassword.error.isPet': {
+  'family.resetPin.error.isPet': {
     en: "Pets don't need a PIN.",
     beanie: "pets don't need a pin.",
   },
-  'family.resetPassword.error.cannotResetOwner': {
+  'family.resetPin.error.cannotResetOwner': {
     en: 'The pod owner changes their own PIN from Settings.',
     beanie: 'the pod owner changes their own pin from settings.',
   },
-  'family.resetPassword.error.notAuthorized': {
+  'family.resetPin.error.notAuthorized': {
     en: "You don't have permission to reset another member's PIN.",
     beanie: "you don't have permission to reset another member's pin.",
   },
-  'family.resetPassword.error.familyKeyMissing': {
+  'family.resetPin.error.familyKeyMissing': {
     en: 'Could not load family key — please sign out and back in, then try again.',
     beanie: 'could not load family key — please sign out and back in, then try again.',
   },
-  'family.resetPassword.error.wrapFailed': {
+  'family.resetPin.error.wrapFailed': {
     en: 'Failed to re-wrap the account key. Please try again.',
     beanie: 'failed to re-wrap the account key. please try again.',
   },
-  'family.resetPassword.error.updateFailed': {
-    en: "Couldn't update their password. Nothing was changed. Please try again.",
-    beanie: "couldn't update their password. nothing was changed. please try again.",
+  'family.resetPin.error.updateFailed': {
+    en: "Couldn't update their PIN. Nothing was changed. Please try again.",
+    beanie: "couldn't update their pin. nothing was changed. please try again.",
   },
-  'family.resetPassword.error.saveFailed': {
-    en: "Couldn't save the new password. Nothing changed — their current password still works. Please check your connection and try again.",
+  'family.resetPin.error.saveFailed': {
+    en: "Couldn't save the new PIN. Nothing changed — their current PIN still works. Please check your connection and try again.",
     beanie:
-      "couldn't save the new password. nothing changed — their current password still works. please check your connection and try again.",
+      "couldn't save the new pin. nothing changed — their current pin still works. please check your connection and try again.",
   },
-  'family.resetPassword.error.noConnection': {
-    en: "You'll need a connection to reset their password. Reconnect and try again.",
-    beanie: "you'll need a connection to reset their password. reconnect and try again.",
+  'family.resetPin.error.noConnection': {
+    en: "You'll need a connection to reset their PIN. Reconnect and try again.",
+    beanie: "you'll need a connection to reset their pin. reconnect and try again.",
   },
-  'family.resetPassword.error.rollbackFailed': {
+  'family.resetPin.error.rollbackFailed': {
     en: "Something went wrong and we couldn't fully undo the change. Please sign out and back in to be safe, then try again.",
     beanie:
       "something went wrong and we couldn't fully undo the change. please sign out and back in to be safe, then try again.",
   },
-  'family.resetPassword.error.unexpected': {
+  'family.resetPin.error.unexpected': {
     en: 'Something went wrong. Please try again.',
     beanie: 'something went wrong. please try again.',
   },
@@ -2335,9 +2311,9 @@ const STRING_DEFS = {
     beanie: 'confirm it’s really you before continuing.',
   },
   'reauth.noCredential': {
-    en: 'You need a PIN or a password set up before you can do this. Open Settings → Security to add one, then try again.',
+    en: 'You need a PIN or a password set up before you can do this. Open Settings → Account & Sign-In to add one, then try again.',
     beanie:
-      'you need a pin or a password set up before you can do this. open settings → security to add one, then try again.',
+      'you need a pin or a password set up before you can do this. open settings → account & sign-in to add one, then try again.',
   },
   'settings.deleteFamilyExportFailed': {
     en: 'Nothing was deleted',
@@ -2422,9 +2398,9 @@ const STRING_DEFS = {
     beanie: 'this account has no password on file.',
   },
   'transferOwnership.reauthNoCredential': {
-    en: 'You need a passkey or a password set up to transfer ownership. Open Settings → Security to add one, then try again.',
+    en: 'You need a passkey or a password set up to transfer ownership. Open Settings → Account & Sign-In to add one, then try again.',
     beanie:
-      'you need a passkey or a password set up to transfer ownership. open settings → security to add one, then try again.',
+      'you need a passkey or a password set up to transfer ownership. open settings → account & sign-in to add one, then try again.',
   },
   'transferOwnership.confirmTitle': { en: 'Confirm Transfer', beanie: 'confirm transfer' },
   'transferOwnership.confirmMessage': {
@@ -3266,10 +3242,6 @@ const STRING_DEFS = {
     en: 'Copy the invite link and send it to them',
     beanie: 'copy the magic bean link and send it their way',
   },
-  'family.inviteSection.step2': {
-    en: 'They open the link and choose a password',
-    beanie: 'they open the link and pick a secret password',
-  },
   'family.inviteSection.step3': {
     en: "They're in! They can now sign in with their own account",
     beanie: "they're in! they can now sign into your family pod",
@@ -3536,7 +3508,6 @@ const STRING_DEFS = {
     en: 'Load data from a JSON file',
     beanie: 'load data from a json file',
   },
-  'settings.security': { en: 'Security', beanie: 'security' },
   // Password modal
   'password.enterPassword': { en: 'Enter Password', beanie: 'enter password' },
   'password.enterPasswordDescription': {
@@ -3555,20 +3526,13 @@ const STRING_DEFS = {
     en: 'Incorrect password. Please try again.',
     beanie: 'wrong password. try again.',
   },
+  // Credential-NEUTRAL on purpose. `tryUnwrapFamilyKey` tries the member wraps and then
+  // the recovery passphrase, so at the point this fires it cannot say which one the
+  // person typed. Naming "password" here misdescribed every passphrase attempt.
   'password.decryptionError': {
-    en: "That password didn't unlock the pod. If you're sure it's right, ask a family member to open the pod first — we'll automatically repair the issue on your next sign-in.",
+    en: "That didn't open your family file. If you're sure it's right, ask a family member to open it first — we'll automatically repair the issue on your next sign-in.",
     beanie:
-      "that password didn't unlock the pod. if you're sure it's right, ask a family member to open the pod first — we'll quietly fix it next time you sign in.",
-  },
-  'password.setAndContinue': { en: 'Set Password & Continue', beanie: 'set password & continue' },
-  'password.strongPasswordDescription': {
-    en: "Choose a strong password to protect your data file. You'll need this password each time you open the app.",
-    beanie:
-      "choose a strong password to protect your data file. you'll need this password each time you open the app.",
-  },
-  'password.encryptedFileDescription': {
-    en: 'This file is encrypted. Enter your password to decrypt and load your data.',
-    beanie: 'this file is encrypted. enter your password to decrypt and load your data.',
+      "that didn't open your family file. if you're sure it's right, ask a family member to open it first — we'll quietly fix it next time you sign in.",
   },
 
   // Setup (kept: keys used by CreatePodView.vue)
@@ -3775,19 +3739,6 @@ const STRING_DEFS = {
     beanie:
       'sign-in worked, but the cross-device key sync needs attention. try signing out and back in. details in console.',
   },
-  'auth.passwordsDoNotMatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },
-  'auth.passwordMinLength': {
-    en: 'Password must be at least 8 characters',
-    beanie: 'password must be at least 8 characters',
-  },
-  'auth.createPasswordPrompt': {
-    en: 'Create a password for your account. You will use this to sign in next time.',
-    beanie: 'create a password for your account. you will use this to sign in next time.',
-  },
-  'auth.createPasswordPlaceholder': {
-    en: 'Choose a password (min 8 characters)',
-    beanie: 'choose a password (min 8 characters)',
-  },
   'auth.createAndSignIn': { en: 'Create Password & Sign In', beanie: 'create password & sign in' },
   'auth.familyName': { en: 'Family Name', beanie: 'family name' },
   'auth.familyNamePlaceholder': { en: 'The Smith Family', beanie: 'the smith family' },
@@ -3876,11 +3827,6 @@ const STRING_DEFS = {
     en: 'Biometric sign-in failed. Please try with your PIN.',
     beanie: 'biometric sign-in failed. please try with your pin.',
   },
-  'passkey.crossDeviceNoCache': {
-    en: 'This biometric was synced from another device. Sign in with your password once to enable it here.',
-    beanie:
-      'this biometric was synced from another device. sign in with your password once to enable it here.',
-  },
   'passkey.wrongFamilyError': {
     en: 'This biometric does not belong to the current family. Please try again.',
     beanie: 'this biometric does not belong to the current family. please try again.',
@@ -3892,24 +3838,9 @@ const STRING_DEFS = {
     en: 'That biometric belongs to a different bean. Use your PIN to sign in.',
     beanie: 'that biometric belongs to a different bean. use your pin to sign in.',
   },
-  'passkey.dekStale': {
-    en: 'Your encryption key has changed since biometric was set up. Please sign in with your PIN and re-register biometric in Settings.',
-    beanie:
-      'your encryption key has changed since biometric was set up. please sign in with your pin and re-register biometric in settings.',
-  },
   'passkey.fileLoadError': {
     en: 'Could not load your data file. Please sign in with your PIN.',
     beanie: 'could not load your data file. please sign in with your pin.',
-  },
-  'passkey.errEnableFailed': {
-    en: "Biometric unlock couldn't be set up on this device right now. You can still sign in with your PIN.",
-    beanie:
-      "biometric unlock couldn't be set up on this device right now. you can still sign in with your pin.",
-  },
-  'passkey.errNotReadable': {
-    en: 'Your device could not complete this request. Please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
-    beanie:
-      'your device could not complete this request. please make sure your device biometrics (fingerprint or face unlock) are set up, then try again.',
   },
   'passkey.errNotSupported': {
     en: "Biometric unlock isn't available on this device right now. You can sign in with your PIN.",
@@ -3919,10 +3850,6 @@ const STRING_DEFS = {
   'passkey.errSecurity': {
     en: 'A security error occurred. Please make sure you are on a secure (HTTPS) connection.',
     beanie: 'a security error occurred. please make sure you are on a secure (https) connection.',
-  },
-  'passkey.errGeneric': {
-    en: 'Something went wrong with biometric unlock. You can sign in with your PIN.',
-    beanie: 'something went wrong with biometric unlock. you can sign in with your pin.',
   },
   // Native (installed app) hardware-Keystore biometric copy. See nativeBiometric.ts.
   'biometric.cancelled': {
@@ -3966,10 +3893,6 @@ const STRING_DEFS = {
     en: 'No biometric logins registered yet.',
     beanie: 'no biometric logins registered yet.',
   },
-  'passkey.unsupported': {
-    en: "Biometric unlock isn't available on this device. Your PIN signs you in.",
-    beanie: "biometric unlock isn't available on this device. your pin signs you in.",
-  },
   'passkey.webRetired': {
     en: 'Face ID and fingerprint unlock live in the beanies app for iPhone and Android. In your browser, your 6-digit PIN is the quick way in — nothing to set up here.',
     beanie:
@@ -4012,10 +3935,6 @@ const STRING_DEFS = {
     beanie: 'your data file was found but needs permission to access. click below to reconnect.',
   },
   'auth.reconnectButton': { en: 'Reconnect to data file', beanie: 'reconnect to data file' },
-  'auth.noMembersWithPassword': {
-    en: 'No members have set a password yet. Please complete onboarding first.',
-    beanie: 'no members have set a password yet. please complete onboarding first.',
-  },
   'auth.fileLoadFailed': {
     en: 'Failed to load file. Please try again.',
     beanie: 'failed to load file. please try again.',
@@ -4027,12 +3946,6 @@ const STRING_DEFS = {
   'auth.subscribeNewsletter': {
     en: 'Keep me updated with product news and features',
     beanie: 'keep me updated with product news and features',
-  },
-  'auth.createPassword': { en: 'Create a password', beanie: 'create a password' },
-  'auth.confirmPassword': { en: 'Confirm password', beanie: 'confirm password' },
-  'auth.confirmPasswordPlaceholder': {
-    en: 'Re-enter your password',
-    beanie: 're-enter your password',
   },
 
   // Login — Page titles
@@ -4237,8 +4150,8 @@ const STRING_DEFS = {
     beanie: 'last saved:',
   },
   'resumeSetup.unlockPod': {
-    en: 'Unlock my pod',
-    beanie: 'unlock my pod',
+    en: 'Open my pod',
+    beanie: 'open my pod',
   },
   'resumeSetup.couldNotFindPod': {
     en: "We couldn't auto-load your pod — please pick where it lives below.",
@@ -4907,9 +4820,9 @@ const STRING_DEFS = {
   'recovery.sectionTitle': { en: 'Recovery & Backup', beanie: 'recovery & backup' },
   'recovery.kitTitle': { en: 'Recovery Kit', beanie: 'recovery kit' },
   'recovery.kitDescription': {
-    en: "A one-page backup key that unlocks your family data if every password and PIN is forgotten. Keep it somewhere safe — beanies can't recover your data without it.",
+    en: "A one-page recovery kit that opens your family data if every PIN is forgotten. Keep it somewhere safe — beanies can't recover your data without it.",
     beanie:
-      'a one-page backup key that unlocks your family data if every password and pin is forgotten. keep it somewhere safe.',
+      'a one-page recovery kit that opens your family data if every pin is forgotten. keep it somewhere safe.',
   },
   'recovery.kitGenerate': { en: 'Create Recovery Kit', beanie: 'create recovery kit' },
   'recovery.kitRegenerate': { en: 'Create a New Kit', beanie: 'create a new kit' },
@@ -4985,7 +4898,6 @@ const STRING_DEFS = {
     beanie: 'recovery passphrase saved. it works on any device from the next sync.',
   },
   'recovery.useKitLink': { en: 'Use a recovery kit', beanie: 'use a recovery kit' },
-  'recovery.kitEnterTitle': { en: 'Enter Your Recovery Code', beanie: 'enter your recovery code' },
   'recovery.kitEnterBody': {
     en: 'Type the code from your recovery kit (the dashes are optional).',
     beanie: 'type the code from your recovery kit (dashes optional).',
@@ -4998,11 +4910,11 @@ const STRING_DEFS = {
     en: "This family doesn't have a recovery kit on file.",
     beanie: "this family doesn't have a recovery kit on file.",
   },
-  'recovery.unlock': { en: 'Unlock', beanie: 'unlock' },
+  'recovery.unlock': { en: 'Open My Family', beanie: 'open my family' },
   'recovery.resetPinTitle': { en: 'Set a New PIN', beanie: 'set a new pin' },
   'recovery.resetPinBody': {
-    en: "You're in with your recovery key — set a fresh 6-digit PIN to use from now on.",
-    beanie: "you're in with your recovery key — set a fresh 6-digit pin to use from now on.",
+    en: "You're in with your recovery kit — set a fresh 6-digit PIN to use from now on.",
+    beanie: "you're in with your recovery kit — set a fresh 6-digit pin to use from now on.",
   },
   'recovery.resetPinAction': { en: 'Set PIN & Sign In', beanie: 'set pin & sign in' },
   // ⚠️ `recovery.passphraseHint` was deleted here. It read "Your password — or your
@@ -5082,9 +4994,9 @@ const STRING_DEFS = {
   },
   'setup.choosePinLabel': { en: 'Choose Your PIN', beanie: 'choose your pin' },
   'setup.choosePinHint': {
-    en: 'A 6-digit PIN unlocks beanies on your devices. Your recovery kit (next step) is the master key.',
+    en: 'A 6-digit PIN signs you in on devices where your family is already set up. Your recovery kit (next step) is what gets you in on a brand-new one.',
     beanie:
-      'a 6-digit pin unlocks beanies on your devices. your recovery kit (next step) is the master key.',
+      'a 6-digit pin signs you in on devices where your family is already set up. your recovery kit (next step) is what gets you in on a brand-new one.',
   },
   'setup.kitStepIntro': {
     en: 'Your family pod is ready! One last thing — save your recovery kit somewhere safe.',
@@ -5092,9 +5004,9 @@ const STRING_DEFS = {
   },
   'recovery.kitPromptTitle': { en: 'Save Your Recovery Kit', beanie: 'save your recovery kit' },
   'recovery.kitPromptBody': {
-    en: "Your recovery kit is the master key to your family's data — if every device and PIN is lost, it's the only way back in. Create it now and keep it somewhere safe.",
+    en: "Your recovery kit is what gets you back into your family's data — if every device and PIN is lost, it's the only way back in. Create it now and keep it somewhere safe.",
     beanie:
-      "your recovery kit is the master key to your family's data — if every device and pin is lost, it's the only way back in. create it now and keep it somewhere safe.",
+      "your recovery kit is what gets you back into your family's data — if every device and pin is lost, it's the only way back in. create it now and keep it somewhere safe.",
   },
   'pin.promptTitle': { en: 'Set Up a PIN?', beanie: 'set up a pin?' },
   'pin.promptBody': {
@@ -5180,8 +5092,8 @@ const STRING_DEFS = {
       "beanies.family doesn't run any server or database \u2014 your encrypted .beanpod file lives in your own storage.",
   },
   'loginV6.howThisWorks.bullet1': {
-    en: 'AES-256 encryption. Only your password unlocks it.',
-    beanie: 'aes-256 encryption. only your password unlocks it.',
+    en: 'AES-256 encryption. Only your family can open it.',
+    beanie: 'aes-256 encryption. only your family can open it.',
   },
   'loginV6.howThisWorks.bullet2': {
     en: 'No tracking. No analytics on your finances.',
@@ -5320,8 +5232,8 @@ const STRING_DEFS = {
     en: 'Generating secure invite link...',
     beanie: 'generating secure invite link...',
   },
-  'join.setPasswordTitle': { en: 'Choose Your PIN', beanie: 'choose your pin' },
-  'join.setPasswordSubtitle': {
+  'join.setPinTitle': { en: 'Choose Your PIN', beanie: 'choose your pin' },
+  'join.setPinSubtitle': {
     en: 'This 6-digit PIN is just for you — it signs you in on any of your family devices.',
     beanie: 'this 6-digit pin is just for you — it signs you in on any of your family devices.',
   },

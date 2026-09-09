@@ -72,7 +72,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'Do not clear your data or sign out to fix this; it changes nothing and removes your local copy.',
-          'Do not re-enter a password; this is not a password problem.',
+          'Do not re-try your PIN or recovery code; this is not a sign-in problem.',
           'Do not pick a different family file. The one beanies is pointing at is the right one; it just needs a newer beanies to open it.',
         ],
       },
