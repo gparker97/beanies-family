@@ -11,18 +11,23 @@
  * busy-guard → confirm → adopt → toast → catch → finally, differing only in two
  * message keys.
  *
- * ⚠️ ONE COMPOSABLE, NOT TWO. Splitting the adopt action from the banner state
- * was considered and rejected: these two components are the only ones in the
- * repo that carry a `dismissed` flag AND the only ones that call
+ * ⚠️ IT WAS ONE COMPOSABLE, AND 2026-09-09 SPLIT THE STATE HALF OUT. The reason
+ * given for keeping them together was that "these two components are the only
+ * ones in the repo that carry a `dismissed` flag AND the only ones that call
  * `useRemoteFileOverLocalDocument`, so the second composable's consumer set is
- * exactly the first's, and its output is only ever read alongside the first's
- * (`:show="blocked && !dismissed"`, `:disabled="busy"`). A file that buys
- * nothing is a file to maintain.
+ * exactly the first's". `PodUnreadableBanner` broke exactly that premise: it
+ * carries `dismissed` and its exit is a RETRY, not an adopt. The state half now
+ * lives in `useBlockerLatch` and all three banners share it; this file keeps the
+ * adopt action and its two message keys, and its exported signature is
+ * deliberately unchanged so `LineageBanner` and `LocalDocUnreadableBanner` have a
+ * zero-line diff. If either appears in that commit's diff, the split was done
+ * wrong.
  */
-import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
+import { type ComputedRef, type Ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
+import { useBlockerLatch } from '@/composables/useBlockerLatch';
 import { useSyncStore, type BackgroundSyncErrorKind } from '@/stores/syncStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -44,20 +49,7 @@ export function useBlockerBanner(opts: {
   const { t } = useTranslation();
   const syncStore = useSyncStore();
 
-  const dismissed = ref(false);
-  const busy = ref(false);
-  const blocked = computed(
-    () => syncStore.podUnopenable && syncStore.backgroundSyncErrorKind === opts.kind
-  );
-
-  // A NEW block after a dismissal must speak again — the user dismissed the last
-  // one, not every one. `clearPodUnopenable` is the only thing that clears the
-  // latch, so this re-arms exactly when the state genuinely resolved. It lives in
-  // the same file as the `blocked` it watches, which is half the reason the two
-  // halves are one composable.
-  watch(blocked, (isBlocked) => {
-    if (!isBlocked) dismissed.value = false;
-  });
+  const { blocked, dismissed, busy } = useBlockerLatch(opts.kind);
 
   /**
    * Adopt the family file over this device's document.

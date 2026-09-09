@@ -5810,6 +5810,18 @@ const STRING_DEFS = {
     beanie:
       "your family data has been deleted from everywhere. we're sorry to see you go — every bean counts.",
   },
+  // Shown when the deletion could not prove it removed everything — the family
+  // data file survived, or the registry entry that points at it did. Deliberately
+  // does NOT enumerate which: the firehose carries that for triage, and a user
+  // reading a farewell needs one true sentence and one action, not an inventory.
+  // The `beanie` value keeps the real nouns ("family data", "device") — this is a
+  // deletion surface, and the beanie floor forbids euphemism where a reader who
+  // does not know the joke could act wrongly.
+  'settings.deleteFamilyFarewellPartialMsg': {
+    en: "Your family has been removed from this device. Not everything could be removed for you — get in touch and we can finish clearing it. We're sorry to see you go — every bean counts.",
+    beanie:
+      "your family has been removed from this device. not everything could be removed for you — get in touch and we can finish clearing it. we're sorry to see you go — every bean counts.",
+  },
 
   // Family To-Do
   'todo.title': { en: 'To-Do List', beanie: 'our to-do list' },
@@ -7086,6 +7098,17 @@ const STRING_DEFS = {
   'googleDrive.reconnected': {
     en: 'Reconnected — all data saved',
     beanie: 'reconnected — all data saved',
+  },
+  // ⚠️ RESTORED 2026-09-09, and the distinction from `googleDrive.reconnected`
+  // above is the point. On the two Drive-RESTORE paths the reconnect succeeds and
+  // the restore is then abandoned — nothing was saved and the user has to start
+  // it again. Those sites were switched to the "all data saved" line, which told
+  // them the opposite of both facts and dropped the only instruction that got
+  // them out. Keep `googleDrive.reconnected` for the paths that really do reload
+  // and re-arm (App.vue, silentReconnect).
+  'settings.reconnectedTryAgain': {
+    en: 'Reconnected to Google. Try loading the file again.',
+    beanie: 'reconnected to google. try loading the file again.',
   },
   'googleDrive.noFilesHint': {
     en: 'Make sure the file is in a folder named "beanies.family" on this account.',

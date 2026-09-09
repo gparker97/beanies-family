@@ -41,11 +41,47 @@ afterEach(() => {
 });
 
 describe('classifyDriveFailure', () => {
-  it('classifies offline before anything else', () => {
+  it('reports an HTTP STATUS over `navigator.onLine`, because a status proves we got through', () => {
+    // ⚠️ THIS ASSERTION IS REVERSED FROM THE ONE IT REPLACES, and the old
+    // premise was simply untrue. It read: "even a 404 is reported as offline —
+    // the file may be perfectly fine and simply unreachable". But all three of
+    // these errors are constructed in exactly one place, `driveRequest`, and
+    // only AFTER `res.ok` came back false — i.e. Google answered. You cannot
+    // receive a 404 while offline.
+    //
+    // It mattered most for 401. `navigator.onLine` is unreliable in Capacitor
+    // and Android WebViews, so a browser wrongly reporting offline sent a real
+    // consent expiry to OFFLINE, and every caller that branches on auth — the
+    // Drive restore among them — fell through to a generic dead end instead of
+    // offering the reconnect that fixes it.
     setOnline(false);
-    // Even a 404 is reported as offline — the file may be perfectly fine and
-    // simply unreachable, and telling the user their file is gone would be wrong.
-    expect(classifyDriveFailure(new DriveFileNotFoundError('gone', 404))).toBe('OFFLINE');
+    expect(classifyDriveFailure(new DriveApiError('unauthorized', 401))).toBe('CONSENT_EXPIRED');
+    expect(classifyDriveFailure(new DriveFileNotFoundError('forbidden', 403))).toBe(
+      'PERMISSION_DENIED'
+    );
+    expect(classifyDriveFailure(new DriveFileNotFoundError('gone', 404))).toBe('FILE_NOT_FOUND');
+  });
+
+  it('STILL reports offline for a failure that carries no status', () => {
+    // A 408 is thrown from the abort path, before any response — so it proves
+    // nothing about connectivity and offline remains the better message. Same
+    // for a bare network error.
+    setOnline(false);
+    expect(classifyDriveFailure(new DriveApiError('Request timed out', 408))).toBe('OFFLINE');
+    expect(classifyDriveFailure(new Error('Failed to fetch'))).toBe('OFFLINE');
+  });
+
+  it('classifies a token expiry WITHOUT depending on the class surviving a mock', () => {
+    // ⚠️ 29 test files replace `@/services/google/googleAuth` wholesale and
+    // export no `TokenExpiredError`. An `instanceof` here evaluated
+    // `instanceof undefined` and threw "Right-hand side of instanceof is not
+    // callable" from a module those tests never touched. A duck-typed `name`
+    // check cannot break that way — this plain object proves it.
+    setOnline(true);
+    expect(classifyDriveFailure({ name: 'TokenExpiredError' })).toBe('CONSENT_EXPIRED');
+    expect(classifyDriveFailure({ name: 'SomethingElse' })).toBe('VERIFY_UNAVAILABLE');
+    expect(classifyDriveFailure(null)).toBe('VERIFY_UNAVAILABLE');
+    expect(classifyDriveFailure(undefined)).toBe('VERIFY_UNAVAILABLE');
   });
 
   it.each([

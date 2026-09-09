@@ -40,8 +40,7 @@ import {
   emitProveOutcome,
   emitRosterFallbackUsed,
 } from '@/services/telemetry/loginFlowEvents';
-import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
-import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
+import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import {
   unlockWithPin,
   enrollPinUnlock,
@@ -977,13 +976,25 @@ export function useLoginFlow(opts: {
     if (state.value.kind !== 'open-recovery' || isBusy.value) return;
     isBusy.value = true;
     try {
-      const ok = await googleReconnect(syncStore.providerAccountEmail ?? undefined);
-      // On redirect surfaces (iOS/PWA) reconnect() kicked off a FULL-PAGE navigation and
-      // resolves while the page is unloading — dispatching a retry now would churn
-      // against the still-dead token and pollute the firehose. The boot path re-enters
-      // the flow with a fresh token on return.
-      if (shouldUseRedirectAuth()) return;
-      if (!ok) {
+      const outcome = await googleReconnect(syncStore.providerAccountEmail ?? undefined);
+      // ⚠️ BOTH TESTS BELOW USED TO BE WRONG, and they failed in opposite
+      // directions.
+      //
+      // `shouldUseRedirectAuth()` was a SECOND copy of the redirect question,
+      // sampled independently of the answer: on a redirect surface the silent
+      // path can recover without navigating anywhere, and this then returned
+      // early and left the user on the recovery screen holding a live token.
+      //
+      // `if (!ok)` was dead code once the return widened to a string union —
+      // every arm is truthy — so a FAILED reconnect fell through, CLEARED the
+      // error area and immediately re-ran the open against a token
+      // `invalidateAccessToken()` had just nulled. A silent retry loop at the
+      // login gate, with no message.
+      //
+      // A redirect means the page is on its way to Google and nothing has been
+      // acquired; the boot path re-enters this flow with a fresh token on return.
+      if (outcome === 'redirecting') return;
+      if (!reconnectSucceeded(outcome)) {
         proveError.value = reconnectError.value || t('googleDrive.reconnectFailed');
         return;
       }

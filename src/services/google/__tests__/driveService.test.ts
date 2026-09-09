@@ -6,9 +6,12 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mockGetGoogleAccountEmail = vi.fn(() => 'a@example.com' as string | null);
 const mockFetchGoogleUserEmail = vi.fn(async (_token: string) => 'a@example.com' as string | null);
 
+const mockInvalidateAccessToken = vi.fn();
+
 vi.mock('../googleAuth', () => ({
   getGoogleAccountEmail: () => mockGetGoogleAccountEmail(),
   fetchGoogleUserEmail: (token: string) => mockFetchGoogleUserEmail(token),
+  invalidateAccessToken: () => mockInvalidateAccessToken(),
 }));
 
 import {
@@ -697,5 +700,58 @@ describe('driveService', () => {
       const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[1]?.headers?.Authorization).toBe(`Bearer ${mockToken}`);
     });
+  });
+});
+
+describe('driveRequest — a 401 drops the cached access token', () => {
+  /**
+   * ⚠️ THE ROOT CAUSE THIS PROTECTS. `isTokenValid()` is a LOCAL CLOCK CHECK. It
+   * compares `expiresAt` and never contacts Google, so a grant revoked on
+   * another device kept reading as valid for the rest of its local TTL — and
+   * roughly fifteen consumers trust that answer, including
+   * `tryReconnectSilently`, which returned true at its first line without
+   * acquiring anything. The user pressed Reconnect, was told "Reconnected", and
+   * the next request 401'd identically.
+   *
+   * This is the only place in the app that learns Google has refused, so it is
+   * the only place that can say so. Fixing it at a UI button instead covered one
+   * of those fifteen consumers and destroyed working tokens doing it.
+   */
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetGoogleAccountEmail.mockReturnValue('a@example.com');
+  });
+
+  it('invalidates when Google rejects the token', async () => {
+    global.fetch = mockFetch({ error: { message: 'Invalid Credentials' } }, 401);
+    await expect(readFile(mockToken, 'file-1')).rejects.toThrow(DriveApiError);
+    expect(mockInvalidateAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('does so on EVERY Drive call, not just reads — there is one door', async () => {
+    // The provider holds no `fetch` of its own; write, read and the metadata
+    // probe all arrive here. A per-call-site fix would have missed two of three.
+    global.fetch = mockFetch({ error: { message: 'Invalid Credentials' } }, 401);
+    await expect(getFileModifiedTime(mockToken, 'file-1')).rejects.toThrow(DriveApiError);
+    expect(mockInvalidateAccessToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the token alone on a 404 — a missing file is not a dead grant', async () => {
+    global.fetch = mockFetch({ error: { message: 'File not found' } }, 404);
+    await expect(readFile(mockToken, 'file-1')).rejects.toThrow(DriveFileNotFoundError);
+    expect(mockInvalidateAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('leaves the token alone on a 403, a 500 and a success', async () => {
+    global.fetch = mockFetch({ error: { message: 'Forbidden' } }, 403);
+    await expect(readFile(mockToken, 'file-1')).rejects.toThrow(DriveFileNotFoundError);
+
+    global.fetch = mockFetch({ error: { message: 'Backend error' } }, 500);
+    await expect(readFile(mockToken, 'file-1')).rejects.toThrow(DriveApiError);
+
+    global.fetch = mockFetch({ ok: true });
+    await getFileModifiedTime(mockToken, 'file-1');
+
+    expect(mockInvalidateAccessToken).not.toHaveBeenCalled();
   });
 });
