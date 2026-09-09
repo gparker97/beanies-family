@@ -27,8 +27,17 @@
  *      document over the compacted one — undoing the compaction.
  *
  * So the copy says beanies could not work out which changes are missing, rather
- * than implying it never tried. `docs/plans/2026-09-09-stage-6-preservation-brief.md`
- * would shrink case 2 further by carrying local-only entities across.
+ * than implying it never tried.
+ *
+ * ⚠️ STAGE 6 DID NOT SHRINK CASE 2, and this comment used to claim it would.
+ * `rebaseUnavailable` is set only inside `if (act === 'rebase')`, and `rebase` is
+ * reached only from `adopt-remote × dirty` and `adopt-remote × user-file` — whereas
+ * the stage-6 carry is scoped to `adopt-remote × clean`. The two are DISJOINT by
+ * construction, so the carry cannot make this banner rarer. What WOULD shrink case
+ * 2 is a baseline-independent carry on this fallback itself, converting the block
+ * into adopt-plus-carry; that trades away the "your work is still yours" promise
+ * for edits to shared entities, so it needs its own decision and has not been
+ * made. See `docs/plans/2026-09-09-stage-6-carry-local-only-entities.md` § Context.
  *
  * ⚠️ TWO VERDICTS, TWO PIECES OF COPY. Case 1 is not recoverable by the person
  * sitting there, and offering the adopt would invite them to discard one of two

@@ -32,6 +32,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { tr } from '@/services/translation/tr';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { PayloadLoadError, isRemoteBlocker, LocalDocUnreadableError } from '@/types/sync';
 // Type + `instanceof` only — never `guardLineage`, which the eslint rule
 // correctly bans outside the worker. Reading a flag off a thrown error is
@@ -1363,14 +1364,28 @@ export async function mergeRemoteEnvelope(
         { envelope, familyId, basis: { kind: 'no-local-document' } satisfies LineageBasis },
         opts
       );
-      if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
-      noteDocInstalled();
-      bumpOpenCycle('reconstruction');
-      return res;
+      // The re-issue's basis is `no-local-document`, which skips the lineage
+      // guard entirely, so `carried` is provably absent on this path. Reported
+      // through the same helper anyway — see `finishMerge`.
+      return finishMerge(familyId, res);
     }
     throw err;
   }
+  return finishMerge(familyId, res);
+}
+
+/**
+ * Everything that must happen on a resolved merge, at EVERY return point.
+ *
+ * ⚠️ A HELPER, NOT FOUR CALLS REPEATED TWICE. `mergeRemoteEnvelope` has two
+ * returns — the recovery re-issue and the normal path — and both already ran the
+ * same three calls, duplicated. Adding the stage-6 report to only one of them, on
+ * the reasoning that the other's basis makes it unnecessary, would be scoping by
+ * INSPECTION: true today, silently wrong the first time either path changes.
+ */
+function finishMerge(familyId: string | null, res: MergeOutcome): MergeOutcome {
   if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
+  noteLocalOnlyCarry(familyId, res);
   // The worker installed a document for this family, so whatever we knew about
   // an empty cache is stale. (`kept-local` too: it kept a document it holds.)
   noteDocInstalled();
@@ -1378,6 +1393,68 @@ export async function mergeRemoteEnvelope(
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');
   return res;
+}
+
+/**
+ * Report a scoped clean adopt's local-only carry, and tell the user when it
+ * rescued something (ADR-036 stage 6).
+ *
+ * ⚠️ IN THE MERGE WRAPPER, NOT `logMergeTerminus`. It is true today that all
+ * three carrying paths log a terminus — but that is scoping by inspection, and an
+ * eighth `mergeRemoteEnvelope` call site would silently lose both the event and
+ * the toast. `noteRebaseUnavailable` sits here for exactly the same reason.
+ */
+function noteLocalOnlyCarry(familyId: string | null, res: MergeOutcome): void {
+  // Scope first, so a reader sees in line one that this is a no-op for `merged`,
+  // `kept-local`, and every adopt that was not the scoped clean case.
+  if (res.carried === undefined && !res.carryFailed) return;
+  if (res.carryFailed) {
+    logEvent({
+      level: 'warn',
+      surface: 'pod-lineage',
+      message: 'local-only carry failed — fell back to a plain adopt',
+      context: {
+        action: 'adopt-carry-failed',
+        error_code: res.carryFailed,
+        ...(familyId ? { family_id: familyId } : {}),
+      },
+    });
+    return;
+  }
+  // ⚠️ EMITTED ON THE ZERO CASE TOO, so this event is its OWN denominator and the
+  // carry RATE is measurable rather than just the occurrences. `adopted` alone is
+  // a poor denominator: it also counts first-load adopts and both `user-file`
+  // adopts. The rate's denominator is this event plus `adopt-carry-failed`.
+  logEvent({
+    level: 'info',
+    surface: 'pod-lineage',
+    message: 'clean adopt local-only carry',
+    context: {
+      action: 'adopt-carried-local-only',
+      count: res.carried,
+      ...(familyId ? { family_id: familyId } : {}),
+    },
+  });
+  if (!res.carried) return;
+  const one = res.carried === 1;
+  // A non-latching info toast: something was rescued, nothing went wrong, and
+  // there is no action to force. The detail line deliberately does not promise
+  // the items were "only on this device" — a carried entity may have been deleted
+  // on a peer and resurrected here, so it tells the user what to check instead.
+  showToast(
+    'info',
+    fillTemplate(
+      tr(
+        one ? 'podLineage.carriedLocalOnly.one' : 'podLineage.carriedLocalOnly.other',
+        one ? 'Kept {count} item from this device' : 'Kept {count} items from this device'
+      ),
+      { count: res.carried }
+    ),
+    tr(
+      'podLineage.carriedLocalOnly.detail',
+      'Your family file was compacted on another device. Items added here were kept, so check anything that looks out of date.'
+    )
+  );
 }
 
 /**
