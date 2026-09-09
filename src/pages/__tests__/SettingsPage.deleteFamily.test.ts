@@ -182,8 +182,13 @@ describe('SettingsPage — delete family export gate', () => {
     const wrapper = await mountPage();
     await runDeleteWithExport(wrapper);
 
+    // ⚠️ THE THIRD MESSAGE, and it exists because the other two have each been
+    // wrong here. "Deleted from all systems" is FALSE — the user kept their
+    // family data file and the registry row still points at it. "Not everything
+    // could be removed" is ALARMING and also false — nothing failed, this is
+    // what they chose. So the default path says what actually happened.
     expect(alertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'settings.deleteFamilyFarewellMsg' })
+      expect.objectContaining({ message: 'settings.deleteFamilyFarewellKeptFileMsg' })
     );
   });
 

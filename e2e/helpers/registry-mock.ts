@@ -77,6 +77,10 @@ export async function mockRegistry(page: Page): Promise<void> {
     }
 
     if (method === 'DELETE') {
+      // The real Lambda TOMBSTONES rather than dropping the row, but GET answers
+      // 404 for a tombstone — so from every client's point of view the two are
+      // identical, and an in-memory delete models it exactly. Revisit only if a
+      // test ever needs to observe a deleted row being restored.
       store.delete(familyId);
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
       return;

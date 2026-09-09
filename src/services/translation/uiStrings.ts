@@ -3802,6 +3802,13 @@ const STRING_DEFS = {
   'action.load': { en: 'Load', beanie: 'load' },
   'action.seeAll': { en: 'See All', beanie: 'see all' },
   'action.tryAgain': { en: 'Try again', beanie: 'try again' },
+  // The retry ran and hit the same wall. Says what happened rather than
+  // repeating the banner title sitting directly above it. Important surface, so
+  // the beanie value keeps the real noun.
+  'sync.retryFailedStillBlocked': {
+    en: 'Still no luck — beanies could not open your family file this time either.',
+    beanie: 'still no luck — beanies could not open your family file this time either.',
+  },
 
   // Confirmation dialog titles
   'confirm.deleteAccountTitle': { en: 'Delete Account', beanie: 'remove account' },
@@ -5817,6 +5824,14 @@ const STRING_DEFS = {
   // The `beanie` value keeps the real nouns ("family data", "device") — this is a
   // deletion surface, and the beanie floor forbids euphemism where a reader who
   // does not know the joke could act wrongly.
+  // The DEFAULT outcome, and it needs its own sentence. The user chose to keep
+  // their family data file, so "deleted from all systems" is false and "not
+  // everything could be removed" is alarming for a state nothing failed in.
+  'settings.deleteFamilyFarewellKeptFileMsg': {
+    en: "Your family has been removed from this device. Your family data file is untouched, as you chose — it is yours to keep or delete. We're sorry to see you go — every bean counts.",
+    beanie:
+      "your family has been removed from this device. your family data file is untouched, as you chose — it is yours to keep or delete. we're sorry to see you go — every bean counts.",
+  },
   'settings.deleteFamilyFarewellPartialMsg': {
     en: "Your family has been removed from this device. Not everything could be removed for you — get in touch and we can finish clearing it. We're sorry to see you go — every bean counts.",
     beanie:

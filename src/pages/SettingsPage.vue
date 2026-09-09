@@ -716,15 +716,30 @@ async function openDriveRestorePicker(): Promise<void> {
         level: 'info',
         surface: 'pod-load-failure',
         message: 'drive restore listing needs reconnect',
-        context: { action: 'restore-needs-reconnect' },
+        context: { action: 'list-needs-reconnect' },
       });
       // `loginHint`: without it `tryReconnectSilently` bails at its
       // `if (!boundEmail) return false` and the beanpod-mirrored token recovery
       // never runs, so the user is pushed to a consent screen we could have
       // avoided. Line ~357 of this file already does this correctly.
       const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
-      // The page is navigating to Google; say nothing and touch nothing.
-      if (outcome === 'redirecting') return;
+      // ⚠️ THE SAME TREATMENT AS THE READ LADDER BELOW, because this is its twin
+      // and fixing only one of a pair is how this file got here. On native the
+      // WebView does not unload, so a user who dismisses the Google tab lands
+      // back on Settings with the picker closed and a raw developer string still
+      // painted — and nothing in CloudWatch to find it by.
+      if (outcome === 'redirecting') {
+        syncStore.clearError();
+        logEvent({
+          level: 'info',
+          surface: 'pod-load-failure',
+          message: 'drive restore LISTING reconnect redirected to Google',
+          // `list-` prefixed throughout this ladder so a CloudWatch filter can
+          // tell "the file LIST needed a reconnect" from "the file READ did".
+          context: { action: 'list-reconnect-redirecting' },
+        });
+        return;
+      }
       const reconnected = reconnectSucceeded(outcome);
       if (reconnected) {
         // Re-arm autosync and clear the banner, exactly as this page's own
@@ -750,7 +765,7 @@ async function openDriveRestorePicker(): Promise<void> {
         message: reconnected ? 'drive restore reconnected' : 'drive restore reconnect failed',
         // The success arm too, so the reconnect success RATE is measurable —
         // an event that only fires on failure cannot give you one.
-        context: { action: reconnected ? 'reconnect-ok' : 'reconnect-failed' },
+        context: { action: reconnected ? 'list-reconnect-ok' : 'list-reconnect-failed' },
       });
       if (reconnected) {
         // ⚠️ NOT `importError`. That renders in an Alert Red slab, and Red is
@@ -850,26 +865,25 @@ async function handleDriveRestoreSelected(payload: {
       return;
     }
 
-    // ⚠️ TWO REVIEW ROUNDS PULLED THIS ARM IN OPPOSITE DIRECTIONS. Writing down
-    // both, because the next reader will otherwise "fix" it back.
+    // ⚠️ THREE REVIEW ROUNDS PULLED THIS ARM AROUND. All three were right about
+    // what they objected to, and neither of the first two fixes was the answer.
     //
-    // Round 3 said: do not clear. That amber slab hosts the Reconnect Drive and
-    // Force Save buttons, so clearing it and then telling the user to reconnect
-    // instructs them to do the thing the UI just removed.
+    //   Round 3: do not clear — that amber slab is the ONLY host of the Reconnect
+    //            Drive and Force Save buttons, so clearing it and then telling
+    //            the user to reconnect removes the control the copy names.
+    //   Round 4: you MUST clear — `syncStore.error` mirrors the service's raw
+    //            `lastError`, an untranslated exception string that on this path
+    //            can carry two email addresses. This file's own rule (see the
+    //            `NEVER syncStore.error HERE` comment further down) forbids it.
+    //   Round 5: clearing still deletes the buttons, and the copy then instructs
+    //            the user to use them.
     //
-    // Round 4 said: you MUST clear. `syncStore.error` mirrors the service's raw
-    // `lastError`, which on this path is an untranslated exception string —
-    // sometimes carrying two email addresses — and line 924 of this very file
-    // states the rule: never show it to a user. A Chinese-locale user would get
-    // that developer string as their entire message.
-    //
-    // Round 4 wins, and the button is not actually lost: the Restore button that
-    // started this flow is still on the page, so the user's path is "reconnect
-    // failed, try the restore again", which is what the copy says. The raw cause
-    // is not discarded either — it went to the firehose above, which is where a
-    // developer string belongs.
-    syncStore.clearError();
-    importError.value = t('settings.drivePickerAuth');
+    // Both objections are about the same slab, so the fix is to keep it AND make
+    // it readable: `setTranslatedError` swaps the developer string for the
+    // sentence, and the Reconnect and Force Save buttons stay exactly where the
+    // copy says they are. The raw cause is not lost — it went to the firehose
+    // above, which is where a developer string belongs.
+    syncStore.setTranslatedError(t('settings.drivePickerAuth'));
     return;
   }
 
@@ -1364,12 +1378,23 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     // cannot prove the file is gone, the row stays and we say so.
     let podFileDeleted = false;
 
-    // Everything this deletion could NOT prove it removed. It drives two things
-    // that were both missing: the farewell copy (which asserted "deleted from
-    // all systems" unconditionally, including on the paths that deliberately
-    // keep the row) and the firehose (which said nothing at all, so a report of
-    // "my file is still there" could not be triaged without the device).
+    // Everything the user ASKED to be removed that we cannot say was removed.
+    // Distinct from what merely SURVIVES — see `keptByChoice` below. The farewell
+    // asserted "deleted from all systems" unconditionally, including on paths
+    // that deliberately keep the row, and the firehose said nothing at all, so a
+    // report of "my file is still there" could not be triaged without the device.
     const kept: string[] = [];
+
+    /**
+     * The user KEPT their family data file — the default, since the Drive-delete
+     * checkbox is opt-in and is never rendered at all for a local-file family.
+     *
+     * ⚠️ A THIRD STATE, because the farewell has now been wrong in both other
+     * directions. Claiming "deleted from all systems" is false here: the pod and
+     * its registry row both survive. Claiming "not everything could be removed"
+     * is alarming and also false: nothing failed, this is what they chose.
+     */
+    let keptByChoice = false;
 
     // 2. Delete Drive file if requested
     if (wantDeleteDrive.value) {
@@ -1496,6 +1521,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       // touch", at the single most trust-sensitive moment in the app, for a
       // state the user had asked for. And `warn` on the default path is the
       // opposite of a usable alerting signal.
+      keptByChoice = true;
       logEvent({
         level: 'info',
         surface: 'registry',
@@ -1541,15 +1567,26 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       logEvent({
         level: 'warn',
         surface: 'registry',
-        message: `family deletion could not remove: ${kept.join(', ')}`,
-        context: { action: 'delete-family', error_code: 'delete-incomplete', count: kept.length },
+        message: 'family deletion could not remove everything it was asked to',
+        // `error_code` carries WHICH, structured and queryable — never
+        // interpolated into `message` (CLAUDE.md § Observability rule 4).
+        context: {
+          action: 'delete-family',
+          error_code: kept.join('+'),
+          count: kept.length,
+        },
       });
     }
+    // Three outcomes, three sentences. `kept` (something asked for did not
+    // happen) outranks `keptByChoice` (the user kept their file), which outranks
+    // the absolute claim — which is now only made when it is actually true.
     await showAlert({
       title: 'settings.deleteFamilyFarewellTitle',
       message: kept.length
         ? 'settings.deleteFamilyFarewellPartialMsg'
-        : 'settings.deleteFamilyFarewellMsg',
+        : keptByChoice
+          ? 'settings.deleteFamilyFarewellKeptFileMsg'
+          : 'settings.deleteFamilyFarewellMsg',
     });
 
     // 7. Redirect

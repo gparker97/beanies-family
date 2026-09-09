@@ -191,6 +191,33 @@ export async function handler(event) {
         : !existing.ownerEmail ||
           (!!normEmail(writerEmail) && normEmail(writerEmail) === normEmail(existing.ownerEmail));
 
+      // ─── A DELETED FAMILY IS NOT WRITEABLE EXCEPT BY ITS OWNER ────────────
+      //
+      // ⚠️ THIS GUARD IS `isOwner`, NOT `pointerAccepted`, AND THE FIRST CUT GOT
+      // THAT WRONG IN A WAY THAT LOOKED RIGHT. `pointerAccepted` is
+      // `isOwner || samePointer`, and `samePointer` is VACUOUSLY TRUE against a
+      // tombstone: the DELETE arm deliberately drops `provider`/`fileId`/
+      // `displayPath`, so a device that sends a null pointer — a cold boot, an
+      // evicted provider config, an `ensureRegistered` mid-boot — compares
+      // 'local' to 'local' and null to null, matches, and lifts the tombstone.
+      // The family came back LIVE pointing at nothing.
+      //
+      // ⚠️ AND IT RETURNS RATHER THAN MERGING. Preserving only `deletedAt` was
+      // not enough either: the same `PutItem` re-stamps `familyName`,
+      // `subscribeNewsletter`, `country`, `memberCount`, `beanpodSizeKb` and, on
+      // a login, `lastLoginAt: today` — every field the DELETE arm dropped ON
+      // PURPOSE, because they are family content, a marketing consent, and
+      // activity signals that would keep a deleted family alive in the metrics.
+      // A member's ordinary background register would have resurrected the
+      // deleted family's NAME and its newsletter opt-in, invisibly, because GET
+      // still 404s.
+      //
+      // So: nothing to merge, nothing to write. The family is deleted, and the
+      // caller gets the same success a write to a deleted row has always got.
+      if (existing.deletedAt && !isOwner) {
+        return response(200, { success: true, pointerAccepted: false }, event);
+      }
+
       // A write that would not CHANGE the pointer is a no-op, not a refusal.
       // This matters: the common case is a member device re-picking the family's
       // correct file, or simply logging in and echoing the pointer back. Reporting
@@ -234,8 +261,18 @@ export async function handler(event) {
         // Write-once, and the real pointer authority. Stamped on a row's first
         // accepted write — including the first write by the owner of a legacy
         // email-only row, which upgrades that row off the mutable email.
-        ownerMemberId:
-          existing.ownerMemberId ?? (pointerAccepted ? body.ownerMemberId : null) ?? null,
+        // ⚠️ `isOwner`, NOT `pointerAccepted`. This is a WRITE-ONCE field, so a
+        // wrong value is permanent and there is no in-app route back. Gating it
+        // on `pointerAccepted` let `samePointer` do the stamping: every member
+        // device echoes the family's real pointer on every login, so on a legacy
+        // (email-only) row a member running a still-deployed PRE-SPLIT client —
+        // which sends its own id as `ownerMemberId` — matched on the pointer and
+        // stamped ITSELF as the family's permanent registry owner. The real owner
+        // then fails tier 1 forever and every deliberate re-point pages Slack.
+        //
+        // The tier-2 comment above already says what this should be: stamp "the
+        // first time its OWNER writes".
+        ownerMemberId: existing.ownerMemberId ?? (isOwner ? body.ownerMemberId : null) ?? null,
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
@@ -303,23 +340,9 @@ export async function handler(event) {
         signupPlatform:
           existing.signupPlatform ??
           (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
-        // ⚠️ A TOMBSTONE IS ONLY LIFTED BY A WRITE THAT MAY SET THE POINTER.
-        //
-        // `PutItem` replaces the whole item, so simply omitting `deletedAt` made
-        // EVERY write revive a deleted family — including a refused one. A member
-        // device doing an ordinary background register after the owner deleted
-        // the family took the refused branch, wrote `provider: 'local', fileId:
-        // null` (the else-arms above, reading a tombstone that carries no
-        // pointer), and cleared `deletedAt` — resurrecting the row as LIVE with a
-        // pointer at nothing. GET starts answering 200, the metrics count it
-        // again, resume-from-registry dies on the null fileId, and only the owner
-        // can ever repair it. The hard delete could not produce that state, so
-        // this was a regression the tombstone introduced.
-        //
-        // `pointerAccepted` is exactly the right gate: it is true for the owner,
-        // and for a write that would not move the pointer anyway. Anything else
-        // leaves the row deleted, which is what the user asked for.
-        ...(!pointerAccepted && existing.deletedAt ? { deletedAt: existing.deletedAt } : {}),
+        // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
+        // so reaching this point at all IS the revival. Only the owner reaches
+        // it — every other writer returned above with the family still deleted.
         updatedAt: now,
       };
       await client.send(
@@ -413,6 +436,9 @@ export async function handler(event) {
               // `subscribeNewsletter` (family content and a marketing consent —
               // the user asked for this family to be gone).
               deletedAt: new Date().toISOString(),
+              // Ops hygiene: every other row carries one, and a tombstone with
+              // no `updatedAt` is invisible to a "what changed recently" scan.
+              updatedAt: new Date().toISOString(),
             },
             { removeUndefinedValues: true }
           ),

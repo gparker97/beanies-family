@@ -44,7 +44,6 @@ import {
 import { isDocLoaded } from '@/services/automerge/docService';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
-import { PodLineageError } from '@/services/sync/podLineage';
 
 /**
  * The one correctness guard, kept PURE (no I/O, no store access) so it is
@@ -296,28 +295,20 @@ export async function reconnectForWriteRetry(email?: string | null): Promise<boo
  * unchanged forced-consent flow. Never throws.
  */
 export async function tryReconnectSilently(
-  boundEmail: string | null | undefined,
-  opts?: { assumeStale?: boolean }
+  boundEmail: string | null | undefined
 ): Promise<boolean> {
   try {
-    // ⚠️ `assumeStale` EXISTS BECAUSE `isTokenValid()` CANNOT ANSWER THIS. It is
-    // a local clock check that never contacts Google, so a grant revoked on
-    // another device still reads valid until its own expiry — and this line then
-    // returns true without acquiring anything, the caller reports success, and
-    // the next request fails identically. An infinite loop with a human in it.
+    // ⚠️ THIS LINE TRUSTS A LOCAL CLOCK, and that is only safe because the two
+    // places that LEARN the grant is bad now clear the cached token themselves:
+    // `driveService.driveRequest` on a 401, and `googleDriveProvider` on an
+    // account mismatch. Without those, a grant revoked on another device still
+    // reads valid here until its own expiry, this returns true without
+    // contacting Google, and the caller reports a reconnect that never happened.
     //
-    // Observing the 401 in `driveService` covers the case where a Drive request
-    // actually failed, but NOT the prompts raised without one: an account
-    // mismatch (a 404 plus a session check), or `firePermanentFailureCallbacks`.
-    // A user pressing Reconnect is asserting the connection is broken, so their
-    // assertion beats the clock.
-    //
-    // It does NOT destroy the token, which is the point: an earlier fix
-    // invalidated unconditionally here and threw away working credentials when
-    // the button was pressed for an unrelated sync error. Skipping the
-    // short-circuit just means we ASK Google — and if the token really was fine,
-    // the refresh succeeds and installs a fresher one.
-    if (!opts?.assumeStale && isTokenValid()) return true; // already connected
+    // Do NOT "fix" that by forcing the ladder from here or from a caller: it was
+    // tried twice, and both times it destroyed working credentials and drove the
+    // escalation counter to its threshold before the consent screen could open.
+    if (isTokenValid()) return true; // already connected
     const familyId = getActiveFamilyId();
     if (!familyId) return false;
 
@@ -347,7 +338,25 @@ export async function tryReconnectSilently(
      */
     const adopt = async (tok: StoredRefreshToken): Promise<boolean> => {
       const current = await getGoogleRefreshToken(familyId);
-      if (current?.token && current.token !== tok.token && !isStrictlyNewer(tok, current)) {
+      // ⚠️ REFUSE ONLY WHAT IS PROVABLY OLDER. The first cut used
+      // `!isStrictlyNewer(tok, current)`, which coalesces a null `issuedAt` to 0
+      // — and `issuedAt: number | null` is a documented live shape on BOTH sides
+      // (legacy entries predate the field). So a peer's genuinely-live mirrored
+      // token carrying `issuedAt: null` computed `0 > T` = false and was refused
+      // WITHOUT ever asking Google, on exactly the straggler devices strategies 2
+      // and 3 exist for, pushing them to the consent screen this module exists to
+      // avoid. Unknown age is not evidence of staleness: let Google decide.
+      const provablyOlder =
+        typeof tok.issuedAt === 'number' &&
+        typeof current?.issuedAt === 'number' &&
+        tok.issuedAt < current.issuedAt;
+      if (current?.token && current.token !== tok.token && provablyOlder) {
+        logEvent({
+          level: 'info',
+          surface: 'drive-token-silent-reconnect',
+          message: 'declined an older mirrored Drive token',
+          context: { action: 'older-token-declined' },
+        });
         return false;
       }
       await restoreLocalFromDoc(familyId, tok, epochAtStart);
@@ -423,8 +432,21 @@ export async function tryReconnectSilently(
       //
       // The target is the device that can READ the file but must not MERGE it,
       // and that is exactly one class.
-      const blocker = syncService.isRemoteBlocked();
-      if (!(blocker instanceof PodLineageError)) return false;
+      // ⚠️ BY NAME, NOT `instanceof`, and the class list is the point. The states
+      // to EXCLUDE are the ones where re-reading is itself the harm: a device
+      // that could not ALLOCATE the document (re-downloading megabytes to fail
+      // the same way is what the latch prevents, and this decrypt is the same
+      // allocation) and bytes that cannot be decrypted at all.
+      //
+      // `RemoteMergeError` belongs IN, not out: it means the remote was read and
+      // then could not be merged, which is this step's target state verbatim. An
+      // earlier cut used `instanceof PodLineageError` and silently excluded it —
+      // and `types/sync.ts` records that exact trap, plus the rule: prefer a
+      // duck-typed test to `instanceof` anywhere the question is "should this
+      // latch". By name also keeps the class out of this module's import graph,
+      // which its header guards.
+      const blockerName = (syncService.isRemoteBlocked() as { name?: string } | null)?.name;
+      if (blockerName !== 'PodLineageError' && blockerName !== 'RemoteMergeError') return false;
 
       const connections = await syncService.readRemoteDriveConnections();
       if (!connections) {

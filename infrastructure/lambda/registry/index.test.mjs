@@ -670,14 +670,14 @@ describe('registry PUT — restoring a tombstoned row', () => {
     expect(item.deletedAt).toBeUndefined();
   });
 
-  it('still refuses a non-owner the pointer on a tombstoned row', async () => {
+  it('still refuses a non-owner on a tombstoned row, without writing', async () => {
     // Deleting a family does not relinquish ownership of its id.
     const { res, item } = await put(
       { provider: 'google_drive', fileId: 'MEMBER-COPY', ownerMemberId: M_A, writerMemberId: M_B },
       TOMB
     );
     expect(JSON.parse(res.body).pointerAccepted).toBe(false);
-    expect(item.fileId).toBeNull();
+    expect(item).toBeNull();
   });
 });
 
@@ -901,7 +901,7 @@ describe('registry PUT — a tombstone is only lifted by a write that may re-poi
     deletedAt: '2026-09-09T00:00:00.000Z',
   };
 
-  it('a REFUSED write leaves the family deleted', async () => {
+  it('a refused write leaves the family deleted, and writes nothing', async () => {
     // ⚠️ THE REGRESSION THE TOMBSTONE ITSELF INTRODUCED. `PutItem` replaces the
     // whole item, so omitting `deletedAt` made every write revive the row —
     // including a refused one, which writes the else-arms' `provider: 'local',
@@ -919,8 +919,7 @@ describe('registry PUT — a tombstone is only lifted by a write that may re-poi
       TOMB
     );
     expect(JSON.parse(res.body).pointerAccepted).toBe(false);
-    expect(item.deletedAt).toBe('2026-09-09T00:00:00.000Z');
-    expect(item.fileId).toBeNull();
+    expect(item).toBeNull();
   });
 
   it('the OWNER re-registering does lift it', async () => {
@@ -938,12 +937,50 @@ describe('registry PUT — a tombstone is only lifted by a write that may re-poi
     expect(item.createdAt).toBe('2025-03-01T00:00:00.000Z');
   });
 
-  it('a same-pointer write lifts it too — it is not moving anything', async () => {
-    const { item } = await put(
-      { provider: 'local', ownerMemberId: M_A, writerMemberId: M_B },
-      { ...TOMB, provider: 'local', fileId: null, displayPath: null }
+  it('a NULL-POINTER write from a non-owner does NOT lift it', async () => {
+    // ⚠️ THIS TEST ASSERTED THE OPPOSITE AND PINNED A BUG AS CORRECT. The
+    // tombstone carries no pointer by design, so `samePointer` is VACUOUSLY true
+    // for any device sending nulls — a cold boot, an evicted provider config, an
+    // `ensureRegistered` mid-boot. Gating the revival on `pointerAccepted`
+    // therefore let a member device bring the deleted family back as LIVE,
+    // pointing at nothing, and this test called that "it is not moving
+    // anything".
+    const { item } = await del(
+      { createdAt: '2025-03-01T00:00:00.000Z', ownerMemberId: M_A },
+      { writerMemberId: M_A }
     );
-    expect(item.deletedAt).toBeUndefined();
+    expect(item.deletedAt).toBeTruthy();
+
+    const revive = await put(
+      { provider: 'local', fileId: null, displayPath: null, writerMemberId: M_B },
+      item
+    );
+    expect(revive.item).toBeNull(); // nothing written at all
+  });
+
+  it('writes NOTHING for a non-owner, so the deleted name and consent stay gone', async () => {
+    // Preserving only `deletedAt` was not enough: the same PutItem re-stamped
+    // `familyName`, `subscribeNewsletter`, `country`, `memberCount`,
+    // `beanpodSizeKb` and `lastLoginAt` — every field the DELETE arm dropped ON
+    // PURPOSE. A member's ordinary login register would have resurrected the
+    // deleted family's name and its newsletter opt-in, invisibly.
+    const { res, item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'X',
+        familyName: 'The Parkers',
+        subscribeNewsletter: true,
+        country: 'SG',
+        memberCount: 5,
+        isLoginEvent: true,
+        ownerMemberId: M_A,
+        writerMemberId: M_B,
+      },
+      TOMB
+    );
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+    expect(item).toBeNull();
   });
 
   it('never invents a deletedAt on an ordinary LIVE row, refused or not', async () => {
@@ -958,5 +995,49 @@ describe('registry PUT — a tombstone is only lifted by a write that may re-poi
 
     const firstWrite = await put({ ownerMemberId: M_A, writerMemberId: M_A }, null);
     expect(firstWrite.item.deletedAt).toBeUndefined();
+  });
+});
+
+describe('registry PUT — the write-once owner stamp needs OWNERSHIP', () => {
+  it('a PRE-SPLIT member cannot stamp itself owner by echoing the pointer', async () => {
+    // ⚠️ Pre-split clients are still in the field and they send their own id as
+    // `ownerMemberId`. On a legacy (email-only) row `isOwner` is false for a
+    // member — but every member device echoes the family's real pointer on every
+    // login, so `samePointer` was true, `pointerAccepted` was true, and the
+    // write-once stamp fired with the MEMBER's id. The field is permanent, so the
+    // real owner then failed tier 1 forever with no in-app route back.
+    const legacy = {
+      ownerEmail: 'owner@example.com',
+      provider: 'google_drive',
+      fileId: 'ORIGINAL',
+      displayPath: 'pod.beanpod',
+    };
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'ORIGINAL',
+        displayPath: 'pod.beanpod',
+        ownerEmail: 'member@example.com',
+        ownerMemberId: M_B,
+      },
+      legacy
+    );
+    expect(item.ownerMemberId).toBeNull();
+  });
+
+  it('the real owner still upgrades a legacy row off the mutable email', async () => {
+    const legacy = { ownerEmail: 'owner@example.com', provider: 'google_drive', fileId: 'F' };
+    const { item } = await put(
+      {
+        provider: 'google_drive',
+        fileId: 'F',
+        ownerEmail: 'owner@example.com',
+        ownerMemberId: M_A,
+        writerEmail: 'owner@example.com',
+        writerMemberId: M_A,
+      },
+      legacy
+    );
+    expect(item.ownerMemberId).toBe(M_A);
   });
 });

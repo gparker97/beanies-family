@@ -14,10 +14,6 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import PodUnreadableBanner from '@/components/common/PodUnreadableBanner.vue';
 import { BLOCKER_BANNER_KIND, BANNERED_BLOCKER_KINDS } from '@/stores/syncStore';
-import {
-  isBlockerDismissed,
-  __resetBlockerDismissalsForTesting,
-} from '@/composables/useBlockerLatch';
 
 const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }));
 
@@ -77,7 +73,6 @@ describe('PodUnreadableBanner — render', () => {
     holder.store.backgroundSyncErrorKind = null;
     holder.store.podBlockMessageKey = null;
     holder.store.backgroundSyncFromFile = vi.fn(async () => 'refreshed');
-    __resetBlockerDismissalsForTesting();
     vi.clearAllMocks();
   });
 
@@ -123,7 +118,6 @@ describe('PodUnreadableBanner — render', () => {
 describe('PodUnreadableBanner — the retry', () => {
   beforeEach(() => {
     holder.store.backgroundSyncFromFile = vi.fn(async () => 'refreshed');
-    __resetBlockerDismissalsForTesting();
     vi.clearAllMocks();
   });
 
@@ -197,35 +191,20 @@ describe('PodUnreadableBanner — the retry', () => {
     expect(wrapper.text()).toBe('');
   });
 
-  it('a dismissal is VISIBLE to the toast layer, so the block keeps a surface', async () => {
-    // ⚠️ THE HOLE THIS CLOSES. `BackgroundSyncBar` suppresses its toast for kinds
-    // that have a banner. `dismissed` used to be component-local, so the bar
-    // could not see it, and one tap on Dismiss left a session-ending blocker with
-    // NO surface at all — banner hidden, toast suppressed — for the rest of the
-    // session. Nothing on the failed-retry path calls `clearPodUnopenable`, so
-    // the latch never re-arms by itself.
-    block('podTooLarge.inline');
-    expect(isBlockerDismissed('decrypt')).toBe(false);
-
-    const wrapper = mountBanner();
-    await wrapper.findAll('button')[1]!.trigger('click');
-
-    expect(isBlockerDismissed('decrypt')).toBe(true);
-  });
-
   it('a NEW block after a dismissal speaks again', async () => {
+    // The re-arm is the reason `dismissed` stays per-component: the user
+    // dismissed THIS block, not every future one. Needs a reactive store, or the
+    // `watch` this relies on never fires.
     block('podTooLarge.inline');
     const wrapper = mountBanner();
     await wrapper.findAll('button')[1]!.trigger('click');
     expect(wrapper.text()).toBe('');
 
-    // The latch clears (a recovery), then a fresh failure arrives.
     holder.store.podUnopenable = false;
     await nextTick();
-    expect(isBlockerDismissed('decrypt')).toBe(false);
-
     holder.store.podUnopenable = true;
     await nextTick();
+
     expect(wrapper.text()).toContain('sync.podUnopenable');
   });
 });

@@ -38,6 +38,7 @@ function payload(over: Partial<RegistryWritePayload> = {}): RegistryWritePayload
     ownerEmail: 'owner@example.com',
     ownerMemberId: OWNER,
     writerMemberId: OWNER,
+    writerEmail: 'owner@example.com',
     subscribeNewsletter: null,
     country: 'SG',
     beanpodSizeKb: 350,
@@ -103,6 +104,26 @@ describe('registry PUT — the writer/owner split on the wire', () => {
     const body = lastBody(f);
     expect('writerMemberId' in body).toBe(true);
     expect(body.writerMemberId).toBeNull();
+  });
+
+  it('sends writerEmail, and as an explicit NULL rather than omitted', async () => {
+    // ⚠️ SAME PRESENCE RULE AS `writerMemberId`, and forgetting it opened a hole
+    // rather than closing one. The server's LEGACY pointer tier compares emails;
+    // once `ownerEmail` came from the pod roster, every device sent the OWNER'S
+    // address, so that tier matched for everyone and any member could re-point a
+    // legacy row. An ABSENT field means "pre-split client" and takes the old
+    // path, so the field has to be there even when there is no email to give.
+    const f = okFetch({ success: true, pointerAccepted: true });
+    global.fetch = f;
+    await registerFamilyOrThrow(FAMILY, payload());
+    expect(lastBody(f).writerEmail).toBe('owner@example.com');
+
+    const g = okFetch({ success: true, pointerAccepted: true });
+    global.fetch = g;
+    await registerFamilyOrThrow(FAMILY, payload({ writerEmail: null }));
+    const body = lastBody(g);
+    expect('writerEmail' in body).toBe(true);
+    expect(body.writerEmail).toBeNull();
   });
 
   it('counts where the owner fields came from, on the SUCCESS path', async () => {

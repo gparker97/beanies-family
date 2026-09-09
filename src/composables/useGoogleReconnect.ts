@@ -95,12 +95,18 @@ export function useGoogleReconnect() {
       // That covers every consumer of `isTokenValid()`, not just this one, and it
       // never touches a token Google still accepts.
       //
-      // That alone is not enough, though, because not every reconnect prompt
-      // follows an observed 401 — an account mismatch raises one from a 404, and
-      // `firePermanentFailureCallbacks` raises one from no request at all. So the
-      // silent path is asked NOT to trust the local clock here. It still destroys
-      // nothing: if the token really is live the refresh simply succeeds.
-      if (await tryReconnectSilently(loginHint, { assumeStale: true })) {
+      // ⚠️ AND AN ATTEMPT TO ALSO SKIP THE CLOCK CHECK HERE WAS WITHDRAWN. Not
+      // every reconnect prompt follows an observed 401 — an account mismatch
+      // raises one from a 404 — so a flag was added asking the silent path not to
+      // trust `isTokenValid()`. That reinstated, verbatim, the harm the paragraph
+      // above records: pressed on a non-auth error it forced the full ladder,
+      // which on an `invalid_grant` DELETES the stored refresh token and raises
+      // the permanent-failure surface on a connection that was live.
+      //
+      // The rule stands: invalidate where the badness is OBSERVED. So the account
+      // mismatch does it at the point it detects the mismatch, in
+      // `googleDriveProvider`, next to the 404 that proves it.
+      if (await tryReconnectSilently(loginHint)) {
         outcome = 'recovered';
         return outcome;
       }

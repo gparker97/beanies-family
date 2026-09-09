@@ -96,30 +96,4 @@ describe('BackgroundSyncBar — the toast defers only where a banner exists', ()
     await raise({ kind: 'auth-transient', latched: false });
     expect(toastMock).not.toHaveBeenCalled();
   });
-
-  it('SPEAKS AGAIN once the user has dismissed the banner', async () => {
-    // ⚠️ THE HOLE. Suppressing on "this kind has a banner" is not the same as
-    // "a banner is up". Dismiss hid the banner while this kept the toast
-    // suppressed, so a session-ending blocker had no surface at all — and
-    // nothing on the failed-retry path calls `clearPodUnopenable` to re-arm it.
-    const { __resetBlockerDismissalsForTesting } = await import('@/composables/useBlockerLatch');
-    __resetBlockerDismissalsForTesting();
-
-    await raise({ kind: 'decrypt', latched: true });
-    expect(toastMock).not.toHaveBeenCalled();
-
-    // The user dismisses the banner; the latch is untouched.
-    const { useBlockerLatch } = await import('@/composables/useBlockerLatch');
-    const { dismissed } = useBlockerLatch('decrypt');
-    dismissed.value = true;
-    await nextTick();
-
-    toastMock.mockClear();
-    holder.store.backgroundSyncError = null;
-    await nextTick();
-    holder.store.backgroundSyncError = 'boom again';
-    await nextTick();
-
-    expect(toastMock).toHaveBeenCalledWith('warning', 'sync.podUnopenable', 'boom again');
-  });
 });

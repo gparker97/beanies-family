@@ -11,6 +11,10 @@ vi.mock('@/services/google/googleAuth', () => ({
   fetchGoogleUserEmail: vi.fn(async () => 'test@example.com'),
   getGoogleAccountEmail: vi.fn(() => null),
   setGoogleAccountEmail: vi.fn(),
+  // The account-mismatch classifier drops the cached token: this is where the
+  // app LEARNS the session cannot reach the file, and `isTokenValid()` is a
+  // local clock check that would otherwise keep blessing it for up to an hour.
+  invalidateAccessToken: vi.fn(),
   TokenExpiredError: class TokenExpiredError extends Error {
     constructor(message = 'Google access token expired and silent refresh failed') {
       super(message);
@@ -369,9 +373,20 @@ describe('GoogleDriveProvider', () => {
       mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
 
       await expect(bound.read()).rejects.toBeInstanceOf(TokenExpiredError);
+
+      // ⚠️ AND THE CACHED TOKEN IS DROPPED. This is the ONE place the app learns
+      // the live session cannot reach the file — there is no 401 here, only a
+      // 404 plus a session check. Without this, `isTokenValid()` keeps answering
+      // true on its local clock, `tryReconnectSilently` returns at its first line
+      // without contacting Google, and the reconnect this error raises reports
+      // success on a connection that is still wrong.
+      const { invalidateAccessToken } = await import('@/services/google/googleAuth');
+      expect(invalidateAccessToken).toHaveBeenCalled();
     });
 
     it('read() 404 WITHOUT a mismatch → re-throws the raw 404 (missing-file recovery)', async () => {
+      const { invalidateAccessToken } = await import('@/services/google/googleAuth');
+      (invalidateAccessToken as ReturnType<typeof vi.fn>).mockClear();
       const { getGoogleAccountEmail } = await import('@/services/google/googleAuth');
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
       const bound = GoogleDriveProvider.fromExisting('file-A', 'a.beanpod', 'a@example.com');
@@ -379,6 +394,8 @@ describe('GoogleDriveProvider', () => {
       mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
 
       await expect(bound.read()).rejects.toBeInstanceOf(MockDriveApiError);
+      // A missing file is not a bad token — leave the credential alone.
+      expect(invalidateAccessToken).not.toHaveBeenCalled();
     });
 
     it('write() 404 WITH an account mismatch → reconnect TokenExpiredError', async () => {
