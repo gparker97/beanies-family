@@ -55,9 +55,11 @@ describe('stagePendingFile', () => {
   });
 
   it('classifies a load failure into the machine transport vocabulary', async () => {
+    // No 'permission' row: `loadFromFile` never returns it (its union is
+    // 'auth' | 'not-found' | 'error') — permission is decided by the `needsPermission`
+    // precondition above, asserted separately.
     for (const [reason, expected] of [
       ['auth', 'auth'],
-      ['permission', 'permission'],
       ['not-found', 'not-found'],
       ['file-not-found', 'not-found'],
       ['something-else', 'error'],
@@ -79,7 +81,15 @@ describe('stagePendingFile', () => {
     const outcome = await stagePendingFile(false);
     expect(outcome).toEqual({ ok: false, reason: 'error', payload });
 
-    syncMocks.loadFromFile.mockRejectedValue(new Error('network died'));
-    await expect(stagePendingFile(false)).resolves.toEqual({ ok: false, reason: 'error' });
+    // The original exception is CARRIED, not discarded: the wrapper reports it, and a
+    // classified-then-thrown-away error leaves a CloudWatch entry with no message and no
+    // stack — the opposite of the point of reporting it.
+    const boom = new Error('network died');
+    syncMocks.loadFromFile.mockRejectedValue(boom);
+    await expect(stagePendingFile(false)).resolves.toEqual({
+      ok: false,
+      reason: 'error',
+      cause: boom,
+    });
   });
 });

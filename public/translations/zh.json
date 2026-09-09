@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-09",
-    "translationCount": 4636
+    "translationCount": 4637
   },
   "translations": {
     "app.name": {
@@ -20912,7 +20912,7 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.unlock": {
-      "translation": "我的家人",
+      "translation": "打开我的家庭",
       "hash": "s1p8v6",
       "lastUpdated": "2026-09-09"
     },
@@ -21152,7 +21152,7 @@
       "lastUpdated": "2026-08-28"
     },
     "setup.choosePinHint": {
-      "translation": "在已设置家庭成员的设备上， 6位数PIN会为您登录。您的恢复工具包（下一步）是让您使用全新工具包的原因。",
+      "translation": "在已设置好家庭的设备上，6位数PIN码可为您登录。您的恢复工具包（下一步）才是在全新设备上打开家庭数据的方式。",
       "hash": "oh5du0",
       "lastUpdated": "2026-09-09"
     },
@@ -23172,18 +23172,23 @@
       "lastUpdated": "2026-09-09"
     },
     "recovery.passphraseRequired": {
-      "translation": "请输入您的密码短语",
+      "translation": "请输入您的恢复密码。",
       "hash": "p4xx6g",
       "lastUpdated": "2026-09-09"
     },
     "join.setPinTitle": {
-      "translation": "选择",
+      "translation": "选择您的PIN码",
       "hash": "mjsnbj",
       "lastUpdated": "2026-09-09"
     },
     "join.setPinSubtitle": {
       "translation": "这款6位数PIN码仅供您使用，可在您的任何家庭设备上登录。",
       "hash": "uoowrs",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.usePassphraseLink": {
+      "translation": "使用我的恢复密码",
+      "hash": "iiktsq",
       "lastUpdated": "2026-09-09"
     }
   }

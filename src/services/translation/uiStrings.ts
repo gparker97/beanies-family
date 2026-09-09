@@ -4868,6 +4868,13 @@ const STRING_DEFS = {
       'an optional memorable phrase that unlocks your family data on any device. anyone who knows it can open your data, so keep it private.',
   },
   'recovery.passphraseSet': { en: 'Set Passphrase', beanie: 'set passphrase' },
+  // The LOGIN-gate link. Deliberately NOT `recovery.passphraseSet` ('Set Passphrase'),
+  // which is the Settings action button: on the sign-in screen that told a locked-out
+  // person to create a passphrase rather than enter the one they have.
+  'recovery.usePassphraseLink': {
+    en: 'Use my recovery passphrase',
+    beanie: 'use my recovery passphrase',
+  },
   'recovery.passphraseChange': { en: 'Change Passphrase', beanie: 'change passphrase' },
   'recovery.passphraseIsSet': {
     en: 'A recovery passphrase is set for this family.',
