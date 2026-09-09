@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-09",
-    "translationCount": 4640
+    "translationCount": 4645
   },
   "translations": {
     "app.name": {
@@ -23204,6 +23204,31 @@
     "loginV6.unlockNoAccessTitle": {
       "translation": "无法登录此家庭？",
       "hash": "q7lrbx",
+      "lastUpdated": "2026-09-09"
+    },
+    "loginV6.unlockSubtitleEither": {
+      "translation": "输入您的密码或恢复密码，我们将找到您的账号",
+      "hash": "cbzokv",
+      "lastUpdated": "2026-09-09"
+    },
+    "loginV6.unlockFooterEither": {
+      "translation": "任何一个都会解密您的本地数据。我们不会存储或恢复它们。",
+      "hash": "rk6zy9",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.secretEitherLabel": {
+      "translation": "密码或恢复密码",
+      "hash": "tsf6mb",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.secretEitherPlaceholder": {
+      "translation": "请输入任意一个",
+      "hash": "ocsbub",
+      "lastUpdated": "2026-09-09"
+    },
+    "recovery.useSecretEitherLink": {
+      "translation": "使用我的密码或恢复密码",
+      "hash": "mpejh9",
       "lastUpdated": "2026-09-09"
     }
   }

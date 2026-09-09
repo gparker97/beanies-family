@@ -4050,6 +4050,10 @@ const STRING_DEFS = {
     en: "Enter your family recovery passphrase and we'll find your account",
     beanie: "enter your family recovery passphrase and we'll find your account",
   },
+  'loginV6.unlockSubtitleEither': {
+    en: "Enter your password or recovery passphrase and we'll find your account",
+    beanie: "enter your password or recovery passphrase and we'll find your account",
+  },
   'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
   'loginV6.unlockMemberCount': {
     en: '{count} members in this family',
@@ -4064,6 +4068,11 @@ const STRING_DEFS = {
   'loginV6.unlockFooterPassphrase': {
     en: "This passphrase decrypts your local data. We don't store or recover it.",
     beanie: "this passphrase decrypts your local data. we don't store or recover it.",
+  },
+  // ...and the partner for an envelope that accepts both.
+  'loginV6.unlockFooterEither': {
+    en: "Either one decrypts your local data. We don't store or recover them.",
+    beanie: "either one decrypts your local data. we don't store or recover them.",
   },
   'loginV6.unlockNoPasswordTitle': {
     en: "Don't have the password?",
@@ -4949,6 +4958,22 @@ const STRING_DEFS = {
   'recovery.passphraseLabel': {
     en: 'Family Recovery Passphrase',
     beanie: 'family recovery passphrase',
+  },
+  // The one secret field accepts a member password OR the family recovery passphrase
+  // (`tryUnwrapFamilyKey` tries the wraps, then the passphrase). When the envelope
+  // carries both, it has to say so, or the passphrase silently works while the label
+  // denies it.
+  'recovery.secretEitherLabel': {
+    en: 'Password or Recovery Passphrase',
+    beanie: 'password or recovery passphrase',
+  },
+  'recovery.secretEitherPlaceholder': {
+    en: 'Enter either one',
+    beanie: 'enter either one',
+  },
+  'recovery.useSecretEitherLink': {
+    en: 'Use my password or passphrase',
+    beanie: 'use my password or passphrase',
   },
   'recovery.passphrasePlaceholder': {
     en: 'Enter your recovery passphrase',
