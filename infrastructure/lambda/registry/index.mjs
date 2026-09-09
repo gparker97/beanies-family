@@ -1,10 +1,5 @@
 /* global process */
-import {
-  DynamoDBClient,
-  GetItemCommand,
-  PutItemCommand,
-  DeleteItemCommand,
-} from '@aws-sdk/client-dynamodb';
+import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
 const client = new DynamoDBClient({});
@@ -82,10 +77,19 @@ export async function handler(event) {
         new GetItemCommand({
           TableName: tableName,
           Key: marshall({ familyId }),
+          // Strongly consistent. An eventually-consistent read can miss a row
+          // written moments ago, and a client told "absent" for a family that
+          // does exist takes a recovery path it had no business taking.
+          ConsistentRead: true,
         })
       );
       if (!Item) return response(404, { error: 'Family not found' }, event);
-      return response(200, unmarshall(Item), event);
+      const row = unmarshall(Item);
+      // A tombstoned row is GONE as far as every client is concerned. Its
+      // identity attributes survive so a later PUT can restore them (see the
+      // DELETE arm); that is bookkeeping, not a live family.
+      if (row.deletedAt) return response(404, { error: 'Family not found' }, event);
+      return response(200, row, event);
     }
 
     if (method === 'PUT') {
@@ -100,6 +104,11 @@ export async function handler(event) {
         new GetItemCommand({
           TableName: tableName,
           Key: marshall({ familyId }),
+          // Strongly consistent, and this one is load-bearing: the result feeds a
+          // full-row PutItem, so a stale miss does not merely read wrong — it
+          // CLOBBERS every write-once field (createdAt, ownerMemberId,
+          // ownerEmail, signupPlatform) with the defaults below.
+          ConsistentRead: true,
         })
       );
       const existing = existingRaw ? unmarshall(existingRaw) : {};
@@ -136,8 +145,35 @@ export async function handler(event) {
       //   3. Row has neither (pre-2026-04-12, dormant since) -> fall open, exactly
       //      as today, and stamp both.
       const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : null);
+
+      // ─── WHO IS WRITING, vs who the row says OWNS the family ───────────────
+      //
+      // Until 2026-09-09 these were one field. The client sent the signed-in
+      // member's id AS `ownerMemberId`, so "the owner is whoever is writing" was
+      // baked into the wire format, and a member device writing to a row the
+      // registry had just lost stamped itself owner. `ownerMemberId` now means
+      // the OWNER FROM THE POD ROSTER and `writerMemberId` means this device's
+      // signed-in member; the guard asks the second and protects the first.
+      //
+      // The fallback is presence-based, NOT `??`, and the distinction is the
+      // whole point:
+      //
+      //   - Field ABSENT  => a client that predates the split. It is sending its
+      //     own session id as `ownerMemberId`, which is exactly the value the
+      //     old guard compared, so judging it on that keeps it working. Without
+      //     this, deploying the guard refuses the pointer for the whole fleet at
+      //     once.
+      //   - Field PRESENT but null => a current client with NO signed-in member.
+      //     `??` would fall back to `ownerMemberId` — the roster owner, a value
+      //     any device holding the decrypted pod can compute — and hand the
+      //     guard's own answer to an unauthenticated writer. Presence keeps that
+      //     shut: no writer id, no pointer move.
+      //
+      // Remove the fallback only once no pre-split client is in the field.
+      const writerMemberId = 'writerMemberId' in body ? body.writerMemberId : body.ownerMemberId;
+
       const isOwner = existing.ownerMemberId
-        ? body.ownerMemberId === existing.ownerMemberId
+        ? writerMemberId === existing.ownerMemberId
         : !existing.ownerEmail ||
           (!!normEmail(body.ownerEmail) &&
             normEmail(body.ownerEmail) === normEmail(existing.ownerEmail));
@@ -163,7 +199,7 @@ export async function handler(event) {
           String(existing.ownerEmail).split('@')[1],
           String(body.ownerEmail).split('@')[1],
           String(existing.ownerMemberId ?? '').slice(-6),
-          String(body.ownerMemberId ?? '').slice(-6)
+          String(writerMemberId ?? '').slice(-6)
         );
       }
 
@@ -232,10 +268,13 @@ export async function handler(event) {
         //      created on iOS as `web` the first time its owner opened a browser.
         //   2. `body.isSignupEvent` — only a genuine family-creation write may
         //      stamp at all. Row EXISTENCE is NOT a usable proxy for "this is a
-        //      signup": `syncStore.disconnect()` DELETES the row (an ordinary
-        //      Settings action, fire-and-forget), so an iOS family whose owner
-        //      later disconnects and reconnects from a browser would come back
-        //      through the create branch and be permanently relabelled `web`.
+        //      signup". This used to cite `syncStore.disconnect()`, which dropped
+        //      the row outright from an ordinary Settings action; that function is
+        //      deleted and the DELETE arm below tombstones rather than drops, so a
+        //      deleted-then-recreated family now comes back with its original
+        //      stamp. The flag stays anyway: the guarantee must not rest on which
+        //      callers happen to exist this week, and a row can still be removed
+        //      by hand in ops.
         //
         // Together: absent stays absent, and absent means UNKNOWN — excluded from
         // platform breakdowns, never assumed web. A pod creation whose registry
@@ -268,10 +307,85 @@ export async function handler(event) {
     }
 
     if (method === 'DELETE') {
-      await client.send(
-        new DeleteItemCommand({
+      // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
+      //
+      // A hard delete lost `createdAt`, `ownerMemberId`, `ownerEmail`, `country`
+      // and `signupPlatform` irrecoverably, and the next write from ANY member
+      // device recreated the row from scratch with that member stamped as the
+      // owner. That is how greg's pod reported an owner it never had. See
+      // docs/investigations/2026-09-08-compaction-fallout.md items 3 + 8.
+      //
+      // Keeping the identity attributes makes that loss structurally impossible:
+      // a re-registration restores the row the family had rather than inventing
+      // a new one. The client-side fix (a per-device action no longer issues a
+      // DELETE at all) closes the door that was actually used; this closes the
+      // room, because the investigation could not fully identify the trigger and
+      // defence in depth is the whole design here.
+      const { Item: existingRaw } = await client.send(
+        new GetItemCommand({
           TableName: tableName,
           Key: marshall({ familyId }),
+          ConsistentRead: true,
+        })
+      );
+      const existing = existingRaw ? unmarshall(existingRaw) : null;
+
+      // Nothing to tombstone. Writing a bare `deletedAt` row for a family that
+      // never registered would manufacture junk every reader then has to filter,
+      // so report the same idempotent success the hard delete gave.
+      if (!existing) return response(200, { success: true }, event);
+
+      // ─── DELETE ladder, step 1 of 2: MEASURE, DO NOT ENFORCE ─────────────
+      //
+      // NOT AUTHORIZATION, and it must not later be mistaken for it. The API key
+      // ships inside the client bundle, so a curl gets the same answer here that
+      // the app does — exactly as the pointer guard above already concedes. This
+      // defends a family against the APP'S OWN BUGS, which is the failure that
+      // actually happened, and against nothing else.
+      //
+      // The delete still proceeds. This warn IS the measurement that decides when
+      // the 403 can ship: every client deployed before the writer id goes on the
+      // wire sends none at all and would be refused on day one, including the
+      // Playwright teardown hook. Enforce only once this line is quiet for real
+      // families for a full release cycle.
+      const writerMemberId = event.queryStringParameters?.writerMemberId;
+      const writerValid = typeof writerMemberId === 'string' && UUID_RE.test(writerMemberId);
+      const deleteAuthorized =
+        writerValid && !!existing.ownerMemberId && writerMemberId === existing.ownerMemberId;
+
+      if (!deleteAuthorized) {
+        // Id TAILS only — never a full member id in CloudWatch, matching the
+        // masking the pointer-refusal warn above already uses.
+        console.warn(
+          '[registry] delete would be refused',
+          familyId,
+          writerValid ? String(writerMemberId).slice(-6) : 'no-writer-id',
+          String(existing.ownerMemberId ?? '').slice(-6) || 'no-owner'
+        );
+      }
+
+      await client.send(
+        new PutItemCommand({
+          TableName: tableName,
+          Item: marshall(
+            {
+              familyId,
+              // Identity and provenance survive so a restore is a restore.
+              createdAt: existing.createdAt ?? null,
+              ownerMemberId: existing.ownerMemberId ?? null,
+              ownerEmail: existing.ownerEmail ?? null,
+              country: existing.country ?? null,
+              signupPlatform: existing.signupPlatform ?? null,
+              // Everything else is deliberately DROPPED, and the omissions are
+              // decisions: the canonical pointer (a stale pointer is worse than
+              // none), the activity signals and roster size (they would keep a
+              // deleted family alive in the metrics), and `familyName` +
+              // `subscribeNewsletter` (family content and a marketing consent —
+              // the user asked for this family to be gone).
+              deletedAt: new Date().toISOString(),
+            },
+            { removeUndefinedValues: true }
+          ),
         })
       );
       return response(200, { success: true }, event);
