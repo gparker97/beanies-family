@@ -1985,6 +1985,59 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+### ⭐⭐ Session 2026-09-09 (2) — READ THIS BLOCK FIRST ⭐⭐
+
+> **STAGE 2 IS DEPLOYED TO PROD. Everything else is on `main`, UNDEPLOYED and UNPUSHED.**
+>
+> The registry Lambda was applied 2026-09-09 (`terraform apply`, account
+> 517040426968). Verified afterwards: the deployed code is byte-identical to the
+> repo, and all eight behaviours were exercised live against the DEV table —
+> create, read, tombstone, 404-after-delete, a member's write to a deleted family
+> refused without writing, an owner's restore lifting the tombstone while
+> preserving `createdAt` and `signupPlatform`, and a member refused the pointer on
+> a live row. Both new guard warns are in CloudWatch, masked to id tails.
+>
+> ⚠️ **DO NOT DEPLOY THE WEB BUNDLE YET.** Stages 4 and 5 (client `writerMemberId`
+> / `writerEmail` / roster-sourced owner) are committed but are deliberately being
+> HELD BACK to let stage 2 soak. The deploy order is Lambda-then-web and the Lambda
+> half is done; the web half is a decision, not a leftover.
+>
+> ⚠️ **THE AUTH WORK WAS REVERTED. Do not re-apply it from the commit history.**
+> `db105529` takes round 7's `googleAuth` / `driveTokenRecovery` /
+> `googleDriveProvider` changes back out. Eight `/code-review max` rounds ran; rounds
+> 5-8 each found defects in the previous round's fixes, almost all in that one
+> subsystem, and round 8 showed round 7's fixes were net-negative (a ~18 req/min
+> poll storm, a disabled `critical` page, a token destroyed on transient network
+> failure). **Start from `docs/plans/2026-09-09-auth-token-lifecycle-brief.md`** —
+> it lists seven still-open defects with the mechanism of each failed fix, and says
+> why the state machine has to be written down before any code changes.
+>
+> **Stage 6 is still not built, and that is greg's decision, made twice.** Its
+> ready-to-execute brief is `docs/plans/2026-09-09-stage-6-preservation-brief.md`.
+> Its value went UP this session: the orange lineage banner only appears when the
+> automatic rebase could not run, and what stops the rebase is a missing baseline —
+> which is exactly what the stage-6 carry does not need. It is the lever that makes
+> that banner rare.
+>
+> **Still owed, in order:**
+>
+> 1. Let stage 2 soak. Watch `[registry] delete would be refused` and
+>    `[registry] write to a deleted family refused` in CloudWatch.
+> 2. Then decide on the web deploy (stages 4 + 5).
+> 3. After BOTH halves are live: re-verify `ownerMemberId` on greg's row
+>    `ae92950b`. It was hand-NULLed and is re-claimable until a current client
+>    stamps it.
+> 4. Drop `dynamodb:DeleteItem` from the registry Lambda's IAM policy
+>    (`infrastructure/modules/registry/main.tf:80`) — unused since the tombstone.
+>    Must land AFTER the Lambda deploy, which it now has.
+> 5. §2d-ii (the registry DELETE 403) stays gated on a MEASUREMENT: the
+>    `delete would be refused` warn must be quiet for real families for a full
+>    release cycle. Every pre-stage-4 client sends no writer id.
+> 6. `promptBelowVersion` stays `0.16` until 0.17 is live on BOTH stores.
+>
+> **jojo is stopped and disabled** until Thursday, at greg's request. Restore with
+> `systemctl --user enable --now jojo.service`.
+
 ### ⭐ Session 2026-09-09 (2) — the compaction plan is DONE except stage 6 ⭐
 
 > ⭐⭐ **READ `docs/investigations/2026-09-08-compaction-fallout.md` § HANDOFF
