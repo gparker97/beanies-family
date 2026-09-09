@@ -30,11 +30,13 @@ import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
   buildRebaseOps,
+  // ⚠️ ONE NAME. This module used to import `applyMutation` TWICE — once aliased
+  // as `applyMutationOp` and once bare — with each name used exactly once, so a
+  // reader could not tell which was canonical.
   applyMutation as applyMutationOp,
   migrateDoc,
   loadDoc,
   saveDoc,
-  applyMutation,
   mergeDocs,
   getHeads as headsOf,
   getChangesSince as changesSince,
@@ -56,6 +58,7 @@ import type {
   MutationOp,
   ProjectionDelta,
   Heads,
+  MergeOutcome,
   CachePersistFailureDetail,
   CacheClearResult,
 } from './protocol';
@@ -760,7 +763,7 @@ export function mutate(op: MutationOp): {
 } {
   const doc = requireDoc('mutate');
   const before = headsOf(doc);
-  const { doc: next, result, delta } = applyMutation(doc, op);
+  const { doc: next, result, delta } = applyMutationOp(doc, op);
   const changed = !headsEqual(before, headsOf(next));
   currentDoc = next;
   if (changed) {
@@ -890,23 +893,11 @@ export async function mergeRemoteEnvelope(
   envelope: BeanpodFileV4,
   id: string | null,
   basis: LineageBasis
-): Promise<{
-  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-  heads: Heads;
-  dirty: boolean;
-  changed: boolean;
-  remoteHeads: Heads;
-  /** How many ops a rebase replayed. Absent on every other action. */
-  replayed?: number;
-  /** Fields both sides wrote that could not be merged; the saved value stayed. */
-  conflicts?: number;
-  /**
-   * The policy asked for a rebase and it could not run, so this outcome is a
-   * fallback rather than the policy's own answer. Diagnostic only — nothing
-   * branches on it. `user-file` adopts only; every other context throws.
-   */
-  rebaseUnavailable?: true;
-}> {
+  // ⚠️ `MergeOutcome`, not an inline literal. This shape used to be hand-copied
+  // five times across the worker, `docClient` and `syncService`; it is declared
+  // once in `protocol.ts` so a new field cannot be added here and silently
+  // dropped by a consumer's stale annotation.
+): Promise<MergeOutcome> {
   const key = requireKey('mergeRemoteEnvelope');
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,

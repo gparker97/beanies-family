@@ -57,6 +57,7 @@ import {
   type LineageBasis,
   type ExportedPayload,
   type CacheClearResult,
+  type MergeOutcome,
 } from './protocol';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
@@ -1292,18 +1293,10 @@ export async function mergeRemoteEnvelope(
    */
   basis: LineageBasis,
   opts?: RequestOpts
-): Promise<{
-  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-  /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
-  replayed?: number;
-  conflicts?: number;
-  /** The policy asked for a rebase and it could not run. Diagnostic only. */
-  rebaseUnavailable?: true;
-  heads: Heads;
-  dirty: boolean;
-  changed: boolean;
-  remoteHeads: Heads;
-}> {
+  // ⚠️ `MergeOutcome` from `protocol.ts`, the ONE declaration. The worker returns
+  // it and this is the only boundary it crosses, so a second copy here could only
+  // ever drift.
+): Promise<MergeOutcome> {
   // ⚠️ NO PRE-CHECK HERE ANY MORE, AND ITS REMOVAL IS THE FIX.
   //
   // A `rehydrateFailed` latch used to be tested at this point. It could not
@@ -1318,20 +1311,9 @@ export async function mergeRemoteEnvelope(
   // holds no document (`applyAndProject.mergeRemoteEnvelope`). That is the one
   // place the fact is actually known, it is checked at the moment of the merge
   // rather than before it, and it covers all three docless routes instead of one.
-  type MergeResult = {
-    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-    /** Ops a rebase replayed, and writes it could not carry. Rebase only. */
-    replayed?: number;
-    conflicts?: number;
-    rebaseUnavailable?: true;
-    heads: Heads;
-    dirty: boolean;
-    changed: boolean;
-    remoteHeads: Heads;
-  };
-  let res: MergeResult;
+  let res: MergeOutcome;
   try {
-    res = await request<MergeResult>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
+    res = await request<MergeOutcome>('mergeRemoteEnvelope', { envelope, familyId, basis }, opts);
   } catch (err) {
     // ⚠️ THE OTHER HALF OF THE SAME SIGNAL. A rebase that could not run either
     // adopts (`user-file`) or throws (everything else), so reporting only the
@@ -1376,7 +1358,7 @@ export async function mergeRemoteEnvelope(
         message: 'merge re-issued as a wholesale install — main had been told this cache was empty',
         context: { action: 'no-local-document-corroborated', family_id: familyId },
       });
-      res = await request<MergeResult>(
+      res = await request<MergeOutcome>(
         'mergeRemoteEnvelope',
         { envelope, familyId, basis: { kind: 'no-local-document' } satisfies LineageBasis },
         opts
@@ -1398,12 +1380,18 @@ export async function mergeRemoteEnvelope(
   return res;
 }
 
-/** What a merge terminus needs to report. Structural subset of the outcome. */
-export interface MergeTerminusOutcome {
-  action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-  replayed?: number;
-  conflicts?: number;
-}
+/**
+ * What a merge terminus needs to report. A DELIBERATELY LOOSER view of
+ * `MergeOutcome` (`protocol.ts`), which is the source of truth for the shape.
+ *
+ * ⚠️ EXACTLY THESE THREE KEYS. Callers pass fresh object literals (see
+ * `docClient.test.ts`), so widening the `Pick` to `heads`/`dirty`/`changed`/
+ * `remoteHeads` would break them — and the terminus genuinely does not need them.
+ * `carried`/`carryFailed` are excluded for a second reason: the carry is reported
+ * from `mergeRemoteEnvelope`'s own wrapper (`finishMerge`), so every caller is
+ * covered by construction rather than by whether it happens to log a terminus.
+ */
+export type MergeTerminusOutcome = Pick<MergeOutcome, 'action' | 'replayed' | 'conflicts'>;
 
 /**
  * Report where a merge ended up. ONE implementation, both termini.

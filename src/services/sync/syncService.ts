@@ -18,7 +18,7 @@ import {
   type RemoteBlocker,
 } from '@/types/sync';
 import { PodLineageError } from '@/services/sync/podLineage';
-import type { LineageBasis } from '@/services/automerge/worker/protocol';
+import type { LineageBasis, MergeOutcome } from '@/services/automerge/worker/protocol';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, beanpodVersionFor } from './fileSync';
@@ -1694,12 +1694,16 @@ async function fetchAndMergeRemote(): Promise<void> {
   // exist), then merges or adopts, and returns which it did. `adopted` returns
   // the SAME shape as `merged`, so the baseline commit, `setEnvelope`, the latch
   // clear and the `if (dirty)` tail below are all unchanged.
-  let merged: {
-    action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
-    dirty: boolean;
+  // ⚠️ A DELIBERATELY LOOSER VIEW of `MergeOutcome` (`worker/protocol.ts`), which
+  // is the source of truth for the shape. It is NOT a hand-copy any more, but it
+  // does keep `remoteHeads` NULLABLE where the contract says `Heads`, and that is
+  // a decision rather than drift: `commitRemoteBaseline(remoteHeads ?? null)`
+  // below is the documented fail-safe idiom shared with `syncStore` — an absent
+  // field means "we do not KNOW what Drive holds", which must resolve to "read
+  // again", never to a false skip. Picking the contract's non-null `Heads` would
+  // make that `??` provably dead and silently delete the fail-safe.
+  let merged: Pick<MergeOutcome, 'action' | 'dirty' | 'replayed' | 'conflicts'> & {
     remoteHeads: string[] | null;
-    replayed?: number;
-    conflicts?: number;
   };
   try {
     merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, remoteEnvelope.familyId, basis);
