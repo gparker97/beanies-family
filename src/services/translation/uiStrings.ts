@@ -4044,6 +4044,12 @@ const STRING_DEFS = {
     en: "Enter your password and we'll find your account",
     beanie: "enter your password and we'll find your account",
   },
+  // Shown instead of the above when the envelope carries a recovery passphrase but no
+  // password wraps — naming the credential the family actually has.
+  'loginV6.unlockSubtitlePassphrase': {
+    en: "Enter your family recovery passphrase and we'll find your account",
+    beanie: "enter your family recovery passphrase and we'll find your account",
+  },
   'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
   'loginV6.unlockMemberCount': {
     en: '{count} members in this family',
@@ -4053,9 +4059,21 @@ const STRING_DEFS = {
     en: "This password decrypts your local data. We don't store or recover it.",
     beanie: "this password decrypts your local data. we don't store or recover it.",
   },
+  // The passphrase partner of the above. The secret field serves both credentials, so
+  // the reassurance under it has to name whichever one this envelope actually accepts.
+  'loginV6.unlockFooterPassphrase': {
+    en: "This passphrase decrypts your local data. We don't store or recover it.",
+    beanie: "this passphrase decrypts your local data. we don't store or recover it.",
+  },
   'loginV6.unlockNoPasswordTitle': {
     en: "Don't have the password?",
     beanie: "don't have the password?",
+  },
+  // The credential-neutral partner, for a family whose file has no password wraps at all
+  // (kit-born, passphrase-only, or nothing). Same card, same advice: ask for an invite.
+  'loginV6.unlockNoAccessTitle': {
+    en: "Can't sign in to this family?",
+    beanie: "can't sign in to this family?",
   },
   'loginV6.unlockNoPasswordHint': {
     en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow, no password needed up front.',
