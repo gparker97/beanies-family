@@ -45,6 +45,15 @@ vi.mock('@/services/indexeddb/database', () => ({
 
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
+// Step 3 reaches `syncService` through a DYNAMIC import, so the factory is only
+// ever evaluated on the path that takes it.
+let remoteBlocked: object | null = null;
+const readRemoteDriveConnections = vi.fn<() => Promise<unknown[] | null>>();
+vi.mock('@/services/sync/syncService', () => ({
+  isRemoteBlocked: () => remoteBlocked,
+  readRemoteDriveConnections: () => readRemoteDriveConnections(),
+}));
+
 import {
   matchesBoundAccount,
   readDriveTokenFromDoc,
@@ -62,6 +71,9 @@ beforeEach(async () => {
   onLocalRead = null;
   tokenValid = false;
   mockSessionEpoch = 0;
+  remoteBlocked = null;
+  readRemoteDriveConnections.mockReset();
+  readRemoteDriveConnections.mockResolvedValue(null);
 });
 
 async function seedDoc(accountEmail: string, refreshToken: string, issuedAt: number | null) {
@@ -265,5 +277,113 @@ describe('tryReconnectSilently', () => {
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'auth-epoch-discard' })
     );
+  });
+});
+
+describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () => {
+  const REMOTE_ENTRY = {
+    accountEmail: 'greg@example.com',
+    refreshToken: 'remote-tok',
+    issuedAt: 3000,
+  };
+
+  /** Local dead, our own doc copy dead too — the state step 3 exists for. */
+  function bothLocalCopiesDead() {
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    attemptSilentRefresh.mockResolvedValue(null);
+  }
+
+  it('adopts a newer token from the remote pod when the pod is LATCHED', async () => {
+    bothLocalCopiesDead();
+    remoteBlocked = { blockCode: 'lineage' };
+    readRemoteDriveConnections.mockResolvedValue([REMOTE_ENTRY]);
+    // The adopt attempt is the one that succeeds.
+    attemptSilentRefresh
+      .mockResolvedValueOnce(null) // step 1, local
+      .mockResolvedValueOnce('access-token'); // step 3, remote copy
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(true);
+    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'remote-tok', {
+      issuedAt: 3000,
+    });
+    expect(primeRefreshToken).toHaveBeenCalledWith('fam-1', {
+      token: 'remote-tok',
+      issuedAt: 3000,
+    });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'healed-from-remote' } })
+    );
+  });
+
+  it('does NOT read the remote pod when the pod is not latched', async () => {
+    // Everywhere else the ordinary merge is about to deliver the same document,
+    // so a second full download would be pure waste.
+    bothLocalCopiesDead();
+    remoteBlocked = null;
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(readRemoteDriveConnections).not.toHaveBeenCalled();
+  });
+
+  it('a WHOLLY DEAD credential changes nothing, and says so once', async () => {
+    // The honest limit of step 3: a device that cannot read Drive at all gets
+    // today's behaviour. Without the event, an inert step 3 would be invisible.
+    bothLocalCopiesDead();
+    remoteBlocked = { blockCode: 'lineage' };
+    readRemoteDriveConnections.mockResolvedValue(null);
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(primeRefreshToken).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'remote-read-unavailable' } })
+    );
+  });
+
+  it('never re-tries a token this device has already proved dead', async () => {
+    bothLocalCopiesDead();
+    remoteBlocked = { blockCode: 'lineage' };
+    // The remote mirrors the very token step 1 just failed on.
+    readRemoteDriveConnections.mockResolvedValue([
+      { accountEmail: 'greg@example.com', refreshToken: 'local-tok', issuedAt: 9000 },
+    ]);
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(attemptSilentRefresh).toHaveBeenCalledTimes(1); // step 1 only
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('never adopts a token belonging to a DIFFERENT Google account', async () => {
+    // The per-account invariant holds on the remote read exactly as it does on
+    // the local one — a device acting as B must never take A's credential.
+    bothLocalCopiesDead();
+    remoteBlocked = { blockCode: 'lineage' };
+    readRemoteDriveConnections.mockResolvedValue([
+      { accountEmail: 'someone-else@example.com', refreshToken: 'other-tok', issuedAt: 9000 },
+    ]);
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('does not reach step 3 at all when there is no bound account', async () => {
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    attemptSilentRefresh.mockResolvedValue(null);
+    remoteBlocked = { blockCode: 'lineage' };
+
+    expect(await tryReconnectSilently(undefined)).toBe(false);
+    expect(readRemoteDriveConnections).not.toHaveBeenCalled();
+  });
+
+  it('prefers our own doc copy — the remote read is a last resort, not a first', async () => {
+    localToken = { token: 'local-tok', issuedAt: 1000 };
+    await seedDoc('greg@example.com', 'doc-tok', 2000);
+    remoteBlocked = { blockCode: 'lineage' };
+    attemptSilentRefresh
+      .mockResolvedValueOnce(null) // step 1
+      .mockResolvedValueOnce('access-token'); // step 2 succeeds
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(true);
+    expect(readRemoteDriveConnections).not.toHaveBeenCalled();
   });
 });
