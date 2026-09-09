@@ -29,6 +29,7 @@ import {
   attemptSilentRefresh,
   isTokenValid,
   getSessionEpoch,
+  tryCandidateRefreshToken,
 } from './googleAuth';
 import { logEvent } from '@/services/telemetry';
 import {
@@ -99,7 +100,21 @@ export async function readDriveTokenFromDoc(
  * B2 — best-effort mirror of the just-acquired refresh token into the doc, keyed
  * by account. Registered as an `onTokenAcquired` subscriber (see
  * `registerDriveTokenMirror`). A DUMB mirror: it persists whatever the local
- * store holds; precedence/newer-wins lives ONLY in `reconcileDriveTokenWithDoc`.
+ * store holds. Precedence lives in the two READERS, and they now answer different
+ * questions: `reconcileDriveTokenWithDoc` adopts only when this device has no
+ * token at all, and `adoptDocToken` adopts only what Google has just accepted.
+ * Neither READER compares ages any more.
+ *
+ * ⚠️ THE MIRROR-UP DIRECTION STILL DOES, and it is a known open item rather than
+ * an oversight. `reconcileDriveTokenWithDoc`'s `mirrorLocalToDoc` branch takes a
+ * strictly-newer LOCAL token and writes it over the shared doc entry WITHOUT
+ * validating it, so a device holding a token Google has already killed (an
+ * individual revoke, or FIFO eviction at the per-client cap) whose `issuedAt` is
+ * newer can still overwrite the family's live shared copy. That hazard predates
+ * this change and is unchanged by it; a consent on any device repairs the entry
+ * via this mirror. Fixing it means probing on the write path too — a separate
+ * decision, deliberately not bundled here. See
+ * `docs/plans/2026-09-09-adopt-only-a-token-google-accepted.md` § follow-ups.
  * Gated on `interactive` because silent refreshes don't rotate the refresh token
  * (re-mirroring them would churn the CRDT every ~hour for no value).
  */
@@ -176,6 +191,136 @@ async function restoreLocalFromDoc(
 }
 
 /**
+ * What the CALLER must do next — nothing more.
+ *
+ * The four telemetry `action` values live at the emit sites inside
+ * `adoptDocToken`; they are the observability contract, and the return type is
+ * not the place to re-encode them. No caller needs to tell "Google refused" from
+ * "we kept the local one" apart: both mean the connection is not live and there
+ * is nothing further to try here.
+ */
+type AdoptOutcome =
+  /** Google accepted the candidate. It is installed and the connection is LIVE. */
+  | 'accepted'
+  /** Persisted WITHOUT validation, because there was no local token to lose. Not live. */
+  | 'unverified-adopted'
+  /** Nothing was written. The local credential, if any, is untouched. */
+  | 'not-adopted';
+
+/**
+ * The one shared, VALIDATED "adopt the doc token" step.
+ *
+ * ⚠️ THE WHOLE POINT IS THAT IT ASKS GOOGLE FIRST. Adopting a mirrored token
+ * before validating it is what destroyed working credentials across a whole
+ * family (see `tryCandidateRefreshToken`). A candidate Google refuses now leaves
+ * the local credential exactly where it was.
+ *
+ * Three epoch guards exist on this path and they are NOT redundant — do not
+ * "de-duplicate" them, they guard three different instants:
+ *   1. the fast path below (a sign-out that already happened — skip the exchange),
+ *   2. `commitAcquiredToken`'s pre-commit + post-persist checks (accept arm),
+ *   3. `restoreLocalFromDoc`'s check, re-evaluated AT WRITE TIME (blind arm).
+ */
+async function adoptDocToken(
+  familyId: string,
+  docTok: StoredRefreshToken,
+  expectedEpoch: number
+): Promise<AdoptOutcome> {
+  // Fast path only. It also carries the `auth-epoch-discard` event, because after
+  // this change the probe short-circuits before `restoreLocalFromDoc` is reached,
+  // and that event is the only production signal that a sign-out cancelled an
+  // adopt. Same observable, emitted one layer up.
+  if (expectedEpoch !== getSessionEpoch()) {
+    logEvent({
+      level: 'info',
+      surface: 'auth-epoch-discard',
+      message:
+        'skipped adopting the beanpod Drive token — signed out during recovery (epoch advanced)',
+    });
+    return 'not-adopted';
+  }
+
+  // Re-read HERE, once, for every caller. This is the read `tryReconnectSilently`
+  // used to do inline, and its rationale is unchanged: step 3 can spend seconds on
+  // a multi-MB download, and a redirect return or the wake listener may have
+  // installed a fresher credential in that window. Owning it here rather than
+  // taking a "has a local token" parameter is what makes "one place" true — a
+  // caller could otherwise pass a value read before its own await.
+  const current = await getGoogleRefreshToken(familyId);
+  if (current?.token === docTok.token) return 'not-adopted'; // already ours; no probe, no noise
+
+  const { outcome, errorCode } = await tryCandidateRefreshToken(familyId, docTok, expectedEpoch);
+
+  if (outcome === 'accepted') {
+    logEvent({
+      level: 'info',
+      surface: 'drive-token-adopt',
+      message: 'adopted a mirrored Drive token that Google accepted',
+      context: { action: 'candidate-accepted' },
+    });
+    return 'accepted';
+  }
+
+  if (outcome === 'rejected') {
+    // THE signal this whole class of bug lacked. A poisoned shared entry shows up
+    // as this line rising across distinct devices in one family.
+    logEvent({
+      level: 'warn',
+      surface: 'drive-token-adopt',
+      message: 'Google refused the mirrored Drive token — local credential left untouched',
+      // ⚠️ THE CODE GOOGLE ACTUALLY USED, not a hardcoded guess.
+      // `isPermanentRefreshFailure` matches `invalid_grant` OR `expired or
+      // revoked`, and this is the one event triage keys on — a guess dressed as a
+      // fact here would misdirect exactly when it matters most.
+      context: { action: 'candidate-refused', error_code: errorCode ?? 'invalid_grant' },
+    });
+    return 'not-adopted';
+  }
+
+  // Transient: we could not get an answer.
+  //
+  // ⚠️ RE-READ. `current` was captured BEFORE the probe, and the probe can burn a
+  // full 15s fetch timeout. In that window an interactive reconnect can mint and
+  // commit a fresh token, so a stale "this device has nothing to lose" would let
+  // the arm below overwrite a credential Google had just issued — with an
+  // unvalidated copy, which is the exact harm this whole function exists to stop.
+  // The epoch guard does NOT cover it: no sign-out happened, so the epoch is
+  // unchanged. `error_code` rides along so a proxy defect (an HTTP 4xx that is not
+  // a grant refusal) stays queryable here rather than only in `reportError`.
+  const afterProbe = await getGoogleRefreshToken(familyId);
+  if (afterProbe?.token) {
+    logEvent({
+      level: 'info',
+      surface: 'drive-token-adopt',
+      message: 'could not verify the mirrored Drive token — kept the local one',
+      context: {
+        action: 'candidate-unverified-kept-local',
+        ...(errorCode ? { error_code: errorCode } : {}),
+      },
+    });
+    return 'not-adopted';
+  }
+
+  // Nothing to lose, so adopt blind — today's exact behaviour, unchanged.
+  // ⚠️ VIA `restoreLocalFromDoc` SPECIFICALLY, because its epoch check runs at
+  // WRITE TIME. `tryCandidateRefreshToken` returns 'transient' both for a network
+  // failure AND for a sign-out that landed mid-probe (a torn-down session), and
+  // those are indistinguishable here. Without that write-time guard this arm would
+  // persist a token into a dead session: the cold-start zombie the guard prevents.
+  await restoreLocalFromDoc(familyId, docTok, expectedEpoch);
+  logEvent({
+    level: 'info',
+    surface: 'drive-token-adopt',
+    message: 'adopted a mirrored Drive token unverified — this device had no token to lose',
+    context: {
+      action: 'candidate-unverified-adopted',
+      ...(errorCode ? { error_code: errorCode } : {}),
+    },
+  });
+  return 'unverified-adopted';
+}
+
+/**
  * Mirror a local refresh token UP into the shared doc — the symmetric counterpart
  * to `restoreLocalFromDoc`, so the epoch-guard/ordering can never drift between the
  * two directions. The caller captures `getSessionEpoch()` BEFORE its async read and
@@ -208,13 +353,36 @@ async function mirrorLocalToDoc(
 
 /**
  * B3 — cold-start reconciliation. Keeps the doc copy and the local copy in sync
- * for the bound account, **strictly-newer-`issuedAt` wins** (a tie is a no-op):
+ * for the bound account:
  *  - identical tokens → nothing to do (no CRDT churn).
- *  - doc strictly newer / local missing → restore local + prime (the recovery).
+ *  - **local MISSING and a doc copy exists → restore local + prime (the recovery).**
  *  - local strictly newer / doc missing → mirror local → doc.
- *  - tokens differ but neither is strictly newer (e.g. both `issuedAt: null`) →
- *    leave the shared doc copy UNTOUCHED — an unknown-age local must not clobber
- *    it; a later fresh acquisition (real timestamp) breaks the tie.
+ *  - local present and a doc copy exists → **NOTHING**, whatever their ages.
+ *
+ * ⚠️ THIS BRANCH NO LONGER ADOPTS OVER A PRESENT LOCAL TOKEN, and that is the fix.
+ * It used to take the strictly-newer doc copy and overwrite local with it WITHOUT
+ * ASKING GOOGLE ANYTHING — so a mirrored token that was newer but dead silently
+ * replaced a working credential, and the next refresh's `invalid_grant` then
+ * cleared the store, costing that device a consent screen it did not need. Since
+ * the mirror is shared, every device did it.
+ *
+ * The heal for a device whose local token is genuinely dead has NOT been lost; it
+ * moved to where the badness is actually OBSERVED. `attemptSilentRefresh` fails →
+ * `firePermanentFailureCallbacks` → `attemptSilentSelfRecovery` →
+ * `tryReconnectSilently` → `adoptDocToken`, which asks Google before it writes.
+ *
+ * Deliberately NOT solved by probing here. This function is AWAITED on the load
+ * path, ahead of `setupAutoSync()` and `markPodCreated()` (`syncStore`), and a
+ * probe is bounded only by the OAuth proxy's 15s fetch timeout — so a dead network
+ * would add up to 15s of cold-start stall to a path that today issues zero
+ * exchanges. Not adopting costs nothing and needs no network at all.
+ *
+ * The trade, stated plainly: a device whose local token is still alive stops
+ * eagerly converging on a newer mirrored token at cold start, and converges on
+ * the next reconnect instead. Eager convergence on one shared token is precisely
+ * what propagated the dead token across the fleet, so this is the direction of
+ * travel rather than a regression.
+ *
  * Call AFTER the stores are loaded (so `boundEmail` is resolvable). If the
  * account isn't bound yet, the doc mirror on the next acquisition is the backstop.
  * Never throws.
@@ -238,15 +406,22 @@ export async function reconcileDriveTokenWithDoc(
     // Steady state — same token on both sides → no write, no churn.
     if (docTok && localTok && docTok.token === localTok.token) return;
 
-    if (docTok && (!localTok || isStrictlyNewer(docTok, localTok))) {
+    // ⚠️ `!localTok` ONLY — no `isStrictlyNewer` on this side any more. There is
+    // nothing to destroy when the device holds no token, so the blind adopt is
+    // safe and is exactly today's behaviour for that case. When the device DOES
+    // hold one, we leave it alone: see the header.
+    if (docTok && !localTok) {
       await restoreLocalFromDoc(familyId, docTok, epochAtStart);
     } else if (localTok && (!docTok || isStrictlyNewer(localTok, docTok))) {
       // Epoch-guarded, symmetric with the adopt branch above: a sign-out mid-read
       // must not propagate the torn-down session's token into the shared doc.
       await mirrorLocalToDoc(boundEmail, localTok, epochAtStart);
     }
-    // else: both present, tokens differ, neither strictly newer → ambiguous tie;
-    // leave the doc copy untouched (do not destroy a possibly-good shared token).
+    // else: both present and differing → leave BOTH copies untouched. The doc
+    // copy is not destroyed (it may be the good one for another device), and the
+    // local copy is not displaced by something Google has not vouched for. A
+    // device whose local token really is dead heals via `tryReconnectSilently`,
+    // which asks Google first.
   } catch (error) {
     reportError({
       surface: 'drive-token-reconcile',
@@ -322,45 +497,38 @@ export async function tryReconnectSilently(
     const tried = new Set<string>();
 
     /**
-     * Adopt a candidate token and see whether Google accepts it.
+     * Adopt a candidate token — Google decides, this device does not guess.
      *
-     * ⚠️ REFUSES AN OLDER COPY. `restoreLocalFromDoc` writes to IndexedDB and
-     * primes memory BEFORE anything validates the candidate, so without this an
-     * older mirrored token overwrites a newer local one — and if Google then
-     * answers `invalid_grant`, the permanent branch CLEARS the refresh token and
-     * the device ends its "recovery" with no credential at all. The module header
-     * promises this never clobbers a good local token; `reconcileDriveTokenWithDoc`
-     * exists for the same reason and already uses `isStrictlyNewer`.
-     *
-     * The local token is re-read rather than closed over: step 3 can spend
-     * seconds on a multi-MB download, and a redirect return or the wake listener
-     * may have installed a fresher credential in that window.
+     * The `provablyOlder`/`isStrictlyNewer` heuristics that used to live here are
+     * GONE, and their own comment said why they had to: `issuedAt: number | null`
+     * is a documented live shape on both sides, so unknown age is not evidence of
+     * staleness, and refusing on it pushed exactly the straggler devices this
+     * exists for to a consent screen. `adoptDocToken` asks Google instead, and
+     * writes nothing that Google has not accepted.
      */
     const adopt = async (tok: StoredRefreshToken): Promise<boolean> => {
-      const current = await getGoogleRefreshToken(familyId);
-      // ⚠️ REFUSE ONLY WHAT IS PROVABLY OLDER. The first cut used
-      // `!isStrictlyNewer(tok, current)`, which coalesces a null `issuedAt` to 0
-      // — and `issuedAt: number | null` is a documented live shape on BOTH sides
-      // (legacy entries predate the field). So a peer's genuinely-live mirrored
-      // token carrying `issuedAt: null` computed `0 > T` = false and was refused
-      // WITHOUT ever asking Google, on exactly the straggler devices strategies 2
-      // and 3 exist for, pushing them to the consent screen this module exists to
-      // avoid. Unknown age is not evidence of staleness: let Google decide.
-      const provablyOlder =
-        typeof tok.issuedAt === 'number' &&
-        typeof current?.issuedAt === 'number' &&
-        tok.issuedAt < current.issuedAt;
-      if (current?.token && current.token !== tok.token && provablyOlder) {
-        logEvent({
-          level: 'info',
-          surface: 'drive-token-silent-reconnect',
-          message: 'declined an older mirrored Drive token',
-          context: { action: 'older-token-declined' },
-        });
-        return false;
-      }
-      await restoreLocalFromDoc(familyId, tok, epochAtStart);
-      return (await attemptSilentRefresh()) !== null;
+      const outcome = await adoptDocToken(familyId, tok, epochAtStart);
+      if (outcome === 'accepted') return true;
+      // ⚠️ ONLY on the blind-adopt arm do we run the ladder, and it must stay.
+      // That arm means this device had NO token to lose, so it is the straggler
+      // this whole module exists for — and the ladder is its documented ~22.5s
+      // recovery budget (5 attempts, sized for Chrome-on-Windows wake-from-sleep).
+      // Cutting it to the single exchange the probe just made would hand that
+      // device a consent screen for one wake-time network blip.
+      //
+      // ⚠️ NOTE THE ARITHMETIC, because a comment here used to claim the 30s
+      // `syncStore.SELF_RECOVERY_TIMEOUT_MS` outlasts this, and it no longer does:
+      // the probe can spend up to 15s before the 22.5s ladder even starts, so
+      // self-recovery's `raceTimeout` can cut the wait at 30s and raise the
+      // reconnect banner while the ladder is still running. The late success then
+      // clears it via `onTokenAcquired`, so the cost is a banner flash rather than
+      // a forced consent — but it is a real, if minor, regression against that
+      // pin, recorded rather than silently absorbed.
+      if (outcome === 'unverified-adopted') return (await attemptSilentRefresh()) !== null;
+      // 'not-adopted': either Google refused (it has answered) or we kept the
+      // local token (which strategy 1 just tried). A ladder here is a guaranteed
+      // duplicate.
+      return false;
     };
 
     // 1. The EXISTING local token. `attemptSilentRefresh` recovers it from the
@@ -402,10 +570,11 @@ export async function tryReconnectSilently(
     //    that window the fetch fails, this returns false, and behaviour is
     //    exactly today's.
     //
-    //    Two things widen it slightly and deliberately: `reconnect()` passes
-    //    `assumeStale`, so the clock short-circuit no longer hides a live access
-    //    token from steps 1-3; and a peer that rotated recently is exactly the
-    //    case where the remote mirror holds something this device has not tried.
+    //    One thing widens it slightly: a peer that rotated recently is exactly
+    //    the case where the remote mirror holds something this device has not
+    //    tried. (An earlier note here claimed `reconnect()` passes `assumeStale`
+    //    to skip the clock short-circuit — that parameter was reverted in
+    //    `db105529` and never existed after it.)
     //
     //    `remote-read-unavailable` versus `healed-from-remote` measures the
     //    split, so an inert step 3 shows up as a number rather than being
