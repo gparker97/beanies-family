@@ -729,7 +729,10 @@ async function openDriveRestorePicker(): Promise<void> {
       // back on Settings with the picker closed and a raw developer string still
       // painted — and nothing in CloudWatch to find it by.
       if (outcome === 'redirecting') {
-        syncStore.clearError();
+        // ⚠️ NO `clearError()` HERE, unlike the READ ladder below. This path never
+        // painted `syncStore.error` — the listing failure surfaces through
+        // `importError` — so clearing would destroy an unrelated live
+        // save-failure slab and the recovery buttons it hosts.
         logEvent({
           level: 'info',
           surface: 'pod-load-failure',
@@ -865,25 +868,33 @@ async function handleDriveRestoreSelected(payload: {
       return;
     }
 
-    // ⚠️ THREE REVIEW ROUNDS PULLED THIS ARM AROUND. All three were right about
-    // what they objected to, and neither of the first two fixes was the answer.
+    // ⚠️ FOUR REVIEW ROUNDS PULLED THIS ARM AROUND. Writing the whole argument
+    // down, because each fix looked right and three of them were not.
     //
-    //   Round 3: do not clear — that amber slab is the ONLY host of the Reconnect
-    //            Drive and Force Save buttons, so clearing it and then telling
-    //            the user to reconnect removes the control the copy names.
+    //   Round 3: do not clear — the amber slab hosts Reconnect Drive and Force
+    //            Save, so clearing it removes the control the copy names.
     //   Round 4: you MUST clear — `syncStore.error` mirrors the service's raw
-    //            `lastError`, an untranslated exception string that on this path
-    //            can carry two email addresses. This file's own rule (see the
-    //            `NEVER syncStore.error HERE` comment further down) forbids it.
-    //   Round 5: clearing still deletes the buttons, and the copy then instructs
-    //            the user to use them.
+    //            `lastError`, an untranslated exception string that can carry two
+    //            email addresses.
+    //   Round 5: clearing still deletes the buttons.
+    //   Round 6: writing a TRANSLATED sentence into that slab does not survive.
+    //            `syncService.onStateChange` assigns `error.value = lastError` on
+    //            every one of `updateState`'s call sites, and the service still
+    //            holds the raw string — so the very next save, including the one
+    //            Force Save starts from inside that slab, either blanks it
+    //            mid-press or repaints the developer string.
     //
-    // Both objections are about the same slab, so the fix is to keep it AND make
-    // it readable: `setTranslatedError` swaps the developer string for the
-    // sentence, and the Reconnect and Force Save buttons stay exactly where the
-    // copy says they are. The raw cause is not lost — it went to the firehose
-    // above, which is where a developer string belongs.
-    syncStore.setTranslatedError(t('settings.drivePickerAuth'));
+    // So the slab is the wrong home for this sentence, full stop. `importError`
+    // has its own render site directly beneath the restore buttons — added,
+    // per the comment further down this file, precisely BECAUSE a refused file's
+    // sentence surfacing in the pod's sync-failure slab beside Force Save was
+    // itself a bug. Force Save uploads the in-memory document to Drive, which is
+    // the wrong direction for a user mid-restore.
+    //
+    // The recovery is not lost with the slab: the Restore button that started
+    // this flow is still on screen, which is what "try the restore again" means.
+    syncStore.clearError();
+    importError.value = t('settings.drivePickerAuth');
     return;
   }
 
@@ -1420,6 +1431,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
           error: e,
           context: { action: 'delete-family', error_code: 'safety-copy-delete-failed' },
         });
+        // ⚠️ AND IT MUST REACH THE FAREWELL. This arm's own comment already said
+        // "the farewell screen then tells them it is gone" — which stayed true
+        // through the three-message rewrite, because reporting `critical` is not
+        // the same as telling the person in front of the screen.
+        kept.push('safety-copy');
       }
       try {
         const config = await getProviderConfig(familyId);
@@ -1521,7 +1537,11 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       // touch", at the single most trust-sensitive moment in the app, for a
       // state the user had asked for. And `warn` on the default path is the
       // opposite of a usable alerting signal.
-      keptByChoice = true;
+      // Only when the file survives BY CHOICE. If the user asked for the Drive
+      // delete and it did not happen, `kept` already carries `pod-file` and this
+      // is a failure, not a preference — `keptByChoice` would otherwise make the
+      // two indistinguishable in both the copy and the firehose.
+      keptByChoice = !wantDeleteDrive.value;
       logEvent({
         level: 'info',
         surface: 'registry',
@@ -1531,11 +1551,17 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     }
 
     // 4. Delete local family (IndexedDB, passkeys, file handles, local registry).
+    //    Its failure also has to reach the farewell — see step 2's arms.
     //    The boolean matters: `familyContextStore.deleteLocalFamily` catches every
     //    throw and returns false, so discarding it let a failed IndexedDB or
     //    passkey teardown sail through to the farewell screen with the members,
     //    the passkeys and the cached family key still on the device.
     if (!(await familyContextStore.deleteLocalFamily(familyId))) {
+      // ⚠️ INTO `kept` TOO. Every one of the three farewell messages opens with
+      // "Your family has been removed from this device" — which is exactly the
+      // sentence this failure falsifies. Paging the team is not the same as
+      // telling the person reading the screen.
+      kept.push('local-data');
       reportError({
         surface: 'pod-access',
         severity: 'critical',
@@ -1570,9 +1596,12 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
         message: 'family deletion could not remove everything it was asked to',
         // `error_code` carries WHICH, structured and queryable — never
         // interpolated into `message` (CLAUDE.md § Observability rule 4).
+        // `count` carries the breadth; `error_code` names the FIRST survivor so
+        // an exact-match filter still finds it. A joined string made
+        // `error_code = "pod-file"` miss every combined case.
         context: {
           action: 'delete-family',
-          error_code: kept.join('+'),
+          error_code: kept[0] ?? 'unknown',
           count: kept.length,
         },
       });

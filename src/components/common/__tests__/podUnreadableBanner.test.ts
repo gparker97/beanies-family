@@ -149,6 +149,40 @@ describe('PodUnreadableBanner — the retry', () => {
     expect(wrapper.text()).toContain('podNewerVersion.inline');
   });
 
+  it('speaks when the block is STILL UP, whatever the outcome is called', async () => {
+    // ⚠️ THE OVERSIZED-POD CASE, which is what this banner most often shows for.
+    // A thrown blocker comes back as `'network-failed'` while the kind is set to
+    // `decrypt` — so an arm keyed on `'decrypt-failed'` never fired, and
+    // `BackgroundSyncBar` suppresses its toast for a latched `decrypt`. The
+    // button flickered busy and said nothing at all.
+    block('podTooLarge.inline');
+    holder.store.backgroundSyncFromFile = vi.fn(async () => 'network-failed');
+    const wrapper = mountBanner();
+
+    await wrapper.findAll('button')[0]!.trigger('click');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(toastMock).toHaveBeenCalledWith('warning', 'sync.retryFailedStillBlocked');
+  });
+
+  it('stays SILENT when a sync was already running — nothing was attempted', async () => {
+    // `skipped-in-flight` means no read happened and the running sync may yet
+    // succeed. Claiming a failure there would be a lie, which is why a blanket
+    // fallback was wrong too.
+    block('podTooLarge.inline');
+    holder.store.podUnopenable = false; // the running sync cleared it
+    holder.store.backgroundSyncFromFile = vi.fn(async () => 'skipped-in-flight');
+    const wrapper = mountBanner();
+    holder.store.podUnopenable = true;
+    await new Promise((r) => setTimeout(r, 0));
+    holder.store.podUnopenable = false;
+
+    await wrapper.findAll('button')[0]!.trigger('click');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
   it('says something when the retry throws, instead of looking like it worked', async () => {
     block('podTooLarge.inline');
     holder.store.backgroundSyncFromFile = vi.fn(async () => {
@@ -189,6 +223,23 @@ describe('PodUnreadableBanner — the retry', () => {
 
     await wrapper.findAll('button')[1]!.trigger('click');
     expect(wrapper.text()).toBe('');
+  });
+
+  it('a DIFFERENT blocker after a dismissal speaks again, without the latch clearing', async () => {
+    // ⚠️ SEVEN MESSAGE KEYS SHARE THE KIND `decrypt`, and the classification is
+    // refreshed while the latch still holds — so watching `blocked` alone left a
+    // genuinely new session-ending state with the banner hidden AND its toast
+    // suppressed, because the bar defers to a banner it assumes is on screen.
+    block('podTooLarge.inline');
+    const wrapper = mountBanner();
+    await wrapper.findAll('button')[1]!.trigger('click');
+    expect(wrapper.text()).toBe('');
+
+    // `podUnopenable` never goes false — only the blocker changes.
+    holder.store.podBlockMessageKey = 'podMerge.failedInline';
+    await nextTick();
+
+    expect(wrapper.text()).toContain('podMerge.failedInline');
   });
 
   it('a NEW block after a dismissal speaks again', async () => {

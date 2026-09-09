@@ -232,6 +232,17 @@ export class GoogleDriveProvider implements StorageProvider {
       // it. Classify (finding 9): an account mismatch → reconnect banner for the
       // bound account; otherwise let the caller run missing-file recovery.
       if (e instanceof DriveApiError && e.status === 404) {
+        // ⚠️ QUEUE BEFORE CLASSIFYING. `reconnectIfAccountMismatch` THROWS a
+        // manufactured `TokenExpiredError` on a mismatch — and it throws from
+        // here, past the `e instanceof TokenExpiredError` arm above, which
+        // already ran and did not match because `e` is the `DriveApiError`. So
+        // this was the one exit from this catch that discarded the user's edit
+        // bytes: the banner appeared, they reconnected, the offline queue
+        // flushed, and their change was not in it. Every other arm queues first.
+        //
+        // Queuing before a plain 404 too is deliberate: missing-file recovery
+        // re-binds and flushes, so the bytes are wanted either way.
+        enqueueOfflineSave(content);
         this.reconnectIfAccountMismatch();
         throw e;
       }
@@ -332,6 +343,14 @@ export class GoogleDriveProvider implements StorageProvider {
       return await fn(token);
     } catch (e) {
       if (e instanceof TokenExpiredError) throw e;
+      // ⚠️ CLASSIFY THE 404 HERE TOO. This probe backs the 10-second poll, so it
+      // is the highest-frequency place a mismatch shows up — and it was the one
+      // Drive-facing path that classified nothing. `remoteChanged` filed the raw
+      // 404 as `file-not-found`, and because nothing had invalidated the token,
+      // `isTokenValid()` was still true, so syncStore raised the alarming "your
+      // data file is missing" banner at a user who is simply signed in to the
+      // wrong Google account.
+      if (e instanceof DriveApiError && e.status === 404) this.reconnectIfAccountMismatch();
       if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) throw e;
       // Network errors, 5xx, and other failures — non-critical for a metadata check
       return null;

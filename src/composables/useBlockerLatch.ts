@@ -54,12 +54,25 @@ export function useBlockerLatch(kind: NonNullable<BackgroundSyncErrorKind>): Blo
   );
 
   // A NEW block after a dismissal must speak again — the user dismissed the last
-  // one, not every one. `clearPodUnopenable` is the only thing that clears the
-  // latch, so this re-arms exactly when the state genuinely resolved. It lives in
-  // the same file as the `blocked` it watches, which is why the two travel
-  // together rather than each banner keeping its own copy.
-  watch(blocked, (isBlocked) => {
+  // one, not every one.
+  //
+  // ⚠️ WATCHING `blocked` ALONE WAS NOT ENOUGH, and the gap was invisible because
+  // one KIND covers many blocks. `BLOCKER_BANNER_KIND` maps SEVEN distinct
+  // message keys onto `decrypt`, and `mirrorServiceLatch` refreshes the
+  // classification even while the latch already holds — so after a dismissal, a
+  // genuinely different blocker (an out-of-memory pod becoming a failed merge,
+  // say) arrived with `blocked` never going false, stayed hidden, and had its
+  // toast suppressed too, because `BackgroundSyncBar` defers to a banner it
+  // assumes is on screen. Zero surfaces for a new session-ending state.
+  //
+  // The message KEY is what distinguishes one block from the next, so it is what
+  // the re-arm has to watch. An earlier attempt shared the dismissal with the
+  // toast layer through module-scope state instead; it was unreachable where it
+  // mattered and broke the two in-layout banners, and this is the smaller answer
+  // that actually covers the case.
+  watch([blocked, () => syncStore.podBlockMessageKey], ([isBlocked], [wasBlocked, prevKey]) => {
     if (!isBlocked) dismissed.value = false;
+    else if (wasBlocked && syncStore.podBlockMessageKey !== prevKey) dismissed.value = false;
   });
 
   // `busy` belongs here, not in each banner, because the rule that governs it is
