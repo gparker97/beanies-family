@@ -4,6 +4,43 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Verify a fix the way a reviewer would: by driving it, not by reading it
+
+**Date:** 2026-09-09
+**Context:** Three consecutive `/code-review max` rounds each found defects in the
+previous round's fixes, and round 6 found that THREE of round 5's headline fixes
+did not work at all. Two had to be reverted outright and one rewritten:
+
+- The tombstone revival guard gated on `pointerAccepted`, not `isOwner`. Because
+  the DELETE arm drops the pointer, `samePointer` is VACUOUSLY TRUE against a
+  tombstone, so any device sending nulls still lifted it. The test written
+  alongside it asserted that behaviour was correct, so the whole thing shipped
+  green.
+- A module-scope Set added so the toast layer could see a banner's dismissal was
+  unreachable at the only moment it was read (its consumer is a watcher that
+  fires on a value CHANGE, and the value is constant per block), and it broke two
+  other banners.
+- Forcing the silent-refresh ladder from the reconnect button reinstated, word
+  for word, harm documented in a comment twenty lines above the change.
+
+Each of those was reasoned about carefully and each was wrong. What separated
+round 6 from rounds 4 and 5 is that its reviewer **drove the real handler with
+the exact state the code produces** instead of reading the diff.
+
+**Rule:** for any fix to a guard, a merge, or a state machine, construct the real
+input the system produces and run it. For a pure function that is a unit test
+whose fixture is BUILT BY the producing code path, not hand-written to look like
+it — the tombstone tests hand-wrote a tombstone that carried a pointer, which the
+DELETE arm never writes, so the vacuous-match case was never exercised. Reverting
+the fix and watching a test fail is necessary and NOT sufficient: it proves the
+test binds to the code, not that the code is right about the world.
+
+**Corollary:** when a fix needs new shared mutable state to work, treat that as
+evidence the fix is in the wrong place. Both reverts here were of exactly that
+shape, and the simpler behaviour they restored was correct all along.
+
+---
+
 ## A guard sourced from shared data is not a guard
 
 **Date:** 2026-09-09
