@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **beanies no longer loses a working Google connection to a stale one shared by your other devices.** Each device keeps a copy of the connection in your family file so the others can borrow it and stay signed in. beanies used to install a borrowed copy before checking whether it still worked, decide from the copy's age which one to keep, and then throw away the working connection it already had when Google turned the borrowed one down. Since the copy is shared, every device did the same thing, which is why the sign-in screen kept coming back every few hours on all of them. beanies now asks Google first and keeps what it has unless Google accepts the replacement, so a stale copy costs nothing. A device that has no connection of its own still borrows one exactly as before.
 - **Reconnecting to Google now actually reconnects.** When you revoked access on another device, beanies checked only its own clock, decided the connection was still fine, and told you it had reconnected without ever asking Google. The next thing you did failed the same way, and pressing the button again did the same thing again. It also used to say "reconnected" on a phone while the Google screen was still opening, and start using the connection before you had approved anything.
 - **Reconnecting no longer offers to open a file picker that this screen never uses**, and a reconnect that worked now says so in green rather than in the red used for things that went wrong.
 - **The Refresh button in the Google Drive file list works again.** It had been quietly changed to a version that could not ask for a new connection, so on an older list it did nothing at all and said nothing.
@@ -26,6 +27,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Deleting your family now says what actually happened.** It used to say your data was gone from everywhere even when you had chosen to keep your family data file, and a first attempt to fix that swung the other way and reported a failure when nothing had failed. There are three endings now, and the one you get is the true one.
 - **Deleting a family really is final.** Another device writing to it afterwards could quietly bring it back, and bring its name and your newsletter choice back with it.
 - **The message about changes that could not be combined now says what happened, and offers one way on.** It called compaction "reorganised", a word the app uses nowhere else, and led with "Export my changes" — which reads like a rescue but produces a copy that cannot be merged back in. It now says beanies could not work out which changes were missing and did not guess, puts the way forward first, and offers the copy as something to read.
+
+### Changed
+
+- **Developer-facing:** the `older-token-declined` telemetry action is retired with the age heuristic it reported on (one producer, no consumers). Adopting a mirrored Drive token now emits `candidate-accepted` / `candidate-refused` / `candidate-unverified-kept-local` / `candidate-unverified-adopted` on the new `drive-token-adopt` surface, and a superseded `invalid_grant` emits `permanent-failure-superseded` on `google-token-lifecycle`. No new telemetry context keys, so no store-declaration change.
 
 ## 2026-09-08
 

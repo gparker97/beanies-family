@@ -174,6 +174,27 @@ counter persisted in sessionStorage, and `network`/`timeout`/`unknown` all count
 permanent costs a consent = a whole-grant revoke. _Fix:_ escalate only on a classified
 `permanent` or 4xx; never on network/timeout/unknown.
 
+**Root cause 6 (found 2026-09-09, FIXED): a mirrored token was adopted before it
+was validated.** Both readers of the shared `driveConnections` mirror installed a
+candidate token into IndexedDB and primed it into memory BEFORE asking Google
+anything, and decided between candidates by comparing `issuedAt`. Two probes
+against the real code confirmed the consequences. `tryReconnectSilently`: a device
+holding a good token (`issuedAt: 5000`) adopted a dead unknown-age copy
+(`issuedAt: null`, a live legacy shape the age guard could not refuse), and the
+resulting `invalid_grant` then CLEARED the store — the device ended its "recovery"
+with no credential at all. `reconcileDriveTokenWithDoc`, on the cold-start path,
+overwrote a good local token with a newer-but-dead doc copy while issuing ZERO
+exchanges. Because the mirror is shared and issue #62 deliberately converges every
+device on it, each device met the same dead token and each was forced to consent —
+"grants seem to be lost across devices, every few hours". _Fixed:_ a new
+`googleAuth.tryCandidateRefreshToken` exchanges a candidate and installs it only if
+Google accepts it (via the existing `commitAcquiredToken` chokepoint), so a refused
+candidate costs nothing; reconcile adopts only when the device has no token at all,
+which needs no network call on the load path; and both age heuristics are deleted.
+A token-identity guard in `performSilentRefresh`'s permanent branch stops an
+in-flight ladder's `invalid_grant` from destroying a token adopted meanwhile. Plan:
+`docs/plans/2026-09-09-adopt-only-a-token-google-accepted.md`.
+
 **Root cause 4 (feeds items 3 + 8): wrong-member token adoption.** `reconcileDriveTokenForMember`
 keys the doc token on `currentMember.googleAccountEmail` (`syncStore.ts:2234-2237`), and
 `37c23b1d` (09-07) now `preselectSessionMember`s before the roster loads. If the bound member

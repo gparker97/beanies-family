@@ -144,6 +144,29 @@ function isSessionStillCurrent(epochAtStart: number, accessTokenToRevoke: string
 const SESSION_DISCARDED_CANCEL = 'user_cancel: signed out during sign-in — token discarded';
 
 /**
+ * Where the refresh token being committed came from.
+ *
+ * ⚠️ ONE REQUIRED FIELD, NOT TWO OPTIONAL FLAGS, and that is the point. "Did
+ * Google mint this token in this response, or are we re-homing one we already
+ * hold?" is a SINGLE fact that two separate call-site decisions depend on (the
+ * `issuedAt` stamp and the `op: 'mint'` counter). Encoding it as two optional
+ * booleans with defaults means a future persisting seam can set half of it and
+ * be silently wrong — and `migratePendingRefreshToken` below exists because
+ * someone got exactly the `issuedAt` half wrong once already. Required, so a new
+ * seam cannot inherit a default that is wrong for it; a union, so the next
+ * variation adds a member rather than a third boolean.
+ */
+type RefreshTokenOrigin =
+  /** Google issued this refresh token in THIS response. Stamp it `now`; count the mint. */
+  | { kind: 'minted' }
+  /**
+   * Re-homing a token we already hold (adopted from the beanpod mirror). Carry the
+   * source `issuedAt` LITERALLY and do not count a mint — see the two call-site
+   * comments in `commitAcquiredToken`.
+   */
+  | { kind: 'adopted'; issuedAt: number | null };
+
+/**
  * The single token-commit chokepoint shared by the three *persisting* acquisition
  * seams (silent auth-code, popup, redirect). Centralizes, in one place a future
  * seam can't skip: the pre-commit epoch re-check, the in-memory + IndexedDB writes,
@@ -174,8 +197,9 @@ async function commitAcquiredToken(args: {
   interactive: boolean;
   epochAtStart: number;
   storageKey: string;
+  refreshTokenOrigin: RefreshTokenOrigin;
 }): Promise<{ committed: true; token: string } | { committed: false }> {
-  const { tokens, interactive, epochAtStart, storageKey } = args;
+  const { tokens, interactive, epochAtStart, storageKey, refreshTokenOrigin } = args;
 
   // Pre-commit guard: discard if a sign-out cleared the session while the exchange
   // was in flight (best-effort revoke + info log happen inside isSessionStillCurrent).
@@ -186,7 +210,14 @@ async function commitAcquiredToken(args: {
 
   let wrotePersisted = false;
   if (tokens.refresh_token) {
-    const issuedAt = Date.now();
+    // ⚠️ AN ADOPTED TOKEN KEEPS ITS SOURCE AGE. Re-stamping `Date.now()` on a
+    // token we are merely re-homing invents a fresh age for a possibly-old
+    // credential, which falsifies `refreshTokenAgeMs` in the `invalid_grant`
+    // diagnostic below — the field that surfaces revocation patterns.
+    // `migratePendingRefreshToken` already carries its source `issuedAt`
+    // literally for this same reason.
+    const issuedAt =
+      refreshTokenOrigin.kind === 'adopted' ? refreshTokenOrigin.issuedAt : Date.now();
     currentRefreshToken = { token: tokens.refresh_token, issuedAt };
     try {
       await storeGoogleRefreshToken(storageKey, tokens.refresh_token, { issuedAt });
@@ -244,7 +275,13 @@ async function commitAcquiredToken(args: {
   // discarded/revoked. A refresh_token in the response means Google minted a new
   // grant (this Drive chokepoint never handles calendar); the success-side
   // counterpart to the revoke events for fleet-wide token-pressure (#62).
-  if (tokens.refresh_token) {
+  //
+  // ⚠️ AN ADOPTED TOKEN IS NOT A MINT. `tryCandidateRefreshToken` synthesizes a
+  // `refresh_token` into the response (Google's refresh endpoint returns none) to
+  // re-home a token the fleet already holds, so counting it here would inflate the
+  // #62 token-pressure metric on exactly the devices this heals. The adopt has its
+  // own counter: `candidate-accepted` on the `drive-token-adopt` surface.
+  if (tokens.refresh_token && refreshTokenOrigin.kind === 'minted') {
     logTokenLifecycle({
       grant: 'drive',
       op: 'mint',
@@ -1004,6 +1041,7 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
       interactive: false,
       epochAtStart,
       storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+      refreshTokenOrigin: { kind: 'minted' },
     });
     if (!result.committed) return null;
 
@@ -1109,6 +1147,7 @@ async function performPopupAuth(
     interactive: true,
     epochAtStart,
     storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+    refreshTokenOrigin: { kind: 'minted' },
   });
   if (!result.committed) {
     // Signed out mid-flow — benign. This function's contract is string-or-throw, so
@@ -1300,6 +1339,143 @@ export async function attemptSilentRefresh(): Promise<string | null> {
   }
 }
 
+/**
+ * What Google said about a candidate refresh token.
+ *
+ * `rejected` means Google REFUSED THE GRANT. Nothing else is a rejection — see
+ * the classifier in `tryCandidateRefreshToken` for why a bare 4xx is not.
+ */
+export type CandidateTokenOutcome = 'accepted' | 'rejected' | 'transient';
+
+/**
+ * The verdict plus the code behind it.
+ *
+ * `errorCode` exists so the adopt telemetry never has to GUESS. On a rejection it
+ * is the wording Google actually used (`isPermanentRefreshFailure` matches
+ * `invalid_grant` OR `expired or revoked`); on a transient failure it is the
+ * matched `HTTP 4xx`, if any, so a proxy-side request defect stays queryable and
+ * cannot be mistaken for a dead grant.
+ */
+export interface CandidateTokenResult {
+  outcome: CandidateTokenOutcome;
+  errorCode?: string;
+}
+
+/**
+ * Try a CANDIDATE refresh token against Google and install it ONLY if Google
+ * accepts it. Never throws.
+ *
+ * ⚠️ THIS EXISTS BECAUSE ADOPTING BEFORE VALIDATING DESTROYS WORKING CREDENTIALS.
+ * `driveTokenRecovery` used to persist a mirrored token into IndexedDB and prime
+ * it into memory BEFORE anything asked Google about it. When Google then answered
+ * `invalid_grant`, the permanent branch cleared the store — so a device that had
+ * arrived holding a perfectly good token left holding none, and was shown a
+ * consent screen it did not need. Because the mirror is SHARED, every device in
+ * the family met the same dead token and the same fate. That is the re-consent
+ * storm.
+ *
+ * Three prior fixes tried to GUESS which token was better from `issuedAt`
+ * ("strictly newer", "provably older", a rollback) and all three failed, because
+ * `issuedAt: number | null` is a documented live shape on both sides and unknown
+ * age is not evidence of staleness. This asks the only authority instead. A
+ * refused candidate then costs nothing, which is what the rollback attempt was
+ * reaching for and could not achieve.
+ *
+ * Deliberately does NOT join the `pendingSilentRefresh` dedup: that dedups
+ * "refresh the current token", a different question from "is this specific
+ * candidate any good". It must stay callable from inside a permanent-failure
+ * callback without deadlocking (`syncStore.attemptSilentSelfRecovery`). The
+ * consequence — a second writer of `currentRefreshToken` outside the dedup — is
+ * closed by the token-identity guard in `performSilentRefresh`'s permanent branch.
+ *
+ * @param expectedEpoch The caller's epoch, captured BEFORE its async reads. Not
+ *   re-snapshotted here: a later snapshot would silently narrow the guard window
+ *   the caller deliberately opened.
+ */
+export async function tryCandidateRefreshToken(
+  familyId: string,
+  candidate: StoredRefreshToken,
+  expectedEpoch: number
+): Promise<CandidateTokenResult> {
+  try {
+    // Preflight, before any network call. `performSilentRefresh` has the same
+    // guard: without it a misconfigured build sends `client_id: ''`, the proxy
+    // answers 4xx, and a BUILD ERROR is reported as "Google refused your token".
+    const clientId = getClientId();
+    if (!clientId) {
+      reportError({
+        surface: 'drive-token-adopt',
+        severity: 'warning',
+        message:
+          'candidate probe skipped — VITE_GOOGLE_CLIENT_ID is unset; Google recovery is disabled for this build. See docs/SELF_HOSTING.md',
+      });
+      return { outcome: 'transient' };
+    }
+
+    const tokens = await refreshAccessToken({ refreshToken: candidate.token, clientId });
+
+    // Google accepted it. Commit through the ONE persisting chokepoint, which
+    // owns the pre-commit epoch check, the IndexedDB write, the post-persist
+    // rollback, the auto-refresh schedule and the subscriber notify. The
+    // `refresh_token` is synthesized — Google's refresh endpoint returns none,
+    // and re-homing this candidate is the entire point — so the origin says
+    // `adopted` and the commit neither re-stamps its age nor counts a mint.
+    const result = await commitAcquiredToken({
+      tokens: { ...tokens, refresh_token: candidate.token },
+      interactive: false,
+      epochAtStart: expectedEpoch,
+      storageKey: familyId,
+      refreshTokenOrigin: { kind: 'adopted', issuedAt: candidate.issuedAt },
+    });
+    if (!result.committed) return { outcome: 'transient' }; // signed out mid-probe; nothing installed
+
+    // Only now: the module is bound to this family. `commitAcquiredToken` takes a
+    // `storageKey` but deliberately never assigns `currentFamilyId` (its three
+    // other callers pass `currentFamilyId ?? PENDING_FAMILY_KEY`, so folding it in
+    // would set '__pending__'). Without this the permanent branch would later skip
+    // `clearGoogleRefreshToken` and a genuinely revoked token would never leave IDB.
+    // Set AFTER the commit succeeds, so the failure arms below stay mutation-free.
+    currentFamilyId = familyId;
+    lastSilentRefreshDiagnostics = null;
+    return { outcome: 'accepted' };
+  } catch (e) {
+    // ⚠️ `isPermanentRefreshFailure` ALONE. It is this module's own definition of
+    // "Google refused this grant" — `classifySilentRefreshError` treats nothing
+    // else as `'permanent'` and files every other 4xx as `'http'`, i.e. TRANSIENT
+    // AND RETRIED. Using `isRefreshRejection` here (the escalation-counter
+    // predicate, which matches any 4xx bar 403/408/429) would make this probe
+    // strictly more destructive than the real permanent branch: a proxy-side
+    // `HTTP 400 invalid_request` would permanently strand the straggler device
+    // that has no local token, which today persists the mirrored copy and heals
+    // on the next wake.
+    if (isPermanentRefreshFailure(e)) {
+      // Report the wording Google actually used, not a hardcoded assumption —
+      // `candidate-refused` is the event triage keys on.
+      const msg = e instanceof Error ? e.message : String(e);
+      return {
+        outcome: 'rejected',
+        errorCode: msg.includes('invalid_grant') ? 'invalid_grant' : 'expired_or_revoked',
+      };
+    }
+
+    // Everything else is transient — but never SILENTLY transient. A persistent
+    // proxy misconfiguration or an unexpected throw would otherwise hide inside
+    // the ordinary network-flakiness bucket forever; `getApiBaseUrl`'s own error
+    // message already names the env var and the doc that fixes it.
+    reportError({
+      surface: 'drive-token-adopt',
+      severity: 'warning',
+      message: 'candidate probe could not be completed',
+      error: e instanceof Error ? e : new Error(String(e)),
+    });
+    // Carry the 4xx, when there is one, so a proxy-side request defect (an
+    // `HTTP 400 invalid_request`, say) is queryable on the adopt events rather
+    // than hiding in the generic network-flakiness bucket forever.
+    const status = /HTTP (\d{3})/.exec(e instanceof Error ? e.message : String(e))?.[1];
+    return { outcome: 'transient', ...(status ? { errorCode: `HTTP ${status}` } : {}) };
+  }
+}
+
 async function performSilentRefresh(): Promise<string | null> {
   const epochAtStart = sessionEpoch;
   const clientId = getClientId();
@@ -1374,6 +1550,11 @@ async function performSilentRefresh(): Promise<string | null> {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const startMs = performance.now();
+    // Hoisted out of the `try` so the `catch` can see WHICH token this attempt
+    // asked Google about. `null` fails SAFE: if a throw somehow preceded the
+    // assignment, the permanent branch's identity check below reads "not the
+    // current token" and destroys nothing.
+    let tokenAtAttempt: string | null = null;
     try {
       console.warn(
         `[googleAuth] Attempting silent token refresh (attempt ${attempt}/${MAX_ATTEMPTS})...`
@@ -1390,7 +1571,7 @@ async function performSilentRefresh(): Promise<string | null> {
         console.warn('[googleAuth] Silent refresh aborted: session torn down mid-retry');
         return null;
       }
-      const tokenAtAttempt = currentRefreshToken.token;
+      tokenAtAttempt = currentRefreshToken.token;
       const tokens = await refreshAccessToken({
         refreshToken: tokenAtAttempt,
         clientId,
@@ -1434,6 +1615,25 @@ async function performSilentRefresh(): Promise<string | null> {
       const isPermanent = classification === 'permanent';
 
       if (isPermanent) {
+        // ⚠️ THE REFUSED TOKEN IS NOT NECESSARILY THE CURRENT ONE, and the body
+        // below destroys whatever is current. `tryCandidateRefreshToken` and
+        // `primeRefreshToken` both write `currentRefreshToken` OUTSIDE the
+        // `pendingSilentRefresh` dedup, so a good token can be installed while
+        // this attempt's fetch is still in flight — and then this branch would
+        // delete the credential Google just accepted and raise the reconnect
+        // surface on a healthy session.
+        //
+        // Invalidate where the badness was OBSERVED, and what was observed is a
+        // specific token STRING, not a moment in time.
+        if (currentRefreshToken?.token !== tokenAtAttempt) {
+          logEvent({
+            level: 'info',
+            surface: 'google-token-lifecycle',
+            message: 'ignored an invalid_grant for a refresh token that had already been replaced',
+            context: { action: 'permanent-failure-superseded' },
+          });
+          return null;
+        }
         console.warn(
           '[googleAuth] Silent refresh failed (permanent — refresh token revoked):',
           errorMessage
@@ -2403,6 +2603,7 @@ export async function completeRedirectAuth(): Promise<string | null> {
     interactive: true,
     epochAtStart,
     storageKey: currentFamilyId ?? PENDING_FAMILY_KEY,
+    refreshTokenOrigin: { kind: 'minted' },
   });
   if (!result.committed) return null;
 

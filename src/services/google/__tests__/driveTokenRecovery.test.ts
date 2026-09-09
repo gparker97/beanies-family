@@ -12,6 +12,15 @@ import { PayloadTooLargeError } from '@/types/sync';
 // ── Mock the heavy auth deps; use the REAL docService + driveRepository ────────
 const primeRefreshToken = vi.fn();
 const attemptSilentRefresh = vi.fn<() => Promise<string | null>>();
+// ⚠️ A FAITHFUL DOUBLE, and the faithfulness is the whole point of these tests.
+// The real `tryCandidateRefreshToken` mutates NOTHING on 'rejected' and
+// 'transient' — no IndexedDB write, no prime, no counter. A double that quietly
+// wrote the candidate anyway would hide exactly the bug this work fixes, which is
+// the fourth unfaithful-mock shape `docs/lessons.md` records. So this default
+// never touches `localToken`; only the 'accepted' arm installs, mirroring the
+// real commit path.
+const tryCandidateRefreshToken =
+  vi.fn<() => Promise<{ outcome: 'accepted' | 'rejected' | 'transient'; errorCode?: string }>>();
 let tokenValid = false;
 // Controllable session epoch — bump mid-flight to simulate a sign-out between the
 // async doc read and the adopt (the session-epoch guard).
@@ -23,6 +32,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   attemptSilentRefresh: () => attemptSilentRefresh(),
   isTokenValid: () => tokenValid,
   getSessionEpoch: () => mockSessionEpoch,
+  tryCandidateRefreshToken: (...a: unknown[]) => tryCandidateRefreshToken(...(a as [])),
   // A refresh that restores the WRONG account is not a reconnect: the pod stays
   // unreachable. Defaults to the bound account so the ordinary tests describe an
   // ordinary device.
@@ -76,6 +86,11 @@ beforeEach(async () => {
   await installInlineBackend();
   primeRefreshToken.mockClear();
   attemptSilentRefresh.mockReset();
+  tryCandidateRefreshToken.mockReset();
+  // Default: Google refuses. The safe default for these tests — an accidental
+  // `undefined` return would otherwise read as a falsy non-'accepted' outcome and
+  // silently take the same branch, hiding a wiring mistake.
+  tryCandidateRefreshToken.mockResolvedValue({ outcome: 'rejected', errorCode: 'invalid_grant' });
   storeGoogleRefreshToken.mockClear();
   logEvent.mockClear();
   localToken = null;
@@ -131,9 +146,32 @@ describe('readDriveTokenFromDoc', () => {
 });
 
 describe('reconcileDriveTokenWithDoc', () => {
-  it('doc newer than local → restores local + primes in-memory', async () => {
+  // ⚠️ INVERTED 2026-09-09, and the inversion IS the fix. This used to assert that
+  // a strictly-newer doc token replaces the local one. Reconcile did that without
+  // asking Google anything, so a mirrored token that was newer BUT DEAD silently
+  // destroyed a working credential — and because the mirror is shared, it did so
+  // on every device in the family, costing each one a consent screen. A device
+  // that holds a token now keeps it; the heal moved to `tryReconnectSilently`,
+  // which validates first.
+  it('doc newer than a PRESENT local token → adopts nothing and asks Google nothing', async () => {
     await seedDoc('greg@example.com', 'doc-tok', 2000);
     localToken = { token: 'local-tok', issuedAt: 1000 };
+
+    await reconcileDriveTokenWithDoc('greg@example.com');
+
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(primeRefreshToken).not.toHaveBeenCalled();
+    expect(tryCandidateRefreshToken).not.toHaveBeenCalled();
+    // The doc copy is left alone too — it may be the good one for another device.
+    expect((await getDriveConnectionByAccount('greg@example.com'))?.refreshToken).toBe('doc-tok');
+  });
+
+  // The ONLY surviving adopt branch in reconcile, and it was previously untested:
+  // the existing cross-account case has `localToken = null` but a non-matching doc
+  // entry, so it proved nothing about the adopt itself.
+  it('no local token at all → adopts the doc copy (blind, as before — nothing to lose)', async () => {
+    await seedDoc('greg@example.com', 'doc-tok', 2000);
+    localToken = null;
 
     await reconcileDriveTokenWithDoc('greg@example.com');
 
@@ -214,13 +252,25 @@ describe('tryReconnectSilently', () => {
     expect(primeRefreshToken).not.toHaveBeenCalled();
   });
 
-  it('doc token present + silent refresh succeeds → true, seeds local + in-memory', async () => {
+  it('doc token present + Google ACCEPTS it → true; googleAuth owns the install', async () => {
     await seedDoc('greg@example.com', 'doc-tok', 2000);
-    attemptSilentRefresh.mockResolvedValue('fresh-access');
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'accepted' });
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
-    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'doc-tok', { issuedAt: 2000 });
-    expect(primeRefreshToken).toHaveBeenCalledWith('fam-1', { token: 'doc-tok', issuedAt: 2000 });
+    // This module no longer persists or primes on the accept path — the candidate
+    // is handed to googleAuth, which commits it only after Google says yes.
+    expect(tryCandidateRefreshToken).toHaveBeenCalledWith(
+      'fam-1',
+      {
+        token: 'doc-tok',
+        issuedAt: 2000,
+      },
+      expect.any(Number)
+    );
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'candidate-accepted' } })
+    );
   });
 
   it('doc token present but silent refresh fails → false (caller forces consent)', async () => {
@@ -254,12 +304,21 @@ describe('tryReconnectSilently', () => {
   it('local token fails, different doc token present → recovers from the doc copy', async () => {
     localToken = { token: 'dead-local', issuedAt: 1000 };
     await seedDoc('greg@example.com', 'doc-tok', 2000);
-    attemptSilentRefresh.mockResolvedValueOnce(null).mockResolvedValueOnce('fresh-access');
+    attemptSilentRefresh.mockResolvedValue(null); // step 1: the local token is dead
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'accepted' });
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
-    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'doc-tok', { issuedAt: 2000 });
-    expect(primeRefreshToken).toHaveBeenCalledWith('fam-1', { token: 'doc-tok', issuedAt: 2000 });
-    expect(attemptSilentRefresh).toHaveBeenCalledTimes(2);
+    expect(tryCandidateRefreshToken).toHaveBeenCalledWith(
+      'fam-1',
+      {
+        token: 'doc-tok',
+        issuedAt: 2000,
+      },
+      expect.any(Number)
+    );
+    // Step 1 laddered once; the accept path does NOT ladder again (the probe
+    // already got a live token), so this stays at one.
+    expect(attemptSilentRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('local fails and the doc holds the SAME token → false, no pointless retry', async () => {
@@ -309,19 +368,20 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     bothLocalCopiesDead();
     remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue([REMOTE_ENTRY]);
-    // The adopt attempt is the one that succeeds.
-    attemptSilentRefresh
-      .mockResolvedValueOnce(null) // step 1, local
-      .mockResolvedValueOnce('access-token'); // step 3, remote copy
+    attemptSilentRefresh.mockResolvedValue(null); // step 1, local: dead
+    // No doc entry is seeded here, so step 2 never probes: the single probe call
+    // IS the remote copy, and Google accepts it.
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'accepted' });
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
-    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'remote-tok', {
-      issuedAt: 3000,
-    });
-    expect(primeRefreshToken).toHaveBeenCalledWith('fam-1', {
-      token: 'remote-tok',
-      issuedAt: 3000,
-    });
+    expect(tryCandidateRefreshToken).toHaveBeenLastCalledWith(
+      'fam-1',
+      {
+        token: 'remote-tok',
+        issuedAt: 3000,
+      },
+      expect.any(Number)
+    );
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ context: { action: 'healed-from-remote' } })
     );
@@ -379,28 +439,35 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
   });
 
-  it('does not overwrite a local token with a PROVABLY older mirrored one', async () => {
-    // ⚠️ THIS GUARD IS KNOWN-INCOMPLETE AND IS DELIBERATELY LEFT THAT WAY.
-    // `restoreLocalFromDoc` writes to IndexedDB and primes memory BEFORE anything
-    // validates, so an unknown-age or equal-age candidate can still displace a
-    // good local token. Three successive attempts to close that — "strictly
-    // newer", "provably older", and a rollback — each traded one failure mode for
-    // another, because age is not the question and the rollback could not run on
-    // the path that reaches it most often.
+  it('does not overwrite a local token with a mirrored one GOOGLE REFUSES', async () => {
+    // ⚠️ THE GUARD THAT REPLACED THREE FAILED ONES. It used to be an age
+    // comparison — "strictly newer", then "provably older", then a rollback — and
+    // each traded one failure mode for another, because age was never the
+    // question: `issuedAt: null` is a live shape on both sides, so an unknown-age
+    // candidate could still displace a good local token, and the following
+    // `invalid_grant` then CLEARED the store, leaving the device with nothing and
+    // forcing a consent screen it did not need.
     //
-    // It is recorded as an open item in
-    // `docs/plans/2026-09-09-auth-token-lifecycle-brief.md` rather than patched a
-    // fourth time. See that brief before touching this.
+    // Now Google decides, and a refused candidate costs nothing.
     localToken = { token: 'local-tok', issuedAt: 5000 };
     attemptSilentRefresh.mockResolvedValue(null);
     remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
     readRemoteDriveConnections.mockResolvedValue([
-      { accountEmail: 'greg@example.com', refreshToken: 'older-tok', issuedAt: 1000 },
+      { accountEmail: 'greg@example.com', refreshToken: 'refused-tok', issuedAt: 1000 },
     ]);
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'rejected' });
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+    // The local credential is untouched: not overwritten, not primed, not cleared.
     expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
     expect(primeRefreshToken).not.toHaveBeenCalled();
+    expect(localToken).toEqual({ token: 'local-tok', issuedAt: 5000 });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: { action: 'candidate-refused', error_code: 'invalid_grant' },
+      })
+    );
   });
 
   it('tries an UNKNOWN-AGE peer token rather than refusing it unread', async () => {
@@ -412,14 +479,19 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     readRemoteDriveConnections.mockResolvedValue([
       { accountEmail: 'greg@example.com', refreshToken: 'peer-tok', issuedAt: null },
     ]);
-    attemptSilentRefresh
-      .mockResolvedValueOnce(null) // step 1, local
-      .mockResolvedValueOnce('access-token'); // step 3, the peer copy works
+    attemptSilentRefresh.mockResolvedValue(null); // step 1, local: dead
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'accepted' }); // the peer copy works
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
-    expect(storeGoogleRefreshToken).toHaveBeenCalledWith('fam-1', 'peer-tok', {
-      issuedAt: null,
-    });
+    // The unknown-age candidate is PROBED, not refused unread — that is the point.
+    expect(tryCandidateRefreshToken).toHaveBeenCalledWith(
+      'fam-1',
+      {
+        token: 'peer-tok',
+        issuedAt: null,
+      },
+      expect.any(Number)
+    );
   });
 
   it('never adopts a token belonging to a DIFFERENT Google account', async () => {
@@ -448,11 +520,101 @@ describe('tryReconnectSilently — step 3, healing from the REMOTE beanpod', () 
     localToken = { token: 'local-tok', issuedAt: 1000 };
     await seedDoc('greg@example.com', 'doc-tok', 2000);
     remoteBlocked = new PodLineageError('adopt-remote', 'lineage mismatch');
-    attemptSilentRefresh
-      .mockResolvedValueOnce(null) // step 1
-      .mockResolvedValueOnce('access-token'); // step 2 succeeds
+    attemptSilentRefresh.mockResolvedValue(null); // step 1: dead
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'accepted' }); // step 2 succeeds
 
     expect(await tryReconnectSilently('greg@example.com')).toBe(true);
     expect(readRemoteDriveConnections).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE REGRESSION TESTS FOR THE RE-CONSENT STORM.
+//
+// These two reproduce, against the real code, the defect that manufactured
+// Google consent screens across a whole family. Both FAILED before the fix.
+//
+// ⚠️ THE DOUBLES HERE ARE FAITHFUL ON PURPOSE, and that is the only reason these
+// tests can see the bug. `attemptSilentRefresh` CLEARS the stored token on
+// `invalid_grant` (the real permanent branch does exactly that) and leaves it
+// alone on a transient failure; `storeGoogleRefreshToken` writes through into the
+// same `localToken` the reader returns. A convenient double that merely returned
+// null would have shown a passing test over a destroyed credential — the shape
+// `docs/lessons.md` records four times over.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('re-consent storm — a mirrored token must never destroy a working one', () => {
+  /** Write-through, so the test observes what the device would actually hold. */
+  function persistWritesThrough() {
+    storeGoogleRefreshToken.mockImplementation(async (_fam, token, opts) => {
+      localToken = {
+        token: token as string,
+        issuedAt: (opts as { issuedAt: number | null }).issuedAt,
+      };
+    });
+  }
+
+  it('tryReconnectSilently: a REFUSED doc token leaves the good local one intact', async () => {
+    // The device holds a good local token of known age; the shared beanpod holds a
+    // dead one of UNKNOWN age (a legacy mirrored entry — `issuedAt: null` is a live
+    // shape). Before the fix the age heuristic could not refuse the unknown-age
+    // candidate, so it was written to IndexedDB and primed BEFORE validation, and
+    // the resulting `invalid_grant` then cleared the store: the device ended the
+    // "recovery" with no credential at all and was shown a consent screen.
+    localToken = { token: 'good-local', issuedAt: 5000 };
+    await seedDoc('greg@example.com', 'dead-doc', null);
+    persistWritesThrough();
+    // Step 1 fails TRANSIENTLY (a network blip) — the real code leaves the store
+    // alone here, which is what makes the local token still worth protecting.
+    attemptSilentRefresh.mockResolvedValue(null);
+    tryCandidateRefreshToken.mockResolvedValue({ outcome: 'rejected' });
+
+    expect(await tryReconnectSilently('greg@example.com')).toBe(false);
+
+    // THE ASSERTION THIS FILE EXISTS FOR: the good credential survived.
+    expect(localToken).toEqual({ token: 'good-local', issuedAt: 5000 });
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    expect(primeRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('reconcile: a newer-but-dead doc token never displaces a live local one', async () => {
+    // The cold-start path, and the worse of the two: reconcile used to overwrite
+    // local with a strictly-newer doc copy while asking Google NOTHING AT ALL, so
+    // the destruction was one step removed rather than absent — the next refresh's
+    // `invalid_grant` cleared the store. It now adopts only when there is nothing
+    // to lose, which needs no network call.
+    localToken = { token: 'good-local', issuedAt: 1000 };
+    await seedDoc('greg@example.com', 'dead-doc', 2000); // strictly newer
+    persistWritesThrough();
+
+    await reconcileDriveTokenWithDoc('greg@example.com');
+
+    expect(localToken).toEqual({ token: 'good-local', issuedAt: 1000 });
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+    // And it stays off the cold-start critical path: zero OAuth exchanges.
+    expect(tryCandidateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('a token minted DURING the probe is not overwritten by the blind adopt', async () => {
+    // ⚠️ THE STALE-SNAPSHOT RACE. `adoptDocToken` reads the local token before the
+    // probe, and the probe can burn a 15s fetch timeout. If it decided the
+    // blind-adopt arm from that stale read, an interactive reconnect that minted
+    // and committed a token in the meantime would be overwritten by the
+    // unvalidated doc copy — the exact harm this function exists to prevent,
+    // through a narrower window. The epoch guard does NOT cover it: no sign-out
+    // happened, so the epoch never advances.
+    localToken = null; // nothing to lose, at the moment the probe starts
+    await seedDoc('greg@example.com', 'doc-tok', 2000);
+    persistWritesThrough();
+    attemptSilentRefresh.mockResolvedValue(null);
+    tryCandidateRefreshToken.mockImplementation(async () => {
+      // A reconnect completes mid-probe and commits a fresh credential.
+      localToken = { token: 'freshly-minted', issuedAt: 9999 };
+      return { outcome: 'transient' };
+    });
+
+    await tryReconnectSilently('greg@example.com');
+
+    expect(localToken).toEqual({ token: 'freshly-minted', issuedAt: 9999 });
+    expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
   });
 });
