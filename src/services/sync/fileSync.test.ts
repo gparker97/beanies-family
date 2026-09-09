@@ -292,12 +292,30 @@ describe('fileSync V4 format', () => {
       expect(result.memberIds.sort()).toEqual(['alice', 'bob']);
     });
 
-    it('throws Incorrect password when no member uses this password', async () => {
+    it('throws a typed UnlockFailedError carrying a translatable key, not a raw message', async () => {
       const envelope = await buildEnvelopeWithMembers([
         { memberId: 'alice', password: 'alice-pw' },
       ]);
 
-      await expect(tryUnwrapFamilyKey(envelope, 'wrong')).rejects.toThrow('Incorrect password');
+      // The MESSAGE is deliberately no longer the user-facing sentence: it used to be
+      // returned up the stack and rendered verbatim, putting untranslated English crypto
+      // internals on the login gate. Callers render `messageKey` instead.
+      await expect(tryUnwrapFamilyKey(envelope, 'wrong')).rejects.toMatchObject({
+        name: 'UnlockFailedError',
+        reason: 'incorrect-secret',
+        messageKey: 'password.decryptionError',
+      });
+    });
+
+    it('throws no-candidates, not "incorrect", when the envelope has nothing to try', async () => {
+      // Distinct reasons because they mean different things to the user: one is "try
+      // again", the other is "this file cannot be opened with a password at all".
+      const envelope = await buildEnvelopeWithMembers([]);
+
+      await expect(tryUnwrapFamilyKey(envelope, 'anything')).rejects.toMatchObject({
+        name: 'UnlockFailedError',
+        reason: 'no-candidates',
+      });
     });
   });
 });

@@ -101,7 +101,9 @@ import {
   tryUnwrapFamilyKey,
   envelopeNeedsRecovery,
   reEncryptEnvelope,
+  UnlockFailedError,
 } from '@/services/sync/fileSync';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { preserveLocalKeyDicts, keyDictSize, withoutPayload } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
@@ -2087,7 +2089,18 @@ export const useSyncStore = defineStore('sync', () => {
     } = {}
   ): Promise<{
     success: boolean;
+    /**
+     * DEVELOPER-FACING. May be a raw exception message, so it must never be rendered —
+     * `errorKey` is for that. Kept because three callers BRANCH on it, two of them on the
+     * exact literal `'Incorrect password'` (`SettingsPage.vue`, `syncStore` resume).
+     */
     error?: string;
+    /**
+     * The translated message for THIS failure, when it was a credential failure.
+     * Render this. Absent for failures that have no user-facing sentence of their own,
+     * where the caller's own fallback applies.
+     */
+    errorKey?: UIStringKey;
     memberIds?: string[];
     /** True when the FAMILY RECOVERY PASSPHRASE (not a member password) unlocked the
      *  file — identity is NOT established; callers must route to a person pick/prove. */
@@ -2298,8 +2311,18 @@ export const useSyncStore = defineStore('sync', () => {
         notePodUnopenable(e);
         return { success: false, error: errorMessage, payloadError: e };
       }
-      if (errorMessage.includes('Incorrect password')) {
-        return { success: false, error: 'Incorrect password' };
+      // `errorKey` is ADDED, never a repurposing of `error`. Three callers BRANCH on
+      // `error`'s developer-facing string — `SettingsPage.vue` distinguishes a wrong
+      // password by that exact literal, and `useJoinFlow`'s `asJoinDecryptError` reads it
+      // — while only the two login surfaces RENDER it. Adding a field leaves all three
+      // untouched and makes the render paths explicit.
+      const errorKey = e instanceof UnlockFailedError ? e.messageKey : undefined;
+      if (errorMessage.includes('Incorrect password') || e instanceof UnlockFailedError) {
+        return {
+          success: false,
+          error: errorKey === 'password.decryptionError' ? 'Incorrect password' : errorMessage,
+          errorKey,
+        };
       }
       return { success: false, error: errorMessage };
     }
