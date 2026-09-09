@@ -24,6 +24,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Deleting your family no longer claims more than it did.** The goodbye message said your data had been removed from all systems even when part of it could not be, which is the default when you keep your family data file.
 - **Reconnecting from the Restore screen keeps the Reconnect button on screen** when it does not work, instead of removing it and then telling you to reconnect. A reconnect that works there no longer says your data was saved, because nothing was saved and the restore still needs starting again.
 - **Moving your family file to a new place no longer uploads it twice.**
+- **A message about your family file that you dismiss no longer takes the last warning with it.** Dismissing it left nothing at all to tell you sync had stopped for the rest of the session.
+- **Deleting your family says "goodbye", not "something went wrong", when nothing went wrong.** Keeping your family data file is the normal choice, and it was being reported as a failure to remove it.
 
 ## 2026-09-08
 
