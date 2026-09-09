@@ -356,15 +356,6 @@ let consecutiveTransientExhaustions = 0;
 const SILENT_REFRESH_FAILURE_ESCALATION_THRESHOLD = 2;
 
 function firePermanentFailureCallbacks(): void {
-  // ⚠️ DROP THE CACHED ACCESS TOKEN. This is the THIRD place the app learns a
-  // grant is finished, and it was the one left uncovered when a blanket
-  // invalidation at the reconnect button was reverted. It matters most here:
-  // `scheduleAutoRefresh` fires five minutes BEFORE expiry, so when this runs the
-  // token is still clock-valid — and the subscriber is `attemptSilentSelfRecovery`,
-  // whose `tryReconnectSilently` then returns true at its first line without
-  // contacting Google, recording a recovery that acquired nothing on a grant
-  // Google has just definitively refused.
-  invalidateAccessToken();
   permanentFailureCallbacks.forEach((cb) => {
     try {
       cb();
