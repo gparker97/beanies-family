@@ -4,6 +4,36 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A guard sourced from shared data is not a guard
+
+**Date:** 2026-09-09
+**Context:** The registry's canonical-pointer guard was tightened by sourcing the
+owner from the pod ROSTER instead of from whoever was signed in. That is right for
+the field's MEANING and wrong for anything that COMPARES it — and the same change
+did both, in two places:
+
+- The Lambda's legacy tier compares `ownerEmail`. Once every device sent the
+  owner's address rather than its own, that comparison matched for everyone, so
+  any member could re-point a legacy row at a private copy — reported as
+  `pointerAccepted: true`, so nothing paged. The guard was not weakened, it was
+  inverted, by the change meant to strengthen it.
+- The same trap was avoided by accident on the id half, only because
+  `writerMemberId` had been added there first.
+
+**Rule:** any value every peer can compute from shared state is IDENTITY, never
+AUTHORITY. Before sourcing a field from the document, grep for every comparison
+that reads it — a guard whose two sides now come from the same place always
+passes. Pair each such field with a separate "who is asking" value, and add the
+pairing in the SAME change, not the next one.
+
+**Corollary, from the tombstone in the same commit:** when a delete becomes a
+soft-delete, every write path becomes a potential UNDELETE. `PutItem` replaces the
+whole item, so omitting the tombstone field silently revived deleted rows — on the
+refused path, as a live row pointing at nothing, a state the hard delete could not
+produce. Ask what LIFTS the new state, not only what sets it.
+
+---
+
 ## Widening a return type does not migrate its callers, and a truthy union has no compiler
 
 **Date:** 2026-09-09

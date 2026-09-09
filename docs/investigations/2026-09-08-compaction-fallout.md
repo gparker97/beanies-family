@@ -703,6 +703,21 @@ the Lambda AND the client are both live, re-check `ownerMemberId`: it should be
 greg's roster-owner id. If a pre-stage-5 device re-claimed it with something else,
 NULL it again and let a current client stamp it.
 
+A FIFTH round then ran over that work and found fifteen more, fixed in
+`6b0e455a` — **two of them security regressions the stage-4/5 work itself
+created**, and they are the reason this file now carries a rule in
+`docs/lessons.md`:
+
+- Sourcing `ownerEmail` from the roster INVERTED the Lambda's legacy pointer tier.
+  That tier compares emails, and once every device sent the owner's address rather
+  than its own, it matched for everyone: any member could re-point a legacy row,
+  reported as accepted so nothing paged. `writerEmail` now rides beside
+  `writerMemberId`.
+- The tombstone could be LIFTED by a refused write, because `PutItem` replaces the
+  whole item. A member's ordinary background register after a deletion brought the
+  family back as live with a null pointer — a state the hard delete could not
+  produce. Only a write that may set the pointer lifts it now.
+
 A fourth `/code-review max` round ran over the third round's fixes and found
 fourteen findings, all fixed in `4a9b524e`. The headline: `reconnect()`'s widening
 from boolean to a string union had been applied to four of its six call sites, and
