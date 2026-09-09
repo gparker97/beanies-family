@@ -22,7 +22,7 @@ import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
-import type { PodLineage } from '@/types/models';
+import type { PodLineage, DriveConnection } from '@/types/models';
 import { PayloadLoadError, LocalDocUnreadableError, CacheInitError } from '@/types/sync';
 import type { CacheInitLoss } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
@@ -40,6 +40,7 @@ import {
   getChangesSince as changesSince,
   applyChanges as applyChangesOp,
   decryptToDoc,
+  materializeCollection,
   encryptDocPayload,
   buildFullProjection,
   projectionDeltasBetween,
@@ -1227,6 +1228,34 @@ export async function verifyEnvelope(envelope: BeanpodFileV4): Promise<{ ok: tru
   return { ok: true };
 }
 
+/**
+ * Read ONLY the Drive connections out of a fetched envelope. Decrypts, takes the
+ * one collection, and throws the document away.
+ *
+ * ⚠️ THE RETURN TYPE IS THE SAFETY PROPERTY, not a convenience. This runs beside
+ * the merge path on a device whose pod is lineage-BLOCKED — the one state in
+ * which merging is exactly what must not happen. A sibling that handed back a
+ * decrypted `Doc` would be one `mergeDocs` away from becoming the sync path it
+ * exists to avoid; one that can only ever yield credentials cannot. Do not
+ * generalize this into `readRemoteDoc`.
+ *
+ * `materializeCollection` is the same function the projection uses, so the
+ * values that cross the postMessage boundary are plain and structured-clone-safe
+ * (no Automerge proxies). The cast mirrors the projection's: the document is
+ * untyped at the entity level, and the collection name is what pins the shape.
+ */
+export async function readDriveConnections(
+  envelope: BeanpodFileV4
+): Promise<{ connections: DriveConnection[] }> {
+  const key = requireKey('readDriveConnections');
+  const doc = await decryptToDoc(envelope, key);
+  return {
+    connections: materializeCollection(doc, 'driveConnections').map(
+      ([, entity]) => entity as DriveConnection
+    ),
+  };
+}
+
 /** Serialize + encrypt the current doc → base64 payload (main assembles the
  * envelope + uploads; key material never leaves main for the upload path).
  *
@@ -1565,6 +1594,8 @@ export async function dispatch(
       return { result: await exportEncryptedPayload() };
     case 'verifyEnvelope':
       return { result: await verifyEnvelope(a.envelope as BeanpodFileV4) };
+    case 'readDriveConnections':
+      return { result: await readDriveConnections(a.envelope as BeanpodFileV4) };
     case 'getHeads':
       return { result: getHeads() };
     case 'applyChanges':

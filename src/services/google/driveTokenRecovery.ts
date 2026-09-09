@@ -13,6 +13,12 @@
  *  - This module depends ONLY on `googleAuth`'s public surface (it never reaches
  *    into its private state) + `driveRepository` + `isDocLoaded`. `googleAuth`
  *    itself imports nothing from here and gains no recovery logic.
+ *    ONE EXCEPTION, 2026-09-09: `tryReconnectSilently`'s third strategy reads the
+ *    REMOTE document for a newer token, which needs `syncService`. It is a
+ *    DYNAMIC import inside that closure, so the dependency exists only on the
+ *    one path that takes it and never at module load. Keep it that way: a
+ *    module-scope import would put the whole sync engine in the graph of token
+ *    recovery, which is the direction this invariant exists to prevent.
  *
  * See docs/plans/2026-06-12-drive-connectivity-robustness.md.
  */
@@ -299,23 +305,111 @@ export async function tryReconnectSilently(
     // Snapshot before any async read so a sign-out mid-reconnect skips the adopt.
     const epochAtStart = getSessionEpoch();
 
-    // 1. Try the EXISTING local token first. attemptSilentRefresh recovers it
-    //    from the store when in-memory is empty; this path never overwrites a
-    //    good local credential with the doc copy.
+    // Read once, shared by all three strategies: each must know which tokens
+    // this device has ALREADY proved dead, or it re-tries the same string and
+    // reports a failure as a different one.
     const local = await getGoogleRefreshToken(familyId);
-    if (local?.token) {
-      if ((await attemptSilentRefresh()) !== null) return true;
-      // Local failed (revoked/exhausted). attemptSilentRefresh already cleared
-      // it on invalid_grant; fall through to the beanpod copy as recovery.
-    }
+    const tried = new Set<string>();
 
-    // 2. Local missing or just failed → recover from the account-matched doc copy.
+    /** Adopt a candidate token and see whether Google accepts it. */
+    const adopt = async (tok: StoredRefreshToken): Promise<boolean> => {
+      await restoreLocalFromDoc(familyId, tok, epochAtStart);
+      return (await attemptSilentRefresh()) !== null;
+    };
+
+    // 1. The EXISTING local token. `attemptSilentRefresh` recovers it from the
+    //    store when in-memory is empty, so this never overwrites a good local
+    //    credential with a copy from anywhere else.
+    const fromLocalToken = async (): Promise<boolean> => {
+      if (!local?.token) return false;
+      tried.add(local.token);
+      return (await attemptSilentRefresh()) !== null;
+      // A failure here means revoked/exhausted; `attemptSilentRefresh` has
+      // already cleared it on invalid_grant. Fall through to the copies.
+    };
+
+    // 2. The account-matched copy in OUR OWN document.
+    const fromDocCopy = async (account: string): Promise<boolean> => {
+      const docTok = await readDriveTokenFromDoc(account);
+      if (!docTok?.token || tried.has(docTok.token)) return false;
+      tried.add(docTok.token);
+      return adopt(docTok);
+    };
+
+    // 3. The account-matched copy in the REMOTE document, for the one device
+    //    state the two strategies above cannot serve.
+    //
+    //    WHAT IT FIXES. A pod whose lineage this device refuses to merge (the
+    //    state a compaction leaves a straggler in) LATCHES for the session. Our
+    //    own document is therefore frozen at whatever it held before the latch,
+    //    so strategy 2 keeps re-reading a copy that may predate the token every
+    //    other device in the family has already rotated to. The newer token is
+    //    sitting in the remote file, readable, and the only route to it used to
+    //    be a consent screen — the storm this work exists to stop.
+    //
+    //    WHAT IT EXPLICITLY DOES NOT FIX, and the distinction matters because
+    //    it is easy to expect more of this than it gives: a device whose
+    //    credential is WHOLLY dead cannot read Drive at all, so the fetch
+    //    fails, this returns false, and behaviour is exactly today's. The
+    //    target is narrower than "any permanent failure" — it is precisely
+    //    "can still READ, cannot MERGE". `remote-read-unavailable` counts the
+    //    other half, so an inert step 3 shows up as a number rather than being
+    //    rediscovered months later.
+    //
+    //    Dynamic import, deliberately: this module's header states that it
+    //    depends only on `googleAuth`'s public surface, `driveRepository` and
+    //    `isDocLoaded`. A module-scope `syncService` import would widen that at
+    //    load time and put the sync engine in the dependency graph of token
+    //    recovery, which is the direction the header exists to prevent.
+    const fromRemoteDocCopy = async (account: string): Promise<boolean> => {
+      const syncService = await import('@/services/sync/syncService');
+
+      // Only in the latched state. Everywhere else the ordinary merge is about
+      // to deliver the same document, so a second full download would be waste.
+      if (!syncService.isRemoteBlocked()) return false;
+
+      const connections = await syncService.readRemoteDriveConnections();
+      if (!connections) {
+        logEvent({
+          level: 'info',
+          surface: 'drive-token-silent-reconnect',
+          message: 'could not read the remote beanpod for a newer Drive token',
+          context: { action: 'remote-read-unavailable' },
+        });
+        return false;
+      }
+
+      const entry = connections.find((c) => matchesBoundAccount(c.accountEmail, account));
+      if (!entry?.refreshToken || tried.has(entry.refreshToken)) return false;
+      tried.add(entry.refreshToken);
+
+      const healed = await adopt({ token: entry.refreshToken, issuedAt: entry.issuedAt });
+      if (healed) {
+        logEvent({
+          level: 'info',
+          surface: 'drive-token-silent-reconnect',
+          message: 'healed the Drive connection from the remote beanpod',
+          context: { action: 'healed-from-remote' },
+        });
+      }
+      return healed;
+    };
+
+    // One set of returns. Each strategy answers only "did I connect", so a new
+    // one is a line here rather than an early return threaded past the others —
+    // which is how step 3 came to be reachable from just one of step 2's three
+    // exits in the first draft.
+    if (await fromLocalToken()) return true;
+
+    // THE PER-ACCOUNT INVARIANT, and it gates both copy strategies rather than
+    // sitting inside one of them. Without a bound account there is nothing to
+    // match a stored entry against, and adopting an unmatched one would hand
+    // account A's token to a device acting as B. Strategy 1 above needs no
+    // match — it is this device's own credential.
     if (!boundEmail) return false;
-    const docTok = await readDriveTokenFromDoc(boundEmail);
-    if (!docTok?.token) return false;
-    if (local?.token === docTok.token) return false; // same token already failed
-    await restoreLocalFromDoc(familyId, docTok, epochAtStart);
-    return (await attemptSilentRefresh()) !== null;
+
+    if (await fromDocCopy(boundEmail)) return true;
+    return await fromRemoteDocCopy(boundEmail);
   } catch (error) {
     reportError({
       surface: 'drive-token-silent-reconnect',
