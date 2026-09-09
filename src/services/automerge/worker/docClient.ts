@@ -37,6 +37,7 @@ import { PayloadLoadError, isRemoteBlocker, LocalDocUnreadableError } from '@/ty
 // correctly bans outside the worker. Reading a flag off a thrown error is
 // not making a lineage decision.
 import { PodLineageError } from '@/services/sync/podLineage';
+import type { DriveConnection } from '@/types/models';
 import { deviceMemoryScalar } from '@/utils/diagnostics';
 import { getPlatform } from '@/services/sync/capabilities';
 import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
@@ -489,6 +490,7 @@ const JSON_SAFE_METHODS = new Set([
   'mutate',
   'mergeRemoteEnvelope',
   'verifyEnvelope',
+  'readDriveConnections',
   'persistEnvelope',
 ]);
 
@@ -502,6 +504,8 @@ const HEAVY_METHODS = new Set([
   'mergeRemoteEnvelope',
   'initAndLoadCache',
   'verifyEnvelope',
+  // A whole-doc decrypt, same cost class as the verify above it.
+  'readDriveConnections',
   'exportEncryptedPayload',
   'applyChanges',
 ]);
@@ -511,7 +515,12 @@ const HEAVY_METHODS = new Set([
 // plainify only the SMALL envelope fields (wrappedKeys/inviteKeys/metadata) so the
 // main thread doesn't JSON-round-trip megabytes per call. `mutate` is deliberately
 // NOT here — its small entity payload needs full proxy-stripping.
-const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'persistEnvelope']);
+const ENVELOPE_METHODS = new Set([
+  'mergeRemoteEnvelope',
+  'verifyEnvelope',
+  'readDriveConnections',
+  'persistEnvelope',
+]);
 
 /**
  * The subset of `ENVELOPE_METHODS` that actually needs the encrypted bytes.
@@ -523,7 +532,11 @@ const ENVELOPE_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope', 'pers
  * a pod ever wrote an envelope row again, silently, because
  * `persistEnvelopeSafely` swallows the throw into a warning.
  */
-const PAYLOAD_REQUIRED_METHODS = new Set(['mergeRemoteEnvelope', 'verifyEnvelope']);
+const PAYLOAD_REQUIRED_METHODS = new Set([
+  'mergeRemoteEnvelope',
+  'verifyEnvelope',
+  'readDriveConnections',
+]);
 
 /**
  * Reject a stripped envelope before it can reach the doc realm.
@@ -588,6 +601,10 @@ const RETRYABLE_METHODS = new Set([
   // depends on worker state the rehydrate can change underneath it.
   'mergeRemoteEnvelope',
   'verifyEnvelope',
+  // A pure read that installs nothing and depends on no worker state beyond the
+  // family key, which a respawn re-posts. Re-issuing it decrypts the same bytes
+  // to the same answer.
+  'readDriveConnections',
   'flush',
   'dropDoc',
   'reset',
@@ -1465,6 +1482,21 @@ export function exportEncryptedPayload(): Promise<ExportedPayload> {
  * Rejects with `CorruptPayloadError` if not. Pass `{quiet}` on classify-locally paths. */
 export function verifyEnvelope(envelope: BeanpodFileV4, opts?: RequestOpts): Promise<{ ok: true }> {
   return request('verifyEnvelope', { envelope }, opts);
+}
+
+/**
+ * Read ONLY the Drive connections out of a fetched envelope — decrypt, take one
+ * collection, discard the document.
+ *
+ * The narrow return type is deliberate: this is called on a device whose pod is
+ * lineage-BLOCKED, right next to the merge path it must not take. See the
+ * worker-side doc comment before widening it.
+ */
+export function readDriveConnections(
+  envelope: BeanpodFileV4,
+  opts?: RequestOpts
+): Promise<{ connections: DriveConnection[] }> {
+  return request('readDriveConnections', { envelope }, opts);
 }
 
 /** DEV/E2E-only: load a raw (unencrypted) Automerge binary as the doc. */

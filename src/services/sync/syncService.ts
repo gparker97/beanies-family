@@ -23,6 +23,7 @@ import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandle
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, beanpodVersionFor } from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
+import type { DriveConnection } from '@/types/models';
 import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { logEvent } from '@/services/telemetry';
@@ -2212,6 +2213,53 @@ export async function loadAndParseV4(): Promise<{
   } catch (e) {
     updateState({ lastError: (e as Error).message });
     return { success: false };
+  }
+}
+
+/**
+ * Read the family's mirrored Drive refresh tokens straight from the REMOTE
+ * `.beanpod`, merging nothing.
+ *
+ * WHY THIS EXISTS. A device can be in a state where it reads Drive perfectly
+ * well but must not MERGE what it reads — a lineage mismatch after a compaction
+ * is exactly that state, and it LATCHES for the session. Its local Drive token
+ * may meanwhile be dead, and the doc copy it would normally self-heal from is in
+ * the document it is refusing to merge. Without this the only way out is a
+ * consent screen, which is the storm this whole work exists to stop.
+ *
+ * WHAT IT DELIBERATELY IS NOT. Not a general "read the remote document" helper.
+ * It yields credentials for one collection and nothing else, so it cannot be
+ * mistaken for — or quietly grown into — a second sync path sitting next to the
+ * one that is refusing to run. See `docClient.readDriveConnections`.
+ *
+ * It reads through the provider DIRECTLY rather than through `load()`: `load()`
+ * samples and rewrites the change-detection marker and mutates `isSyncing` /
+ * `lastError`, so routing a side-channel read through it would let a token
+ * lookup move the sync baseline and paint the pod's error slab.
+ *
+ * `null` means COULD NOT READ (no provider, no key, network, a payload this
+ * build cannot parse); `[]` means read fine and the family mirrors nothing. The
+ * caller needs that difference — one is a degradation worth counting, the other
+ * is an ordinary answer.
+ *
+ * Never throws. The Drive provider acquires its token with `getValidTokenSilent`
+ * on every path, so this can never surface a consent screen of its own; that is
+ * a property of the provider, not something re-asserted here.
+ */
+export async function readRemoteDriveConnections(): Promise<DriveConnection[] | null> {
+  if (!currentProvider || !hasFamilyKey()) return null;
+  try {
+    const text = await currentProvider.read();
+    if (!text) return null;
+    const envelope = parseBeanpodV4(text);
+    // `quiet`: a failure here is a missed self-heal the caller already counts,
+    // not a doc-worker incident, and this runs while the pod is latched — the
+    // one moment the user is least served by another error surface.
+    const { connections } = await docClient.readDriveConnections(envelope, { quiet: true });
+    return connections;
+  } catch (e) {
+    console.warn('[syncService] readRemoteDriveConnections failed — no remote token to adopt', e);
+    return null;
   }
 }
 
