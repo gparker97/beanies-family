@@ -9,8 +9,15 @@
  * the columns and park one-off lists in a thin strip along the bottom, which
  * made half of them easy to miss and drew a lifecycle distinction no family
  * thinks in — "leo's jobs" and "swim bag" are both Leo's list. Each column now
- * stacks that bean's lists under their own titles, and overflow opens the
- * drawer rather than being clipped.
+ * stacks that bean's lists under their own titles.
+ *
+ * NOTHING IS HIDDEN. The column used to stop at seven rows and offer "+N more",
+ * which opened the drawer — while the column body already scrolled, so the cap
+ * was trimming a list that had somewhere to go. Worse, that button opened the
+ * ALL-lists drawer rather than the list being read, so a child who tapped "+4
+ * more" under Leo's swim bag landed in a grid of everybody's lists and lost
+ * their place. The orphan column below has always rendered uncapped and simply
+ * scrolled; the columns now do the same.
  *
  * Lists whose owner is not a member the wall knows about get their own labelled
  * block instead of being dropped. That is rare (a deleted member, an unsynced
@@ -21,7 +28,9 @@ import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
-import { WALL_LOCK } from '@/components/wall/wallLockKey';
+import { useWallLock } from '@/components/wall/wallLockKey';
+import { WALL_EDIT } from '@/components/wall/wallEditKey';
+import WallAddRow from '@/components/wall/WallAddRow.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -32,8 +41,12 @@ import type { FamilyMember } from '@/types/models';
 
 defineOptions({ inheritAttrs: false });
 
-/** Rows a column can show before the rest moves into the drawer. */
-const COLUMN_ROWS = 7;
+/** One bean's board column: their lists, whole, plus their tally. */
+interface BoardColumn {
+  groups: WallListGroup[];
+  done: number;
+  total: number;
+}
 
 const props = defineProps<{
   /**
@@ -49,16 +62,13 @@ const emit = defineEmits<{ toggle: [WallJob]; back: []; open: [WallSheetTarget] 
 
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
-const lock = inject(WALL_LOCK, undefined);
+const { canEdit } = useWallLock();
 
 /**
- * When unlocked, every list on the board offers a way to add to it — including
- * the repeating chore lists, which previously had none: their titles were plain
- * text, so the only add affordance in the product sat on the one-off lists in
- * the drawer. The board is tight for space, so the "+" opens that list in the
- * drawer where the input lives rather than inlining a field per column.
+ * The write channel. Optional: a board mounted without it renders read-plus-tick
+ * rather than showing controls that would swallow every write.
  */
-const canAdd = computed(() => lock?.isLocked.value === false);
+const edit = inject(WALL_EDIT, undefined);
 
 const members = computed(() => {
   const humans = familyStore.sortedHumans;
@@ -68,37 +78,15 @@ const members = computed(() => {
 });
 
 /**
- * A column's lists, trimmed to what fits. Trimming happens across the WHOLE
- * column rather than per list, so one long shopping list cannot push every
- * other list of that bean's off the board.
+ * A column's lists, whole. Groups with no jobs are dropped: a list every one of
+ * whose items is deduped away (they are all to-dos due today) would otherwise
+ * render as a heading with nothing under it.
  */
-function buildColumn(memberId: string) {
-  const groups = props.peripherals.listsFor(memberId);
-  const shown: WallListGroup[] = [];
-  let rows = 0;
-  let hidden = 0;
-  for (const group of groups) {
-    // A list every one of whose items is deduped away (they are all to-dos due
-    // today) would otherwise render as a heading with nothing under it.
-    if (!group.jobs.length) continue;
-
-    // Charge for the title BEFORE allocating item rows. Adding it afterwards
-    // let a column overrun its budget and then drop the next list wholesale for
-    // being "full" of rows that had been added retroactively.
-    const room = COLUMN_ROWS - rows - 1;
-    if (room <= 0) {
-      hidden += group.jobs.length;
-      continue;
-    }
-    const jobs = group.jobs.slice(0, room);
-    hidden += group.jobs.length - jobs.length;
-    rows += jobs.length + 1;
-    shown.push({ list: group.list, jobs });
-  }
+function buildColumn(memberId: string): BoardColumn {
+  const groups = props.peripherals.listsFor(memberId).filter((group) => group.jobs.length);
   // `jobsProgress` already supplies `total`; spelling it again just invited the
   // two to drift.
-  const all = groups.flatMap((g) => g.jobs);
-  return { shown, hidden, ...jobsProgress(all) };
+  return { groups, ...jobsProgress(groups.flatMap((g) => g.jobs)) };
 }
 
 /**
@@ -267,7 +255,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2"
           :style="{ background: `${member.color}0d` }"
         >
-          <div v-for="group in column.shown" :key="group.list.id">
+          <div v-for="group in column.groups" :key="group.list.id">
             <button
               type="button"
               class="font-outfit wall-list-title mb-0.5 flex w-full items-center gap-1.5 text-left font-bold tracking-[0.06em] text-[var(--muted-text,#4d5d6c)] uppercase"
@@ -281,29 +269,22 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
               >
                 {{ t('wall.list.repeats') }}
               </span>
-              <span
-                v-if="canAdd"
-                class="font-outfit text-primary-500 ml-auto shrink-0 rounded-lg bg-[var(--tint-orange-15)] px-1.5 font-extrabold"
-                :aria-label="t('wall.list.addItem')"
-                >+</span
-              >
             </button>
             <WallJobList
               :jobs="group.jobs"
               :is-pending="isPending"
               @toggle="emit('toggle', $event)"
             />
+            <!--
+              Add straight to THIS list, rather than sending a child to the
+              drawer to find it again. Only while the wall is unlocked.
+            -->
+            <WallAddRow
+              v-if="canEdit && edit"
+              :placeholder="t('wall.list.addItem')"
+              :submit="(title: string) => edit!.addListItem(group.list.id, title)"
+            />
           </div>
-
-          <button
-            v-if="column.hidden"
-            type="button"
-            class="font-outfit text-primary-500 wall-more shrink-0 rounded-xl bg-[var(--tint-orange-8)] px-2 py-1 font-bold"
-            @click="emit('open', { kind: 'lists' })"
-          >
-            {{ fillTemplate(t('wall.card.more'), { count: column.hidden }) }}
-            <span aria-hidden="true">›</span>
-          </button>
         </div>
 
         <p class="wall-stars shrink-0 px-3 pt-1 pb-3 tracking-[2px]" aria-hidden="true">

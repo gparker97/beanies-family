@@ -7,9 +7,13 @@
  * second would punish the only bean who finished.
  */
 import { mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import WallChoreBoard from '../WallChoreBoard.vue';
+import WallAddRow from '../WallAddRow.vue';
+import { WALL_LOCK } from '../wallLockKey';
+import { WALL_EDIT, type WallEditContext } from '../wallEditKey';
 import type { FamilyList, FamilyMember } from '@/types/models';
 import type { WallJob, WallListGroup } from '@/types/wall';
 
@@ -60,7 +64,9 @@ function group(listId: string, jobs: WallJob[]): WallListGroup {
 function mountBoard(
   byMember: Record<string, WallListGroup[]>,
   orphanLists: WallListGroup[] = [],
-  todosByMember: Record<string, WallJob[]> = {}
+  todosByMember: Record<string, WallJob[]> = {},
+  /** Provide the lock + write channel to render the board UNLOCKED. */
+  edit?: Partial<WallEditContext> | null
 ) {
   return mount(WallChoreBoard, {
     props: {
@@ -76,6 +82,18 @@ function mountBoard(
     },
     global: {
       stubs: { BeanieAvatar: true, WallJobList: true },
+      provide: edit
+        ? {
+            [WALL_LOCK as symbol]: { isLocked: ref(false), noteActivity: () => {} },
+            [WALL_EDIT as symbol]: {
+              addListItem: async () => true,
+              addTodo: async () => true,
+              renameJob: async () => true,
+              removeJob: async () => true,
+              ...edit,
+            },
+          }
+        : {},
     },
   });
 }
@@ -205,5 +223,89 @@ describe('WallChoreBoard', () => {
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(1);
     // Milo and Ana are filtered out entirely; they must not reappear as chips.
     expect(w.find('[data-test="idle-strip"]').exists()).toBe(false);
+  });
+
+  /**
+   * The column used to stop at seven rows and offer "+N more" into the ALL-lists
+   * drawer, while the column body already scrolled. Nothing asserted the cap, so
+   * the suite would have stayed green straight through a regression either way.
+   */
+  describe('nothing is hidden', () => {
+    function manyJobs(n: number): WallJob[] {
+      return Array.from({ length: n }, (_, i) => job(`j${i}`, false));
+    }
+
+    it('renders every item a bean has, far past the old seven-row budget', () => {
+      const w = mountBoard({ m1: [group('l1', manyJobs(12))] });
+      const passed = w.findComponent({ name: 'WallJobList' }).props('jobs') as WallJob[];
+      expect(passed).toHaveLength(12);
+    });
+
+    it('renders every LIST, so a fourth list is not dropped for being "full"', () => {
+      const w = mountBoard({
+        m1: [
+          group('l1', manyJobs(6)),
+          group('l2', manyJobs(6)),
+          group('l3', manyJobs(6)),
+          group('l4', manyJobs(6)),
+        ],
+      });
+      const lists = w.findAllComponents({ name: 'WallJobList' });
+      expect(lists).toHaveLength(4);
+      expect(lists.flatMap((l) => l.props('jobs') as WallJob[])).toHaveLength(24);
+    });
+
+    it('offers no overflow button at any length', () => {
+      const w = mountBoard({ m1: [group('l1', manyJobs(30))] });
+      expect(w.text()).not.toContain('wall.card.more');
+      expect(w.find('[data-test="board-column"]').text()).not.toContain('more');
+    });
+
+    it('still counts the whole column in the tally', () => {
+      const w = mountBoard({
+        m1: [group('l1', [...manyJobs(9), job('done1', true), job('done2', true)])],
+      });
+      expect(w.find('[data-test="board-column"]').text()).toContain('2 / 11');
+    });
+
+    it('drops a list whose jobs were all deduped away, rather than showing an empty heading', () => {
+      const w = mountBoard({ m1: [group('l1', manyJobs(2)), group('l2', [])] });
+      expect(w.findAllComponents({ name: 'WallJobList' })).toHaveLength(1);
+    });
+  });
+
+  describe('the add row', () => {
+    it('is absent while the wall is locked', () => {
+      const w = mountBoard({ m1: [group('l1', [job('j1', false)])] });
+      expect(w.findComponent(WallAddRow).exists()).toBe(false);
+    });
+
+    it('appears under every list once unlocked', () => {
+      const w = mountBoard(
+        { m1: [group('l1', [job('j1', false)]), group('l2', [job('j2', false)])] },
+        [],
+        {},
+        {}
+      );
+      expect(w.findAllComponents(WallAddRow)).toHaveLength(2);
+    });
+
+    it('adds to the list it sits under, not to whichever list was tapped last', async () => {
+      const addListItem = vi.fn().mockResolvedValue(true);
+      const w = mountBoard(
+        { m1: [group('l1', [job('j1', false)]), group('l2', [job('j2', false)])] },
+        [],
+        {},
+        { addListItem }
+      );
+      const second = w.findAllComponents(WallAddRow)[1];
+      await second.props('submit')('bread');
+      expect(addListItem).toHaveBeenCalledWith('l2', 'bread');
+    });
+
+    it('gives the orphan column no add row: nobody owns it, so "who is this for" has no answer', () => {
+      const w = mountBoard({}, [group('lo', [job('jo', false)])], {}, {});
+      expect(w.find('[data-test="orphan-column"]').findComponent(WallAddRow).exists()).toBe(false);
+    });
   });
 });
