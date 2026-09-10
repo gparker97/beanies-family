@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-10
 
+### Added
+
+- New `beanie-video` skill for cutting, branding and delivering videos, GIFs and loops from raw family footage. Covers shot selection, the ffmpeg craft, two named look presets (oval photo-frame and full-bleed), and fitting platform file-size caps. Ships eight helper scripts: clip probing, contact sheets, face-driven per-shot framing, watermark and frame-plate generation, GIF budget search, animated WebP, and output verification.
+
 ### Fixed
 
 - **The sign-in screen no longer mentions a password your family has never had.** The line under the heading, the note under the field and the "don't have the password?" card all said "password" regardless of how your family actually opens its file. A family that signs in with a recovery passphrase is now told about the passphrase, and one that uses a recovery kit is not told about a password at all.
