@@ -130,11 +130,24 @@ onMounted(() => {
  * `Math.random()`, for the same reason the scatter is: two renders of the same
  * surface must not visibly differ.
  */
-const APEX_PCT = [-48, -74, -58, -86, -64, -80] as const;
-const REST_PX = [0, 5, 2, 8, 3, 6] as const;
-const BURST_MS = [1280, 1520, 1380, 1700, 1440, 1600] as const;
-const SPIN_DEG = [340, 620, 480, 880, 400, 720] as const;
-const THROW_DELAY_MS = [0, 40, 90, 25, 140, 65] as const;
+/**
+ * ⚠️ THESE LENGTHS MUST STAY COPRIME WITH 2, because the corner alternates on
+ * `i % 2` and every one of these is indexed off the same `i`.
+ *
+ * They were all length SIX, which is even, so the parity was locked: the left
+ * corner only ever drew the low apexes and short durations and the right corner
+ * only ever drew the high, slow ones. The left threw a fast, low, visible arc
+ * while the right lobbed everything so high and so slowly that it read as
+ * nothing coming from that side at all — which is exactly how it was reported.
+ * One corner had looked fine precisely because a single corner draws every value.
+ *
+ * Five and seven are odd, so each corner now sees every value.
+ */
+const APEX_PCT = [-52, -78, -60, -88, -68] as const;
+const REST_PX = [0, 5, 2, 8, 3, 6, 1] as const;
+const BURST_MS = [1300, 1560, 1380, 1680, 1460] as const;
+const SPIN_DEG = [340, 620, 480, 880, 400, 720, 540] as const;
+const THROW_DELAY_MS = [0, 55, 25, 110, 70] as const;
 
 /** How many pieces the popper fires. A card never fires: it has no floor. */
 const BURST_COUNT = 24;
