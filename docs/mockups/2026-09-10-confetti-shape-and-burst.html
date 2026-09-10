@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>confetti: shape, opacity, burst</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --page: #eef1f4;
+        --surface: #fff;
+        --ink: #2c3e50;
+        --muted: #4d5d6c;
+        --line: rgba(44, 62, 80, 0.15);
+        --orange: #f15d22;
+        --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+        --annotation: #64748b;
+      }
+      html.dark {
+        --page: #0f161d;
+        --surface: #1e2a36;
+        --ink: #f2f5f7;
+        --muted: #c3ced6;
+        --line: #4a5b69;
+        --orange: #ff8b5e;
+        --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
+        --annotation: #c3ced6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        background: var(--page);
+        color: var(--ink);
+        font-family: Inter, system-ui, sans-serif;
+        margin: 0;
+        padding: 0 0 5rem;
+      }
+      .doc { margin: 0 auto; max-width: 1120px; padding: 0 1.25rem; }
+      .head {
+        align-items: flex-end;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-bottom: 2.5rem;
+        padding: 2.5rem 0 1.25rem;
+      }
+      h1 { font-family: Outfit, sans-serif; font-size: 1.5rem; font-weight: 800; margin: 0 0 .3rem; }
+      .head p { color: var(--annotation); font-size: .9rem; margin: 0; max-width: 60ch; }
+      button.ctl {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+        color: var(--ink); cursor: pointer; font-family: Outfit, sans-serif;
+        font-size: .85rem; font-weight: 700; min-height: 2.75rem; padding: 0 1.1rem;
+      }
+      button.ctl:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+      section { margin-bottom: 3.5rem; }
+      h2 { font-family: Outfit, sans-serif; font-size: 1.1rem; font-weight: 800; margin: 0 0 .35rem; }
+      .lede { color: var(--annotation); font-size: .92rem; line-height: 1.55; margin: 0 0 1.5rem; max-width: 72ch; }
+      .row { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+      .label { align-items: baseline; display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .6rem; }
+      .label strong { font-family: Outfit, sans-serif; font-size: .95rem; font-weight: 800; }
+      .label span { color: var(--annotation); font-size: .85rem; }
+      .tag {
+        background: rgb(241 93 34 / 15%); border-radius: 999px; color: var(--orange);
+        font-family: Outfit, sans-serif; font-size: .68rem; font-weight: 800;
+        letter-spacing: .06em; padding: .12rem .5rem; text-transform: uppercase;
+      }
+      .tag.n { background: rgba(44,62,80,.1); color: var(--muted); }
+      html.dark .tag.n { background: rgba(255,255,255,.1); }
+      .note {
+        border-left: 3px solid rgb(241 93 34 / 25%); color: var(--annotation);
+        font-size: .86rem; line-height: 1.55; margin: .9rem 0 0; max-width: 70ch; padding-left: .9rem;
+      }
+      .note strong { color: var(--ink); }
+
+      /* ── shape swatches ─────────────────────────────────────────── */
+      .swatch {
+        background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow);
+        padding: 1.25rem;
+      }
+      .zoom { display: flex; gap: 1.5rem; align-items: center; justify-content: center; min-height: 90px; }
+      .zoom .piece { transform: scale(6); }
+      .actual { display: flex; gap: .5rem; align-items: center; justify-content: center; margin-top: 1.25rem; min-height: 26px; }
+
+      /* the pieces themselves */
+      .piece { display: block; position: relative; }
+      .piece.bean {
+        background: var(--c);
+        border-radius: 50% 50% 48% 52% / 60% 58% 42% 40%;
+        box-shadow: 0 0 0 1.25px rgb(255 255 255 / 85%);
+        height: 7px; width: 10px;
+      }
+      /* confetti: three real forms, not one blob */
+      .piece.rect { background: var(--c); height: 4px; width: 9px; border-radius: 1px; }
+      .piece.strip { background: var(--c); height: 9px; width: 3px; border-radius: 1px; }
+      .piece.curl {
+        background: var(--c); height: 8px; width: 8px;
+        border-radius: 60% 0 60% 0;
+      }
+      .piece.disc { background: var(--c); height: 6px; width: 6px; border-radius: 50%; }
+      html.dark .piece.bean { box-shadow: 0 0 0 1.25px rgb(30 41 59 / 85%); }
+
+      /* ── the card demo ──────────────────────────────────────────── */
+      .demo-card {
+        background: var(--surface); border-radius: 20px; box-shadow: var(--card-shadow);
+        isolation: isolate; overflow: hidden; padding: 1rem 1.1rem; position: relative;
+      }
+      .demo-card h3 { font-family: Outfit, sans-serif; font-size: 1rem; margin: 0 0 .2rem; }
+      .demo-card p { color: var(--muted); font-size: .85rem; margin: 0; }
+      .layer { inset: 0; overflow: hidden; pointer-events: none; position: absolute; z-index: -1; }
+      .layer .piece { position: absolute; }
+
+      /* ── the drawer demo ────────────────────────────────────────── */
+      .demo-drawer {
+        background: var(--surface); border-radius: 24px; box-shadow: var(--card-shadow);
+        isolation: isolate; min-height: 300px; overflow: hidden; padding: 1.4rem; position: relative;
+      }
+      .demo-drawer h3 { font-family: Outfit, sans-serif; font-size: 1.4rem; margin: 0 0 1rem; }
+      .demo-drawer .field {
+        background: rgba(44,62,80,.05); border-radius: 14px; margin-bottom: .7rem; padding: .7rem .9rem;
+      }
+      html.dark .demo-drawer .field { background: rgba(255,255,255,.05); }
+      .demo-drawer .field b { display: block; font-family: Outfit, sans-serif; font-size: 1.05rem; }
+      .demo-drawer .field span { color: var(--muted); font-size: .78rem; }
+
+      /* ═══ ANIMATIONS ═══════════════════════════════════════════════ */
+
+      /* today: decelerates into place, which is what reads as "floating to a stop" */
+      .anim-current .piece {
+        animation: fall-current var(--dur) cubic-bezier(0.34, 0.06, 0.36, 1) backwards;
+        animation-delay: var(--delay);
+      }
+      @keyframes fall-current {
+        0% { opacity: 0; transform: translate3d(var(--sx), calc(var(--fall) * -1), 0) rotate(calc(var(--r) - 220deg)); }
+        14% { opacity: 1; }
+        100% { opacity: 1; transform: translate3d(0,0,0) rotate(var(--r)); }
+      }
+
+      /*
+       * Proposed: gravity. Accelerating (ease-IN), a tight stagger so it lands as
+       * one burst, a small overshoot, then a slow drift so the pieces stay alive.
+       */
+      .anim-burst .piece {
+        animation:
+          burst-fall var(--dur) cubic-bezier(0.45, 0.02, 0.75, 0.35) backwards,
+          drift 5200ms ease-in-out var(--driftdelay) infinite;
+        animation-delay: var(--delay), var(--driftdelay);
+      }
+      @keyframes burst-fall {
+        0% { opacity: 0; transform: translate3d(var(--sx), calc(var(--fall) * -1), 0) rotate(calc(var(--r) - 300deg)); }
+        6% { opacity: 1; }
+        86% { transform: translate3d(calc(var(--sx) * 0.08), 7px, 0) rotate(calc(var(--r) + 14deg)); }
+        100% { opacity: 1; transform: translate3d(0,0,0) rotate(var(--r)); }
+      }
+      @keyframes drift {
+        0%, 100% { transform: translate3d(0, 0, 0) rotate(var(--r)); }
+        50% { transform: translate3d(2px, -3px, 0) rotate(calc(var(--r) + 5deg)); }
+      }
+
+      /* cards: same burst, shorter fall, then drift */
+      .anim-cardburst .piece {
+        animation:
+          burst-fall var(--dur) cubic-bezier(0.45, 0.02, 0.75, 0.35) backwards,
+          drift 6000ms ease-in-out var(--driftdelay) infinite;
+        animation-delay: var(--delay), var(--driftdelay);
+      }
+      /* cards today: a 10px nudge */
+      .anim-carddrop .piece {
+        animation: carddrop 460ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
+        animation-delay: var(--delay);
+      }
+      @keyframes carddrop {
+        from { opacity: 0; transform: translateY(-10px) rotate(var(--r)) scale(.6); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .piece { animation: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <header class="head">
+        <div>
+          <h1>confetti: shape, opacity, burst</h1>
+          <p>
+            Four questions, side by side and moving. Hit replay on any block to watch it again.
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="ctl" onclick="document.documentElement.classList.toggle('dark')">light / dark</button>
+          <button class="ctl" onclick="replayAll()">replay all</button>
+        </div>
+      </header>
+
+      <!-- 1. SHAPE -->
+      <section>
+        <h2>1. What is the piece?</h2>
+        <p class="lede">
+          Shown at 6&times; and then at real size, which is the size that matters. The current
+          piece is one 10&times;7px rounded blob; the proposal is four real confetti forms mixed
+          together, still in the Pod's four colours and still in Pod order.
+        </p>
+        <div class="row">
+          <div class="swatch">
+            <div class="label"><strong>Today</strong><span class="tag n">bean</span></div>
+            <div class="zoom" id="zoom-bean"></div>
+            <div class="actual" id="actual-bean"></div>
+          </div>
+          <div class="swatch">
+            <div class="label"><strong>Proposed</strong><span class="tag">confetti</span></div>
+            <div class="zoom" id="zoom-conf"></div>
+            <div class="actual" id="actual-conf"></div>
+          </div>
+        </div>
+        <p class="note">
+          At real size the bean has about 70 pixels to work with and no room for the notch that
+          makes a bean a bean, so it lands as a generic blob. Mixed forms read as confetti almost
+          instantly, because <strong>the variety itself is the signal</strong>: rectangles,
+          strips, curls and discs together are a thing nothing else looks like.
+        </p>
+      </section>
+
+      <!-- 2. OPACITY -->
+      <section>
+        <h2>2. How much can the card take?</h2>
+        <p class="lede">
+          Real text over each, so it is a readability judgement rather than a swatch. The layer
+          already sits behind the text; this is about visual noise, not occlusion.
+        </p>
+        <div class="row" id="opacity-row"></div>
+        <p class="note">
+          My vote is <strong>0.30 on cards</strong>, keeping <strong>0.45 in the drawer</strong>,
+          which is mostly empty space and can carry more. Below about 0.22 the pieces stop
+          reading as confetti at all and just look like dust on the screen.
+        </p>
+      </section>
+
+      <!-- 3. CARDS -->
+      <section>
+        <h2>3. Should cards animate too?</h2>
+        <p class="lede">
+          Today a card's pieces drop 10px in 460ms and stop. Proposed: the same burst the drawer
+          gets, at a shorter distance, then a slow drift so the card stays alive.
+        </p>
+        <div class="row" id="card-row"></div>
+        <p class="note">
+          <strong>One caveat, and it is the wall.</strong> A kitchen tablet never sleeps, so an
+          infinite drift there means confetti moving in the corner of the room all evening, on
+          every birthday card, forever. I would take the drift in the app and
+          <strong>hold it off the wall</strong>: wall cards get the burst on arrival and then
+          settle. Reduced motion drops the movement everywhere and keeps the pieces.
+        </p>
+      </section>
+
+      <!-- 4. DRAWER -->
+      <section>
+        <h2>4. The drawer: fall vs burst</h2>
+        <p class="lede">
+          Same distance, same pieces. The only differences are the easing, the stagger and what
+          happens on landing.
+        </p>
+        <div class="row" id="drawer-row"></div>
+        <p class="note">
+          <strong>Why today's reads as floating:</strong> the easing decelerates into the
+          landing, so the last third of every piece's journey is a crawl. Gravity does the
+          opposite, so the proposal accelerates, lands in about half the time, staggers over
+          260ms instead of 900ms so it arrives as one burst, overshoots slightly, and then
+          drifts.
+        </p>
+      </section>
+    </div>
+
+    <script>
+      const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
+      const POD_DARK = ['#4A6274', '#E67E22', '#F15D22', '#AED6F1'];
+      const FORMS = ['rect', 'strip', 'curl', 'disc'];
+      // the app's real scatter table
+      const SCATTER = [[8,18,-38],[46,74,20],[78,26,-12],[26,58,46],[92,62,-56],[16,84,30],[60,12,-24],[36,34,64],[70,88,-8],[4,46,38],[52,44,-48],[86,8,16],[22,8,-30],[64,62,58],[40,92,-14],[96,38,42],[12,66,-62],[74,48,26],[30,22,-44],[56,78,50]];
+      const FALL = [210, 280, 175, 320, 245];
+      const SWAY = [-13, 9, -5, 16, -10];
+      const DUR_SLOW = [980, 1180, 860, 1090];
+      const DUR_FAST = [560, 640, 500, 600];
+
+      function piece(i, form, colour) {
+        const el = document.createElement('span');
+        el.className = 'piece ' + form;
+        el.style.setProperty('--c', colour);
+        return el;
+      }
+
+      // ── 1. shape swatches
+      for (const [zoomId, actualId, forms] of [
+        ['zoom-bean', 'actual-bean', ['bean','bean','bean','bean']],
+        ['zoom-conf', 'actual-conf', FORMS],
+      ]) {
+        const zoom = document.getElementById(zoomId);
+        const actual = document.getElementById(actualId);
+        forms.forEach((f, i) => {
+          zoom.appendChild(piece(i, f, POD[i % 4]));
+          for (let k = 0; k < 5; k++) actual.appendChild(piece(k, f, POD[(i + k) % 4]));
+        });
+      }
+
+      // ── shared: fill a layer with pieces
+      function fill(layer, { count, forms, animClass, fast, cardFall }) {
+        layer.className = 'layer ' + animClass;
+        layer.innerHTML = '';
+        SCATTER.slice(0, count).forEach(([left, top, rotate], i) => {
+          const el = piece(i, forms[i % forms.length], POD[i % 4]);
+          const fall = cardFall ? 90 + (i % 4) * 26 : FALL[i % FALL.length];
+          const dur = (fast ? DUR_FAST : DUR_SLOW)[i % 4];
+          const step = fast ? 14 : 45;
+          const delay = i * step;
+          el.style.left = left + '%';
+          el.style.top = top + '%';
+          el.style.setProperty('--r', rotate + 'deg');
+          el.style.setProperty('--fall', fall + 'px');
+          el.style.setProperty('--sx', SWAY[i % SWAY.length] + 'px');
+          el.style.setProperty('--dur', dur + 'ms');
+          el.style.setProperty('--delay', delay + 'ms');
+          el.style.setProperty('--driftdelay', delay + dur + 'ms');
+          layer.appendChild(el);
+        });
+      }
+
+      function card(title, sub, opacity, animClass, opts = {}) {
+        const wrap = document.createElement('div');
+        const lab = document.createElement('div');
+        lab.className = 'label';
+        lab.innerHTML = `<strong>${title}</strong><span>${sub}</span>`;
+        const c = document.createElement('div');
+        c.className = 'demo-card';
+        c.innerHTML = `<h3>Leo's Birthday 🎂</h3><p>Thursday 10 September · 9:00 – 10:00 · with John</p>`;
+        const layer = document.createElement('div');
+        layer.style.opacity = opacity;
+        c.appendChild(layer);
+        fill(layer, { count: 14, forms: opts.bean ? ['bean'] : FORMS, animClass, fast: opts.fast, cardFall: true });
+        const btn = document.createElement('button');
+        btn.className = 'ctl';
+        btn.style.marginTop = '.6rem';
+        btn.textContent = 'replay';
+        btn.onclick = () => fill(layer, { count: 14, forms: opts.bean ? ['bean'] : FORMS, animClass, fast: opts.fast, cardFall: true });
+        wrap.append(lab, c, btn);
+        return wrap;
+      }
+
+      // ── 2. opacity
+      const orow = document.getElementById('opacity-row');
+      [['0.45', 'today', 0.45], ['0.30', 'proposed', 0.30], ['0.22', 'too faint', 0.22]].forEach(
+        ([t, s, o]) => orow.appendChild(card(t, s, o, 'anim-cardburst', { fast: true }))
+      );
+
+      // ── 3. cards
+      const crow = document.getElementById('card-row');
+      crow.appendChild(card('Today', '10px drop, 460ms, then still', 0.45, 'anim-carddrop', { bean: true }));
+      crow.appendChild(card('Proposed', 'burst in, then a slow drift', 0.30, 'anim-cardburst', { fast: true }));
+
+      // ── 4. drawer
+      function drawer(title, sub, animClass, fast) {
+        const wrap = document.createElement('div');
+        const lab = document.createElement('div');
+        lab.className = 'label';
+        lab.innerHTML = `<strong>${title}</strong><span>${sub}</span>`;
+        const d = document.createElement('div');
+        d.className = 'demo-drawer';
+        d.innerHTML = `<h3>Leo's Birthday 🎂</h3>
+          <div class="field"><span>WHEN</span><b>09:00 – 10:00</b></div>
+          <div class="field"><span>WHO</span><b>John Doe</b></div>`;
+        const layer = document.createElement('div');
+        layer.style.opacity = 0.45;
+        d.appendChild(layer);
+        const opts = { count: 20, forms: fast ? FORMS : ['bean'], animClass, fast };
+        fill(layer, opts);
+        const btn = document.createElement('button');
+        btn.className = 'ctl';
+        btn.style.marginTop = '.6rem';
+        btn.textContent = 'replay';
+        btn.onclick = () => fill(layer, opts);
+        wrap.append(lab, d, btn);
+        return wrap;
+      }
+      const drow = document.getElementById('drawer-row');
+      drow.appendChild(drawer('Today', 'decelerates in, 900ms stagger', 'anim-current', false));
+      drow.appendChild(drawer('Proposed', 'accelerates, 260ms stagger, then drifts', 'anim-burst', true));
+
+      function replayAll() {
+        document.querySelectorAll('button.ctl').forEach((b) => {
+          if (b.textContent === 'replay') b.click();
+        });
+      }
+    </script>
+  </body>
+</html>

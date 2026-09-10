@@ -42,9 +42,9 @@ describe('CelebrationConfetti', () => {
       expect(await stillCount(second)).toBeGreaterThan(0);
     });
 
-    it('still renders the beans when the animation is spent', async () => {
+    it('still renders the pieces when the animation is spent', async () => {
       mountConfetti();
-      expect(mountConfetti().findAll('.confetti-bean').length).toBeGreaterThan(0);
+      expect(mountConfetti().findAll('.confetti-piece').length).toBeGreaterThan(0);
     });
   });
 
@@ -73,12 +73,19 @@ describe('CelebrationConfetti', () => {
       expect(drawer.findAll('.confetti-drop')).toHaveLength(0);
     });
 
-    it('staggers wider than a card, so it reads as falling rather than one blink', async () => {
+    /**
+     * Tight on both, so the shower lands as ONE burst. At the old 45ms the
+     * twentieth piece began after the first had already finished, which is a
+     * queue rather than a celebration.
+     */
+    it('staggers tightly, so the pieces arrive together as a burst', async () => {
       const delayOf = (w: ReturnType<typeof mountConfetti>, i: number) =>
-        (w.findAll('.confetti-bean')[i].element as HTMLElement).style.animationDelay;
-      expect(delayOf(mountConfetti({ variant: 'drawer' }), 2)).toBe('90ms');
+        (w.findAll('.confetti-piece')[i].element as HTMLElement).style.getPropertyValue(
+          '--fall-delay'
+        );
+      expect(delayOf(mountConfetti({ variant: 'drawer' }), 2)).toBe('28ms');
       resetCelebrationSeen();
-      expect(delayOf(mountConfetti(), 2)).toBe('36ms');
+      expect(delayOf(mountConfetti(), 2)).toBe('20ms');
     });
 
     /**
@@ -88,7 +95,9 @@ describe('CelebrationConfetti', () => {
      * than the card's 10px drop and read as floating rather than falling.
      */
     it('falls a real distance, in px, not a percentage of a 7px bean', () => {
-      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll('.confetti-bean');
+      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll(
+        '.confetti-piece'
+      );
       const falls = beans.map((b) =>
         Number.parseInt((b.element as HTMLElement).style.getPropertyValue('--bean-fall'), 10)
       );
@@ -98,9 +107,11 @@ describe('CelebrationConfetti', () => {
     });
 
     it('varies duration and drift out of step with each other', () => {
-      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll('.confetti-bean');
+      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll(
+        '.confetti-piece'
+      );
       const durations = new Set(
-        beans.map((b) => (b.element as HTMLElement).style.animationDuration)
+        beans.map((b) => (b.element as HTMLElement).style.getPropertyValue('--fall-ms'))
       );
       const sways = new Set(
         beans.map((b) => (b.element as HTMLElement).style.getPropertyValue('--bean-sway'))
@@ -109,10 +120,76 @@ describe('CelebrationConfetti', () => {
       expect(sways.size).toBeGreaterThan(1);
     });
 
-    it('leaves cards alone: no per-bean duration override on a card', () => {
-      const card = mountConfetti({ density: 'card' });
-      const first = card.findAll('.confetti-bean')[0].element as HTMLElement;
-      expect(first.style.animationDuration).toBe('');
+    it('falls a shorter way on a card than in a drawer', () => {
+      const fall = (w: ReturnType<typeof mountConfetti>) =>
+        Number.parseInt(
+          (w.findAll('.confetti-piece')[0].element as HTMLElement).style.getPropertyValue(
+            '--bean-fall'
+          ),
+          10
+        );
+      const drawer = fall(mountConfetti({ variant: 'drawer' }));
+      resetCelebrationSeen();
+      expect(fall(mountConfetti({ density: 'card' }))).toBeLessThan(drawer);
+    });
+  });
+
+  describe('the piece is confetti, not a bean', () => {
+    it('mixes four forms, because the variety is what makes it legible at 9px', () => {
+      const forms = mountConfetti({ density: 'card' })
+        .findAll('.confetti-piece')
+        .map((p) => [...p.classes()].find((c) => c.startsWith('cf-')));
+      expect(new Set(forms)).toEqual(new Set(['cf-rect', 'cf-strip', 'cf-curl', 'cf-disc']));
+    });
+
+    it('still cycles the Pod colours in their mandated order', () => {
+      const pieces = mountConfetti({ density: 'card' }).findAll('.confetti-piece');
+      const light = pieces
+        .slice(0, 4)
+        .map((p) => (p.element as HTMLElement).style.getPropertyValue('--bean-light'));
+      expect(light).toEqual(['#2C3E50', '#E67E22', '#F15D22', '#AED6F1']);
+    });
+  });
+
+  describe('opacity is a surface decision', () => {
+    it('is quieter on a card, where it competes with text', () => {
+      expect(mountConfetti({ density: 'card' }).get('.celebration-confetti').classes()).toContain(
+        'is-card'
+      );
+    });
+
+    it('is fuller in a drawer, which is mostly space', () => {
+      expect(mountConfetti({ variant: 'drawer' }).get('.celebration-confetti').classes()).toContain(
+        'is-drawer'
+      );
+    });
+  });
+
+  describe('the drift after landing', () => {
+    it('keeps app cards alive', async () => {
+      const w = mountConfetti({ density: 'card' });
+      await nextTick();
+      expect(w.findAll('.confetti-drifts').length).toBeGreaterThan(0);
+    });
+
+    it('is held OFF wall cards: a kitchen tablet never sleeps', async () => {
+      const w = mountConfetti({ density: 'wall' });
+      await nextTick();
+      expect(w.findAll('.confetti-drifts')).toHaveLength(0);
+    });
+
+    it('runs in a wall DRAWER, which someone opened and will close', async () => {
+      const w = mountConfetti({ density: 'wall', variant: 'drawer' });
+      await nextTick();
+      expect(w.findAll('.confetti-drifts').length).toBeGreaterThan(0);
+    });
+
+    it('starts only once that piece has landed', () => {
+      const p = mountConfetti({ variant: 'drawer' }).findAll('.confetti-piece')[3]
+        .element as HTMLElement;
+      const delay = Number.parseInt(p.style.getPropertyValue('--fall-delay'), 10);
+      const dur = Number.parseInt(p.style.getPropertyValue('--fall-ms'), 10);
+      expect(Number.parseInt(p.style.getPropertyValue('--drift-delay'), 10)).toBe(delay + dur);
     });
   });
 });

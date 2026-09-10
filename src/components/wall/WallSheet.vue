@@ -205,6 +205,19 @@ const todoGroups = computed(() => {
   })).filter((group) => group.jobs.length);
 });
 
+/**
+ * The activity id when this sheet is showing a celebration, else null.
+ *
+ * Hoisted out of the card's own `v-if` because the confetti moved up to the
+ * panel: the layer needs the id, and the card is no longer the thing that owns
+ * the occasion.
+ */
+const celebratingActivity = computed(() => {
+  const value = activity.value;
+  if (!value) return null;
+  return identityFor(value).celebration.celebrating ? value.id : null;
+});
+
 /** Who owes this to-do — "Anyone" when nobody has claimed it. */
 function todoOwnerName(job: WallJob): string {
   if (job.ownerId === UNASSIGNED) return t('wall.todo.anyone');
@@ -298,7 +311,23 @@ const { identityFor } = useActivityIdentity();
         </button>
       </div>
 
-      <div class="wall-sheet-body min-h-0 flex-1 overflow-y-auto">
+      <div
+        class="wall-sheet-body relative min-h-0 flex-1 overflow-y-auto"
+        :class="celebratingActivity ? 'is-celebration' : ''"
+      >
+        <!--
+          The confetti covers the WHOLE panel, not the event card inside it.
+          It used to live on that card, which on the wall is a thin horizontal
+          strip near the top, so the shower stopped a couple of centimetres down
+          and the rest of a very large drawer was empty. The occasion is the
+          panel's subject; the panel is the surface it gets.
+        -->
+        <CelebrationConfetti
+          v-if="celebratingActivity"
+          :activity-id="celebratingActivity"
+          density="wall"
+          variant="drawer"
+        />
         <!-- one activity, read only -->
         <template v-if="target.kind === 'activity'">
           <!--
@@ -310,17 +339,23 @@ const { identityFor } = useActivityIdentity();
             Cloud-White ground, not the page's, and the scallops are punched in whatever is
             behind them.
           -->
+          <!--
+            When celebrating, this card goes slightly translucent so the panel's
+            confetti reads THROUGH it rather than stopping at its edge. The app's
+            drawer gets this for free because its field boxes are already
+            translucent; this one is opaque white, so the shower would have been
+            visible only in the empty space below it. 80% keeps the text on an
+            essentially solid ground: the pieces are small, sparse and at 45%.
+          -->
           <div
             v-if="activity"
-            class="dark:bg-surface-raised rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)]"
-            :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
+            class="rounded-[26px] p-5 shadow-[var(--card-shadow)]"
+            :class="
+              celebratingActivity
+                ? 'is-celebration dark:bg-surface-raised/80 bg-white/80'
+                : 'dark:bg-surface-raised bg-white'
+            "
           >
-            <CelebrationConfetti
-              v-if="identityFor(activity).celebration.celebrating"
-              :activity-id="activity.id"
-              density="wall"
-              variant="drawer"
-            />
             <!--
               Time and place are the hero. They are the only two things anybody
               walks up to a wall to check about an activity, so they get a band
