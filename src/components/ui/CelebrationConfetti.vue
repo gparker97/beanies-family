@@ -85,15 +85,26 @@ const SCATTER = [
 ] as const;
 
 /**
- * The scatter always renders; only the entrance ANIMATION is once-per-session.
+ * The scatter always renders; only the entrance ANIMATION is rationed.
  *
  * Gating the whole layer on the claim was a bug: once a card had mounted anywhere the
  * confetti was gone for the rest of the session and the card looked broken. The scatter is a
  * persistent decoration; what must not repeat is the beans arriving.
+ *
+ * A DRAWER NEVER CLAIMS. The claim exists because cards re-mount constantly — the planner
+ * re-keys on navigation, long lists virtualise, the wall repaints at day rollover — so
+ * without it a birthday would twitch every time it scrolled back into view. None of that is
+ * true of a drawer: it mounts only because someone just opened it, which is the whole reason
+ * the drawer variant rains rather than settles.
+ *
+ * Sharing one activity-keyed claim across both meant the drawer could essentially NEVER
+ * animate. You reach a drawer by tapping the chip, the chip mounted first and spent the
+ * claim, so the panel that was designed to rain opened on a static scatter every time.
+ * `||` short-circuits, so a drawer does not spend a card's claim either.
  */
 const animate = ref(false);
 onMounted(() => {
-  animate.value = claimConfetti(props.activityId);
+  animate.value = props.variant === 'drawer' || claimConfetti(props.activityId);
 });
 
 const beans = computed(() =>
