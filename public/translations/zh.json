@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-10",
-    "translationCount": 4643
+    "translationCount": 4642
   },
   "translations": {
     "app.name": {
@@ -13162,9 +13162,9 @@
       "lastUpdated": "2026-05-06"
     },
     "loginV6.unlockNoPasswordHint": {
-      "translation": "此文件包含另一个系列的加密数据。如需加入，请要求家庭所有者向您发送邀请链接。您将通过该流程设置自己的账号，无需预先输入密码。",
-      "hash": "6faxdu",
-      "lastUpdated": "2026-05-06"
+      "translation": "此文件包含另一个家庭的加密数据。如需加入，请要求该家庭的所有者向您发送邀请链接。您将通过该流程创建自己的账号。",
+      "hash": "701h5j",
+      "lastUpdated": "2026-09-10"
     },
     "error.refreshFailed": {
       "translation": "刷新失败",
@@ -20852,9 +20852,9 @@
       "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseSuggestion": {
-      "translation": "建议的密码",
-      "hash": "frl21l",
-      "lastUpdated": "2026-08-28"
+      "translation": "建议的家庭密码",
+      "hash": "ji4m8n",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseRegenerate": {
       "translation": "建议另一个",
@@ -23214,11 +23214,6 @@
     "loginV6.unlockSubtitleWithFamily": {
       "translation": "这会解密{familyName}的家庭数据。接下来，您将以家庭成员身份登录。",
       "hash": "sx9agx",
-      "lastUpdated": "2026-09-10"
-    },
-    "recovery.resetPinBodyPassphrase": {
-      "translation": "您使用的是家庭密码。为此设备设置6位数PIN码，或使用您已有的PIN码登录。",
-      "hash": "5tvugr",
       "lastUpdated": "2026-09-10"
     }
   }

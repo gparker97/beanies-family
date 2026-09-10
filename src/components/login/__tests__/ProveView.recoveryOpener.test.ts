@@ -1,15 +1,23 @@
 /**
  * ProveView — a kit and a family passphrase are not the same arrival.
  *
- * Both are family-level secrets that open the pod without identifying a member, so both
- * offer SET-A-NEW-PIN. Only the KIT leads with it.
+ * Both are family-level secrets that open the pod without identifying a member. ONLY THE
+ * KIT MAY RESET A PIN.
  *
  * A kit is break-glass: reaching for one means the PIN is gone, so the reset is the
  * screen. A family passphrase is the ORDINARY route onto a device that has never seen
  * this family — there is no device wrap yet, so the file must be decrypted before any PIN
- * can be checked — and that person usually still knows their PIN. Leading with a reset
- * there told a whole class of users to replace a credential that works, and told them so
- * in copy that said "you're in with your recovery kit".
+ * can be checked — and that person usually still knows their PIN.
+ *
+ * The reason this is more than a different default: a PIN reset hands over a member's
+ * IDENTITY. Decryption alone does not, since whoever holds the passphrase can already
+ * read everything, so a secret that can reset any PIN is a full member-impersonation
+ * credential. Of the two, the passphrase is the loosely-held one: memorised, typed on
+ * devices, plausibly spoken aloud in a house with children. Nobody is stranded, because
+ * `RecoveryKitLink` is unconditionally on this screen (the never-blank guarantee).
+ *
+ * The UI half of this is only half: `useLoginFlow.onResetPin` carries the matching
+ * authorization gate, tested separately.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -51,50 +59,35 @@ function mountProve(openedBy: 'kit' | 'passphrase' | null) {
 describe('ProveView — which secret opened the pod', () => {
   it('KIT leads with the PIN reset', () => {
     const w = mountProve('kit');
-    expect(w.text().toLowerCase()).toContain('recovery kit');
-    // The reset pane is the active one: it has the new-PIN inputs.
-    expect(w.text().toLowerCase()).toContain('set a');
-  });
-
-  it('PASSPHRASE does NOT lead with the PIN reset', () => {
-    const w = mountProve('passphrase');
-    const text = w.text().toLowerCase();
-    // The bug: someone who typed a passphrase was told they were in with a kit.
-    expect(text).not.toContain("you're in with your recovery kit");
-    // ...and was pushed to replace a PIN that works.
-    expect(text).not.toContain('set a fresh 6-digit pin to use from now on');
-  });
-
-  it('PASSPHRASE still keeps the reset one tap away', () => {
-    // Not a removal: someone who arrived by passphrase BECAUSE they forgot their PIN must
-    // still be able to reach the reset without starting over.
-    const w = mountProve('passphrase');
-    expect(w.text().toLowerCase()).toContain('set a new pin');
-  });
-
-  it('the reset pane, once reached by passphrase, names the PASSPHRASE not a kit', async () => {
-    // ⚠️ The assertion the earlier "does not lead with reset" test CANNOT make: while the
-    // reset pane is not the active one, its copy is not rendered at all, so a test that
-    // only checks the landing screen passes whether or not the copy is branched. Reach
-    // the pane the way a user does — the switch link — and read what it actually says.
-    const w = mountProve('passphrase');
-    const reset = w.findAll('button').find((b) => b.text().toLowerCase().includes('set a new pin'));
-    expect(reset).toBeTruthy();
-    await reset!.trigger('click');
-
-    const text = w.text().toLowerCase();
-    expect(text).toContain('family passphrase');
-    expect(text).not.toContain('recovery kit');
-  });
-
-  it('the reset pane, reached by kit, still names the KIT', async () => {
-    const w = mountProve('kit');
     expect(w.text().toLowerCase()).toContain("you're in with your recovery kit");
   });
 
-  it('a member credential offers no reset at all', () => {
-    const w = mountProve(null);
+  it('PASSPHRASE lands on the member’s own methods, not a reset', () => {
+    const w = mountProve('passphrase');
+    const text = w.text().toLowerCase();
+    // The reported bug: a passphrase arrival was told it was in with a recovery kit...
+    expect(text).not.toContain("you're in with your recovery kit");
+    // ...and pushed to replace a PIN that works.
+    expect(text).not.toContain('set a fresh 6-digit pin to use from now on');
+  });
+
+  it('PASSPHRASE offers NO reset at all, not even as a switch link', () => {
+    // The reset belongs to the kit alone, because it hands over a member's identity.
+    const w = mountProve('passphrase');
     expect(w.text().toLowerCase()).not.toContain('set a new pin');
-    expect(w.text().toLowerCase()).not.toContain("you're in with your recovery kit");
+  });
+
+  it('PASSPHRASE still shows the kit link, which is the route to a reset', () => {
+    // Not a lockout: someone who arrived by passphrase BECAUSE they forgot their PIN
+    // reaches the reset through the kit, without starting over.
+    const w = mountProve('passphrase');
+    expect(w.find('.kit-link').exists()).toBe(true);
+  });
+
+  it('a member credential offers no reset and names no recovery secret', () => {
+    const w = mountProve(null);
+    const text = w.text().toLowerCase();
+    expect(text).not.toContain('set a new pin');
+    expect(text).not.toContain("you're in with your recovery kit");
   });
 });

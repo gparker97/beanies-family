@@ -24,7 +24,7 @@ import { showToast } from '@/composables/useToast';
 import { isNavigationCancelled } from '@/utils/appChrome';
 import { features } from '@/config/features';
 import { useSyncStore } from '@/stores/syncStore';
-import { useLoginFlow } from '@/composables/useLoginFlow';
+import { useLoginFlow, type RecoveryOpener } from '@/composables/useLoginFlow';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -624,7 +624,7 @@ function handleUseRecoveryKit() {
  * A bootstrap load finished (LoadPodView emitted `file-loaded`): the pod is open, the
  * roster is live — hand over to the machine, which renders the person picker from it.
  */
-async function handleFileLoaded(source?: 'recovery') {
+async function handleFileLoaded(openedBy?: RecoveryOpener | null) {
   // Same spinner rule: the flow hand-off can take a beat (roster build, live members).
   activeView.value = 'loading';
   const ok = await enterFlow(
@@ -643,10 +643,11 @@ async function handleFileLoaded(source?: 'recovery') {
     activeView.value = 'welcome';
     return;
   }
-  // Armed AFTER the flow entered. `'kit'` specifically, not a generic "recovery": the
-  // prove screen leads with set-a-new-PIN for a kit (reaching for it means the PIN is
-  // gone) but not for a passphrase, which the passphrase route sets for itself.
-  flow.recoveryOpenedBy.value = source === 'recovery' ? 'kit' : null;
+  // Armed AFTER the flow entered, and passed through UNCHANGED. This used to translate a
+  // one-value `'recovery'` sentinel into `'kit'`, which silently relabelled every
+  // passphrase unlock on this route as a kit arrival. The emitter knows which secret it
+  // used; nothing here can, so nothing here decides.
+  flow.recoveryOpenedBy.value = openedBy ?? null;
 }
 
 /**

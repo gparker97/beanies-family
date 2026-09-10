@@ -14,13 +14,6 @@
  */
 
 import { ref, type Ref } from 'vue';
-
-/**
- * The family-level secrets that can open a pod without identifying a member.
- *
- * Both grant the family key; only their EXPECTATIONS differ. See `recoveryOpenedBy`.
- */
-export type RecoveryOpener = 'kit' | 'passphrase';
 import { PayloadLoadError, payloadErrorMessageKey, payloadErrorKind } from '@/types/sync';
 import type { PayloadErrorKind } from '@/types/sync';
 import { reportPayloadFailure, surfacePayloadFatal } from '@/utils/payloadFailureSurface';
@@ -66,6 +59,14 @@ import { raceTimeout } from '@/utils/timing';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 
+/**
+ * The family-level secrets that can open a pod without identifying a member.
+ *
+ * Both grant the family key. They are NOT interchangeable: only the kit may reset a
+ * member's PIN. See `recoveryOpenedBy` and `onResetPin`.
+ */
+export type RecoveryOpener = 'kit' | 'passphrase';
+
 export interface UseLoginFlow {
   state: Ref<LoginFlowState>;
   /** Error text for the prove screen (wrong password, mismatch, …). */
@@ -76,14 +77,19 @@ export interface UseLoginFlow {
    * WHICH family-level secret opened the pod this session, or `null` if a member
    * credential did.
    *
-   * ⚠️ Was a boolean, and the two routes it conflated do not want the same screen. A KIT
-   * is break-glass: reaching for it means the PIN is gone, so the prove screen leads with
-   * set-a-new-PIN. A FAMILY PASSPHRASE is the ordinary way onto a device that has never
-   * seen this family — there is no device wrap yet, so the file must be decrypted before
-   * any PIN can be checked — and the person almost always still knows their PIN. Leading
-   * with a PIN reset there tells a whole class of users to replace a credential that
-   * works. It also let `recovery.resetPinBody` say "you're in with your recovery kit" to
-   * someone who had typed a passphrase, because by render time the routes were identical.
+   * ⚠️ Was a boolean, and the two routes it conflated must not get the same screen.
+   *
+   * A KIT is break-glass: reaching for one means the PIN is gone, so the prove screen
+   * leads with set-a-new-PIN, and the kit is the ONLY secret permitted to reset one.
+   *
+   * A FAMILY PASSPHRASE is the ordinary way onto a device that has never seen this family
+   * — there is no device wrap yet, so the file must be decrypted before any PIN can be
+   * checked — so it behaves like a normal arrival: the member's own methods, no reset
+   * offered and none authorized (`onResetPin`). A PIN reset hands over a member's
+   * IDENTITY, and the passphrase is the more loosely-held of the two secrets.
+   *
+   * While these were one boolean, `recovery.resetPinBody` also told someone who had typed
+   * a passphrase that they were in with a recovery kit.
    *
    * Set by the kit and passphrase routes; cleared on sign-in and on leaving the flow.
    */
@@ -890,13 +896,24 @@ export function useLoginFlow(opts: {
   }
 
   /**
-   * Recovery-mode PIN reset: the kit/passphrase opened the pod, identity is granted by
-   * that family-level secret, and the member sets a fresh PIN in place of the forgotten
-   * credentials. Only reachable when a family-level secret armed the prove screen.
+   * Recovery PIN reset: THE RECOVERY KIT ONLY.
+   *
+   * ⚠️ This is an authorization gate, not a convenience check, and it deliberately tests
+   * `=== 'kit'` rather than truthiness. Resetting a member's PIN does not merely open the
+   * family's data — whoever holds the passphrase can already decrypt all of it — it hands
+   * over that member's IDENTITY. So a secret that can reset any PIN is a full
+   * member-impersonation credential, and the two family-level secrets are not equally
+   * protected: the kit is a printed artefact kept offline, while a passphrase is
+   * memorised, typed on devices and plausibly spoken aloud in the house. Allowing the
+   * passphrase here let anyone who overheard it reset a parent's PIN and become them.
+   *
+   * Nobody is stranded: `RecoveryKitLink` is unconditionally on the prove screen
+   * (`ProveView.vue:457`, the never-blank guarantee), so a member who arrived by
+   * passphrase and has genuinely forgotten their PIN reaches the kit from there.
    */
   async function onResetPin(pin: string): Promise<void> {
     const s = currentProve();
-    if (!s || isBusy.value || !recoveryOpenedBy.value) return;
+    if (!s || isBusy.value || recoveryOpenedBy.value !== 'kit') return;
     proveError.value = null;
     isBusy.value = true;
     try {

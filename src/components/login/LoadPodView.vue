@@ -33,6 +33,7 @@ import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowE
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
+import type { RecoveryOpener } from '@/composables/useLoginFlow';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -72,7 +73,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   back: [];
-  'file-loaded': [source?: 'recovery'];
+  /**
+   * ⚠️ Carries WHICH family-level secret opened the pod, not merely THAT one did.
+   *
+   * This was `source?: 'recovery'` — one value for two secrets — and `LoginPage` mapped
+   * every `'recovery'` to `'kit'`. So a family passphrase typed into the box below
+   * arrived at the prove screen labelled a recovery kit: it was told "you're in with your
+   * recovery kit", led with a PIN reset, and (once the reset became kit-only) passed an
+   * authorization gate meant to exclude it. A one-bit channel cannot carry a two-value
+   * distinction, and the receiver had to invent the missing half.
+   */
+  'file-loaded': [openedBy?: RecoveryOpener | null];
   'signed-in': [destination: string];
   'request-create': [];
 }>();
@@ -149,9 +160,10 @@ const secretIsPassphrase = computed(
  * feature on the one surface where it silently works.
  *
  * ⚠️ Derived as a set rather than branched per render site. The label, placeholder,
- * reassurance and the kit form's way back all have to agree about which credential is on
- * offer, and they previously disagreed — the footer still said "this password" under a
- * field labelled as a passphrase. One source, four consumers.
+ * reassurance, empty-field error and the kit form's way back all have to agree about which
+ * credential is on offer, and they previously disagreed — the footer still said "this
+ * password" under a field labelled as a passphrase, and submitting an empty passphrase
+ * field answered "Password is required". One source, five consumers.
  *
  * The heading and subtitle are deliberately NOT members here: they describe the STEP
  * (decrypt this beanpod), not the credential, so they are constant across all three cases.
@@ -164,6 +176,7 @@ const secretField = computed(() => {
       placeholder: 'recovery.secretEitherPlaceholder',
       footer: 'loginV6.unlockFooterEither',
       switchLabel: 'recovery.useSecretEitherLink',
+      required: 'recovery.passphraseRequired',
     } as const;
   }
   if (secretIsPassphrase.value) {
@@ -172,6 +185,7 @@ const secretField = computed(() => {
       placeholder: 'recovery.passphrasePlaceholder',
       footer: 'loginV6.unlockFooterPassphrase',
       switchLabel: 'recovery.usePassphraseLink',
+      required: 'recovery.passphraseRequired',
     } as const;
   }
   // Password-only, and the fallback when capabilities are unknown: the wording this
@@ -181,6 +195,7 @@ const secretField = computed(() => {
     placeholder: 'password.enterPasswordPlaceholder',
     footer: 'loginV6.unlockFooter',
     switchLabel: 'passkey.usePassword',
+    required: 'password.required',
   } as const;
 });
 /**
@@ -192,18 +207,6 @@ const secretField = computed(() => {
 const nothingCanOpenIt = computed(
   () => !!caps.value && coldCredentialSurface(caps.value) === 'none'
 );
-/**
- * The line under the heading, or `null` when this surface should carry none.
- *
- * ⚠️ This was the unconditional `loginV6.unlockSubtitle`, "Enter your password and
- * we'll find your account" — rendered above a Recovery Code box on a kit-born family,
- * above a passphrase field, and above the "nothing can open this file" terminal. Naming
- * a credential the envelope cannot accept is the exact defect this change exists to
- * remove, so the subtitle is derived from the same capabilities as the field below it.
- *
- * The kit form and the degenerate terminal each state their own case immediately above
- * the field, so a second line there would only repeat them.
- */
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -436,9 +439,9 @@ async function ensureDurableHome() {
   }
 }
 
-async function finishLoaded(source?: 'recovery') {
+async function finishLoaded(openedBy?: RecoveryOpener | null) {
   await ensureDurableHome();
-  emit('file-loaded', source);
+  emit('file-loaded', openedBy);
 }
 
 async function handlePendingPassword(
@@ -808,7 +811,7 @@ async function handleKitRedeem() {
     kitCodeInput.value = '';
     // 'recovery': a family-level secret opened the pod — the person picker's prove
     // screen offers SET-A-NEW-PIN instead of demanding the forgotten credentials.
-    await finishLoaded('recovery');
+    await finishLoaded('kit');
   } catch (e) {
     console.error('[LoadPodView] kit redeem failed:', e);
     formError.value = t('password.decryptionError');
@@ -819,7 +822,7 @@ async function handleKitRedeem() {
 
 async function handleDecrypt() {
   if (!decryptPassword.value) {
-    formError.value = t('password.required');
+    formError.value = t(secretField.value.required);
     return;
   }
 
@@ -857,7 +860,7 @@ async function handleDecrypt() {
       }
 
       decryptPassword.value = '';
-      await finishLoaded(result.viaRecoveryPassphrase ? 'recovery' : undefined);
+      await finishLoaded(result.viaRecoveryPassphrase ? 'passphrase' : null);
     } else if (result.payloadError) {
       // NOT a credential failure: the payload could not be loaded however right
       // the password is, so re-prompting loops forever. Before this branch the
@@ -1492,10 +1495,12 @@ async function handleDriveRefresh() {
           </svg>
         </div>
         <div class="flex-1">
-          <!-- ⚠️ Capability-gated for the same reason as the subtitle: this card greets
-               anyone who opened someone else's `.beanpod`, and "Don't have the password?"
-               names a credential a kit-born or passphrase-only family has never had. The
-               body below is about asking for an invite either way. -->
+          <!-- ⚠️ Deliberately NOT capability-gated — the string itself is
+               credential-neutral instead, which is why this card can render on every
+               envelope shape. It replaces a pair split on `caps.password` that said
+               "Don't have the password?" to families that have never had one. Keep the
+               body below neutral too: its `en` value once ended "no password needed up
+               front" while its `beanie` value did not, so the guard test passed. -->
           <p class="text-secondary-500 dark:text-ink text-sm font-bold">
             {{ t('loginV6.unlockNoAccessTitle') }}
           </p>

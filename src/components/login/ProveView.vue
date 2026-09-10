@@ -35,11 +35,13 @@ const props = defineProps<{
   /**
    * WHICH family-level secret opened the pod, or `null`/absent for a member credential.
    *
-   * Both grant identity by possession, so both offer SET-A-NEW-PIN — but only the KIT
-   * LEADS with it. A kit is break-glass, so reaching for one means the PIN is gone. A
-   * family passphrase is the ordinary route onto a device that has never seen this
-   * family, where the person usually still knows their PIN, so leading with a reset there
-   * asks a whole class of users to replace a credential that works.
+   * Both grant the family key, but only the KIT may reset a PIN. A kit is break-glass:
+   * reaching for one means the PIN is gone, so this screen leads with set-a-new-PIN. A
+   * family passphrase is the ordinary route onto a device that has never seen this family
+   * — the person usually still knows their PIN — and, more importantly, a PIN reset hands
+   * over a member's IDENTITY, which the more loosely-held of the two secrets must not do.
+   * A passphrase therefore behaves like a normal arrival here; the always-present recovery
+   * -kit link is the route for someone who has genuinely forgotten their PIN.
    */
   recoveryOpenedBy?: 'kit' | 'passphrase' | null;
   /**
@@ -97,7 +99,12 @@ const retryTarget =
 const activeMethod = ref<ActiveKind>(
   // Only a KIT leads with the reset; a passphrase falls through to the member's own
   // methods, with the reset one tap away in `switchTargets` below.
-  props.recoveryOpenedBy === 'kit' ? 'reset-pin' : (retryTarget ?? firstNonRecovery ?? 'recovery')
+  // A kit LANDS on the reset, but `retryTarget` still wins: the component remounts after
+  // every failed attempt, so an unconditional 'reset-pin' threw a kit user who had
+  // switched to their PIN back onto the reset form with the PIN error above it.
+  props.recoveryOpenedBy === 'kit'
+    ? (retryTarget ?? 'reset-pin')
+    : (retryTarget ?? firstNonRecovery ?? 'recovery')
 );
 const resetPin = ref('');
 const resetPinConfirm = ref('');
@@ -190,7 +197,12 @@ const switchTargets = computed<ActiveKind[]>(() => {
     .filter((m) => m.kind !== activeMethod.value)
     .map((m) => m.kind)
     .filter((k) => !NON_SWITCHABLE.includes(k));
-  if (props.recoveryOpenedBy && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
+  // ⚠️ `=== 'kit'`, matching the authorization gate in `useLoginFlow.onResetPin`. A PIN
+  // reset hands over a member's IDENTITY, so it belongs to the printed break-glass secret
+  // alone. A passphrase holder who has forgotten their PIN reaches it through the
+  // always-present recovery-kit link below, not from here.
+  if (props.recoveryOpenedBy === 'kit' && activeMethod.value !== 'reset-pin')
+    targets.unshift('reset-pin');
   return targets;
 });
 
@@ -315,11 +327,7 @@ function handlePassphraseSubmit() {
         @submit.prevent="handleResetPinSubmit"
       >
         <p class="dark:text-ink-soft text-center text-sm text-gray-600">
-          {{
-            recoveryOpenedBy === 'passphrase'
-              ? t('recovery.resetPinBodyPassphrase')
-              : t('recovery.resetPinBody')
-          }}
+          {{ t('recovery.resetPinBody') }}
         </p>
         <div>
           <p class="dark:text-ink-soft mb-2 text-center text-sm font-medium text-gray-700">
