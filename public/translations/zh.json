@@ -2276,11 +2276,6 @@
       "hash": "n7celo",
       "lastUpdated": "2026-02-24"
     },
-    "auth.createAndSignIn": {
-      "translation": "创建密码并登录",
-      "hash": "3fv777",
-      "lastUpdated": "2026-03-03"
-    },
     "auth.familyName": {
       "translation": "姓",
       "hash": "a3acp3",
@@ -21172,9 +21167,9 @@
       "lastUpdated": "2026-08-28"
     },
     "join.pinHint": {
-      "translation": "要稍后登录全新的设备，请使用设备链接或家庭恢复套件—此设备需要0.14或更高版本。",
-      "hash": "hk5a4s",
-      "lastUpdated": "2026-08-28"
+      "translation": "要稍后在全新设备上登录，请使用设备链接或恢复工具包。此设备需要 beanies 0.14 或更高版本。",
+      "hash": "ns7m1q",
+      "lastUpdated": "2026-09-10"
     },
     "passkey.webRetired": {
       "translation": "在适用于iPhone和Android的beanies应用程序中，人脸识别和指纹会实时解锁。在浏览器中，您可以快速输入6位数PIN码，无需在此处进行设置。",
@@ -23239,6 +23234,11 @@
     "recovery.secretEitherRequired": {
       "translation": "请输入您的密码或家庭密码。",
       "hash": "95gefl",
+      "lastUpdated": "2026-09-10"
+    },
+    "join.createPinAndSignIn": {
+      "translation": "创建PIN码并登录",
+      "hash": "jza8ht",
       "lastUpdated": "2026-09-10"
     }
   }

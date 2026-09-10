@@ -3739,7 +3739,6 @@ const STRING_DEFS = {
     beanie:
       'sign-in worked, but the cross-device key sync needs attention. try signing out and back in. details in console.',
   },
-  'auth.createAndSignIn': { en: 'Create Password & Sign In', beanie: 'create password & sign in' },
   'auth.familyName': { en: 'Family Name', beanie: 'family name' },
   'auth.familyNamePlaceholder': { en: 'The Smith Family', beanie: 'the smith family' },
   'auth.yourNamePlaceholder': { en: 'John Smith', beanie: 'john smith' },
@@ -5315,11 +5314,14 @@ const STRING_DEFS = {
     en: 'This 6-digit PIN is just for you — it signs you in on any of your family devices.',
     beanie: 'this 6-digit pin is just for you — it signs you in on any of your family devices.',
   },
+  // ⚠️ Was `auth.createAndSignIn`, "Create Password & Sign In" — on the step where a joiner
+  // sets a PIN. Password creation has not been part of joining since PINs replaced
+  // passwords; that string was the last one on this surface still naming the old credential.
+  'join.createPinAndSignIn': { en: 'Create PIN & Sign In', beanie: 'create pin & sign in' },
   'join.choosePinLabel': { en: 'Your PIN', beanie: 'your pin' },
   'join.pinHint': {
-    en: 'To sign in on a brand-new device later, use a device link or your family recovery kit — this device needs beanies 0.14 or later.',
-    beanie:
-      'to sign in on a brand-new device later, use a device link or your family recovery kit.',
+    en: 'To sign in on a brand-new device later, use a device link or your recovery kit — this device needs beanies 0.14 or later.',
+    beanie: 'to sign in on a brand-new device later, use a device link or your recovery kit.',
   },
   'join.completing': { en: 'Joining your family...', beanie: 'joining your family...' },
   'join.success': { en: 'Welcome to the family!', beanie: 'welcome to your pod!' },

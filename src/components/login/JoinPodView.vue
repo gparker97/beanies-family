@@ -676,7 +676,9 @@ onMounted(() => {
           :disabled="!!pinError || pin.length !== PIN_LENGTH || confirmPin.length !== PIN_LENGTH"
         >
           {{
-            flow.currentStep.value === 'joining' ? t('join.completing') : t('auth.createAndSignIn')
+            flow.currentStep.value === 'joining'
+              ? t('join.completing')
+              : t('join.createPinAndSignIn')
           }}
         </BaseButton>
       </form>
