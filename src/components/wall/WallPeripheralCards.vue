@@ -54,7 +54,14 @@ const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
-const { tonight, trip } = useWallPeripherals();
+const { tonight, trip, timelineItems } = useWallPeripherals();
+
+/**
+ * The card's teaser. `item.title` is `buildTravelSegmentTitle`, which already
+ * renders a flight as "SIN → HND", so the glance value survives the move off
+ * the wall's own (capped, travel-only) leg model.
+ */
+const tripLegs = computed(() => timelineItems.value.filter((i) => i.kind === 'travel').slice(0, 2));
 
 /** The rail is one column wide, so it shows fewer rows than the band. */
 const rows = computed(() => (props.variant === 'band' ? 3 : props.variant === 'rail' ? 2 : 1));
@@ -418,20 +425,19 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           </span>
         </span>
       </span>
+      <!--
+        A teaser, not the itinerary: two flights, and the drawer has the rest.
+        Filtered to travel deliberately, so a card a family already recognises
+        does not silently start leading with a hotel.
+      -->
       <span
-        v-for="leg in trip.legs.slice(0, 2)"
+        v-for="leg in tripLegs"
         :key="leg.id"
         class="font-inter wall-card-sub flex items-center gap-2 py-0.5 text-[#dfe6ec]"
       >
-        <template v-if="leg.from && leg.to">
-          <b class="font-outfit">{{ leg.from }}</b>
-          <span class="text-[var(--sky-silk,#AED6F1)] opacity-80" aria-hidden="true">→</span>
-          <b class="font-outfit">{{ leg.to }}</b>
-        </template>
-        <span v-else class="truncate">{{ leg.title }}</span>
-        <!-- the card shows the departure only; the sheet shows the full band -->
-        <span v-if="leg.band?.start.time">{{ leg.band.start.time }}</span>
-        <span v-if="leg.reference" class="ml-auto text-[#9fb3c4]">{{ leg.reference }}</span>
+        <b class="font-outfit truncate">{{ leg.title }}</b>
+        <span v-if="leg.timing?.band.start.time">{{ leg.timing.band.start.time }}</span>
+        <span v-if="leg.keyValue" class="ml-auto shrink-0 text-[#9fb3c4]">{{ leg.keyValue }}</span>
       </span>
       <span
         v-if="trip.percent > 0"
