@@ -883,6 +883,7 @@ async function confirmReschedule() {
     save-gradient="orange"
     :save-disabled="showReschedule"
     :show-delete="!showReschedule"
+    :body-class="isCelebration ? 'is-celebration' : ''"
     @close="handleClose"
     @save="handleDone"
     @delete="handleDelete"
@@ -890,18 +891,22 @@ async function confirmReschedule() {
     <!--
       The drawer celebrates across its WHOLE surface, not behind the title.
       Scoping it to the title band was backwards: the title is the one thing that must stay
-      readable, and a drawer is mostly space that can carry the celebration instead. The
-      beans rain in once on open and settle; `-mx-1 px-1` gives the layer a little bleed so
-      it does not stop dead at the content's left edge.
+      readable, and a drawer is mostly space that can carry the celebration instead.
+
+      It rides the modal's body layer rather than the content wrapper, so the floor the
+      confetti settles on is the DRAWER's bottom and not the content's — the same fix the
+      wall's sheet needed, in the same shape, so the two surfaces behave identically.
     -->
-    <div class="-mx-1 space-y-4 px-1" :class="isCelebration ? 'is-celebration' : ''">
+    <template #body-layer>
       <CelebrationConfetti
         v-if="isCelebration"
         :activity-id="activity.id"
         density="wall"
         variant="drawer"
       />
+    </template>
 
+    <div class="-mx-1 flex-1 space-y-4 px-1">
       <!-- One-off override context + reset-to-series (moved/edited single session).
            Quiet, reversible: Sky Silk, never the orange CTA, never red. -->
       <div

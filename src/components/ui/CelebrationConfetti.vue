@@ -140,7 +140,7 @@ const THROW_DELAY_MS = [0, 40, 90, 25, 140, 65] as const;
 const BURST_COUNT = 24;
 
 /**
- * The popper: pieces leave ONE bottom corner, arc across, and land on the floor.
+ * The popper: pieces leave BOTH bottom corners, arc across, and land on the floor.
  *
  * This replaces a fall onto fixed scatter positions spread from 8% to 92% down
  * the panel — which meant the pieces stopped IN MID-AIR, and no amount of easing
@@ -153,13 +153,18 @@ const BURST_COUNT = 24;
  */
 const burst = computed(() =>
   Array.from({ length: BURST_COUNT }, (_, i) => {
+    // Alternating corners. Each popper throws its own way, so the two streams
+    // cross in the middle rather than mirroring each other exactly.
+    const fromLeft = i % 2 === 0;
     const slot = (i / BURST_COUNT) * 92 + 3;
+    const pull = fromLeft ? -5 : 5;
     return {
       i,
+      fromLeft,
       form: FORMS[i % FORMS.length],
       light: POD_LIGHT[i % POD_LIGHT.length],
       dark: POD_DARK[i % POD_DARK.length],
-      land: Math.round(slot + (i % 3) - 1),
+      land: Math.round(Math.max(2, Math.min(96, slot + pull + ((i % 3) - 1)))),
       apex: APEX_PCT[i % APEX_PCT.length],
       rest: REST_PX[i % REST_PX.length],
       duration: BURST_MS[i % BURST_MS.length],
@@ -220,6 +225,7 @@ const showBurst = computed(
         :key="`b${p.i}`"
         class="cf-x"
         :style="{
+          '--from': p.fromLeft ? '-3%' : '103%',
           '--land': `${p.land}%`,
           '--dur': `${p.duration}ms`,
           '--delay': `${p.delay}ms`,
@@ -394,7 +400,7 @@ html.dark .cf-disc {
 
 @keyframes cf-fly-x {
   from {
-    transform: translateX(-3%);
+    transform: translateX(var(--from, -3%));
   }
 
   to {
