@@ -24,8 +24,17 @@ export function wallDeviceTipKeys(
   wakeLockSupported: boolean
 ): UIStringKey[] {
   // Where the browser can hold the screen awake, the OS timeout is a backstop.
-  // Where it cannot, that timeout is the ONLY thing keeping the wall lit, which
-  // is a materially different instruction and has to read like one.
+  // Where it cannot, that timeout is the only thing that will keep a wall lit,
+  // which is a materially different instruction and has to read like one.
+  //
+  // ⚠️ But note what this input is and is not. `platform` is safe to state as a
+  // fact about the reader, because an iPhone and an iPad share the same word
+  // ("Guided Access"), so the answer holds whether they are at the tablet or on
+  // their phone. `wakeLockSupported` has NO such property: it describes the
+  // browser reading this card, which may not be the browser that will run the
+  // wall. So it may only ever change the EMPHASIS of the line, never assert
+  // something about "this device". Both strings are written to be true wherever
+  // they are read; keep it that way.
   const screen: UIStringKey = wakeLockSupported
     ? 'wall.setup.tips.screenBacked'
     : 'wall.setup.tips.screenOnly';

@@ -2202,6 +2202,19 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ### Session 2026-09-11 (1) — the wall's "setup helper" now exists (UNDEPLOYED)
 
+> ### ⚠️ DEPLOY ORDER: WEB FIRST, OR THE NEW SETTINGS LINK IS A 404 ⚠️
+>
+> The Beanie Wall card in Settings now carries an **unconditionally visible** link to
+> `beanies.family/help/getting-started/set-up-the-beanie-wall`. That article ships in the
+> **Astro** build, and `deploy-web.yml` is `workflow_dispatch`-only and independent of the app
+> deploy. **Run "Deploy web (Astro marketing site)" before, or in the same batch as, the next app
+> deploy.** Ship the app first and every parent who taps that link lands on a marketing 404, on
+> the one surface where the link cannot be missed.
+>
+> The `helpLinks.test.ts` drift guard does NOT protect against this: it resolves paths against the
+> local content module, which is green the moment the article is committed, deployed or not. This
+> note is the only guard. Found by `/code-review`, not by CI.
+
 **Origin: a promise on a live marketing page with nothing behind it.** greg asked whether the
 "setup helper" mentioned on the switching pages was real. It was not. `web/src/pages/from/skylight.astro`
 promises one three times (`:840`, `:926`, `:950`, live on prod, verified by curl), and the original
