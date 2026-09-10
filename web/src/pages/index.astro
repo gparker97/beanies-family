@@ -4,6 +4,7 @@ import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
 import HeroShowcase from '../components/HeroShowcase.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL } from '@beanies/brand/nav';
+import { PRICING_LIVE } from '../lib/pricing';
 
 // The LCP element. Single source of truth: this same path feeds BOTH the
 // `<link rel="preload" as="image">` (via BaseLayout's `lcpImage`) and the
@@ -390,7 +391,8 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       <div class="container">
         <h2 class="final-cta__title reveal">so... ready to count some beans? <em>🫘</em></h2>
         <p class="final-cta__sub reveal">
-          it's free. run it locally or login below. yes, it's really free. probably not forever.
+          it's free. run it locally or login below. yes, it's really free.
+          {PRICING_LIVE ? <a href="/pricing" class="final-cta__pricing">probably not forever.</a> : 'probably not forever.'}
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center" class="reveal">
           <a
@@ -1018,6 +1020,9 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 .final-cta__title { color: var(--deep-slate); font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: clamp(1.4rem, 3.5vw, 1.8rem); font-weight: 700; margin-bottom: 8px; }
 .final-cta__title em { color: var(--heritage-orange); font-style: normal; }
 .final-cta__sub { color: var(--muted-text); font-size: 0.95rem; margin-bottom: 28px; }
+/* the hedge, once it has somewhere to land: same ink, an orange underline, no default blue */
+.final-cta__pricing { color: inherit; text-decoration: underline; text-decoration-color: rgb(241 93 34 / 55%); text-underline-offset: 3px; }
+.final-cta__pricing:hover { color: var(--heritage-orange); }
 
 .btn-secondary { background: white; border: 1px solid rgb(44 62 80 / 8%); border-radius: 60px; box-shadow: var(--card-shadow); color: var(--deep-slate); cursor: pointer; display: inline-block; font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif; font-size: 0.85rem; font-weight: 600; padding: 12px 28px; text-decoration: none; transition: all 200ms ease; }
 .btn-secondary:hover { box-shadow: var(--card-hover-shadow); transform: translateY(-2px); }

@@ -761,3 +761,19 @@
     animation: none;
   }
 }
+
+/*
+  A badge may link (the beta one points at /pricing); it must still read as a
+  pill. Sits last because `li a` outranks the `.pull a` / `.ps a` link rules
+  above and stylelint wants specificity ascending.
+*/
+.welcome-page .trust li a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgb(241 93 34 / 45%);
+  text-underline-offset: 3px;
+}
+
+.welcome-page .trust li a:hover {
+  color: var(--heritage-orange);
+}

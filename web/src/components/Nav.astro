@@ -1,5 +1,6 @@
 ---
 import { APP_URL } from '@beanies/brand/nav';
+import { PRICING_LIVE } from '../lib/pricing';
 
 const currentPath = Astro.url.pathname;
 const isHome = currentPath === '/';
@@ -23,6 +24,7 @@ const securityHref = isHome ? '#security' : '/#security';
       <a href={featuresHref} data-scroll-to={isHome ? 'features' : undefined}>what's inside</a>
       <a href={storyHref} data-scroll-to={isHome ? 'story' : undefined}>my story</a>
       <a href={securityHref} data-scroll-to={isHome ? 'security' : undefined}>security</a>
+      {PRICING_LIVE && <a href="/pricing">pricing</a>}
       <a href="/blog">beanstalk</a>
       <a href="/guides">family library</a>
       <a href={`${APP_URL}/login`}>sign in</a>
@@ -81,6 +83,13 @@ const securityHref = isHome ? '#security' : '/#security';
     <li><a href={featuresHref} data-scroll-to={isHome ? 'features' : undefined} data-close-drawer>what's inside</a></li>
     <li><a href={storyHref} data-scroll-to={isHome ? 'story' : undefined} data-close-drawer>my story</a></li>
     <li><a href={securityHref} data-scroll-to={isHome ? 'security' : undefined} data-close-drawer>security</a></li>
+    {PRICING_LIVE && (
+      <li>
+        <a href="/pricing" data-close-drawer>
+          pricing
+        </a>
+      </li>
+    )}
     <li><a href="/blog" data-close-drawer>beanstalk</a></li>
     <li><a href="/guides" data-close-drawer>family library</a></li>
     <li><a href="/help" data-close-drawer>help</a></li>

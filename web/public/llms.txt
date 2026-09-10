@@ -13,7 +13,7 @@
 ## switching from another app
 
 - [from maple](https://beanies.family/from/maple): maple retires Dec 31, 2026 and deletes user data; feature comparison, migration steps, and what beanies does differently
-- [from cozi](https://beanies.family/from/cozi): cozi alternative without ads or a premium paywall; feature comparison and migration steps
+- [from cozi](https://beanies.family/from/cozi): cozi alternative without ads, with nothing your family needs behind a paywall; feature comparison and migration steps
 
 ## policies
 

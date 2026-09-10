@@ -2356,6 +2356,25 @@ still bypass `helpLinks`; `platformLabel.formFactor()` keeps its own UA parse on
 > 💲 **The pricing page was excluded by construction**, not by the flag: it lives on
 > `pricing-page` and `/pricing` returns 404 on prod (verified post-deploy). Its
 > `/code-review` came back with 15 findings, none shipping — see the pending block.
+### 💲 Session 2026-09-10 (7) — THE PRICING PAGE, on branch `pricing-page`. NOT on `main`, NOT deployed.
+
+> **Last updated:** 2026-09-10. Wall edit mode, the trip drawer and the celebration popper
+> shipped to `main` earlier this session (`bf7eca13` → `1b217318`, pushed, not deployed).
+> The pricing work is on **`pricing-page`**, branched from `3517f29b`. greg's instruction,
+> mid-build: "put the page behind a gate so that it does not get pushed to production in
+> the next deploy". **Two gates.** `PRICING_LIVE = false` (`web/src/lib/pricing.ts`)
+> renders `/pricing` as the draft placeholder (noindex, no FAQ schema) and drops the nav,
+> footer, trust-badge and homepage-hedge links; the **branch** is the real gate, because
+> the rewritten prose on `/from/{cozi,maple,skylight,index}`, `/help/faq`, `llms.txt` and
+> four blog posts links to `/pricing` unconditionally. **The model** (settled after
+> rejecting an event-count cap and a trial-only plan): beta = everything free, no clock,
+> ends at v1.0; then 90 days of everything incl. the AI helper; then free tier (whole app
+> minus managed AI, BYOK works) or subscribe. USD $9.99/$84.99, SGD S$13/S$110, switcher
+> extensible. First 10 rate+review families $1/mo forever; everyone before v1.0 half price
+> forever. **To ship:** greg reads the copy, flip the flag, merge, delete the branch.
+> ⚠️ `terms.astro` still says "provided free of charge" — legal read before v1.0. Plan:
+> `docs/plans/2026-09-10-pricing-page.md`; prompts
+> `docs/prompts/2026-09/2026-09-10-pricing-page.md`.
 
 ### ⭐⭐ Session 2026-09-10 (6) — THE CREDENTIAL FIX, VERIFIED. Four defects found. Still NOT deployed. ⭐⭐
 

@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>pricing - beanies.family</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ═══════════════════════════════════════════════════════════════════
+         Values lifted from web/src/styles/switch-page.css and the brand
+         theme. The marketing site has no dark mode; neither does this.
+
+         MODEL (agreed 2026-09-10):
+           beta      everything free, no clock
+           v1.0      new families get 90 days of everything, AI included;
+                     then free (whole app minus managed AI) or subscribe
+           always    subscribers fund the free tier. no subscribers, no beanies.
+         ═══════════════════════════════════════════════════════════════════ */
+      .welcome-page {
+        --deep-slate: #2c3e50;
+        --heritage-orange: #f15d22;
+        --sky-silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud-white: #f8f9fa;
+        --soft-green: #27ae60;
+        --body-text: #4a5568;
+        --muted-text: #4d5d6c;
+        --story-cream: #fdf8f5;
+        --sq: 24px;
+        --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+        --card-hover-shadow: 0 8px 32px rgb(44 62 80 / 10%);
+        background: var(--cloud-white);
+        color: var(--body-text);
+        font-family: Inter, sans-serif;
+        line-height: 1.7;
+        overflow-x: hidden;
+      }
+      * { box-sizing: border-box; }
+      :root { color-scheme: light; }
+      body { margin: 0; background: #fff; color: #4a5568; }
+
+      .welcome-page .wrap { margin: 0 auto; max-width: 1040px; padding: 0 24px; }
+      .welcome-page .narrow { max-width: 680px; }
+      .welcome-page .section { padding: 72px 0; }
+      .welcome-page .section-tight { padding-top: 0; }
+      .welcome-page .section-label {
+        color: var(--heritage-orange); font-family: 'Outfit', sans-serif; font-size: .78rem;
+        font-weight: 700; letter-spacing: .14em; margin: 0 0 .5rem; text-align: center;
+        text-transform: uppercase;
+      }
+      .welcome-page .section-title {
+        color: var(--deep-slate); font-family: 'Outfit', sans-serif;
+        font-size: clamp(1.7rem, 3.6vw, 2.4rem); font-weight: 800; line-height: 1.15;
+        margin: 0 0 .9rem; text-align: center; text-wrap: balance;
+      }
+      .welcome-page .section-subtitle { margin: 0 auto 2.4rem; max-width: 560px; text-align: center; }
+      .welcome-page .btn {
+        border-radius: 16px; display: inline-block; font-family: 'Outfit', sans-serif;
+        font-size: .95rem; font-weight: 700; padding: 14px 26px; text-decoration: none;
+        transition: transform 180ms ease, box-shadow 180ms ease;
+      }
+      .welcome-page .btn-primary {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        box-shadow: 0 8px 24px rgb(241 93 34 / 32%); color: #fff;
+      }
+      .welcome-page .btn-ghost { background: #fff; box-shadow: var(--card-shadow); color: var(--deep-slate); }
+      .welcome-page .btn:hover { transform: translateY(-2px); }
+      .welcome-page .btn:focus-visible { outline: 3px solid var(--heritage-orange); outline-offset: 3px; }
+
+      /* hero */
+      .welcome-page .hero {
+        background:
+          radial-gradient(700px 440px at 10% 2%, rgb(241 93 34 / 10%), transparent 68%),
+          radial-gradient(600px 400px at 90% 24%, rgb(174 214 241 / 34%), transparent 70%),
+          radial-gradient(520px 340px at 64% 102%, rgb(230 126 34 / 10%), transparent 70%),
+          var(--cloud-white);
+        padding: 104px 24px 66px; position: relative; text-align: center;
+      }
+      .welcome-page .hero h1 {
+        color: var(--deep-slate); font-family: 'Outfit', sans-serif;
+        font-size: clamp(2.5rem, 5.3vw, 3.85rem); font-weight: 800; letter-spacing: -.02em;
+        line-height: 1.03; margin: 0 auto .9rem; max-width: 15ch; text-wrap: balance;
+      }
+      .welcome-page .hero h1 em { color: var(--heritage-orange); font-style: italic; }
+      .welcome-page .hero-sub { margin: 0 auto; max-width: 56ch; font-size: 1.05rem; }
+      .welcome-page .kicker-pill {
+        background: #fff; border-radius: 999px; box-shadow: var(--card-shadow);
+        color: var(--deep-slate); display: inline-block; font-family: 'Outfit', sans-serif;
+        font-size: .8rem; font-weight: 700; margin-bottom: 1.2rem; padding: .35rem 1rem;
+      }
+      .welcome-page .hero-cta { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; margin-top: 1.8rem; }
+
+      /* dark treatment */
+      .welcome-page .dark-section { background: var(--deep-slate); color: #ecf0f1; padding: 80px 24px; }
+      .welcome-page .dark-section .section-label { color: var(--sky-silk); }
+      .welcome-page .dark-section .section-title { color: #ecf0f1; }
+      .welcome-page .dark-section .section-subtitle { color: rgb(236 240 241 / 60%); }
+      .welcome-page .promises {
+        display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        margin: 0 auto; max-width: 900px;
+      }
+      .welcome-page .promise {
+        background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 8%);
+        border-radius: 20px; padding: 24px;
+      }
+      .welcome-page .promise-icon {
+        align-items: center; background: rgb(174 214 241 / 15%); border-radius: 12px;
+        display: flex; font-size: 1.2rem; height: 40px; justify-content: center;
+        margin-bottom: .8rem; width: 40px;
+      }
+      .welcome-page .promise h3 { color: #ecf0f1; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; margin: 0 0 .35rem; }
+      .welcome-page .promise p { color: rgb(236 240 241 / 60%); font-size: .9rem; margin: 0; }
+
+      /* ── currency switcher ─────────────────────────────────────────── */
+      .welcome-page .currency {
+        align-items: center; display: flex; gap: .6rem; justify-content: center;
+        margin: -1.2rem auto 1.8rem;
+      }
+      .welcome-page .currency-label { color: var(--muted-text); font-size: .82rem; }
+      .welcome-page .seg {
+        background: #fff; border-radius: 999px; box-shadow: var(--card-shadow);
+        display: inline-flex; padding: 4px;
+      }
+      .welcome-page .seg button {
+        background: transparent; border: 0; border-radius: 999px; color: var(--muted-text);
+        cursor: pointer; font-family: 'Outfit', sans-serif; font-size: .82rem; font-weight: 700;
+        min-height: 2.25rem; padding: 0 .9rem;
+      }
+      .welcome-page .seg button[aria-pressed='true'] {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: #fff;
+      }
+      .welcome-page .seg button:focus-visible { outline: 3px solid var(--heritage-orange); outline-offset: 2px; }
+
+      /* ── the trial band above the plans ────────────────────────────── */
+      .welcome-page .trial {
+        align-items: center; background: #fff; border-radius: var(--sq);
+        border-left: 6px solid var(--heritage-orange); box-shadow: var(--card-shadow);
+        display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 0 auto 22px; max-width: 900px;
+        padding: 22px 26px;
+      }
+      .welcome-page .trial-num {
+        color: var(--heritage-orange); font-family: 'Outfit', sans-serif;
+        font-size: 2.4rem; font-weight: 800; line-height: 1;
+      }
+      .welcome-page .trial-num small { display: block; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; }
+      .welcome-page .trial p { flex: 1; margin: 0; min-width: 260px; }
+      .welcome-page .trial b { color: var(--deep-slate); }
+
+      /* ── the plans ──────────────────────────────────────────────────── */
+      .welcome-page .plans {
+        display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        margin: 0 auto; max-width: 900px;
+      }
+      .welcome-page .plan {
+        background: #fff; border-radius: var(--sq); box-shadow: var(--card-shadow);
+        display: flex; flex-direction: column; padding: 30px 26px 26px; position: relative;
+      }
+      .welcome-page .plan--free { border-top: 6px solid var(--sky-silk); }
+      .welcome-page .plan--paid { border-top: 6px solid var(--heritage-orange); }
+      .welcome-page .plan h3 { color: var(--deep-slate); font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; margin: 0 0 .2rem; }
+      .welcome-page .plan .who { color: var(--muted-text); font-size: .86rem; margin: 0 0 1.1rem; }
+      .welcome-page .price {
+        align-items: baseline; color: var(--deep-slate); display: flex; gap: .35rem;
+        font-family: 'Outfit', sans-serif; font-size: 2.6rem; font-weight: 800; line-height: 1;
+        margin-bottom: .2rem;
+      }
+      .welcome-page .price .per { color: var(--muted-text); font-size: .85rem; font-weight: 600; }
+      .welcome-page .price-note { color: var(--muted-text); font-size: .82rem; margin: 0 0 1.2rem; min-height: 2.6em; }
+      .welcome-page .tape {
+        background: rgb(174 214 241 / 65%); border-radius: 3px; color: var(--deep-slate);
+        font-family: Caveat, Outfit, cursive; font-size: 1.15rem; left: 50%;
+        padding: 2px 18px; position: absolute; top: -14px;
+        transform: translateX(-50%) rotate(-2deg); white-space: nowrap;
+      }
+      .welcome-page .plan ul { list-style: none; margin: 0; padding: 0; }
+      .welcome-page .plan li { display: flex; font-size: .92rem; gap: .6rem; margin-bottom: .55rem; }
+      .welcome-page .plan li span:first-child { flex-shrink: 0; }
+      .welcome-page .plan li.muted { color: var(--muted-text); }
+      /* buttons share a baseline across the row, whatever each list's length */
+      .welcome-page .plan .btn { display: block; margin-top: auto; padding-top: 14px; text-align: center; }
+      .welcome-page .plan ul { margin-bottom: 1.2rem; }
+
+      /* ── who pays, the honesty block ────────────────────────────────── */
+      .welcome-page .whopays {
+        background:
+          radial-gradient(620px 300px at 12% 0%, rgb(241 93 34 / 12%), transparent 70%),
+          radial-gradient(520px 300px at 88% 100%, rgb(174 214 241 / 30%), transparent 70%),
+          var(--story-cream);
+        padding: 66px 24px;
+      }
+      .welcome-page .whopays .handout { border-top-color: var(--terracotta); }
+      .welcome-page .handout {
+        background: #fff; border-radius: var(--sq); border-top: 6px solid var(--heritage-orange);
+        box-shadow: var(--card-shadow); margin: 0 auto; max-width: 720px; padding: 36px;
+      }
+      .welcome-page .handout p { margin: 0 0 1.1rem; }
+      .welcome-page .handout p:last-of-type { margin-bottom: 0; }
+      .welcome-page .highlight { background: linear-gradient(transparent 60%, rgb(174 214 241 / 35%) 60%); padding: 0 2px; }
+      .welcome-page .signoff { color: var(--deep-slate); font-family: Caveat, Outfit, cursive; font-size: 1.6rem; margin-top: 28px; }
+      .welcome-page .signoff .g { color: var(--heritage-orange); }
+
+      /* ── early families ─────────────────────────────────────────────── */
+      .welcome-page .offers {
+        display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        margin: 0 auto; max-width: 820px;
+      }
+      .welcome-page .offer {
+        background: #fff; border-radius: var(--sq); box-shadow: var(--card-shadow);
+        padding: 28px; text-align: center;
+      }
+      .welcome-page .offer--ten { border-top: 6px solid var(--heritage-orange); }
+      .welcome-page .offer--rest { border-top: 6px solid var(--sky-silk); }
+      .welcome-page .offer .who { color: var(--muted-text); font-size: .84rem; margin: 0 0 .6rem; }
+      .welcome-page .offer .deal {
+        color: var(--deep-slate); font-family: 'Outfit', sans-serif;
+        font-size: clamp(1.6rem, 3.4vw, 2.1rem); font-weight: 800; line-height: 1.1; margin: 0 0 .5rem;
+      }
+      .welcome-page .offer .deal em { color: var(--heritage-orange); font-style: normal; }
+      .welcome-page .offer p:last-child { font-size: .92rem; margin: 0; }
+      .welcome-page .offer .works { color: var(--muted-text); font-size: .84rem; }
+
+      /* ── the rollout ────────────────────────────────────────────────── */
+      .welcome-page .steps { margin: 0 auto; max-width: 720px; }
+      .welcome-page .step { display: grid; gap: 0 1.2rem; grid-template-columns: 2.6rem 1fr; position: relative; }
+      .welcome-page .step-rail { display: flex; justify-content: center; position: relative; }
+      .welcome-page .step-rail::before {
+        background: rgb(241 93 34 / 22%); bottom: 0; content: ''; left: 50%;
+        position: absolute; top: 0; transform: translateX(-50%); width: 2px;
+      }
+      .welcome-page .step:last-child .step-rail::before { bottom: auto; height: 1.6rem; }
+      .welcome-page .step-dot {
+        align-items: center; background: #fff; border: 2px solid rgb(241 93 34 / 30%);
+        border-radius: 999px; color: var(--heritage-orange); display: flex;
+        font-family: 'Outfit', sans-serif; font-size: .85rem; font-weight: 800;
+        height: 2.2rem; justify-content: center; position: relative; width: 2.2rem; z-index: 1;
+      }
+      .welcome-page .step--now .step-dot {
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border-color: transparent; color: #fff;
+      }
+      .welcome-page .step-body { padding-bottom: 1.8rem; }
+      .welcome-page .step h3 { color: var(--deep-slate); font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 800; margin: .15rem 0 .3rem; }
+      .welcome-page .step p { margin: 0; font-size: .95rem; }
+      .welcome-page .step .when {
+        color: var(--heritage-orange); font-family: 'Outfit', sans-serif; font-size: .74rem;
+        font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      }
+
+      /* FAQ */
+      .welcome-page details {
+        background: #fff; border-radius: 18px; box-shadow: var(--card-shadow);
+        margin: 0 auto 14px; max-width: 720px; padding: 18px 24px;
+      }
+      .welcome-page summary { color: var(--deep-slate); cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; }
+      .welcome-page details p { color: var(--muted-text); font-size: .93rem; margin: .8rem 0 0; }
+
+      .welcome-page .final { padding: 88px 24px; text-align: center; }
+      .welcome-page .final-title {
+        color: var(--deep-slate); font-family: 'Outfit', sans-serif;
+        font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.1; margin: 0 0 1rem;
+      }
+      .welcome-page .final .hero-sub em { color: var(--heritage-orange); }
+      .welcome-page .ps { color: var(--muted-text); font-size: .88rem; margin-top: 1.4rem; }
+
+      @media (max-width: 640px) {
+        .welcome-page .handout { padding: 26px 22px; }
+        .welcome-page .section { padding: 56px 0; }
+      }
+      @media (prefers-reduced-motion: reduce) { .welcome-page .btn { transition: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="welcome-page">
+
+      <header class="hero">
+        <span class="kicker-pill">🫘 pricing</span>
+        <h1>no ads. no data. <em>no surprises.</em></h1>
+        <p class="hero-sub">
+          right now, while beanies is in beta, everything is free. at v1.0 that changes - but not
+          by as much as you'd think. here's the whole plan, in advance, and why you'll hear it
+          from me first.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#">start counting beans 🫘</a>
+          <a class="btn btn-ghost" href="#plans">see the plans</a>
+        </div>
+      </header>
+
+      <section class="dark-section">
+        <p class="section-label">before we talk money</p>
+        <h2 class="section-title">three things that a price will never change</h2>
+        <div class="promises">
+          <div class="promise">
+            <div class="promise-icon">🚫</div>
+            <h3>no ads, at any tier</h3>
+            <p>there are no advertisers to answer to because there are no ads, period. annoying popups be gone!</p>
+          </div>
+          <div class="promise">
+            <div class="promise-icon">🔒</div>
+            <h3>you are not the product</h3>
+            <p>your data lives in your own encrypted file. i can't read it anyway, so how could i sell it.</p>
+          </div>
+          <div class="promise">
+            <div class="promise-icon">📬</div>
+            <h3>you'll hear it here first</h3>
+            <p>if anything changes, it lands on this page and in your inbox first. you'll know when i do.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="plans">
+        <div class="wrap">
+          <p class="section-label">what you pay</p>
+          <h2 class="section-title">$0 today. a fair number later.</h2>
+          <p class="section-subtitle">
+            here's where you can find our prices. cuz somebody's gotta pay for this.
+          </p>
+
+          <div class="currency" role="group" aria-label="currency">
+            <span class="currency-label">show prices in</span>
+            <div class="seg" id="currency-seg">
+              <button type="button" data-currency="USD" aria-pressed="true">USD $</button>
+              <button type="button" data-currency="SGD" aria-pressed="false">SGD S$</button>
+            </div>
+          </div>
+
+          <div class="trial">
+            <div class="trial-num">90<small>days</small></div>
+            <p>
+              <b>everyone starts with 90 days of everything</b>, the ai helper included. no card,
+              no countdown nagging you, and the longest free run of any family app i could find.
+              when it's up, you pick a lane below. either one is fine by me.
+            </p>
+          </div>
+
+          <div class="plans">
+            <div class="plan plan--free">
+              <h3>free</h3>
+              <p class="who">after your 90 days, for as long as you like</p>
+              <p class="price"><span data-price="free">$0</span><span class="per">/ forever</span></p>
+              <p class="price-note">the whole app. just not the ai helper.</p>
+              <ul>
+                <li><span>✅</span><span>every feature, every world</span></li>
+                <li><span>✅</span><span>your whole family, no seat limits</span></li>
+                <li><span>✅</span><span>your data in your own encrypted file</span></li>
+                <li><span>✅</span><span>export the lot, any time</span></li>
+                <li class="muted"><span>🔑</span><span>the ai helper, if you bring your own key</span></li>
+              </ul>
+              <a class="btn btn-ghost" href="#">start for free</a>
+            </div>
+
+            <div class="plan plan--paid">
+              <h3>monthly</h3>
+              <p class="who">the whole thing, one month at a time</p>
+              <p class="price"><span data-price="monthly">$9.99</span><span class="per">/ month</span></p>
+              <p class="price-note">cancel any time. you keep your data either way.</p>
+              <ul>
+                <li><span>✅</span><span>everything in free</span></li>
+                <li><span>✅</span><span>the ai helper, and i pay the tokens</span></li>
+                <li><span>✅</span><span>more room for photos in your family file</span></li>
+                <li><span>✅</span><span>first in line for new worlds</span></li>
+              </ul>
+              <a class="btn btn-primary" href="#">subscribe monthly</a>
+            </div>
+
+            <div class="plan plan--paid">
+              <span class="tape">save 29%</span>
+              <h3>yearly</h3>
+              <p class="who">one bill, twelve months</p>
+              <p class="price"><span data-price="yearly">$84.99</span><span class="per">/ year</span></p>
+              <p class="price-note">works out to <span data-price="yearlyPerMonth">$7.08</span> a month.</p>
+              <ul>
+                <li><span>✅</span><span>everything in monthly</span></li>
+                <li><span>✅</span><span>one bill a year, not twelve</span></li>
+                <li><span>✅</span><span>roughly three and a half months on the house</span></li>
+              </ul>
+              <a class="btn btn-primary" href="#">subscribe yearly</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="whopays">
+        <p class="section-label">the honest bit</p>
+        <h2 class="section-title">so who's paying for the free tier?</h2>
+        <div class="handout">
+          <p>
+            subscribers. that's the whole model, and i'd rather you heard it from me than
+            wondered.
+          </p>
+          <p>
+            the families who pay for beanies keep the lights on for the families who don't. no
+            ads quietly making up the difference, no data being sold out the back, no
+            investor waiting for a return. <span class="highlight">just the subscription, and
+            nothing else.</span>
+          </p>
+          <p>
+            which means, said plainly: with no subscribers there's no free tier. actually, with
+            no subscribers there's no beanies at all. so if beanies is useful to your family,
+            the subscription isn't a paywall standing between you and the good stuff. it's the
+            thing that keeps the free tier free for the next family.
+          </p>
+          <p>
+            and if it's not for you? take your data and go. it's your file, it always was, and
+            there are no hard feelings. honestly.
+          </p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="wrap">
+          <p class="section-label">a note from me (greg)</p>
+          <h2 class="section-title">i've been paying for this myself</h2>
+          <div class="handout narrow">
+            <p>ok, my beans. down to brass tacks.</p>
+            <p>
+              right now the app is <span class="highlight">free, and it stays that way while
+              we're in beta</span>. i wouldn't dream of charging for software that isn't up to
+              my own standard for a production app, and we're still finding the fiddly little
+              bugs together. (thank you for that, by the way. genuinely.)
+            </p>
+            <p>
+              but i've been footing the bill for months. no ads, no data harvesting, no venture
+              capital breathing down my neck. just me, a credit card, and an aws bill that only
+              goes one direction. so at some point, something's gotta give.
+            </p>
+            <p>
+              here's what that looks like. at v1.0 there'll be a subscription, and it'll be fair
+              - a little on the premium side, because privacy costs more to build than ads do,
+              but not silly. everyone still gets 90 days of everything to work out whether
+              beanies is right for their family. after that, keep using it for free without the
+              ai, or subscribe and have the lot.
+            </p>
+            <p>
+              the families who subscribe are what keep beanies alive. not just for themselves.
+              for everyone.
+            </p>
+            <p class="signoff">- <span class="g">greg</span></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-tight">
+        <div class="wrap">
+          <p class="section-label">while you're early</p>
+          <h2 class="section-title">being here before v1.0 is worth something</h2>
+          <p class="section-subtitle">
+            two things are true for families who arrive before v1.0, and both of them are for
+            life. yes, for real.
+          </p>
+          <div class="offers">
+            <div class="offer offer--ten">
+              <p class="who">the first 10 families</p>
+              <p class="deal"><em>$1</em> a month, forever</p>
+              <p>
+                rate the app, give me a review, and tell me you did. that's your price for good,
+                whatever the price becomes. i'm actually keeping a list.
+              </p>
+            </div>
+            <div class="offer offer--rest">
+              <p class="who">everyone else who joins before v1.0</p>
+              <p class="deal"><em>half price</em>, forever</p>
+              <p>
+                if you ever subscribe, it's 50% off for as long as you stay.
+                <span class="works">that's <span data-price="halfMonthly">$4.99</span> a month, or <span data-price="halfYearly">$42.49</span> a year.</span>
+                no code, no expiry, no renewal to remember.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-tight">
+        <div class="wrap">
+          <p class="section-label">the rollout</p>
+          <h2 class="section-title">the order it happens in</h2>
+          <div class="steps">
+            <div class="step step--now">
+              <div class="step-rail"><span class="step-dot">1</span></div>
+              <div class="step-body">
+                <span class="when">you are here</span>
+                <h3>beta. everything free, no clock.</h3>
+                <p>every feature, every family member, the ai helper too. no card on file, no 90 days ticking. that starts at v1.0, not now.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-rail"><span class="step-dot">2</span></div>
+              <div class="step-body">
+                <span class="when">before anything changes</span>
+                <h3>you get told, here and by email</h3>
+                <p>nothing starts the day it's announced. you'll have time to decide, and the prices above are the prices you'll see.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-rail"><span class="step-dot">3</span></div>
+              <div class="step-body">
+                <span class="when">v1.0</span>
+                <h3>beta ends, subscriptions open</h3>
+                <p>
+                  new families get 90 days of everything, then choose free or paid. families who
+                  were here before v1.0 keep what they were promised: $1 a month for the first
+                  10, half price for everybody else. for life.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-rail"><span class="step-dot">4</span></div>
+              <div class="step-body">
+                <span class="when">after v1.0</span>
+                <h3>new families pay the full price</h3>
+                <p>which is the only reason any of the above is worth telling you now rather than later.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-tight">
+        <div class="wrap">
+          <p class="section-label">fair questions</p>
+          <h2 class="section-title">the ones you're actually asking</h2>
+          <details open>
+            <summary>wait, you keep saying "something's gotta give". so why is there a free tier?</summary>
+            <p>
+              because subscribers pay for it. that's the arrangement, and it's the same one
+              proton and bitwarden run on. the free tier isn't me being generous with money i
+              don't have; it's paying families keeping the door open for everyone else. if that
+              ever stopped working, the free tier would go before beanies did - and you'd hear
+              about it here first.
+            </p>
+          </details>
+          <details>
+            <summary>what do i actually lose after 90 days?</summary>
+            <p>
+              one thing: the ai helper, because every time it runs it costs me real money. that's
+              it. your calendar, lists, meals, money, the wall, your whole family - all still
+              there, all still free. and if you've got your own openai or anthropic key, plug it
+              in and the ai helper works on free too. you pay them instead of me.
+            </p>
+          </details>
+          <details>
+            <summary>what if i never subscribe?</summary>
+            <p>
+              then you use beanies for free, minus the ai, for as long as you like. no nagging,
+              no features quietly disappearing, no "upgrade now" popups. if it's useful, i'd
+              love it if you subscribed one day. if it's not, i'd rather know why.
+            </p>
+          </details>
+          <details>
+            <summary>why is it more than cozi?</summary>
+            <p>
+              because you're not the product. cozi is cheaper on the free tier because the ads
+              are paying, and its paid tier is about the same as mine. beanies costs a little
+              more than the average family app because there's nothing else propping it up - no
+              ads, no data deals - and because you get the money side, the family side and the
+              wall in one place. premium, not silly.
+            </p>
+          </details>
+          <details>
+            <summary>i'm here now. what does that get me?</summary>
+            <p>
+              half price on any paid plan, permanently, for joining before v1.0. the first 10
+              families who rate the app and tell me they did get $1 a month instead. both are
+              for as long as you stay, and there's no renewal to miss.
+            </p>
+          </details>
+          <details>
+            <summary>how do you know i was here before v1.0?</summary>
+            <p>
+              your pod has a creation date, and that's the whole test. no code, no coupon, no
+              screenshot. you don't need to do anything today except be here.
+            </p>
+          </details>
+          <details>
+            <summary>what happens to my data if i stop paying, or leave?</summary>
+            <p>
+              nothing. it's in your own encrypted file, not on my server, so there's nothing for
+              me to lock or delete. stop paying and you're on the free tier. leave altogether and
+              you take the file with you. export everything, whenever you like.
+            </p>
+          </details>
+          <details>
+            <summary>can i just run it myself for free?</summary>
+            <p>
+              yes. it's open source, and self-hosting is free, forever, no strings. you'll need
+              somewhere to run it and a bit of patience, but you'll never see a bill from me.
+            </p>
+          </details>
+          <details>
+            <summary>will there be other currencies?</summary>
+            <p>
+              yes. usd and sgd first, because that's where most beanies live right now. others
+              as families ask for them. the price is the price wherever you are - nobody pays
+              more for being somewhere else.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="final">
+        <h2 class="final-title">so... ready to count some beans? 🫘</h2>
+        <p class="hero-sub">it's free, <em>for now</em>. get in while the gettin's good.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#">create your bean pod 🫘</a>
+        </div>
+        <p class="ps">every bean counts.</p>
+      </section>
+    </div>
+
+    <script>
+      /*
+       * One table, one currency at a time. Adding a currency is one entry here
+       * plus one button; nothing else in the page knows the list.
+       */
+      const PRICES = {
+        USD: { free: '$0', monthly: '$9.99', yearly: '$84.99', yearlyPerMonth: '$7.08', halfMonthly: '$4.99', halfYearly: '$42.49' },
+        SGD: { free: 'S$0', monthly: 'S$13', yearly: 'S$110', yearlyPerMonth: 'S$9.17', halfMonthly: 'S$6.50', halfYearly: 'S$55' },
+      };
+      const seg = document.getElementById('currency-seg');
+      function show(code) {
+        const table = PRICES[code];
+        if (!table) return;
+        document.querySelectorAll('[data-price]').forEach((el) => {
+          const v = table[el.dataset.price];
+          if (v !== undefined) el.textContent = v;
+        });
+        seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.currency === code)));
+        try { localStorage.setItem('beanies-currency', code); } catch {}
+      }
+      seg.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-currency]');
+        if (b) show(b.dataset.currency);
+      });
+      let initial = 'USD';
+      try { initial = localStorage.getItem('beanies-currency') || initial; } catch {}
+      show(initial);
+    </script>
+  </body>
+</html>
