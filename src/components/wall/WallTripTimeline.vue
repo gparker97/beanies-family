@@ -19,6 +19,7 @@
  */
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { nookDateParts } from '@/utils/date';
 import type { DateGroup, TimelineItem } from '@/composables/useVacationTimeline';
 
 defineProps<{
@@ -35,7 +36,16 @@ const { t } = useTranslation();
   <div class="wall-trip-timeline">
     <div v-for="group in groups" :key="group.date" class="wall-day">
       <div class="wall-day-rail">
-        <span class="wall-day-chip font-outfit">{{ group.label }}</span>
+        <!--
+          Stacked, not `group.label` as one string: "Wed, 6 Mar" wrapped badly in
+          a 52px rail column. The day number is the thing you scan for, so it
+          leads.
+        -->
+        <span class="wall-day-chip font-outfit">
+          <span class="wall-day-dow">{{ nookDateParts(group.date).dow }}</span>
+          <span class="wall-day-num">{{ nookDateParts(group.date).day }}</span>
+          <span class="wall-day-mon">{{ nookDateParts(group.date).mon }}</span>
+        </span>
       </div>
       <div class="wall-day-items">
         <div v-for="item in group.items" :key="item.id" class="wall-node">
@@ -101,6 +111,23 @@ const { t } = useTranslation();
 
 <style scoped>
 /*
+ * The day chip's own tokens, defined on the root so both themes resolve from one
+ * place. `#0077B6` is named in the CIG as one of three blue accents that shipped
+ * UNDER the AA floor on dark, so its dark partner is `teal-lift` — the CIG's own
+ * "Travel teal". Same pair `SegmentWhenBand`'s caption uses, so the date chip and
+ * the "departs / arrives" captions directly beneath it read as one family.
+ */
+.wall-trip-timeline {
+  --day-chip-bg: #fff;
+  --day-chip-ink: #0077b6;
+}
+
+html.dark .wall-trip-timeline {
+  --day-chip-bg: var(--color-surface-overlay, #26343f);
+  --day-chip-ink: var(--color-teal-lift, #4fd1be);
+}
+
+/*
  * The rail. `--vacation-teal` and its tints already carry dark partners in
  * `style.css`, so every colour here resolves in both modes with no local
  * override; nothing is painted with a raw hex.
@@ -112,7 +139,20 @@ const { t } = useTranslation();
   grid-template-columns: 3.25rem 1fr;
 }
 
-.wall-day-rail,
+/*
+ * The DAY chip aligns to the top of its group, not the middle.
+ *
+ * It was centred, so a day holding three bookings put its date beside the
+ * SECOND one. Reading top-down, a date belongs at the start of the cluster it
+ * labels; centring it makes the reader work out which items the date covers.
+ */
+.wall-day-rail {
+  align-items: flex-start;
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
 .wall-node-rail {
   align-items: center;
   display: flex;
@@ -132,19 +172,41 @@ const { t } = useTranslation();
   width: 2px;
 }
 
+/*
+ * A tinted chip with accent text, which is the app's own pill language, rather
+ * than a saturated teal slab with near-black text on it. The ink matches
+ * `SegmentWhenBand`'s caption exactly, so the date and the "departs / arrives"
+ * captions directly beneath it read as one family instead of two.
+ */
 .wall-day-chip {
-  background: var(--vacation-teal);
-  border-radius: 0.65rem;
-  color: #04323b;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  padding: 0.3rem 0.35rem;
+  align-items: center;
+  background: var(--day-chip-bg);
+  border: 1px solid var(--vacation-teal-15);
+  border-radius: 14px;
+  color: var(--day-chip-ink);
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  padding: 0.35rem 0.2rem 0.4rem;
   position: relative;
   text-align: center;
   width: 100%;
   z-index: 1;
+}
+
+.wall-day-dow,
+.wall-day-mon {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  text-transform: uppercase;
+}
+
+.wall-day-num {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .wall-day-items {
