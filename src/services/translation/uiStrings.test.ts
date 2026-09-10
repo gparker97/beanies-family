@@ -164,7 +164,6 @@ describe('uiStrings', () => {
       // ("counting beans", the all-clear cheer) that beanie mode exists for, and
       // policing that would be wrong. Removing someone's row is the part where a
       // reader who does not know the joke could act wrongly.
-      'wall.job.remove',
       'wall.job.removed',
       'wall.job.undo',
       'wall.removeFailed.',

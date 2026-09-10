@@ -156,11 +156,35 @@ const { draft, inputRef, onEnter, onBlur } = useInlineRename({
   },
 });
 
-function onRemove() {
-  if (props.pending) return;
+/**
+ * In flight, so a double-tap cannot fire two deletes. On the to-do path the
+ * second one returns false, which is a genuine failure to `write()` — it would
+ * page `#beanies-errors` at `critical` and toast the family, for a benign
+ * double-tap on a wall-mounted tablet. On the list path it would succeed as a
+ * no-op and stack a second, stale Undo.
+ */
+const removing = ref(false);
+
+async function onRemove() {
+  if (props.pending || removing.value) return;
+  removing.value = true;
   noteActivity();
-  void edit?.removeJob(props.job);
+  try {
+    await edit?.removeJob(props.job);
+  } finally {
+    removing.value = false;
+  }
 }
+
+/**
+ * The 2-minute idle relock does not reset while a rename sits untouched, so an
+ * open editor could outlive the padlock: the trash and every add row would
+ * vanish and the input would stay, still committing through `renameJob` on
+ * blur. Close it with everything else.
+ */
+watch(canEdit, (allowed) => {
+  if (!allowed) renaming.value = false;
+});
 </script>
 
 <template>
@@ -180,11 +204,20 @@ function onRemove() {
       :aria-label="job.title"
       @click="onTick"
     >
+      <!--
+        The empty tick is Deep Slate at 18%, which on a dark surface composites
+        to a Deep Slate ring on a Deep Slate ground: the control this whole
+        screen exists for was INVISIBLE in dark mode. `line-strong` is the
+        semantic border for an interactive element and clears the 3:1 WCAG floor
+        for UI components on every dark surface.
+      -->
       <span
         ref="tickEl"
         class="wall-tick grid shrink-0 place-items-center rounded-full border-[2.5px] text-white"
         :class="[
-          isDone ? 'is-done border-[#27AE60] bg-[#27AE60]' : 'border-[rgba(44,62,80,0.18)]',
+          isDone
+            ? 'is-done border-[#27AE60] bg-[#27AE60]'
+            : 'dark:border-line-strong border-[rgba(44,62,80,0.18)]',
           celebrating ? 'is-celebrating' : '',
         ]"
       >

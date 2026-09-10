@@ -22,11 +22,11 @@ import {
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { buildWallJobs, captureListRestore, sortJobs } from '@/utils/wallJobs';
+import { buildWallJobs, captureListRemoval, sortJobs } from '@/utils/wallJobs';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup } from '@/types/wall';
-import type { TodoItem, UpdateFamilyListInput } from '@/types/models';
+import type { FamilyListItem, TodoItem } from '@/types/models';
 
 const SURFACE = 'beanie-wall';
 
@@ -78,17 +78,32 @@ async function write(
 ): Promise<boolean> {
   // One definition of "this write failed", so a refusal and a throw cannot
   // drift into reporting different things.
+  //
+  // Its OWN try/catch, because both halves can throw: `onRefused` reaches the
+  // translation store and the toast queue, and `reportError` reaches the
+  // telemetry queue. Without this, a throw from inside `fail` on the refusal
+  // path would fall into the outer catch and report a SECOND time with the
+  // toast's error instead of the real refusal — and a throw on the catch path
+  // would escape `write` entirely, which callers are promised cannot happen.
   const fail = (error?: unknown): false => {
-    onRefused();
-    reportError({
-      surface: SURFACE,
-      message: WRITE_OPS[op].failed,
-      severity: 'critical',
-      ...(error === undefined
-        ? {}
-        : { error: error instanceof Error ? error : new Error(String(error)) }),
-      context: { action: op, kind },
-    });
+    try {
+      onRefused();
+    } catch (reportingError) {
+      console.error(`[${SURFACE}] could not report a failed ${op} to the user`, reportingError);
+    }
+    try {
+      reportError({
+        surface: SURFACE,
+        message: WRITE_OPS[op].failed,
+        severity: 'critical',
+        ...(error === undefined
+          ? {}
+          : { error: error instanceof Error ? error : new Error(String(error)) }),
+        context: { action: op, kind },
+      });
+    } catch (reportingError) {
+      console.error(`[${SURFACE}] could not report a failed ${op} to telemetry`, reportingError);
+    }
     return false;
   };
 
@@ -310,13 +325,16 @@ export function useWallJobs() {
 
     // Captured up front; `undefined` if the record is already gone, in which
     // case the delete below will refuse and report before undo is ever offered.
-    const listSnapshot: UpdateFamilyListInput | undefined =
+    // ONE item and its position, never a snapshot of the whole array: the undo
+    // is offered for six seconds while an add row sits under the same list, and
+    // writing a pre-delete array back would destroy anything added in between.
+    const listRemoval: { item: FamilyListItem; index: number } | null =
       job.source === 'list'
         ? (() => {
             const list = listStore.lists.find((l) => l.id === job.listId);
-            return list ? captureListRestore(list) : undefined;
+            return list ? captureListRemoval(list, job.itemId as string) : null;
           })()
-        : undefined;
+        : null;
     const todoSnapshot: TodoItem | undefined =
       job.source === 'todo' ? todoStore.todos.find((td) => td.id === job.todoId) : undefined;
 
@@ -338,7 +356,7 @@ export function useWallJobs() {
 
     // Nothing to offer if the snapshot could not be taken. Say so rather than
     // showing an Undo that would do nothing.
-    if (!listSnapshot && !todoSnapshot) return true;
+    if (!listRemoval && !todoSnapshot) return true;
 
     showToast('info', fillTemplate(t('wall.job.removed'), { title: job.title }), undefined, {
       surface: SURFACE,
@@ -354,7 +372,11 @@ export function useWallJobs() {
           () =>
             (todoSnapshot
               ? todoStore.restoreTodo(todoSnapshot)
-              : listStore.updateList(job.listId as string, listSnapshot as UpdateFamilyListInput)
+              : listStore.restoreItem(
+                  job.listId as string,
+                  (listRemoval as { item: FamilyListItem; index: number }).item,
+                  (listRemoval as { item: FamilyListItem; index: number }).index
+                )
             ).then((written) => written !== null),
           () => reportJobEditFailed('undo', job.source, job.todoId ?? job.itemId ?? job.key)
         );

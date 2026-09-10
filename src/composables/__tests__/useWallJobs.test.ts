@@ -277,41 +277,39 @@ describe('useWallJobs write contract', () => {
       );
     });
 
-    it('restores the COMPLETION state as well as the items, so undo cannot file the list away', async () => {
+    it('restores ONE item at its original position, never a whole-array snapshot', async () => {
       const listStore = seedList({
-        completed: true,
-        completedBy: 'leo',
-        completedAt: '2026-09-10T00:00:00.000Z',
+        items: [
+          { id: 'i0', title: 'towel', completed: false },
+          { id: 'i1', title: 'goggles', completed: false },
+          { id: 'i2', title: 'cap', completed: false },
+        ],
       } as Partial<FamilyList>);
       vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
-      const updateList = vi.spyOn(listStore, 'updateList').mockResolvedValue({ id: 'l1' } as never);
+      const restoreItem = vi
+        .spyOn(listStore, 'restoreItem')
+        .mockResolvedValue({ id: 'l1' } as never);
 
       await useWallJobs().removeJob(listJob);
       await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
 
-      expect(updateList).toHaveBeenCalledWith(
+      expect(restoreItem).toHaveBeenCalledWith(
         'l1',
-        expect.objectContaining({
-          completed: true,
-          completedBy: 'leo',
-          completedAt: '2026-09-10T00:00:00.000Z',
-        })
+        expect.objectContaining({ id: 'i1', title: 'goggles' }),
+        1
       );
     });
 
-    it('snapshots BEFORE the delete, so undo restores the pre-removal items', async () => {
+    it('never writes the items array wholesale: that is what destroyed concurrent adds', async () => {
       const listStore = seedList();
-      const before = listStore.lists[0].items;
-      vi.spyOn(listStore, 'removeItem').mockImplementation(async () => {
-        listStore.lists = [{ ...listStore.lists[0], items: [] } as FamilyList];
-        return listStore.lists[0];
-      });
-      const updateList = vi.spyOn(listStore, 'updateList').mockResolvedValue({ id: 'l1' } as never);
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
+      vi.spyOn(listStore, 'restoreItem').mockResolvedValue({ id: 'l1' } as never);
+      const updateList = vi.spyOn(listStore, 'updateList');
 
       await useWallJobs().removeJob(listJob);
       await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
 
-      expect(updateList).toHaveBeenCalledWith('l1', expect.objectContaining({ items: before }));
+      expect(updateList).not.toHaveBeenCalled();
     });
 
     it('restores a to-do under its ORIGINAL id, not as a new record', async () => {
@@ -350,7 +348,7 @@ describe('useWallJobs write contract', () => {
     it('reports a failed undo rather than leaving the family to guess', async () => {
       const listStore = seedList();
       vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
-      vi.spyOn(listStore, 'updateList').mockResolvedValue(null);
+      vi.spyOn(listStore, 'restoreItem').mockResolvedValue(null);
 
       await useWallJobs().removeJob(listJob);
       await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
@@ -363,6 +361,41 @@ describe('useWallJobs write contract', () => {
           context: { action: 'job_remove_undo', kind: 'list' },
         })
       );
+    });
+  });
+
+  describe('the contract holds even when reporting itself fails', () => {
+    it('does not throw out of a write when the user-facing reporter throws', async () => {
+      const listStore = useListStore();
+      vi.spyOn(listStore, 'addItem').mockResolvedValue(null);
+      vi.mocked(reportListAddFailed).mockImplementationOnce(() => {
+        throw new Error('toast queue is gone');
+      });
+
+      await expect(useWallJobs().addListItem('l1', 'Bread')).resolves.toBe(false);
+    });
+
+    it("reports the REAL refusal, not the reporter's own error", async () => {
+      const listStore = useListStore();
+      vi.spyOn(listStore, 'addItem').mockResolvedValue(null);
+      vi.mocked(reportListAddFailed).mockImplementationOnce(() => {
+        throw new Error('toast queue is gone');
+      });
+
+      await useWallJobs().addListItem('l1', 'Bread');
+
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(reportError).mock.calls[0][0]).not.toHaveProperty('error');
+    });
+
+    it('does not throw out of a write when telemetry throws', async () => {
+      const listStore = useListStore();
+      vi.spyOn(listStore, 'addItem').mockResolvedValue(null);
+      vi.mocked(reportError).mockImplementationOnce(() => {
+        throw new Error('telemetry queue is gone');
+      });
+
+      await expect(useWallJobs().addListItem('l1', 'Bread')).resolves.toBe(false);
     });
   });
 });

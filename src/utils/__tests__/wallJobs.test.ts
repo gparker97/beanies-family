@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   UNASSIGNED,
   buildWallJobs,
-  captureListRestore,
+  captureListRemoval,
   jobsProgress,
   sortJobs,
 } from '@/utils/wallJobs';
@@ -299,56 +299,49 @@ describe('what a shared screen must never show', () => {
 });
 
 /**
- * The undo snapshot. This is the highest-consequence, lowest-visibility rule in
- * the wall's write path: removing the last open item on a one-off list FILES
- * that list, and the wall filters filed lists out, so a snapshot of `items`
- * alone would make an undo delete the whole list from the wall instead of
- * putting one row back.
+ * What an undo needs. This is the highest-consequence, lowest-visibility rule in
+ * the wall's write path, and it has now been wrong twice in two different ways:
+ * first by restoring only `items` (which left a one-off list FILED, so the undo
+ * deleted the whole list from the wall instead of putting one row back), and
+ * then by restoring the whole array (which destroyed anything added during the
+ * six seconds the undo is on screen, with an add row sitting under that very
+ * list). Capturing one item and its index is what makes both impossible.
  */
-describe('captureListRestore', () => {
-  it('captures the completion triple, not just the items', () => {
-    const l = list({
-      id: 'l1',
-      items: [{ id: 'i1', title: 'goggles', completed: false }],
-      completed: true,
-      completedBy: 'leo',
-      completedAt: '2026-09-10T04:00:00.000Z',
-    } as never);
+describe('captureListRemoval', () => {
+  const threeItems = [
+    { id: 'i1', title: 'goggles', completed: false },
+    { id: 'i2', title: 'towel', completed: true, completedBy: 'leo' },
+    { id: 'i3', title: 'cap', completed: false },
+  ];
 
-    expect(captureListRestore(l)).toEqual({
-      items: l.items,
-      completed: true,
-      completedBy: 'leo',
-      completedAt: '2026-09-10T04:00:00.000Z',
-      cycleCelebrated: undefined,
-    });
+  it('captures the item and where it sat, so undo can put it back in place', () => {
+    const l = list({ id: 'l1', items: threeItems } as never);
+
+    expect(captureListRemoval(l, 'i2')).toEqual({ item: threeItems[1], index: 1 });
   });
 
-  it('carries `cycleCelebrated` so a recurring list is not re-celebrated on undo', () => {
-    const l = list({ id: 'l2', cycleCelebrated: true } as never);
+  it('hands back the SAME item reference, so its completion state survives verbatim', () => {
+    const l = list({ id: 'l1', items: threeItems } as never);
 
-    expect(captureListRestore(l).cycleCelebrated).toBe(true);
+    expect(captureListRemoval(l, 'i2')?.item).toBe(threeItems[1]);
   });
 
-  it('names every field the restore needs, so a new one cannot be forgotten silently', () => {
-    expect(Object.keys(captureListRestore(list({ id: 'l3' } as never))).sort()).toEqual([
-      'completed',
-      'completedAt',
-      'completedBy',
-      'cycleCelebrated',
-      'items',
-    ]);
+  it('captures the first and last positions correctly', () => {
+    const l = list({ id: 'l1', items: threeItems } as never);
+
+    expect(captureListRemoval(l, 'i1')?.index).toBe(0);
+    expect(captureListRemoval(l, 'i3')?.index).toBe(2);
   });
 
-  it('hands back the SAME items reference, so undo restores ids and order verbatim', () => {
-    const l = list({
-      id: 'l4',
-      items: [
-        { id: 'i1', title: 'towel', completed: true, completedBy: 'leo' },
-        { id: 'i2', title: 'cap', completed: false },
-      ],
-    } as never);
+  it('returns null when the item is already gone, so no undo is offered for nothing', () => {
+    const l = list({ id: 'l1', items: threeItems } as never);
 
-    expect(captureListRestore(l).items).toBe(l.items);
+    expect(captureListRemoval(l, 'nope')).toBeNull();
+  });
+
+  it('does NOT capture the items array, which is what made undo destructive', () => {
+    const l = list({ id: 'l1', items: threeItems } as never);
+
+    expect(captureListRemoval(l, 'i2')).not.toHaveProperty('items');
   });
 });

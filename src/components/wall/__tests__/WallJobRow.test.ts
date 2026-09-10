@@ -206,4 +206,57 @@ describe('WallJobRow', () => {
       expect(wrapper.emitted('toggle')).toHaveLength(1);
     });
   });
+  describe('guards found by review', () => {
+    it('does not fire a second delete on a double-tap', async () => {
+      let release!: (v: boolean) => void;
+      const removeJob = vi.fn(() => new Promise<boolean>((r) => (release = r)));
+      const { wrapper } = mountRow({ unlocked: true, edit: { removeJob } });
+
+      await wrapper.findComponent(ActionButtons).vm.$emit('delete');
+      await wrapper.findComponent(ActionButtons).vm.$emit('delete');
+
+      expect(removeJob).toHaveBeenCalledTimes(1);
+      release(true);
+    });
+
+    it('accepts a delete again once the first one has landed', async () => {
+      const removeJob = vi.fn().mockResolvedValue(true);
+      const { wrapper } = mountRow({ unlocked: true, edit: { removeJob } });
+
+      await wrapper.findComponent(ActionButtons).vm.$emit('delete');
+      await nextTick();
+      await wrapper.findComponent(ActionButtons).vm.$emit('delete');
+
+      expect(removeJob).toHaveBeenCalledTimes(2);
+    });
+
+    it('closes an open rename when the wall relocks, rather than writing past the padlock', async () => {
+      const isLocked = ref(false);
+      const writers = {
+        addListItem: vi.fn().mockResolvedValue(true),
+        addTodo: vi.fn().mockResolvedValue(true),
+        renameJob: vi.fn().mockResolvedValue(true),
+        removeJob: vi.fn().mockResolvedValue(true),
+      };
+      const wrapper = mount(WallJobRow, {
+        props: { job, pending: false },
+        global: {
+          provide: {
+            [WALL_LOCK as symbol]: { isLocked, noteActivity: vi.fn() },
+            [WALL_EDIT as symbol]: writers,
+          },
+        },
+      });
+
+      await wrapper.get('button:not([aria-pressed])').trigger('click');
+      expect(wrapper.find('input').exists()).toBe(true);
+
+      // The 2-minute idle timer fires while the editor sits untouched.
+      isLocked.value = true;
+      await nextTick();
+
+      expect(wrapper.find('input').exists()).toBe(false);
+      expect(wrapper.findComponent(ActionButtons).exists()).toBe(false);
+    });
+  });
 });
