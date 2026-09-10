@@ -1,0 +1,1363 @@
+<!doctype html>
+<html lang="en" class="">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>beanie wall: inline add row + trip timeline</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ═══════════════════════════════════════════════════════════════
+         Tokens lifted verbatim from src/style.css + packages/brand/theme.css.
+         Nothing invented: the wall's identity is settled, this mockup is
+         about layout and interaction only.
+         ═══════════════════════════════════════════════════════════════ */
+      :root {
+        --cloud-white: #f8f9fa;
+        --heritage-orange: #f15d22;
+        --deep-slate: #2c3e50;
+        --color-text: #2c3e50;
+        --muted-text: #4d5d6c;
+        --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+        --tint-orange-8: rgb(241 93 34 / 8%);
+        --tint-orange-15: rgb(241 93 34 / 15%);
+        --tint-slate-5: rgb(44 62 80 / 5%);
+        --tint-slate-10: rgb(44 62 80 / 10%);
+        --hairline: rgba(44, 62, 80, 0.15);
+        --surface: #ffffff;
+        --ground: #f8f9fa;
+        --teal: #00b4d8;
+        --teal-cap: #0077b6;
+        --teal-line: rgb(0 180 216 / 28%);
+        --teal-fill: rgb(0 180 216 / 6%);
+        --teal-soft: rgb(0 180 216 / 18%);
+        --gold-tint: rgb(255 217 61 / 12%);
+        --gold-text: #b45309;
+        --green: #27ae60;
+        --danger: #c0392b;
+        --page: #eef1f4;
+        --annotation: #64748b;
+        --annotation-rule: #dbe2e8;
+      }
+
+      html.dark {
+        --cloud-white: #151e27;
+        --color-text: #f2f5f7;
+        --muted-text: #c3ced6;
+        --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
+        --tint-orange-8: rgb(241 93 34 / 12%);
+        --tint-orange-15: rgb(241 93 34 / 20%);
+        --tint-slate-5: rgb(255 255 255 / 5%);
+        --tint-slate-10: rgb(255 255 255 / 10%);
+        --hairline: #4a5b69;
+        --surface: #1e2a36;
+        --ground: #151e27;
+        /* accents get LIGHTER on dark, never darker (CIG slides 8-9) */
+        --heritage-orange: #ff8b5e;
+        --teal: #4fd1be;
+        --teal-cap: #4fd1be;
+        --teal-line: rgb(79 209 190 / 32%);
+        --teal-fill: rgb(79 209 190 / 10%);
+        --teal-soft: rgb(79 209 190 / 20%);
+        --gold-tint: rgb(255 217 61 / 16%);
+        --gold-text: #f0a05a;
+        --green: #5fd08a;
+        --danger: #ff8484;
+        --page: #0f161d;
+        --annotation: #c3ced6;
+        --annotation-rule: #26343f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--page);
+        color: var(--color-text);
+        font-family: Inter, system-ui, sans-serif;
+        margin: 0;
+        padding: 0 0 6rem;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── mockup chrome (not part of the product) ───────────────────── */
+      .doc {
+        margin: 0 auto;
+        max-width: 1180px;
+        padding: 0 1.25rem;
+      }
+      .doc-head {
+        border-bottom: 1px solid var(--annotation-rule);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 2.5rem;
+        padding: 2.5rem 0 1.25rem;
+      }
+      .doc-head h1 {
+        font-family: Outfit, sans-serif;
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        margin: 0 0 0.3rem;
+      }
+      .doc-head p {
+        color: var(--annotation);
+        font-size: 0.9rem;
+        margin: 0;
+        max-width: 58ch;
+      }
+      .toggle {
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 999px;
+        color: var(--color-text);
+        cursor: pointer;
+        font-family: Outfit, sans-serif;
+        font-size: 0.85rem;
+        font-weight: 700;
+        min-height: 2.75rem;
+        padding: 0 1.1rem;
+      }
+      .toggle:focus-visible {
+        outline: 3px solid var(--heritage-orange);
+        outline-offset: 2px;
+      }
+
+      section.concept {
+        margin-bottom: 4.5rem;
+      }
+      .concept > h2 {
+        font-family: Outfit, sans-serif;
+        font-size: 1.15rem;
+        font-weight: 800;
+        margin: 0 0 0.35rem;
+      }
+      .concept > .lede {
+        color: var(--annotation);
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin: 0 0 2rem;
+        max-width: 70ch;
+      }
+      .variant {
+        margin-bottom: 2.75rem;
+      }
+      .variant-head {
+        align-items: baseline;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-bottom: 0.9rem;
+      }
+      .variant-head strong {
+        font-family: Outfit, sans-serif;
+        font-size: 0.98rem;
+        font-weight: 800;
+      }
+      .variant-head span {
+        color: var(--annotation);
+        font-size: 0.86rem;
+      }
+      .tag {
+        background: var(--tint-orange-15);
+        border-radius: 999px;
+        color: var(--heritage-orange);
+        font-family: Outfit, sans-serif;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        padding: 0.15rem 0.55rem;
+        text-transform: uppercase;
+      }
+      .tag.neutral {
+        background: var(--tint-slate-10);
+        color: var(--muted-text);
+      }
+
+      /* the wall backdrop, so cards sit on the ground they really sit on */
+      .wall {
+        background: var(--cloud-white);
+        border: 1px solid var(--hairline);
+        border-radius: 1.5rem;
+        padding: 1.1rem;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         CONCEPT A — the chore board column
+         ══════════════════════════════════════════════════════════════ */
+      .board {
+        display: grid;
+        gap: 0.625rem;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        justify-items: center;
+      }
+      .col {
+        background: var(--surface);
+        border-radius: 22px;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        max-width: 420px;
+        overflow: hidden;
+        width: 100%;
+      }
+      .col-head {
+        align-items: center;
+        border-bottom: 1px solid var(--hairline);
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.5rem 0.625rem;
+        text-align: center;
+      }
+      .avatar {
+        align-items: center;
+        border-radius: 999px;
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 1.05rem;
+        font-weight: 800;
+        height: 2.75rem;
+        justify-content: center;
+        width: 2.75rem;
+      }
+      .bean-name {
+        font-family: Outfit, sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      .bean-count {
+        color: var(--muted-text);
+        font-size: 0.78rem;
+        margin: 0;
+      }
+      .col-body {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 0.5rem;
+        overflow-y: auto;
+        padding: 0.5rem 0.75rem;
+      }
+      .list-title {
+        align-items: center;
+        color: var(--muted-text);
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        gap: 0.375rem;
+        letter-spacing: 0.06em;
+        margin: 0 0 0.125rem;
+        text-transform: uppercase;
+        width: 100%;
+      }
+      .pill {
+        background: var(--tint-orange-15);
+        border-radius: 999px;
+        color: var(--heritage-orange);
+        font-family: Outfit, sans-serif;
+        font-size: 0.6rem;
+        font-weight: 800;
+        padding: 0 0.375rem;
+      }
+      .job {
+        align-items: center;
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+      }
+      .tick {
+        border: 2.5px solid rgba(44, 62, 80, 0.18);
+        border-radius: 999px;
+        display: grid;
+        flex-shrink: 0;
+        height: 2rem;
+        place-items: center;
+        width: 2rem;
+      }
+      html.dark .tick {
+        border-color: #4a5b69;
+      }
+      .tick.done {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+        font-size: 1rem;
+      }
+      .job-title {
+        font-size: 1.05rem;
+        line-height: 1.15;
+      }
+      .job.is-done .job-title {
+        opacity: 0.55;
+        text-decoration: line-through;
+      }
+      .stars {
+        font-size: 0.95rem;
+        letter-spacing: 2px;
+        margin: 0;
+        padding: 0.25rem 0.75rem 0.75rem;
+      }
+      .stars .dot {
+        color: #d7dee5;
+      }
+      html.dark .stars .dot {
+        color: #4a5b69;
+      }
+
+      /* today's "+N more" — shown once, for comparison only */
+      .more-btn {
+        background: var(--tint-orange-8);
+        border: 0;
+        border-radius: 0.75rem;
+        color: var(--heritage-orange);
+        font-family: Outfit, sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        text-align: left;
+      }
+
+      /* ── the add row itself ────────────────────────────────────────── */
+      .addrow {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+      }
+      .addrow input {
+        background: transparent;
+        border: 1.5px dashed var(--hairline);
+        border-radius: 0.875rem;
+        color: var(--color-text);
+        flex: 1;
+        font-family: Inter, sans-serif;
+        font-size: 0.95rem;
+        min-height: 2.75rem;
+        min-width: 0;
+        padding: 0 0.75rem;
+      }
+      .addrow input::placeholder {
+        color: var(--muted-text);
+        opacity: 0.8;
+      }
+      .addrow input:focus {
+        background: var(--surface);
+        border-color: var(--heritage-orange);
+        border-style: solid;
+        outline: none;
+      }
+      .addrow .go {
+        background: var(--tint-orange-15);
+        border: 0;
+        border-radius: 0.875rem;
+        color: var(--heritage-orange);
+        flex-shrink: 0;
+        font-family: Outfit, sans-serif;
+        font-size: 1.15rem;
+        font-weight: 800;
+        min-height: 2.75rem;
+        width: 2.75rem;
+      }
+      /* quiet until there is something to submit */
+      .addrow .go.dormant {
+        opacity: 0;
+        pointer-events: none;
+        transform: scale(0.8);
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+        width: 0;
+      }
+
+      /* row editing, only when unlocked */
+      .job .row-x {
+        background: transparent;
+        border: 0;
+        border-radius: 0.6rem;
+        color: var(--muted-text);
+        flex-shrink: 0;
+        font-size: 1.1rem;
+        line-height: 1;
+        margin-left: auto;
+        min-height: 2.25rem;
+        opacity: 0.55;
+        width: 2.25rem;
+      }
+      .job .row-x:hover,
+      .job .row-x:focus-visible {
+        background: var(--tint-slate-10);
+        color: var(--danger);
+        opacity: 1;
+      }
+      .job-title.editable {
+        border-bottom: 1.5px dashed var(--hairline);
+        flex: 1;
+        min-width: 0;
+      }
+      .job-rename {
+        background: var(--surface);
+        border: 1.5px solid var(--heritage-orange);
+        border-radius: 0.75rem;
+        color: var(--color-text);
+        flex: 1;
+        font-family: Inter, sans-serif;
+        font-size: 1.05rem;
+        min-height: 2.5rem;
+        min-width: 0;
+        padding: 0 0.6rem;
+      }
+      .undo-toast {
+        align-items: center;
+        background: var(--color-text);
+        border-radius: 0.875rem;
+        color: var(--surface);
+        display: inline-flex;
+        font-family: Inter, sans-serif;
+        font-size: 0.95rem;
+        gap: 0.9rem;
+        margin-top: 0.9rem;
+        padding: 0.6rem 0.9rem;
+      }
+      .undo-toast button {
+        background: transparent;
+        border: 0;
+        color: var(--heritage-orange);
+        font-family: Outfit, sans-serif;
+        font-size: 0.95rem;
+        font-weight: 800;
+      }
+
+      /* option B — the ghost row that expands */
+      .ghost-add {
+        align-items: center;
+        background: transparent;
+        border: 1.5px dashed var(--hairline);
+        border-radius: 0.875rem;
+        color: var(--muted-text);
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 0.9rem;
+        font-weight: 700;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-top: 0.25rem;
+        min-height: 2.75rem;
+        width: 100%;
+      }
+      .ghost-add .plus {
+        color: var(--heritage-orange);
+        font-size: 1.1rem;
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         CONCEPT B — the trip sheet
+         ══════════════════════════════════════════════════════════════ */
+      .sheet {
+        background: var(--surface);
+        border-radius: 24px;
+        box-shadow: var(--card-shadow);
+        margin: 0 auto;
+        max-width: 780px;
+        overflow: hidden;
+      }
+      .sheet-head {
+        align-items: center;
+        border-bottom: 1px solid var(--hairline);
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        padding: 1.1rem 1.4rem;
+      }
+      .sheet-title {
+        font-family: Outfit, sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+      }
+      .sheet-close {
+        align-items: center;
+        background: var(--tint-slate-5);
+        border: 0;
+        border-radius: 999px;
+        color: var(--color-text);
+        display: flex;
+        font-size: 1.25rem;
+        height: 2.9rem;
+        justify-content: center;
+        width: 2.9rem;
+      }
+      .sheet-body {
+        padding: 1.1rem 1.4rem 1.4rem;
+      }
+      .countdown {
+        align-items: center;
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 1.6rem;
+        font-weight: 800;
+        gap: 0.6rem;
+        margin: 0 0 0.75rem;
+      }
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .meta {
+        border-radius: 0.5rem;
+        font-family: Outfit, sans-serif;
+        font-size: 0.88rem;
+        font-weight: 600;
+        padding: 0.125rem 0.5rem;
+      }
+      .meta.gold {
+        background: var(--gold-tint);
+        color: var(--gold-text);
+      }
+      .meta.plain {
+        color: var(--muted-text);
+      }
+      .travellers {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1.25rem;
+      }
+      .chip {
+        align-items: center;
+        background: var(--tint-slate-5);
+        border-radius: 999px;
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+      }
+      .chip .avatar {
+        font-size: 0.8rem;
+        height: 1.75rem;
+        width: 1.75rem;
+      }
+      .chip span {
+        font-size: 1rem;
+      }
+
+      /* the old flat leg list, for the before column */
+      .leg {
+        margin-top: 0.75rem;
+      }
+      .leg:first-child {
+        margin-top: 0;
+      }
+      .leg-title {
+        align-items: center;
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        gap: 0.5rem;
+        margin: 0 0 0.25rem;
+      }
+      .leg-ref {
+        color: var(--muted-text);
+        font-family: Inter, sans-serif;
+        font-size: 0.88rem;
+        font-weight: 400;
+      }
+      .unbooked {
+        background: var(--gold-tint);
+        border-radius: 0.5rem;
+        color: var(--gold-text);
+        font-family: Outfit, sans-serif;
+        font-size: 0.88rem;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 0.125rem 0.5rem;
+        white-space: nowrap;
+      }
+
+      /* the when band, reused verbatim from SegmentWhenBand.vue */
+      .when-band {
+        align-items: stretch;
+        border: 1px solid var(--teal-line);
+        border-radius: 0.875rem;
+        display: flex;
+        overflow: hidden;
+      }
+      .when-cell {
+        background: var(--teal-fill);
+        flex: 1;
+        min-width: 0;
+        padding: 0.5rem 0.875rem;
+      }
+      .when-cell + .when-cell {
+        border-left: 1px solid var(--teal-soft);
+      }
+      .when-cap {
+        align-items: center;
+        color: var(--teal-cap);
+        display: flex;
+        font-family: Outfit, sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        gap: 0.375rem;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.125rem;
+        text-transform: uppercase;
+      }
+      .when-nextday {
+        color: var(--heritage-orange);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: normal;
+        text-transform: none;
+      }
+      .when-big {
+        font-family: Outfit, sans-serif;
+        font-size: 1.125rem;
+        font-weight: 700;
+        line-height: 1.15;
+      }
+      .when-sub {
+        color: var(--muted-text);
+        font-size: 0.75rem;
+        margin-top: 0.0625rem;
+      }
+      .when-arrow {
+        align-items: center;
+        background: var(--teal-fill);
+        color: var(--teal);
+        display: flex;
+        font-size: 1rem;
+        padding: 0 0.375rem;
+      }
+
+      /* ── the spine ─────────────────────────────────────────────────── */
+      .timeline {
+        margin-top: 0.25rem;
+      }
+      .day {
+        display: grid;
+        gap: 0 0.9rem;
+        grid-template-columns: 3.25rem 1fr;
+      }
+      .day-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+      }
+      /* the continuous line, drawn behind every node */
+      .day-rail::before {
+        background: var(--teal-soft);
+        bottom: 0;
+        content: '';
+        left: 50%;
+        position: absolute;
+        top: 0;
+        transform: translateX(-50%);
+        width: 2px;
+      }
+      .day:first-child .day-rail::before {
+        top: 1.5rem;
+      }
+      .day:last-child .day-rail::before {
+        bottom: auto;
+        height: calc(100% - 1.5rem);
+      }
+      .day-chip {
+        background: var(--teal);
+        border-radius: 0.65rem;
+        color: #04323b;
+        font-family: Outfit, sans-serif;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+        padding: 0.3rem 0.35rem;
+        position: relative;
+        text-align: center;
+        text-transform: uppercase;
+        width: 100%;
+        z-index: 1;
+      }
+      html.dark .day-chip {
+        color: #06231f;
+      }
+      .day-chip .dnum {
+        display: block;
+        font-size: 1.15rem;
+        letter-spacing: 0;
+      }
+      .day-items {
+        padding-bottom: 1.1rem;
+        padding-top: 0.15rem;
+      }
+      .node {
+        display: grid;
+        gap: 0 0.9rem;
+        grid-template-columns: 3.25rem 1fr;
+        margin-top: 0.85rem;
+      }
+      .day-items > .node:first-child {
+        margin-top: 0;
+      }
+      /* nodes are laid out inside .day-items, so they re-declare the rail */
+      .node-rail {
+        align-items: center;
+        display: flex;
+        justify-content: center;
+        position: relative;
+      }
+      .node-dot {
+        align-items: center;
+        background: var(--surface);
+        border: 2px solid var(--teal-soft);
+        border-radius: 999px;
+        display: flex;
+        font-size: 1.15rem;
+        height: 2.4rem;
+        justify-content: center;
+        position: relative;
+        width: 2.4rem;
+        z-index: 1;
+      }
+      /* a stay is a SPAN, not a moment: taller node, bracket rather than disc */
+      .node.is-stay .node-dot {
+        border-radius: 0.9rem;
+        border-style: dashed;
+        height: 3.1rem;
+      }
+      .node-body {
+        min-width: 0;
+      }
+
+      .note {
+        border-left: 3px solid var(--tint-orange-15);
+        color: var(--annotation);
+        font-size: 0.86rem;
+        line-height: 1.55;
+        margin: 0.9rem 0 0;
+        max-width: 66ch;
+        padding-left: 0.9rem;
+      }
+      .note strong {
+        color: var(--color-text);
+      }
+
+      .two-up {
+        display: grid;
+        gap: 1.25rem;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      }
+
+      @media (max-width: 700px) {
+        .day,
+        .node {
+          grid-template-columns: 2.6rem 1fr;
+          gap: 0 0.6rem;
+        }
+        .node-dot {
+          font-size: 1rem;
+          height: 2.1rem;
+          width: 2.1rem;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <header class="doc-head">
+        <div>
+          <h1>beanie wall: inline add row + trip timeline</h1>
+          <p>
+            Two changes, mocked against the wall's real tokens and type scale. Nothing here invents
+            colour or type; the CIG settled that. What is being decided is layout and how a kid
+            reaches the thing they want.
+          </p>
+        </div>
+        <button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">
+          light / dark
+        </button>
+      </header>
+
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <section class="concept">
+        <h2>A. The chore board, unlocked</h2>
+        <p class="lede">
+          The column already scrolls, so the seven-row cap and its "+3 more" are cutting a list
+          that had room. Below: what the column looks like today, then two ways to put "add to this
+          list" on the board itself instead of two taps away in the drawer.
+        </p>
+
+        <div class="variant">
+          <div class="variant-head">
+            <strong>Today</strong>
+            <span class="tag neutral">for reference</span>
+            <span>Capped at 7 rows. The button opens every family list, not this one.</span>
+          </div>
+          <div class="wall" style="max-width: 300px">
+            <div class="board">
+              <div class="col">
+                <div class="col-head" style="background: #f15d222e">
+                  <div class="avatar" style="background: #f15d22; color: #fff">J</div>
+                  <div>
+                    <p class="bean-name">Joey</p>
+                    <p class="bean-count">2 / 9</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #f15d220d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🧹</span><span>Jobs</span
+                      ><span class="pill">Repeats</span>
+                    </p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Feed the fish</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Reading, 20 min</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Make bed</span></div>
+                  </div>
+                  <div>
+                    <p class="list-title"><span aria-hidden="true">🏊</span><span>Swim bag</span></p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Goggles</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Towel</span></div>
+                  </div>
+                  <button class="more-btn" type="button">+4 more ›</button>
+                </div>
+                <p class="stars">
+                  ⭐⭐<span class="dot">·······</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <p class="note">
+            The four hidden items are goggles' siblings: cap, shampoo, water bottle, kickboard.
+            Nothing about them needed hiding, and the tap that reveals them lands on a grid of
+            everybody's lists.
+          </p>
+        </div>
+
+        <div class="variant">
+          <div class="variant-head">
+            <strong>Option A</strong>
+            <span class="tag">recommended</span>
+            <span>Every list shows its own box. The + arrives when there is something to add.</span>
+          </div>
+          <div class="wall">
+            <div class="board">
+              <div class="col">
+                <div class="col-head" style="background: #f15d222e">
+                  <div class="avatar" style="background: #f15d22; color: #fff">J</div>
+                  <div>
+                    <p class="bean-name">Joey</p>
+                    <p class="bean-count">2 / 9</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #f15d220d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🧹</span><span>Jobs</span
+                      ><span class="pill">Repeats</span>
+                    </p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Feed the fish</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Reading, 20 min</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Make bed</span></div>
+                    <div class="addrow">
+                      <input placeholder="add to jobs" aria-label="add to jobs" />
+                      <button class="go dormant" type="button" tabindex="-1">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="list-title"><span aria-hidden="true">🏊</span><span>Swim bag</span></p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Goggles</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Towel</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Swim cap</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Shampoo</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Water bottle</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Kickboard</span></div>
+                    <div class="addrow">
+                      <input value="Flip flops" aria-label="add to swim bag" />
+                      <button class="go" type="button">+</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="stars">⭐⭐<span class="dot">·······</span></p>
+              </div>
+
+              <div class="col">
+                <div class="col-head" style="background: #27ae602e">
+                  <div class="avatar" style="background: #27ae60; color: #fff">L</div>
+                  <div>
+                    <p class="bean-name">Leo</p>
+                    <p class="bean-count">1 / 5</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #27ae600d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🧹</span><span>Jobs</span
+                      ><span class="pill">Repeats</span>
+                    </p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bins out</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Homework</span></div>
+                    <div class="addrow">
+                      <input placeholder="add to jobs" aria-label="add to jobs" />
+                      <button class="go dormant" type="button" tabindex="-1">+</button>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="list-title"><span aria-hidden="true">🛒</span><span>Groceries</span></p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Milk</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bread</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bananas</span></div>
+                    <div class="addrow">
+                      <input placeholder="add to groceries" aria-label="add to groceries" />
+                      <button class="go dormant" type="button" tabindex="-1">+</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="stars">⭐<span class="dot">····</span></p>
+              </div>
+
+              <div class="col">
+                <div class="col-head" style="background: #8e44ad2e">
+                  <div class="avatar" style="background: #8e44ad; color: #fff">M</div>
+                  <div>
+                    <p class="bean-name">Max</p>
+                    <p class="bean-count">3 / 3</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #8e44ad0d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🧹</span><span>Jobs</span
+                      ><span class="pill">Repeats</span>
+                    </p>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Shoes away</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Teeth</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Toys in the box</span></div>
+                    <div class="addrow">
+                      <input placeholder="add to jobs" aria-label="add to jobs" />
+                      <button class="go dormant" type="button" tabindex="-1">+</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="stars">⭐⭐⭐</p>
+              </div>
+            </div>
+          </div>
+          <p class="note">
+            <strong>What changed:</strong> the cap is gone, so all nine items are on the board and
+            the column scrolls, exactly as the orphan column beside it already does. Each list
+            carries its own box, so a kid never has to know which list they are in. The orange <span
+              style="color: var(--heritage-orange); font-weight: 700"
+              >+</span
+            >
+            is hidden while the box is empty and slides in on the first keystroke, which keeps a
+            column with four lists from reading as a form. Enter submits too. The box keeps the
+            44px touch floor the rest of the wall uses.
+          </p>
+        </div>
+
+
+        <div class="variant">
+          <div class="variant-head">
+            <strong>Option A, with row editing</strong>
+            <span class="tag">answers "can it edit and remove too"</span>
+            <span>The tick is untouched. Everything else only exists while unlocked.</span>
+          </div>
+          <div class="wall" style="max-width: 300px">
+            <div class="board">
+              <div class="col">
+                <div class="col-head" style="background: #f15d222e">
+                  <div class="avatar" style="background: #f15d22; color: #fff">J</div>
+                  <div>
+                    <p class="bean-name">Joey</p>
+                    <p class="bean-count">2 / 9</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #f15d220d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🏊</span><span>Swim bag</span>
+                    </p>
+                    <div class="job">
+                      <span class="tick"></span>
+                      <span class="job-title editable">Goggles</span>
+                      <button class="row-x" type="button" aria-label="Remove goggles">✕</button>
+                    </div>
+                    <div class="job">
+                      <span class="tick"></span>
+                      <input class="job-rename" value="Towel, the big one" aria-label="Rename towel" />
+                    </div>
+                    <div class="job">
+                      <span class="tick"></span>
+                      <span class="job-title editable">Swim cap</span>
+                      <button class="row-x" type="button" aria-label="Remove swim cap">✕</button>
+                    </div>
+                    <div class="addrow">
+                      <input placeholder="add to swim bag" aria-label="add to swim bag" />
+                      <button class="go dormant" type="button" tabindex="-1">+</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="stars">⭐⭐<span class="dot">·······</span></p>
+              </div>
+            </div>
+          </div>
+          <span class="undo-toast">Shampoo removed <button type="button">Undo</button></span>
+          <p class="note">
+            <strong>The tick never changes.</strong> It is the biggest target on the row and the
+            one thing a five year old uses, so nothing new goes near it. The row controls appear
+            only while the wall is unlocked, which is already behind the PIN.
+            <br /><br />
+            <strong>Rename:</strong> tap the words (not the tick) and the row becomes a box in
+            place, shown here on "Towel". <strong>Remove:</strong> the trailing ✕, which deletes
+            straight away and offers Undo in a toast rather than stopping the parent with a
+            confirm dialog. The wall already has <code>showToast</code> and has never had a modal,
+            so undo suits the surface better than a red confirm.
+            <br /><br />
+            <strong>Deleting a whole list is deliberately not here.</strong> Removing "Swim bag"
+            takes its history with it and affects every screen, not just the wall. That belongs on
+            the lists page where the consequence is legible. The wall edits the rows inside a
+            list, and adds new ones.
+          </p>
+        </div>
+
+        <div class="variant">
+          <div class="variant-head">
+            <strong>Option B</strong>
+            <span class="tag neutral">alternative</span>
+            <span>A quiet ghost row that opens into the box on tap.</span>
+          </div>
+          <div class="wall" style="max-width: 300px">
+            <div class="board">
+              <div class="col">
+                <div class="col-head" style="background: #27ae602e">
+                  <div class="avatar" style="background: #27ae60; color: #fff">L</div>
+                  <div>
+                    <p class="bean-name">Leo</p>
+                    <p class="bean-count">1 / 5</p>
+                  </div>
+                </div>
+                <div class="col-body" style="background: #27ae600d">
+                  <div>
+                    <p class="list-title">
+                      <span aria-hidden="true">🧹</span><span>Jobs</span
+                      ><span class="pill">Repeats</span>
+                    </p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bins out</span></div>
+                    <div class="job is-done"><span class="tick done">✓</span><span class="job-title">Homework</span></div>
+                    <button class="ghost-add" type="button"><span class="plus">+</span> add</button>
+                  </div>
+                  <div>
+                    <p class="list-title"><span aria-hidden="true">🛒</span><span>Groceries</span></p>
+                    <div class="job"><span class="tick"></span><span class="job-title">Milk</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bread</span></div>
+                    <div class="job"><span class="tick"></span><span class="job-title">Bananas</span></div>
+                    <div class="addrow">
+                      <input value="Peanut butter" aria-label="add to groceries" />
+                      <button class="go" type="button">+</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="stars">⭐<span class="dot">····</span></p>
+              </div>
+            </div>
+          </div>
+          <p class="note">
+            Groceries is shown mid-add, Jobs is shown at rest. Quieter with many lists, but it
+            costs a tap, and a child has to work out that the faint row is a button. Worth having
+            on the table; not what I would ship.
+          </p>
+        </div>
+      </section>
+
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <section class="concept">
+        <h2>B. The trip drawer</h2>
+        <p class="lede">
+          Today the drawer shows the first three flights and nothing else, because the wall builds
+          its legs from <code>travelSegments.slice(0, 3)</code>. A trip also carries hotels and
+          ground transport, and a family standing at the wall wants them in the order they happen,
+          not sorted by which table they live in.
+        </p>
+
+        <div class="variant">
+          <div class="variant-head">
+            <strong>Proposed</strong>
+            <span class="tag">all segments, in time order</span>
+            <span>Four flights, two stays, one car. Scrolls on the wall.</span>
+          </div>
+
+          <div class="sheet">
+            <div class="sheet-head">
+              <p class="sheet-title">Hokkaido, June</p>
+              <button class="sheet-close" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="sheet-body">
+              <p class="countdown"><span aria-hidden="true">✈️</span> 34 days until we go</p>
+              <div class="meta-row">
+                <span class="meta plain">5 of 7 booked</span>
+                <span class="meta gold"><span aria-hidden="true">⏳</span> 2 need booking</span>
+              </div>
+              <div class="travellers">
+                <span class="chip"><span class="avatar" style="background: #f15d22; color: #fff">J</span><span>Joey</span></span>
+                <span class="chip"><span class="avatar" style="background: #27ae60; color: #fff">L</span><span>Leo</span></span>
+                <span class="chip"><span class="avatar" style="background: #8e44ad; color: #fff">M</span><span>Max</span></span>
+                <span class="chip"><span class="avatar" style="background: #2c3e50; color: #fff">G</span><span>Greg</span></span>
+              </div>
+
+              <div class="timeline">
+                <!-- day 1 -->
+                <div class="day">
+                  <div class="day-rail">
+                    <span class="day-chip">Fri<span class="dnum">12</span>Jun</span>
+                  </div>
+                  <div class="day-items">
+                    <div class="node">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">✈️</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          SIN <span style="color: var(--teal)" aria-hidden="true">→</span> HND
+                          <span class="leg-ref">SQ 634</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Departs</div>
+                            <div class="when-big">23:55</div>
+                            <div class="when-sub">Fri 12 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Arrives <span class="when-nextday">next day</span></div>
+                            <div class="when-big">07:30</div>
+                            <div class="when-sub">Sat 13 Jun</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- day 2 -->
+                <div class="day">
+                  <div class="day-rail">
+                    <span class="day-chip">Sat<span class="dnum">13</span>Jun</span>
+                  </div>
+                  <div class="day-items">
+                    <div class="node">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">✈️</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          HND <span style="color: var(--teal)" aria-hidden="true">→</span> CTS
+                          <span class="leg-ref">NH 61</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Departs</div>
+                            <div class="when-big">10:00</div>
+                            <div class="when-sub">Sat 13 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Arrives</div>
+                            <div class="when-big">11:35</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="node is-stay">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">🏨</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          Sapporo Grand <span class="leg-ref">2 rooms</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Check in</div>
+                            <div class="when-big">Sat 13 Jun</div>
+                            <div class="when-sub">from 15:00</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Check out</div>
+                            <div class="when-big">Tue 16 Jun</div>
+                            <div class="when-sub">3 nights</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="node">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">🚗</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          Rental car <span class="leg-ref">Toyota Rent a Car, CTS</span>
+                          <span class="unbooked"><span aria-hidden="true">⏳</span> not booked</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Pick up</div>
+                            <div class="when-big">12:30</div>
+                            <div class="when-sub">Sat 13 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Return</div>
+                            <div class="when-big">09:00</div>
+                            <div class="when-sub">Thu 18 Jun</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- day 3 -->
+                <div class="day">
+                  <div class="day-rail">
+                    <span class="day-chip">Tue<span class="dnum">16</span>Jun</span>
+                  </div>
+                  <div class="day-items">
+                    <div class="node is-stay">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">♨️</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          Noboribetsu ryokan
+                          <span class="unbooked"><span aria-hidden="true">⏳</span> not booked</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Check in</div>
+                            <div class="when-big">Tue 16 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Check out</div>
+                            <div class="when-big">Thu 18 Jun</div>
+                            <div class="when-sub">2 nights</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- day 4 -->
+                <div class="day">
+                  <div class="day-rail">
+                    <span class="day-chip">Thu<span class="dnum">18</span>Jun</span>
+                  </div>
+                  <div class="day-items">
+                    <div class="node">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">✈️</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          CTS <span style="color: var(--teal)" aria-hidden="true">→</span> HND
+                          <span class="leg-ref">NH 68</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Departs</div>
+                            <div class="when-big">12:00</div>
+                            <div class="when-sub">Thu 18 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Arrives</div>
+                            <div class="when-big">13:40</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="node">
+                      <div class="node-rail"><span class="node-dot" aria-hidden="true">✈️</span></div>
+                      <div class="node-body">
+                        <p class="leg-title">
+                          HND <span style="color: var(--teal)" aria-hidden="true">→</span> SIN
+                          <span class="leg-ref">SQ 635</span>
+                        </p>
+                        <div class="when-band">
+                          <div class="when-cell">
+                            <div class="when-cap">Departs</div>
+                            <div class="when-big">17:15</div>
+                            <div class="when-sub">Thu 18 Jun</div>
+                          </div>
+                          <div class="when-arrow" aria-hidden="true">→</div>
+                          <div class="when-cell">
+                            <div class="when-cap">Arrives</div>
+                            <div class="when-big">23:40</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p class="note">
+            <strong>Why a spine rather than a flat list:</strong> a trip really is a sequence, so
+            the rail is carrying information rather than decorating. It also makes "four flights"
+            countable from across the room, which is the thing that failed. The date chip groups by
+            day so the drawer answers "what happens Saturday" without reading every band.
+            <br /><br />
+            <strong>Stays read as spans, not moments.</strong> A hotel node is a dashed rounded
+            bracket rather than a disc, because a stay covers the nights between two flights. The
+            band underneath already says check in and check out, so nothing new had to be invented
+            to show it.
+            <br /><br />
+            <strong>Kept as-is:</strong> the countdown hero, the booked count, the gold "needs
+            booking" pill and <code>SegmentWhenBand</code> itself, so the wall and the trip page
+            still agree about when a flight leaves. The small trip card on the wall keeps its
+            two-leg cap; that one is doing its job.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      // the + only appears once the box has something in it
+      document.querySelectorAll('.addrow input').forEach((input) => {
+        const go = input.parentElement.querySelector('.go');
+        const sync = () => go.classList.toggle('dormant', !input.value.trim());
+        input.addEventListener('input', sync);
+        sync();
+      });
+      // option B: the ghost row opens into a real box
+      document.querySelectorAll('.ghost-add').forEach((ghost) => {
+        ghost.addEventListener('click', () => {
+          const row = document.createElement('div');
+          row.className = 'addrow';
+          row.innerHTML =
+            '<input aria-label="add" /><button class="go dormant" type="button">+</button>';
+          ghost.replaceWith(row);
+          const input = row.querySelector('input');
+          const go = row.querySelector('.go');
+          input.addEventListener('input', () =>
+            go.classList.toggle('dormant', !input.value.trim())
+          );
+          input.focus();
+        });
+      });
+    </script>
+  </body>
+</html>
