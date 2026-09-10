@@ -1,0 +1,19 @@
+{
+  "skill_name": "beanie-video",
+  "evals": [
+    {
+      "id": 0,
+      "name": "cut-branded-loop-from-raw-clips",
+      "prompt": "In my google drive at Projects/beanies.family/Marketing/Video/Raw Videos there are a few clips named *celebrating* and *celebrate* of my kids using the beanie wall and getting excited when they finish their chores list. Can you cut me a short looping video, around 6 seconds, branded with the beanies.family logo? Portrait, for instagram. IMPORTANT: do not write anything back to google drive - save every output into the output folder given to you.",
+      "expected_output": "A 5-8s portrait 1080x1920 mp4 loop assembled from multiple source clips, house grade applied, beanies.family watermark placed per the skill's placement rules, plus a shot list. Duration verified and the cut ends on a beat that loops.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "fit-gif-under-substack-cap",
+      "prompt": "I have a finished 7 second portrait video I want to put in a substack email as a gif, but substack rejects anything over 5MB and my first export came out at 7MB. Can you get me a gif that fits without it looking rough, and tell me what you gave up to get there? Save the gif into the output folder given to you.",
+      "expected_output": "A GIF under 5,000,000 bytes that keeps 128 colours (no colour-depth degradation of faces), reduces frame rate before width, verified frame count/duration/loop flag, and an explanation of the tradeoff.",
+      "files": []
+    }
+  ]
+}
