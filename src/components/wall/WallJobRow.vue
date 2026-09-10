@@ -20,7 +20,10 @@
  * and nothing dims at any point.
  */
 import { computed, inject, ref, watch } from 'vue';
-import { WALL_LOCK } from '@/components/wall/wallLockKey';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
+import { useInlineRename } from '@/composables/useInlineRename';
+import { useWallLock } from '@/components/wall/wallLockKey';
+import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -44,7 +47,8 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [WallJob] }>();
 
 const { t } = useTranslation();
-const lock = inject(WALL_LOCK, undefined);
+const { canEdit, noteActivity } = useWallLock();
+const edit = inject(WALL_EDIT, undefined);
 const burst = inject(WALL_BURST, undefined);
 const tickEl = ref<HTMLElement | null>(null);
 
@@ -94,7 +98,7 @@ let popTimer: ReturnType<typeof setTimeout> | undefined;
 
 function onTick() {
   if (props.pending) return;
-  lock?.noteActivity();
+  noteActivity();
   const nowDone = !isDone.value;
   optimistic.value = nowDone;
 
@@ -116,57 +120,141 @@ function onTick() {
   }
   emit('toggle', props.job);
 }
+
+/**
+ * Tapping the row.
+ *
+ * LOCKED, this is byte-for-byte the old behaviour: a tap anywhere on the row
+ * (tick, title, owner pill, done stamp or list emoji) ticks it. That is the
+ * whole point of the surface and edit mode must not make it smaller or riskier.
+ *
+ * UNLOCKED, the title area becomes the rename target. The tick keeps its own
+ * button either way, so the one thing a five-year-old uses never moves.
+ */
+const renaming = ref(false);
+
+function onTitleTap() {
+  // A row mid-write is not a row to start editing.
+  if (props.pending) return;
+  if (!canEdit.value || !edit) {
+    onTick();
+    return;
+  }
+  noteActivity();
+  renaming.value = true;
+}
+
+const { draft, inputRef, onEnter, onBlur } = useInlineRename({
+  editing: renaming,
+  current: () => props.job.title,
+  save: (next) => {
+    renaming.value = false;
+    void edit?.renameJob(props.job, next);
+  },
+  cancel: () => {
+    renaming.value = false;
+  },
+});
+
+function onRemove() {
+  if (props.pending) return;
+  noteActivity();
+  void edit?.removeJob(props.job);
+}
 </script>
 
 <template>
-  <button
-    type="button"
-    class="wall-job-row flex w-full items-center gap-3 py-2 text-left"
-    :disabled="pending"
-    :aria-pressed="isDone"
-    @click="onTick"
-  >
-    <span
-      ref="tickEl"
-      class="wall-tick grid shrink-0 place-items-center rounded-full border-[2.5px] text-white"
-      :class="[
-        isDone ? 'is-done border-[#27AE60] bg-[#27AE60]' : 'border-[rgba(44,62,80,0.18)]',
-        celebrating ? 'is-celebrating' : '',
-      ]"
+  <!--
+    A div, not a button. An <input> and a trash <button> cannot be nested inside
+    a <button>: it is invalid HTML and the inner control's click and focus
+    behaviour is not reliable across engines. The row still has exactly one root
+    element, which <TransitionGroup> requires, and `job.key` is untouched so the
+    FLIP move is unaffected.
+  -->
+  <div class="wall-job-row flex w-full items-center gap-3 py-2 text-left">
+    <button
+      type="button"
+      class="wall-tick-hit grid shrink-0 place-items-center"
+      :disabled="pending"
+      :aria-pressed="isDone"
+      :aria-label="job.title"
+      @click="onTick"
     >
-      <span v-if="isDone" class="wall-check" aria-hidden="true">✓</span>
-    </span>
-    <span
-      class="font-inter wall-job-title min-w-0 flex-1 leading-tight"
-      :class="
-        isDone ? 'text-secondary-400 dark:text-ink-faint' : 'text-secondary-500 dark:text-ink'
-      "
+      <span
+        ref="tickEl"
+        class="wall-tick grid shrink-0 place-items-center rounded-full border-[2.5px] text-white"
+        :class="[
+          isDone ? 'is-done border-[#27AE60] bg-[#27AE60]' : 'border-[rgba(44,62,80,0.18)]',
+          celebrating ? 'is-celebrating' : '',
+        ]"
+      >
+        <span v-if="isDone" class="wall-check" aria-hidden="true">✓</span>
+      </span>
+    </button>
+
+    <input
+      v-if="renaming"
+      :ref="(el) => (inputRef = el as HTMLInputElement | null)"
+      v-model="draft"
+      type="text"
+      class="wall-job-rename font-inter dark:border-line-strong dark:bg-surface-ground dark:text-ink text-secondary-500 min-w-0 flex-1 rounded-xl border-[1.5px] border-[var(--heritage-orange,#F15D22)] bg-white px-2 leading-tight outline-none"
+      :placeholder="t('wall.job.renamePlaceholder')"
+      :aria-label="t('wall.job.rename')"
+      @keyup.enter="onEnter"
+      @blur="onBlur"
+      @input="noteActivity"
+    />
+    <!--
+      Everything a locked tap should hit lives INSIDE this button: the title,
+      the owner pill, the done stamp and the list emoji. Putting any of them
+      outside it would have quietly killed "tap anywhere to tick".
+    -->
+    <button
+      v-else
+      type="button"
+      class="flex min-w-0 flex-1 items-center gap-3 text-left"
+      :disabled="pending"
+      @click="onTitleTap"
     >
-      <!--
-        The strike lives on an INLINE span wrapping just the words. On the
-        `flex-1` element it sized to the whole row, so the line shot out past
-        the text and across the column.
-      -->
-      <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
-    </span>
-    <span
-      v-if="ownerLabel"
-      class="font-inter wall-job-done-at text-secondary-500 dark:text-ink max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold"
-      :class="ownerColor ? '' : 'bg-[var(--tint-slate-10)]'"
-      :style="ownerColor ? { background: `${ownerColor}2e` } : undefined"
-    >
-      {{ ownerLabel }}
-    </span>
-    <span
-      v-if="doneAt"
-      class="font-inter wall-job-done-at shrink-0 text-[var(--muted-text,#4d5d6c)] opacity-70"
-    >
-      {{ doneAt }}
-    </span>
-    <span v-if="job.listEmoji" class="wall-job-tag shrink-0 opacity-60" aria-hidden="true">
-      {{ job.listEmoji }}
-    </span>
-  </button>
+      <span
+        class="font-inter wall-job-title min-w-0 flex-1 leading-tight"
+        :class="
+          isDone ? 'text-secondary-400 dark:text-ink-faint' : 'text-secondary-500 dark:text-ink'
+        "
+      >
+        <!--
+          The strike lives on an INLINE span wrapping just the words. On the
+          `flex-1` element it sized to the whole row, so the line shot out past
+          the text and across the column.
+        -->
+        <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
+      </span>
+      <span
+        v-if="ownerLabel"
+        class="font-inter wall-job-done-at text-secondary-500 dark:text-ink max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold"
+        :class="ownerColor ? '' : 'bg-[var(--tint-slate-10)]'"
+        :style="ownerColor ? { background: `${ownerColor}2e` } : undefined"
+      >
+        {{ ownerLabel }}
+      </span>
+      <span
+        v-if="doneAt"
+        class="font-inter wall-job-done-at shrink-0 text-[var(--muted-text,#4d5d6c)] opacity-70"
+      >
+        {{ doneAt }}
+      </span>
+      <span v-if="job.listEmoji" class="wall-job-tag shrink-0 opacity-60" aria-hidden="true">
+        {{ job.listEmoji }}
+      </span>
+    </button>
+
+    <ActionButtons
+      v-if="canEdit && edit && !renaming"
+      size="xl"
+      :show-edit="false"
+      @delete="onRemove"
+    />
+  </div>
 </template>
 
 <style scoped>
@@ -176,6 +264,22 @@ function onTick() {
  * and it fought the burst for attention. The button is still `disabled` so a
  * double-tap cannot fire two writes; it just no longer says so in grey.
  */
+
+/*
+ * The tick's GLYPH stays 2rem (`.wall-tick` in the wall scale); this is its HIT
+ * area. 44px is the touch floor every other wall control holds, and the row was
+ * already ~48px tall, so the target grows and nothing reflows.
+ */
+.wall-tick-hit {
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+}
+
+.wall-job-rename {
+  font-size: 1.05rem;
+  min-height: 2.75rem;
+}
+
 .wall-tick {
   transition:
     background-color 200ms ease,

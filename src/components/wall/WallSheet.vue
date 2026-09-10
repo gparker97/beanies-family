@@ -10,7 +10,7 @@
  * Read-only apart from ticking list items, which is the one edit a locked wall
  * allows anywhere (same rule as `WallJobRow`).
  */
-import { computed, inject, onMounted, onBeforeUnmount } from 'vue';
+import { computed, inject, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { activityEmoji } from '@/utils/activityEmoji';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -20,6 +20,7 @@ import WallJobList from '@/components/wall/WallJobList.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
+import { useEscapeClose } from '@/composables/useEscapeClose';
 import WallAddRow from '@/components/wall/WallAddRow.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -83,15 +84,24 @@ const { mealsToday, trip } = useWallPeripherals();
 const target = computed(() => props.target);
 
 /**
- * Escape closes the sheet. A wall is a touch surface, but the same build runs on
- * a desktop browser during setup, and a dialog with no keyboard dismissal is a
- * dead end there.
+ * Escape closes the sheet, through the SHARED stack.
+ *
+ * This used to be a hand-rolled `window.addEventListener('keydown', ...)`,
+ * which sat outside `useEscapeClose`'s module-level stack and therefore fired
+ * for every Escape regardless of what was focused. That made it impossible for
+ * anything nested inside the sheet to take an Escape first: a rename in a job
+ * row would have been cancelled AND the whole sheet dismissed on one keypress.
+ *
+ * The sheet is `v-if`'d by its parent, so being mounted IS being open, and
+ * `useEscapeClose` watches with `{ immediate: true }` and cleans up via
+ * `onScopeDispose`. An editing row registers its own token on top, so one
+ * Escape cancels the rename and leaves the sheet open; a second closes it.
+ *
+ * A wall is a touch surface, but the same build runs on a desktop browser
+ * during setup, and a dialog with no keyboard dismissal is a dead end there.
  */
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') emit('close');
-}
-onMounted(() => window.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+const isOpen = ref(true);
+useEscapeClose(isOpen, () => emit('close'));
 
 /**
  * The day the open activity falls on.
