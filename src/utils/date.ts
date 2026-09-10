@@ -67,6 +67,22 @@ export function formatNookDate(dateStr: string): string {
 }
 
 /**
+ * The three parts of a compact date chip: weekday, day-of-month, month.
+ *
+ * Exists so a stacked chip does not have to re-split `formatNookDate`'s output
+ * or keep its own copy of the month and weekday names, which is how two
+ * spellings of "Sep" end up in one codebase.
+ */
+export function nookDateParts(dateStr: string): { dow: string; day: string; mon: string } {
+  const date = parseLocalDate(dateStr);
+  return {
+    dow: DAYS_SHORT[date.getDay()],
+    day: String(date.getDate()),
+    mon: MONTHS_SHORT[date.getMonth()],
+  };
+}
+
+/**
  * Format: "Wed, 6 Mar 2026" — full date with day-of-week and year.
  */
 export function formatDateFull(dateStr: string): string {

@@ -126,29 +126,55 @@ onMounted(() => {
 });
 
 /**
- * Per-piece fall.
- *
- * Deterministic from the index rather than `Math.random()`, for the same reason the scatter
- * is: two renders of the same card must not visibly differ. The variation is what stops the
- * shower reading as one rigid sheet of beans on rails, so distance, drift and duration all
- * vary out of step with each other (5, 5 and 4) rather than in lockstep.
- *
- * Distances are in PX and deliberately large. The beans start above the panel and are
- * clipped by the layer until they enter, so every one of them falls in from the top edge
- * whatever its resting position.
+ * The popper's throw, per piece. Deterministic from the index rather than
+ * `Math.random()`, for the same reason the scatter is: two renders of the same
+ * surface must not visibly differ.
  */
-const FALL_PX = [210, 280, 175, 320, 245] as const;
-/** Cards fall a shorter way: the surface is smaller and the burst has less room. */
-const CARD_FALL_PX = [96, 148, 82, 170, 120] as const;
-const SWAY_PX = [-13, 9, -5, 16, -10] as const;
-/**
- * Fast. A shower is a burst, not a descent — the previous 860-1180ms with a
- * decelerating ease meant the last third of every piece's journey was a crawl,
- * which is what read as "it falls, then floats".
- */
-const FALL_MS = [560, 640, 500, 600] as const;
+const APEX_PCT = [-48, -74, -58, -86, -64, -80] as const;
+const REST_PX = [0, 5, 2, 8, 3, 6] as const;
+const BURST_MS = [1280, 1520, 1380, 1700, 1440, 1600] as const;
+const SPIN_DEG = [340, 620, 480, 880, 400, 720] as const;
+const THROW_DELAY_MS = [0, 40, 90, 25, 140, 65] as const;
 
-const beans = computed(() =>
+/** How many pieces the popper fires. A card never fires: it has no floor. */
+const BURST_COUNT = 24;
+
+/**
+ * The popper: pieces leave ONE bottom corner, arc across, and land on the floor.
+ *
+ * This replaces a fall onto fixed scatter positions spread from 8% to 92% down
+ * the panel — which meant the pieces stopped IN MID-AIR, and no amount of easing
+ * could make that look natural, because nothing stops halfway down. Landing on a
+ * floor is what makes it read as confetti.
+ *
+ * The landing spread is index-based so the pile lays ALONG the floor rather than
+ * heaping where a hash happened to cluster, and it reaches both edges even on a
+ * panel as wide as the wall's drawer.
+ */
+const burst = computed(() =>
+  Array.from({ length: BURST_COUNT }, (_, i) => {
+    const slot = (i / BURST_COUNT) * 92 + 3;
+    return {
+      i,
+      form: FORMS[i % FORMS.length],
+      light: POD_LIGHT[i % POD_LIGHT.length],
+      dark: POD_DARK[i % POD_DARK.length],
+      land: Math.round(slot + (i % 3) - 1),
+      apex: APEX_PCT[i % APEX_PCT.length],
+      rest: REST_PX[i % REST_PX.length],
+      duration: BURST_MS[i % BURST_MS.length],
+      spin: SPIN_DEG[i % SPIN_DEG.length] * (i % 2 ? 1 : -1),
+      delay: THROW_DELAY_MS[i % THROW_DELAY_MS.length],
+    };
+  })
+);
+
+/**
+ * The quiet scatter. On a card this is the WHOLE treatment; in a drawer it
+ * arrives after the popper has finished, so the burst is the event and this is
+ * what it leaves behind.
+ */
+const ambient = computed(() =>
   SCATTER.slice(0, COUNT[props.density]).map(([left, top, rotate], i) => ({
     i,
     left,
@@ -157,53 +183,76 @@ const beans = computed(() =>
     light: POD_LIGHT[i % POD_LIGHT.length],
     dark: POD_DARK[i % POD_DARK.length],
     form: FORMS[i % FORMS.length],
-    fall: (props.variant === 'drawer' ? FALL_PX : CARD_FALL_PX)[i % FALL_PX.length],
-    sway: SWAY_PX[i % SWAY_PX.length],
-    duration: FALL_MS[i % FALL_MS.length],
   }))
 );
 
-/**
- * Tight, so the shower lands as ONE burst rather than a trickle. Twenty pieces
- * at 14ms all start inside 266ms; at the old 45ms the last one began after the
- * first had already finished, which is a queue, not a celebration.
- */
-const delayStep = computed(() => (props.variant === 'drawer' ? 14 : 10));
+/** A drawer's scatter waits for the floor to settle; a card's arrives at once. */
+const ambientStart = computed(() => (props.variant === 'drawer' ? 1450 : 0));
 
 /**
- * Does the piece keep breathing after it lands?
+ * Does the piece keep breathing once it has arrived?
  *
  * Everywhere EXCEPT a wall card. A kitchen tablet never sleeps, so an infinite
  * drift there is confetti moving in the corner of a room all evening, on every
  * celebrating card, indefinitely — plus continuous compositing on an always-on
- * device. A wall card bursts in and settles. A drawer is a surface someone
- * deliberately opened and will close, so it may keep drifting.
+ * device. A drawer is a surface someone deliberately opened and will close, so
+ * it may keep drifting.
  */
 const drifts = computed(() => props.variant === 'drawer' || props.density !== 'wall');
+
+/** The popper is pure motion, so reduced motion gets the scatter and nothing else. */
+const showBurst = computed(
+  () => props.variant === 'drawer' && animate.value && !prefersReducedMotion.value
+);
 </script>
 
 <template>
   <div class="celebration-confetti" :class="`is-${variant}`" aria-hidden="true">
+    <!--
+      THE POPPER. Three nested boxes per piece, and the nesting is the point:
+      horizontal and vertical need DIFFERENT easing (drag going out, gravity
+      coming down), and one transform cannot carry two curves. That is exactly
+      why the previous version could only ever travel in a straight line.
+    -->
+    <template v-if="showBurst">
+      <span
+        v-for="p in burst"
+        :key="`b${p.i}`"
+        class="cf-x"
+        :style="{
+          '--land': `${p.land}%`,
+          '--dur': `${p.duration}ms`,
+          '--delay': `${p.delay}ms`,
+        }"
+      >
+        <span class="cf-y" :style="{ '--apex': `${p.apex}%` }">
+          <span class="cf-p" :style="{ '--rest': `${p.rest}px`, '--spin': `${p.spin}deg` }">
+            <i
+              :class="`cf-${p.form}`"
+              :style="{ '--bean-light': p.light, '--bean-dark': p.dark }"
+            />
+          </span>
+        </span>
+      </span>
+    </template>
+
+    <!-- what the celebration leaves behind, and a card's whole treatment -->
     <span
-      v-for="b in beans"
-      :key="b.i"
+      v-for="a in ambient"
+      :key="`a${a.i}`"
       class="confetti-piece"
       :class="[
-        `cf-${b.form}`,
-        variant === 'drawer' ? 'confetti-rain' : 'confetti-drop',
+        `cf-${a.form}`,
         { 'confetti-still': prefersReducedMotion || !animate, 'confetti-drifts': drifts },
       ]"
       :style="{
-        '--bean-light': b.light,
-        '--bean-dark': b.dark,
-        '--bean-rotate': `${b.rotate}deg`,
-        '--bean-fall': `${b.fall}px`,
-        '--bean-sway': `${b.sway}px`,
-        '--fall-ms': `${b.duration}ms`,
-        '--fall-delay': `${b.i * delayStep}ms`,
-        '--drift-delay': `${b.i * delayStep + b.duration}ms`,
-        left: `${b.left}%`,
-        top: `${b.top}%`,
+        '--bean-light': a.light,
+        '--bean-dark': a.dark,
+        '--bean-rotate': `${a.rotate}deg`,
+        '--in-delay': `${ambientStart + a.i * 45}ms`,
+        '--drift-delay': `${ambientStart + a.i * 45 + 700}ms`,
+        left: `${a.left}%`,
+        top: `${a.top}%`,
       }"
     />
   </div>
@@ -228,9 +277,9 @@ const drifts = computed(() => props.variant === 'drawer' || props.density !== 'w
 /*
  * A card carries text; a drawer is mostly space.
  *
- * At the old flat 0.45 the scatter competed with the words on a card, and
- * readability beats decoration every time. Below about 0.22 it stops reading as
- * confetti and becomes dust, so 0.3 is the floor worth having.
+ * At a flat 0.45 the scatter competed with the words on a card, and readability
+ * beats decoration every time. Below about 0.22 it stops reading as confetti and
+ * becomes dust, so 0.3 is the floor worth having.
  */
 .celebration-confetti.is-card {
   --confetti-opacity: 0.3;
@@ -244,14 +293,15 @@ const drifts = computed(() => props.variant === 'drawer' || props.density !== 'w
  * Four forms. The hairline ring is what makes a piece legible on ANY member
  * colour: every card carries its owner's wash, so an orange piece on an orange
  * wash was invisible. A ring in the card's own surface colour separates it
- * without touching the Pod colours and without dimming the wash, which would
- * have made a birthday the least-owned card on the board.
+ * without touching the Pod colours and without dimming the wash.
  */
-.confetti-piece {
+.cf-rect,
+.cf-strip,
+.cf-curl,
+.cf-disc {
   background: var(--bean-light);
   box-shadow: 0 0 0 1.25px rgb(255 255 255 / 85%);
-  position: absolute;
-  transform: rotate(var(--bean-rotate));
+  display: block;
 }
 
 .cf-rect {
@@ -279,76 +329,126 @@ const drifts = computed(() => props.variant === 'drawer' || props.density !== 'w
   width: 6px;
 }
 
-html.dark .confetti-piece {
+html.dark .cf-rect,
+html.dark .cf-strip,
+html.dark .cf-curl,
+html.dark .cf-disc {
   background: var(--bean-dark);
   box-shadow: 0 0 0 1.25px rgb(30 41 59 / 85%);
 }
 
+/* ── the popper ─────────────────────────────────────────────────────────── */
+
+/*
+ * Both wrappers fill the container, which is what makes their percentages mean
+ * "of the panel" rather than "of a 9px piece" — the unit mistake that once
+ * turned a fall from above into a 10px nudge.
+ */
+.cf-x,
+.cf-y {
+  inset: 0;
+  position: absolute;
+}
+
+.cf-p {
+  bottom: var(--rest, 0);
+  left: 0;
+  position: absolute;
+}
+
+.confetti-piece {
+  position: absolute;
+  transform: rotate(var(--bean-rotate));
+}
+
 @media (prefers-reduced-motion: no-preference) {
-  /*
-   * Cards and drawers now share the burst; only the DISTANCE differs (see
-   * `CARD_FALL_PX`). Keeping two class names would have implied two behaviours.
-   */
-  .confetti-drop:not(.confetti-still),
-  .confetti-rain:not(.confetti-still) {
-    animation: confetti-rain var(--fall-ms, 560ms) cubic-bezier(0.45, 0.02, 0.75, 0.35) backwards;
-    animation-delay: var(--fall-delay, 0ms);
+  /* out: fast at first, then dragging to a stop, like something thrown */
+  .cf-x {
+    animation: cf-fly-x var(--dur) cubic-bezier(0.12, 0.72, 0.35, 1) both;
+    animation-delay: var(--delay);
   }
 
-  /*
-   * The drift is a SECOND animation, delayed until this piece has landed. Two
-   * animations on one property means the later one wins once it is running, and
-   * during its delay it contributes nothing, so the fall plays untouched and the
-   * drift takes over exactly on landing.
-   */
-  .confetti-drifts:not(.confetti-still) {
+  /* up, then down: the two halves carry their own easing inside the keyframes */
+  .cf-y {
+    animation: cf-fly-y var(--dur) both;
+    animation-delay: var(--delay);
+  }
+
+  .cf-p {
+    animation: cf-spin var(--dur) linear both;
+    animation-delay: var(--delay);
+  }
+
+  .confetti-piece:not(.confetti-still) {
+    animation: cf-arrive 800ms ease-out backwards;
+    animation-delay: var(--in-delay, 0ms);
+  }
+
+  .confetti-piece.confetti-drifts:not(.confetti-still) {
     animation:
-      confetti-rain var(--fall-ms, 560ms) cubic-bezier(0.45, 0.02, 0.75, 0.35) backwards,
-      confetti-drift 5600ms ease-in-out infinite;
-    animation-delay: var(--fall-delay, 0ms), var(--drift-delay, 600ms);
+      cf-arrive 800ms ease-out backwards,
+      cf-drift 5600ms ease-in-out infinite;
+    animation-delay: var(--in-delay, 0ms), var(--drift-delay, 800ms);
   }
 }
 
-/*
- * GRAVITY, not a descent.
- *
- * This used to decelerate into the landing, so the last third of every piece's
- * journey was a crawl — which is exactly what a person reads as "it falls, then
- * floats". Real confetti accelerates, so the easing is ease-IN and the whole
- * fall is roughly half as long. The small overshoot at 86% is the settle: a
- * piece that stops dead at its resting position looks pinned.
- *
- * Ends explicitly on the resting transform rather than relying on the implicit
- * end state, so it cannot drift if `.confetti-piece`'s base rule changes.
- */
-@keyframes confetti-rain {
+@keyframes cf-fly-x {
+  from {
+    transform: translateX(-3%);
+  }
+
+  to {
+    transform: translateX(var(--land));
+  }
+}
+
+@keyframes cf-fly-y {
   0% {
-    opacity: 0;
-    transform: translate3d(var(--bean-sway, 0), calc(var(--bean-fall, 240px) * -1), 0)
-      rotate(calc(var(--bean-rotate) - 300deg));
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+    transform: translateY(0);
   }
 
-  6% {
-    opacity: 1;
-  }
-
-  86% {
-    transform: translate3d(calc(var(--bean-sway, 0px) * 0.08), 7px, 0)
-      rotate(calc(var(--bean-rotate) + 14deg));
+  38% {
+    animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.6);
+    transform: translateY(var(--apex));
   }
 
   100% {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) rotate(var(--bean-rotate));
+    transform: translateY(0);
+  }
+}
+
+@keyframes cf-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(var(--spin));
   }
 }
 
 /*
- * After the burst, a breath. Deliberately tiny (2x3px over 5.6s): enough that a
- * celebrating card is not a still photograph, small enough that nobody reading
- * the card notices it moving.
+ * The scatter does not fall. It fades up where it sits, after the floor has
+ * settled, so the popper is the event and this is the residue.
  */
-@keyframes confetti-drift {
+@keyframes cf-arrive {
+  from {
+    opacity: 0;
+    transform: rotate(var(--bean-rotate)) scale(0.4);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(var(--bean-rotate)) scale(1);
+  }
+}
+
+/*
+ * A breath. Deliberately tiny (2x3px over 5.6s): enough that a celebrating card
+ * is not a still photograph, small enough that nobody reading it notices.
+ */
+@keyframes cf-drift {
   0%,
   100% {
     transform: translate3d(0, 0, 0) rotate(var(--bean-rotate));
