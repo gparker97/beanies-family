@@ -5,6 +5,7 @@ import { APP_URL } from '@beanies/brand/nav';
 // Caveat — the CIG handwritten accent face, imported per-page (same pattern as
 // WorldsBeanstalk.astro and /from/maple).
 import '@fontsource-variable/caveat';
+import TrustBetaFree from '../../components/TrustBetaFree.astro';
 
 /**
  * The switching hub. Each entry becomes a card; `href` null means the page
@@ -101,7 +102,7 @@ const SOURCES = [
           <li>🔒 end-to-end encrypted</li>
           <li>📂 your file, your storage</li>
           <li>🚫 no ads, ever</li>
-          <li>🆓 free while beanies is in beta</li>
+          <TrustBetaFree />
         </ul>
         <a
           href={APP_URL}

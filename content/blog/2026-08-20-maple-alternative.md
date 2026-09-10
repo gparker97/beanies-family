@@ -74,7 +74,7 @@ Check out how we measure up:
 | **a cool family scrapbook**                    | nope                                                                                     | ✅                                                                                                   |
 | **family finances (accounts, budgets, goals)** | nope                                                                                     | ✅                                                                                                   |
 | **track assets and loans**                     | nope                                                                                     | ✅                                                                                                   |
-| **price**                                      | maple+ subscription                                                                      | ✅ free (well, for now)                                                                              |
+| **price**                                      | maple+ subscription                                                                      | ✅ free ([well, for now](/pricing))                                                                  |
 | **where your family's data lives**             | not with you. maple's servers                                                            | ✅ your own storage, encrypted                                                                       |
 | **still yours if the app shuts down**          | not anymore. deleted as of dec 31, 2026                                                  | ✅ it was always yours. and always will be.                                                          |
 
@@ -92,7 +92,7 @@ That's what local-first means, and it's what would have saved every Maple family
 
 If you're lost and looking for somewhere to go, give [beanies.family](/) a shot. You're welcome here.
 
-It takes roughly five minutes to set up, your data stays with you, and it's free to start (it's actually free altogether, for now, until some point at which it stops being economically feasible for me to continue burning a hole in my wallet by hosting it myself, and I start charging at the very least to cover my costs.)
+It takes roughly five minutes to set up, your data stays with you, and it's free to start (it's actually free altogether, [for now](/pricing), until some point at which it stops being economically feasible for me to continue burning a hole in my wallet by hosting it myself, and I start charging at the very least to cover my costs.)
 
 No deletion date, no acquisition surprises, and no ads for life. That's the beanies guarantee, which I made up just now. But it's true.
 

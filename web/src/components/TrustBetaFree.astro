@@ -1,0 +1,16 @@
+---
+/**
+ * The "free while beanies is in beta" trust badge.
+ *
+ * This was the same string hand-copied into four switching pages, and the one
+ * place on the site most likely to go stale the day beta ends. One component,
+ * and once /pricing is live it links to the page that says what happens next.
+ * While the page is gated it renders exactly the plain badge it replaced.
+ */
+import { PRICING_LIVE } from '../lib/pricing';
+---
+
+<li>
+  🆓{' '}
+  {PRICING_LIVE ? <a href="/pricing">free while beanies is in beta</a> : 'free while beanies is in beta'}
+</li>
