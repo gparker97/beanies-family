@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { UNASSIGNED, buildWallJobs, jobsProgress, sortJobs } from '@/utils/wallJobs';
+import {
+  UNASSIGNED,
+  buildWallJobs,
+  captureListRestore,
+  jobsProgress,
+  sortJobs,
+} from '@/utils/wallJobs';
 import type { FamilyList, TodoItem } from '@/types/models';
 
 const TODAY = '2026-08-31';
@@ -289,5 +295,60 @@ describe('what a shared screen must never show', () => {
   it('keeps a personal "me" list off the wall', () => {
     const mine = list({ id: 'lm', category: 'me', ownerId: 'greg' });
     expect(build([], [mine]).listsByMember.greg).toEqual([]);
+  });
+});
+
+/**
+ * The undo snapshot. This is the highest-consequence, lowest-visibility rule in
+ * the wall's write path: removing the last open item on a one-off list FILES
+ * that list, and the wall filters filed lists out, so a snapshot of `items`
+ * alone would make an undo delete the whole list from the wall instead of
+ * putting one row back.
+ */
+describe('captureListRestore', () => {
+  it('captures the completion triple, not just the items', () => {
+    const l = list({
+      id: 'l1',
+      items: [{ id: 'i1', title: 'goggles', completed: false }],
+      completed: true,
+      completedBy: 'leo',
+      completedAt: '2026-09-10T04:00:00.000Z',
+    } as never);
+
+    expect(captureListRestore(l)).toEqual({
+      items: l.items,
+      completed: true,
+      completedBy: 'leo',
+      completedAt: '2026-09-10T04:00:00.000Z',
+      cycleCelebrated: undefined,
+    });
+  });
+
+  it('carries `cycleCelebrated` so a recurring list is not re-celebrated on undo', () => {
+    const l = list({ id: 'l2', cycleCelebrated: true } as never);
+
+    expect(captureListRestore(l).cycleCelebrated).toBe(true);
+  });
+
+  it('names every field the restore needs, so a new one cannot be forgotten silently', () => {
+    expect(Object.keys(captureListRestore(list({ id: 'l3' } as never))).sort()).toEqual([
+      'completed',
+      'completedAt',
+      'completedBy',
+      'cycleCelebrated',
+      'items',
+    ]);
+  });
+
+  it('hands back the SAME items reference, so undo restores ids and order verbatim', () => {
+    const l = list({
+      id: 'l4',
+      items: [
+        { id: 'i1', title: 'towel', completed: true, completedBy: 'leo' },
+        { id: 'i2', title: 'cap', completed: false },
+      ],
+    } as never);
+
+    expect(captureListRestore(l).items).toBe(l.items);
   });
 });

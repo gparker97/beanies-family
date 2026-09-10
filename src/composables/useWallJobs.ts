@@ -25,6 +25,85 @@ import type { WallJob, WallListGroup } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
 
+/**
+ * Every write the wall can make. The key IS the `action` context value, so no
+ * lookup table carries one.
+ */
+type WriteOp =
+  'job_toggle' | 'list_add' | 'todo_add' | 'job_rename' | 'job_remove' | 'job_remove_undo';
+
+/**
+ * Literal message strings only, never built by interpolation: a CloudWatch
+ * filter is worth exactly as much as `grep` finding the string in this file.
+ */
+const WRITE_OPS: Record<WriteOp, { ok: string; failed: string }> = {
+  job_toggle: { ok: 'wall_job_toggled', failed: 'wall_job_toggle_failed' },
+  list_add: { ok: 'wall_list_item_added', failed: 'wall_list_add_failed' },
+  todo_add: { ok: 'wall_todo_added', failed: 'wall_todo_add_failed' },
+  job_rename: { ok: 'wall_job_renamed', failed: 'wall_job_rename_failed' },
+  job_remove: { ok: 'wall_job_removed', failed: 'wall_job_remove_failed' },
+  job_remove_undo: { ok: 'wall_job_remove_undone', failed: 'wall_job_remove_undo_failed' },
+};
+
+/**
+ * ONE error contract for every wall write.
+ *
+ * This file used to carry three hand-copied try/catch/report/log blocks, which
+ * had already drifted from each other (the toggle logged `action: 'job_toggled'`
+ * on success but `'job_toggle'` on failure; the two adds carried `kind: 'ok'` on
+ * success and no `kind` at all on failure). Six operations written that way
+ * would be six chances to drift. Adding a seventh is now one `write()` call.
+ *
+ * `run` returns "did the store actually write". Normalising the stores' two
+ * return conventions is the caller's job precisely because this is the only
+ * place that has to know the difference: the list actions, `updateTodo` and
+ * `createTodo` answer with an entity or `null`, while `deleteTodo` answers with
+ * a bare boolean — and returns `false` for a throw as well as a refusal, so on
+ * that path the `false` branch is the entire failure signal.
+ *
+ * `onRefused` is the user-facing half: `actionFailure`'s reporters toast the
+ * family in their own language and print a cause plus a fix to the console.
+ * Nothing here can fail silently — a refusal and a throw take the same path.
+ */
+async function write(
+  op: WriteOp,
+  kind: WallJob['source'],
+  run: () => Promise<boolean>,
+  onRefused: () => void
+): Promise<boolean> {
+  // One definition of "this write failed", so a refusal and a throw cannot
+  // drift into reporting different things.
+  const fail = (error?: unknown): false => {
+    onRefused();
+    reportError({
+      surface: SURFACE,
+      message: WRITE_OPS[op].failed,
+      severity: 'critical',
+      ...(error === undefined
+        ? {}
+        : { error: error instanceof Error ? error : new Error(String(error)) }),
+      context: { action: op, kind },
+    });
+    return false;
+  };
+
+  try {
+    // `wrapAsync` swallows real store failures and answers the same way a
+    // not-found refusal does, so this branch — not the catch — is where most
+    // store-originated failures actually land. It carries the paging signal too.
+    if (!(await run())) return fail();
+  } catch (error) {
+    return fail(error);
+  }
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: WRITE_OPS[op].ok,
+    context: { action: op, kind },
+  });
+  return true;
+}
+
 export function useWallJobs() {
   const familyStore = useFamilyStore();
   const listStore = useListStore();
@@ -126,45 +205,18 @@ export function useWallJobs() {
     const actor = known ? job.ownerId : (authStore.currentUser?.memberId ?? '');
 
     pending.value = new Set(pending.value).add(job.key);
-    try {
-      const written = await writers[job.source](job, actor);
-      if (written === null) {
-        // The store did not write. `wrapAsync` swallows real failures and
-        // returns undefined (normalised to null) just as a not-found refusal
-        // does, so this branch — not the catch below — is where EVERY
-        // store-originated failure actually lands. It therefore has to carry
-        // the paging signal: a tick that looks done and isn't is data loss
-        // from the family's point of view.
-        reportJobToggleFailed(job.source, job.todoId ?? job.listId ?? job.key);
-        reportError({
-          surface: SURFACE,
-          message: 'wall_job_toggle_failed',
-          severity: 'critical',
-          context: { action: 'job_toggle', kind: job.source },
-        });
-        return;
-      }
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'wall_job_toggled',
-        context: { action: 'job_toggled', kind: job.source },
-      });
-    } catch (error) {
-      // wrapAsync already toasted; this adds the paging signal, because a lost
-      // tick is user-visible data loss from the family's point of view.
-      reportError({
-        surface: SURFACE,
-        message: 'wall_job_toggle_failed',
-        severity: 'critical',
-        error: error instanceof Error ? error : new Error(String(error)),
-        context: { action: 'job_toggle', kind: job.source },
-      });
-    } finally {
-      const next = new Set(pending.value);
-      next.delete(job.key);
-      pending.value = next;
-    }
+    // `write` never throws, so the pending cleanup below needs no `finally`.
+    await write(
+      'job_toggle',
+      job.source,
+      // `!== null` deliberately, matching the previous behaviour exactly: the
+      // stores normalise a swallowed failure to null.
+      () => writers[job.source](job, actor).then((written) => written !== null),
+      () => reportJobToggleFailed(job.source, job.todoId ?? job.listId ?? job.key)
+    );
+    const next = new Set(pending.value);
+    next.delete(job.key);
+    pending.value = next;
   }
 
   /**
@@ -172,41 +224,17 @@ export function useWallJobs() {
    *
    * Standing at the kitchen screen, "put bread on the shopping list" is the
    * natural action after ticking; editing an activity is not, which is why
-   * activities stay read-only here and live in the app. Same write discipline
-   * as `toggle`: a refused write is never silent.
+   * activities stay read-only here and live in the app.
    */
   async function addListItem(listId: string, title: string): Promise<boolean> {
     const trimmed = title.trim();
     if (!trimmed) return false;
-    try {
-      const written = await listStore.addItem(listId, trimmed);
-      if (written === null) {
-        reportListAddFailed(listId);
-        reportError({
-          surface: SURFACE,
-          message: 'wall_list_add_failed',
-          severity: 'critical',
-          context: { action: 'list_add' },
-        });
-        return false;
-      }
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'wall_list_item_added',
-        context: { action: 'list_add', kind: 'ok' },
-      });
-      return true;
-    } catch (error) {
-      reportError({
-        surface: SURFACE,
-        message: 'wall_list_add_failed',
-        severity: 'critical',
-        error: error instanceof Error ? error : new Error(String(error)),
-        context: { action: 'list_add' },
-      });
-      return false;
-    }
+    return write(
+      'list_add',
+      'list',
+      () => listStore.addItem(listId, trimmed).then((written) => written !== null),
+      () => reportListAddFailed(listId)
+    );
   }
 
   /**
@@ -217,43 +245,23 @@ export function useWallJobs() {
   async function addTodo(title: string): Promise<boolean> {
     const trimmed = title.trim();
     if (!trimmed) return false;
-    try {
-      const written = await todoStore.createTodo({
-        title: trimmed,
-        dueDate: today.value,
-        assigneeIds: [],
-        completed: false,
-        // Created BY whoever's session is running the wall — that is a fact
-        // about provenance, not a claim about who has to do it.
-        createdBy: authStore.currentUser?.memberId ?? '',
-      });
-      if (written === null) {
-        reportTodoAddFailed();
-        reportError({
-          surface: SURFACE,
-          message: 'wall_todo_add_failed',
-          severity: 'critical',
-          context: { action: 'todo_add' },
-        });
-        return false;
-      }
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'wall_todo_added',
-        context: { action: 'todo_add', kind: 'ok' },
-      });
-      return true;
-    } catch (error) {
-      reportError({
-        surface: SURFACE,
-        message: 'wall_todo_add_failed',
-        severity: 'critical',
-        error: error instanceof Error ? error : new Error(String(error)),
-        context: { action: 'todo_add' },
-      });
-      return false;
-    }
+    return write(
+      'todo_add',
+      'todo',
+      () =>
+        todoStore
+          .createTodo({
+            title: trimmed,
+            dueDate: today.value,
+            assigneeIds: [],
+            completed: false,
+            // Created BY whoever's session is running the wall — that is a fact
+            // about provenance, not a claim about who has to do it.
+            createdBy: authStore.currentUser?.memberId ?? '',
+          })
+          .then((written) => written !== null),
+      () => reportTodoAddFailed()
+    );
   }
 
   const isPending = (job: WallJob) => pending.value.has(job.key);
