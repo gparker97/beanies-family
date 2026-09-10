@@ -14,7 +14,7 @@ import { useTranslation } from '@/composables/useTranslation';
 
 const props = withDefaults(
   defineProps<{
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'xl';
     editTestId?: string;
     /** `showDelete`, not `delete` — `delete` is a JS keyword and cannot be a bare
      *  template expression. Defaults reproduce the original edit+delete pair, so the
@@ -43,16 +43,30 @@ const SIZES = {
   sm: { btn: 'p-1.5', glyph: 'sm' },
   md: { btn: 'p-2', glyph: 'md' },
   lg: { btn: 'flex h-9 w-9 items-center justify-center', glyph: 'sm' },
+  /**
+   * 44px, for the beanie wall. A wall-mounted tablet is read and tapped from
+   * across a kitchen, and 36px is the app's desk-distance size; every control a
+   * child reaches for on the wall holds this floor.
+   */
+  xl: { btn: 'flex h-11 w-11 items-center justify-center', glyph: 'md' },
 } as const;
 
+/**
+ * `text-gray-400` and `hover:text-red-600` are raw Tailwind greys with no dark
+ * partner, so the resting glyph and the hover both fell back to a light-mode
+ * colour on a dark surface. The dark partners below are strictly ADDITIVE:
+ * light mode is pixel-identical to what shipped, and only dark mode changes.
+ */
 const BASE =
-  'dark:hover:bg-surface-hover rounded-lg text-gray-400 transition-colors hover:bg-gray-100';
+  'dark:hover:bg-surface-hover dark:text-ink-faint rounded-lg text-gray-400 transition-colors hover:bg-gray-100';
 
 const btn = (tone: 'primary' | 'danger'): string =>
   [
     SIZES[props.size].btn,
     BASE,
-    tone === 'danger' ? 'hover:text-red-600' : 'hover:text-primary-600',
+    tone === 'danger'
+      ? 'hover:text-red-600 dark:hover:text-danger-lift'
+      : 'hover:text-primary-600 dark:hover:text-accent-lift',
   ].join(' ');
 </script>
 
