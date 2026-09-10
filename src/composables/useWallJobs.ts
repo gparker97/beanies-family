@@ -14,14 +14,19 @@ import { useToday } from '@/composables/useToday';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import {
+  reportJobEditFailed,
   reportJobToggleFailed,
   reportListAddFailed,
   reportTodoAddFailed,
 } from '@/utils/actionFailure';
-import { buildWallJobs, sortJobs } from '@/utils/wallJobs';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { buildWallJobs, captureListRestore, sortJobs } from '@/utils/wallJobs';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup } from '@/types/wall';
+import type { TodoItem, UpdateFamilyListInput } from '@/types/models';
 
 const SURFACE = 'beanie-wall';
 
@@ -264,6 +269,100 @@ export function useWallJobs() {
     );
   }
 
+  /**
+   * Rename a job in place, whichever store it lives in.
+   *
+   * Both stores no-op an empty or unchanged title, which is what lets the row's
+   * "clear the field and press Enter" revert cleanly instead of deleting.
+   * Deletion is the trash button's job, never an emptied edit.
+   */
+  async function renameJob(job: WallJob, title: string): Promise<boolean> {
+    const trimmed = title.trim();
+    if (!trimmed || trimmed === job.title) return false;
+    return write(
+      'job_rename',
+      job.source,
+      () =>
+        (job.source === 'todo'
+          ? todoStore.updateTodo(job.todoId as string, { title: trimmed })
+          : listStore.updateItemText(job.listId as string, job.itemId as string, trimmed)
+        ).then((written) => written !== null),
+      () => reportJobEditFailed('rename', job.source, job.todoId ?? job.itemId ?? job.key)
+    );
+  }
+
+  /**
+   * Remove a job, and offer to put it back.
+   *
+   * The snapshot is taken BEFORE the delete, because after it the record is
+   * gone and there is nothing left to copy. For a list that snapshot is not
+   * just `items`: removing the last open item on a one-off list files it, and
+   * the wall hides filed lists, so restoring items alone would make the whole
+   * list vanish instead of putting one row back. `captureListRestore` owns that
+   * rule.
+   *
+   * Undo rather than a confirm dialog: the wall has never opened a modal, a
+   * dialog on a screen the whole family can see is intrusive, and a mis-tap
+   * standing at a wall is common enough that reversal beats interrogation.
+   */
+  async function removeJob(job: WallJob): Promise<boolean> {
+    const { t } = useTranslationStore();
+
+    // Captured up front; `undefined` if the record is already gone, in which
+    // case the delete below will refuse and report before undo is ever offered.
+    const listSnapshot: UpdateFamilyListInput | undefined =
+      job.source === 'list'
+        ? (() => {
+            const list = listStore.lists.find((l) => l.id === job.listId);
+            return list ? captureListRestore(list) : undefined;
+          })()
+        : undefined;
+    const todoSnapshot: TodoItem | undefined =
+      job.source === 'todo' ? todoStore.todos.find((td) => td.id === job.todoId) : undefined;
+
+    const removed = await write(
+      'job_remove',
+      job.source,
+      () =>
+        job.source === 'todo'
+          ? // `deleteTodo` answers with a bare boolean, and returns false for a
+            // throw as well as a refusal, so that branch is the whole failure
+            // signal on this path.
+            todoStore.deleteTodo(job.todoId as string)
+          : listStore
+              .removeItem(job.listId as string, job.itemId as string)
+              .then((written) => written !== null),
+      () => reportJobEditFailed('remove', job.source, job.todoId ?? job.itemId ?? job.key)
+    );
+    if (!removed) return false;
+
+    // Nothing to offer if the snapshot could not be taken. Say so rather than
+    // showing an Undo that would do nothing.
+    if (!listSnapshot && !todoSnapshot) return true;
+
+    showToast('info', fillTemplate(t('wall.job.removed'), { title: job.title }), undefined, {
+      surface: SURFACE,
+      // 6s, matching `useGiveDose` and `useContributeToGoal`. Toasts carrying an
+      // `actionFn` are exempt from dedupe, so two quick removes each keep their
+      // own closure.
+      durationMs: 6000,
+      actionLabel: t('wall.job.undo'),
+      actionFn: async () => {
+        await write(
+          'job_remove_undo',
+          job.source,
+          () =>
+            (todoSnapshot
+              ? todoStore.restoreTodo(todoSnapshot)
+              : listStore.updateList(job.listId as string, listSnapshot as UpdateFamilyListInput)
+            ).then((written) => written !== null),
+          () => reportJobEditFailed('undo', job.source, job.todoId ?? job.itemId ?? job.key)
+        );
+      },
+    });
+    return true;
+  }
+
   const isPending = (job: WallJob) => pending.value.has(job.key);
 
   return {
@@ -277,6 +376,8 @@ export function useWallJobs() {
     toggle,
     addListItem,
     addTodo,
+    renameJob,
+    removeJob,
     isPending,
   };
 }
