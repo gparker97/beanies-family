@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **A screen no longer tells you you're in with your recovery kit when you used your family passphrase.** This was fixed twice: the first fix reached only one of the two ways a passphrase can open your family file, so signing in from the file-load screen still called it a kit.
 - **Only your recovery kit can set a new PIN at sign-in now.** A family passphrase opens your family file, but it does not say which person you are, so it no longer offers to replace anyone's PIN. If you have forgotten yours, the recovery kit link on that screen is the way through.
 - **An empty family passphrase box no longer answers "Password is required".**
+- **"Use a recovery kit" works from the sign-in screen again.** If your family file was already open — you had just unlocked it with your family passphrase and were being asked for your PIN — tapping it ran a spinner and put you back on the list of family members, without ever showing the box to type your kit code into. It opens that box now, and accepts the code.
+- **The recovery kit now says when to reach for it.** The button carries the question it answers: "Forgot your PIN?", or your password, or your family passphrase, depending on what the screen is asking you for. It read like another way to sign in rather than the emergency exit it is.
 - **The recovery passphrase is now called the family passphrase, everywhere.** It had six different names in the app, and "recovery" was also the name of the recovery kit, the recovery code and the whole Settings section, so there was no way to tell from a name which one you had. "Recovery" now means the printed kit and nothing else.
 
 ## 2026-09-09

@@ -2042,7 +2042,7 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
 > `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
 > at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
-> **7 commits**, not 4 — last prod deploy is still `3127e20e`.
+> **9 commits**, not 4 — last prod deploy is still `3127e20e`.
 >
 > **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
@@ -2119,8 +2119,8 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 ### ⭐⭐ Session 2026-09-10 (6) — THE CREDENTIAL FIX, VERIFIED. Four defects found. Still NOT deployed. ⭐⭐
 
 > **Last updated:** 2026-09-10. `e8aaa4dd` → `97b26d2b` → `954fccc0` → `7779a3f0` →
-> `a83d811e` → `be84c8db` on `main`, all PUSHED. **NOTHING DEPLOYED — the undeployed
-> backlog is now 7 commits deep, last prod deploy `3127e20e`.**
+> `a83d811e` → `be84c8db` → `c816cf40` → `db309f00` on `main`, all PUSHED. **NOTHING
+> DEPLOYED — the undeployed backlog is now 9 commits deep, last prod deploy `3127e20e`.**
 >
 > **The task:** verify session 5's credential work, which shipped with green tests and no
 > browser check at all. The test plan was NOT lost — it survived as § Testing Plan in
@@ -2166,6 +2166,37 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > string that named a password to every English and Chinese reader. Both guards now run in
 > both overlays. **This is the more transferable finding of the two;** see `docs/lessons.md`.
 >
+> **AFTER THE WRAP-UP — greg verified the whole flow and found a FIFTH defect** (`db309f00`).
+> Sign-out → clear data → Google consent → password/passphrase screen → passphrase → member
+> list → PIN challenge now behaves correctly. But **"use a recovery kit" under the PIN
+> challenge looped**: spinner, then the member picker again, kit form never shown.
+>
+> The prove screen is routinely shown with the pod ALREADY OPEN, yet the escape called
+> `enterGenericLoadFallback(..., { autoLoad: true })` unconditionally — so it re-read a file
+> that was already open, `autoLoadFile` took its SUCCESS branch, emitted `file-loaded`, and
+> the flow re-entered at the picker. **Every route into the kit panel ran through a FILE
+> LOAD, and this case has nothing to load.** Underneath it a second failure was waiting:
+> `handleKitRedeem` read `pendingEncryptedFile?.envelope` and `return`ed SILENTLY when
+> absent — exactly the open-pod case — so even with the panel open a valid code would have
+> done nothing. Both fixed; with the pod open the kit now proves IDENTITY rather than
+> decrypting, handing `'kit'` to the flow so the member lands on set-a-new-PIN.
+>
+> ⏳ **NOT BROWSER-VERIFIED.** The open-pod kit redeem cannot be reached headlessly (it needs
+> a real decrypted family), so the one path greg reported is covered by unit tests only.
+> **Ask him to re-test that button.**
+>
+> Also: the kit pill now carries the question it answers ("Forgot your PIN?" / "your
+> password?" / "your family passphrase?"), derived at both call sites, omitted where naming
+> a credential would be wrong. A bare "Use a recovery kit" read as an alternative sign-in
+> rather than break-glass.
+>
+> ⚠️ **A TEST ASSERTED AN UNREACHABLE STATE AND PASSED.** "A passphrase family is asked about
+> its family passphrase" was green because the helper skipped the routing and always rendered
+> the secret form; the real screen sends kit-before-passphrase, so such a family lands IN the
+> kit form with no link to caption. The BROWSER said prompt NONE while the unit test said
+> otherwise. Same lesson as the beanie-overlay one, in a new place: a test that
+> re-implements the code it tests agrees with itself, not with the app.
+>
 > **THE FRAMING + THE TERMINOLOGY** (greg's direction, decided via AskUserQuestion):
 > the unlock screen is **step 1 of 2** and now says so. Heading is a constant "Unlock My
 > Beanpod" on both forms (it read "Sign In to {family}", which describes step 2 while
@@ -2177,7 +2208,7 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > code AND the passphrase). "Recovery" now means the printed kit alone. Settled in the theme
 > skill's enforced terminology table with the two-step credential model.
 >
-> **TESTS:** +31 (7178 → 7209). `LoadPodView.credentialSurface` (18),
+> **TESTS:** +39 (7178 → 7217). `LoadPodView.credentialSurface` (18),
 > `ProveView.recoveryOpener` (5), `useLoginFlow.guards` (8, renamed from `.staging`).
 > **Every guard was mutation-tested** — including one round where the first version of a
 > copy test passed against BOTH the fixed and the buggy code, because the pane it asserted
