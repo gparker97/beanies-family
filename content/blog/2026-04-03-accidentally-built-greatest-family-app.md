@@ -13,7 +13,7 @@ author: greg
 
 **Hi everybody! (Hi Dr. Nick!)**
 
-Yes, it's _still_ me. Believe it or not, I actually prefer to write these myself, leaving AI in the dust with apt metaphors, stirring my glorious cauldron of human-generated thoughts and ideas, bubbling with astute cerebral insight, boiling over into a stew of wonderfully salubrious word soup du jour, ensuring that I never lose my precious perspicacity (don't worry - it's always in the last place you look). By the way, +100 points to anyone who spots the classic mid-90s TV show references.
+Yes, it's _still_ me. Believe it or not, I actually prefer to write these myself, leaving AI in the dust with my apt metaphors, stirring my glorious cauldron of human-generated thoughts and ideas, bubbling with astute cerebral insight, boiling over into a stew of wonderfully salubrious word soup du jour, ensuring that I never lose my precious perspicacity (don't worry - it's always in the last place you look). By the way, +100 points to anyone who spots the classic mid-90s TV show references.
 
 Beat that, ChatGPT. Now, where was I?
 
