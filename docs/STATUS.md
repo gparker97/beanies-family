@@ -2036,14 +2036,26 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 ## Pending / Next Session
 
 > **Validated 2026-09-10 (session 6).** Every carried entry re-checked by fingerprint.
-> **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
-> — done this session, and it found four defects; see the session-6 block. Still OPEN by
-> fingerprint: `beanies-plan` has no implement/review/fix phases (SKILL.md still ends at
-> Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
-> `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
-> at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
-> **17 commits** (`git rev-list --count 3127e20e..HEAD`), not 4 — last prod deploy is still
-> `3127e20e`.
+>
+> - 💲 **BRANCH IN FLIGHT: `pricing-page` (2026-09-10, session 7).** The `/pricing` page,
+>   the `PRICING_LIVE` gate, and the "free for now" link sweep across the switching pages,
+>   help FAQ and four blog posts all live on that branch, deliberately OFF `main` so the
+>   next deploy cannot carry them. greg said: "put the page behind a gate so that it does
+>   not get pushed to production in the next deploy". Two gates, on purpose: the flag
+>   (`web/src/lib/pricing.ts` `PRICING_LIVE = false`) hides the page, the nav/footer links,
+>   the badge link and the homepage hedge; the branch is the real gate, because the prose
+>   rewrites on `/from/*`, `/help/faq` and the blog are NOT behind the flag and would
+>   send readers to a draft placeholder. To ship: review the copy on the branch, flip the
+>   flag, merge, then delete the branch (local + remote). To abandon: delete the branch
+>   and record why here. Plan + model: `docs/plans/2026-09-10-pricing-page.md`.
+>   **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
+>   — done this session, and it found four defects; see the session-6 block. Still OPEN by
+>   fingerprint: `beanies-plan` has no implement/review/fix phases (SKILL.md still ends at
+>   Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
+>   `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
+>   at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
+>   **17 commits** (`git rev-list --count 3127e20e..HEAD`), not 4 — last prod deploy is still
+>   `3127e20e`.
 >
 > **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
