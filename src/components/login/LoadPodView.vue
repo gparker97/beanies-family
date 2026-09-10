@@ -160,7 +160,7 @@ const secretIsPassphrase = computed(
  * feature on the one surface where it silently works.
  *
  * ⚠️ Derived as a set rather than branched per render site. The label, placeholder,
- * reassurance, empty-field error and the kit form's way back all have to agree about which
+ * reassurance, empty-field error, kit prompt and the kit form's way back all have to agree about which
  * credential is on offer, and they previously disagreed — the footer still said "this
  * password" under a field labelled as a passphrase, and submitting an empty passphrase
  * field answered "Password is required". One source, five consumers.
@@ -177,6 +177,7 @@ const secretField = computed(() => {
       footer: 'loginV6.unlockFooterEither',
       switchLabel: 'recovery.useSecretEitherLink',
       required: 'recovery.passphraseRequired',
+      forgot: 'secret',
     } as const;
   }
   if (secretIsPassphrase.value) {
@@ -186,6 +187,7 @@ const secretField = computed(() => {
       footer: 'loginV6.unlockFooterPassphrase',
       switchLabel: 'recovery.usePassphraseLink',
       required: 'recovery.passphraseRequired',
+      forgot: 'passphrase',
     } as const;
   }
   // Password-only, and the fallback when capabilities are unknown: the wording this
@@ -196,6 +198,7 @@ const secretField = computed(() => {
     footer: 'loginV6.unlockFooter',
     switchLabel: 'passkey.usePassword',
     required: 'password.required',
+    forgot: 'password',
   } as const;
 });
 /**
@@ -492,6 +495,14 @@ onMounted(async () => {
   if (props.loadError) {
     formError.value = props.loadError;
   }
+  // The kit form was asked for explicitly and there is nothing to load (the pod is already
+  // open, so `LoginPage` passed `autoLoad: false`). Open the panel directly; the watcher
+  // above puts it straight into kit entry. Without this the screen sat on the storage
+  // picker, because every route into the panel ran through a FILE LOAD that this case has
+  // no need of.
+  if (props.startInKitEntry && !props.autoLoad) {
+    showDecryptModal.value = true;
+  }
   if (props.providerHint === 'local') {
     selectedSource.value = 'local';
   }
@@ -768,8 +779,20 @@ async function handleKitRedeem() {
     formError.value = t('recovery.kitWrongCode');
     return;
   }
-  const envelope = syncStore.pendingEncryptedFile?.envelope;
-  if (!envelope) return;
+  // ⚠️ Falls back to the LIVE envelope. Reached from the prove screen the pod is usually
+  // already open, so there is no pending file — and this used to `return` silently, so the
+  // button did nothing at all and said nothing about why.
+  const envelope = syncStore.pendingEncryptedFile?.envelope ?? syncStore.envelope;
+  if (!envelope) {
+    formError.value = t('loginFlow.recoveryOnlyBody');
+    reportError({
+      surface: 'login-flow',
+      message: 'kit redeem with no envelope in reach',
+      severity: 'warning',
+      context: { action: 'kit_redeem_no_envelope' },
+    });
+    return;
+  }
   isLoadingFile.value = true;
   formError.value = null;
   try {
@@ -784,6 +807,19 @@ async function handleKitRedeem() {
         message: 'kit_redeemed',
         context: { action: 'failed', error_code: result.reason },
       });
+      return;
+    }
+    // Pod already open: the kit is proving IDENTITY here, not decrypting anything. Hand
+    // the opener straight to the flow, which re-enters the picker and — because the opener
+    // is a kit — leads with set-a-new-PIN.
+    if (!syncStore.hasPendingEncryptedFile) {
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'kit_redeemed',
+        context: { action: 'accepted-pod-open' },
+      });
+      await finishLoaded('kit');
       return;
     }
     const dec = await syncStore.decryptPendingFileWithKey(result.familyKey);
@@ -1382,7 +1418,7 @@ async function handleDriveRefresh() {
         </BaseButton>
 
         <div v-if="hasRecoveryKits" class="mt-4">
-          <RecoveryKitLink @click="openKitEntry" />
+          <RecoveryKitLink :forgot="secretField.forgot" @click="openKitEntry" />
         </div>
 
         <p

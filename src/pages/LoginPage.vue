@@ -615,7 +615,17 @@ function handleFinishStorage() {
  * stays one tap away).
  */
 function handleUseRecoveryKit() {
-  enterGenericLoadFallback(undefined, { autoLoad: true, withError: false });
+  // ⚠️ `autoLoad` ONLY when the pod is still closed.
+  //
+  // This escape is reached from the prove screen, which is routinely shown with the pod
+  // ALREADY OPEN — a family passphrase or a cached key decrypted it and the member is now
+  // at the PIN challenge. Auto-loading there re-read a file that was already open, so
+  // `autoLoadFile` took its success branch, emitted `file-loaded`, and `handleFileLoaded`
+  // put the person picker straight back on screen: a few seconds of spinner and a round
+  // trip to nowhere, with the kit form never rendered. With the pod open there is nothing
+  // to load — the envelope is live — so LoadPodView opens the kit panel directly.
+  const podOpen = familyStore.members.length > 0;
+  enterGenericLoadFallback(undefined, { autoLoad: !podOpen, withError: false });
   kitEntryRequested.value = true; // AFTER the reset (resetLoadPodFlags clears it)
   flow.dispatch({ type: 'EXIT' }); // activeView is already 'load-pod' -> onExit no-ops
 }
