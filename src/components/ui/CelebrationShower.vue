@@ -8,9 +8,16 @@
  * dismiss. The single tick has a small burst; finishing a whole list earns
  * this.
  *
- * CIG: the confetti is the Pod in its mandated order (Deep Slate, Terracotta,
- * Heritage Orange, Sky Silk), bean-shaped rather than rectangular, with soft
- * shadows and no Alert Red — warm, not loud.
+ * The confetti is the Pod's four colours in their mandated order (Deep Slate,
+ * Terracotta, Heritage Orange, Sky Silk), with soft shadows and no Alert Red —
+ * warm, not loud.
+ *
+ * The pieces are confetti forms, not beans, matching `CelebrationConfetti`. A
+ * previous docblock here claimed bean shapes were "the CIG's rule for every
+ * confetti surface"; no such rule exists. The CIG's bean rule is the Pod's
+ * Golden Rule — the four must never be recoloured, reordered or SEPARATED —
+ * which if anything argues against scattering separated beans. The Pod stays the
+ * Pod; this borrows its palette.
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import {
@@ -33,6 +40,8 @@ const { prefersReducedMotion } = useReducedMotion();
  * and 27 of the 36 beans fell transparently.
  */
 const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
+/** Four forms mixed: the variety is what makes confetti legible at this size. */
+const FORMS = ['rect', 'strip', 'curl', 'disc'] as const;
 const BEAN_COUNT = 36;
 
 function scatter() {
@@ -40,6 +49,7 @@ function scatter() {
     id: i,
     left: Math.round((i / BEAN_COUNT) * 100 + (Math.random() * 6 - 3)),
     colour: POD[i % POD.length],
+    form: FORMS[i % FORMS.length],
     delay: Math.round(Math.random() * 900),
     duration: 2600 + Math.round(Math.random() * 1400),
     drift: Math.round(Math.random() * 80 - 40),
@@ -113,6 +123,7 @@ function undo() {
           v-for="bean in beans"
           :key="bean.id"
           class="shower-bean"
+          :class="`sw-${bean.form}`"
           :style="{
             left: `${bean.left}%`,
             background: bean.colour,
@@ -178,15 +189,35 @@ function undo() {
   animation-fill-mode: both;
   animation-name: shower-fall;
   animation-timing-function: cubic-bezier(0.35, 0.1, 0.5, 1);
-
-  /* an organic bean, not a rectangle */
-  border-radius: 50% 50% 48% 48% / 62% 62% 38% 38%;
   box-shadow: 0 1px 3px rgb(44 62 80 / 18%);
   display: block;
-  height: 1rem;
   position: absolute;
   top: -8%;
-  width: 0.75rem;
+}
+
+/* Bigger than the card scatter: this one falls the height of the viewport. */
+.sw-rect {
+  border-radius: 2px;
+  height: 0.5rem;
+  width: 0.95rem;
+}
+
+.sw-strip {
+  border-radius: 2px;
+  height: 1.05rem;
+  width: 0.3rem;
+}
+
+.sw-curl {
+  border-radius: 60% 0;
+  height: 0.85rem;
+  width: 0.85rem;
+}
+
+.sw-disc {
+  border-radius: 50%;
+  height: 0.65rem;
+  width: 0.65rem;
 }
 
 @keyframes shower-fall {
