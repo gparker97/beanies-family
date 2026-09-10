@@ -7,9 +7,13 @@
 // omits them) renders exactly as before. The row owns its in-flight edit draft
 // (so the modal needs no per-row draft) and self-commits on blur / unmount /
 // editing→false while dirty, so closing the drawer mid-edit never loses text.
-// Esc sets a `resolved` guard so the unmount-blur can't re-commit a cancel.
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue';
+// The inline-edit discipline (draft, focus, and the three ways an edit can end
+// without losing text) lives in `useInlineRename`, shared with the wall's job
+// row. Escape is owned by that composable via the shared `useEscapeClose`
+// stack, so this file must NOT also bind `@keyup.esc`.
+import { toRef } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useInlineRename } from '@/composables/useInlineRename';
 import type { FamilyListItem } from '@/types/models';
 
 const props = defineProps<{
@@ -33,57 +37,12 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
-const draft = ref('');
-// A terminal action (save via Enter, or cancel via Esc) already happened this
-// edit session — guards the unmount/blur backstops from firing a second time.
-const resolved = ref(false);
-const inputRef = ref<HTMLInputElement | null>(null);
-
-watch(
-  () => props.editing,
-  (isEditing, was) => {
-    if (isEditing && !was) {
-      draft.value = props.item.title;
-      resolved.value = false;
-      void nextTick(() => inputRef.value?.focus());
-    } else if (!isEditing && was) {
-      // The modal ended this edit (e.g. switched to another field via
-      // useInlineEdit's auto-save-previous) — commit a dirty draft.
-      commitIfDirty();
-    }
-  }
-);
-
-/** Save the draft if it's a real change and nothing has resolved yet. The store
- *  trims + no-ops empty/unchanged, so this stays a clean single dispatch. */
-function commitIfDirty(): void {
-  if (resolved.value) return;
-  resolved.value = true;
-  if (draft.value.trim() && draft.value !== props.item.title) emit('edit-save', draft.value);
-}
-
-function onEnter(): void {
-  if (resolved.value) return;
-  resolved.value = true;
-  emit('edit-save', draft.value); // store no-ops empty/unchanged → reverts cleanly
-}
-
-function onEsc(): void {
-  if (resolved.value) return;
-  resolved.value = true;
-  emit('edit-cancel');
-}
-
-// Tap-away save (and the native blur fired when the input unmounts). Guarded by
-// `resolved` so an Enter/Esc that already ran makes this a no-op.
-function onBlur(): void {
-  commitIfDirty();
-}
-
-// Backstop: a focused input removed from the DOM (modal close / list switch)
-// doesn't reliably fire blur, so commit a dirty draft here too. `resolved`
-// prevents a double-emit when blur DID fire.
-onBeforeUnmount(() => commitIfDirty());
+const { draft, inputRef, onEnter, onEsc, onBlur } = useInlineRename({
+  editing: toRef(props, 'editing'),
+  current: () => props.item.title,
+  save: (text) => emit('edit-save', text),
+  cancel: () => emit('edit-cancel'),
+});
 </script>
 
 <template>
@@ -120,14 +79,13 @@ onBeforeUnmount(() => commitIfDirty());
          input's blur-to-save can't fire BEFORE a deliberate ✕ cancel. -->
     <template v-if="editable && editing">
       <input
-        ref="inputRef"
+        :ref="(el) => (inputRef = el as HTMLInputElement | null)"
         v-model="draft"
         type="text"
         class="min-w-0 flex-1 border-b border-[var(--color-primary-500)] bg-transparent text-base text-[var(--color-text)] outline-none"
         :placeholder="t('lists.detail.itemPlaceholder')"
         :aria-label="t('lists.detail.editItem')"
         @keyup.enter="onEnter"
-        @keyup.esc="onEsc"
         @blur="onBlur"
       />
       <button
