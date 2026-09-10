@@ -26,7 +26,13 @@
  * Lists and to-dos are still deduped against each other: the same task written
  * in both places is one job, not two, and the dated to-do wins.
  */
-import type { FamilyList, FamilyListItem, ListCategory, TodoItem } from '@/types/models';
+import type {
+  FamilyList,
+  FamilyListItem,
+  ListCategory,
+  TodoItem,
+  UpdateFamilyListInput,
+} from '@/types/models';
 import type {
   WallJob,
   WallJobsInput,
@@ -221,4 +227,32 @@ export function sortJobs(jobs: readonly WallJob[]): WallJob[] {
 
 export function jobsProgress(jobs: readonly WallJob[]): { done: number; total: number } {
   return { done: jobs.filter((j) => j.done).length, total: jobs.length };
+}
+
+/**
+ * What `updateList` must be given to put a removed list item back EXACTLY as it was.
+ *
+ * `items` alone is NOT enough. `listStore.removeItem` re-derives completion, so
+ * removing the last open item on a one-off list FILES that list, and
+ * `useWallPeripherals` filters filed lists out via `isFiled`. Restoring only
+ * `items` would leave the list filed, so an undo would make the whole list
+ * disappear from the wall rather than putting one row back.
+ *
+ * All five fields, unconditionally, with no lifecycle branch:
+ * `automergeRepository.update` deletes keys explicitly set to `undefined` and
+ * ignores absent ones, and completion derivation never touches
+ * `cycleCelebrated` on a one-off list, so writing a one-off's own prior value
+ * back is a guaranteed no-op. One branch fewer is one thing fewer to get wrong.
+ *
+ * Pure on purpose: this is the highest-consequence, lowest-visibility rule in
+ * the wall's write path, and here it is testable with no Pinia and no mocks.
+ */
+export function captureListRestore(list: FamilyList): UpdateFamilyListInput {
+  return {
+    items: list.items,
+    completed: list.completed,
+    completedBy: list.completedBy,
+    completedAt: list.completedAt,
+    cycleCelebrated: list.cycleCelebrated,
+  };
 }
