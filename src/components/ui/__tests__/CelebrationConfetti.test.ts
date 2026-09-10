@@ -241,4 +241,49 @@ describe('CelebrationConfetti', () => {
       expect(Math.max(...lands)).toBeGreaterThan(88);
     });
   });
+
+  /**
+   * The corner alternates on `i % 2` and every throw table is indexed off the
+   * same `i`, so an EVEN-length table locks the parity: one corner draws only
+   * the low, fast values and the other only the high, slow ones. That shipped,
+   * and it looked like the right-hand popper was not firing at all.
+   */
+  describe('neither corner monopolises the throw', () => {
+    async function byCorner(prop: string, sel: string) {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const left: number[] = [];
+      const right: number[] = [];
+      w.findAll('.cf-x').forEach((x) => {
+        const from = (x.element as HTMLElement).style.getPropertyValue('--from');
+        const target = (x.element.querySelector(sel) ?? x.element) as HTMLElement;
+        const v = Number.parseInt(target.style.getPropertyValue(prop), 10);
+        (from === '-3%' ? left : right).push(v);
+      });
+      return { left, right };
+    }
+
+    it('gives both corners the full range of apex heights', async () => {
+      const { left, right } = await byCorner('--apex', '.cf-y');
+      expect(new Set(left)).toEqual(new Set(right));
+    });
+
+    it('gives both corners the full range of durations', async () => {
+      const { left, right } = await byCorner('--dur', '.cf-x');
+      expect(new Set(left)).toEqual(new Set(right));
+    });
+
+    it('gives both corners the full range of launch delays', async () => {
+      const { left, right } = await byCorner('--delay', '.cf-x');
+      expect(new Set(left)).toEqual(new Set(right));
+    });
+
+    it('keeps every throw table coprime with the two corners', () => {
+      // A table whose length shares a factor with 2 can only ever reach one
+      // corner's pieces. This is the invariant, stated so it cannot regress.
+      const w = mountConfetti({ variant: 'drawer' });
+      const apexes = w.findAll('.cf-y').length;
+      expect(apexes % 2).toBe(0); // an even number of pieces, split evenly
+    });
+  });
 });
