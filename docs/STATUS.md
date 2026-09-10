@@ -2042,7 +2042,8 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
 > `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
 > at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
-> **9 commits**, not 4 — last prod deploy is still `3127e20e`.
+> **17 commits** (`git rev-list --count 3127e20e..HEAD`), not 4 — last prod deploy is still
+> `3127e20e`.
 >
 > **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
@@ -2127,8 +2128,9 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 ### ⭐⭐ Session 2026-09-10 (6) — THE CREDENTIAL FIX, VERIFIED. Four defects found. Still NOT deployed. ⭐⭐
 
 > **Last updated:** 2026-09-10. `e8aaa4dd` → `97b26d2b` → `954fccc0` → `7779a3f0` →
-> `a83d811e` → `be84c8db` → `c816cf40` → `db309f00` on `main`, all PUSHED. **NOTHING
-> DEPLOYED — the undeployed backlog is now 9 commits deep, last prod deploy `3127e20e`.**
+> `a83d811e` → `be84c8db` → `db309f00` → `4e4fa002` → `bdbf1d19` on `main`, all PUSHED.
+> **NOTHING DEPLOYED — `git rev-list --count 3127e20e..HEAD` is **17**, last prod deploy
+> `3127e20e` (2026-09-09). I undercounted this twice today as 7 and 9; 17 is the number.**
 >
 > **The task:** verify session 5's credential work, which shipped with green tests and no
 > browser check at all. The test plan was NOT lost — it survived as § Testing Plan in
@@ -2204,6 +2206,38 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > kit form with no link to caption. The BROWSER said prompt NONE while the unit test said
 > otherwise. Same lesson as the beanie-overlay one, in a new place: a test that
 > re-implements the code it tests agrees with itself, not with the app.
+>
+> **THE JOIN PATH — greg asked for it to be validated live, and it was BROKEN** (`4e4fa002`,
+> `bdbf1d19`). He challenged a review finding I had relayed without checking: three
+> reviewers called `JoinPodView`'s decrypt modal a capability-blind copy needing a shared
+> `credentialCopy(caps)` extraction. His objection — joining is via invite link, so why is
+> there a password box at all — was right, and tracing it found something worse.
+> `handleLocalLoadResult` opened that modal on BOTH `success` and `needsPassword`, and **the
+> local-file route never called `tryInviteTokenDecrypt` at all**; only the three Drive routes
+> did (`useJoinFlow.ts:757, 804, 833`). So a joiner with a VALID invite who supplied the
+> `.beanpod` from disk was asked for a password, and a family born since 0.13R2 has no
+> `wrappedKeys`, so the join could not complete. Fixed by `handleLocalFileLoaded()`; the
+> modal, `handleSubmitDecryptPassword` and its two "(no-invite-token fallback)" tests are
+> deleted.
+>
+> ⭐ **VALIDATED LIVE, END TO END, AGAINST A REAL INVITE.** A kit-born beanpod
+> (`wrappedKeys: {}`) generated with the repo's OWN `generateFamilyKey` /
+> `encryptDocPayload` / `createInvitePackage` / `createBeanpodV4`, redeemed through a genuine
+> `/join?fam=..&t=..` link in Chromium: invite redeemed → bean picker → PIN created → signed
+> in → `/nook`. Before/after proved by reverting: the old code rendered ONE field labelled
+> "PASSWORD *" over that same envelope. **Reuse this generator technique** — it is the only
+> way to exercise the join path for real.
+>
+> The walkthrough then found the last string on that surface still naming the retired
+> credential: the PIN step's CTA read **"Create Password & Sign In"**
+> (`auth.createAndSignIn`) on the screen where a joiner chooses a PIN. No unit test would
+> have caught it — it was a shared key from the `auth.` namespace. "password" now appears
+> NOWHERE in the join flow, checked at all five steps.
+>
+> ⚠️ **THREE REVIEWERS AGREED WITH EACH OTHER AND ALL THREE WERE WRONG ABOUT THE CAUSE.**
+> Convergence is evidence of a real problem, not of a correct diagnosis. I would have
+> shipped their `credentialCopy` extraction — fixing a label on a route that was skipping
+> the invite redemption entirely — if greg had not asked what the actual issue was.
 >
 > **THE FRAMING + THE TERMINOLOGY** (greg's direction, decided via AskUserQuestion):
 > the unlock screen is **step 1 of 2** and now says so. Heading is a constant "Unlock My
