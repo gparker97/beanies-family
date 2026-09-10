@@ -859,6 +859,30 @@ Security is foundational but should feel safe, never scary. Security UI communic
 | Last Saved | Last Sync |
 | Saving... | Syncing... |
 | counting beans... | Loading... |
+| Family Passphrase | Recovery Passphrase, Decryption Passphrase, Passphrase (bare), Pass Phrase |
+| Recovery Kit | Backup Kit, Master Key, Recovery Key |
+| Recovery Code | Kit Code, Recovery Key |
+
+### Credentials: which word for which secret
+
+Opening a family is **two steps**, and the vocabulary must keep them apart. Getting this
+wrong is what shipped a "use password instead" link to families that have never had a
+password (see `docs/plans/2026-09-09-credential-vocabulary-and-offer-correctness.md`).
+
+| Step | Scope | Secrets | What the UI calls it |
+|---|---|---|---|
+| 1. Decrypt the beanpod | Family-wide | member password (legacy), **family passphrase**, **recovery kit** / **recovery code** | "Unlock My Beanpod" |
+| 2. Prove who you are | Per person | PIN, biometric | "Sign in" |
+
+- **"Recovery" means the printed kit and nothing else.** It used to modify the kit, the
+  code AND the passphrase, so a user holding one could not tell which they had.
+- **Headings, titles and CTAs name the object as the `beanpod`.** Subtitles and body copy
+  spell out that a beanpod is your family's data, so the reader learns the word in context.
+- **Never name a credential the envelope cannot accept.** Offer copy derives from
+  `envelopeCapabilities()`; a screen that says "password" to a kit-born family is a defect,
+  not a wording preference.
+- The `recoveryPassphrase` **envelope field**, the `'passphrase'` `ProveMethod` kind and the
+  `password-recovery` help slug keep their names: on-disk format and live URLs, not copy.
 
 ---
 
