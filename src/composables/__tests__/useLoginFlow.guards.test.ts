@@ -1,5 +1,11 @@
 /**
- * `useLoginFlow` — the envelope-staging guards.
+ * `useLoginFlow` — the guards nothing on screen reveals.
+ *
+ * Two groups: the envelope-staging guards, and the authorization gate on the recovery
+ * PIN reset. Both are invisible from the UI they protect, which is why they are pinned
+ * here rather than through a component.
+ *
+ * ── The envelope-staging guards ──
  *
  * These four properties are the ones Pass 3 and Pass 4 of the credential plan added, and
  * the only part of that plan's Testing Plan (item 4) that shipped with no coverage. All
@@ -33,6 +39,7 @@ const h = vi.hoisted(() => ({
   envelope: null as BeanpodFileV4 | null,
   members: [] as unknown[],
   activeFamilyId: null as string | null,
+  resetCalls: 0,
 }));
 
 vi.mock('@/services/auth/stagePendingFile', () => ({
@@ -93,7 +100,14 @@ vi.mock('@/stores/familyContextStore', () => ({
   }),
 }));
 
-vi.mock('@/stores/authStore', () => ({ useAuthStore: () => ({}) }));
+vi.mock('@/stores/authStore', () => ({
+  useAuthStore: () => ({
+    resetMemberPinViaRecovery: vi.fn(async () => {
+      h.resetCalls += 1;
+      return { success: true };
+    }),
+  }),
+}));
 vi.mock('@/stores/settingsStore', () => ({
   // Returning no cached key skips the trusted-device fast path, so every test below
   // exercises the COLD route the staging guards exist for.
@@ -248,5 +262,50 @@ describe('useLoginFlow — envelope staging', () => {
     await vi.advanceTimersByTimeAsync(25_000);
     expect(h.resolveCalls).toBeGreaterThan(0);
     expect(h.lastEnvelopeArg).toMatchObject({ known: false });
+  });
+});
+
+describe('useLoginFlow — only a recovery KIT may reset a PIN', () => {
+  beforeEach(() => {
+    h.stageCalls = 0;
+    h.stageImpl = null;
+    h.lastEnvelopeArg = null;
+    h.resolveCalls = 0;
+    h.pendingEncryptedFile = null;
+    h.envelope = null;
+    h.members = [];
+    h.activeFamilyId = null;
+    h.resetCalls = 0;
+    vi.clearAllMocks();
+  });
+
+  /**
+   * ⚠️ An AUTHORIZATION gate, not a convenience check, so hiding the affordance in
+   * `ProveView` is only half of it. A PIN reset hands over a member's IDENTITY —
+   * decryption alone does not, since whoever holds the passphrase can already read
+   * everything — so a secret that can reset any PIN is a full member-impersonation
+   * credential. Of the two family-level secrets the passphrase is the loosely-held one.
+   */
+  async function attemptReset(openedBy: 'kit' | 'passphrase' | null) {
+    const flow = makeFlow();
+    await pickInto(flow, 'A');
+    flow.recoveryOpenedBy.value = openedBy;
+    await flow.onResetPin('123456');
+    return flow;
+  }
+
+  it('a KIT session may reset', async () => {
+    await attemptReset('kit');
+    expect(h.resetCalls).toBe(1);
+  });
+
+  it('a PASSPHRASE session may NOT reset, even if the call is made directly', async () => {
+    await attemptReset('passphrase');
+    expect(h.resetCalls).toBe(0);
+  });
+
+  it('a member-credential session may NOT reset', async () => {
+    await attemptReset(null);
+    expect(h.resetCalls).toBe(0);
   });
 });

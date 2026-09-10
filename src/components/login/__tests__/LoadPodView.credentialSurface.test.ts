@@ -12,7 +12,9 @@ import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import LoadPodView from '@/components/login/LoadPodView.vue';
 import { useSyncStore } from '@/stores/syncStore';
+import { useTranslationStore } from '@/stores/translationStore';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import { getSourceText } from '@/services/translation/uiStrings';
 
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/services/telemetry/loginFlowEvents', () => ({
@@ -39,8 +41,14 @@ function envelope(over: Partial<BeanpodFileV4>): BeanpodFileV4 {
 }
 
 /** Mount with `env` staged as the pending file, forced onto the decrypt surface. */
-async function mountWith(env: BeanpodFileV4) {
+async function mountWith(env: BeanpodFileV4, beanie = true) {
   setActivePinia(createPinia());
+  // ⚠️ Beanie mode is the store default (`translationStore.ts:38`), so a component test
+  // that never touches it asserts the BEANIE overlay and never the shipped English. That
+  // is not a detail: `loginV6.unlockNoPasswordHint` said "no password needed up front" in
+  // `en` while its `beanie` value did not, so the "names no password anywhere" guard below
+  // passed for months against a string that named a password to every English reader.
+  useTranslationStore().setBeanieMode(beanie);
   const sync = useSyncStore();
   // @ts-expect-error — test seam: the store's staged envelope is what `caps` derives from.
   sync.pendingEncryptedFile = { envelope: env, fileName: 'f.beanpod' };
@@ -62,14 +70,14 @@ async function mountWith(env: BeanpodFileV4) {
 }
 
 /** Reproduce the component's own routing for a cold envelope, then render it. */
-async function renderColdSurface(env: BeanpodFileV4) {
-  const { w, setup } = await mountWith(env);
+async function renderColdSurface(env: BeanpodFileV4, beanie = true) {
+  const { w, setup } = await mountWith(env, beanie);
   // `setupState` UNWRAPS refs, so these are plain reads/writes, not `.value`.
   const c = setup.caps as { password: boolean; kit: boolean; passphrase: boolean } | null;
   if (c && !c.password) {
     if (c.kit) setup.showKitEntry = true;
     else if (c.passphrase) setup.showKitEntry = false;
-    else setup.formError = 'nothing can open this file';
+    else setup.formError = getSourceText('loginFlow.recoveryOnlyBody');
   }
   setup.showDecryptModal = true;
   await nextTick();
@@ -87,12 +95,16 @@ describe('LoadPodView — cold credential surface', () => {
     expect(text).not.toContain('use a password');
   });
 
-  it('kit-born family: names no password ANYWHERE on the screen', async () => {
-    // The offer was fixed first, but three strings kept saying "password" over an
-    // envelope with no password wrap: the heading subtitle and the cold-arrival card.
-    const w = await renderColdSurface(envelope({ recoveryKeys: { k1: kitWrap } }));
-    expect(w.text().toLowerCase()).not.toContain('password');
-  });
+  it.each([true, false])(
+    'kit-born family: names no password ANYWHERE on the screen (beanie=%s)',
+    async (beanie) => {
+      // The offer was fixed first, but several strings kept saying "password" over an
+      // envelope with no password wrap. Checked in BOTH overlays: the English-only leak in
+      // `unlockNoPasswordHint` survived precisely because this ran in beanie alone.
+      const w = await renderColdSurface(envelope({ recoveryKeys: { k1: kitWrap } }), beanie);
+      expect(w.text().toLowerCase()).not.toContain('password');
+    }
+  );
 
   it('legacy family: still offers the password field (the untested regression risk)', async () => {
     const w = await renderColdSurface(envelope({ wrappedKeys: { m1: wrap } }));
@@ -110,6 +122,11 @@ describe('LoadPodView — cold credential surface', () => {
     // Every string on the screen names the credential this family actually has.
     expect(text).toContain('family passphrase');
     expect(text).not.toContain('password');
+  });
+
+  it('passphrase-only family: names no password in ENGLISH either', async () => {
+    const w = await renderColdSurface(envelope({ recoveryPassphrase: kitWrap }), false);
+    expect(w.text().toLowerCase()).not.toContain('password');
   });
 
   it('legacy family WITH a passphrase: the one field names both credentials', async () => {
@@ -130,11 +147,15 @@ describe('LoadPodView — cold credential surface', () => {
   it('all-false envelope: shows the honest message and NO credential field', async () => {
     const w = await renderColdSurface(envelope({}));
     // The acceptance criterion: "resolves to the degenerate terminal, NEVER the kit form".
+    // ⚠️ Asserts the SHIPPED string, not a literal of the test's own. The earlier version
+    // wrote 'nothing can open this file' into `formError` and then asserted on it, so it
+    // would have stayed green if the real copy regressed or went missing entirely.
+    const real = getSourceText('loginFlow.recoveryOnlyBody').toLowerCase();
     const text = w.text().toLowerCase();
-    expect(text).toContain('nothing can open this file');
+    expect(text).toContain(real);
     expect(w.findAll('input').length).toBe(0);
     // The honest message once, not twice: the kit form used to re-render `formError`.
-    expect(text.split('nothing can open this file').length - 1).toBe(1);
+    expect(text.split(real).length - 1).toBe(1);
   });
 });
 
@@ -164,5 +185,31 @@ describe('LoadPodView — the unlock screen describes step 1, not step 2', () =>
   it('the degenerate envelope promises no next step it cannot keep', async () => {
     const w = await renderColdSurface(envelope({}));
     expect(w.text().toLowerCase()).not.toContain("you'll sign in as a member");
+  });
+});
+
+describe('LoadPodView — the file-loaded channel carries WHICH secret opened the pod', () => {
+  /**
+   * ⚠️ The gap that let the reported bug survive a fix. `file-loaded` used to be
+   * `[source?: 'recovery']` — one token for two secrets — and `LoginPage` turned every
+   * `'recovery'` into `'kit'`. So a family passphrase typed into this screen arrived at
+   * the prove screen labelled a kit: told "you're in with your recovery kit", led with a
+   * PIN reset, and admitted through a gate that is meant to accept the kit alone.
+   *
+   * Neither end's tests could see it: `ProveView.recoveryOpener.test.ts` sets the prop by
+   * hand, and this file never emitted. The emit is the seam, so the emit is what to pin.
+   */
+  it('emits the opener verbatim, so nothing downstream has to guess', async () => {
+    const { w, setup } = await mountWith(envelope({ recoveryPassphrase: kitWrap }));
+    const finish = setup.finishLoaded as (o?: 'kit' | 'passphrase' | null) => Promise<void>;
+
+    await finish('passphrase');
+    await finish('kit');
+    await finish(null);
+
+    const payloads = (w.emitted('file-loaded') ?? []).map((a) => (a as unknown[])[0]);
+    // Distinct values survive the hop. A channel that collapsed them would show
+    // ['recovery', 'recovery', undefined] here.
+    expect(payloads).toEqual(['passphrase', 'kit', null]);
   });
 });
