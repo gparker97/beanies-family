@@ -184,6 +184,13 @@ function switchTo(method: ActiveKind) {
  * returns "Use password", so a leak here shows a password affordance on a member who
  * has none — the reason this filter, not a `switchLabel` case, is the guard.
  */
+const NON_SWITCHABLE: readonly ActiveKind[] = [
+  // Renders as the standalone recovery-kit chip below (always visible, warm included).
+  'recovery',
+  // An explanation, not a choice — nothing for the user to switch TO (#79).
+  'invite-needed',
+];
+
 /**
  * Which credential the kit prompt should name, from whatever this screen is asking for
  * RIGHT NOW. `null` where naming one would be wrong: a biometric or tap-through is not
@@ -201,13 +208,6 @@ const forgotCredential = computed<'pin' | 'password' | 'passphrase' | null>(() =
       return null;
   }
 });
-
-const NON_SWITCHABLE: readonly ActiveKind[] = [
-  // Renders as the standalone recovery-kit chip below (always visible, warm included).
-  'recovery',
-  // An explanation, not a choice — nothing for the user to switch TO (#79).
-  'invite-needed',
-];
 
 /** The switch links: every offered method except the active one, in offer order. */
 const switchTargets = computed<ActiveKind[]>(() => {

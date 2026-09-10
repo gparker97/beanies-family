@@ -3,7 +3,6 @@ import type { RemoteBlocker } from '@/types/sync';
 /* global FileSystemFileHandle */
 import { ref, computed, onMounted, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -74,8 +73,6 @@ watch(
 // Phase 4: the claim credential is a 6-digit PIN (no new passwords, ever).
 const pin = ref('');
 const confirmPin = ref('');
-const decryptPassword = ref('');
-const showDecryptModal = ref(false);
 const isLoadingLocalFile = ref(false);
 const localFormError = ref<string | null>(null);
 
@@ -191,13 +188,13 @@ function handleLocalLoadResult(result: {
   cancelled?: true;
 }): void {
   if (result.cancelled) return;
-  if (result.success) {
-    // No invite token → ask the user for the file password.
-    showDecryptModal.value = true;
-    return;
-  }
-  if (result.needsPassword) {
-    showDecryptModal.value = true;
+  // ⚠️ Both arms hand off to the SAME place. `needsPassword` only means "this file is
+  // still encrypted"; on the join surface the credential that opens it is the invite, not
+  // a password. This used to open a password modal on both, which skipped the invite
+  // redemption the three Drive routes perform and asked a joiner for a credential their
+  // family may never have had.
+  if (result.success || result.needsPassword) {
+    void flow.handleLocalFileLoaded();
     return;
   }
   if (result.payloadError) {
@@ -223,17 +220,6 @@ const { isDragging, bindings: dropZoneBindings } = useFileDrop({
     await handleDroppedFile(dropped.file, dropped.handle);
   },
 });
-
-// ── Decrypt modal ────────────────────────────────────────────────────────────
-
-async function handleDecrypt(): Promise<void> {
-  if (!decryptPassword.value) return;
-  const ok = await flow.handleSubmitDecryptPassword(decryptPassword.value);
-  if (ok) {
-    showDecryptModal.value = false;
-    decryptPassword.value = '';
-  }
-}
 
 // ── PIN creation (final join step, Phase 4) ─────────────────────────────────
 
@@ -695,35 +681,6 @@ onMounted(() => {
         </BaseButton>
       </form>
     </template>
-
-    <!-- ============================================ -->
-    <!-- Decrypt Modal (no invite token / local file) -->
-    <!-- ============================================ -->
-    <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
-      <div class="text-center">
-        <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
-          {{ t('loginV6.unlockTitle') }}
-        </h3>
-        <p class="mt-1 text-xs opacity-40">{{ t('loginV6.unlockSubtitle') }}</p>
-      </div>
-
-      <form class="mt-6" @submit.prevent="handleDecrypt">
-        <BaseInput
-          v-model="decryptPassword"
-          :label="t('password.password')"
-          type="password"
-          :placeholder="t('password.enterPasswordPlaceholder')"
-          required
-        />
-
-        <BaseButton
-          type="submit"
-          class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
-        >
-          {{ t('loginV6.unlockButton') }}
-        </BaseButton>
-      </form>
-    </BaseModal>
 
     <!-- ============================================ -->
     <!-- Diagnostic-info Modal                        -->

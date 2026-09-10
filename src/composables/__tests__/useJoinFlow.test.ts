@@ -881,27 +881,42 @@ describe('useJoinFlow', () => {
     });
   });
 
-  describe('handleSubmitDecryptPassword (no-invite-token fallback)', () => {
-    it('decrypts with password and advances on success', async () => {
+  describe('handleLocalFileLoaded — the invite is the credential', () => {
+    /**
+     * The local-file route used to skip the invite redemption entirely and open a PASSWORD
+     * modal, on BOTH `success` and `needsPassword`. So a joiner holding a valid invite was
+     * asked for a password instead — and a family born since 0.13R2 has no `wrappedKeys`
+     * at all, so that field could never open their file. The three Drive routes always
+     * redeemed the invite; only this one did not.
+     */
+    it('redeems the invite token and advances, without asking for a password', async () => {
       const { useJoinFlow } = await import('../useJoinFlow');
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(`${buildInviteLink({ familyId: 'fam', fileName: 'f.beanpod' })}&t=tok`);
       const flow = useJoinFlow();
-      familyMembers.push({ id: 'm1', requiresPassword: true, isPet: false });
+      await flow.init();
+      familyMembers.push({ id: 'm1', requiresPassword: false, isPet: false });
       mockSyncStore.envelope = { familyId: 'fam' };
 
-      const ok = await flow.handleSubmitDecryptPassword('p');
-      expect(ok).toBe(true);
-      expect(mockSyncStore.decryptPendingFile).toHaveBeenCalledWith('p');
-      expect(flow.currentStep.value).toBe('pick-member');
+      await flow.handleLocalFileLoaded();
+
+      expect(mockSyncStore.decryptPendingFile).not.toHaveBeenCalled();
+      expect(flow.currentError.value?.code).not.toBe('FILE_DECRYPT_FAILED');
     });
 
-    it('sets FILE_DECRYPT_FAILED when the password is wrong', async () => {
+    it('a link with NO token is not a join at all', async () => {
+      // Joining is only ever via an invite link. Anyone else holding this family's file is
+      // signing in, which is a different surface — so this must not offer a credential.
       const { useJoinFlow } = await import('../useJoinFlow');
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(buildInviteLink({ familyId: 'fam', fileName: 'f.beanpod' }));
       const flow = useJoinFlow();
-      mockSyncStore.decryptPendingFile = vi.fn(async () => ({ success: false, error: 'no' }));
+      await flow.init();
 
-      const ok = await flow.handleSubmitDecryptPassword('p');
-      expect(ok).toBe(false);
-      expect(flow.currentError.value?.code).toBe('FILE_DECRYPT_FAILED');
+      await flow.handleLocalFileLoaded();
+
+      expect(flow.currentError.value?.code).toBe('INVITE_TOKEN_INVALID');
+      expect(mockSyncStore.decryptPendingFile).not.toHaveBeenCalled();
     });
   });
 

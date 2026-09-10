@@ -2077,17 +2077,25 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > **1b. Review findings deliberately NOT fixed this session** (from `/code-review max`,
 > all recorded here rather than in a branch):
 >
-> - **`JoinPodView.vue:713` is a second, capability-BLIND unlock modal.** It hardcodes
->   `password.password` over any envelope, so a kit-born or passphrase-only `.beanpod`
->   opened on the join path gets a "Password" field that can only throw — the ORIGINAL
->   reported bug, unfixed on that surface. It also inherited this session's reworded
->   `loginV6.unlockTitle` / `unlockSubtitle` / `unlockButton` without review, so it now
->   promises "Next, you'll sign in as a member" to a joiner who will actually create a new
->   account. **The right fix is the shared one:** move `secretField` out of LoadPodView
->   into `fileSync.ts` beside `coldCredentialSurface` as `credentialCopy(caps)` returning
->   the `{label, placeholder, footer, switchLabel, required}` key set, and have LoadPodView,
->   JoinPodView and ProveView all call it. Three reviewers independently reached this same
->   conclusion. Deserves its own plan.
+> - **✅ FIXED — and it was NOT what the reviewers said it was.** Three reviewers called
+>   `JoinPodView`'s decrypt modal a capability-blind copy of the unlock surface needing a
+>   shared `credentialCopy(caps)` extraction. greg pushed back: joining is via invite link,
+>   so why is there a password box at all? Tracing it out proved him right and found
+>   something worse. `handleLocalLoadResult` opened that modal on BOTH `result.success` and
+>   `result.needsPassword`, and **the local-file route never called `tryInviteTokenDecrypt`
+>   at all** — only the three Drive routes did (`useJoinFlow.ts:757, 804, 833`). So a joiner
+>   holding a PERFECTLY VALID invite who supplied the `.beanpod` from disk was asked for a
+>   password instead of having their invite redeemed, and a family born since 0.13R2 has no
+>   `wrappedKeys`, so that field could never open their file. **Not a vestigial path with
+>   bad copy: a real break in the primary join flow whenever the file came from local disk.**
+>   Fixed by `handleLocalFileLoaded()`, which redeems the invite exactly as the Drive routes
+>   do; with no token it records `INVITE_TOKEN_INVALID`, because joining is only ever via an
+>   invite link and anyone else holding the file is signing in. The password modal,
+>   `handleSubmitDecryptPassword` and its two "(no-invite-token fallback)" tests are deleted.
+>   **The lesson: the reviewers agreed with each other and were all wrong about the cause.**
+>   Three independent finders converging is evidence of a real problem, not of a correct
+>   diagnosis.
+>
 > - **`loginV6.unlockButton` and `recovery.unlock` are now byte-identical** ("Unlock My
 >   Beanpod"), created by this session's rewording. Merge one into the other.
 > - **`loginFlow.recoveryOnlyBody` has two consumers that want different sentences.** On

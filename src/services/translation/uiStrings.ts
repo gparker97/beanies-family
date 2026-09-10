@@ -5001,6 +5001,12 @@ const STRING_DEFS = {
     en: 'Enter your family passphrase',
     beanie: 'enter your family passphrase',
   },
+  // The both-credentials partner. The "either one" field reported "Please enter your family
+  // passphrase.", which is the same label/copy drift `secretField` exists to remove.
+  'recovery.secretEitherRequired': {
+    en: 'Please enter your password or family passphrase.',
+    beanie: 'please enter your password or family passphrase.',
+  },
   'recovery.passphraseRequired': {
     en: 'Please enter your family passphrase.',
     beanie: 'please enter your family passphrase.',
