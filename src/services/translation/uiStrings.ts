@@ -6456,13 +6456,20 @@ const STRING_DEFS = {
     en: 'Before you hang it up, three things on the device:',
     beanie: 'before you hang it up, three things on the device:',
   },
+  // ⚠️ Neither line may say "this device". The card is usually opened ON the
+  // wall tablet, but not always: a parent may be reading Settings on their phone
+  // about an iPad in the other room. The platform half of the checklist survives
+  // that (an iPhone and an iPad both say "Guided Access"), but wake-lock support
+  // is a fact about the CURRENT browser, so any sentence pointing at "this
+  // device" is wrong for exactly the reader who most needs it right.
   'wall.setup.tips.screenBacked': {
-    en: 'Set the screen to never lock, so it stays on between taps',
-    beanie: 'set the screen to never lock, so it stays on between taps',
+    en: 'Set the screen to never lock, so the wall stays on between taps',
+    beanie: 'set the screen to never lock, so the wall stays on between taps',
   },
   'wall.setup.tips.screenOnly': {
-    en: 'Set the screen to never lock. On this device that is the only thing keeping it on',
-    beanie: 'set the screen to never lock. on this device that is the only thing keeping it on',
+    en: 'Set the screen to never lock. Some tablets, older iPads especially, stay on no other way',
+    beanie:
+      'set the screen to never lock. some tablets, older iPads especially, stay on no other way',
   },
   'wall.setup.tips.guidedAccess': {
     en: 'Turn on Guided Access, so a tap cannot wander off into another app',
