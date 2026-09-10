@@ -4955,6 +4955,15 @@ const STRING_DEFS = {
     en: "You're in with your recovery kit — set a fresh 6-digit PIN to use from now on.",
     beanie: "you're in with your recovery kit — set a fresh 6-digit pin to use from now on.",
   },
+  // The passphrase partner. This pane used to render the line above whichever secret was
+  // typed, so someone who had just entered a family passphrase was told they were in with
+  // a recovery kit. It also assumes less: a passphrase is the ordinary route onto a new
+  // device, so it OFFERS a new PIN rather than announcing one is being set.
+  'recovery.resetPinBodyPassphrase': {
+    en: "You're in with your family passphrase. Set a 6-digit PIN for this device, or sign in with the one you already have.",
+    beanie:
+      "you're in with your family passphrase. set a 6-digit pin for this device, or sign in with the one you already have.",
+  },
   'recovery.resetPinAction': { en: 'Set PIN & Sign In', beanie: 'set pin & sign in' },
   // ⚠️ `recovery.passphraseHint` was deleted here. It read "Your password — or your
   // family recovery passphrase, if one was set." and sat under a SINGLE input, so one

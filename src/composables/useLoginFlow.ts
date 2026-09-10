@@ -14,6 +14,13 @@
  */
 
 import { ref, type Ref } from 'vue';
+
+/**
+ * The family-level secrets that can open a pod without identifying a member.
+ *
+ * Both grant the family key; only their EXPECTATIONS differ. See `recoveryOpenedBy`.
+ */
+export type RecoveryOpener = 'kit' | 'passphrase';
 import { PayloadLoadError, payloadErrorMessageKey, payloadErrorKind } from '@/types/sync';
 import type { PayloadErrorKind } from '@/types/sync';
 import { reportPayloadFailure, surfacePayloadFatal } from '@/utils/payloadFailureSurface';
@@ -66,11 +73,21 @@ export interface UseLoginFlow {
   /** A prove/opening effect is in flight — views disable their affordances. */
   isBusy: Ref<boolean>;
   /**
-   * A family-level recovery secret (kit or passphrase) opened the pod this session: the
-   * prove screen offers SET-A-NEW-PIN instead of demanding forgotten credentials. Set by
-   * the kit/passphrase redeem paths; cleared on sign-in and on leaving the flow.
+   * WHICH family-level secret opened the pod this session, or `null` if a member
+   * credential did.
+   *
+   * ⚠️ Was a boolean, and the two routes it conflated do not want the same screen. A KIT
+   * is break-glass: reaching for it means the PIN is gone, so the prove screen leads with
+   * set-a-new-PIN. A FAMILY PASSPHRASE is the ordinary way onto a device that has never
+   * seen this family — there is no device wrap yet, so the file must be decrypted before
+   * any PIN can be checked — and the person almost always still knows their PIN. Leading
+   * with a PIN reset there tells a whole class of users to replace a credential that
+   * works. It also let `recovery.resetPinBody` say "you're in with your recovery kit" to
+   * someone who had typed a passphrase, because by render time the routes were identical.
+   *
+   * Set by the kit and passphrase routes; cleared on sign-in and on leaving the flow.
    */
-  recoveryMode: Ref<boolean>;
+  recoveryOpenedBy: Ref<RecoveryOpener | null>;
   /**
    * Which credential the last attempt used, so the prove screen can restore the form the
    * user was on after the machine remounts it. `null` before any attempt.
@@ -124,7 +141,7 @@ export function useLoginFlow(opts: {
   const state = ref<LoginFlowState>({ kind: 'idle' });
   const proveError = ref<string | null>(null);
   const isBusy = ref(false);
-  const recoveryMode = ref(false);
+  const recoveryOpenedBy = ref<RecoveryOpener | null>(null);
 
   /**
    * Out-of-band password for the current opening attempt. Never reactive. RETAINED
@@ -514,7 +531,7 @@ export function useLoginFlow(opts: {
       return;
     }
     if (s.kind === 'done') {
-      recoveryMode.value = false;
+      recoveryOpenedBy.value = null;
       opts.onSignedIn(s.destination);
       return;
     }
@@ -525,7 +542,7 @@ export function useLoginFlow(opts: {
     if (s.kind === 'idle') {
       pendingPassword = null;
       lastAttempted.value = null;
-      recoveryMode.value = false;
+      recoveryOpenedBy.value = null;
       opts.onExit();
     }
   }
@@ -875,11 +892,11 @@ export function useLoginFlow(opts: {
   /**
    * Recovery-mode PIN reset: the kit/passphrase opened the pod, identity is granted by
    * that family-level secret, and the member sets a fresh PIN in place of the forgotten
-   * credentials. Only reachable when `recoveryMode` armed the prove screen.
+   * credentials. Only reachable when a family-level secret armed the prove screen.
    */
   async function onResetPin(pin: string): Promise<void> {
     const s = currentProve();
-    if (!s || isBusy.value || !recoveryMode.value) return;
+    if (!s || isBusy.value || !recoveryOpenedBy.value) return;
     proveError.value = null;
     isBusy.value = true;
     try {
@@ -990,7 +1007,7 @@ export function useLoginFlow(opts: {
               // says the phrase was accepted rather than "wrong password".
               pendingPassword = null;
               await familyStore.loadMembers();
-              recoveryMode.value = true;
+              recoveryOpenedBy.value = 'passphrase';
               proveError.value = t('recovery.passphraseAcceptedProve');
               emitProveOutcome({
                 method: lastAttempted.value ?? 'password',
@@ -1181,7 +1198,7 @@ export function useLoginFlow(opts: {
     state,
     proveError,
     isBusy,
-    recoveryMode,
+    recoveryOpenedBy,
     startForFamily,
     tryCachedKeyDecrypt,
     dispatch,

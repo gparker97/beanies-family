@@ -154,7 +154,7 @@ export type ProveMethod =
   /**
    * The family recovery PASSPHRASE (Phase 3), offered cold and only when the envelope
    * proves one exists. It identifies NO member — `decryptPendingFile` returns
-   * `viaRecoveryPassphrase` and `runOpening` routes that to `recoveryMode` — so it
+   * `viaRecoveryPassphrase` and `runOpening` routes that to `recoveryOpenedBy` — so it
    * opens the pod without signing anyone in.
    */
   | { kind: 'passphrase' }

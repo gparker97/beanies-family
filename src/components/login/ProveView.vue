@@ -33,10 +33,15 @@ const props = defineProps<{
   /** Whether the pod is already open — drives tap-through and passphrase-hint copy. */
   podOpen: boolean;
   /**
-   * A family-level recovery secret opened the pod: identity is granted by possession,
-   * so this screen offers SET-A-NEW-PIN instead of demanding forgotten credentials.
+   * WHICH family-level secret opened the pod, or `null`/absent for a member credential.
+   *
+   * Both grant identity by possession, so both offer SET-A-NEW-PIN — but only the KIT
+   * LEADS with it. A kit is break-glass, so reaching for one means the PIN is gone. A
+   * family passphrase is the ordinary route onto a device that has never seen this
+   * family, where the person usually still knows their PIN, so leading with a reset there
+   * asks a whole class of users to replace a credential that works.
    */
-  recoveryMode?: boolean;
+  recoveryOpenedBy?: 'kit' | 'passphrase' | null;
   /**
    * The credential the last attempt used. On a failed attempt the machine REMOUNTS this
    * component, so without it a mistyped passphrase reopens the password form.
@@ -90,7 +95,9 @@ const retryTarget =
       ? 'password'
       : null;
 const activeMethod = ref<ActiveKind>(
-  props.recoveryMode ? 'reset-pin' : (retryTarget ?? firstNonRecovery ?? 'recovery')
+  // Only a KIT leads with the reset; a passphrase falls through to the member's own
+  // methods, with the reset one tap away in `switchTargets` below.
+  props.recoveryOpenedBy === 'kit' ? 'reset-pin' : (retryTarget ?? firstNonRecovery ?? 'recovery')
 );
 const resetPin = ref('');
 const resetPinConfirm = ref('');
@@ -183,7 +190,7 @@ const switchTargets = computed<ActiveKind[]>(() => {
     .filter((m) => m.kind !== activeMethod.value)
     .map((m) => m.kind)
     .filter((k) => !NON_SWITCHABLE.includes(k));
-  if (props.recoveryMode && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
+  if (props.recoveryOpenedBy && activeMethod.value !== 'reset-pin') targets.unshift('reset-pin');
   return targets;
 });
 
@@ -308,7 +315,11 @@ function handlePassphraseSubmit() {
         @submit.prevent="handleResetPinSubmit"
       >
         <p class="dark:text-ink-soft text-center text-sm text-gray-600">
-          {{ t('recovery.resetPinBody') }}
+          {{
+            recoveryOpenedBy === 'passphrase'
+              ? t('recovery.resetPinBodyPassphrase')
+              : t('recovery.resetPinBody')
+          }}
         </p>
         <div>
           <p class="dark:text-ink-soft mb-2 text-center text-sm font-medium text-gray-700">

@@ -643,9 +643,10 @@ async function handleFileLoaded(source?: 'recovery') {
     activeView.value = 'welcome';
     return;
   }
-  // Armed AFTER the flow entered: a family-level recovery secret opened the pod, so the
-  // prove screen offers set-a-new-PIN instead of demanding forgotten credentials.
-  flow.recoveryMode.value = source === 'recovery';
+  // Armed AFTER the flow entered. `'kit'` specifically, not a generic "recovery": the
+  // prove screen leads with set-a-new-PIN for a kit (reaching for it means the PIN is
+  // gone) but not for a passphrase, which the passphrase route sets for itself.
+  flow.recoveryOpenedBy.value = source === 'recovery' ? 'kit' : null;
 }
 
 /**
@@ -718,7 +719,7 @@ async function handleStartOver() {
           :error="flowError"
           :is-busy="flowBusy"
           :pod-open="familyStore.members.length > 0"
-          :recovery-mode="flow.recoveryMode.value"
+          :recovery-opened-by="flow.recoveryOpenedBy.value"
           :last-attempted="flow.lastAttempted.value"
           @biometric="flow.onBiometric"
           @tap-through="flow.onTapThrough"
