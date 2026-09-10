@@ -107,6 +107,22 @@ onMounted(() => {
   animate.value = props.variant === 'drawer' || claimConfetti(props.activityId);
 });
 
+/**
+ * Per-bean fall, for the drawer only.
+ *
+ * Deterministic from the index rather than `Math.random()`, for the same reason the scatter
+ * is: two renders of the same card must not visibly differ. The variation is what stops the
+ * shower reading as one rigid sheet of beans on rails, so distance, drift and duration all
+ * vary out of step with each other (5, 5 and 4) rather than in lockstep.
+ *
+ * Distances are in PX and deliberately large. The beans start above the panel and are
+ * clipped by the layer until they enter, so every one of them falls in from the top edge
+ * whatever its resting position.
+ */
+const FALL_PX = [210, 280, 175, 320, 245] as const;
+const SWAY_PX = [-13, 9, -5, 16, -10] as const;
+const FALL_MS = [980, 1180, 860, 1090] as const;
+
 const beans = computed(() =>
   SCATTER.slice(0, COUNT[props.density]).map(([left, top, rotate], i) => ({
     i,
@@ -115,11 +131,14 @@ const beans = computed(() =>
     rotate,
     light: POD_LIGHT[i % POD_LIGHT.length],
     dark: POD_DARK[i % POD_DARK.length],
+    fall: FALL_PX[i % FALL_PX.length],
+    sway: SWAY_PX[i % SWAY_PX.length],
+    duration: FALL_MS[i % FALL_MS.length],
   }))
 );
 
-/** Drawers stagger further apart, so the rain reads as falling rather than as one blink. */
-const delayStep = computed(() => (props.variant === 'drawer' ? 60 : 18));
+/** Drawers stagger, so the shower arrives as a fall rather than as one blink. */
+const delayStep = computed(() => (props.variant === 'drawer' ? 45 : 18));
 </script>
 
 <template>
@@ -136,9 +155,12 @@ const delayStep = computed(() => (props.variant === 'drawer' ? 60 : 18));
         '--bean-light': b.light,
         '--bean-dark': b.dark,
         '--bean-rotate': `${b.rotate}deg`,
+        '--bean-fall': `${b.fall}px`,
+        '--bean-sway': `${b.sway}px`,
         left: `${b.left}%`,
         top: `${b.top}%`,
         animationDelay: `${b.i * delayStep}ms`,
+        ...(variant === 'drawer' ? { animationDuration: `${b.duration}ms` } : {}),
       }"
     />
   </div>
@@ -188,8 +210,12 @@ html.dark .confetti-bean {
     animation: confetti-drop 460ms cubic-bezier(0.2, 0.7, 0.3, 1) backwards;
   }
 
+  /*
+   * Duration comes from the inline per-bean value; this is only the fallback for
+   * a bean that somehow renders without one.
+   */
   .confetti-rain:not(.confetti-still) {
-    animation: confetti-rain 900ms cubic-bezier(0.25, 0.65, 0.35, 1) backwards;
+    animation: confetti-rain 1000ms cubic-bezier(0.34, 0.06, 0.36, 1) backwards;
   }
 }
 
@@ -206,14 +232,35 @@ html.dark .confetti-bean {
   }
 }
 
+/*
+ * A real fall, in PX.
+ *
+ * This used to start at `translateY(-140%)`. A percentage in `translateY` resolves against
+ * the element's OWN height, and a bean is 7px tall — so "rain in from above" was a 9.8px
+ * drift stretched over 900ms, which is slower than the card's 10px drop and read as beans
+ * gently floating rather than confetti falling. The distance is now 175-320px, which puts
+ * every bean above the panel (the layer clips, so they are unseen until they enter) and
+ * makes the arrival read as a shower.
+ *
+ * Ends explicitly on the resting transform rather than relying on the implicit end state,
+ * so the settle matches `.confetti-bean`'s own `rotate` exactly and cannot drift if that
+ * base rule changes. Still once, still no `infinite`: a wall tablet never sleeps, and
+ * ambient motion in a kitchen all evening is not a celebration.
+ */
 @keyframes confetti-rain {
   0% {
     opacity: 0;
-    transform: translateY(-140%) rotate(calc(var(--bean-rotate) - 180deg));
+    transform: translate3d(var(--bean-sway, 0), calc(var(--bean-fall, 240px) * -1), 0)
+      rotate(calc(var(--bean-rotate) - 220deg));
   }
 
-  25% {
+  14% {
     opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(var(--bean-rotate));
   }
 }
 </style>

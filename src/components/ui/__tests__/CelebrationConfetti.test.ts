@@ -76,9 +76,43 @@ describe('CelebrationConfetti', () => {
     it('staggers wider than a card, so it reads as falling rather than one blink', async () => {
       const delayOf = (w: ReturnType<typeof mountConfetti>, i: number) =>
         (w.findAll('.confetti-bean')[i].element as HTMLElement).style.animationDelay;
-      expect(delayOf(mountConfetti({ variant: 'drawer' }), 2)).toBe('120ms');
+      expect(delayOf(mountConfetti({ variant: 'drawer' }), 2)).toBe('90ms');
       resetCelebrationSeen();
       expect(delayOf(mountConfetti(), 2)).toBe('36ms');
+    });
+
+    /**
+     * The regression this exists for: the fall used to be `translateY(-140%)`,
+     * and a percentage there resolves against the bean's OWN height. At 7px tall
+     * that made "rain in from above" a 9.8px drift over 900ms, which is slower
+     * than the card's 10px drop and read as floating rather than falling.
+     */
+    it('falls a real distance, in px, not a percentage of a 7px bean', () => {
+      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll('.confetti-bean');
+      const falls = beans.map((b) =>
+        Number.parseInt((b.element as HTMLElement).style.getPropertyValue('--bean-fall'), 10)
+      );
+      expect(falls.every((f) => f >= 150)).toBe(true);
+      // More than one distance, or the shower is a rigid sheet on rails.
+      expect(new Set(falls).size).toBeGreaterThan(1);
+    });
+
+    it('varies duration and drift out of step with each other', () => {
+      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll('.confetti-bean');
+      const durations = new Set(
+        beans.map((b) => (b.element as HTMLElement).style.animationDuration)
+      );
+      const sways = new Set(
+        beans.map((b) => (b.element as HTMLElement).style.getPropertyValue('--bean-sway'))
+      );
+      expect(durations.size).toBeGreaterThan(1);
+      expect(sways.size).toBeGreaterThan(1);
+    });
+
+    it('leaves cards alone: no per-bean duration override on a card', () => {
+      const card = mountConfetti({ density: 'card' });
+      const first = card.findAll('.confetti-bean')[0].element as HTMLElement;
+      expect(first.style.animationDuration).toBe('');
     });
   });
 });
