@@ -20,6 +20,11 @@ vi.mock('@/utils/actionFailure', () => ({
   reportJobToggleFailed: vi.fn(),
   reportListAddFailed: vi.fn(),
   reportTodoAddFailed: vi.fn(),
+  reportJobEditFailed: vi.fn(),
+}));
+vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+vi.mock('@/stores/translationStore', () => ({
+  useTranslationStore: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: { value: '2026-09-10' } }) }));
 
@@ -28,7 +33,14 @@ import { useListStore } from '@/stores/listStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
-import { reportListAddFailed, reportTodoAddFailed } from '@/utils/actionFailure';
+import {
+  reportJobEditFailed,
+  reportListAddFailed,
+  reportTodoAddFailed,
+} from '@/utils/actionFailure';
+import { showToast } from '@/composables/useToast';
+import type { WallJob } from '@/types/wall';
+import type { FamilyList, TodoItem } from '@/types/models';
 
 const SURFACE = 'beanie-wall';
 
@@ -147,6 +159,208 @@ describe('useWallJobs write contract', () => {
           message: 'wall_todo_add_failed',
           severity: 'critical',
           context: { action: 'todo_add', kind: 'todo' },
+        })
+      );
+    });
+  });
+
+  const listJob: WallJob = {
+    key: 'list:l1:i1',
+    title: 'goggles',
+    done: false,
+    ownerId: 'm1',
+    source: 'list',
+    listId: 'l1',
+    itemId: 'i1',
+  };
+  const todoJob: WallJob = {
+    key: 'todo:t1:m1',
+    title: 'passports',
+    done: false,
+    ownerId: 'm1',
+    source: 'todo',
+    todoId: 't1',
+  };
+
+  describe('renameJob', () => {
+    it('routes a list job to updateItemText, trimmed', async () => {
+      const listStore = useListStore();
+      const rename = vi.spyOn(listStore, 'updateItemText').mockResolvedValue({ id: 'l1' } as never);
+
+      await expect(useWallJobs().renameJob(listJob, '  swim cap  ')).resolves.toBe(true);
+
+      expect(rename).toHaveBeenCalledWith('l1', 'i1', 'swim cap');
+      expect(logEvent).toHaveBeenCalledWith({
+        level: 'info',
+        surface: SURFACE,
+        message: 'wall_job_renamed',
+        context: { action: 'job_rename', kind: 'list' },
+      });
+    });
+
+    it('routes a to-do job to updateTodo, not to the list store', async () => {
+      const todoStore = useTodoStore();
+      const listStore = useListStore();
+      const update = vi.spyOn(todoStore, 'updateTodo').mockResolvedValue({ id: 't1' } as never);
+      const listRename = vi.spyOn(listStore, 'updateItemText');
+
+      await expect(useWallJobs().renameJob(todoJob, 'passports and visas')).resolves.toBe(true);
+
+      expect(update).toHaveBeenCalledWith('t1', { title: 'passports and visas' });
+      expect(listRename).not.toHaveBeenCalled();
+    });
+
+    it('does not write when the title is unchanged', async () => {
+      const listStore = useListStore();
+      const rename = vi.spyOn(listStore, 'updateItemText');
+
+      await expect(useWallJobs().renameJob(listJob, 'goggles')).resolves.toBe(false);
+
+      expect(rename).not.toHaveBeenCalled();
+      expect(logEvent).not.toHaveBeenCalled();
+    });
+
+    it('does not DELETE when the field is cleared: an emptied edit is not a removal', async () => {
+      const listStore = useListStore();
+      const rename = vi.spyOn(listStore, 'updateItemText');
+      const remove = vi.spyOn(listStore, 'removeItem');
+
+      await expect(useWallJobs().renameJob(listJob, '   ')).resolves.toBe(false);
+
+      expect(rename).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+    });
+
+    it('pages and tells the family when the store refuses', async () => {
+      const listStore = useListStore();
+      vi.spyOn(listStore, 'updateItemText').mockResolvedValue(null);
+
+      await expect(useWallJobs().renameJob(listJob, 'swim cap')).resolves.toBe(false);
+
+      expect(reportJobEditFailed).toHaveBeenCalledWith('rename', 'list', 'i1');
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'wall_job_rename_failed',
+          severity: 'critical',
+          context: { action: 'job_rename', kind: 'list' },
+        })
+      );
+    });
+  });
+
+  describe('removeJob', () => {
+    function seedList(over: Partial<FamilyList> = {}) {
+      const listStore = useListStore();
+      listStore.lists = [
+        {
+          id: 'l1',
+          title: 'Swim bag',
+          items: [{ id: 'i1', title: 'goggles', completed: false }],
+          completed: false,
+          ...over,
+        } as FamilyList,
+      ];
+      return listStore;
+    }
+
+    it('removes a list item and offers Undo for 6 seconds', async () => {
+      const listStore = seedList();
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
+
+      await expect(useWallJobs().removeJob(listJob)).resolves.toBe(true);
+
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('wall.job.removed'),
+        undefined,
+        expect.objectContaining({ durationMs: 6000, actionLabel: 'wall.job.undo' })
+      );
+    });
+
+    it('restores the COMPLETION state as well as the items, so undo cannot file the list away', async () => {
+      const listStore = seedList({
+        completed: true,
+        completedBy: 'leo',
+        completedAt: '2026-09-10T00:00:00.000Z',
+      } as Partial<FamilyList>);
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
+      const updateList = vi.spyOn(listStore, 'updateList').mockResolvedValue({ id: 'l1' } as never);
+
+      await useWallJobs().removeJob(listJob);
+      await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
+
+      expect(updateList).toHaveBeenCalledWith(
+        'l1',
+        expect.objectContaining({
+          completed: true,
+          completedBy: 'leo',
+          completedAt: '2026-09-10T00:00:00.000Z',
+        })
+      );
+    });
+
+    it('snapshots BEFORE the delete, so undo restores the pre-removal items', async () => {
+      const listStore = seedList();
+      const before = listStore.lists[0].items;
+      vi.spyOn(listStore, 'removeItem').mockImplementation(async () => {
+        listStore.lists = [{ ...listStore.lists[0], items: [] } as FamilyList];
+        return listStore.lists[0];
+      });
+      const updateList = vi.spyOn(listStore, 'updateList').mockResolvedValue({ id: 'l1' } as never);
+
+      await useWallJobs().removeJob(listJob);
+      await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
+
+      expect(updateList).toHaveBeenCalledWith('l1', expect.objectContaining({ items: before }));
+    });
+
+    it('restores a to-do under its ORIGINAL id, not as a new record', async () => {
+      const todoStore = useTodoStore();
+      const original = { id: 't1', title: 'passports', completed: false } as TodoItem;
+      todoStore.todos = [original];
+      vi.spyOn(todoStore, 'deleteTodo').mockResolvedValue(true);
+      const restore = vi.spyOn(todoStore, 'restoreTodo').mockResolvedValue(original);
+
+      await useWallJobs().removeJob(todoJob);
+      await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
+
+      expect(restore).toHaveBeenCalledWith(original);
+    });
+
+    it('offers no Undo when the delete itself was refused', async () => {
+      const listStore = seedList();
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue(null);
+
+      await expect(useWallJobs().removeJob(listJob)).resolves.toBe(false);
+
+      expect(showToast).not.toHaveBeenCalled();
+      expect(reportJobEditFailed).toHaveBeenCalledWith('remove', 'list', 'i1');
+    });
+
+    it('offers no Undo it could not honour when the record was already gone', async () => {
+      const listStore = useListStore();
+      listStore.lists = [];
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
+
+      await expect(useWallJobs().removeJob(listJob)).resolves.toBe(true);
+
+      expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it('reports a failed undo rather than leaving the family to guess', async () => {
+      const listStore = seedList();
+      vi.spyOn(listStore, 'removeItem').mockResolvedValue({ id: 'l1' } as never);
+      vi.spyOn(listStore, 'updateList').mockResolvedValue(null);
+
+      await useWallJobs().removeJob(listJob);
+      await vi.mocked(showToast).mock.calls[0][3]!.actionFn!();
+
+      expect(reportJobEditFailed).toHaveBeenCalledWith('undo', 'list', 'i1');
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'wall_job_remove_undo_failed',
+          severity: 'critical',
+          context: { action: 'job_remove_undo', kind: 'list' },
         })
       );
     });

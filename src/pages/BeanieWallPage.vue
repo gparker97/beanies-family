@@ -27,6 +27,7 @@ import {
   wallViewTransition,
 } from '@/components/wall/wallViews';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
+import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useToday } from '@/composables/useToday';
@@ -105,6 +106,18 @@ if (!tooNarrow.value) orientation.release();
 
 provide(WALL_LOCK, { isLocked: lock.isLocked, noteActivity: lock.noteActivity });
 provide(WALL_BURST, burst);
+/**
+ * The write channel: a projection of `useWallJobs`, not a second write layer.
+ * `WallJobRow` sits under `WallJobList`, which serves the board, the lanes and
+ * the sheet, so threading these down as props would mean editing call sites
+ * that never use them.
+ */
+provide(WALL_EDIT, {
+  addListItem: jobs.addListItem,
+  addTodo: jobs.addTodo,
+  renameJob: jobs.renameJob,
+  removeJob: jobs.removeJob,
+});
 
 /**
  * The wall's ONE date concept, owned here so it survives a view switch.
@@ -797,8 +810,6 @@ watch(activeView, () => (sheet.value = null));
         :all-todos="jobs.allTodos.value"
         :lists-for="jobs.listsFor"
         :orphan-lists="jobs.orphanLists.value"
-        :add-list-item="jobs.addListItem"
-        :add-todo="jobs.addTodo"
         @close="sheet = null"
         @toggle="onToggle"
         @open="openSheet"

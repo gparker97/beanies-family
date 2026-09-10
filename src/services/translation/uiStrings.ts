@@ -6423,6 +6423,25 @@ const STRING_DEFS = {
     en: 'That to-do was not saved. Try again in a moment.',
     beanie: 'that to-do was not saved. try again in a moment.',
   },
+  // Removing a row is a DESTRUCTIVE action, so the `beanie` values keep the real
+  // nouns (item, device) and only drop case. A reader who does not know the joke
+  // must not be able to act wrongly here. See CLAUDE.md, beanie-mode floor.
+  'wall.removeFailed.title': { en: "That didn't get removed", beanie: "that didn't get removed" },
+  'wall.removeFailed.message': {
+    en: 'It may have already been removed on another device. The wall will catch up on the next sync.',
+    beanie:
+      'it may have already been removed on another device. the wall will catch up on the next sync.',
+  },
+  'wall.undoFailed.title': { en: "That didn't come back", beanie: "that didn't come back" },
+  'wall.undoFailed.message': {
+    en: 'The item could not be restored. Add it again, or open the list in the app.',
+    beanie: 'the item could not be restored. add it again, or open the list in the app.',
+  },
+  'wall.job.remove': { en: 'Remove', beanie: 'remove' },
+  'wall.job.removed': { en: 'Removed "{title}"', beanie: 'removed "{title}"' },
+  'wall.job.undo': { en: 'Undo', beanie: 'undo' },
+  'wall.job.rename': { en: 'Rename', beanie: 'rename' },
+  'wall.job.renamePlaceholder': { en: 'What should it say?', beanie: 'what should it say?' },
   'wall.list.addItem': { en: 'Add an item', beanie: 'add an item' },
   'wall.todo.add': { en: 'Add a to-do', beanie: 'add a to-do' },
   'wall.setup.title': { en: 'Beanie Wall', beanie: 'beanie wall' },

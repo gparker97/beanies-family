@@ -166,6 +166,42 @@ export const useTodoStore = defineStore('todos', () => {
     return result ?? false;
   }
 
+  /**
+   * Put a deleted to-do back exactly as it was, for the wall's undo.
+   *
+   * `CreateTodoInput` is `Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>`, so
+   * every other field round-trips: `completed`, `completedAt`, `someday`,
+   * `dueTime`, `description` and the hint markers all survive. Only the two
+   * repository-stamped timestamps are lost.
+   *
+   * TWO deliberate differences from `createTodo`, both load-bearing:
+   *
+   * 1. No `trackFeature`. A restore is not a new feature use, and counting it
+   *    would inflate the to-do adoption metric by one for every undo.
+   * 2. An idempotence guard. `createWithId` is a `set` that re-stamps
+   *    `createdAt`, so a double-invoke would silently rewrite the record.
+   *    `invokeToastAction` dismisses the toast before invoking, so this should
+   *    be unreachable; one line makes it unreachable by construction rather
+   *    than by timing.
+   */
+  async function restoreTodo(todo: TodoItem): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === todo.id);
+    if (existing) return existing;
+
+    const { id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = todo;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const restored = await todoRepo.createTodoWithId(id, rest);
+        todos.value = [...todos.value, restored];
+        return restored;
+      },
+      { action: 'todoStore:restoreTodo' }
+    );
+    return result ?? null;
+  }
+
   async function toggleComplete(id: string, completedBy: string): Promise<TodoItem | null> {
     const existing = todos.value.find((t) => t.id === id);
     if (!existing) return null;
@@ -256,6 +292,7 @@ export const useTodoStore = defineStore('todos', () => {
     createTodo,
     updateTodo,
     deleteTodo,
+    restoreTodo,
     toggleComplete,
     setSomeday,
     acknowledgeHint,

@@ -10,7 +10,7 @@
  * Read-only apart from ticking list items, which is the one edit a locked wall
  * allows anywhere (same rule as `WallJobRow`).
  */
-import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, inject, onMounted, onBeforeUnmount } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { activityEmoji } from '@/utils/activityEmoji';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -18,7 +18,9 @@ import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
-import { WALL_LOCK } from '@/components/wall/wallLockKey';
+import { useWallLock } from '@/components/wall/wallLockKey';
+import { WALL_EDIT } from '@/components/wall/wallEditKey';
+import WallAddRow from '@/components/wall/WallAddRow.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -52,9 +54,6 @@ const props = defineProps<{
   allTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
   orphanLists: WallListGroup[];
-  /** Adding — the edits an unlocked wall allows. */
-  addListItem: (listId: string, title: string) => Promise<boolean>;
-  addTodo: (title: string) => Promise<boolean>;
 }>();
 const emit = defineEmits<{
   close: [];
@@ -63,41 +62,14 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const lock = inject(WALL_LOCK, undefined);
-
 /**
- * Adding is the only edit the padlock actually gates. Ticking is always allowed
- * (that is the wall's whole purpose) and activities are read-only here by
- * design — a wall is for display, and the app is where you edit an activity.
+ * Editing is what the padlock gates. Ticking is always allowed (that is the
+ * wall's whole purpose) and activities are read-only here by design — a wall is
+ * for display, and the app is where you edit an activity.
  */
-const canAdd = computed(() => lock?.isLocked.value === false);
-const draft = ref<Record<string, string>>({});
-const adding = ref<string | null>(null);
+const { canEdit } = useWallLock();
+const edit = inject(WALL_EDIT, undefined);
 
-const todoDraft = ref('');
-const addingTodo = ref(false);
-
-async function submitTodo() {
-  if (!todoDraft.value.trim() || addingTodo.value) return;
-  addingTodo.value = true;
-  lock?.noteActivity();
-  const ok = await props.addTodo(todoDraft.value);
-  addingTodo.value = false;
-  if (ok) todoDraft.value = '';
-}
-
-async function submitItem(listId: string) {
-  const title = draft.value[listId] ?? '';
-  // Guard on THIS list. A shared guard blocked every other list's add while one
-  // was in flight, but their buttons stayed enabled — so the tap did nothing and
-  // said nothing.
-  if (!title.trim() || adding.value === listId) return;
-  adding.value = listId;
-  lock?.noteActivity();
-  const ok = await props.addListItem(listId, title);
-  adding.value = null;
-  if (ok) draft.value = { ...draft.value, [listId]: '' };
-}
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
@@ -532,22 +504,11 @@ const { identityFor } = useActivityIdentity();
             editing" is only half true. Added unassigned and due today, which is
             what someone standing at the wall means by "remember this".
           -->
-          <form v-if="canAdd" class="mt-2 flex gap-2" @submit.prevent="submitTodo">
-            <input
-              v-model="todoDraft"
-              :placeholder="t('wall.todo.add')"
-              :aria-label="t('wall.todo.add')"
-              :disabled="addingTodo"
-              class="font-inter wall-sheet-line dark:border-line-strong dark:bg-surface-ground min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2"
-            />
-            <button
-              type="submit"
-              class="font-outfit text-primary-500 wall-sheet-line shrink-0 rounded-xl bg-[var(--tint-orange-15)] px-3 py-2 font-bold disabled:opacity-50"
-              :disabled="addingTodo || !todoDraft.trim()"
-            >
-              <span aria-hidden="true">+</span>
-            </button>
-          </form>
+          <WallAddRow
+            v-if="canEdit && edit"
+            :placeholder="t('wall.todo.add')"
+            :submit="edit.addTodo"
+          />
         </template>
 
         <!-- every list, or just one, tickable -->
@@ -580,25 +541,11 @@ const { identityFor } = useActivityIdentity();
                 list" is the natural thing to do standing at a kitchen screen,
                 and it is the payload that makes unlocking mean something.
               -->
-              <form v-if="canAdd" class="mt-2 flex gap-2" @submit.prevent="submitItem(list.id)">
-                <input
-                  :value="draft[list.id] ?? ''"
-                  :placeholder="t('wall.list.addItem')"
-                  :aria-label="t('wall.list.addItem')"
-                  :disabled="adding === list.id"
-                  class="font-inter wall-sheet-line dark:border-line-strong dark:bg-surface-ground min-w-0 flex-1 rounded-xl border border-[rgba(44,62,80,0.15)] bg-white px-3 py-2"
-                  @input="
-                    draft = { ...draft, [list.id]: ($event.target as HTMLInputElement).value }
-                  "
-                />
-                <button
-                  type="submit"
-                  class="font-outfit text-primary-500 wall-sheet-line shrink-0 rounded-xl bg-[var(--tint-orange-15)] px-3 py-2 font-bold disabled:opacity-50"
-                  :disabled="adding === list.id || !(draft[list.id] ?? '').trim()"
-                >
-                  <span aria-hidden="true">+</span>
-                </button>
-              </form>
+              <WallAddRow
+                v-if="canEdit && edit"
+                :placeholder="t('wall.list.addItem')"
+                :submit="(title: string) => edit!.addListItem(list.id, title)"
+              />
               <p class="font-inter wall-card-sub mt-2 text-[var(--muted-text,#4d5d6c)]">
                 {{
                   fillTemplate(t('wall.list.progress'), {
