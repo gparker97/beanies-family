@@ -168,6 +168,12 @@ describe('uiStrings', () => {
       'wall.job.undo',
       'wall.removeFailed.',
       'wall.undoFailed.',
+      // The wall setup card's device checklist, which is a separate case from the
+      // destructive copy above: these lines tell a parent what to change on a real
+      // device (its screen lock, its app pinning), so "keep your bean awake" is an
+      // instruction a reader could act wrongly on. `wall.setup.help.` is
+      // deliberately NOT here; that key is a link label, not an instruction.
+      'wall.setup.tips.',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

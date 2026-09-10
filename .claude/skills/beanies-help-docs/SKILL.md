@@ -267,13 +267,15 @@ If a new category is needed (e.g., "Troubleshooting", "FAQs"), propose it with:
 
 For reference, the current help center contains these articles:
 
-**Getting Started (6):**
+**Getting Started (8):**
 - Creating Your First Pod
 - Adding Family Members
 - Language & Currency
 - Connecting Google Drive
 - Moving your pod between local file and Google Drive
 - Installing beanies.family as an app
+- Family holidays on the planner
+- Set up the beanie wall on a tablet *(device setup: screen lock, Guided Access / screen pinning, orientation, mounting and charging; linked from the Beanie Wall card in Settings)*
 
 **Features (16):**
 - Managing Accounts

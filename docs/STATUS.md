@@ -2200,6 +2200,52 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
+### Session 2026-09-11 (1) — the wall's "setup helper" now exists (UNDEPLOYED)
+
+**Origin: a promise on a live marketing page with nothing behind it.** greg asked whether the
+"setup helper" mentioned on the switching pages was real. It was not. `web/src/pages/from/skylight.astro`
+promises one three times (`:840`, `:926`, `:950`, live on prod, verified by curl), and the original
+beanie-wall plan's requirement 17 had specified it as a Help Center article
+(`getting-started/set-up-the-beanie-wall`, a phase 7 deliverable) that was never written.
+greg's call: **the copy stays, we build the thing**.
+
+**Shipped (on `main`, not deployed):**
+
+- **The article.** `set-up-the-beanie-wall` in `src/content/help/getting-started.ts`. Apple and
+  Android blocks both unconditionally visible (never sniffed, because the reader is usually on
+  their phone holding the tablet). Device paths verified against Apple, Google and Samsung's own
+  docs rather than written from memory. Covers all six of the original plan's scope notes: PIN
+  prerequisite, battery swelling at 100%, the orientation matrix, the wake-lock caveat, Android
+  menu variance, and no finances on the wall. Rendered and checked at 200 in `dev:web`, 12 unique
+  heading ids, 12 distinct TOC rows, listed on the category page and in `help-index.json`.
+- **`WallSetupCard`** gains a three-line platform-aware nudge plus a prominent help link.
+  Deliberately a nudge, not a checklist: greg's constraint was that it must not look intimidating.
+- **`isWakeLockSupported()` moved to `capabilities.ts`**, not exported from `useWakeLock`. That
+  composable acquires a lock on setup via `watch(..., { immediate: true })`, so a Settings card
+  asking it a question would have held a real screen lock while someone read their settings. A
+  test asserts the card never imports it.
+- **`getDevicePlatform()`** added to the same seam and `PwaReinstallModal` migrated onto it
+  (it had the identical branch inline). **`openHelpArticle`** extracted to `src/utils/helpLinks.ts`
+  with `HELP_PATHS`, and `CreatePodWelcome` migrated onto it; its two existing tests pass unmodified,
+  which is the evidence the extraction was faithful.
+
+**⚠️ OUT OF SCOPE, decided and not to be re-proposed: a help link in the wall's lock dropdown.**
+greg asked for one, then dropped it on the reasoning. The padlock menu opens with **no challenge**,
+so any child can tap it, and `/help/*` is not an in-app route: `src/router/index.ts:37` does
+`window.location.replace(MARKETING_URL + path)` cross-origin off the app. A help entry there is an
+ungated route out of the wall that bypasses the PIN-gated Leave, which is the exact thing that gate
+exists to prevent, and under Guided Access it either dies as a dead tap or strands a child on the
+marketing site. `WallLockMenu.vue` is unmodified.
+
+**Verification:** `npm run lint` exit 0, `type-check` clean, full unit suite **7358 passed / 601
+files**, article rendered in a real browser build. Plan (all four passes recorded):
+`docs/plans/2026-09-11-beanie-wall-setup-help.md`.
+
+**Deferred, written down so it is not done by accident:** five more hand-built help-article URLs
+(`ActivityViewEditModal`, `TodoItemRow`, `OnboardingAccount`, `PwaReinstallModal`, `useInstallNudge`)
+still bypass `helpLinks`; `platformLabel.formFactor()` keeps its own UA parse on purpose (its
+`desktop`/`device` tokens are Slack strings). The `helpLinks.ts` docblock is what stops the count growing.
+
 ### 🚀 Session 2026-09-10 (7) — 0.19 SHIPPED TO ALL FOUR SURFACES. The credential arc is finally live. 🚀
 
 > **Last updated:** 2026-09-10. Deployed commit `1f9b1ba0` (`APP_VERSION` 0.18 → 0.19,

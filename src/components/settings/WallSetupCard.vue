@@ -20,6 +20,9 @@ import PinSettings from '@/components/settings/PinSettings.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
+import { getDevicePlatform, isWakeLockSupported } from '@/services/sync/capabilities';
+import { openHelpArticle, HELP_PATHS } from '@/utils/helpLinks';
+import { wallDeviceTipKeys } from '@/utils/wallDeviceTips';
 
 const router = useRouter();
 const { t } = useTranslation();
@@ -38,6 +41,22 @@ const member = computed(() =>
 const canEnterWall = computed(() => !!(member.value?.pinHash || member.value?.passwordHash));
 
 const pinModalOpen = ref(false);
+
+/**
+ * The device nudge: three signposts, not a checklist. The full instructions
+ * live in the help article, because a wall of device settings on the card is
+ * the thing most likely to stop someone trying the wall at all.
+ *
+ * Resolved once at setup rather than as a `computed`: neither the OS nor
+ * wake-lock support can change while this card is mounted, and a `computed`
+ * would imply otherwise. Note this asks `capabilities` for wake-lock SUPPORT
+ * and never touches `useWakeLock`, which would acquire a real lock on setup.
+ */
+const tipKeys = wallDeviceTipKeys(getDevicePlatform(), isWakeLockSupported());
+
+function openSetupHelp(): void {
+  openHelpArticle(HELP_PATHS.wallSetup, 'wall-setup-card');
+}
 
 function start() {
   if (canEnterWall.value) {
@@ -73,6 +92,28 @@ watch(canEnterWall, (ready) => {
     <p v-if="!canEnterWall" class="text-secondary-400 dark:text-ink-soft mt-3 text-sm">
       {{ t('wall.setup.needsPin.message') }}
     </p>
+
+    <p class="text-secondary-400 dark:text-ink-soft mt-4 text-sm">
+      {{ t('wall.setup.tips.lead') }}
+    </p>
+    <ul class="mt-2 space-y-1">
+      <li
+        v-for="key in tipKeys"
+        :key="key"
+        class="text-secondary-400 dark:text-ink-soft flex gap-2 text-sm leading-snug"
+      >
+        <span class="text-primary-500 dark:text-accent-lift shrink-0" aria-hidden="true">•</span>
+        <span>{{ t(key) }}</span>
+      </li>
+    </ul>
+    <button
+      type="button"
+      data-testid="wall-setup-help"
+      class="text-primary-500 dark:text-accent-lift mt-3 text-sm font-semibold hover:underline"
+      @click="openSetupHelp"
+    >
+      {{ t('wall.setup.help.link') }}
+    </button>
 
     <BaseButton class="mt-4" @click="start">
       {{ canEnterWall ? t('wall.setup.start') : t('wall.setup.setPinAndStart') }}

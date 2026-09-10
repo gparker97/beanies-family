@@ -14,6 +14,7 @@
 import { onScopeDispose, ref, watch } from 'vue';
 import { useToday } from '@/composables/useToday';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isWakeLockSupported } from '@/services/sync/capabilities';
 
 type WakeLockLike = {
   released: boolean;
@@ -22,7 +23,10 @@ type WakeLockLike = {
 };
 
 export function useWakeLock(surface: string) {
-  const supported = typeof navigator !== 'undefined' && 'wakeLock' in navigator;
+  // The predicate itself lives in `capabilities.ts` so a surface that only wants
+  // the ANSWER can ask without importing this composable, which acquires a lock
+  // on setup. One definition, two very different callers.
+  const supported = isWakeLockSupported();
   const active = ref(false);
   const lastError = ref<string | null>(null);
 

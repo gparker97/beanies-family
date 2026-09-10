@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-11
+
+### Added
+
+- **There is now a guide for setting a tablet up as the beanie wall.** Turning the wall on was the easy part; keeping the screen awake and stopping a child tapping their way into another app are settings on the tablet itself, and nothing explained them. The new guide covers both, with separate steps for iPads and Android tablets, plus which way up the wall works on each device, where to hang it, and why leaving it charging at 100% all day is bad for the battery.
+- **The Beanie Wall card in Settings now says what the tablet needs.** Three short lines, matched to the device you are on (Guided Access on an iPad, screen pinning on Android), and a link to the full guide. On a device whose browser cannot hold the screen awake by itself, the first line says so, because there the tablet's own screen-lock setting is the only thing keeping the wall lit.
+
 ## 2026-09-10
 
 ### Added
