@@ -7,12 +7,13 @@ import { mount } from '@vue/test-utils';
 import { nextTick, ref } from 'vue';
 import CelebrationConfetti from '../CelebrationConfetti.vue';
 import { resetCelebrationSeen } from '@/composables/useCelebrationSeen';
+import { useReducedMotion } from '@/composables/useReducedMotion';
 
 // A real ref, not `{ value: false }`: the template auto-unwraps a ref, but a
 // plain object is simply truthy, which would silently force reduced motion on
 // and make every "it animates" assertion pass for the wrong reason.
 vi.mock('@/composables/useReducedMotion', () => ({
-  useReducedMotion: () => ({ prefersReducedMotion: ref(false) }),
+  useReducedMotion: vi.fn(() => ({ prefersReducedMotion: ref(false) })),
 }));
 
 const mountConfetti = (props: Record<string, unknown> = {}) =>
@@ -66,72 +67,6 @@ describe('CelebrationConfetti', () => {
       mountConfetti({ variant: 'drawer' });
       expect(await stillCount(mountConfetti({ density: 'month' }))).toBe(0);
     });
-
-    it('uses the falling animation, not the card drop', async () => {
-      const drawer = mountConfetti({ variant: 'drawer' });
-      expect(drawer.findAll('.confetti-rain').length).toBeGreaterThan(0);
-      expect(drawer.findAll('.confetti-drop')).toHaveLength(0);
-    });
-
-    /**
-     * Tight on both, so the shower lands as ONE burst. At the old 45ms the
-     * twentieth piece began after the first had already finished, which is a
-     * queue rather than a celebration.
-     */
-    it('staggers tightly, so the pieces arrive together as a burst', async () => {
-      const delayOf = (w: ReturnType<typeof mountConfetti>, i: number) =>
-        (w.findAll('.confetti-piece')[i].element as HTMLElement).style.getPropertyValue(
-          '--fall-delay'
-        );
-      expect(delayOf(mountConfetti({ variant: 'drawer' }), 2)).toBe('28ms');
-      resetCelebrationSeen();
-      expect(delayOf(mountConfetti(), 2)).toBe('20ms');
-    });
-
-    /**
-     * The regression this exists for: the fall used to be `translateY(-140%)`,
-     * and a percentage there resolves against the bean's OWN height. At 7px tall
-     * that made "rain in from above" a 9.8px drift over 900ms, which is slower
-     * than the card's 10px drop and read as floating rather than falling.
-     */
-    it('falls a real distance, in px, not a percentage of a 7px bean', () => {
-      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll(
-        '.confetti-piece'
-      );
-      const falls = beans.map((b) =>
-        Number.parseInt((b.element as HTMLElement).style.getPropertyValue('--bean-fall'), 10)
-      );
-      expect(falls.every((f) => f >= 150)).toBe(true);
-      // More than one distance, or the shower is a rigid sheet on rails.
-      expect(new Set(falls).size).toBeGreaterThan(1);
-    });
-
-    it('varies duration and drift out of step with each other', () => {
-      const beans = mountConfetti({ variant: 'drawer', density: 'wall' }).findAll(
-        '.confetti-piece'
-      );
-      const durations = new Set(
-        beans.map((b) => (b.element as HTMLElement).style.getPropertyValue('--fall-ms'))
-      );
-      const sways = new Set(
-        beans.map((b) => (b.element as HTMLElement).style.getPropertyValue('--bean-sway'))
-      );
-      expect(durations.size).toBeGreaterThan(1);
-      expect(sways.size).toBeGreaterThan(1);
-    });
-
-    it('falls a shorter way on a card than in a drawer', () => {
-      const fall = (w: ReturnType<typeof mountConfetti>) =>
-        Number.parseInt(
-          (w.findAll('.confetti-piece')[0].element as HTMLElement).style.getPropertyValue(
-            '--bean-fall'
-          ),
-          10
-        );
-      const drawer = fall(mountConfetti({ variant: 'drawer' }));
-      resetCelebrationSeen();
-      expect(fall(mountConfetti({ density: 'card' }))).toBeLessThan(drawer);
-    });
   });
 
   describe('the piece is confetti, not a bean', () => {
@@ -183,13 +118,94 @@ describe('CelebrationConfetti', () => {
       await nextTick();
       expect(w.findAll('.confetti-drifts').length).toBeGreaterThan(0);
     });
+  });
 
-    it('starts only once that piece has landed', () => {
-      const p = mountConfetti({ variant: 'drawer' }).findAll('.confetti-piece')[3]
+  /**
+   * The popper. Pieces used to fall onto fixed scatter positions spread from 8%
+   * to 92% down the panel, so they stopped IN MID-AIR; no easing makes that look
+   * natural because nothing stops halfway down. They now leave one corner, arc,
+   * and land on the floor.
+   */
+  describe('the corner popper', () => {
+    /** The burst is gated on `animate`, decided in `onMounted`, so it needs a tick. */
+    async function burstPieces(w: ReturnType<typeof mountConfetti>) {
+      await nextTick();
+      return w.findAll('.cf-x');
+    }
+
+    it('fires in a drawer', async () => {
+      expect((await burstPieces(mountConfetti({ variant: 'drawer' }))).length).toBeGreaterThan(0);
+    });
+
+    it('does not fire on a card, which has no floor worth landing on', async () => {
+      expect(await burstPieces(mountConfetti({ density: 'card' }))).toHaveLength(0);
+      expect(await burstPieces(mountConfetti({ density: 'wall' }))).toHaveLength(0);
+    });
+
+    it('lands its pieces across the whole width, not in a heap', async () => {
+      const lands = (await burstPieces(mountConfetti({ variant: 'drawer' }))).map((p) =>
+        Number.parseInt((p.element as HTMLElement).style.getPropertyValue('--land'), 10)
+      );
+      expect(Math.min(...lands)).toBeLessThan(10);
+      expect(Math.max(...lands)).toBeGreaterThan(88);
+      // Evenly, rather than clustered wherever a hash happened to land.
+      expect(new Set(lands).size).toBeGreaterThan(lands.length / 2);
+    });
+
+    it('throws every piece up before gravity takes it down', async () => {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const apexes = w
+        .findAll('.cf-y')
+        .map((p) =>
+          Number.parseInt((p.element as HTMLElement).style.getPropertyValue('--apex'), 10)
+        );
+      expect(apexes.every((a) => a < 0)).toBe(true);
+      expect(new Set(apexes).size).toBeGreaterThan(1);
+    });
+
+    it('spins pieces both ways, so the throw does not look mechanical', async () => {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const spins = w
+        .findAll('.cf-p')
+        .map((p) =>
+          Number.parseInt((p.element as HTMLElement).style.getPropertyValue('--spin'), 10)
+        );
+      expect(spins.some((v) => v > 0)).toBe(true);
+      expect(spins.some((v) => v < 0)).toBe(true);
+    });
+
+    it('does not fire under reduced motion: the popper is pure movement', async () => {
+      vi.mocked(useReducedMotion).mockReturnValueOnce({ prefersReducedMotion: ref(true) });
+      expect(await burstPieces(mountConfetti({ variant: 'drawer' }))).toHaveLength(0);
+    });
+  });
+
+  describe('the scatter it leaves behind', () => {
+    const inDelay = (w: ReturnType<typeof mountConfetti>) =>
+      Number.parseInt(
+        (w.findAll('.confetti-piece')[0].element as HTMLElement).style.getPropertyValue(
+          '--in-delay'
+        ),
+        10
+      );
+
+    it('waits for the drawer floor to settle before fading in', () => {
+      expect(inDelay(mountConfetti({ variant: 'drawer' }))).toBeGreaterThan(1000);
+    });
+
+    it('arrives at once on a card, which had no burst to wait for', () => {
+      expect(inDelay(mountConfetti({ density: 'card' }))).toBe(0);
+    });
+
+    it('starts its drift only after it has arrived', () => {
+      const el = mountConfetti({ variant: 'drawer' }).findAll('.confetti-piece')[4]
         .element as HTMLElement;
-      const delay = Number.parseInt(p.style.getPropertyValue('--fall-delay'), 10);
-      const dur = Number.parseInt(p.style.getPropertyValue('--fall-ms'), 10);
-      expect(Number.parseInt(p.style.getPropertyValue('--drift-delay'), 10)).toBe(delay + dur);
+      const arrive = Number.parseInt(el.style.getPropertyValue('--in-delay'), 10);
+      expect(Number.parseInt(el.style.getPropertyValue('--drift-delay'), 10)).toBeGreaterThan(
+        arrive
+      );
     });
   });
 });
