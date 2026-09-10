@@ -111,7 +111,6 @@ export interface WallJobsInput {
  */
 export type WallSheetTarget =
   | { kind: 'activity'; activityId: string; ymd: string }
-  | { kind: 'lists' }
   | { kind: 'todos' }
   | { kind: 'list'; listId: string }
   | { kind: 'trip' }

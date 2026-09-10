@@ -13,14 +13,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - New `beanie-video` skill for cutting, branding and delivering videos, GIFs and loops from raw family footage. Covers shot selection, the ffmpeg craft, two named look presets (oval photo-frame and full-bleed), and fitting platform file-size caps. Ships eight helper scripts: clip probing, contact sheets, face-driven per-shot framing, watermark and frame-plate generation, GIF budget search, animated WebP, and output verification.
+- **You can now add to any list from the wall itself.** Unlock the wall and every list on the chore board gets its own box, so nobody has to work out which list they are in first.
+- **You can rename and remove jobs on the wall too.** Tap a job's words to rename it in place; the bin at the end of the row removes it and offers Undo for a few seconds. Both appear only while the wall is unlocked. Ticking is untouched, and tapping anywhere on a locked row still ticks it.
 
 ### Fixed
 
+- **The beanie wall's chore board no longer hides jobs it has room for.** A column stopped after seven rows and offered "+N more", which opened a drawer listing every family member's lists rather than the one you were reading, so a child tapping it lost their place. The column now shows everything and scrolls, which it was already able to do.
+- **A travel plan on the wall now shows the whole trip.** It was showing the first three flights and nothing else: a fourth flight was missing, and hotels and ground transport never appeared at all. Every booking is now there, in the order it happens, grouped by day. Anything without dates yet is listed under "still deciding" instead of being left out.
 - **The sign-in screen no longer mentions a password your family has never had.** The line under the heading, the note under the field and the "don't have the password?" card all said "password" regardless of how your family actually opens its file. A family that signs in with a recovery passphrase is now told about the passphrase, and one that uses a recovery kit is not told about a password at all.
 - **A family file that nothing can open now says so and stops there**, instead of also offering a Recovery Code box for a kit it does not have, with the explanation printed twice above it.
 
 ### Changed
 
+- **The wall's trip card leads with the flight name as one line.** The airport codes are no longer bolded separately from the arrow between them. The card also now only ever shows flights, so it cannot start leading with a hotel.
+- Trip times on a dark screen are readable again; the caption above them was below the contrast floor.
 - **The first sign-in screen now says what it is actually doing.** Opening your family happens in two steps: your beanpod is decrypted, and then you sign in as a member. The screen was titled "Sign In", which is the second step, while asking for the secret that does the first. It now reads "unlock my beanpod", says whose data it is decrypting and what happens next, and uses the same wording whether you open it with a password, a family passphrase or your recovery kit.
 - **Signing in with your family passphrase no longer asks you to replace a PIN that works.** Because a passphrase is the normal way onto a device that has never seen your family, arriving that way used to land you on "set a new PIN" as though you had lost yours. It now takes you to your usual sign-in, with a new PIN one tap away if you do need one. Using your recovery kit still leads with setting a new PIN, which is what a kit is for.
 - **A screen no longer tells you you're in with your recovery kit when you used your family passphrase.** This was fixed twice: the first fix reached only one of the two ways a passphrase can open your family file, so signing in from the file-load screen still called it a kit.

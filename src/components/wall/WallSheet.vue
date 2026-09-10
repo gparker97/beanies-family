@@ -15,7 +15,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { activityEmoji } from '@/utils/activityEmoji';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
-import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
+import WallTripTimeline from '@/components/wall/WallTripTimeline.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useWallLock } from '@/components/wall/wallLockKey';
@@ -31,14 +31,7 @@ import { isRecurring, listProgress } from '@/utils/listLifecycle';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { activityDetailRows } from '@/utils/activityDetails';
-import { useVacationStore } from '@/stores/vacationStore';
-import {
-  bookingProgress,
-  computeAccommodationGaps,
-  daysUntilTrip,
-  tripCountdownKey,
-  tripTypeEmoji,
-} from '@/utils/vacation';
+import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
 import { UNASSIGNED } from '@/utils/wallJobs';
@@ -73,8 +66,8 @@ const edit = inject(WALL_EDIT, undefined);
 
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
-const vacationStore = useVacationStore();
-const { mealsToday, trip } = useWallPeripherals();
+const { mealsToday, trip, tripVacation, groupedByDate, accommodationGaps, undatedItems } =
+  useWallPeripherals();
 
 /**
  * Read the discriminated union through a local first. Narrowing on
@@ -125,6 +118,7 @@ const activity = computed(() => {
  */
 const sheetLists = computed<WallListGroup[]>(() => {
   const value = target.value;
+  if (value.kind !== 'list') return [];
   const allowed = props.visibleMemberIds ? new Set(props.visibleMemberIds) : null;
   const all = [
     ...familyStore.sortedHumans
@@ -135,8 +129,7 @@ const sheetLists = computed<WallListGroup[]>(() => {
     // out of reach.
     ...props.orphanLists,
   ];
-  if (value.kind === 'list') return all.filter((g) => g.list.id === value.listId);
-  return all;
+  return all.filter((g) => g.list.id === value.listId);
 });
 
 /**
@@ -146,16 +139,15 @@ const sheetLists = computed<WallListGroup[]>(() => {
  * second opinion that ends up disagreeing with the trip page.
  */
 const tripDetail = computed(() => {
-  const summary = trip.value;
-  if (!summary) return null;
-  const vacation = vacationStore.vacations.find((v) => v.id === summary.id);
+  const vacation = tripVacation.value;
   if (!vacation) return null;
   const booking = bookingProgress(vacation);
   return {
     emoji: tripTypeEmoji(vacation.tripType, vacation.tripPurpose),
     booking,
     unbooked: booking.total - booking.booked,
-    gaps: computeAccommodationGaps(vacation).length,
+    // From the composable, rather than deriving the gaps a second time here.
+    gaps: accommodationGaps.value.length,
     countdownKey: tripCountdownKey(vacation.tripType, vacation.tripPurpose) as UIStringKey,
     daysAway: vacation.startDate ? daysUntilTrip(vacation.startDate) : null,
   };
@@ -166,8 +158,6 @@ const sheetTitle = computed(() => {
   switch (value.kind) {
     case 'activity':
       return activity.value?.title ?? t('wall.sheet.activity');
-    case 'lists':
-      return t('wall.sharedLists');
     case 'list':
       return sheetLists.value[0]?.list.title ?? t('wall.sharedLists');
     case 'todos':
@@ -522,7 +512,7 @@ const { identityFor } = useActivityIdentity();
         </template>
 
         <!-- every list, or just one, tickable -->
-        <template v-else-if="target.kind === 'lists' || target.kind === 'list'">
+        <template v-else-if="target.kind === 'list'">
           <div
             class="grid gap-3"
             style="grid-template-columns: repeat(auto-fit, minmax(230px, 1fr))"
@@ -695,35 +685,11 @@ const { identityFor } = useActivityIdentity();
               </span>
             </div>
             <!--
-              Leaving and arriving are the only things anybody walks up to a
-              wall to check about a trip, so each leg leads with the app's own
-              "departs → arrives" band rather than a squashed one-line summary.
-              `SegmentWhenBand` is reused verbatim — same component, same
-              formatting, same ocean-teal travel identity as the trip page.
+              Every booking, in the order it happens: flights, stays and ground
+              transport alike. This used to be the first three TRAVEL segments
+              and nothing else.
             -->
-            <div v-for="leg in trip.legs" :key="leg.id" class="wall-leg mt-3 first:mt-0">
-              <p class="font-outfit wall-sheet-line mb-1 flex items-center gap-2 font-bold">
-                <template v-if="leg.from && leg.to">
-                  {{ leg.from }}
-                  <span class="text-[#00b4d8]" aria-hidden="true">→</span>
-                  {{ leg.to }}
-                </template>
-                <template v-else>{{ leg.title }}</template>
-                <span
-                  v-if="leg.reference"
-                  class="font-inter wall-card-sub text-[var(--muted-text,#4d5d6c)]"
-                >
-                  {{ leg.reference }}
-                </span>
-                <span
-                  v-if="!leg.booked"
-                  class="font-outfit wall-card-sub dark:text-terracotta-lift ml-auto rounded-lg bg-[var(--vacation-gold-tint,rgba(255,217,61,0.18))] px-2 py-0.5 font-semibold text-amber-700"
-                >
-                  <span aria-hidden="true">⏳</span> {{ t('wall.trip.unbookedLeg') }}
-                </span>
-              </p>
-              <SegmentWhenBand v-if="leg.band" :band="leg.band" />
-            </div>
+            <WallTripTimeline :groups="groupedByDate" :undated="undatedItems" />
           </div>
         </template>
       </div>

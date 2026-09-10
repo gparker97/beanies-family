@@ -16,14 +16,14 @@ import { useListStore } from '@/stores/listStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { isWallSafeList } from '@/utils/wallJobs';
 import { isFiled } from '@/utils/listLifecycle';
-import { buildWhenBand, tripDayProgress, tripPhase } from '@/utils/vacation';
-import type { WhenBand } from '@/utils/vacation';
+import { tripDayProgress, tripPhase } from '@/utils/vacation';
 import { SLOT_EMOJI, SLOT_INDEX } from '@/constants/mealSlots';
 import type { FamilyList, FamilyMember, MealPlanEntry, MealSlot } from '@/types/models';
 
@@ -37,20 +37,6 @@ export interface WallMeal {
   cook: FamilyMember | null;
 }
 
-export interface WallTripLeg {
-  id: string;
-  from?: string;
-  to?: string;
-  reference?: string;
-  title: string;
-  booked: boolean;
-  /**
-   * The same "departs → arrives" band the app's expanded segment card shows.
-   * `null` when the segment has neither a date nor a time to lead with.
-   */
-  band: WhenBand | null;
-}
-
 export interface WallTrip {
   id: string;
   name: string;
@@ -60,7 +46,6 @@ export interface WallTrip {
   /** 0–100, only meaningful once the trip has started. */
   percent: number;
   phase: ReturnType<typeof tripPhase>;
-  legs: WallTripLeg[];
 }
 
 export function useWallPeripherals() {
@@ -102,9 +87,17 @@ export function useWallPeripherals() {
     return meals.find((m) => m.slot === 'dinner') ?? meals[meals.length - 1] ?? null;
   });
 
+  /**
+   * The raw vacation behind the wall's trip, exposed so the sheet does not
+   * re-look it up. That second lookup was both a second source of truth and a
+   * real if rare failure mode: when the find missed, the whole trip body
+   * rendered empty with nothing logged.
+   */
+  const tripVacation = computed(() => vacationStore.upcomingVacations[0]);
+
   /** The trip in flight, else the next one coming. */
   const trip = computed<WallTrip | null>(() => {
-    const vacation = vacationStore.upcomingVacations[0];
+    const vacation = tripVacation.value;
     if (!vacation) return null;
     const progress = tripDayProgress(vacation, today.value);
     return {
@@ -117,20 +110,25 @@ export function useWallPeripherals() {
       endDate: vacation.endDate,
       percent: progress ? Math.round((progress.day / progress.total) * 100) : 0,
       phase: tripPhase(vacation, today.value),
-      // `buildWhenBand` is the app's own timing rule — reused rather than
-      // re-read off the segment here, so the wall cannot disagree with the trip
-      // page about when a flight leaves.
-      legs: vacation.travelSegments.slice(0, 3).map((segment) => ({
-        id: segment.id,
-        from: segment.departureAirport,
-        to: segment.arrivalAirport,
-        reference: [segment.airline, segment.flightNumber].filter(Boolean).join(' ') || undefined,
-        title: segment.title,
-        booked: segment.status === 'booked',
-        band: buildWhenBand('travel', segment)?.band ?? null,
-      })),
     };
   });
+
+  /**
+   * The itinerary, from the app's OWN timeline rule.
+   *
+   * This used to be a hand-rolled `vacation.travelSegments.slice(0, 3)` — the
+   * only place in the app that built its own leg list, and the only one with a
+   * cap, so a trip with four flights showed three and a trip with a hotel
+   * showed none of it. `useVacationTimeline` already merges all three entity
+   * types, orders them by date then time with untimed last, groups them by day
+   * and attaches each one's when-band; the travel page has rendered it in
+   * production all along. The wall now reads the same thing rather than holding
+   * a second opinion about what a trip contains.
+   */
+  const { timelineItems, groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(
+    tripVacation,
+    today
+  );
 
   /**
    * Active lists, minus the private categories.
@@ -149,5 +147,15 @@ export function useWallPeripherals() {
     listStore.lists.filter((l) => !isFiled(l) && isWallSafeList(l))
   );
 
-  return { mealsToday, tonight, trip, lists };
+  return {
+    mealsToday,
+    tonight,
+    trip,
+    tripVacation,
+    timelineItems,
+    groupedByDate,
+    accommodationGaps,
+    undatedItems,
+    lists,
+  };
 }
