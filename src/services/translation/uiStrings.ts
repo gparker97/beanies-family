@@ -6437,7 +6437,6 @@ const STRING_DEFS = {
     en: 'The item could not be restored. Add it again, or open the list in the app.',
     beanie: 'the item could not be restored. add it again, or open the list in the app.',
   },
-  'wall.job.remove': { en: 'Remove', beanie: 'remove' },
   'wall.job.removed': { en: 'Removed "{title}"', beanie: 'removed "{title}"' },
   'wall.job.undo': { en: 'Undo', beanie: 'undo' },
   'wall.job.rename': { en: 'Rename', beanie: 'rename' },
