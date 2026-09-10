@@ -15,6 +15,7 @@ relatedPosts:
   - getting-your-beans-in-a-row
   - my-life-could-use-some-helpful-hints
   - mommy-whats-for-dinner-tonight
+  - beanie-wall-for-your-whole-family
 tags:
   - family-organization
   - routines
