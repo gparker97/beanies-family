@@ -14,6 +14,15 @@
  *   - WebP quality 80
  *   - EXIF stripped (phone photos carry GPS coordinates of your home)
  *
+ * ANIMATED INPUT (gif / animated webp) is detected and kept animated. This used to
+ * be the script's sharpest edge: `sharp(input)` reads only the FIRST FRAME unless it
+ * is opened with `{ animated: true }`, so an 84-frame celebration gif came out as a
+ * single frozen frame, every verification below still passed, and the still shipped.
+ * Nothing failed. So animated files are re-opened with `{ animated: true }`, and the
+ * frame count is now an assertion rather than an assumption. `.rotate()` is skipped
+ * for them: there is no EXIF on a gif, and rotate on a multi-page pipeline mangles
+ * the frame strip.
+ *
  * The Astro build injects width/height into the <img> at build time
  * (web/src/lib/rehype-image-dims.mjs), so there is no CLS to worry about — but that
  * plugin only *reads* the file. If the file is missing it logs and moves on, and the
@@ -71,32 +80,51 @@ async function optimize(input, opts) {
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
-  const src = sharp(input).rotate(); // honour EXIF orientation, then drop the EXIF
+  // Probe first: `pages` is only reported when the file is opened as animated, so
+  // this read decides which pipeline the real work uses.
+  const probe = await sharp(input, { animated: true }).metadata();
+  const frames = probe.pages ?? 1;
+  const animated = frames > 1;
+
+  // rotate() only for stills — see the ANIMATED INPUT note in the header.
+  const src = animated ? sharp(input, { animated: true }) : sharp(input).rotate();
   const meta = await src.metadata();
+  // For a multi-page image `height` is the whole frame strip; `pageHeight` is the
+  // one that means what a person means by "how tall is it".
+  const srcHeight = animated ? meta.pageHeight : meta.height;
 
   await src
     // `withoutEnlargement` matters: a 900px source stays 900px. Upscaling would add
     // bytes and no detail.
     .resize({ width: opts.width, withoutEnlargement: true })
-    .webp({ quality: opts.quality })
+    .webp({ quality: opts.quality, ...(animated ? { effort: 5 } : {}) })
     .toFile(outPath);
 
   /* eslint-disable security/detect-non-literal-fs-filename -- see the note above */
   const before = fs.statSync(input).size;
   const after = fs.statSync(outPath).size;
   /* eslint-enable security/detect-non-literal-fs-filename */
-  const outMeta = await sharp(outPath).metadata();
+  const outMeta = await sharp(outPath, { animated: true }).metadata();
+  const outFrames = outMeta.pages ?? 1;
+  const outHeight = animated ? outMeta.pageHeight : outMeta.height;
 
   // Verify rather than assume: a silently-zero-byte or wrong-size output would
   // surface as a broken image on the live site, long after this ran.
   if (after === 0) throw new Error(`wrote an empty file: ${outPath}`);
   if (outMeta.width > opts.width) throw new Error(`resize failed: ${outMeta.width}px`);
+  // The one that actually bit us: a flattened animation is a valid, correctly-sized,
+  // non-empty webp, so every other check above passes while the motion is gone.
+  if (outFrames !== frames) {
+    throw new Error(`frame loss: ${frames} frame(s) in, ${outFrames} out`);
+  }
 
   return {
     markdown: `/blog/${stem}.webp`,
     fsPath: outPath,
-    from: `${meta.width}x${meta.height}`,
-    to: `${outMeta.width}x${outMeta.height}`,
+    from: `${meta.width}x${srcHeight}`,
+    to: `${outMeta.width}x${outHeight}`,
+    frames,
+    animated,
     before,
     after,
   };
@@ -119,7 +147,10 @@ for (const input of inputs) {
   try {
     const r = await optimize(input, opts);
     const saved = Math.round((1 - r.after / r.before) * 100);
-    console.log(`✓ ${r.markdown}  ${r.from} -> ${r.to}  ${kb(r.before)} -> ${kb(r.after)} (-${saved}%)`);
+    const anim = r.animated ? `  animated (${r.frames} frames kept)` : '';
+    console.log(
+      `✓ ${r.markdown}  ${r.from} -> ${r.to}  ${kb(r.before)} -> ${kb(r.after)} (-${saved}%)${anim}`
+    );
   } catch (err) {
     failed++;
     console.error(`✗ ${input}: ${err.message}`);
