@@ -34,6 +34,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Everything above is now live as release 0.19**, on the web, and submitted to both app stores: Android straight to production, and iPhone to the App Store to release automatically once Apple has reviewed it.
+- **Devices below version 0.18 are now asked to update.** 0.18 is live on both stores, and a device older than that cannot read a tidied-up family file but will write over it anyway, so anything created on it in between cannot be recovered.
 - **The wall's trip card leads with the flight name as one line.** The airport codes are no longer bolded separately from the arrow between them. The card also now only ever shows flights, so it cannot start leading with a hotel.
 - Trip times on a dark screen are readable again; the caption above them was below the contrast floor.
 - **The tick circles on the wall are visible in dark mode.** An unticked circle was drawn in a colour that all but disappeared against a dark screen, so the one control the board exists for could not be seen.

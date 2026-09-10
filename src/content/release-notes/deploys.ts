@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.10',
+    date: '2026-09-10',
+    month: '10 september 2026',
+    summary: {
+      en: 'Signing in is clearer, and the beanie wall can be edited from the wall.',
+      beanie: 'signing in is clearer, and the beanie wall can be edited from the wall.',
+    },
+    features: [
+      {
+        icon: '\u{1F513}',
+        title: { en: 'Signing in makes sense now', beanie: 'signing in makes sense now' },
+        description: {
+          en: 'The first screen says what it is doing: unlocking your family file, then signing you in. It asks for the secret your family actually uses, the family passphrase has one name everywhere, and the ways in that used to dead-end all go through now.',
+          beanie:
+            'the first screen says what it is doing: unlocking your family file, then signing you in. it asks for the secret your family actually uses, the family passphrase has one name everywhere, and the ways in that used to dead-end all go through now.',
+        },
+      },
+      {
+        icon: '\u{1F4FA}',
+        title: {
+          en: 'A wall you can fix from the wall',
+          beanie: 'a wall you can fix from the wall',
+        },
+        description: {
+          en: 'Unlock the beanie wall to add, rename and remove jobs in place, with Undo. The chore board stops hiding jobs behind “+N more”, and a travel plan now shows the whole trip.',
+          beanie:
+            'unlock the beanie wall to add, rename and remove jobs in place, with undo. the chore board stops hiding jobs behind “+N more”, and a travel plan now shows the whole trip.',
+        },
+        tryItRoute: '/wall',
+        tryItLabel: { en: 'Open the wall', beanie: 'open the wall' },
+      },
+    ],
+  },
+  {
     version: '2026.09.09',
     date: '2026-09-09',
     month: '9 september 2026',
