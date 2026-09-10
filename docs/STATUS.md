@@ -2035,6 +2035,15 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Validated 2026-09-10 (session 6).** Every carried entry re-checked by fingerprint.
+> **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
+> — done this session, and it found four defects; see the session-6 block. Still OPEN by
+> fingerprint: `beanies-plan` has no implement/review/fix phases (SKILL.md still ends at
+> Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
+> `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
+> at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
+> **7 commits**, not 4 — last prod deploy is still `3127e20e`.
+>
 > **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
 > `infrastructure/modules/registry/main.tf:80`; `jojo` still `inactive` + `disabled`
@@ -2058,31 +2067,40 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > sustainably so those phases are part of the skill rather than retyped each time.
 > Keep the four-pass plan discipline intact; the new phases come AFTER Phase 4/5.
 >
-> **1. Verify the credential fix in a BROWSER** (2026-09-09 session 5). The
-> password/passphrase work is CODE-COMPLETE and pushed, and **none of it is visually
-> verified** — `docs/lessons.md` is explicit that green tests have hidden real defects on
-> exactly this surface. The full testing plan was printed to greg in session 5; the three
-> that matter most:
+> **1. ✅ DONE — the credential fix is browser-verified** (2026-09-10). Four defects found
+> and fixed, seven commits, all pushed, NONE deployed. See the session-6 block. What is
+> still owed and CANNOT be automated: the two-device passphrase repro over real Drive; a
+> legacy family with a DEAD Drive token reaching the reconnect panel; `login-flow`
+> telemetry in CloudWatch (needs a deploy); dark + Large reading mode on ProveView /
+> RecoverySettings / ResetMemberPinModal; on-device iOS/Android.
 >
-> - **The reported repro**: create a family with a PIN in session A, open session B —
->   it must ask for the Recovery Code and offer **no** password option; then set a
->   passphrase in A and confirm B accepts it **without clearing data**.
-> - **A LEGACY family** (a pre-0.13R2 `.beanpod` with `wrappedKeys`), cold, no roster
->   cache: the password field must still appear and still work. This is the regression
->   risk, and it is untested. Also with a dead Drive token: it must reach the RECONNECT
->   panel, not a recovery terminal with the password silently withdrawn.
-> - **A passphrase-only family**: must get a passphrase field, never a Recovery Code box.
->   This is the regression `/code-review` caught — gating the kit form's escape on
->   `caps.password` had left such a family unable to open its file at all.
+> **1b. Review findings deliberately NOT fixed this session** (from `/code-review max`,
+> all recorded here rather than in a branch):
 >
-> Then Chinese (two CTAs were hand-fixed after the pipeline broke them), dark mode and
-> Large reading mode on ProveView / LoadPodView / RecoverySettings / ResetMemberPinModal,
-> and — after a deploy — the new `login-flow` telemetry in CloudWatch
-> (`prove_methods_resolved` carrying `+suppressed:password`, `envelope_capabilities_unknown`,
-> `envelope_capabilities_changed`). **Nothing from session 5 is deployed.**
->
-> ⚠️ Not reachable without a hand-edited envelope, so untested by anyone: the degenerate
-> "nothing can open this file" terminal (`coldCredentialSurface` → `'none'`).
+> - **`JoinPodView.vue:713` is a second, capability-BLIND unlock modal.** It hardcodes
+>   `password.password` over any envelope, so a kit-born or passphrase-only `.beanpod`
+>   opened on the join path gets a "Password" field that can only throw — the ORIGINAL
+>   reported bug, unfixed on that surface. It also inherited this session's reworded
+>   `loginV6.unlockTitle` / `unlockSubtitle` / `unlockButton` without review, so it now
+>   promises "Next, you'll sign in as a member" to a joiner who will actually create a new
+>   account. **The right fix is the shared one:** move `secretField` out of LoadPodView
+>   into `fileSync.ts` beside `coldCredentialSurface` as `credentialCopy(caps)` returning
+>   the `{label, placeholder, footer, switchLabel, required}` key set, and have LoadPodView,
+>   JoinPodView and ProveView all call it. Three reviewers independently reached this same
+>   conclusion. Deserves its own plan.
+> - **`loginV6.unlockButton` and `recovery.unlock` are now byte-identical** ("Unlock My
+>   Beanpod"), created by this session's rewording. Merge one into the other.
+> - **`loginFlow.recoveryOnlyBody` has two consumers that want different sentences.** On
+>   LoadPodView's degenerate terminal it names a kit and a passphrase the envelope
+>   provably lacks; on ProveView's recovery pane the new "nothing on this device can open
+>   this beanpod" wording is false, because that pane is routinely shown with the pod
+>   already open. Needs splitting into two keys.
+> - **`startInKitEntry` is not gated on `caps.kit`** (`LoadPodView.vue:89`): a legacy
+>   password-only family tapping "use a recovery kit" on the prove screen gets a Recovery
+>   Code field over an envelope with no kit wraps.
+> - **The plan for this session has no Observability Coverage section**, which CLAUDE.md
+>   requires. The three-way credential branch emits no `logEvent`, so "it won't let me in"
+>   cannot be triaged from CloudWatch alone.
 >
 > **2. Raise the update floor 0.17 → 0.18** once 0.18 is live on BOTH stores (~half a
 > day after the 2026-09-09 submission; check App Store Connect and Play). Edit
@@ -2097,6 +2115,88 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > stage 6 unimplemented (no `carryLocalOnly`/`localOnlyEntities` symbol anywhere
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
+
+### ⭐⭐ Session 2026-09-10 (6) — THE CREDENTIAL FIX, VERIFIED. Four defects found. Still NOT deployed. ⭐⭐
+
+> **Last updated:** 2026-09-10. `e8aaa4dd` → `97b26d2b` → `954fccc0` → `7779a3f0` →
+> `a83d811e` → `be84c8db` on `main`, all PUSHED. **NOTHING DEPLOYED — the undeployed
+> backlog is now 7 commits deep, last prod deploy `3127e20e`.**
+>
+> **The task:** verify session 5's credential work, which shipped with green tests and no
+> browser check at all. The test plan was NOT lost — it survived as § Testing Plan in
+> `docs/plans/2026-09-09-credential-vocabulary-and-offer-correctness.md`, all 13 items.
+>
+> ⭐ **THE DRIVE-FREE BROWSER ROUTE.** LoadPodView's drop-file path parses an envelope
+> WITHOUT decrypting it, so a hand-built `.beanpod` dropped on `div[role="button"].border-dashed`
+> reaches the real credential surface with no OAuth token, no Drive mock and no Picker. This
+> is the seam every previous session assumed did not exist (an Explore agent's §5 lists
+> OAuth, the Picker and the OS file picker as hard blockers — the drop path sidesteps all
+> three, Chromium-only). Five envelope shapes × two widths × two themes, all from the real
+> app. **Use this again; it is by far the cheapest real verification available.**
+>
+> **FOUR DEFECTS, none of which the 7178 green tests saw:**
+>
+> 1. **The degenerate envelope fell into the kit form.** `nothingCanOpenIt` gated the secret
+>    form off, but the kit form below was a bare `v-else`, so an envelope with no wraps at
+>    all got a Recovery Code field and the honest message printed twice. The acceptance
+>    criterion "never the kit form" had never been exercised because it needs a hand-edited
+>    file.
+> 2. **Copy naming credentials the envelope cannot accept** — the unconditional subtitle,
+>    the footer ("this password" under a passphrase field), the "Don't have the password?"
+>    card, and later the empty-field error ("Password is required" on a passphrase field).
+> 3. **greg's report: a passphrase sign-in demanded a new PIN**, under copy saying "you're
+>    in with your recovery kit". Fixed by splitting `recoveryMode: boolean` into
+>    `recoveryOpenedBy: 'kit' | 'passphrase' | null`. greg then tightened the rule: **only
+>    the recovery kit may reset a PIN, ever.** A PIN reset hands over a member's IDENTITY,
+>    and of the two family-level secrets the passphrase is the loosely-held one (memorised,
+>    typed on devices, spoken aloud in a house with children). Enforced in BOTH layers —
+>    `ProveView` hides it, `useLoginFlow.onResetPin` refuses it.
+> 4. ⚠️ **THE FIX FOR 3 DID NOT WORK, and greg found that too.** `LoadPodView` emitted
+>    `'file-loaded': [source?: 'recovery']` — one token for two secrets — and `LoginPage`
+>    mapped every `'recovery'` to `'kit'`. Only `useLoginFlow.runOpening` had been fixed.
+>    Worse: once the reset became kit-only, that path **laundered a passphrase into kit
+>    authority**, admitting exactly who the gate excluded. `/code-review max` found this
+>    independently via SIX of its finders. The channel now carries `RecoveryOpener | null`
+>    and `LoginPage` passes it through unchanged.
+>
+> ⚠️ **THE GUARD TESTS WERE ASSERTING THE BEANIE OVERLAY, NOT ENGLISH.** `beanieMode` is
+> `ref(true)` by default, so a component test that never touches it renders beanie alone.
+> `loginV6.unlockNoPasswordHint` said "no password needed up front" in `en` while its
+> `beanie` value did not — so "kit-born family names no password ANYWHERE" passed against a
+> string that named a password to every English and Chinese reader. Both guards now run in
+> both overlays. **This is the more transferable finding of the two;** see `docs/lessons.md`.
+>
+> **THE FRAMING + THE TERMINOLOGY** (greg's direction, decided via AskUserQuestion):
+> the unlock screen is **step 1 of 2** and now says so. Heading is a constant "Unlock My
+> Beanpod" on both forms (it read "Sign In to {family}", which describes step 2 while
+> performing step 1, while its own kit form four lines below said "Open My Family"). The
+> family name moved into the subtitle. Headings and CTAs name the object as the **beanpod**;
+> subtitles spell out that a beanpod is your family's data.
+> **`recovery passphrase` → `family passphrase` everywhere** (it had SIX noun phrases, and
+> "recovery" was simultaneously the Settings section name and the adjective on the kit, the
+> code AND the passphrase). "Recovery" now means the printed kit alone. Settled in the theme
+> skill's enforced terminology table with the two-step credential model.
+>
+> **TESTS:** +31 (7178 → 7209). `LoadPodView.credentialSurface` (18),
+> `ProveView.recoveryOpener` (5), `useLoginFlow.guards` (8, renamed from `.staging`).
+> **Every guard was mutation-tested** — including one round where the first version of a
+> copy test passed against BOTH the fixed and the buggy code, because the pane it asserted
+> on was not rendered on the landing screen. Mutation testing caught that, not review.
+>
+> **zh:** ~30 strings regenerated and READ, not trusted. Ten hand-fixed: 要么 as a dangling
+> conjunction; 会员 (a club member) for "family member"; 密码短语 vs 恢复密码 vs 家庭密码
+> inconsistency; 康复工具包 (a _rehabilitation_ kit) for the recovery kit; 系列 ("series")
+> for the family; a stray space before a full-width question mark.
+>
+> **Terraform:** `terraform plan` (with `~/.beanies-tf.env`, NOT `~/.tfvars.env` which does
+> not exist) reports **"No changes"** and zero drift. Nothing today touches infrastructure.
+>
+> **Gates:** 7209 tests, `type-check`, `lint` (0 errors), `security:lint`, `npm run translate`
+> all green.
+>
+> Plan: `docs/plans/2026-09-10-unlock-step-framing-and-family-passphrase.md`
+> Prompts: `docs/prompts/2026-09/2026-09-10-credential-verification-and-unlock-framing.md`
+> Lessons: two added (widening a type; the beanie-overlay test blindness).
 
 ### ⭐⭐ Session 2026-09-09 (5) — THE CREDENTIAL-OFFER FIX. Pushed, NOT deployed, NOT browser-verified. ⭐⭐
 

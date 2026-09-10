@@ -4,6 +4,62 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## When you widen a type, walk every producer of the value
+
+**Date:** 2026-09-10
+**Context:** A boolean `recoveryMode` conflated two family-level secrets (recovery kit,
+family passphrase) that want different screens and different authority. It was widened to
+`recoveryOpenedBy: 'kit' | 'passphrase' | null`, the consumer (`ProveView`) was updated, a
+test was written, three mutations were caught, and it shipped.
+
+It did not work. `LoadPodView` produces that value through a Vue emit that was declared
+`'file-loaded': [source?: 'recovery']` — ONE token for both secrets — and `LoginPage` mapped
+every `'recovery'` to `'kit'`. So the passphrase route the change existed to fix still
+arrived labelled a kit. Only the OTHER passphrase route, inside `useLoginFlow`, had been
+touched. greg found it by using the app; a `/code-review max` then found it independently
+via six of its finders.
+
+It was worse than cosmetic. The same session had narrowed the PIN-reset authorization gate
+to `=== 'kit'`, on the reasoning that a PIN reset hands over a member's identity and the
+passphrase is the more loosely-held secret. That mislabelling path _laundered a passphrase
+into kit authority_, so the gate admitted exactly who it was written to exclude.
+
+The tests could not see it. `ProveView`'s set the prop by hand; `LoadPodView`'s never
+emitted. Both ends were tested and the seam between them was not.
+
+**Rule:** widening a type is not done when the consumer compiles. Grep every producer of
+the old value and check each one can express the new distinction — a narrower channel
+upstream (an emit signature, an event payload, a DB column, a query param) will silently
+force a receiver to invent the missing half. Test the SEAM, not just the two ends: assert
+on the emitted payload, not on a prop you set yourself.
+
+---
+
+## A component test asserts one translation overlay, not the copy
+
+**Date:** 2026-09-10
+**Context:** `LoadPodView.credentialSurface.test.ts` guarded the central rule of the
+credential work — "a kit-born family is never shown the word password" — with
+`expect(w.text().toLowerCase()).not.toContain('password')`. It passed. Meanwhile
+`loginV6.unlockNoPasswordHint` ended "no password needed up front" in its `en` value while
+its `beanie` value did not.
+
+`translationStore.ts` declares `const beanieMode = ref(true)`, so any component test that
+does not touch it renders the beanie overlay alone. The guard proved the rule for beanie
+mode and said nothing about the English (or the Chinese, which is generated from `en`) that
+a reader with beanie mode off actually sees.
+
+Restoring the old copy afterwards fails the English variants and still passes the beanie
+ones, which is the diagnosis in one line.
+
+**Rule:** any assertion about the PRESENCE OR ABSENCE of a word in rendered output must run
+in both overlays — `it.each([true, false])` with `setBeanieMode(beanie)`. The two values are
+authored independently and drift independently, which is the whole point of the dual
+standard. Related: never assert on a string the test itself wrote into the component; read
+it from `getSourceText(key)` so a regression in the real copy fails the test.
+
+---
+
 ## Review the premise, not just the mechanism
 
 **Date:** 2026-09-09
