@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick, ref } from 'vue';
 import { __resetEscapeCloseForTests } from '@/composables/useEscapeClose';
+import { __resetWallRowEditForTests } from '@/composables/useWallRowEdit';
 import WallJobRow from '../WallJobRow.vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import { WALL_LOCK } from '../wallLockKey';
@@ -55,7 +56,13 @@ function mountRow(
 }
 
 describe('WallJobRow', () => {
-  beforeEach(() => __resetEscapeCloseForTests());
+  beforeEach(() => {
+    __resetEscapeCloseForTests();
+    // The active row is module-level (one row edits at a time, across every wall
+    // surface), so a test that leaves one open would put the next test's row
+    // straight into edit mode.
+    __resetWallRowEditForTests();
+  });
 
   describe('locked: the tick is the whole row, exactly as before', () => {
     it('ticks when the tick itself is tapped', async () => {
@@ -257,6 +264,92 @@ describe('WallJobRow', () => {
 
       expect(wrapper.find('input').exists()).toBe(false);
       expect(wrapper.findComponent(ActionButtons).exists()).toBe(false);
+    });
+  });
+
+  /**
+   * One row at a time. Two live inputs on a wall is a state nobody can reason
+   * about, and an unchanged row used to stay open forever because the
+   * commit-on-blur path only runs when the draft is dirty.
+   */
+  describe('only one row edits at a time', () => {
+    function twoRows() {
+      const writers = {
+        addListItem: vi.fn().mockResolvedValue(true),
+        addTodo: vi.fn().mockResolvedValue(true),
+        renameJob: vi.fn().mockResolvedValue(true),
+        removeJob: vi.fn().mockResolvedValue(true),
+      };
+      const provide = {
+        [WALL_LOCK as symbol]: { isLocked: ref(false), noteActivity: vi.fn() },
+        [WALL_EDIT as symbol]: writers,
+      };
+      const a = mount(WallJobRow, {
+        props: { job, pending: false },
+        global: { provide },
+      });
+      const b = mount(WallJobRow, {
+        props: { job: { ...job, key: 'list:l1:i2', itemId: 'i2', title: 'towel' }, pending: false },
+        global: { provide },
+      });
+      return { a, b, writers };
+    }
+
+    const openRename = (w: ReturnType<typeof mount>) =>
+      w.get('button:not([aria-pressed])').trigger('click');
+
+    it('closes the first row when a second is tapped', async () => {
+      const { a, b } = twoRows();
+      await openRename(a);
+      expect(a.find('input').exists()).toBe(true);
+
+      await openRename(b);
+      await nextTick();
+
+      expect(a.find('input').exists()).toBe(false);
+      expect(b.find('input').exists()).toBe(true);
+    });
+
+    it('SAVES the first row rather than discarding it when switching', async () => {
+      const { a, b, writers } = twoRows();
+      await openRename(a);
+      await a.get('input').setValue('swim cap');
+
+      await openRename(b);
+      await nextTick();
+
+      expect(writers.renameJob).toHaveBeenCalledWith(job, 'swim cap');
+    });
+
+    it('lets the new row keep the claim when the old row tears down', async () => {
+      const { a, b } = twoRows();
+      await openRename(a);
+      await openRename(b);
+      await nextTick();
+      // a's input unmounted and blurred on the way out; b must survive that.
+      expect(b.find('input').exists()).toBe(true);
+    });
+
+    it('closes on blur even when nothing was changed', async () => {
+      const { a } = twoRows();
+      await openRename(a);
+      expect(a.find('input').exists()).toBe(true);
+
+      await a.get('input').trigger('blur');
+      await nextTick();
+
+      expect(a.find('input').exists()).toBe(false);
+    });
+
+    it('closes on blur after a change, and saves it', async () => {
+      const { a, writers } = twoRows();
+      await openRename(a);
+      await a.get('input').setValue('goggles case');
+      await a.get('input').trigger('blur');
+      await nextTick();
+
+      expect(a.find('input').exists()).toBe(false);
+      expect(writers.renameJob).toHaveBeenCalledWith(job, 'goggles case');
     });
   });
 });

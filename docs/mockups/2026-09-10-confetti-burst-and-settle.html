@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>confetti: burst, settle, ambient</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --page:#eef1f4; --surface:#fff; --ink:#2c3e50; --muted:#4d5d6c;
+        --line:rgba(44,62,80,.15); --orange:#f15d22; --annotation:#64748b;
+        --card-shadow:0 4px 20px rgb(44 62 80 / 5%); --field:rgba(44,62,80,.05);
+      }
+      html.dark {
+        --page:#0f161d; --surface:#1e2a36; --ink:#f2f5f7; --muted:#c3ced6;
+        --line:#4a5b69; --orange:#ff8b5e; --annotation:#c3ced6;
+        --card-shadow:0 4px 20px rgb(0 0 0 / 20%); --field:rgba(255,255,255,.05);
+      }
+      *{box-sizing:border-box}
+      body{background:var(--page);color:var(--ink);font-family:Inter,system-ui,sans-serif;margin:0;padding:0 0 5rem}
+      .doc{margin:0 auto;max-width:1180px;padding:0 1.25rem}
+      .head{align-items:flex-end;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;margin-bottom:2.5rem;padding:2.5rem 0 1.25rem}
+      h1{font-family:Outfit,sans-serif;font-size:1.5rem;font-weight:800;margin:0 0 .3rem}
+      .head p{color:var(--annotation);font-size:.9rem;margin:0;max-width:64ch}
+      button.ctl{background:var(--surface);border:1px solid var(--line);border-radius:999px;color:var(--ink);cursor:pointer;font-family:Outfit,sans-serif;font-size:.85rem;font-weight:700;min-height:2.75rem;padding:0 1.1rem}
+      button.ctl:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+      section{margin-bottom:3rem}
+      h2{font-family:Outfit,sans-serif;font-size:1.1rem;font-weight:800;margin:0 0 .35rem}
+      .lede{color:var(--annotation);font-size:.92rem;line-height:1.55;margin:0 0 1.5rem;max-width:74ch}
+      .row{display:grid;gap:1.25rem;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+      .label{align-items:baseline;display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem}
+      .label strong{font-family:Outfit,sans-serif;font-size:.95rem;font-weight:800}
+      .label span{color:var(--annotation);font-size:.85rem}
+      .tag{background:rgb(241 93 34/15%);border-radius:999px;color:var(--orange);font-family:Outfit,sans-serif;font-size:.68rem;font-weight:800;letter-spacing:.06em;padding:.12rem .5rem;text-transform:uppercase}
+      .tag.n{background:rgba(44,62,80,.1);color:var(--muted)}
+      html.dark .tag.n{background:rgba(255,255,255,.1)}
+      .note{border-left:3px solid rgb(241 93 34/25%);color:var(--annotation);font-size:.86rem;line-height:1.55;margin:.9rem 0 0;max-width:72ch;padding-left:.9rem}
+      .note strong{color:var(--ink)}
+
+      /* the drawer under test */
+      .drawer{background:var(--surface);border-radius:24px;box-shadow:var(--card-shadow);height:330px;isolation:isolate;overflow:hidden;padding:1.3rem;position:relative}
+      .drawer h3{font-family:Outfit,sans-serif;font-size:1.35rem;margin:0 0 .9rem}
+      .drawer .field{background:var(--field);border-radius:14px;margin-bottom:.6rem;padding:.6rem .85rem;position:relative}
+      .drawer .field b{display:block;font-family:Outfit,sans-serif;font-size:1rem}
+      .drawer .field span{color:var(--muted);font-size:.72rem}
+
+      /* ── the layers ───────────────────────────────────────────────── */
+      .layer{inset:0;overflow:hidden;pointer-events:none;position:absolute}
+      .layer.behind{z-index:-1}
+
+      /*
+       * A piece is three nested boxes, which is what buys a real ARC:
+       *   .cf-x  full-size, moves horizontally  (ease-OUT = air drag)
+       *   .cf-y  full-size, moves vertically    (up then down, gravity)
+       *   .cf-p  the visual, spins
+       * X and Y need independent easing; one transform cannot do that, which is
+       * why the current version can only ever move in a straight line.
+       */
+      .cf-x,.cf-y{inset:0;position:absolute}
+      .cf-p{bottom:var(--rest);position:absolute;left:0}
+      .cf-p i{display:block}
+      .f-rect{background:var(--c);border-radius:1px;height:4px;width:9px}
+      .f-strip{background:var(--c);border-radius:1px;height:9px;width:3px}
+      .f-curl{background:var(--c);border-radius:60% 0;height:8px;width:8px}
+      .f-disc{background:var(--c);border-radius:50%;height:6px;width:6px}
+
+      /* BURST */
+      .burst .cf-x{animation:fly-x var(--dur) cubic-bezier(.12,.72,.35,1) both;animation-delay:var(--delay)}
+      .burst .cf-y{animation:fly-y var(--dur) both;animation-delay:var(--delay)}
+      .burst .cf-p{animation:spin var(--dur) linear both;animation-delay:var(--delay)}
+      @keyframes fly-x{from{transform:translateX(var(--x0))}to{transform:translateX(var(--x1))}}
+      @keyframes fly-y{
+        0%{transform:translateY(0);animation-timing-function:cubic-bezier(.2,.7,.4,1)}
+        38%{transform:translateY(var(--apex));animation-timing-function:cubic-bezier(.5,0,.85,.6)}
+        100%{transform:translateY(0)}
+      }
+      @keyframes spin{from{transform:rotate(var(--r0))}to{transform:rotate(var(--r1))}}
+
+      /* AMBIENT: fades in across the card once the burst has landed, then breathes */
+      .ambient .cf-p{animation:fade-in 900ms ease-out both,breathe 6200ms ease-in-out infinite;animation-delay:var(--adelay),calc(var(--adelay) + 900ms)}
+      @keyframes fade-in{from{opacity:0;transform:rotate(var(--r1)) scale(.4)}to{opacity:1;transform:rotate(var(--r1)) scale(1)}}
+      @keyframes breathe{0%,100%{transform:translate3d(0,0,0) rotate(var(--r1))}50%{transform:translate3d(2px,-3px,0) rotate(calc(var(--r1) + 5deg))}}
+
+      /* TODAY, for comparison */
+      .today .cf-p{animation:drop-today var(--dur) cubic-bezier(.45,.02,.75,.35) backwards;animation-delay:var(--delay)}
+      @keyframes drop-today{
+        0%{opacity:0;transform:translate3d(var(--sx),calc(var(--fall) * -1),0) rotate(calc(var(--r1) - 300deg))}
+        6%{opacity:1}
+        100%{opacity:1;transform:translate3d(0,0,0) rotate(var(--r1))}
+      }
+      @media (prefers-reduced-motion:reduce){.cf-x,.cf-y,.cf-p{animation:none!important}}
+    </style>
+  </head>
+  <body>
+    <div class="doc">
+      <header class="head">
+        <div>
+          <h1>confetti: burst, settle, ambient</h1>
+          <p>
+            Three phases, per your description: a popper fires from a corner, gravity brings the
+            pieces down to the floor where they pile, and only then does a quiet scatter fade in
+            across the card. Replay any block.
+          </p>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="ctl" onclick="document.documentElement.classList.toggle('dark')">light / dark</button>
+          <button class="ctl" onclick="replayAll()">replay all</button>
+        </div>
+      </header>
+
+      <section>
+        <h2>The three options</h2>
+        <p class="lede">
+          Same pieces, same colours, same drawer. What differs is where the burst comes from.
+        </p>
+        <div class="row" id="row"></div>
+        <p class="note">
+          <strong>Why today's cannot be fixed by tuning:</strong> its pieces land on fixed
+          scatter positions spread from 8% to 92% down the panel, so they stop
+          <strong>in mid-air</strong>. No easing makes that look natural, because nothing in the
+          world stops halfway down. Settling on a floor is the whole difference.
+          <br /><br />
+          <strong>Is it heavy?</strong> No. Each piece is three nested spans instead of one, so a
+          drawer holds 60 small elements rather than 20, and everything animates
+          <code>transform</code> and <code>opacity</code> only, which stay on the compositor. The
+          three nested boxes are what buy the arc: horizontal and vertical need
+          <em>different</em> easing (drag out, gravity down), and a single transform cannot do
+          that, which is exactly why today's can only ever travel in a straight line.
+          <br /><br />
+          <strong>My pick is two corners.</strong> One corner reads slightly lopsided in a wide
+          panel, and the wall drawer is very wide. Two is symmetrical and costs nothing.
+        </p>
+      </section>
+    </div>
+
+    <script>
+      const POD = ['#2C3E50', '#E67E22', '#F15D22', '#AED6F1'];
+      const FORMS = ['f-rect', 'f-strip', 'f-curl', 'f-disc'];
+      const SCATTER = [[8,18,-38],[46,74,20],[78,26,-12],[26,58,46],[92,62,-56],[16,84,30],[60,12,-24],[36,34,64],[70,88,-8],[4,46,38],[52,44,-48],[86,8,16],[22,8,-30],[64,62,58],[40,92,-14],[96,38,42],[12,66,-62],[74,48,26],[30,22,-44],[56,78,50]];
+      const rnd = (i, a, b) => a + (((i * 2654435761) % 1000) / 1000) * (b - a);
+
+      function build(el, form, colour) {
+        const x = document.createElement('span'); x.className = 'cf-x';
+        const y = document.createElement('span'); y.className = 'cf-y';
+        const p = document.createElement('span'); p.className = 'cf-p';
+        const i = document.createElement('i'); i.className = form;
+        i.style.setProperty('--c', colour);
+        p.appendChild(i); y.appendChild(p); x.appendChild(y); el.appendChild(x);
+        return { x, y, p };
+      }
+
+      /** the popper: pieces leave a corner, arc, and land on the floor */
+      function burst(layer, corners) {
+        layer.innerHTML = '';
+        layer.className = 'layer burst';
+        SCATTER.forEach((_, i) => {
+          const from = corners[i % corners.length];       // 0 = left, 1 = right
+          const { x, y, p } = build(layer, FORMS[i % 4], POD[i % 4]);
+          // Spread by INDEX with a little jitter, not by hash alone: a pure hash
+          // clumped the pile into one heap instead of laying it along the floor.
+          const n = SCATTER.length;
+          const slot = (i / n) * 88 + 4;                  // 4% .. 92%, evenly
+          const pull = from === 0 ? -6 : 6;               // each popper throws its own way
+          const land = Math.max(2, Math.min(95, slot + pull + rnd(i + 11, -5, 5)));
+          x.style.setProperty('--x0', (from === 0 ? -2 : 102) + '%');
+          x.style.setProperty('--x1', land + '%');
+          y.style.setProperty('--apex', -(rnd(i + 7, 42, 88)) + '%');
+          p.style.setProperty('--rest', rnd(i + 3, 0, 9) + 'px');
+          p.style.setProperty('--r0', rnd(i, 0, 90) + 'deg');
+          p.style.setProperty('--r1', rnd(i + 5, 220, 900) + 'deg');
+          x.style.setProperty('--dur', Math.round(rnd(i + 1, 1250, 1750)) + 'ms');
+          y.style.setProperty('--dur', Math.round(rnd(i + 1, 1250, 1750)) + 'ms');
+          p.style.setProperty('--dur', Math.round(rnd(i + 1, 1250, 1750)) + 'ms');
+          const d = Math.round(rnd(i + 9, 0, 190)) + 'ms';
+          x.style.setProperty('--delay', d); y.style.setProperty('--delay', d); p.style.setProperty('--delay', d);
+        });
+      }
+
+      /** the quiet scatter that arrives afterwards */
+      function ambient(layer, after) {
+        layer.innerHTML = '';
+        layer.className = 'layer behind ambient';
+        layer.style.opacity = 0.45;
+        SCATTER.forEach(([left, top, rotate], i) => {
+          const { x, p } = build(layer, FORMS[i % 4], POD[i % 4]);
+          x.style.transform = `translateX(${left}%)`;
+          p.style.bottom = 'auto';
+          p.style.top = top + '%';
+          p.style.setProperty('--r1', rotate + 'deg');
+          p.style.setProperty('--adelay', after + i * 40 + 'ms');
+        });
+      }
+
+      /** today, for comparison: pieces stop wherever the scatter says */
+      function todayFall(layer) {
+        layer.innerHTML = '';
+        layer.className = 'layer behind today';
+        layer.style.opacity = 0.45;
+        const FALL = [210,280,175,320,245], SWAY = [-13,9,-5,16,-10], MS = [560,640,500,600];
+        SCATTER.forEach(([left, top, rotate], i) => {
+          const { x, p } = build(layer, FORMS[i % 4], POD[i % 4]);
+          x.style.transform = `translateX(${left}%)`;
+          p.style.bottom = 'auto';
+          p.style.top = top + '%';
+          p.style.setProperty('--r1', rotate + 'deg');
+          p.style.setProperty('--fall', FALL[i % 5] + 'px');
+          p.style.setProperty('--sx', SWAY[i % 5] + 'px');
+          p.style.setProperty('--dur', MS[i % 4] + 'ms');
+          p.style.setProperty('--delay', i * 14 + 'ms');
+        });
+      }
+
+      function panel(title, sub, tag, kind) {
+        const wrap = document.createElement('div');
+        const lab = document.createElement('div');
+        lab.className = 'label';
+        lab.innerHTML = `<strong>${title}</strong><span class="tag ${tag === 'today' ? 'n' : ''}">${tag}</span><span>${sub}</span>`;
+        const d = document.createElement('div');
+        d.className = 'drawer';
+        d.innerHTML = `<h3>Leo's Birthday 🎂</h3>
+          <div class="field"><span>WHEN</span><b>09:00 – 10:00</b></div>
+          <div class="field"><span>WHO</span><b>John Doe</b></div>`;
+        const back = document.createElement('div');
+        const front = document.createElement('div');
+        front.className = 'layer';
+        d.append(back, front);
+        const run = () => {
+          if (kind === 'today') { todayFall(back); front.innerHTML = ''; front.className = 'layer'; }
+          else { burst(front, kind === 'one' ? [0] : [0, 1]); ambient(back, 1500); }
+        };
+        run();
+        const btn = document.createElement('button');
+        btn.className = 'ctl'; btn.style.marginTop = '.6rem'; btn.textContent = 'replay';
+        btn.onclick = run;
+        wrap.append(lab, d, btn);
+        return wrap;
+      }
+
+      const row = document.getElementById('row');
+      row.appendChild(panel('Today', 'pieces stop in mid-air', 'today', 'today'));
+      row.appendChild(panel('One corner', 'popper, bottom left', 'option a', 'one'));
+      row.appendChild(panel('Two corners', 'poppers, both bottom corners', 'recommended', 'two'));
+
+      function replayAll() {
+        document.querySelectorAll('button.ctl').forEach((b) => { if (b.textContent === 'replay') b.click(); });
+      }
+    </script>
+  </body>
+</html>

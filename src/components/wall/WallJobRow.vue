@@ -22,6 +22,7 @@
 import { computed, inject, ref, watch } from 'vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import { useInlineRename } from '@/composables/useInlineRename';
+import { useWallRowEdit } from '@/composables/useWallRowEdit';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
@@ -131,7 +132,11 @@ function onTick() {
  * UNLOCKED, the title area becomes the rename target. The tick keeps its own
  * button either way, so the one thing a five-year-old uses never moves.
  */
-const renaming = ref(false);
+const {
+  editing: renaming,
+  start: startRename,
+  stop: stopRename,
+} = useWallRowEdit(() => props.job.key);
 
 function onTitleTap() {
   // A row mid-write is not a row to start editing.
@@ -141,18 +146,20 @@ function onTitleTap() {
     return;
   }
   noteActivity();
-  renaming.value = true;
+  // Claiming the row closes whatever else was open, and the losing row commits
+  // a dirty draft on its way out rather than discarding it.
+  startRename();
 }
 
 const { draft, inputRef, onEnter, onBlur } = useInlineRename({
   editing: renaming,
   current: () => props.job.title,
   save: (next) => {
-    renaming.value = false;
+    stopRename();
     void edit?.renameJob(props.job, next);
   },
   cancel: () => {
-    renaming.value = false;
+    stopRename();
   },
 });
 
@@ -164,6 +171,17 @@ const { draft, inputRef, onEnter, onBlur } = useInlineRename({
  * no-op and stack a second, stale Undo.
  */
 const removing = ref(false);
+
+/**
+ * Tapping away closes the editor, whether or not anything changed.
+ *
+ * `onBlur` alone only ends the edit when the draft is dirty, because that path
+ * runs through `save`. An unchanged row therefore stayed open forever.
+ */
+function onRowBlur() {
+  onBlur();
+  stopRename();
+}
 
 async function onRemove() {
   if (props.pending || removing.value) return;
@@ -183,7 +201,7 @@ async function onRemove() {
  * blur. Close it with everything else.
  */
 watch(canEdit, (allowed) => {
-  if (!allowed) renaming.value = false;
+  if (!allowed) stopRename();
 });
 </script>
 
@@ -234,7 +252,7 @@ watch(canEdit, (allowed) => {
       :placeholder="t('wall.job.renamePlaceholder')"
       :aria-label="t('wall.job.rename')"
       @keyup.enter="onEnter"
-      @blur="onBlur"
+      @blur="onRowBlur"
       @input="noteActivity"
     />
     <!--
