@@ -15,6 +15,7 @@ import ReauthChallenge from '@/components/auth/ReauthChallenge.vue';
 import WallUnlockPad from '@/components/wall/WallUnlockPad.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import type { FamilyMember } from '@/types/models';
+import { useEscapeClose } from '@/composables/useEscapeClose';
 
 const props = defineProps<{
   isLocked: boolean;
@@ -125,17 +126,14 @@ function onDocumentPointer(event: PointerEvent) {
   if (!open.value) return;
   if (root.value && !root.value.contains(event.target as Node)) open.value = false;
 }
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') open.value = false;
-}
-onMounted(() => {
-  document.addEventListener('pointerdown', onDocumentPointer);
-  window.addEventListener('keydown', onKeydown);
-});
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointer);
-  window.removeEventListener('keydown', onKeydown);
-});
+onMounted(() => document.addEventListener('pointerdown', onDocumentPointer));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointer));
+
+// Escape goes through the SHARED stack, not a private window listener, so this
+// menu cannot eat an Escape aimed at something opened on top of it (and cannot
+// close alongside it either). The pointer listener stays: click-outside is a
+// different concern and `useEscapeClose` does not cover it.
+useEscapeClose(open, () => (open.value = false));
 </script>
 
 <template>
