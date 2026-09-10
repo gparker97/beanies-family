@@ -5,9 +5,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry';
-import { reportError } from '@/utils/errorReporter';
-import { openExternal } from '@/utils/openExternal';
-import { MARKETING_URL } from '@/utils/marketing';
+import { openHelpArticle, HELP_PATHS } from '@/utils/helpLinks';
 
 /**
  * The Create-pod welcome / "what to expect" intro. Shown once (per LoginPage
@@ -24,11 +22,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-
-// The broad "how your data stays safe" promise → the zero-knowledge overview
-// (nobody, us included, can read your data), not just the encryption mechanics.
-// Same destination as the onboarding privacy link (OnboardingAccount.vue).
-const SAFETY_HELP_URL = `${MARKETING_URL}/help/security/zero-knowledge-architecture`;
 
 // Conceptual journey (NOT literal wizard steps — see the plan). Numbered because
 // setup is a genuinely ordered sequence.
@@ -73,25 +66,12 @@ function cancel() {
 }
 
 function openSafetyHelp() {
-  // openExternal gives no success/failure signal, so record the click unconditionally.
-  logEvent({
-    level: 'info',
-    surface: 'create-welcome',
-    message: 'help_click',
-    context: { action: 'help_click' },
-  });
-  // Defense-in-depth: the URL is a compile-time constant so this catch is
-  // effectively unreachable, but a bare call must never fail silently.
-  try {
-    openExternal(SAFETY_HELP_URL);
-  } catch (error) {
-    reportError({
-      surface: 'create-welcome',
-      severity: 'warning',
-      message: 'safety help link failed',
-      error: error instanceof Error ? error : new Error(String(error)),
-    });
-  }
+  // The broad "how your data stays safe" promise → the zero-knowledge overview
+  // (nobody, us included, can read your data), not just the encryption mechanics.
+  // Same destination as the onboarding privacy link (OnboardingAccount.vue).
+  // Click logging and the never-fail-silently wrapper live in `helpLinks`, which
+  // this function used to hand-roll.
+  openHelpArticle(HELP_PATHS.zeroKnowledge, 'create-welcome');
 }
 </script>
 

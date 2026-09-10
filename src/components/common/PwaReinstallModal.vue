@@ -4,21 +4,17 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import { useStalePwaNotice } from '@/composables/useStalePwaNotice';
 import { useTranslation } from '@/composables/useTranslation';
 import { MARKETING_URL } from '@/utils/marketing';
-import { isIosOrIpadOs } from '@/services/sync/capabilities';
+import { getDevicePlatform } from '@/services/sync/capabilities';
 import { claimInterruption } from '@/composables/useSessionInterruption';
 
 const { t } = useTranslation();
 const { shouldShow, dismiss, trackInstallClicked } = useStalePwaNotice();
 
-type Platform = 'ios' | 'android' | 'desktop';
-
-const platform = computed<Platform>(() => {
-  // iOS arm via the shared primitive (also catches iPadOS-13+ desktop-UA Safari,
-  // which correctly shows the iOS install steps). Android/desktop stay inline.
-  if (isIosOrIpadOs()) return 'ios';
-  if (typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent)) return 'android';
-  return 'desktop';
-});
+// The shared OS-family seam (catches iPadOS-13+ desktop-UA Safari, which
+// correctly shows the iOS install steps). Its 'other' arm is this modal's old
+// 'desktop' arm renamed; the `pwaReinstall.desktopStep*` string keys are
+// unchanged.
+const platform = computed(getDevicePlatform);
 
 // Pure eligibility: stale-pwa notice active AND not an E2E run (the same
 // `e2e_auto_auth` guard the notifications auto-open uses — see useNotifications).

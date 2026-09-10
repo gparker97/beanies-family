@@ -762,4 +762,255 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  // \u26a0\ufe0f The "Which way up" section below describes the orientation matrix as it
+  // stands BEFORE the beanie wall's phase 8 (native Android landscape). When
+  // `@capacitor/screen-orientation` lands and `useWallOrientation` grows its
+  // native branch, revisit that paragraph: the installed Android PWA and the
+  // Android app stop being portrait-only. See
+  // docs/plans/2026-08-31-beanie-wall.md.
+  {
+    slug: 'set-up-the-beanie-wall',
+    category: 'getting-started',
+    title: 'Set up the beanie wall on a tablet',
+    excerpt:
+      'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
+    icon: '\u{1F9F1}',
+    readTime: 6,
+    updatedDate: '2026-09-11',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "The <strong>beanie wall</strong> turns a spare tablet into the family's wall display: the week, everyone's jobs, and what is happening today, big enough to read from across the kitchen. It is the thing a fridge calendar does, except it keeps itself up to date. By the end of this guide you will have the wall running on a tablet that stays awake, stays on beanies, and stays where you hung it.",
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Setting it up takes about ten minutes, once. Most of that is two settings on the tablet itself, which is what the rest of this guide is about. You only ever do it on the tablet that lives on the wall.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Leaving the wall asks for your PIN, which is what stops a child tapping their way back into the full app. So you need a PIN on your own profile before you can start. If you do not have one yet, the Beanie Wall card in Settings will offer to set one up for you first.',
+        title: 'You need a PIN first',
+        icon: '\u{1F511}',
+      },
+      {
+        type: 'heading',
+        content: 'Turn the wall on',
+        level: 2,
+        id: 'turn-the-wall-on',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On the tablet you want to use, open beanies and sign in as yourself',
+          'Go to <strong>Settings</strong> and find the <strong>Beanie Wall</strong> card',
+          'Tap <strong>Start the wall</strong> (if it says <strong>Set a PIN and start</strong>, it will walk you through the PIN first)',
+          'Pick a view from the switcher: <strong>The week</strong>, <strong>Each bean</strong>, <strong>Today</strong> or <strong>The chore board</strong>',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'That is the wall running. Everything below is about the tablet, not about beanies, and it is what turns "a browser tab that happens to be open" into something that survives a whole day on a wall.',
+      },
+      {
+        type: 'heading',
+        content: 'Make the screen stay on',
+        level: 2,
+        id: 'keep-the-screen-on',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "While the wall is showing, beanies asks the tablet to keep the screen awake by itself. Most modern browsers allow this. Some, particularly on older iPads, do not, and on those the tablet's own auto-lock setting is the <strong>only</strong> thing keeping the screen lit. Setting it either way costs nothing and means the wall does not go dark on you, so it is worth doing regardless of which tablet you have.",
+      },
+      {
+        type: 'heading',
+        content: 'Keep an iPad or iPhone awake',
+        level: 3,
+        id: 'screen-on-apple',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong> on the iPad',
+          'Tap <strong>Display &amp; Brightness</strong>',
+          'Tap <strong>Auto-Lock</strong>',
+          'Choose <strong>Never</strong>',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Keep an Android tablet awake',
+        level: 3,
+        id: 'screen-on-android',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong> on the tablet',
+          'Tap <strong>Display</strong>',
+          'Tap <strong>Screen timeout</strong>',
+          'Choose the longest option offered (many Android tablets stop at 30 minutes, which is exactly why the setting above matters)',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Android manufacturers rename these screens freely. On a Samsung tablet the wording differs slightly from a Pixel, and some models tuck screen timeout under Display, others under Advanced. If a menu name here does not match yours, search the tablet\'s own Settings for "timeout" and you will land in the right place.',
+        title: 'Android menus vary by manufacturer',
+        icon: '\u{1F50D}',
+      },
+      {
+        type: 'heading',
+        content: 'Stop small hands wandering off',
+        level: 2,
+        id: 'stop-wandering',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The wall is designed to be safe to tap: locked, it lets anyone tick a job or change the day, and nothing else. What it cannot do on its own is stop someone leaving beanies altogether and opening YouTube instead. That is a job for the tablet, and both Apple and Android have a setting for exactly it.',
+      },
+      {
+        type: 'heading',
+        content: 'Turn on Guided Access (Apple)',
+        level: 3,
+        id: 'guided-access-apple',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong>, tap <strong>Accessibility</strong>, then tap <strong>Guided Access</strong>',
+          'Turn <strong>Guided Access</strong> on',
+          'Tap <strong>Passcode Settings</strong>, then <strong>Set Guided Access Passcode</strong>, and choose a code the children do not know',
+          'Open beanies and start the wall',
+          'Triple-click the top button (the side button on older iPads). If a shortcuts panel appears, tap <strong>Guided Access</strong>',
+          'Tap <strong>Start</strong>',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To finish a Guided Access session later, triple-click the same button again and enter the passcode.',
+      },
+      {
+        type: 'heading',
+        content: 'Turn on screen pinning (Android)',
+        level: 3,
+        id: 'screen-pinning-android',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong>, tap <strong>Security and privacy</strong>, then <strong>More security settings</strong>',
+          'Tap <strong>App pinning</strong> (on a Samsung tablet this reads <strong>Allow apps to be pinned</strong>) and turn it on',
+          'Turn on the option to ask for your PIN, pattern or password before unpinning, which is the part that actually keeps a child in the app',
+          'Open beanies and start the wall',
+          'Open <strong>Recents</strong>, tap the beanies icon at the top of its card, then tap <strong>Pin</strong>',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To unpin later, touch and hold <strong>Back</strong> and <strong>Home</strong> together (or <strong>Back</strong> and <strong>Recents</strong> on a Samsung), then enter your code.',
+      },
+      {
+        type: 'heading',
+        content: 'Which way up',
+        level: 2,
+        id: 'which-way-up',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The wall is built for a landscape tablet, and that works today in a browser tab on any tablet, and in the beanies app on iPad. If you installed beanies to your Android home screen, or you are using the Android app, the wall stays portrait for now; landscape there is coming in a later release. It still works, it is just taller than it is wide. iPhones are portrait by design, and a phone screen is too narrow for the wall in any case, so beanies will tell you it needs a wider screen rather than showing you something unreadable.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you want landscape on an Android tablet today, open beanies in a browser tab rather than the installed app.',
+      },
+      {
+        type: 'heading',
+        content: 'Hanging it and keeping it charged',
+        level: 2,
+        id: 'mounting-and-charging',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Pick the spot first, then the mount.</strong> The wall earns its keep somewhere everyone passes, which is usually the kitchen. A cheap adhesive or magnetic tablet mount is all you need.',
+          '<strong>Hang it within reach of a socket.</strong> A wall tablet is a plugged-in tablet; battery life stops being the constraint and cable length starts being one.',
+          '<strong>Put it at adult eye level, not child eye level.</strong> The children can still reach it to tick things off, and it stays readable from across the room.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'A tablet held at 100% all day, every day, will swell its battery over a year or two. Many Android tablets can cap the charge for exactly this reason (look for Battery protection or Protect battery, often around 85%). Most iPads have no equivalent hard cap, though Optimised Battery Charging helps. If you can, put it on a socket or smart plug you can switch off overnight.',
+        title: 'Do not leave it charging at 100% forever',
+        icon: '\u{1F50B}',
+      },
+      {
+        type: 'heading',
+        content: 'What the wall shows, and what it never shows',
+        level: 2,
+        id: 'what-the-wall-shows',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'What is on today and this week, for everyone',
+          'Everyone\u2019s chores and the to-dos due today, ready to tick',
+          'Your beanie lists, including the shared ones like the grocery list',
+          'An upcoming trip, with its flights, hotels and transport in the order they happen',
+          'The meal plan, once that feature is switched on for your family',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          "No financial information is ever shown on the wall. No accounts, no balances, no transactions, no goals, no net worth. This is not a setting you have to remember to turn off: the wall simply has no access to any of it, whoever is signed in. A tablet on the kitchen wall is the last place your family's money should be readable from.",
+        title: 'Never any money on the wall',
+        icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'Getting back out',
+        level: 2,
+        id: 'getting-back-out',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "Tap the padlock in the corner of the wall. <strong>Unlock editing</strong> lets any grown-up in the family add, rename or remove things with their PIN, and hands the wall back to the children automatically after a couple of quiet minutes, or immediately with <strong>Lock the wall again</strong>. <strong>Start night mode now</strong> dims the screen to a large clock, which you can wake with a touch. <strong>Leave the beanie wall</strong> returns to the full app, and asks for <em>your own</em> PIN rather than any grown-up's, because it resumes your session with everything your account can reach.",
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Night mode is something you start yourself from that menu when you want it. There is no schedule to configure.',
+      },
+      {
+        type: 'heading',
+        content: 'What next',
+        level: 2,
+        id: 'what-next',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "The wall is only as useful as what is on it. If the week looks empty, add your family's activities on the <strong>Family Planner</strong>, and set up recurring chore lists in <strong>Beanie Lists</strong> so the chore board has something to tick. Both have their own guides in this help center.",
+      },
+    ],
+  },
 ];
