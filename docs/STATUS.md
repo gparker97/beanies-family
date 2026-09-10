@@ -2035,27 +2035,90 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-> **Validated 2026-09-10 (session 6).** Every carried entry re-checked by fingerprint.
+> **Validated 2026-09-10 (session 7 — the 0.19 deploy).** Every carried entry re-checked
+> by fingerprint, not carried forward blind. **2 dropped as shipped, 2 corrected.**
+> **DROPPED:** old item 2 (raise the floor 0.17 → 0.18) — done AND published this session;
+> `web/public/min-app-version.json` reads `"0.18"` and `beanies.family/min-app-version.json`
+> serves it. **DROPPED:** the "17 commits undeployed" line — the backlog is now **0 runtime
+> commits** (`3541e80b` is docs-only; last prod deploy is `1f9b1ba0` = 0.19).
+> **CORRECTED:** the credential fix's `login-flow`-telemetry check was blocked on "needs a
+> deploy" — that deploy has happened, so it is actionable today. **CORRECTED:** the
+> session-6 note below had been split mid-sentence by an inserted bullet; rejoined here.
+> Re-confirmed STILL OPEN by fingerprint: `beanies-plan` SKILL.md still ends at Phase 5;
+> `loginV6.unlockButton` + `recovery.unlock` still byte-identical (`uiStrings.ts:4056` /
+> `:4968`); `loginFlow.recoveryOnlyBody` still has its two disagreeing consumers
+> (`LoadPodView.vue:493,792` + `ProveView.vue:235`); `startInKitEntry` still ungated by
+> `caps.kit` (`LoadPodView.vue:100,508`); `dynamodb:DeleteItem` still at
+> `infrastructure/modules/registry/main.tf:80`; stage 6 still unimplemented (no
+> `carryLocalOnly` / `localOnlyEntities` anywhere in `src/`). NOT verifiable from the repo,
+> carried forward unchanged: the `jojo` restore (needs AWS; was due 2026-09-10 and did not
+> happen).
+
+> ### ⭐ 0.19 IS LIVE ON WEB. BOTH STORES ARE IN REVIEW. ⭐
 >
-> - 💲 **BRANCH IN FLIGHT: `pricing-page` (2026-09-10, session 7).** The `/pricing` page,
->   the `PRICING_LIVE` gate, and the "free for now" link sweep across the switching pages,
->   help FAQ and four blog posts all live on that branch, deliberately OFF `main` so the
->   next deploy cannot carry them. greg said: "put the page behind a gate so that it does
->   not get pushed to production in the next deploy". Two gates, on purpose: the flag
->   (`web/src/lib/pricing.ts` `PRICING_LIVE = false`) hides the page, the nav/footer links,
->   the badge link and the homepage hedge; the branch is the real gate, because the prose
->   rewrites on `/from/*`, `/help/faq` and the blog are NOT behind the flag and would
->   send readers to a draft placeholder. To ship: review the copy on the branch, flip the
->   flag, merge, then delete the branch (local + remote). To abandon: delete the branch
->   and record why here. Plan + model: `docs/plans/2026-09-10-pricing-page.md`.
->   **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
->   — done this session, and it found four defects; see the session-6 block. Still OPEN by
->   fingerprint: `beanies-plan` has no implement/review/fix phases (SKILL.md still ends at
->   Phase 5); `web/public/min-app-version.json` still reads `"0.17"`; `jojo` still
->   `inactive` (restore was due 2026-09-10 and did NOT happen); `dynamodb:DeleteItem` still
->   at `infrastructure/modules/registry/main.tf:80`. ENLARGED: the undeployed backlog is now
->   **17 commits** (`git rev-list --count 3127e20e..HEAD`), not 4 — last prod deploy is still
->   `3127e20e`.
+> Deployed `1f9b1ba0` on 2026-09-10 to all four surfaces, verified live rather than
+> assumed (the served bundle reports `"0.19"` and build sha `1f9b1ba0`, not `"dev"`).
+> Android → Play **production**; iOS → **appstore-automatic**, so it self-releases on
+> Apple's approval and **no Release click is owed**. Two things follow:
+>
+> - **On-device verification is owed on THESE builds** and cannot be done any other way.
+>   It is the only route to checking the credential arc on a real phone: the two-device
+>   passphrase repro over real Drive, a legacy family with a DEAD Drive token reaching the
+>   reconnect panel, and dark + Large reading mode on ProveView / RecoverySettings /
+>   ResetMemberPinModal.
+> - **Do NOT raise the floor to 0.19 until 0.19 is LIVE on both stores.** Raising it to a
+>   merely-submitted version is precisely the 2026-09-08 mistake; the floor file's own
+>   `NEXT:` line says the same thing.
+
+> - 💲 **BRANCH IN FLIGHT: `pricing-page` (2026-09-10, session 7) — now with 15 open
+>   review findings.** The `/pricing` page, the `PRICING_LIVE` gate, and the "free for now"
+>   link sweep across the switching pages, help FAQ and four blog posts all live on that
+>   branch, deliberately OFF `main` so a deploy cannot carry them. greg: "put the page
+>   behind a gate so that it does not get pushed to production in the next deploy."
+>   **This held through the 0.19 deploy — `/pricing` returned 404 on prod afterwards,
+>   checked, not assumed.** Two gates, on purpose: the flag (`web/src/lib/pricing.ts`
+>   `PRICING_LIVE = false`) hides the page, the nav/footer links, the badge link and the
+>   homepage hedge; the branch is the real gate, because the prose rewrites on `/from/*`,
+>   `/help/faq` and the blog are NOT behind the flag and would send readers to a draft
+>   placeholder. To ship: review the copy, fix the findings below, flip the flag, merge,
+>   then delete the branch (local + remote). To abandon: delete the branch and say why
+>   here. Plan + model: `docs/plans/2026-09-10-pricing-page.md`; prompts
+>   `docs/prompts/2026-09/2026-09-10-pricing-page.md`.
+>
+>   **`/code-review main..pricing-page` found 15 issues. None are shipping.** The four
+>   that matter before greg reads the copy:
+>
+>   1. **`DraftPlaceholder` is itself a full `BaseLayout`, rendered INSIDE the page's
+>      `BaseLayout`** (`pricing.astro:43`), so the gated page ships two nested HTML
+>      documents: double `<html>`/`<nav>`/`<footer>`, Plausible twice, duplicate ids that
+>      leave the mobile hamburger inert, and a second, wrong canonical. Fix with the
+>      repo's existing `{hidden ? <DraftPlaceholder/> : <BaseLayout>…}` ternary — which
+>      also fixes (2).
+>   2. **`hidden` hides from sighted users only.** Every price, all nine FAQ answers and
+>      the og:description still ship in the HTML, so the BRANCH is the only real gate —
+>      exactly as recorded above, now confirmed by review.
+>   3. **Both flagship prose blocks use `.handout`, which has no paragraph-spacing rule**,
+>      so under Tailwind preflight's `margin:0` they render as unbroken walls of text.
+>      That is "so who's paying for the free tier?" and "a note from me (greg)" — the two
+>      pieces of copy the page exists for. Fix: change two classes to `.letter`.
+>   4. **Ten of the new inline `/pricing` links are invisible as links.** They sit in
+>      `.fact`, `<details><p>` and `<td>`, none of which have an anchor rule, and preflight
+>      resets `a{color:inherit;text-decoration:inherit}`. The link sweep — the whole point
+>      of the work — cannot be seen by a reader on the switching pages. (`/help/faq` is
+>      fine; it has `.faq-a a`.)
+>
+>   Also flagged, and worth a decision rather than a patch: the free plan promises "every
+>   feature, every world" while the paid cards sell photo room and early access to worlds,
+>   contradicting the page's own "the ai helper is the only paid thing" — which ships
+>   verbatim in the FAQ JSON-LD. And `packages/brand/schema.ts:52` still declares
+>   `offers: { price: '0' }` sitewide, so answer engines would keep saying beanies is free
+>   after the flag flips. ⚠️ `web/src/pages/terms.astro` still says "provided free of
+>   charge" and wants a legal read before v1.0.
+
+> **Validated 2026-09-10 (session 6).** Every carried entry re-checked by fingerprint.
+> **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
+> — done that session, and it found four defects; see the session-6 block. (Its "still
+> OPEN" list and commit count are superseded by the session-7 validation above.)
 >
 > **Validated 2026-09-09 (session 4).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 2 corrected.** Verified still OPEN: `dynamodb:DeleteItem` at
@@ -2123,10 +2186,10 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >   requires. The three-way credential branch emits no `logEvent`, so "it won't let me in"
 >   cannot be triaged from CloudWatch alone.
 >
-> **2. Raise the update floor 0.17 → 0.18** once 0.18 is live on BOTH stores (~half a
-> day after the 2026-09-09 submission; check App Store Connect and Play). Edit
-> `web/public/min-app-version.json` AND run `deploy-web.yml` — the file reaches users
-> only through the Astro deploy, so an edit alone publishes nothing.
+> **2. ✅ DONE — the update floor is 0.18** (2026-09-10). Raised only after greg confirmed
+> 0.18 was live on BOTH stores, and shipped on a deploy that included WEB, so it actually
+> published: `beanies.family/min-app-version.json` serves `"0.18"`. The next raise is to
+> 0.19, and not until 0.19 is live on both stores.
 >
 > **Validated 2026-09-09 (session 3).** Every carried entry re-checked by
 > fingerprint. **Two dropped as shipped:** "decide on the web deploy (stages 4+5)"
