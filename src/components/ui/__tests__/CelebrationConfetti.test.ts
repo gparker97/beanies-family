@@ -208,4 +208,37 @@ describe('CelebrationConfetti', () => {
       );
     });
   });
+
+  describe('both corners fire', () => {
+    it('throws from the left AND the right', async () => {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const froms = new Set(
+        w.findAll('.cf-x').map((p) => (p.element as HTMLElement).style.getPropertyValue('--from'))
+      );
+      expect(froms).toEqual(new Set(['-3%', '103%']));
+    });
+
+    it('splits the pieces roughly evenly between them', async () => {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const left = w
+        .findAll('.cf-x')
+        .filter((p) => (p.element as HTMLElement).style.getPropertyValue('--from') === '-3%');
+      const all = w.findAll('.cf-x').length;
+      expect(left.length).toBe(all / 2);
+    });
+
+    it('still lays the pile across the full width', async () => {
+      const w = mountConfetti({ variant: 'drawer' });
+      await nextTick();
+      const lands = w
+        .findAll('.cf-x')
+        .map((p) =>
+          Number.parseInt((p.element as HTMLElement).style.getPropertyValue('--land'), 10)
+        );
+      expect(Math.min(...lands)).toBeLessThan(10);
+      expect(Math.max(...lands)).toBeGreaterThan(88);
+    });
+  });
 });

@@ -19,6 +19,12 @@ interface Props {
   /** Label shown beside the spinner while submitting. Defaults to `common.saving`. */
   submittingLabel?: string;
   showDelete?: boolean;
+  /**
+   * Extra classes for the body element — for a caller that needs to mark the
+   * whole body rather than its content, such as `is-celebration`, whose
+   * `isolation: isolate` has to sit on the same box as the layer it contains.
+   */
+  bodyClass?: string;
   /** When true, uses the #custom-header slot edge-to-edge (no padding/border). Modal only. */
   customHeader?: boolean;
   /** Render as a centered modal or a right-side drawer. */
@@ -123,9 +129,32 @@ const containerProps = computed(() => {
       </div>
     </template>
 
-    <!-- Body: Cloud White bg, scrollable -->
-    <div class="dark:bg-surface-raised/50 -mx-6 -my-6 bg-[#F8F9FA] px-6 py-5">
-      <div class="space-y-5">
+    <!--
+      Body: Cloud White bg, scrollable.
+
+      A DRAWER's body stretches to fill its panel. A drawer is full-height by
+      definition, so a short body left everything below it belonging to the
+      panel rather than the body — which is invisible until something paints the
+      body, at which point (a celebration's confetti, say) the paint stops where
+      the content does and the rest of a tall drawer sits empty. A modal is
+      auto-height, so `min-h-full` there resolves to the content height and
+      changes nothing.
+    -->
+    <div
+      class="dark:bg-surface-raised/50 relative -mx-6 -my-6 bg-[#F8F9FA] px-6 py-5"
+      :class="[variant === 'drawer' ? 'flex min-h-full flex-col' : '', bodyClass]"
+    >
+      <!--
+        A full-bleed layer behind the body's content: a celebration's confetti,
+        and anything else that must cover the whole body rather than stopping
+        where the content does. It goes HERE, on the element that fills the
+        panel, because a layer on the slotted content is only ever as tall as
+        that content, which on a short activity leaves most of a tall drawer
+        empty. `relative` is what makes an absolutely-positioned layer measure
+        against this box.
+      -->
+      <slot name="body-layer" />
+      <div class="space-y-5" :class="variant === 'drawer' ? 'flex flex-1 flex-col' : ''">
         <slot />
       </div>
     </div>
