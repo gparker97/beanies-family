@@ -4087,7 +4087,7 @@ const STRING_DEFS = {
     beanie: "can't unlock this beanpod?",
   },
   'loginV6.unlockNoPasswordHint': {
-    en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow, no password needed up front.',
+    en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow.',
     beanie:
       'this file is another family’s encrypted data. to join, ask the family owner for an invite link. you’ll set up your own account through that flow.',
   },
@@ -4916,7 +4916,10 @@ const STRING_DEFS = {
     en: 'No family passphrase set.',
     beanie: 'no family passphrase set.',
   },
-  'recovery.passphraseSuggestion': { en: 'Suggested Passphrase', beanie: 'suggested passphrase' },
+  'recovery.passphraseSuggestion': {
+    en: 'Suggested Family Passphrase',
+    beanie: 'suggested family passphrase',
+  },
   'recovery.passphraseRegenerate': { en: 'Suggest Another', beanie: 'suggest another' },
   'recovery.passphraseUseOwn': { en: 'Use my own phrase', beanie: 'use my own phrase' },
   'recovery.passphraseRules': {
@@ -4954,15 +4957,6 @@ const STRING_DEFS = {
   'recovery.resetPinBody': {
     en: "You're in with your recovery kit — set a fresh 6-digit PIN to use from now on.",
     beanie: "you're in with your recovery kit — set a fresh 6-digit pin to use from now on.",
-  },
-  // The passphrase partner. This pane used to render the line above whichever secret was
-  // typed, so someone who had just entered a family passphrase was told they were in with
-  // a recovery kit. It also assumes less: a passphrase is the ordinary route onto a new
-  // device, so it OFFERS a new PIN rather than announcing one is being set.
-  'recovery.resetPinBodyPassphrase': {
-    en: "You're in with your family passphrase. Set a 6-digit PIN for this device, or sign in with the one you already have.",
-    beanie:
-      "you're in with your family passphrase. set a 6-digit pin for this device, or sign in with the one you already have.",
   },
   'recovery.resetPinAction': { en: 'Set PIN & Sign In', beanie: 'set pin & sign in' },
   // ⚠️ `recovery.passphraseHint` was deleted here. It read "Your password — or your
