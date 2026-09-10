@@ -52,7 +52,7 @@ _“We’re always excited to have companies like beanies.family using Tinfoil! 
 
 We indeed have a kindred connection - building platforms that preserve privacy in this world of almost ubiquitous relinquishing of the same.
 
-Depending on the model used, a token on _Tinfoil_ costs roughly 5 - 10x the price of a token on a platform that harvests your data for advertising and/or training. For now, that's the price that we (or, I, I should say) pay for your privacy. It's worth it, at least to me - and hopefully to you too. Because, one thing I can be sure of is that I won’t be able to subsidize this thing forever :)
+Depending on the model used, a token on _Tinfoil_ costs roughly 5 - 10x the price of a token on a platform that harvests your data for advertising and/or training. For now, that's the price that we (or, I, I should say) pay for your privacy. It's worth it, at least to me - and hopefully to you too. Because, one thing I can be sure of is that I won’t be able to subsidize this thing [forever](/pricing) :)
 
 So, say it with me: We’re now [beanies.family](http://beanies.family/) - _**powered by Tinfoil AI**_!
 
