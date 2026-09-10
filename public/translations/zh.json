@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-10",
-    "translationCount": 4646
+    "translationCount": 4647
   },
   "translations": {
     "app.name": {
@@ -23234,6 +23234,11 @@
     "recovery.forgotSecret": {
       "translation": "忘记密码或家庭密码？",
       "hash": "ckirup",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.secretEitherRequired": {
+      "translation": "请输入您的密码或家庭密码。",
+      "hash": "95gefl",
       "lastUpdated": "2026-09-10"
     }
   }

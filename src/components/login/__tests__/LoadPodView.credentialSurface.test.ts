@@ -317,3 +317,44 @@ describe('LoadPodView — the kit prompt names the credential being asked for', 
     expect(w.text().toLowerCase()).toContain('forgot your password or family passphrase?');
   });
 });
+
+describe('LoadPodView — the open-pod kit surface says nothing false', () => {
+  /**
+   * The recovery-kit escape from the PIN challenge opens this screen with the pod ALREADY
+   * OPEN. Two strings written for a cold arrival were wrong there: the cold-arrival card
+   * told a member of THIS family that the file belongs to another family and to go ask for
+   * an invite, and the subtitle promised a decryption and a member step that had both
+   * already happened.
+   */
+  async function openPodKitSurface() {
+    setActivePinia(createPinia());
+    useTranslationStore().setBeanieMode(true);
+    const w = mount(LoadPodView, {
+      props: { startInKitEntry: true, autoLoad: false },
+      global: {
+        stubs: {
+          GoogleDriveFilePicker: true,
+          RecoveryKitLink: { template: '<a class="kit-link" />' },
+          NoPodEmptyState: true,
+          LoginChoiceCard: true,
+          BeanieSpinner: true,
+          Teleport: true,
+        },
+      },
+    });
+    await nextTick();
+    await nextTick();
+    return w;
+  }
+
+  it('does not tell a member of this family that the file is someone else’s', async () => {
+    const w = await openPodKitSurface();
+    expect(w.text().toLowerCase()).not.toContain('another family');
+    expect(w.text().toLowerCase()).not.toContain('invite link');
+  });
+
+  it('does not promise a decryption that is not happening', async () => {
+    const w = await openPodKitSurface();
+    expect(w.text().toLowerCase()).not.toContain("you'll sign in as a member");
+  });
+});
