@@ -184,6 +184,24 @@ function switchTo(method: ActiveKind) {
  * returns "Use password", so a leak here shows a password affordance on a member who
  * has none — the reason this filter, not a `switchLabel` case, is the guard.
  */
+/**
+ * Which credential the kit prompt should name, from whatever this screen is asking for
+ * RIGHT NOW. `null` where naming one would be wrong: a biometric or tap-through is not
+ * something you forget, and on `reset-pin` the kit has already been redeemed.
+ */
+const forgotCredential = computed<'pin' | 'password' | 'passphrase' | null>(() => {
+  switch (activeMethod.value) {
+    case 'pin':
+      return 'pin';
+    case 'password':
+      return 'password';
+    case 'passphrase':
+      return 'passphrase';
+    default:
+      return null;
+  }
+});
+
 const NON_SWITCHABLE: readonly ActiveKind[] = [
   // Renders as the standalone recovery-kit chip below (always visible, warm included).
   'recovery',
@@ -464,7 +482,11 @@ function handlePassphraseSubmit() {
       <!-- The recovery terminal: a member who has forgotten everything reaches the
            kit / passphrase / bootstrap here. Always present (never-blank guarantee). -->
       <div class="pt-2">
-        <RecoveryKitLink :disabled="isBusy" @click="emit('use-recovery')" />
+        <RecoveryKitLink
+          :disabled="isBusy"
+          :forgot="forgotCredential"
+          @click="emit('use-recovery')"
+        />
       </div>
     </div>
   </div>

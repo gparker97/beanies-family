@@ -40,6 +40,40 @@ function envelope(over: Partial<BeanpodFileV4>): BeanpodFileV4 {
   } as BeanpodFileV4;
 }
 
+/**
+ * ⚠️ `mountWith` STUBS `RecoveryKitLink`, so nothing it renders is asserted by the tests
+ * above — dropping the `:forgot` prop passed to it is invisible to them. `renderWithKitLink`
+ * keeps the real component for the prompt assertions.
+ */
+async function renderWithKitLink(env: BeanpodFileV4) {
+  setActivePinia(createPinia());
+  useTranslationStore().setBeanieMode(true);
+  const sync = useSyncStore();
+  // @ts-expect-error — test seam: the store's staged envelope is what `caps` derives from.
+  sync.pendingEncryptedFile = { envelope: env, fileName: 'f.beanpod' };
+  const w = mount(LoadPodView, {
+    global: {
+      stubs: {
+        GoogleDriveFilePicker: true,
+        NoPodEmptyState: true,
+        LoginChoiceCard: true,
+        BeanieSpinner: true,
+        Teleport: true,
+      },
+    },
+  });
+  const setup = (w.vm.$ as unknown as { setupState: Record<string, unknown> }).setupState;
+  // ⚠️ Runs the SAME routing as `renderColdSurface`. Without it every envelope rendered the
+  // secret form, so a test could assert a prompt on a family the real screen sends to the
+  // kit form instead — which is exactly what happened for passphrase+kit.
+  const c = setup.caps as { password: boolean; kit: boolean; passphrase: boolean } | null;
+  if (c && !c.password && c.kit) setup.showKitEntry = true;
+  setup.showDecryptModal = true;
+  await nextTick();
+  await nextTick();
+  return w;
+}
+
 /** Mount with `env` staged as the pending file, forced onto the decrypt surface. */
 async function mountWith(env: BeanpodFileV4, beanie = true) {
   setActivePinia(createPinia());
@@ -211,5 +245,75 @@ describe('LoadPodView — the file-loaded channel carries WHICH secret opened th
     // Distinct values survive the hop. A channel that collapsed them would show
     // ['recovery', 'recovery', undefined] here.
     expect(payloads).toEqual(['passphrase', 'kit', null]);
+  });
+});
+
+describe('LoadPodView — the recovery-kit escape from an OPEN pod', () => {
+  /**
+   * greg's report: tapping "use a recovery kit" under the PIN challenge ran a spinner and
+   * dropped him back on the member picker. The prove screen is routinely shown with the
+   * pod ALREADY OPEN (a family passphrase or a cached key decrypted it), and the escape
+   * auto-loaded a file that was already open — so `autoLoadFile` took its success branch,
+   * emitted `file-loaded`, and the picker came straight back. The kit form never rendered.
+   *
+   * With nothing to load, the panel has to open on its own.
+   */
+  it('opens the kit panel directly when there is nothing to load', async () => {
+    setActivePinia(createPinia());
+    useTranslationStore().setBeanieMode(true);
+    const w = mount(LoadPodView, {
+      props: { startInKitEntry: true, autoLoad: false },
+      global: {
+        stubs: {
+          GoogleDriveFilePicker: true,
+          RecoveryKitLink: { template: '<a class="kit-link" />' },
+          NoPodEmptyState: true,
+          LoginChoiceCard: true,
+          BeanieSpinner: true,
+          Teleport: true,
+        },
+      },
+    });
+    await nextTick();
+    await nextTick();
+    const setup = (w.vm.$ as unknown as { setupState: Record<string, unknown> }).setupState;
+    expect(setup.showDecryptModal).toBe(true);
+    expect(setup.showKitEntry).toBe(true);
+    // ...and the code field is actually on screen, not just the flags set.
+    expect(w.text().toLowerCase()).toContain('recovery kit');
+  });
+});
+
+describe('LoadPodView — the kit prompt names the credential being asked for', () => {
+  it('a password family is asked about its password', async () => {
+    const w = await renderWithKitLink(
+      envelope({ wrappedKeys: { m1: wrap }, recoveryKeys: { k1: kitWrap } })
+    );
+    expect(w.text().toLowerCase()).toContain('forgot your password?');
+  });
+
+  it('a passphrase family with a kit is already ON the kit form, so it gets no prompt', async () => {
+    // `coldCredentialSurface` sends kit-before-passphrase, so this family lands in kit
+    // entry — there is no kit LINK to caption. Verified in Chromium: prompt NONE.
+    const w = await renderWithKitLink(
+      envelope({ recoveryPassphrase: kitWrap, recoveryKeys: { k1: kitWrap } })
+    );
+    expect(w.text().toLowerCase()).not.toContain('forgot your');
+  });
+
+  it('a passphrase family with NO kit has no kit link to caption either', async () => {
+    const w = await renderWithKitLink(envelope({ recoveryPassphrase: kitWrap }));
+    expect(w.text().toLowerCase()).not.toContain('forgot your');
+  });
+
+  it('a family with BOTH is asked about either', async () => {
+    const w = await renderWithKitLink(
+      envelope({
+        wrappedKeys: { m1: wrap },
+        recoveryPassphrase: kitWrap,
+        recoveryKeys: { k1: kitWrap },
+      })
+    );
+    expect(w.text().toLowerCase()).toContain('forgot your password or family passphrase?');
   });
 });

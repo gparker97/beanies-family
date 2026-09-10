@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-10",
-    "translationCount": 4642
+    "translationCount": 4646
   },
   "translations": {
     "app.name": {
@@ -23214,6 +23214,26 @@
     "loginV6.unlockSubtitleWithFamily": {
       "translation": "这会解密{familyName}的家庭数据。接下来，您将以家庭成员身份登录。",
       "hash": "sx9agx",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.forgotPin": {
+      "translation": "忘记PIN码？",
+      "hash": "t4z6g6",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.forgotPassword": {
+      "translation": "忘记密码？",
+      "hash": "kbw9n8",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.forgotPassphrase": {
+      "translation": "忘记家庭密码？",
+      "hash": "es9muh",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.forgotSecret": {
+      "translation": "忘记密码或家庭密码？",
+      "hash": "ckirup",
       "lastUpdated": "2026-09-10"
     }
   }

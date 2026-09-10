@@ -4939,6 +4939,20 @@ const STRING_DEFS = {
     en: 'Family passphrase saved. It decrypts your beanpod on any device from the next sync.',
     beanie: 'family passphrase saved. it decrypts your beanpod on any device from the next sync.',
   },
+  // The line ABOVE the recovery-kit pill, naming the credential the person is currently
+  // being asked for. The kit is an emergency exit, and a bare "Use a recovery kit" sitting
+  // under a PIN box does not say WHEN to reach for it — so it read as an alternative
+  // sign-in rather than the break-glass it is.
+  'recovery.forgotPin': { en: 'Forgot your PIN?', beanie: 'forgot your pin?' },
+  'recovery.forgotPassword': { en: 'Forgot your password?', beanie: 'forgot your password?' },
+  'recovery.forgotPassphrase': {
+    en: 'Forgot your family passphrase?',
+    beanie: 'forgot your family passphrase?',
+  },
+  'recovery.forgotSecret': {
+    en: 'Forgot your password or family passphrase?',
+    beanie: 'forgot your password or family passphrase?',
+  },
   'recovery.useKitLink': { en: 'Use a recovery kit', beanie: 'use a recovery kit' },
   'recovery.kitEnterBody': {
     en: 'Type the code from your recovery kit (the dashes are optional).',

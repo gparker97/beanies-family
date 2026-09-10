@@ -91,3 +91,46 @@ describe('ProveView — which secret opened the pod', () => {
     expect(text).not.toContain("you're in with your recovery kit");
   });
 });
+
+describe('ProveView — the kit prompt names what is being asked for', () => {
+  /**
+   * The pill said only "Use a recovery kit", which does not say WHEN to reach for one —
+   * it read as an alternative sign-in rather than the break-glass it is. The prompt above
+   * it now names the credential the screen is currently asking for.
+   */
+  function mountWithMethods(methods: ProveMethod[], openedBy: 'kit' | 'passphrase' | null) {
+    setActivePinia(createPinia());
+    return mount(ProveView, {
+      props: {
+        familyName: 'Beans',
+        person,
+        methods,
+        error: null,
+        isBusy: false,
+        podOpen: true,
+        recoveryOpenedBy: openedBy,
+      },
+    });
+  }
+
+  it('a PIN challenge asks "Forgot your PIN?"', () => {
+    const w = mountWithMethods([{ kind: 'pin', hasDeviceWrap: false }, { kind: 'recovery' }], null);
+    expect(w.text().toLowerCase()).toContain('forgot your pin?');
+  });
+
+  it('a password form asks about the password, not the PIN', () => {
+    const w = mountWithMethods([{ kind: 'password' }, { kind: 'recovery' }], null);
+    const text = w.text().toLowerCase();
+    expect(text).toContain('forgot your password?');
+    expect(text).not.toContain('forgot your pin?');
+  });
+
+  it('names nothing once the kit has already been redeemed', () => {
+    // On the reset-PIN pane the kit is spent; "forgot your PIN?" there is nonsense.
+    const w = mountWithMethods(
+      [{ kind: 'pin', hasDeviceWrap: false }, { kind: 'recovery' }],
+      'kit'
+    );
+    expect(w.text().toLowerCase()).not.toContain('forgot your');
+  });
+});
