@@ -99,8 +99,7 @@ describe('LoadPodView — cold credential surface', () => {
     expect(w.find('input[type="password"]').exists()).toBe(true);
     const text = w.text().toLowerCase();
     // The password wording is CORRECT here, and must survive the fix above.
-    expect(text).toContain("enter your password and we'll find your account");
-    expect(text).toContain("don't have the password?");
+    expect(text).toContain('your password decrypts this beanpod');
   });
 
   it('passphrase-only family: offers a field, never a Recovery Code box', async () => {
@@ -109,7 +108,7 @@ describe('LoadPodView — cold credential surface', () => {
     const text = w.text().toLowerCase();
     expect(text).not.toContain('recovery code');
     // Every string on the screen names the credential this family actually has.
-    expect(text).toContain('recovery passphrase');
+    expect(text).toContain('family passphrase');
     expect(text).not.toContain('password');
   });
 
@@ -122,12 +121,10 @@ describe('LoadPodView — cold credential surface', () => {
     );
     expect(w.find('input[type="password"]').exists()).toBe(true);
     const text = w.text().toLowerCase();
-    expect(text).toContain('password or recovery passphrase');
+    expect(text).toContain('password or family passphrase');
     // ...and it must not fall back to either single-credential wording.
-    expect(text).not.toContain("enter your password and we'll find your account");
-    expect(text).not.toContain('this password decrypts your local data');
-    // The cold-arrival card is narrow too when a passphrase is also a way in.
-    expect(text).not.toContain("don't have the password?");
+    expect(text).toContain('either one decrypts this beanpod');
+    expect(text).not.toContain('your password decrypts this beanpod');
   });
 
   it('all-false envelope: shows the honest message and NO credential field', async () => {
@@ -138,5 +135,34 @@ describe('LoadPodView — cold credential surface', () => {
     expect(w.findAll('input').length).toBe(0);
     // The honest message once, not twice: the kit form used to re-render `formError`.
     expect(text.split('nothing can open this file').length - 1).toBe(1);
+  });
+});
+
+describe('LoadPodView — the unlock screen describes step 1, not step 2', () => {
+  const shapes = [
+    ['kit-born', envelope({ recoveryKeys: { k1: kitWrap } })],
+    ['legacy', envelope({ wrappedKeys: { m1: wrap } })],
+    ['passphrase-only', envelope({ recoveryPassphrase: kitWrap })],
+    ['both', envelope({ wrappedKeys: { m1: wrap }, recoveryPassphrase: kitWrap })],
+  ] as const;
+
+  it.each(shapes)('%s: the heading names the beanpod, never signing in', async (_n, env) => {
+    const w = await renderColdSurface(env);
+    const text = w.text().toLowerCase();
+    expect(text).toContain('unlock my beanpod');
+    // "Sign In to {family}" described step 2 while performing step 1.
+    expect(text).not.toContain('sign in to beans');
+  });
+
+  it.each(shapes)('%s: the subtitle names the family and the next step', async (_n, env) => {
+    const w = await renderColdSurface(env);
+    const text = w.text().toLowerCase();
+    expect(text).toContain("this decrypts beans's family data");
+    expect(text).toContain("you'll sign in as a member");
+  });
+
+  it('the degenerate envelope promises no next step it cannot keep', async () => {
+    const w = await renderColdSurface(envelope({}));
+    expect(w.text().toLowerCase()).not.toContain("you'll sign in as a member");
   });
 });

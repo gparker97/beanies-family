@@ -175,7 +175,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'When you create a pod, a random 256-bit <strong>family key</strong> is generated',
-          'A <strong>wrapping key</strong> is made from a secret only your family holds \u2014 the recovery kit code created with your family, an optional recovery passphrase, or (for members of older families) a password run through <strong>PBKDF2</strong> (100,000 rounds, SHA-256) with a random 16-byte salt',
+          'A <strong>wrapping key</strong> is made from a secret only your family holds \u2014 the recovery kit code created with your family, an optional family passphrase, or (for members of older families) a password run through <strong>PBKDF2</strong> (100,000 rounds, SHA-256) with a random 16-byte salt',
           'The family key is wrapped (encrypted) with your wrapping key using <strong>AES-KW</strong>',
           'All your family data (Automerge binary) is encrypted with the family key using <strong>AES-GCM</strong> with a random 12-byte IV',
           'The encrypted payload, wrapped keys, and salts are stored in the <code>.beanpod</code> file',
@@ -290,7 +290,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'The file is still encrypted \u2014 opening it on a fresh device always needs something only your family holds: your recovery kit code, your recovery passphrase, or a link from a device that\u2019s already signed in (then your PIN). A copied <code>.beanpod</code> is useless to anyone without one of those.',
+          'The file is still encrypted \u2014 opening it on a fresh device always needs something only your family holds: your recovery kit code, your family passphrase, or a link from a device that\u2019s already signed in (then your PIN). A copied <code>.beanpod</code> is useless to anyone without one of those.',
         title: 'Still needs your key',
         icon: '\u{1F510}',
       },
@@ -410,7 +410,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     category: 'security',
     title: 'Your Recovery Kit (and Other Ways Back In)',
     excerpt:
-      'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the recovery passphrase option, and every other way back in if a PIN or device is lost.',
+      'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the family passphrase option, and every other way back in if a PIN or device is lost.',
     icon: '\u{1F5DD}\uFE0F',
     readTime: 4,
     updatedDate: '2026-08-28',
@@ -440,14 +440,14 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
-        content: 'The recovery passphrase (optional)',
+        content: 'The family passphrase (optional)',
         level: 2,
         id: 'recovery-passphrase',
       },
       {
         type: 'paragraph',
         content:
-          'If you\u2019d rather remember something than store something, you can also set a <strong>recovery passphrase</strong> in <strong>Settings \u2192 Security &amp; Recovery</strong> \u2014 a memorable phrase that can open your family\u2019s data on a fresh device, just like the kit. It\u2019s optional, and it works alongside the kit rather than replacing it.',
+          'If you\u2019d rather remember something than store something, you can also set a <strong>family passphrase</strong> in <strong>Settings \u2192 Security &amp; Recovery</strong> \u2014 a memorable phrase that can open your family\u2019s data on a fresh device, just like the kit. It\u2019s optional, and it works alongside the kit rather than replacing it.',
       },
       {
         type: 'heading',
@@ -464,7 +464,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Ask another parent</strong> \u2014 any pod manager can reset your PIN from your bean page, right in the app. (This is also how parents set or reset a child\u2019s PIN.)',
-          '<strong>Use your recovery kit or passphrase</strong> \u2014 either one unlocks your family\u2019s data on the device, and you can then set yourself a new PIN.',
+          '<strong>Use your recovery kit or family passphrase</strong> \u2014 either one unlocks your family\u2019s data on the device, and you can then set yourself a new PIN.',
         ],
       },
       {
@@ -486,7 +486,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'No signed-in device handy? Your recovery kit or passphrase opens your family\u2019s data on a fresh device too.',
+          'No signed-in device handy? Your recovery kit or family passphrase opens your family\u2019s data on a fresh device too.',
       },
       {
         type: 'heading',
@@ -508,7 +508,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'beanies is built so that <strong>nobody but your family</strong> \u2014 not even us \u2014 can open your data. That means there is no \u201creset by email\u201d: we hold nothing that could unlock it. If every signed-in device is gone, the recovery kit is lost, and no passphrase was set, the data is unrecoverable. That\u2019s not a punishment \u2014 it\u2019s the proof that no one else could get in either.',
+          'beanies is built so that <strong>nobody but your family</strong> \u2014 not even us \u2014 can open your data. That means there is no \u201creset by email\u201d: we hold nothing that could unlock it. If every signed-in device is gone, the recovery kit is lost, and no family passphrase was set, the data is unrecoverable. That\u2019s not a punishment \u2014 it\u2019s the proof that no one else could get in either.',
       },
       {
         type: 'callout',
@@ -555,7 +555,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'Biometrics and your PIN are for everyday convenience. If a device is lost or replaced, your <strong>recovery kit</strong> (or recovery passphrase) is what gets your family back in \u2014 see <a href="/help/security/password-recovery">Your Recovery Kit (and Other Ways Back In)</a>.',
+          'Biometrics and your PIN are for everyday convenience. If a device is lost or replaced, your <strong>recovery kit</strong> (or family passphrase) is what gets your family back in \u2014 see <a href="/help/security/password-recovery">Your Recovery Kit (and Other Ways Back In)</a>.',
         title: 'What the recovery kit is for',
         icon: '\u{1F5DD}\uFE0F',
       },

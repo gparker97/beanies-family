@@ -15,6 +15,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The sign-in screen no longer mentions a password your family has never had.** The line under the heading, the note under the field and the "don't have the password?" card all said "password" regardless of how your family actually opens its file. A family that signs in with a recovery passphrase is now told about the passphrase, and one that uses a recovery kit is not told about a password at all.
 - **A family file that nothing can open now says so and stops there**, instead of also offering a Recovery Code box for a kit it does not have, with the explanation printed twice above it.
 
+### Changed
+
+- **The first sign-in screen now says what it is actually doing.** Opening your family happens in two steps: your beanpod is decrypted, and then you sign in as a member. The screen was titled "Sign In", which is the second step, while asking for the secret that does the first. It now reads "unlock my beanpod", says whose data it is decrypting and what happens next, and uses the same wording whether you open it with a password, a family passphrase or your recovery kit.
+- **The recovery passphrase is now called the family passphrase, everywhere.** It had six different names in the app, and "recovery" was also the name of the recovery kit, the recovery code and the whole Settings section, so there was no way to tell from a name which one you had. "Recovery" now means the printed kit and nothing else.
+
 ## 2026-09-09
 
 ### Fixed

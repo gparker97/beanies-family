@@ -4035,54 +4035,56 @@ const STRING_DEFS = {
     beanie: 'zero servers, zero tracking',
   },
   'loginV6.fileLoaded': { en: 'loaded', beanie: 'loaded' },
-  'loginV6.unlockTitle': { en: 'Sign In', beanie: 'sign in' },
-  'loginV6.unlockTitleWithFamily': {
-    en: 'Sign In to {familyName}',
-    beanie: 'sign in to {familyName}',
-  },
+  // ── Step 1 of opening a family: DECRYPT THE BEANPOD ──
+  // This screen used to be titled "Sign In", which is step 2. Opening a family is two
+  // phases — unwrap the family key with a family-level secret (password, family
+  // passphrase, recovery kit), THEN prove which member you are with a PIN — and the app
+  // only ever said so after step 1 had already succeeded
+  // (`recovery.passphraseAcceptedProve`). Headings and CTAs name the object as the
+  // beanpod; the subtitle is where "your family's data" is spelled out.
+  'loginV6.unlockTitle': { en: 'Unlock My Beanpod', beanie: 'unlock my beanpod' },
+  // ⚠️ Deliberately names NO credential. The field label directly below already does, and
+  // a subtitle that named one needed a variant per capability — which is the drift class
+  // that produced the original "use password instead" bug on a kit-born family.
   'loginV6.unlockSubtitle': {
-    en: "Enter your password and we'll find your account",
-    beanie: "enter your password and we'll find your account",
+    en: "This decrypts your family's data. Next, you'll sign in as a member.",
+    beanie: "this decrypts your family's data. next, you'll sign in as a member.",
   },
-  // Shown instead of the above when the envelope carries a recovery passphrase but no
-  // password wraps — naming the credential the family actually has.
-  'loginV6.unlockSubtitlePassphrase': {
-    en: "Enter your family recovery passphrase and we'll find your account",
-    beanie: "enter your family recovery passphrase and we'll find your account",
+  'loginV6.unlockSubtitleWithFamily': {
+    en: "This decrypts {familyName}'s family data. Next, you'll sign in as a member.",
+    beanie: "this decrypts {familyName}'s family data. next, you'll sign in as a member.",
   },
-  'loginV6.unlockSubtitleEither': {
-    en: "Enter your password or recovery passphrase and we'll find your account",
-    beanie: "enter your password or recovery passphrase and we'll find your account",
-  },
-  'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
+  'loginV6.unlockButton': { en: 'Unlock My Beanpod', beanie: 'unlock my beanpod' },
   'loginV6.unlockMemberCount': {
     en: '{count} members in this family',
     beanie: '{count} members in this pod',
   },
+  // The one line on this screen that DOES name the credential, so it stays derived from
+  // the envelope's capabilities. It also carries the privacy reassurance, which is why it
+  // says "we never see it" rather than only "we don't store it".
   'loginV6.unlockFooter': {
-    en: "This password decrypts your local data. We don't store or recover it.",
-    beanie: "this password decrypts your local data. we don't store or recover it.",
+    en: "Your password decrypts this beanpod on this device. We never see it and can't recover it.",
+    beanie:
+      "your password decrypts this beanpod on this device. we never see it and can't recover it.",
   },
-  // The passphrase partner of the above. The secret field serves both credentials, so
-  // the reassurance under it has to name whichever one this envelope actually accepts.
   'loginV6.unlockFooterPassphrase': {
-    en: "This passphrase decrypts your local data. We don't store or recover it.",
-    beanie: "this passphrase decrypts your local data. we don't store or recover it.",
+    en: "Your family passphrase decrypts this beanpod on this device. We never see it and can't recover it.",
+    beanie:
+      "your family passphrase decrypts this beanpod on this device. we never see it and can't recover it.",
   },
-  // ...and the partner for an envelope that accepts both.
   'loginV6.unlockFooterEither': {
-    en: "Either one decrypts your local data. We don't store or recover them.",
-    beanie: "either one decrypts your local data. we don't store or recover them.",
+    en: "Either one decrypts this beanpod on this device. We never see it and can't recover it.",
+    beanie:
+      "either one decrypts this beanpod on this device. we never see it and can't recover it.",
   },
-  'loginV6.unlockNoPasswordTitle': {
-    en: "Don't have the password?",
-    beanie: "don't have the password?",
-  },
-  // The credential-neutral partner, for a family whose file has no password wraps at all
-  // (kit-born, passphrase-only, or nothing). Same card, same advice: ask for an invite.
+  // ⚠️ ONE title, deliberately. This card greets anyone who opened a beanpod that is not
+  // theirs, and the advice ("ask the owner for an invite") is the same whatever the file
+  // can be opened with — so naming a credential here only risked naming the wrong one.
+  // It replaces a pair split on `caps.password`, which said "Don't have the password?" to
+  // families that have never had one.
   'loginV6.unlockNoAccessTitle': {
-    en: "Can't sign in to this family?",
-    beanie: "can't sign in to this family?",
+    en: "Can't unlock this beanpod?",
+    beanie: "can't unlock this beanpod?",
   },
   'loginV6.unlockNoPasswordHint': {
     en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow, no password needed up front.',
@@ -4888,28 +4890,31 @@ const STRING_DEFS = {
     en: "Couldn't create the PDF — copy the code above instead, or try again.",
     beanie: "couldn't make the pdf — copy the code above instead, or try again.",
   },
-  'recovery.passphraseTitle': { en: 'Recovery Passphrase', beanie: 'recovery passphrase' },
+  'recovery.passphraseTitle': { en: 'Family Passphrase', beanie: 'family passphrase' },
   'recovery.passphraseDescription': {
-    en: 'An optional memorable phrase that can unlock your family data on any device — sign in to Google, type the phrase, done. Anyone who knows it can open your data, so make it strong and keep it private.',
+    en: 'An optional memorable phrase that decrypts your beanpod on any device — sign in to Google, type the phrase, done. Anyone who knows it can open your family data, so make it strong and keep it private.',
     beanie:
-      'an optional memorable phrase that unlocks your family data on any device. anyone who knows it can open your data, so keep it private.',
+      'an optional memorable phrase that decrypts your beanpod on any device. anyone who knows it can open your family data, so keep it private.',
   },
-  'recovery.passphraseSet': { en: 'Set Passphrase', beanie: 'set passphrase' },
+  'recovery.passphraseSet': { en: 'Set Family Passphrase', beanie: 'set family passphrase' },
   // The LOGIN-gate link. Deliberately NOT `recovery.passphraseSet` ('Set Passphrase'),
   // which is the Settings action button: on the sign-in screen that told a locked-out
   // person to create a passphrase rather than enter the one they have.
   'recovery.usePassphraseLink': {
-    en: 'Use my recovery passphrase',
-    beanie: 'use my recovery passphrase',
+    en: 'Use my family passphrase',
+    beanie: 'use my family passphrase',
   },
-  'recovery.passphraseChange': { en: 'Change Passphrase', beanie: 'change passphrase' },
+  'recovery.passphraseChange': {
+    en: 'Change Family Passphrase',
+    beanie: 'change family passphrase',
+  },
   'recovery.passphraseIsSet': {
-    en: 'A recovery passphrase is set for this family.',
-    beanie: 'a recovery passphrase is set for this family.',
+    en: 'A family passphrase is set.',
+    beanie: 'a family passphrase is set.',
   },
   'recovery.passphraseNotSet': {
-    en: 'No recovery passphrase set.',
-    beanie: 'no recovery passphrase set.',
+    en: 'No family passphrase set.',
+    beanie: 'no family passphrase set.',
   },
   'recovery.passphraseSuggestion': { en: 'Suggested Passphrase', beanie: 'suggested passphrase' },
   'recovery.passphraseRegenerate': { en: 'Suggest Another', beanie: 'suggest another' },
@@ -4928,8 +4933,8 @@ const STRING_DEFS = {
     beanie: "your family or a member's name is too easy to guess — pick something else.",
   },
   'recovery.passphraseSaved': {
-    en: 'Recovery passphrase saved. It works on any device from the next sync.',
-    beanie: 'recovery passphrase saved. it works on any device from the next sync.',
+    en: 'Family passphrase saved. It decrypts your beanpod on any device from the next sync.',
+    beanie: 'family passphrase saved. it decrypts your beanpod on any device from the next sync.',
   },
   'recovery.useKitLink': { en: 'Use a recovery kit', beanie: 'use a recovery kit' },
   'recovery.kitEnterBody': {
@@ -4944,7 +4949,7 @@ const STRING_DEFS = {
     en: "This family doesn't have a recovery kit on file.",
     beanie: "this family doesn't have a recovery kit on file.",
   },
-  'recovery.unlock': { en: 'Open My Family', beanie: 'open my family' },
+  'recovery.unlock': { en: 'Unlock My Beanpod', beanie: 'unlock my beanpod' },
   'recovery.resetPinTitle': { en: 'Set a New PIN', beanie: 'set a new pin' },
   'recovery.resetPinBody': {
     en: "You're in with your recovery kit — set a fresh 6-digit PIN to use from now on.",
@@ -4956,37 +4961,37 @@ const STRING_DEFS = {
   // field named two different credentials. The passphrase now has its own labelled form,
   // offered only when the envelope proves a passphrase exists.
   'recovery.passphraseLabel': {
-    en: 'Family Recovery Passphrase',
-    beanie: 'family recovery passphrase',
+    en: 'Family Passphrase',
+    beanie: 'family passphrase',
   },
   // The one secret field accepts a member password OR the family recovery passphrase
   // (`tryUnwrapFamilyKey` tries the wraps, then the passphrase). When the envelope
   // carries both, it has to say so, or the passphrase silently works while the label
   // denies it.
   'recovery.secretEitherLabel': {
-    en: 'Password or Recovery Passphrase',
-    beanie: 'password or recovery passphrase',
+    en: 'Password or Family Passphrase',
+    beanie: 'password or family passphrase',
   },
   'recovery.secretEitherPlaceholder': {
     en: 'Enter either one',
     beanie: 'enter either one',
   },
   'recovery.useSecretEitherLink': {
-    en: 'Use my password or passphrase',
-    beanie: 'use my password or passphrase',
+    en: 'Use my password or family passphrase',
+    beanie: 'use my password or family passphrase',
   },
   'recovery.passphrasePlaceholder': {
-    en: 'Enter your recovery passphrase',
-    beanie: 'enter your recovery passphrase',
+    en: 'Enter your family passphrase',
+    beanie: 'enter your family passphrase',
   },
   'recovery.passphraseRequired': {
-    en: 'Please enter your recovery passphrase.',
-    beanie: 'please enter your recovery passphrase.',
+    en: 'Please enter your family passphrase.',
+    beanie: 'please enter your family passphrase.',
   },
   'recovery.passphraseAcceptedProve': {
-    en: 'Recovery passphrase accepted — your family data is open. Now confirm who you are to sign in.',
+    en: 'Family passphrase accepted. Your beanpod is open — now confirm who you are to sign in.',
     beanie:
-      'recovery passphrase accepted — your family data is open. now confirm who you are to sign in.',
+      'family passphrase accepted. your beanpod is open — now confirm who you are to sign in.',
   },
   // ── Member PIN (login rethink Phase 2) ──
   'pin.invalidFormat': {
@@ -5065,9 +5070,9 @@ const STRING_DEFS = {
       'sign in with a quick 6-digit pin instead of your password. set one up now or later in settings.',
   },
   'loginFlow.recoveryOnlyBody': {
-    en: 'No sign-in method is set up on this device yet — use your recovery kit, your recovery passphrase, or a device link from another family device.',
+    en: 'Nothing on this device can open this beanpod yet — use your recovery kit, your family passphrase, or a device link from another family device.',
     beanie:
-      'no sign-in method is set up on this device yet — use your recovery kit, passphrase, or a link from another family device.',
+      'nothing on this device can open this beanpod yet — use your recovery kit, your family passphrase, or a device link from another family device.',
   },
   'loginFlow.inviteNeededBody': {
     en: "This grown-up bean needs its own invite before it can be opened. Ask someone in your family to invite you from The Pod, and they'll send you a link that lets you set your own PIN.",

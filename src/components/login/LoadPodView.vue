@@ -33,7 +33,6 @@ import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowE
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
-import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -150,15 +149,17 @@ const secretIsPassphrase = computed(
  * feature on the one surface where it silently works.
  *
  * ⚠️ Derived as a set rather than branched per render site. The label, placeholder,
- * subtitle, reassurance and the kit form's way back all have to agree about which
- * credential is on offer, and they previously disagreed — the footer still said
- * "this password" under a field labelled as a passphrase. One source, five consumers.
+ * reassurance and the kit form's way back all have to agree about which credential is on
+ * offer, and they previously disagreed — the footer still said "this password" under a
+ * field labelled as a passphrase. One source, four consumers.
+ *
+ * The heading and subtitle are deliberately NOT members here: they describe the STEP
+ * (decrypt this beanpod), not the credential, so they are constant across all three cases.
  */
 const secretField = computed(() => {
   const c = caps.value;
   if (c?.password && c.passphrase) {
     return {
-      subtitle: 'loginV6.unlockSubtitleEither',
       label: 'recovery.secretEitherLabel',
       placeholder: 'recovery.secretEitherPlaceholder',
       footer: 'loginV6.unlockFooterEither',
@@ -167,7 +168,6 @@ const secretField = computed(() => {
   }
   if (secretIsPassphrase.value) {
     return {
-      subtitle: 'loginV6.unlockSubtitlePassphrase',
       label: 'recovery.passphraseLabel',
       placeholder: 'recovery.passphrasePlaceholder',
       footer: 'loginV6.unlockFooterPassphrase',
@@ -177,7 +177,6 @@ const secretField = computed(() => {
   // Password-only, and the fallback when capabilities are unknown: the wording this
   // screen has always used.
   return {
-    subtitle: 'loginV6.unlockSubtitle',
     label: 'password.password',
     placeholder: 'password.enterPasswordPlaceholder',
     footer: 'loginV6.unlockFooter',
@@ -205,9 +204,6 @@ const nothingCanOpenIt = computed(
  * The kit form and the degenerate terminal each state their own case immediately above
  * the field, so a second line there would only repeat them.
  */
-const unlockSubtitleKey = computed<UIStringKey | null>(() =>
-  nothingCanOpenIt.value || showKitEntry.value ? null : secretField.value.subtitle
-);
 const loadedFileName = ref<string | null>(null);
 const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
@@ -246,6 +242,25 @@ const lastDriveCheckEmpty = ref(false);
 
 /** Family name from the pending encrypted envelope (available before decryption). */
 const pendingFamilyName = computed(() => syncStore.pendingEncryptedFile?.envelope?.familyName);
+/**
+ * The line under the heading: what THIS step does, and what comes after it.
+ *
+ * ⚠️ Names no credential, so it is one string rather than one per capability — the field
+ * label directly below already names the credential, and a subtitle that also did needed a
+ * variant per case, which is the drift that produced the original bug. It is also why the
+ * kit form keeps this line: redeeming a kit decrypts the beanpod exactly as a password
+ * does, so the sentence is true on both paths.
+ *
+ * `null` only for the degenerate envelope, where "next you'll sign in" would be a promise
+ * the screen cannot keep.
+ */
+const unlockSubtitle = computed<string | null>(() => {
+  if (nothingCanOpenIt.value) return null;
+  const name = pendingFamilyName.value;
+  return name
+    ? fillTemplate(t('loginV6.unlockSubtitleWithFamily'), { familyName: name })
+    : t('loginV6.unlockSubtitle');
+});
 
 /** Number of members with wrapped keys in the pending envelope. */
 const pendingMemberCount = computed(() => {
@@ -1318,16 +1333,15 @@ async function handleDriveRefresh() {
           {{ syncStore.providerAccountEmail }}
         </p>
 
-        <!-- Heading -->
+        <!-- Heading. Constant: it names the STEP, not the family and not the credential.
+             It used to read "Sign In to {familyName}", which describes step 2 while
+             performing step 1. The family name moved into the subtitle below, where the
+             reassurance about whose data this is belongs anyway. -->
         <h3 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
-          {{
-            pendingFamilyName
-              ? fillTemplate(t('loginV6.unlockTitleWithFamily'), { familyName: pendingFamilyName })
-              : t('loginV6.unlockTitle')
-          }}
+          {{ t('loginV6.unlockTitle') }}
         </h3>
-        <p v-if="unlockSubtitleKey" class="dark:text-ink-faint mt-1 text-xs text-gray-500">
-          {{ t(unlockSubtitleKey) }}
+        <p v-if="unlockSubtitle" class="dark:text-ink-faint mt-1 text-xs text-gray-500">
+          {{ unlockSubtitle }}
         </p>
       </div>
 
@@ -1483,11 +1497,7 @@ async function handleDriveRefresh() {
                names a credential a kit-born or passphrase-only family has never had. The
                body below is about asking for an invite either way. -->
           <p class="text-secondary-500 dark:text-ink text-sm font-bold">
-            {{
-              caps?.password && !caps.passphrase
-                ? t('loginV6.unlockNoPasswordTitle')
-                : t('loginV6.unlockNoAccessTitle')
-            }}
+            {{ t('loginV6.unlockNoAccessTitle') }}
           </p>
           <p class="text-secondary-500/70 dark:text-ink-soft mt-1 text-xs leading-relaxed">
             {{ t('loginV6.unlockNoPasswordHint') }}

@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-09",
-    "translationCount": 4645
+    "lastUpdated": "2026-09-10",
+    "translationCount": 4642
   },
   "translations": {
     "app.name": {
@@ -2602,24 +2602,24 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.unlockTitle": {
-      "translation": "登入",
-      "hash": "8yrcew",
-      "lastUpdated": "2026-03-04"
+      "translation": "解锁我的Beanpod",
+      "hash": "yq289p",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockSubtitle": {
-      "translation": "输入您的密码，我们会找到您的账号",
-      "hash": "3ei4if",
-      "lastUpdated": "2026-03-04"
+      "translation": "这会解密您的家庭数据。接下来，您将以家庭成员身份登录。",
+      "hash": "h3cnc7",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockButton": {
-      "translation": "登入",
-      "hash": "8yrcew",
-      "lastUpdated": "2026-03-04"
+      "translation": "解锁我的Beanpod",
+      "hash": "yq289p",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockFooter": {
-      "translation": "此密码可解密您的本地数据。我们不会存储或恢复它。",
-      "hash": "ef1524",
-      "lastUpdated": "2026-02-24"
+      "translation": "您的密码将解密此设备上的此Beanpod。我们永远看不到它，也无法恢复它。",
+      "hash": "z9oqgr",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.pickBeanTitle": {
       "translation": "谁在登录？",
@@ -5235,11 +5235,6 @@
       "translation": "将您的所有数据下载为纯文本JSON文件（未加密）",
       "hash": "js3ecr",
       "lastUpdated": "2026-03-23"
-    },
-    "loginV6.unlockTitleWithFamily": {
-      "translation": "登录{familyName}",
-      "hash": "qcor0g",
-      "lastUpdated": "2026-03-04"
     },
     "loginV6.unlockMemberCount": {
       "translation": "此家庭中的{count}个成员",
@@ -13166,11 +13161,6 @@
       "hash": "tzi0p4",
       "lastUpdated": "2026-05-06"
     },
-    "loginV6.unlockNoPasswordTitle": {
-      "translation": "没有密码？",
-      "hash": "bclhjn",
-      "lastUpdated": "2026-05-06"
-    },
     "loginV6.unlockNoPasswordHint": {
       "translation": "此文件包含另一个系列的加密数据。如需加入，请要求家庭所有者向您发送邀请链接。您将通过该流程设置自己的账号，无需预先输入密码。",
       "hash": "6faxdu",
@@ -20832,34 +20822,34 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.passphraseTitle": {
-      "translation": "恢复密码",
-      "hash": "9qsd4l",
-      "lastUpdated": "2026-08-28"
+      "translation": "家庭密码",
+      "hash": "yfznq",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseDescription": {
-      "translation": "一个可选的难忘短语，可以在任何设备上解锁您的家庭数据—登录Google ，键入短语，完成。任何知道的人都可以打开您的数据，因此请将其强化并保密。",
-      "hash": "cmi8hd",
-      "lastUpdated": "2026-08-28"
+      "translation": "一个可选的令人难忘的短语，可以在任何设备上解密您的beanpod —登录Google ，键入短语，完成。任何知道的人都可以打开您的家庭数据，因此请将其强化并保密。",
+      "hash": "4tw49y",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseSet": {
-      "translation": "设置密码",
-      "hash": "abj8i0",
-      "lastUpdated": "2026-08-28"
+      "translation": "设置家庭密码",
+      "hash": "hkl42w",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseChange": {
-      "translation": "更改密码句...",
-      "hash": "ci1ldm",
-      "lastUpdated": "2026-08-28"
+      "translation": "更改家庭密码",
+      "hash": "skjxfa",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseIsSet": {
-      "translation": "已为此系列设置恢复密码。",
-      "hash": "ug1fc9",
-      "lastUpdated": "2026-08-28"
+      "translation": "已设置家庭密码。",
+      "hash": "k9mc3b",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseNotSet": {
-      "translation": "未设置恢复密码。",
-      "hash": "h48vue",
-      "lastUpdated": "2026-08-28"
+      "translation": "未设置家庭密码。",
+      "hash": "93r0zp",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseSuggestion": {
       "translation": "建议的密码",
@@ -20887,9 +20877,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.passphraseSaved": {
-      "translation": "恢复密码已保存。它适用于下次同步的任何设备。",
-      "hash": "oy3az5",
-      "lastUpdated": "2026-08-28"
+      "translation": "家庭密码已保存。它会在下次同步时解密任何设备上的Beanpod。",
+      "hash": "xhq9we",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.useKitLink": {
       "translation": "使用恢复工具包",
@@ -20912,9 +20902,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.unlock": {
-      "translation": "打开我的家庭",
-      "hash": "s1p8v6",
-      "lastUpdated": "2026-09-09"
+      "translation": "解锁我的Beanpod",
+      "hash": "yq289p",
+      "lastUpdated": "2026-09-10"
     },
     "pin.invalidFormat": {
       "translation": "必须恰好是 6 位数",
@@ -21047,9 +21037,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.passphraseAcceptedProve": {
-      "translation": "恢复密码已接受—您的家庭数据已打开。现在，请确认您要登录的用户。",
-      "hash": "o084fn",
-      "lastUpdated": "2026-08-28"
+      "translation": "已接受家庭密码。您的Beanpod已打开，现在请确认您的身份以登录。",
+      "hash": "52zoqn",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.kitShare": {
       "translation": "共享",
@@ -21172,9 +21162,9 @@
       "lastUpdated": "2026-09-09"
     },
     "loginFlow.recoveryOnlyBody": {
-      "translation": "此设备上尚未设置登录方法—请使用您的恢复工具包、恢复密码或来自其他家庭设备的设备链接。",
-      "hash": "o0y5rz",
-      "lastUpdated": "2026-08-28"
+      "translation": "此设备上的任何内容都无法打开此Beanpod —请使用您的恢复工具包、家庭密码或其他家庭设备的设备链接。",
+      "hash": "10xcay",
+      "lastUpdated": "2026-09-10"
     },
     "join.choosePinLabel": {
       "translation": "您的PIN码",
@@ -23162,19 +23152,19 @@
       "lastUpdated": "2026-09-09"
     },
     "recovery.passphraseLabel": {
-      "translation": "家庭恢复密码",
-      "hash": "8jlmmx",
-      "lastUpdated": "2026-09-09"
+      "translation": "家庭密码",
+      "hash": "yfznq",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphrasePlaceholder": {
-      "translation": "输入您的恢复密码",
-      "hash": "jsctcg",
-      "lastUpdated": "2026-09-09"
+      "translation": "输入您的家庭密码",
+      "hash": "jyk5q7",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.passphraseRequired": {
-      "translation": "请输入您的恢复密码。",
-      "hash": "p4xx6g",
-      "lastUpdated": "2026-09-09"
+      "translation": "请输入您的密码短语",
+      "hash": "xzopnb",
+      "lastUpdated": "2026-09-10"
     },
     "join.setPinTitle": {
       "translation": "选择您的PIN码",
@@ -23187,39 +23177,29 @@
       "lastUpdated": "2026-09-09"
     },
     "recovery.usePassphraseLink": {
-      "translation": "使用我的恢复密码",
-      "hash": "iiktsq",
-      "lastUpdated": "2026-09-09"
-    },
-    "loginV6.unlockSubtitlePassphrase": {
-      "translation": "输入您的家庭恢复密码，我们将找到您的账号",
-      "hash": "al9pzf",
-      "lastUpdated": "2026-09-09"
+      "translation": "使用我的家庭密码",
+      "hash": "m4y9ed",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockFooterPassphrase": {
-      "translation": "此恢复密码可解密您的本地数据。我们不会存储或恢复它。",
-      "hash": "mepn2r",
-      "lastUpdated": "2026-09-09"
+      "translation": "您的家庭密码在此设备上解密此Beanpod。我们永远看不到它，也无法恢复它。",
+      "hash": "aexea2",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockNoAccessTitle": {
-      "translation": "无法登录此家庭？",
-      "hash": "q7lrbx",
-      "lastUpdated": "2026-09-09"
-    },
-    "loginV6.unlockSubtitleEither": {
-      "translation": "输入您的密码或恢复密码，我们将找到您的账号",
-      "hash": "cbzokv",
-      "lastUpdated": "2026-09-09"
+      "translation": "无法解锁此Beanpod？",
+      "hash": "lcq38t",
+      "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockFooterEither": {
-      "translation": "任何一个都会解密您的本地数据。我们不会存储或恢复它们。",
-      "hash": "rk6zy9",
-      "lastUpdated": "2026-09-09"
+      "translation": "两者均可解密此设备上的此Beanpod。我们永远看不到它，也无法恢复它。",
+      "hash": "gyftk",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.secretEitherLabel": {
-      "translation": "密码或恢复密码",
-      "hash": "tsf6mb",
-      "lastUpdated": "2026-09-09"
+      "translation": "密码或家庭密码",
+      "hash": "fehw9a",
+      "lastUpdated": "2026-09-10"
     },
     "recovery.secretEitherPlaceholder": {
       "translation": "请输入任意一个",
@@ -23227,9 +23207,14 @@
       "lastUpdated": "2026-09-09"
     },
     "recovery.useSecretEitherLink": {
-      "translation": "使用我的密码或恢复密码",
-      "hash": "mpejh9",
-      "lastUpdated": "2026-09-09"
+      "translation": "使用我的密码或家庭密码",
+      "hash": "slldf1",
+      "lastUpdated": "2026-09-10"
+    },
+    "loginV6.unlockSubtitleWithFamily": {
+      "translation": "这会解密{familyName}的家庭数据。接下来，您将以家庭成员身份登录。",
+      "hash": "sx9agx",
+      "lastUpdated": "2026-09-10"
     }
   }
 }
