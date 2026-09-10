@@ -30,6 +30,18 @@ def build(style, mark_h, word_w, gap, scrim_alpha, radius):
     wh = round(word.height * word_w / word.width)
     word = word.resize((word_w, wh), Image.LANCZOS)
 
+    if style == "mark":
+        pad = 18
+        c = Image.new("RGBA", (mark.width + pad * 2, mark_h + pad * 2), (0, 0, 0, 0))
+        c.alpha_composite(mark, (pad, pad))
+        sh = Image.new("RGBA", c.size, SLATE + (255,))
+        sh.putalpha(c.getchannel("A").point(lambda a: int(a * 0.55)))
+        sh = sh.filter(ImageFilter.GaussianBlur(8))
+        out = Image.new("RGBA", c.size, (0, 0, 0, 0))
+        out.alpha_composite(sh, (0, 3))
+        out.alpha_composite(c)
+        return out
+
     if style == "bare":
         pad = 22
         W, H = mw + gap + word_w, mark_h
@@ -63,7 +75,7 @@ def build(style, mark_h, word_w, gap, scrim_alpha, radius):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--style", choices=["bare", "scrim"], default="scrim")
+    ap.add_argument("--style", choices=["bare", "scrim", "mark"], default="scrim")
     ap.add_argument("--mark-height", type=int, default=92)
     ap.add_argument("--wordmark-width", type=int, default=256)
     ap.add_argument("--gap", type=int, default=17)

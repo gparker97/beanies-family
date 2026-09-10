@@ -29,7 +29,10 @@ deliberate rather than incidental.
 | ground | Cloud White `#F8F9FA` |
 | source window | `crop=1080:1485:0:<per-shot offset>` |
 | vignette | `PI/3.6` |
-| logo | bare lockup, bottom centre, vertical centre at y=1670 |
+| logo | **prominent** mode - bare lockup, bottom centre, vertical centre at y=1670 |
+
+The lockup is prominent here because it has its own cream ground to sit on - it is not
+competing with footage, so restraint would just make it look timid.
 
 ```bash
 python3 scripts/make_logo_lockup.py logo.png --style bare --mark-height 104 --wordmark-width 300 --gap 20
@@ -56,18 +59,20 @@ edge to edge, or when the destination crops unpredictably.
 |---|---|
 | source | no crop, `scale=1080:1920` |
 | vignette | `PI/5.2` |
-| logo | scrim lockup at 92%, top left, 38px margin |
+| logo | pick a mode - see SKILL.md § Branding. Subtle: `--style mark --mark-height 128`, top left, 44px margin, 0.88. Prominent: full lockup, bottom centre. |
 
-```bash
-python3 scripts/make_logo_lockup.py logo.png --style scrim --mark-height 92 --wordmark-width 256
-```
+Full-bleed is the case where the watermark sits over live footage, so the mode choice is
+real work rather than a formality. Family footage that should feel organic wants the
+subtle mascot; an announcement wants the full lockup with room around it. What does not
+work is the middle - a shrunken lockup on a scrim, tucked in a corner, which reads as an
+afterthought.
+
+The scrim is not decoration when you do use it: a bare lockup over this footage vanishes
+against the dark picture frame on the wall, where Deep Slate on dark navy has nearly zero
+contrast.
 
 Top left, not bottom right: TikTok, Reels and Shorts all put their action rail and caption
 block over the bottom-right corner.
-
-The scrim is not decoration. A bare logo at 78% over this footage vanishes against a dark
-picture frame on the wall - Deep Slate on dark navy is nearly zero contrast. Over
-unpredictable backgrounds the cream pill is what keeps the mark legible.
 
 ## Adding a preset
 

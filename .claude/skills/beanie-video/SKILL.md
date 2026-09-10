@@ -179,15 +179,54 @@ Raw phone footage is flat and reads as unfinished; this is a light touch, not a 
 
 ## Branding
 
-Build the watermark with `scripts/make_logo_lockup.py`. Placement follows from what is
-behind it, and getting this wrong is the most common way a video looks amateur:
+Build the watermark with `scripts/make_logo_lockup.py`. **Pick a mode first, then a
+position** - the mode is the decision that matters and it follows from what the video is
+for.
 
-- **On a flat brand ground** (the cream area of a framed preset): `--style bare`, bottom
-  centre. Nothing behind it, so it needs no help.
-- **Over live footage**: `--style scrim`, top left. Two reasons. Bottom-right is where
-  TikTok, Reels and Shorts put the action rail and caption block, so a watermark there gets
-  covered. And a bare logo over unpredictable footage disappears - Deep Slate on a dark
-  background has almost no contrast - so it needs the cream pill behind it.
+### The two modes
+
+**Subtle** - the mascot alone, no wordmark. A presence, not a claim.
+
+```bash
+python3 scripts/make_logo_lockup.py logo.png --style mark --mark-height 128
+# corner, 44px margin, overlay opacity 0.88
+```
+
+Use when the footage is the message: family moments, anything meant to feel organic or
+shot-by-a-parent, anything where an obvious watermark would make a real moment look like
+an ad. 128px on a 1920-tall frame is about 6.7% of frame height - visible if you look,
+ignorable if you don't.
+
+**Prominent** - the full lockup, large, given its own room.
+
+```bash
+python3 scripts/make_logo_lockup.py logo.png --style bare --mark-height 150 --wordmark-width 430 --gap 26
+# bottom centre, ~110px up from the bottom edge, opacity 1.0
+# over busy or dark footage use --style scrim at the same size
+```
+
+Use when the brand is the message: announcements, launches, ads, anything with a call to
+action, and any framed preset where the lockup sits on its own cream ground.
+
+### Why there is no middle
+
+A half-size lockup tucked into a corner - especially on a scrim pill - is the one thing to
+avoid. It is too detailed to ignore and too small to actually read, so it neither
+disappears nor lands. It reads as an afterthought, which is the one thing a brand mark
+must never look like.
+
+If you want restraint, **drop the wordmark** rather than shrinking the pair. If you want
+presence, **give it room** rather than adding a box around it.
+
+### Position
+
+- **Not bottom-right.** TikTok, Reels and Shorts all put their action rail and caption
+  block over that corner, so a watermark there gets covered.
+- **Subtle mode**: top-left is the broadcast-bug position and stays clear of platform UI.
+- **Prominent mode**: bottom centre, or on the brand ground of a framed preset.
+- **Over unpredictable footage**, a bare logo can vanish - Deep Slate on a dark background
+  has almost no contrast. Either use `--style scrim`, or place it where you control the
+  background.
 
 The beanies hold hands and the arrow is never rotated. Brand rules live in
 `.claude/skills/beanies-theme/SKILL.md`; this skill does not restate them.
