@@ -61,8 +61,18 @@ export function helpUrl(path: HelpPath): string {
 }
 
 /**
- * Open a Help Center article, recording that it happened and never failing
- * silently.
+ * Open a Help Center article, recording that it happened.
+ *
+ * ⚠️ KNOWN GAP, so nobody reads more assurance into this than it gives. The
+ * `catch` below only fires on a genuine throw, and the two failures that could
+ * realistically happen do not throw: `openExternal` returns early with just a
+ * `console.error` for an empty or non-http(s) url, and a popup-blocked
+ * synthetic click fails silently in the browser. So a misconfigured
+ * `VITE_MARKETING_URL`, or a blocked click, currently reads in CloudWatch as a
+ * successful open: a `help_click` with no paired warning. Closing that means
+ * `openExternal` returning a boolean, which is a change to a util with eight
+ * callers and belongs in its own commit. Until then, do not treat the absence
+ * of warnings here as evidence that help links are working.
  *
  * Order is deliberate, and differs from `discord.ts`, which navigates before it
  * tracks and calls that order load-bearing. Two reasons it is inverted here.

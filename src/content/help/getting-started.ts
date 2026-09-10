@@ -891,14 +891,15 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'Turn <strong>Guided Access</strong> on',
           'Tap <strong>Passcode Settings</strong>, then <strong>Set Guided Access Passcode</strong>, and choose a code the children do not know',
           'Open beanies and start the wall',
-          'Triple-click the top button (the side button on older iPads). If a shortcuts panel appears, tap <strong>Guided Access</strong>',
+          'Triple-click the <strong>Home</strong> button. On an iPad that has no Home button, triple-click the <strong>top</strong> button instead',
+          'If a shortcuts panel appears, tap <strong>Guided Access</strong>',
           'Tap <strong>Start</strong>',
         ],
       },
       {
         type: 'paragraph',
         content:
-          'To finish a Guided Access session later, triple-click the same button again and enter the passcode.',
+          'To finish a Guided Access session later, triple-click that same button again and enter the passcode.',
       },
       {
         type: 'heading',
@@ -910,8 +911,8 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>Settings</strong>, tap <strong>Security and privacy</strong>, then <strong>More security settings</strong>',
-          'Tap <strong>App pinning</strong> (on a Samsung tablet this reads <strong>Allow apps to be pinned</strong>) and turn it on',
+          'Open <strong>Settings</strong> and find the security section. On a Pixel this is <strong>Security &amp; privacy</strong> then <strong>More security &amp; privacy</strong>; on a Samsung it is <strong>Security and privacy</strong> then <strong>More security settings</strong>',
+          'Turn on <strong>App pinning</strong> (a Samsung tablet calls this <strong>Allow apps to be pinned</strong>)',
           'Turn on the option to ask for your PIN, pattern or password before unpinning, which is the part that actually keeps a child in the app',
           'Open beanies and start the wall',
           'Open <strong>Recents</strong>, tap the beanies icon at the top of its card, then tap <strong>Pin</strong>',
@@ -920,7 +921,14 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'To unpin later, touch and hold <strong>Back</strong> and <strong>Home</strong> together (or <strong>Back</strong> and <strong>Recents</strong> on a Samsung), then enter your code.',
+          'How you unpin depends on how you navigate the tablet. If you use gestures, which is the default on most modern Android tablets, swipe up from the bottom and hold. If you use the three-button bar, touch and hold <strong>Back</strong> and <strong>Home</strong> together, or <strong>Back</strong> and <strong>Recents</strong> on a Samsung. Then enter your code.',
+      },
+      {
+        type: 'callout',
+        content:
+          'As with the screen timeout above, Android manufacturers name these screens differently, and they move between versions. If the path here does not match your tablet, search its own Settings for "pinning" and you will find it.',
+        title: 'Android menus vary here too',
+        icon: '\u{1F50D}',
       },
       {
         type: 'heading',
@@ -980,7 +988,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          "No financial information is ever shown on the wall. No accounts, no balances, no transactions, no goals, no net worth. This is not a setting you have to remember to turn off: the wall simply has no access to any of it, whoever is signed in. A tablet on the kitchen wall is the last place your family's money should be readable from.",
+          "No financial information is ever shown on the wall. No accounts, no balances, no transactions, no goals, no net worth. This is not a setting you have to remember to turn off, and it does not depend on who is signed in: none of the wall's screens will render any of it. A tablet on the kitchen wall is the last place your family's money should be readable from.",
         title: 'Never any money on the wall',
         icon: '\u{1F512}',
       },
