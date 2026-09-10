@@ -2137,6 +2137,41 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
+### 🚀 Session 2026-09-10 (7) — 0.19 SHIPPED TO ALL FOUR SURFACES. The credential arc is finally live. 🚀
+
+> **Last updated:** 2026-09-10. Deployed commit `1f9b1ba0` (`APP_VERSION` 0.18 → 0.19,
+> a MINOR bump on greg's instruction: `derive-store-version.mjs` strips `R<n>`, so 0.18
+> was already spent as an App Store version and no `0.18R*` could have been uploaded).
+> **All six workflows green:** Main CI (7m22s), Security (3m43s), Astro
+> (`34477375974`), Vue PROD (`34478191122`), Play production (`34478197580`), App Store
+> (`34478204869`). Verified live rather than assumed: `app.beanies.family` serves
+> `"0.19"` with build sha `1f9b1ba0` (not `"dev"`), and `beanies.family/min-app-version.json`
+> serves the new floor.
+>
+> **What shipped:** the whole credential/passphrase arc from sessions 5+6 (35 commits
+> behind the last deploy — it had been sitting unshipped), the beanie wall's edit mode
+> (add / rename / remove, chore board scrolling, the whole trip drawer), and the
+> celebration popper. Release note `2026.09.10`, **no spotlight** on greg's call, cut to
+> **two blocks** on his second instruction ("more concise... just 2 updates"): signing in,
+> and the wall. The celebration animations were deliberately left OUT of the note.
+>
+> ⭐ **UPDATE FLOOR RAISED 0.17 → 0.18**, which is the step the 2026-09-09 note said to
+> wait for. Both Decision-C preconditions held and were checked, not assumed: 0.18 is
+> LIVE on both stores (greg confirmed), and a device below the floor can DAMAGE data (a
+> pre-compaction device overwrites a compacted pod; the edits made in between are
+> unrecoverable). The floor rode a deploy that includes WEB, so it actually publishes —
+> the failure mode from 2026-09-08 where it was raised to a merely-submitted version, and
+> the one from an app-only deploy where the file publishes nothing.
+>
+> ⏳ **greg's, not mine:** Google review (Play production) and Apple review (~1-3 days;
+> `appstore-automatic`, so it self-releases on approval, no Release click). On-device
+> verification happens on THESE builds. Once 0.19 is live on both stores, the floor's
+> `NEXT:` line says to raise it to 0.19 — and NOT before.
+>
+> 💲 **The pricing page was excluded by construction**, not by the flag: it lives on
+> `pricing-page` and `/pricing` returns 404 on prod (verified post-deploy). Its
+> `/code-review` came back with 15 findings, none shipping — see the pending block.
+
 ### ⭐⭐ Session 2026-09-10 (6) — THE CREDENTIAL FIX, VERIFIED. Four defects found. Still NOT deployed. ⭐⭐
 
 > **Last updated:** 2026-09-10. `e8aaa4dd` → `97b26d2b` → `954fccc0` → `7779a3f0` →
