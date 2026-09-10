@@ -436,8 +436,14 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         class="font-inter wall-card-sub flex items-center gap-2 py-0.5 text-[#dfe6ec]"
       >
         <b class="font-outfit truncate">{{ leg.title }}</b>
-        <span v-if="leg.timing?.band.start.time">{{ leg.timing.band.start.time }}</span>
-        <span v-if="leg.keyValue" class="ml-auto shrink-0 text-[#9fb3c4]">{{ leg.keyValue }}</span>
+        <!--
+          The departure time only. `keyValue` is a full summary ("SQ 123 · sep
+          12 · 7:15 am · T3"), so rendering it here printed the time twice and
+          crushed the "SIN → HND" the card exists to lead with.
+        -->
+        <span v-if="leg.timing?.band.start.time" class="ml-auto shrink-0 text-[#9fb3c4]">
+          {{ leg.timing.band.start.time }}
+        </span>
       </span>
       <span
         v-if="trip.percent > 0"

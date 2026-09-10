@@ -71,7 +71,7 @@ async function onSubmit() {
     <button
       type="submit"
       class="wall-add-go font-outfit text-primary-500 dark:text-accent-lift shrink-0 rounded-xl bg-[var(--tint-orange-15)] font-extrabold transition-opacity duration-150 disabled:opacity-50"
-      :class="ready ? '' : 'pointer-events-none w-0 overflow-hidden opacity-0'"
+      :class="ready ? '' : 'is-dormant'"
       :disabled="busy || !ready"
       :aria-hidden="!ready"
       :tabindex="ready ? undefined : -1"
@@ -99,8 +99,19 @@ async function onSubmit() {
   width: 2.75rem;
 }
 
-.wall-add-go.w-0 {
+/*
+ * The collapse lives HERE, not on Tailwind's `w-0`. Tailwind 4 emits utilities
+ * inside `@layer utilities`, and an unlayered `\3c style scoped>` rule beats any
+ * layered one whatever the specificity, so `.wall-add-go { width: 2.75rem }`
+ * silently won and the invisible button kept stealing 44px from the input on
+ * every add row.
+ */
+.wall-add-go.is-dormant {
   min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  width: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

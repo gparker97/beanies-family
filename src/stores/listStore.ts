@@ -700,6 +700,34 @@ export const useListStore = defineStore('lists', () => {
   }
 
   /**
+   * Put ONE removed item back where it was. The undo half of `removeItem`.
+   *
+   * Deliberately NOT a whole-array restore. Writing back a snapshot taken
+   * before the delete would clobber anything that happened in between, and on
+   * the beanie wall that window is a 6-second toast with an add row sitting
+   * directly under the same list: a family can add a row, tap Undo, and watch
+   * the new row vanish. Reading the CURRENT items and splicing one back cannot
+   * do that, and it makes a concurrent edit from another device safe too.
+   *
+   * Derives completion like `removeItem` does, so a one-off list that got FILED
+   * by losing its last open item is un-filed on the way back. Idempotent: a
+   * double-invoke returns the list untouched rather than inserting twice.
+   */
+  async function restoreItem(
+    listId: string,
+    item: FamilyListItem,
+    index: number
+  ): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) return null;
+    if (list.items.some((i) => i.id === item.id)) return list;
+    const items = [...list.items];
+    items.splice(Math.max(0, Math.min(index, items.length)), 0, item);
+    const { patch } = deriveCompletion(list, items);
+    return updateList(listId, { items, ...patch });
+  }
+
+  /**
    * Rename a list. Trims; an empty/whitespace or unchanged title is a no-op
    * (returns the list unchanged) — a list must always have a title. Deliberately
    * does NOT derive completion: renaming changes neither which items exist nor
@@ -967,6 +995,7 @@ export const useListStore = defineStore('lists', () => {
     toggleItem,
     addItem,
     removeItem,
+    restoreItem,
     renameList,
     updateItemText,
     reorderItems,
