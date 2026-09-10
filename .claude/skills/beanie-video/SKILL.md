@@ -26,7 +26,15 @@ for it out of the faces.
 ## Where things live
 
 - **Raw footage**: `~/gdrive-gparker97/Projects/beanies.family/Marketing/Video/Raw Videos/`
-- **Finished work**: `~/gdrive-gparker97/Projects/beanies.family/Marketing/Video/<project-slug>/`
+- **Everything else**: its own folder at
+  `~/gdrive-gparker97/Projects/beanies.family/Marketing/Video/<project-slug>/`
+
+  One folder per project, and that includes tests, experiments and review copies - not
+  only finished work. Never leave a loose file at the `Video/` root. A video project is
+  never a single file: it is a master, a web export, a GIF or WebP, the build script and
+  a README, and those only make sense kept together. Name the folder for the piece
+  (`celebration-loop-v3`), and start a new one rather than overwriting when a version
+  changes enough to be worth comparing against.
 - **Never the repo.** Rendered video is a file artefact, not code. It goes to Drive
   (see the Google Drive rule in `CLAUDE.md`). This skill and its scripts are the only
   part that belongs in git.
