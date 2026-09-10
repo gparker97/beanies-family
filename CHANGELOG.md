@@ -19,7 +19,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **The first sign-in screen now says what it is actually doing.** Opening your family happens in two steps: your beanpod is decrypted, and then you sign in as a member. The screen was titled "Sign In", which is the second step, while asking for the secret that does the first. It now reads "unlock my beanpod", says whose data it is decrypting and what happens next, and uses the same wording whether you open it with a password, a family passphrase or your recovery kit.
 - **Signing in with your family passphrase no longer asks you to replace a PIN that works.** Because a passphrase is the normal way onto a device that has never seen your family, arriving that way used to land you on "set a new PIN" as though you had lost yours. It now takes you to your usual sign-in, with a new PIN one tap away if you do need one. Using your recovery kit still leads with setting a new PIN, which is what a kit is for.
-- **A screen no longer tells you you're in with your recovery kit when you used your family passphrase.**
+- **A screen no longer tells you you're in with your recovery kit when you used your family passphrase.** This was fixed twice: the first fix reached only one of the two ways a passphrase can open your family file, so signing in from the file-load screen still called it a kit.
+- **Only your recovery kit can set a new PIN at sign-in now.** A family passphrase opens your family file, but it does not say which person you are, so it no longer offers to replace anyone's PIN. If you have forgotten yours, the recovery kit link on that screen is the way through.
+- **An empty family passphrase box no longer answers "Password is required".**
 - **The recovery passphrase is now called the family passphrase, everywhere.** It had six different names in the app, and "recovery" was also the name of the recovery kit, the recovery code and the whole Settings section, so there was no way to tell from a name which one you had. "Recovery" now means the printed kit and nothing else.
 
 ## 2026-09-09
