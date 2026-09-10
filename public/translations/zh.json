@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-10",
-    "translationCount": 4642
+    "translationCount": 4643
   },
   "translations": {
     "app.name": {
@@ -21062,7 +21062,7 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.resetPinBody": {
-      "translation": "您正在使用康复工具包—请设置一个新的6位数PIN码，以便从现在开始使用。",
+      "translation": "您正在使用恢复工具包。请设置一个新的6位数PIN码，以便从现在开始使用。",
       "hash": "q4nz0x",
       "lastUpdated": "2026-09-09"
     },
@@ -23214,6 +23214,11 @@
     "loginV6.unlockSubtitleWithFamily": {
       "translation": "这会解密{familyName}的家庭数据。接下来，您将以家庭成员身份登录。",
       "hash": "sx9agx",
+      "lastUpdated": "2026-09-10"
+    },
+    "recovery.resetPinBodyPassphrase": {
+      "translation": "您使用的是家庭密码。为此设备设置6位数PIN码，或使用您已有的PIN码登录。",
+      "hash": "5tvugr",
       "lastUpdated": "2026-09-10"
     }
   }
