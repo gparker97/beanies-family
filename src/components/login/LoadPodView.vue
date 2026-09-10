@@ -176,7 +176,7 @@ const secretField = computed(() => {
       placeholder: 'recovery.secretEitherPlaceholder',
       footer: 'loginV6.unlockFooterEither',
       switchLabel: 'recovery.useSecretEitherLink',
-      required: 'recovery.passphraseRequired',
+      required: 'recovery.secretEitherRequired',
       forgot: 'secret',
     } as const;
   }
@@ -262,6 +262,11 @@ const pendingFamilyName = computed(() => syncStore.pendingEncryptedFile?.envelop
  */
 const unlockSubtitle = computed<string | null>(() => {
   if (nothingCanOpenIt.value) return null;
+  // ⚠️ Nothing is being decrypted on the recovery-kit escape from an OPEN pod: the kit is
+  // proving identity against the live envelope, and the person is already past family
+  // selection. "This decrypts your family's data. Next, you'll sign in as a member." is
+  // false on both halves there.
+  if (!syncStore.hasPendingEncryptedFile) return null;
   const name = pendingFamilyName.value;
   return name
     ? fillTemplate(t('loginV6.unlockSubtitleWithFamily'), { familyName: name })
@@ -1514,7 +1519,12 @@ async function handleDriveRefresh() {
            soft shadow + Sky Silk icon-circle) so it reads as part of the same
            visual system rather than a generic SaaS info notice. The key icon
            ties semantically to "no password = no key". -->
+      <!-- ⚠️ COLD ARRIVALS ONLY. This greets someone who opened a `.beanpod` that is not
+           theirs, so it must never render when the pod is already open — the recovery-kit
+           escape from the PIN challenge lands here, and a member of THIS family was being
+           told the file belongs to another family and to go ask for an invite. -->
       <div
+        v-if="syncStore.hasPendingEncryptedFile"
         class="dark:bg-surface-overlay/50 mt-6 flex items-start gap-3 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"
       >
         <div

@@ -711,6 +711,31 @@ export function useJoinFlow() {
    * Validate the loaded file's familyId, then move into member-pick.
    * Handles `FILE_FAMILY_MISMATCH` and `NO_UNCLAIMED_MEMBERS`.
    */
+  /**
+   * The LOCAL-file counterpart of the three Drive routes above.
+   *
+   * ⚠️ The local path used to skip the invite redemption ENTIRELY. `JoinPodView` loaded the
+   * file and opened a PASSWORD modal on both `success` and `needsPassword`, so a joiner
+   * holding a perfectly valid invite was asked for a password instead of having their
+   * invite redeemed — and a family born since 0.13R2 has no `wrappedKeys` at all, so that
+   * modal could never succeed for them. The invite IS the credential.
+   *
+   * With no token this is not a join at all. Joining is only ever via an invite link;
+   * anyone else holding this family's file is signing in, which is a different surface.
+   */
+  async function handleLocalFileLoaded(): Promise<void> {
+    currentStep.value = 'loading';
+    if (!inviteToken.value) {
+      recordError('INVITE_TOKEN_INVALID');
+      return;
+    }
+    if (syncStore.pendingEncryptedFile) {
+      const ok = await tryInviteTokenDecrypt();
+      if (!ok) return; // error already recorded by tryInviteTokenDecrypt
+    }
+    advanceAfterFileLoaded();
+  }
+
   function advanceAfterFileLoaded(): void {
     const loadedFamilyId =
       syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId ?? null;
@@ -845,18 +870,6 @@ export function useJoinFlow() {
     }
   }
 
-  /** Submit the decrypt-modal password (used when no invite token). */
-  async function handleSubmitDecryptPassword(password: string): Promise<boolean> {
-    const ok = await tryStep('FILE_DECRYPT_FAILED', async () => {
-      const result = await syncStore.decryptPendingFile(password);
-      if (!result.success) throw asJoinDecryptError(result);
-      return true;
-    });
-    if (!ok) return false;
-    advanceAfterFileLoaded();
-    return true;
-  }
-
   /** User picks a bean to claim. */
   function handleSelectMember(member: FamilyMember): void {
     selectedMember.value = member;
@@ -944,7 +957,7 @@ export function useJoinFlow() {
     handleAuthTap,
     handleSignInDifferent,
     handleRetry,
-    handleSubmitDecryptPassword,
+    handleLocalFileLoaded,
     handleSelectMember,
     handleSubmitPin,
     linkMode,
