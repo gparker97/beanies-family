@@ -75,7 +75,7 @@ const hasEnd = computed(() => !!props.band.end);
 
 .when-cap {
   align-items: center;
-  color: #0077b6;
+  color: var(--when-cap, #0077b6);
   display: flex;
   font-family: Outfit, sans-serif;
   font-size: 0.75rem;
@@ -119,5 +119,20 @@ const hasEnd = computed(() => !!props.band.end);
 html.dark .when-cell,
 html.dark .when-arrow {
   background: rgb(0 180 216 / 10%);
+}
+
+/*
+ * `#0077B6` is named in the CIG (slide 9) as one of three blue accents that
+ * shipped UNDER the AA floor, at 3.46 on a dark surface. It is an accent used as
+ * readable text, so it needs its lift partner, and the CIG's own table names
+ * `teal-lift` #4FD1BE (8.98 / 7.78) as "Travel teal". Routed through a custom
+ * property rather than a second colour declaration, because the rule that sets
+ * it must beat the light one without duplicating the whole selector.
+ *
+ * The wall renders many more of these bands than the travel page ever did, which
+ * is what pulled a pre-existing defect into scope.
+ */
+html.dark .when-band {
+  --when-cap: var(--color-teal-lift, #4fd1be);
 }
 </style>
