@@ -6449,6 +6449,41 @@ const STRING_DEFS = {
     beanie:
       "turn a spare tablet into the family wall display: the week at a glance and everyone's jobs, ready to tap.",
   },
+  // The card's device checklist. These tell a parent what to change on a real
+  // device, so the beanie values keep the real nouns ("device", "settings",
+  // "screen") and only drop case. Enforced by `uiStrings.test.ts`.
+  'wall.setup.tips.lead': {
+    en: 'Before you hang it up, three things on the device:',
+    beanie: 'before you hang it up, three things on the device:',
+  },
+  'wall.setup.tips.screenBacked': {
+    en: 'Set the screen to never lock, so it stays on between taps',
+    beanie: 'set the screen to never lock, so it stays on between taps',
+  },
+  'wall.setup.tips.screenOnly': {
+    en: 'Set the screen to never lock. On this device that is the only thing keeping it on',
+    beanie: 'set the screen to never lock. on this device that is the only thing keeping it on',
+  },
+  'wall.setup.tips.guidedAccess': {
+    en: 'Turn on Guided Access, so a tap cannot wander off into another app',
+    beanie: 'turn on Guided Access, so a tap cannot wander off into another app',
+  },
+  'wall.setup.tips.screenPinning': {
+    en: 'Turn on screen pinning, so a tap cannot wander off into another app',
+    beanie: 'turn on screen pinning, so a tap cannot wander off into another app',
+  },
+  'wall.setup.tips.lockGeneric': {
+    en: 'Lock the device to this app, so a tap cannot wander off into another one',
+    beanie: 'lock the device to this app, so a tap cannot wander off into another one',
+  },
+  'wall.setup.tips.power': {
+    en: 'Hang it within reach of a socket',
+    beanie: 'hang it within reach of a socket',
+  },
+  'wall.setup.help.link': {
+    en: 'How to set your device up for the wall',
+    beanie: 'how to set your device up for the wall',
+  },
   'wall.setup.start': { en: 'Start the wall', beanie: 'start the wall' },
   'wall.setup.setPinAndStart': { en: 'Set a PIN and start', beanie: 'set a pin and start' },
   'wall.setup.needsPin.title': { en: 'Set a PIN first', beanie: 'set a PIN first' },

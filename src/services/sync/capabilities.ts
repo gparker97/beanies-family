@@ -1,5 +1,18 @@
 /**
- * Browser capability detection for sync features
+ * The app's single browser / device capability seam.
+ *
+ * It began as sync-only detection and is now broader: alongside the file-picker
+ * and crypto probes it owns the native<->web boundary (`isNative`,
+ * `getPlatform`), the standalone-PWA check, the Apple-touch-device check, the
+ * OS family used for user-facing copy (`getDevicePlatform`) and the screen
+ * wake-lock probe. The native<->web half is the part ADR-029 pins to this file.
+ *
+ * Add new capability probes HERE rather than starting a parallel
+ * `deviceCapabilities.ts`. One caveat if you do: 32 test files `vi.mock` this
+ * module with hand-written factories that export only the names they need, so a
+ * new export can surface as "undefined is not a function" in an unrelated
+ * suite. Run the full unit suite after editing, and fix by adding the key to
+ * that test's factory.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -66,6 +79,46 @@ export function isIosOrIpadOs(): boolean {
   return (
     /iP(hone|od|ad)/.test(ua) || (nav.platform === 'MacIntel' && (nav.maxTouchPoints ?? 0) > 1)
   );
+}
+
+/** OS family for user-facing copy. See `getDevicePlatform`. */
+export type DevicePlatform = 'ios' | 'android' | 'other';
+
+/**
+ * OS family for USER-FACING copy that must name a platform's own vocabulary
+ * (Guided Access vs screen pinning, Share sheet vs three-dot menu).
+ *
+ * Deliberately OS, not form factor: an iPhone and an iPad both say "Guided
+ * Access", so the same answer is right whether the reader is standing at the
+ * tablet or reading Settings on their phone.
+ *
+ * Not to be confused with `getPlatform()`, which answers "which Capacitor
+ * shell", or `utils/platformLabel.ts`, which is a Slack-only telemetry
+ * vocabulary that must not cross into UI.
+ *
+ * Safe at module/SSR time (returns 'other' when `navigator` is missing).
+ */
+export function getDevicePlatform(): DevicePlatform {
+  if (isIosOrIpadOs()) return 'ios';
+  if (typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent ?? '')) {
+    return 'android';
+  }
+  return 'other';
+}
+
+/**
+ * Whether this device can hold the screen awake from within the page
+ * (Screen Wake Lock API).
+ *
+ * Lives here, not in `useWakeLock`, so a surface that wants only the ANSWER
+ * (the Settings wall card, which tells a parent whether the tablet's own
+ * Auto-Lock setting is the only thing keeping the screen lit) never imports the
+ * composable that TAKES the lock. `useWakeLock()` acquires on setup, so
+ * importing it merely to ask a question would light up a real wake lock on a
+ * Settings visit. Safe at module/SSR time.
+ */
+export function isWakeLockSupported(): boolean {
+  return typeof navigator !== 'undefined' && 'wakeLock' in navigator;
 }
 
 /**
