@@ -44,7 +44,7 @@ First, set it up.
 
 Navigate to the **settings** page and find the "calendar" box. From there, tap "connect a google calendar" and complete the Google consent flow to allow beanies.family access to **push** events to your connected calendar(s).
 
-_Privacy aside (updated September 2026):_ beanies **never reads your events unless you specifically ask it to**. Day to day, all we ask Google is whether you're busy at a given time, never what you're doing. The one exception is the one-time import, added in September 2026, where you can ask beanies to bring your existing events across: that reads the title, time, place and repeat pattern of events on calendars you pick, you review every one before anything is added, and it happens once. Guest lists are never read, at any time.
+_Privacy aside (updated September 2026):_ beanies **never reads your events unless you specifically ask it to**. Day to day, all we ask Google is whether you're busy at a given time, never what you're doing. The one exception is the one-time import, added in September 2026, where you can ask beanies to import your existing events: that reads the title, time, place and repeat pattern of events on calendars you pick, you review every one before anything is imported, and it runs once. Guest lists are never read, at any time.
 
 I should correct something I wrote here originally. I said that reading only your busy/free status was a limitation of the scopes Google allows. That wasn't right. The scope we were approved for has always permitted reading event content on calendars you own; not doing it was **our** choice, not Google's rule. The choice hasn't really changed, it's just become explicit: we don't read your events, unless you ask.
 
