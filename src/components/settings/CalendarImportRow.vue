@@ -67,8 +67,12 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
 </script>
 
 <template>
+  <!-- The row sits ON the drawer body, so it must be one step UP the elevation
+       ladder from it. The drawer is `bg-white dark:bg-surface-raised`
+       (BeanieFormModal), so a row painting those same tokens would be invisible
+       against its own container. -->
   <li
-    class="dark:bg-surface-raised flex items-center gap-3 rounded-[14px] bg-white px-3 py-2"
+    class="dark:bg-surface-overlay flex items-center gap-3 rounded-[14px] bg-[#f8f9fa] px-3 py-2"
     :class="candidate.alreadyImported ? 'opacity-50' : ''"
   >
     <button
@@ -87,9 +91,18 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
       <span aria-hidden="true">✓</span>
     </button>
 
-    <div class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+    <!-- `items-start` in the column layout, or the chip and the location stretch
+         to the full row width instead of hugging their text. -->
+    <div
+      class="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
+    >
+      <!-- `flex-auto`, NOT `flex-1`. `flex-1` is `flex: 1 1 0%`, which starts the
+           title at ZERO width and grows it only from leftover space, so a long
+           location next to it truncates the title to a couple of characters.
+           `flex-auto` keeps a content-sized basis, and the location below gives up
+           space four times faster, so the title is the last thing to shrink. -->
       <span
-        class="font-outfit text-secondary-500 dark:text-ink truncate text-base font-semibold"
+        class="font-outfit text-secondary-500 dark:text-ink min-w-0 flex-auto truncate text-base font-semibold"
         :title="title"
         >{{ title }}</span
       >
@@ -101,7 +114,7 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
       </span>
       <span
         v-if="candidate.draft.location"
-        class="text-secondary-400 dark:text-ink-faint truncate text-xs"
+        class="text-secondary-400 dark:text-ink-faint hidden max-w-[8rem] min-w-0 shrink-[4] truncate text-xs lg:inline"
         >{{ candidate.draft.location }}</span
       >
     </div>

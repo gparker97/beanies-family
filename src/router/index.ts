@@ -56,6 +56,15 @@ const routes: RouteRecordRaw[] = [
           component: () => import('@/pages/dev/WorkerSpikePage.vue'),
           meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
         } as RouteRecordRaw,
+        {
+          // #94 calendar-import review harness. The real screen is behind a
+          // Google OAuth connection, so this is how a browser run can check row
+          // density, sticky headers, dark mode and phone width at all.
+          path: '/dev/calendar-import',
+          name: 'DevCalendarImport',
+          component: () => import('@/pages/dev/CalendarImportHarness.vue'),
+          meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
+        } as RouteRecordRaw,
       ]
     : []),
   {
