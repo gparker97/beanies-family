@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **The beanie wall now shows birthdays and public holidays too.** The wall's all-day band showed the family's own all-day events but no birthdays and no holidays at all - so the one screen the family reads over breakfast was the one that did not say whose birthday it was. Both now appear in the same band, in the same colours the planner uses, across the day, week and bean-lane views. A day whose only entry is a birthday no longer reads "nothing on".
 - **Family birthdays now show on every calendar view.** They arrived on the month view only; the week view on a phone, the day view and the day agenda were all missed. All four now show them.
 - **Family birthdays are now on the planner.** beanies has always known everyone's birthday — it shows them on the Nook, reminds you to buy a present two weeks out, and rains confetti on the day — but the one place it never put them was the calendar. Every family member's birthday, including pets', now appears as an all-day entry on the month and week views: "Joey's 7th birthday", with the age worked out for you. Nothing to set up and nothing to maintain: they come from the birthday already on each bean's profile, so correcting a date fixes every year at once, and they cannot be accidentally deleted or duplicated. A birthday party, with a time and a place, is still an activity you add yourself.
 

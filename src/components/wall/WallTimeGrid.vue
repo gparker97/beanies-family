@@ -27,7 +27,7 @@ import { layoutTimeGrid, type GridLayout } from '@/utils/wallTimeGrid';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
-import type { WallAllDaySpan, WallOccurrence } from '@/utils/wallActivities';
+import type { WallAllDaySpan, WallBandReference, WallOccurrence } from '@/utils/wallActivities';
 import type { FamilyActivity } from '@/types/models';
 import type { WallSheetTarget } from '@/types/wall';
 
@@ -56,6 +56,13 @@ const props = defineProps<{
    * days go through `wallDayAllDay`, lanes and today through `wallSharedAllDay`.
    */
   allDaySpans: WallAllDaySpan[];
+  /**
+   * Read-only days in the same band — family birthdays and public holidays.
+   * Separate from `allDaySpans` rather than a union inside it: these have no
+   * activity to open, no owner, and no "everyone" state, so folding them in
+   * would give every consumer three cases that cannot happen for one variant.
+   */
+  bandReferences?: WallBandReference[];
   now: Date;
   /** The columns shown ARE today, so what has happened can be dimmed. */
   dimPast: boolean;
@@ -259,9 +266,24 @@ const bandRows = computed(() => {
   return rows;
 });
 
-/** All-day rows touching a given column — an empty column is one with neither. */
-function bandRowsFor(index: number) {
-  return bandRows.value.filter((row) => index >= row.startCol && index < row.startCol + row.span);
+/**
+ * Anything in the BAND touching a given column — an empty column is one with
+ * neither a timed block nor a band item.
+ *
+ * ⚠️ Counts reference days as well as the family's own all-day events. The
+ * comment beside the "nothing on" placeholder describes this exact failure, and
+ * it was written about a birthday: a day whose only content is a birthday would
+ * otherwise print "nothing on" directly beneath a band that is, right there,
+ * showing that birthday.
+ */
+function bandRowsFor(index: number): number {
+  const spans = bandRows.value.filter(
+    (row) => index >= row.startCol && index < row.startCol + row.span
+  ).length;
+  const refs = (props.bandReferences ?? []).filter(
+    (row) => index >= row.startCol && index < row.startCol + row.span
+  ).length;
+  return spans + refs;
 }
 
 const showNowLine = computed(
@@ -314,13 +336,21 @@ function ownerNames(activity: FamilyActivity, laneMemberId?: string): string {
 function openActivity(occurrence: WallOccurrence): void {
   emit('open', { kind: 'activity', activityId: occurrence.activity.id, ymd: occurrence.date });
 }
+/**
+ * The planner's own tokens, so a birthday is the same colour in the kitchen as
+ * it is on a phone. Both carry a light and a dark value (see `style.css`), which
+ * is what keeps them readable on the wall's night mode.
+ */
+function refColour(kind: 'birthday' | 'holiday'): string {
+  return kind === 'birthday' ? 'var(--birthday-orange)' : 'var(--holiday-clay)';
+}
 </script>
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col gap-2" :style="{ '--wall-axis-w': `${axisWidth}px` }">
     <!-- all-day band: pinned above the axis, because these have no time -->
     <div
-      v-if="bandRows.length"
+      v-if="bandRows.length || (bandReferences?.length ?? 0) > 0"
       class="relative shrink-0"
       :style="{ paddingLeft: `${axisWidth}px` }"
     >
@@ -335,6 +365,31 @@ function openActivity(occurrence: WallOccurrence): void {
         style="background: rgb(174 214 241 / 26%)"
         :style="{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }"
       >
+        <!--
+          Reference days first, so the family's own events read as the answer to
+          "what are we doing" and these read as the day's context. Same pill as
+          the rows below - the wall's shape, at the wall's size - but carrying
+          the planner's colour for each kind, so a birthday is the same colour on
+          the kitchen screen as it is on a phone. A `div`, not a `button`: there
+          is nothing behind them to open.
+        -->
+        <div
+          v-for="ref in bandReferences ?? []"
+          :key="ref.reference.id"
+          class="wall-allday dark:bg-surface-raised flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left"
+          :style="{
+            gridColumn: `${ref.startCol + 1} / span ${ref.span}`,
+            borderLeft: `3px solid ${refColour(ref.reference.kind)}`,
+          }"
+        >
+          <span v-if="ref.reference.emoji" aria-hidden="true">{{ ref.reference.emoji }}</span>
+          <span
+            class="font-outfit truncate font-semibold"
+            :style="{ color: refColour(ref.reference.kind) }"
+            >{{ ref.reference.label }}</span
+          >
+        </div>
+
         <button
           v-for="(row, i) in bandRows"
           :key="`${row.occurrence.activity.id}:${row.occurrence.date}:${i}`"
@@ -493,7 +548,7 @@ function openActivity(occurrence: WallOccurrence): void {
               column that was, right above it, showing that day's birthday.
             -->
             <p
-              v-if="!(layout.columns[i] ?? []).length && !bandRowsFor(i).length"
+              v-if="!(layout.columns[i] ?? []).length && bandRowsFor(i) === 0"
               class="font-caveat dark:text-ink-soft absolute top-1/2 right-0 left-0 -translate-y-1/2 text-center opacity-55"
             >
               {{ t('wall.day.nothingOn') }}

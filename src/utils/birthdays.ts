@@ -22,7 +22,10 @@
  * Pure. No stores, no `Date.now()`: the caller passes the window.
  */
 import type { DateOfBirth, FamilyMember, UUID } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { toDateInputValue } from '@/utils/date';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { getOrdinalSuffix } from '@/utils/format';
 
 /** One person's birthday landing on one date inside the requested window. */
 export interface BirthdayOccurrence {
@@ -132,4 +135,25 @@ export function birthdaysByDate(
     else map.set(o.date, [o]);
   }
   return map;
+}
+
+/**
+ * "Joey's 7th birthday", or "Joey's birthday" when the birth YEAR is unknown.
+ *
+ * THE one implementation, shared by the planner's chip and the beanie wall's
+ * all-day band. Takes `t` rather than reaching for the store, the same way
+ * `describeRule` does, so it stays pure and testable — and so the two surfaces
+ * cannot drift into wording the family sees differently in the kitchen and on
+ * their phone.
+ */
+export function birthdayLabel(
+  birthday: Pick<BirthdayOccurrence, 'name' | 'age'>,
+  t: (key: UIStringKey) => string
+): string {
+  return birthday.age === undefined
+    ? fillTemplate(t('planner.birthday.noAge'), { name: birthday.name })
+    : fillTemplate(t('planner.birthday.withAge'), {
+        name: birthday.name,
+        age: getOrdinalSuffix(birthday.age),
+      });
 }
