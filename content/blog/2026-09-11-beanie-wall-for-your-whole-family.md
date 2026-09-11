@@ -22,7 +22,7 @@ At the end of every year, one of the holiday presents from my mom would always b
 
 ![A vintage SAS Scandinavian Airlines wall calendar opened to October 1970, an abstract painting of a Bangkok floating market above the month grid, with a few days annotated by hand](/blog/beanie-wall-kitchen-calendar.webp)
 
-_not my actual family calendar. but something like this. not actually from 1970._
+_not my actual family calendar. but something like this. brings back memories._
 
 And by the way, while we’re taking this nice walk down memory lane, another fond memory from childhood was the weekly allowance I got for doing my chores every day (well - almost every day). My chores routine taught me a valuable lesson in responsibility, hard work, and exploiting legal loopholes. Because, and I’m a bit nervous to say this, since this is the first time I’ve ever admitted this out loud, my mom never really had a reliable way to track whether I actually did those chores.
 
@@ -57,13 +57,13 @@ I also wanted to address some of the biggest (actual) complaints about the Skyli
 
 The result? Well, let me show you. Here it is:
 
-![The beanie wall running on a tablet, showing the family week as a timetable of everyone's activities, with a chores progress card and an upcoming trip card down the right-hand side](/blog/beanie-wall-daily-view.webp)
+![The beanie wall running on a tablet, showing the family week as a timetable of everyone's activities, with a packing list, a family to-do card and an upcoming trip card down the right-hand side](/blog/beanie-wall-daily-view.webp)
 
-_yes, i’m writing this while sitting on the floor at my son’s cubing competition_
+_not our real schedule. i’m actually writing this while sitting on the floor at my son’s cubing competition._
 
-![The beanie wall's chore board on a tablet, one column per child, each finished chore struck through with the time it was done, and a row of stars along the bottom](/blog/beanie-wall-jobs-board.webp)
+![The beanie wall's chore board on a tablet, one column per family member, showing a vacation packing list and grocery list alongside each child's repeating chores](/blog/beanie-wall-jobs-board.webp)
 
-_you better finish those chores if you want that allowance_
+_you better finish those chores if you want that allowance. and daddy’s gotta finish packing too._
 
 And how do I know my family loves it? Well, check out these (drama) beans.
 
@@ -73,7 +73,7 @@ _members of the academy - for your consideration_
 
 Theatrics notwithstanding, the kids are actually neck-deep into their chore-checking routines now, and it really does seem like they finish their chores more proactively. Not only that, they ask me about upcoming events on the calendar, and run to me for their allowance as soon as their weekly chore board is complete. It’s like a beanie dream come true. Now, if only I could get them to start sharing their toys.
 
-On my side, I can flip back in the app at any time to make sure they checked everything off. Of course, whether or not they really did that chore - that requires me to actually check their homework. Someday, I’ll make an app for that too.
+On my side, I can flip back in the app at any time to make sure they checked everything off. Of course, whether or not they really did that chore - that requires me to actually check their homework. Someday, I’ll make an app for that, too.
 
 **_The beanie wall_** is now officially live in my house, and we’re loving it. I’m excited to see how your family likes it as well - so if you set it up too, [let me know how it works for you](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=beanie-wall-for-your-whole-family&utm_content=discord-cta)!
 
