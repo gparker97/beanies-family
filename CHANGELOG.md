@@ -41,6 +41,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Changing which calendar beanies writes to no longer duplicates events it had taken over.** Those events live on the calendar you moved away from, so beanies would look for them on the new one, decide they had been deleted, and make fresh copies.
 - **Buttons on a connected calendar now wait for each other.** "Sync now" stayed live all the way through a disconnect, and using it left events behind in Google that beanies no longer knew about.
 
+### Changed
+
+- **Every "free while we're in beta" line on the site now points at the pricing page.** The switching pages, help FAQ and terms also no longer describe a free tier that isn't happening.
+
 ## 2026-09-10
 
 ### Added

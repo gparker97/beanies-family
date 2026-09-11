@@ -2070,50 +2070,39 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >   merely-submitted version is precisely the 2026-09-08 mistake; the floor file's own
 >   `NEXT:` line says the same thing.
 
-> - 💲 **BRANCH IN FLIGHT: `pricing-page` (2026-09-10, session 7) — now with 15 open
->   review findings.** The `/pricing` page, the `PRICING_LIVE` gate, and the "free for now"
->   link sweep across the switching pages, help FAQ and four blog posts all live on that
->   branch, deliberately OFF `main` so a deploy cannot carry them. greg: "put the page
->   behind a gate so that it does not get pushed to production in the next deploy."
->   **This held through the 0.19 deploy — `/pricing` returned 404 on prod afterwards,
->   checked, not assumed.** Two gates, on purpose: the flag (`web/src/lib/pricing.ts`
->   `PRICING_LIVE = false`) hides the page, the nav/footer links, the badge link and the
->   homepage hedge; the branch is the real gate, because the prose rewrites on `/from/*`,
->   `/help/faq` and the blog are NOT behind the flag and would send readers to a draft
->   placeholder. To ship: review the copy, fix the findings below, flip the flag, merge,
->   then delete the branch (local + remote). To abandon: delete the branch and say why
->   here. Plan + model: `docs/plans/2026-09-10-pricing-page.md`; prompts
->   `docs/prompts/2026-09/2026-09-10-pricing-page.md`.
+> - 💲 **THE PRICING PAGE IS ON `main` AND UNGATED (2026-09-11, session 8).** Everything
+>   the 2026-09-10 entry described as in-flight is resolved: the `pricing-page` branch was
+>   rebased onto `main`, merged fast-forward, and **deleted (local + remote)**. `PRICING_LIVE`
+>   is **gone entirely** — the constant, the `DraftPlaceholder` branch, the gated switcher
+>   script and the sitemap exclusion. `/pricing` is now an ordinary indexed page.
+>   **NOT YET DEPLOYED** — it goes live on the next `Deploy web` dispatch, which is
+>   deliberate and greg's call.
 >
->   **`/code-review main..pricing-page` found 15 issues. None are shipping.** The four
->   that matter before greg reads the copy:
+>   **The model changed shape.** No free tier. 90-day trial of the whole app (magic beans
+>   capped at 1 read/day) landing on **read-only**, then `beanies basic` **$30/yr, yearly
+>   only** (a $2.99/mo charge loses money to the 15% store cut plus twelve transaction fees)
+>   or `beanies + magic beans` $9.99/mo / $84.99/yr. Self-hosting is the free-forever path.
+>   Canonical model lives in `web/src/lib/pricing.ts`.
 >
->   1. **`DraftPlaceholder` is itself a full `BaseLayout`, rendered INSIDE the page's
->      `BaseLayout`** (`pricing.astro:43`), so the gated page ships two nested HTML
->      documents: double `<html>`/`<nav>`/`<footer>`, Plausible twice, duplicate ids that
->      leave the mobile hamburger inert, and a second, wrong canonical. Fix with the
->      repo's existing `{hidden ? <DraftPlaceholder/> : <BaseLayout>…}` ternary — which
->      also fixes (2).
->   2. **`hidden` hides from sighted users only.** Every price, all nine FAQ answers and
->      the og:description still ship in the HTML, so the BRANCH is the only real gate —
->      exactly as recorded above, now confirmed by review.
->   3. **Both flagship prose blocks use `.handout`, which has no paragraph-spacing rule**,
->      so under Tailwind preflight's `margin:0` they render as unbroken walls of text.
->      That is "so who's paying for the free tier?" and "a note from me (greg)" — the two
->      pieces of copy the page exists for. Fix: change two classes to `.letter`.
->   4. **Ten of the new inline `/pricing` links are invisible as links.** They sit in
->      `.fact`, `<details><p>` and `<td>`, none of which have an anchor rule, and preflight
->      resets `a{color:inherit;text-decoration:inherit}`. The link sweep — the whole point
->      of the work — cannot be seen by a reader on the switching pages. (`/help/faq` is
->      fine; it has `.faq-a a`.)
+>   **Two leaks the old gate was not closing**, both "markup gated, data not": the
+>   `DraftPlaceholder` rendered INSIDE `BaseLayout` shipped two complete HTML documents
+>   (duplicate nav/footer, Plausible twice, inert mobile menu, wrong canonical); and the
+>   page-level `<script define:vars={{ PRICES }}>` put **every price in the gated page's
+>   source**. Both fixed and verified on built output. `/pricing` was also listed in the
+>   sitemap while rendering `noindex`.
 >
->   Also flagged, and worth a decision rather than a patch: the free plan promises "every
->   feature, every world" while the paid cards sell photo room and early access to worlds,
->   contradicting the page's own "the ai helper is the only paid thing" — which ships
->   verbatim in the FAQ JSON-LD. And `packages/brand/schema.ts:52` still declares
->   `offers: { price: '0' }` sitewide, so answer engines would keep saying beanies is free
->   after the flag flips. ⚠️ `web/src/pages/terms.astro` still says "provided free of
->   charge" and wants a legal read before v1.0.
+>   **The "free for now" sweep is done** (`397e5d3f`). `from/cozi` and `from/maple` no longer
+>   promise "the free tier stays"; `help/faq` carries both plans; `terms.astro` no longer
+>   claims "provided free of charge". Every remaining free line routes to `/pricing`.
+>
+>   ⚠️ **STILL OPEN, and the sweep missed it:** `packages/brand/schema.ts:54` declares
+>   `offers: { price: '0' }` in the sitewide SoftwareApplication JSON-LD, and it ships in the
+>   built homepage. It is still TRUE during beta, so it is not wrong today — but it must change
+>   when charging starts or answer engines will keep reporting beanies as free. Needs a
+>   decision on timing, not a silent edit. (The sweep only grepped `web/src`, not `packages/`.)
+>
+>   In-app enforcement is **tracker #95** (see below). Plan + model:
+>   `docs/plans/2026-09-10-pricing-page.md`.
 
 > **Validated 2026-09-10 (session 6).** Every carried entry re-checked by fingerprint.
 > **0 dropped, 1 CLOSED, 2 enlarged.** CLOSED: item 1 (browser-verify the credential fix)
@@ -2199,6 +2188,47 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > stage 6 unimplemented (no `carryLocalOnly`/`localOnlyEntities` symbol anywhere
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
+
+### 💲 Session 2026-09-11 (3) — the blog shipped, and the pricing page came off its branch (web UNDEPLOYED)
+
+Two arcs, one session. Both are on `main`; neither the blog post nor the pricing page is
+live until someone dispatches **Deploy web**.
+
+**The beanie wall blog post (#59) is published and live.** Reviewed, fixed in Notion first,
+generated into `content/blog/2026-09-11-beanie-wall-for-your-whole-family.md`, deployed, and
+verified serving. Notion row closed out (Published / URL / Substack ticked). The hub-and-spoke
+loop is closed both ways: the post links to the `family-organization` pillar, and the pillar
+lists the post in `relatedPosts`.
+
+⚠️ **Two real-data escapes were caught before publishing, not after.** The first pair of wall
+screenshots carried all seven family names, the kids' activities and schools, and a dated
+flight itinerary that doubled as a notice of when the house would be empty. greg re-shot both
+on the dev server with a fake family. A blur pass was tried first and rejected as obscuring too
+much — the re-shoot is the better answer and the reason is worth remembering.
+
+🐛 **`optimize-blog-image.mjs` was silently flattening animations.** `sharp(input)` decodes only
+the first frame unless opened with `{ animated: true }`, so an 84-frame clip came out as one
+frozen still and **every existing check passed**: non-empty, correct width, valid webp. It now
+probes `pages`, re-opens animated input correctly, and **asserts the frame count on the way
+out**. Any blog GIF processed before 2026-09-11 is worth re-checking.
+
+**The pricing page left its branch.** See the corrected entry in Pending above for the full
+state. Headline: branch rebased, merged, deleted; `PRICING_LIVE` removed entirely; two
+gate leaks fixed (nested `BaseLayout` shipping two HTML documents, and the switcher script
+serialising every price into the gated page); the site-wide "free for now" sweep done across
+`from/cozi`, `from/maple`, `help/faq`, `terms.astro` and the homepage.
+
+**Tracker #95 raised** — _In-app pricing, entitlement and read-only enforcement for v1_. The
+site now publicly commits to a model the app cannot honour: no plan state, no trial clock, no
+read-only mode, no usage meter, and no way to take money. Research found the read-only
+chokepoint (`mutate()` at `src/services/automerge/worker/docClient.ts:1216`, which all 27
+repositories route through) and two traps worth knowing: `aiTier` is a PRIVACY tier, not a
+plan, and `Family.createdAt` in IndexedDB is re-stamped per device so only
+`RegistryEntry.createdAt` can prove grandfathering.
+
+**Skill corrections.** `beanies-blog/SKILL.md` had five stale claims, including naming the wrong
+Notion MCP namespace (`mcp__notion__*` 404s on that DB; `mcp__notion-beanies__*` works) and an
+instruction to "fix" a `CLAUDE.md` line that was already correct.
 
 ### Session 2026-09-11 (2) — the one-time Google Calendar import, #94 (UNDEPLOYED)
 
