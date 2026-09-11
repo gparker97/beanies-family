@@ -25,7 +25,7 @@ import { computed, type ComputedRef } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { birthdaysInRange, birthdayLabel } from '@/utils/birthdays';
+import { birthdaysInRange, birthdayLabel, birthdayPassesFilter } from '@/utils/birthdays';
 import {
   wallDayReferences,
   wallSharedReferences,
@@ -33,7 +33,17 @@ import {
   type WallReferenceDay,
 } from '@/utils/wallActivities';
 
-export function useWallReferenceDays(days: ComputedRef<readonly string[]>): {
+export function useWallReferenceDays(
+  days: ComputedRef<readonly string[]>,
+  /**
+   * The wall's person filter, or null when everyone is shown. A birthday is
+   * ABOUT a member, so it follows the filter exactly as that member's events do
+   * — otherwise narrowing the wall to one bean left the others' birthdays on
+   * screen with none of their events. Public holidays belong to nobody and
+   * correctly ignore it.
+   */
+  isMemberVisible?: ComputedRef<((memberId: string) => boolean) | null>
+): {
   /** Placed on DAY-shaped columns — the days view and the today view. */
   byDay: ComputedRef<WallBandReference[]>;
   /** Placed across MEMBER-shaped columns for one day — the bean lanes. */
@@ -55,7 +65,9 @@ export function useWallReferenceDays(days: ComputedRef<readonly string[]>): {
 
     const out: WallReferenceDay[] = [];
 
+    const visible = isMemberVisible?.value ?? null;
     for (const b of birthdaysInRange(familyStore.members, first, last)) {
+      if (!birthdayPassesFilter(b, visible)) continue;
       out.push({
         kind: 'birthday',
         id: `b:${b.memberId}:${b.date}`,

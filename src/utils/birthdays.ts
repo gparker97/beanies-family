@@ -157,3 +157,26 @@ export function birthdayLabel(
         age: getOrdinalSuffix(birthday.age),
       });
 }
+
+/**
+ * Should this birthday show under the current person filter?
+ *
+ * ⚠️ PETS ALWAYS PASS, and that is the whole reason this is a named function
+ * rather than an inline `isMemberSelected(b.memberId)` at three call sites.
+ * `memberFilterStore` is scoped to HUMANS by design — pets are excluded from the
+ * filter universe, so `isMemberSelected(aPetId)` is `false` the moment a filter
+ * is active. Filtering naively would therefore have hidden every pet birthday
+ * whenever anyone narrowed the planner to one person, silently reversing the
+ * decision that pets get birthdays at all (greg, 2026-09-11).
+ *
+ * `isMemberVisible` is null when no filter is active, which is also the honest
+ * default for a surface that has no person filter.
+ */
+export function birthdayPassesFilter(
+  birthday: Pick<BirthdayOccurrence, 'memberId' | 'isPet'>,
+  isMemberVisible: ((memberId: string) => boolean) | null
+): boolean {
+  if (!isMemberVisible) return true;
+  if (birthday.isPet) return true;
+  return isMemberVisible(birthday.memberId);
+}

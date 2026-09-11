@@ -216,3 +216,70 @@ describe('MonthDayCard all-day lane', () => {
     expect(wrapper.text()).toContain('+1');
   });
 });
+
+/**
+ * The all-day lane's budget, shared three ways.
+ *
+ * `allDayCap` is 2 in production, so this arithmetic decides whether a family
+ * sees their own plans on a busy day. A straight priority order let a birthday
+ * plus a holiday eat the whole budget and push every real event behind "+N".
+ */
+describe("the all-day cap, split between reference days and the family's own events", () => {
+  const bday = (memberId: string, name: string) => ({
+    date: '2026-05-19',
+    memberId,
+    name,
+    isPet: false,
+  });
+  const allDay = (id: string, title: string) => ({
+    activity: makeActivity({ id, title, isAllDay: true }),
+    isStart: true,
+    isEnd: true,
+  });
+
+  it('leaves the family an event when the day carries a birthday AND a holiday', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: {
+        cell: makeCell({
+          birthdays: [bday('m1', 'Joey')],
+          holidays: [makeHoliday()],
+          allDayItems: [allDay('ad-1', 'Bin night')],
+        }),
+        ...baseProps,
+      },
+    });
+    // One reference day (the birthday leads), and the family's own event keeps
+    // the other slot — it answers "what are we doing today".
+    expect(wrapper.findAll('[data-testid="birthday-chip"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-testid="holiday-chip"]')).toHaveLength(0);
+    expect(wrapper.text()).toContain('Bin night');
+  });
+
+  it('does not strand a slot when the day has no events of its own', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: {
+        cell: makeCell({
+          birthdays: [bday('m1', 'Joey')],
+          holidays: [makeHoliday()],
+          allDayItems: [],
+        }),
+        ...baseProps,
+      },
+    });
+    // Nothing competing, so BOTH reference days show rather than one and a gap.
+    expect(wrapper.findAll('[data-testid="birthday-chip"]')).toHaveLength(1);
+    expect(wrapper.text()).toContain('Vesak Day');
+  });
+
+  it('behaves exactly as before on a day with no reference days', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: {
+        cell: makeCell({
+          allDayItems: [allDay('a1', 'One'), allDay('a2', 'Two'), allDay('a3', 'Three')],
+        }),
+        ...baseProps,
+      },
+    });
+    expect(wrapper.text()).toContain('+1');
+  });
+});

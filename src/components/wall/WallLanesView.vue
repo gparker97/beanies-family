@@ -138,7 +138,12 @@ const gridColumns = computed(() =>
  * day spans the whole width rather than claiming a bean's lane — the same
  * treatment `wallSharedAllDay` gives an "everyone" item.
  */
-const { shared } = useWallReferenceDays(computed(() => [props.anchorYmd]));
+const { shared } = useWallReferenceDays(
+  computed(() => [props.anchorYmd]),
+  computed(() =>
+    props.visibleMemberIds ? (id: string) => props.visibleMemberIds!.includes(id) : null
+  )
+);
 const bandReferences = shared(
   computed(() => props.anchorYmd),
   computed(() => gridColumns.value.length)

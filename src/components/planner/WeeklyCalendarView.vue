@@ -33,7 +33,7 @@ import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
-import { birthdaysInRange, birthdaysByDate } from '@/utils/birthdays';
+import { birthdaysInRange, birthdaysByDate, birthdayPassesFilter } from '@/utils/birthdays';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
@@ -80,6 +80,16 @@ const activityStore = useActivityStore();
 const { identityFor } = useActivityIdentity();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
+
+/**
+ * The person filter as a predicate, or null when everyone is shown. A birthday
+ * follows its member exactly as that member's activities do — otherwise
+ * narrowing the week to one bean left the others' birthdays on screen with none
+ * of their events beside them.
+ */
+const memberVisibility = computed<((id: string) => boolean) | null>(() =>
+  memberFilterStore.isAllSelected ? null : (id: string) => memberFilterStore.isMemberSelected(id)
+);
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 const holidayStore = useHolidayStore();
@@ -137,7 +147,9 @@ const birthdaysForWeek = computed(() => {
   const days = weekDays.value;
   if (days.length === 0) return new Map<string, ReturnType<typeof birthdaysInRange>>();
   return birthdaysByDate(
-    birthdaysInRange(familyStore.members, days[0]!.dateStr, days[days.length - 1]!.dateStr)
+    birthdaysInRange(familyStore.members, days[0]!.dateStr, days[days.length - 1]!.dateStr).filter(
+      (b) => birthdayPassesFilter(b, memberVisibility.value)
+    )
   );
 });
 function birthdaysForDay(dateStr: string) {
