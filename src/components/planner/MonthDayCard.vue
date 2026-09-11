@@ -20,6 +20,8 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { parseLocalDate } from '@/utils/date';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
+import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import MonthChip from '@/components/planner/MonthChip.vue';
@@ -59,6 +61,8 @@ export interface MonthDayCellData {
   segments: TravelSegmentOccurrence[];
   allDayItems: CellAllDayItem[];
   holidays: HolidayOccurrence[];
+  /** Derived family birthdays — read-only labels, not activities. */
+  birthdays: BirthdayOccurrence[];
 }
 
 const props = defineProps<{
@@ -110,12 +114,37 @@ const timedOverflow = computed(() =>
   Math.max(0, props.cell.timedOccurrences.length - props.timedCap)
 );
 
-const allDayOverflow = computed(() =>
-  Math.max(0, props.cell.holidays.length + props.cell.allDayItems.length - props.allDayCap)
+/**
+ * The all-day lane, shared by three sources competing for `allDayCap`.
+ *
+ * Order is birthdays, then holidays, then the family's own all-day activities.
+ * A birthday leads because it is about somebody in this family; a public holiday
+ * is reference data about the country. Each source takes what the ones above it
+ * left, which is why these are three computeds and not three inline `slice`s —
+ * the holiday slice used to live in the template, and a third source sharing one
+ * budget is exactly where that stops being readable.
+ */
+const visibleBirthdays = computed(() => props.cell.birthdays.slice(0, props.allDayCap));
+
+const visibleHolidays = computed(() =>
+  props.cell.holidays.slice(0, Math.max(0, props.allDayCap - props.cell.birthdays.length))
 );
 
 const visibleAllDayItems = computed(() =>
-  props.cell.allDayItems.slice(0, Math.max(0, props.allDayCap - props.cell.holidays.length))
+  props.cell.allDayItems.slice(
+    0,
+    Math.max(0, props.allDayCap - props.cell.birthdays.length - props.cell.holidays.length)
+  )
+);
+
+const allDayOverflow = computed(() =>
+  Math.max(
+    0,
+    props.cell.birthdays.length +
+      props.cell.holidays.length +
+      props.cell.allDayItems.length -
+      props.allDayCap
+  )
 );
 
 /** A day with nothing on it — collapsed to a thin "nothing planned" line on
@@ -125,6 +154,7 @@ const isEmptyDay = computed(
     props.cell.timedOccurrences.length === 0 &&
     props.cell.allDayItems.length === 0 &&
     props.cell.holidays.length === 0 &&
+    props.cell.birthdays.length === 0 &&
     props.cell.segments.length === 0 &&
     props.cell.vacations.length === 0
 );
@@ -189,7 +219,8 @@ function onMoreClick(event: MouseEvent) {
           cell.isToday &&
           cell.timedOccurrences.length === 0 &&
           cell.allDayItems.length === 0 &&
-          cell.holidays.length === 0
+          cell.holidays.length === 0 &&
+          cell.birthdays.length === 0
         "
         class="text-primary-500 dark:text-accent-lift mt-0.5 text-[0.5625rem] font-bold tracking-[0.12em] uppercase"
       >
@@ -211,10 +242,18 @@ function onMoreClick(event: MouseEvent) {
 
     <!-- Events column — right of day-num on mobile, stacked below on desktop -->
     <div class="flex min-w-0 flex-1 flex-col gap-1 md:w-full md:gap-px">
-      <!-- Holidays + all-day chips share a lane, capped to `allDayCap`. -->
-      <template v-if="cell.holidays.length > 0 || cell.allDayItems.length > 0">
+      <!-- Birthdays + holidays + all-day chips share a lane, capped to `allDayCap`. -->
+      <template
+        v-if="cell.birthdays.length > 0 || cell.holidays.length > 0 || cell.allDayItems.length > 0"
+      >
+        <BirthdayChip
+          v-for="b in visibleBirthdays"
+          :key="'b:' + b.memberId"
+          :birthday="b"
+          class="block w-full"
+        />
         <HolidayChip
-          v-for="(h, hi) in cell.holidays.slice(0, allDayCap)"
+          v-for="(h, hi) in visibleHolidays"
           :key="'h:' + hi"
           :holiday="h"
           :is-start="true"
