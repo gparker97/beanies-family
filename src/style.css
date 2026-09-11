@@ -132,6 +132,15 @@
      milestones) and the vacation teal. Never Alert Red. */
   --holiday-clay: #b5654a;
   --holiday-clay-tint: rgb(181 101 74 / 7%);
+
+  /* Family birthdays (derived, read-only — see `utils/birthdays.ts`). The same
+     family as the `birthday` activity category so a derived birthday and a
+     birthday PARTY someone scheduled read as the same kind of day, but DEEPENED
+     from Heritage Orange: #F15D22 measures 3.32:1 on a white month cell, which
+     fails AA for a 12px chip. #b24318 is 5.66:1 on white and 5.37:1 on cloud
+     white. The dark value below is LIGHTER, per the CIG's accent rule. */
+  --birthday-orange: #b24318;
+  --birthday-orange-tint: rgb(241 93 34 / 8%);
   --tint-purple-6: rgb(155 89 182 / 6%);
   --tint-purple-8: rgb(155 89 182 / 8%);
   --tint-purple-12: rgb(155 89 182 / 12%);
@@ -174,6 +183,10 @@
   --vacation-gold-tint: rgb(255 217 61 / 16%);
   --holiday-clay: #c98c75;
   --holiday-clay-tint: rgb(201 140 117 / 12%);
+
+  /* 6.28:1 on surface-raised, 7.41:1 on surface-ground. */
+  --birthday-orange: #ff8a5b;
+  --birthday-orange-tint: rgb(241 93 34 / 14%);
   --tint-purple-6: rgb(155 89 182 / 10%);
   --tint-purple-8: rgb(155 89 182 / 12%);
   --tint-purple-12: rgb(155 89 182 / 16%);

@@ -20,6 +20,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **There is now a guide for setting a tablet up as the beanie wall.** Turning the wall on was the easy part; keeping the screen awake and stopping a child tapping their way into another app are settings on the tablet itself, and nothing explained them. The new guide covers both, with separate steps for iPads and Android tablets, plus which way up the wall works on each device, where to hang it, and why leaving it charging at 100% all day is bad for the battery.
 - **The Beanie Wall card in Settings now says what the tablet needs.** Three short lines, matched to the device you are on (Guided Access on an iPad, screen pinning on Android), and a link to the full guide. On a device whose browser cannot hold the screen awake by itself, the first line says so, because there the tablet's own screen-lock setting is the only thing keeping the wall lit.
 
+### Added
+
+- **Family birthdays are now on the planner.** beanies has always known everyone's birthday — it shows them on the Nook, reminds you to buy a present two weeks out, and rains confetti on the day — but the one place it never put them was the calendar. Every family member's birthday, including pets', now appears as an all-day entry on the month and week views: "Joey's 7th birthday", with the age worked out for you. Nothing to set up and nothing to maintain: they come from the birthday already on each bean's profile, so correcting a date fixes every year at once, and they cannot be accidentally deleted or duplicated. A birthday party, with a time and a place, is still an activity you add yourself.
+
 ### Fixed
 
 - **You can type on the beanie wall again.** On an Android tablet, tapping an add box opened the on-screen keyboard and then closed it again immediately, so edit mode could not be used at all. Android shrinks the app to make room for its keyboard, and the wall read that as "this screen is too small to be a wall" and swapped itself for the come-back-wider message, taking the box you were typing in with it. A keyboard is not a smaller screen, and the wall now knows the difference.

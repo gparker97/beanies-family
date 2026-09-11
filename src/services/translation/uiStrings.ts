@@ -6914,6 +6914,15 @@ const STRING_DEFS = {
   'nook.moreItems': { en: 'more this week', beanie: 'more beans this week' },
   'nook.noMilestones': { en: 'No milestones yet', beanie: 'no milestones yet' },
   'nook.noActivity': { en: 'No recent activity', beanie: 'the beanies are resting' },
+  // The planner's derived birthday chip. Separate keys from `nook.birthday*`
+  // because those carry the Nook's exclamation mark and its "bean day" overlay,
+  // and a calendar chip is a label rather than a greeting. `{age}` arrives
+  // already ordinal-formatted ("7th") from `getOrdinalSuffix`.
+  'planner.birthday.withAge': {
+    en: "{name}'s {age} birthday",
+    beanie: "{name}'s {age} bean day",
+  },
+  'planner.birthday.noAge': { en: "{name}'s birthday", beanie: "{name}'s bean day" },
   'nook.birthday': { en: "{name}'s Birthday", beanie: "{name}'s bean day" },
   'nook.birthdayWithAge': { en: "{name}'s {age} Birthday!", beanie: "{name}'s {age} bean day!" },
   'nook.taskCompleted': { en: 'completed a task', beanie: 'task completed' },

@@ -32,6 +32,8 @@ import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
+import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import { birthdaysInRange, birthdaysByDate } from '@/utils/birthdays';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
@@ -122,6 +124,24 @@ const holidaysByDate = computed(() => {
 });
 function holidayForDay(dateStr: string): HolidayOccurrence | undefined {
   return holidaysByDate.value.get(dateStr);
+}
+
+/**
+ * Family birthdays in the visible week, keyed by date. Derived from each
+ * member's date of birth rather than stored, so there is nothing to load — see
+ * `utils/birthdays.ts`. Unlike holidays this is a LIST per day: two members can
+ * share a birthday, and one of them being hidden would be a bug the family would
+ * notice on exactly the day it mattered.
+ */
+const birthdaysForWeek = computed(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return new Map<string, ReturnType<typeof birthdaysInRange>>();
+  return birthdaysByDate(
+    birthdaysInRange(familyStore.members, days[0]!.dateStr, days[days.length - 1]!.dateStr)
+  );
+});
+function birthdaysForDay(dateStr: string) {
+  return birthdaysForWeek.value.get(dateStr) ?? [];
 }
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -365,6 +385,7 @@ function getUntimedForDay(dateStr: string): Occurrence[] {
 function hasUntimedContent(dateStr: string): boolean {
   return (
     holidaysByDate.value.has(dateStr) ||
+    birthdaysForWeek.value.has(dateStr) ||
     getUntimedForDay(dateStr).length > 0 ||
     (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
     getUntimedSegmentsForDay(dateStr).length > 0 ||
@@ -383,6 +404,7 @@ const hasAnyUntimedContent = computed(
     vacationSpans.value.length > 0 ||
     weekSegmentBuckets.value.untimed.length > 0 ||
     holidaysByDate.value.size > 0 ||
+    birthdaysForWeek.value.size > 0 ||
     weekDays.value.some((d) => hasUntimedContent(d.dateStr))
 );
 
@@ -743,6 +765,7 @@ function onStripDayClick(dateStr: string) {
           <div
             v-if="
               holidayForDay(day.dateStr) ||
+              birthdaysForDay(day.dateStr).length > 0 ||
               getUntimedForDay(day.dateStr).length > 0 ||
               (weekTodos.get(day.dateStr)?.length ?? 0) > 0 ||
               getUntimedSegmentsForDay(day.dateStr).length > 0
@@ -750,6 +773,12 @@ function onStripDayClick(dateStr: string) {
             class="min-w-0 overflow-hidden px-0.5"
             :style="{ gridColumn: `${di + 2}` }"
           >
+            <BirthdayChip
+              v-for="b in birthdaysForDay(day.dateStr)"
+              :key="'b:' + b.memberId"
+              :birthday="b"
+              class="mb-0.5 block w-full"
+            />
             <HolidayChip
               v-if="holidayForDay(day.dateStr)"
               :holiday="holidayForDay(day.dateStr)!"

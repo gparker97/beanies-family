@@ -22,6 +22,7 @@ import type {
   CellVacation,
 } from '@/components/planner/MonthDayCard.vue';
 import type { FamilyActivity, FamilyVacation, HolidayOccurrence } from '@/types/models';
+import { birthdaysByDate, type BirthdayOccurrence } from '@/utils/birthdays';
 
 /** One activity occurrence as `activityStore.activitiesInRange` yields it. */
 export interface ActivityOccurrenceInput {
@@ -49,6 +50,8 @@ export interface MonthCellsInput {
   /** All vacations — filtered to the span (the store holds few). */
   vacations: FamilyVacation[];
   holidays: HolidayOccurrence[];
+  /** Derived family birthdays over the SAME window — see `birthdaysInRange`. */
+  birthdays: BirthdayOccurrence[];
 }
 
 /**
@@ -68,6 +71,7 @@ export interface PreparedCellData {
   vacationDates: Set<string>;
   holidays: Map<string, HolidayOccurrence[]>;
   holidayDates: Set<string>;
+  birthdays: Map<string, BirthdayOccurrence[]>;
 }
 
 export interface PrepareCellDataInput {
@@ -75,6 +79,7 @@ export interface PrepareCellDataInput {
   segments: TravelSegmentOccurrence[];
   vacations: FamilyVacation[];
   holidays: HolidayOccurrence[];
+  birthdays: BirthdayOccurrence[];
   /** Inclusive window bounds — vacations are clipped to this, so a trip with a
    *  mistyped multi-decade end date cannot expand into a six-figure loop. */
   spanStart: string;
@@ -140,7 +145,17 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     holidayDates.add(h.date);
   }
 
-  return { timed, allDay, segments, vacations, vacationDates, holidays, holidayDates };
+  return {
+    timed,
+    allDay,
+    segments,
+    vacations,
+    vacationDates,
+    holidays,
+    holidayDates,
+    // Already windowed and sorted by `birthdaysInRange`; this only buckets them.
+    birthdays: birthdaysByDate(input.birthdays),
+  };
 }
 
 export interface MonthCellsResult {
@@ -190,6 +205,7 @@ export function monthCells(input: MonthCellsInput): MonthCellsResult {
       segments: input.segments,
       vacations: input.vacations,
       holidays: input.holidays,
+      birthdays: input.birthdays,
       spanStart: startYmd,
       spanEnd: endYmd,
     })
@@ -214,6 +230,7 @@ export function monthCellsFrom(
   const dateSegments = data.segments;
   const dateVacations = data.vacations;
   const dateHolidays = data.holidays;
+  const dateBirthdays = data.birthdays;
 
   const pushCell = (dateStr: string, day: number, isCurrentMonth: boolean): void => {
     days.push({
@@ -227,6 +244,7 @@ export function monthCellsFrom(
       segments: dateSegments.get(dateStr) ?? [],
       allDayItems: [],
       holidays: dateHolidays.get(dateStr) ?? [],
+      birthdays: dateBirthdays.get(dateStr) ?? [],
     });
   };
 

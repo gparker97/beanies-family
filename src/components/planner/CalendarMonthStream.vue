@@ -22,6 +22,8 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { birthdaysInRange } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatMonthYear } from '@/utils/date';
 import { monthCellsFrom, prepareCellData, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
@@ -83,6 +85,7 @@ const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 const holidayStore = useHolidayStore();
+const familyStore = useFamilyStore();
 const { today: todayStr } = useToday();
 
 const rootRef = ref<HTMLElement | null>(null);
@@ -121,6 +124,7 @@ const renderedMonths = computed(() => {
     segments: vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd),
     vacations: vacationStore.vacations,
     holidays: holidayStore.holidaysInRange(spanStart, spanEnd),
+    birthdays: birthdaysInRange(familyStore.members, spanStart, spanEnd),
     spanStart,
     spanEnd,
   });

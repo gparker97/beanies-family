@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { monthCells, monthSpan } from '../monthCells';
 import type { FamilyActivity, FamilyVacation, HolidayOccurrence } from '@/types/models';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 
 // `monthCells` is the pure extraction of what used to be CalendarGrid's 180-line
 // `calendarDays` computed. These tests pin the behaviour BOTH surfaces now share
@@ -34,6 +35,7 @@ const BASE = {
   segments: [],
   vacations: [] as FamilyVacation[],
   holidays: [] as HolidayOccurrence[],
+  birthdays: [] as BirthdayOccurrence[],
 };
 
 describe('monthSpan', () => {
