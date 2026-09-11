@@ -60,6 +60,47 @@ export interface CalendarSummary {
   id: string;
   summary: string;
   primary: boolean;
+  /**
+   * Google's `calendarList` access role: 'owner' | 'writer' | 'reader' |
+   * 'freeBusyReader'. Present in the response already, so reading it costs no
+   * extra request and widens no mask.
+   *
+   * Used ONLY by the one-time import chooser (#94), to grey out calendars the
+   * granted scope cannot read (holiday feeds, birthdays, subscribed calendars).
+   * Without it a single holiday feed can fill the import's row cap with junk and
+   * push the family's real events out of the review list. ABSENT is treated as
+   * 'owner', so the chooser fails OPEN onto the existing 403-skip path rather
+   * than hiding a calendar the user does own. The destination picker ignores it.
+   */
+  accessRole?: string;
+}
+
+/**
+ * A Google event as the one-time IMPORT needs it (#94): content, recurrence, and
+ * ownership.
+ *
+ * Deliberately NOT the same read as {@link EventTime}. That one is times-only and
+ * expands recurring events into instances for clash detection; this one requests
+ * content and keeps recurring MASTERS intact so a series can be imported as one
+ * activity rather than N copies. Two questions, two reads, two field masks.
+ *
+ * `attendees` is absent by construction: the import never requests the guest list,
+ * so other people's email addresses cannot reach the family's .beanpod.
+ */
+export interface CalendarEventFull {
+  id: string;
+  summary?: string;
+  description?: string;
+  location?: string;
+  start?: { date?: string; dateTime?: string; timeZone?: string };
+  end?: { date?: string; dateTime?: string; timeZone?: string };
+  /** Raw RRULE/EXDATE/RDATE lines on a recurring MASTER. */
+  recurrence?: string[];
+  /** True when the signed-in user organizes it, so beanies may adopt it. */
+  isOrganizer: boolean;
+  status?: string;
+  /** Present on a modified/cancelled INSTANCE of a series; such items are skipped. */
+  recurringEventId?: string;
 }
 
 /**
@@ -170,4 +211,25 @@ export interface CalendarClient {
     timeMinIso: string,
     timeMaxIso: string
   ): Promise<EventTime[]>;
+  /**
+   * List events WITH CONTENT on one calendar over `[timeMinIso, timeMaxIso)`, for
+   * the one-time import (#94).
+   *
+   * Two deliberate differences from {@link listEventTimes}, which must not be
+   * merged into it: `singleEvents=false`, so a recurring series returns as one
+   * MASTER carrying its RRULE rather than as N expanded instances; and a wider
+   * field mask that requests title, description, location and recurrence. The
+   * mask still omits `attendees`, which is what keeps other people's email
+   * addresses out of the family's file.
+   *
+   * A master whose DTSTART is in the past is returned when any of its instances
+   * fall inside the window, which is how a two-year-old weekly swim lesson is
+   * importable under a future-only window.
+   */
+  listEventsForImport(
+    connectionId: string,
+    calendarId: string,
+    timeMinIso: string,
+    timeMaxIso: string
+  ): Promise<CalendarEventFull[]>;
 }

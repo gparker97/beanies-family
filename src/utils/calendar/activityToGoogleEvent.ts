@@ -4,10 +4,14 @@
 // also uses `startEndForDate` / `masterOccurrenceBody` here to emit per-occurrence
 // recurring-instance EXCEPTIONS (reschedule / edit-one / delete-one) and restore
 // them, keyed by the master's deterministic id + the occurrence instance.
+//
+// This module is no longer one-directional: `googleTimesToActivityFields` (at the
+// foot) is the INVERSE of `startEndForDate`, added for the one-time import (#94).
+// The two live together on purpose, so a change to one is made staring at the other.
 
 import type { FamilyActivity } from '@/types/models';
 import { normalizeAssignees } from '@/utils/assignees';
-import { addDaysYmd } from '@/utils/date';
+import { addDaysYmd, toDateInputValue, toTimeInputValue } from '@/utils/date';
 import { resolveActivityDays, isAllDayActivity } from './activityDays';
 import { buildRecurrenceRule } from './recurrenceRrule';
 import { buildEventDescription, type EventDescriptionContext } from './eventDescription';
@@ -248,4 +252,60 @@ export function computeExceptionHash(
   memberName?: (id: string) => string | undefined
 ): string {
   return `${computePushHash(child, memberName)}|${occurrenceYmd}|${mode}`;
+}
+
+/**
+ * The INVERSE of {@link startEndForDate}: a Google event's start/end → the activity
+ * fields that describe the same span. Added for the one-time import (#94).
+ *
+ * Returns the ACTIVITY-shaped subset, not `ActivityDays`. `ActivityDays` is the
+ * internal day-math shape (`startYmd` / `endYmd` / `endDayOffset` / `allDay`), and
+ * spreading it into a `CreateFamilyActivityInput` would produce a draft with none
+ * of the right field names and no type error at the call site. Returning the real
+ * field names lets the planner spread the result directly.
+ *
+ * Timezone: `FamilyActivity` has no timezone field. `startTime`/`endTime` are bare
+ * local wall-clock `HH:mm`, and the push re-stamps the DEVICE's zone on the way
+ * out. So an offset-bearing Google `dateTime` is converted to local wall clock on
+ * the importing device, which is the same convention the rest of the app uses.
+ */
+export function googleTimesToActivityFields(
+  start: { date?: string; dateTime?: string } | undefined,
+  end: { date?: string; dateTime?: string } | undefined
+): Pick<FamilyActivity, 'date' | 'endDate' | 'isAllDay' | 'startTime' | 'endTime'> | null {
+  if (!start) return null;
+
+  if (start.date) {
+    // All-day. Google's `end.date` is EXCLUSIVE; beanies' `endDate` is inclusive,
+    // so step back a day. A missing or equal end is a single-day event.
+    const startYmd = start.date.slice(0, 10);
+    const exclusiveEnd = end?.date?.slice(0, 10);
+    const inclusiveEnd = exclusiveEnd ? addDaysYmd(exclusiveEnd, -1) : startYmd;
+    return {
+      date: startYmd,
+      isAllDay: true,
+      // Only carry endDate when it genuinely spans more than one day, so a
+      // single-day import matches what the activity form would have produced.
+      ...(inclusiveEnd > startYmd ? { endDate: inclusiveEnd } : {}),
+    };
+  }
+
+  if (!start.dateTime) return null;
+  const startAt = new Date(start.dateTime);
+  if (Number.isNaN(startAt.getTime())) return null;
+  // A timed event with no end is not something Google returns, but the type allows
+  // it; treat it as zero-length rather than inventing a duration.
+  const endAt = end?.dateTime ? new Date(end.dateTime) : startAt;
+  if (Number.isNaN(endAt.getTime())) return null;
+
+  return {
+    date: toDateInputValue(startAt),
+    isAllDay: false,
+    startTime: toTimeInputValue(startAt),
+    endTime: toTimeInputValue(endAt),
+    // An overnight span is expressed by `endTime < startTime`, exactly as the
+    // activity model already does it; a multi-day TIMED event is not representable
+    // and collapses to its first day, which `resolveActivityDays` then reads back
+    // consistently.
+  };
 }
