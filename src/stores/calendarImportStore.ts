@@ -184,9 +184,15 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
     timeMin: string,
     timeMax: string
   ): Promise<ImportCandidate[]> {
+    // Only the ones that actually need it: a master whose start is already in the
+    // future is showing a sensible date, and re-dating it would spend a request to
+    // change nothing. Narrowing to PAST-dated masters is also what keeps the cap
+    // from binding in practice, which matters because the row says "next date
+    // only" — a promise that would not hold for anything the cap dropped.
+    const today = toISODateString(new Date());
     const targets = list
       .map((c, i) => ({ c, i }))
-      .filter(({ c }) => c.outcome === 'unsupported-recurrence')
+      .filter(({ c }) => c.outcome === 'unsupported-recurrence' && c.draft.date < today)
       .slice(0, MAX_OCCURRENCE_LOOKUPS);
     if (targets.length === 0) return list;
 
@@ -412,7 +418,7 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
   /**
    * What a commit did. Three outcomes, not two, because the middle one MUST NOT be
    * worded as a failure: `ImportNotVisibleError` is thrown AFTER the batch has
-   * committed, so telling the user "nothing was brought across" invites a retry
+   * committed, so telling the user "nothing was imported" invites a retry
    * that makes a SECOND full set of activities — the exact duplication this whole
    * feature exists to prevent. `calendarRepository`'s own docblock forbids it.
    */

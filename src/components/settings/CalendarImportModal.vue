@@ -43,6 +43,41 @@ const days = computed(() => {
   return groups;
 });
 
+/** Plural-correct label for the primary button. */
+const importLabel = computed(() =>
+  store.selectedCount === 1
+    ? t('calendarImport.import.one')
+    : fillTemplate(t('calendarImport.import.other'), { count: String(store.selectedCount) })
+);
+
+/**
+ * The confirm's one interpolated field. Built from two pluralized pairs rather
+ * than one sentence, so a run that is entirely one kind says only the half that
+ * applies to it.
+ */
+const confirmDetail = computed(() => {
+  const parts: string[] = [];
+  if (store.adoptCount > 0) {
+    parts.push(
+      store.adoptCount === 1
+        ? t('calendarImport.confirm.sync.one')
+        : fillTemplate(t('calendarImport.confirm.sync.other'), {
+            count: String(store.adoptCount),
+          })
+    );
+  }
+  if (store.copyCount > 0) {
+    parts.push(
+      store.copyCount === 1
+        ? t('calendarImport.confirm.copy.one')
+        : fillTemplate(t('calendarImport.confirm.copy.other'), {
+            count: String(store.copyCount),
+          })
+    );
+  }
+  return parts.join(' ');
+});
+
 const hasUnsupported = computed(() =>
   store.candidates.some((c) => c.outcome === 'unsupported-recurrence')
 );
@@ -71,10 +106,9 @@ async function onCommit(): Promise<void> {
     title: 'calendarImport.confirm.title',
     message: 'calendarImport.confirm.body',
     // Only `detail` is a plain interpolated string, which is where the counts go.
-    detail: fillTemplate(t('calendarImport.confirm.detail'), {
-      adopt: String(store.adoptCount),
-      copy: String(store.copyCount),
-    }),
+    // Each half appears only when it has a count, so an import that is all one
+    // kind never reads "0 events are copied into beanies".
+    detail: confirmDetail.value,
     variant: 'info',
     confirmLabel: 'calendarImport.confirm.go',
   });
@@ -98,7 +132,12 @@ async function onCommit(): Promise<void> {
     return;
   }
 
-  showToast('success', fillTemplate(t('calendarImport.done'), { count: String(result.count) }));
+  showToast(
+    'success',
+    result.count === 1
+      ? t('calendarImport.done.one')
+      : fillTemplate(t('calendarImport.done.other'), { count: String(result.count) })
+  );
   close();
 }
 </script>
@@ -304,7 +343,7 @@ async function onCommit(): Promise<void> {
             :disabled="store.selectedCount === 0 || store.phase === 'importing'"
             @click="onCommit"
           >
-            {{ fillTemplate(t('calendarImport.bring'), { count: String(store.selectedCount) }) }}
+            {{ importLabel }}
           </BaseButton>
         </div>
       </template>
