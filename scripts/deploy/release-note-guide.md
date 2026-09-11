@@ -22,6 +22,24 @@ in `deploys.ts` (the registry merges + sorts them). See `ReleaseNote` +
   note — but if there is genuinely nothing a user could perceive, you may skip
   the note. Default to adding one.
 
+## 0. ⭐ `spotlight` is greg's call, never yours
+
+**Default it to ABSENT.** Set `spotlight: true` ONLY when greg has asked for a spotlight in
+that session, in those words.
+
+`spotlight` does not just badge the bell, it **auto-opens the drawer** on everyone's next
+update. That is an interruption, and whether a release has earned one is a judgement about
+the product and its audience, not about how much code moved. Judging it from the size of the
+diff is how two spotlights shipped on the same day in September 2026, the second one
+auto-opening onto a near-duplicate of the first (see `docs/lessons.md`).
+
+A same-day revision (`R<n>` or a `.1`) is almost never independently significant: it exists
+because the release before it was wrong, and announcing that as a headline tells a family
+about a fix to something they never saw broken. Give it the summary-only minor form.
+
+If the work genuinely looks spotlight-worthy, propose it at the decision gate and let greg
+say yes. Shipping without one is trivially recoverable; shipping with one is not.
+
 ## 1. Judge significance
 
 Review what is shipping: `git log <last-deploy>..HEAD --oneline`, the working-tree

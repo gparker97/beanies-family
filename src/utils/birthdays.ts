@@ -138,24 +138,45 @@ export function birthdaysByDate(
 }
 
 /**
- * "Joey's 7th birthday", or "Joey's birthday" when the birth YEAR is unknown.
+ * The oldest age the calendar will name out loud (greg, 2026-09-12).
+ *
+ * Counting birthdays is a children's pleasure: "Joey's 7th birthday" is the
+ * point of the day, while "Sarah's 43rd birthday" announces something across the
+ * kitchen that an adult may not have chosen to announce. Above this the label
+ * drops to the plain form, which is also what someone with no birth year on file
+ * already gets, so the two cases share one appearance rather than two.
+ *
+ * 21 rather than the `ageGroup` flag on purpose: `ageGroup` is about permissions
+ * and the filter universe, and a household can reasonably mark an 18-year-old as
+ * an adult without wanting their birthday to go quiet a few years early.
+ */
+export const MAX_AGE_SHOWN_ON_CALENDAR = 21;
+
+/**
+ * "Joey's 7th birthday", or "Joey's birthday" when the birth YEAR is unknown OR
+ * the bean is past {@link MAX_AGE_SHOWN_ON_CALENDAR}.
  *
  * THE one implementation, shared by the planner's chip and the beanie wall's
  * all-day band. Takes `t` rather than reaching for the store, the same way
  * `describeRule` does, so it stays pure and testable — and so the two surfaces
  * cannot drift into wording the family sees differently in the kitchen and on
  * their phone.
+ *
+ * The AGE ITSELF is deliberately still carried on `BirthdayOccurrence`: this is
+ * a presentation rule, and a consumer that legitimately needs the number (the
+ * details drawer, a future card) should not have to recompute what this dropped.
  */
 export function birthdayLabel(
   birthday: Pick<BirthdayOccurrence, 'name' | 'age'>,
   t: (key: UIStringKey) => string
 ): string {
-  return birthday.age === undefined
-    ? fillTemplate(t('planner.birthday.noAge'), { name: birthday.name })
-    : fillTemplate(t('planner.birthday.withAge'), {
+  const namesTheAge = birthday.age !== undefined && birthday.age <= MAX_AGE_SHOWN_ON_CALENDAR;
+  return namesTheAge
+    ? fillTemplate(t('planner.birthday.withAge'), {
         name: birthday.name,
-        age: getOrdinalSuffix(birthday.age),
-      });
+        age: getOrdinalSuffix(birthday.age!),
+      })
+    : fillTemplate(t('planner.birthday.noAge'), { name: birthday.name });
 }
 
 /**

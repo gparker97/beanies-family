@@ -4,6 +4,34 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A release note is never a spotlight unless greg asks for one
+
+**Date:** 2026-09-11
+**Context:** Two deploys went out the same day. Both notes were written with
+`spotlight: true` on my own judgement that the work was "significant", and the second one
+repeated what the first had already announced, so a family updating once got a drawer that
+auto-opened onto a near-duplicate of the entry above it. greg: "as a general rule, do NOT
+ever make a release note a spotlight unless i explicitly ask for a spotlight release note."
+
+The mechanism matters. `spotlight: true` does not merely badge the bell, it **auto-opens the
+drawer** in everyone's face on their next update. That is an interruption, and whether a
+release has earned one is a judgement about the product and its audience, not about how much
+code moved. I was making that call from the size of the diff.
+
+There is a second-order trap: a same-day revision is almost never independently significant.
+0.20.1 existed only because 0.20 shipped birthdays on one view instead of six. Announcing
+that as a headline tells a family about a fix to something they never saw broken.
+
+**Rule:** default `spotlight` to ABSENT on every release note. Set it only when greg has
+asked for a spotlight in that session, in those words. When unsure, write the summary-only
+"Minor bug fixes and improvements." form and say in the wrap-up that a spotlight was not set
+so he can ask for one. A revision release (`R<n>`, or a same-day `.1`) gets the minor form
+unless it carries genuinely new user-facing capability of its own. Authored in
+`scripts/deploy/release-note-guide.md`, which now states this ahead of its significance
+rubric.
+
+---
+
 ## When you widen a type, walk every producer of the value
 
 **Date:** 2026-09-10
