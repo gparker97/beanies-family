@@ -17,6 +17,7 @@ import {
   type CalendarErrorKind,
   type CalendarInstance,
   type CalendarSummary,
+  type CalendarEventFull,
   type EventTime,
   type GoogleEventPatch,
   type TokenProvider,
@@ -415,12 +416,15 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
     async listCalendars(connectionId) {
       const res = await authedFetch(connectionId, '/users/me/calendarList', { method: 'GET' });
       const data = (await res.json()) as {
-        items?: Array<{ id: string; summary?: string; primary?: boolean }>;
+        items?: Array<{ id: string; summary?: string; primary?: boolean; accessRole?: string }>;
       };
       return (data.items ?? []).map((c): CalendarSummary => ({
         id: c.id,
         summary: c.summary ?? c.id,
         primary: c.primary === true,
+        // Already in the response; the import chooser uses it to grey out feeds
+        // the granted scope cannot read. Undefined is treated as 'owner'.
+        accessRole: c.accessRole,
       }));
     },
 
@@ -477,6 +481,84 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         if (pageToken && pages >= MAX_EVENT_PAGES) {
           // Enforced invariant: a non-terminating token can never spin the loop.
           console.warn('[calendarClash] events.list exceeded MAX_EVENT_PAGES; truncating', {
+            calendarId,
+            pages,
+          });
+          break;
+        }
+      } while (pageToken);
+      return out;
+    },
+
+    async listEventsForImport(connectionId, calendarId, timeMinIso, timeMaxIso) {
+      const out: CalendarEventFull[] = [];
+      let pageToken: string | undefined;
+      let pages = 0;
+      do {
+        const params = new URLSearchParams({
+          timeMin: timeMinIso,
+          timeMax: timeMaxIso,
+          // FALSE, unlike listEventTimes. A recurring series must come back as ONE
+          // master carrying its RRULE, or the import would create N copies of a
+          // weekly swim lesson instead of one repeating activity. Google returns a
+          // master whose DTSTART is in the past when any instance falls in the
+          // window, which is how a long-running series is importable at all.
+          singleEvents: 'false',
+          showDeleted: 'false',
+          maxResults: '250',
+          // The import's mask, deliberately WIDER than the clash-nudge read's. It
+          // requests what an activity needs and nothing more. `attendees` is absent
+          // on purpose: not requesting the guest list is what keeps other people's
+          // email addresses out of the family's .beanpod. `organizer(self)` and
+          // `creator(self)` are booleans about the signed-in user, not identities.
+          // `nextPageToken` MUST be included or paging stops after page 1.
+          fields:
+            'nextPageToken,items(id,summary,description,location,start,end,recurrence,status,recurringEventId,organizer(self),creator(self))',
+        });
+        if (pageToken) params.set('pageToken', pageToken);
+        const res = await authedFetch(
+          connectionId,
+          `/calendars/${enc(calendarId)}/events?${params.toString()}`,
+          { method: 'GET' }
+        );
+        const data = (await res.json()) as {
+          nextPageToken?: string;
+          items?: Array<
+            Omit<CalendarEventFull, 'isOrganizer'> & {
+              organizer?: { self?: boolean };
+              creator?: { self?: boolean };
+            }
+          >;
+        };
+        for (const it of data.items ?? []) {
+          if (it.status === 'cancelled') continue; // backstop; showDeleted handles most
+          if (!it.start) {
+            // Never a silent drop. An item with no start cannot become an activity.
+            // Same altitude as listEventTimes: the REST client holds no
+            // errorReporter dependency, and real fetch failures still bubble as
+            // CalendarApiError to the store's reportError.
+            console.warn('[calendarImport] events.list item has no start; skipping', {
+              calendarId,
+              eventId: it.id,
+            });
+            continue;
+          }
+          out.push({
+            id: it.id,
+            summary: it.summary,
+            description: it.description,
+            location: it.location,
+            start: it.start,
+            end: it.end,
+            recurrence: it.recurrence,
+            status: it.status,
+            recurringEventId: it.recurringEventId,
+            isOrganizer: it.organizer?.self === true || it.creator?.self === true,
+          });
+        }
+        pageToken = data.nextPageToken;
+        if (++pages >= MAX_EVENT_PAGES) {
+          console.warn('[calendarImport] events.list page cap reached; truncating', {
             calendarId,
             pages,
           });

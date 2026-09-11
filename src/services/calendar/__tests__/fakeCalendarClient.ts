@@ -24,6 +24,9 @@ export function makeCalendarClientStub(overrides: Partial<CalendarClient> = {}):
     async listEventTimes() {
       return [];
     },
+    async listEventsForImport() {
+      return [];
+    },
     ...overrides,
   };
 }
