@@ -39,7 +39,8 @@ export interface PriceTable {
   /** beanies + magic beans. */
   fullYearly: string;
   fullMonthly: string;
-  /** fullYearly / 12. */
+  /** fullYearly / 12, ROUNDED - it is only ever rendered behind a "~". The
+   *  basic equivalent is exact because 30/12 is exactly 2.50. */
   fullPerMonth: string;
   /** The 50%-off-for-life figures for families who joined before v1. */
   halfBasicYearly: string;
@@ -57,7 +58,7 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     basicPerMonth: '$2.50',
     fullYearly: '$84.99',
     fullMonthly: '$9.99',
-    fullPerMonth: '$7.08',
+    fullPerMonth: '$7',
     halfBasicYearly: '$15',
     halfFullYearly: '$42.49',
     one: '$1',
@@ -69,7 +70,7 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     basicPerMonth: 'S$3.25',
     fullYearly: 'S$110',
     fullMonthly: 'S$13',
-    fullPerMonth: 'S$9.17',
+    fullPerMonth: 'S$9',
     halfBasicYearly: 'S$19.50',
     halfFullYearly: 'S$55',
     one: 'S$1',
