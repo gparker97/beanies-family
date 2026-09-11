@@ -16,17 +16,6 @@
  * cut plus twelve transaction fees; `full` adds the AI at 10 reads/day. Free
  * forever still exists, but as self-hosting, not as a tier.
  */
-/**
- * THE GATE. While false, /pricing renders the site's draft placeholder with
- * noindex, and every link into it (nav, footer, the beta trust badge, the
- * homepage hedge) renders as it did before this page existed. Flip to true to
- * publish. One constant, so there is exactly one thing to forget.
- *
- * What this does NOT gate: the prose rewrites on the switching pages and the
- * help FAQ, which describe the new model in words. Those are ordinary copy.
- */
-export const PRICING_LIVE = false;
-
 export type CurrencyCode = 'USD' | 'SGD';
 
 export interface PriceTable {
