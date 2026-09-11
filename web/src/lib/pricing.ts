@@ -15,6 +15,12 @@
  * plans: `basic` is YEARLY ONLY, because $2.99/mo loses money to the 15% store
  * cut plus twelve transaction fees; `full` adds the AI at 10 reads/day. Free
  * forever still exists, but as self-hosting, not as a tier.
+ *
+ * NOT a paid perk: photo storage. `PhotoAttachment` holds a `driveFileId`, so
+ * photo bytes live in the family's OWN Drive and the .beanpod carries only
+ * metadata. We neither pay for that storage nor control the quota, so "more
+ * room for photos" was a promise the architecture contradicts. Removed
+ * 2026-09-12.
  */
 export type CurrencyCode = 'USD' | 'SGD';
 
@@ -34,8 +40,6 @@ export interface PriceTable {
   /** The 50%-off-for-life figures for families who joined before v1. */
   halfBasicYearly: string;
   halfFullYearly: string;
-  /** The first-ten deal. $1 in whichever currency the family pays in. */
-  one: string;
   /** Yearly saving against 12x monthly on the full plan, already rounded. */
   savePct: number;
 }
@@ -50,7 +54,6 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     fullPerMonth: '$7',
     halfBasicYearly: '$15',
     halfFullYearly: '$42.49',
-    one: '$1',
     savePct: 29,
   },
   SGD: {
@@ -62,7 +65,6 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     fullPerMonth: 'S$9',
     halfBasicYearly: 'S$19.50',
     halfFullYearly: 'S$55',
-    one: 'S$1',
     savePct: 29,
   },
 };
@@ -121,7 +123,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'here-now',
     q: "i'm an early adopter beanie. what does that get me?",
-    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for beanies + magic beans. the first 10 families who rate the app and tell me get ${PRICES.USD.one} a month instead. no renewal to miss.`,
+    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for beanies + magic beans. no code, no expiry, and no renewal to miss.`,
   },
   {
     id: 'prove-early',
