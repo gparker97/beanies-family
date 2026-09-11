@@ -32,341 +32,384 @@ const faqSchema = {
   })),
 };
 ---
-
-<BaseLayout
-  title="pricing - beanies.family"
-  description="beanies.family is free while it's in beta. at v1.0: 90 days of everything, then free without the ai helper, or a fair subscription. no ads, your data stays yours, and subscribers are the only thing keeping the lights on."
-  canonicalPath={canonicalPath}
-  jsonLd={PRICING_LIVE ? faqSchema : undefined}
-  noindex={!PRICING_LIVE}
->
-  {!PRICING_LIVE && <DraftPlaceholder backHref="/" backLabel="back home" />}
-  <div class="welcome-page pricing-page" hidden={!PRICING_LIVE}>
-    <header class="hero">
-      <span class="kicker-pill">🫘 pricing</span>
-      <h1>no ads. no data. <em>no surprises.</em></h1>
-      <p class="hero-sub">
-        right now, while beanies is in beta, everything is free. at v1.0 that changes - but
-        not by as much as you'd think. here's the whole plan, in advance, and why you'll hear
-        it from me first.
-      </p>
-      <div class="hero-cta">
-        <a
-          class="btn btn-primary"
-          href={`${APP_URL}/welcome`}
-          data-cta="CTA: Create Pod"
-          data-cta-loc="pricing-hero">start counting beans 🫘</a
-        >
-        <a class="btn btn-ghost" href="#plans">see the plans</a>
-      </div>
-    </header>
-
-    <section class="dark-section">
-      <p class="section-label">before we talk money</p>
-      <h2 class="section-title">three things that a price will never change</h2>
-      <div class="promises">
-        <div class="promise">
-          <div class="promise-icon" aria-hidden="true">🚫</div>
-          <h3>no ads, at any tier</h3>
-          <p>
-            there are no advertisers to answer to because there are no ads, period. annoying
-            popups be gone!
-          </p>
-        </div>
-        <div class="promise">
-          <div class="promise-icon" aria-hidden="true">🔒</div>
-          <h3>you are not the product</h3>
-          <p>
-            your data lives in your own encrypted file. i can't read it anyway, so how could i
-            sell it.
-          </p>
-        </div>
-        <div class="promise">
-          <div class="promise-icon" aria-hidden="true">📬</div>
-          <h3>you'll hear it here first</h3>
-          <p>
-            if anything changes, it lands on this page and in your inbox first. you'll know
-            when i do.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="plans">
-      <div class="wrap">
-        <p class="section-label">what you pay</p>
-        <h2 class="section-title">$0 today. a fair number later.</h2>
-        <p class="section-subtitle">
-          here's where you can find our prices. cuz somebody's gotta pay for this.
-        </p>
-
-        <div class="currency" role="group" aria-label="currency">
-          <span class="currency-label">show prices in</span>
-          <div class="seg" id="currency-seg">
-            {
-              currencies.map((c) => (
-                <button
-                  type="button"
-                  data-currency={c.code}
-                  aria-pressed={c.code === DEFAULT_CURRENCY ? 'true' : 'false'}
+{
+  /*
+   * A ternary, not `{!LIVE && <DraftPlaceholder/>}` inside the layout.
+   * DraftPlaceholder IS a BaseLayout, so rendering it within one shipped two
+   * nested HTML documents: duplicate <nav>/<footer>, Plausible twice, repeated
+   * ids that left the mobile menu inert, and a second, wrong canonical. The
+   * old `hidden` attribute also only hid the page from sighted users - every
+   * price still shipped in the HTML to anyone reading source or a crawler.
+   */
+}
+{
+  !PRICING_LIVE ? (
+    <DraftPlaceholder backHref="/" backLabel="back home" />
+  ) : (
+    <BaseLayout
+      title="pricing - beanies.family"
+      description="beanies.family is free while it's in beta. at v1: 90 days of the whole app, then beanies basic from $30 a year, or beanies + magic beans with the ai included. no ads, and your data stays in your own encrypted file."
+      canonicalPath={canonicalPath}
+      jsonLd={faqSchema}
+    >
+      <div class="welcome-page pricing-page">
+        <header class="hero">
+          <div class="hero-inner">
+            <div class="hero-copy">
+              <span class="kicker-pill">🫘 pricing</span>
+              <h1>no ads. no data. <em>no surprises.</em></h1>
+              <p class="hero-sub">
+                free while we're in beta (which is right now). i'll add pricing at v1, but i
+                promise not to burn a hole in your wallet. your dog may even find a couple bucks
+                in the corner of the sofa to cover the first month.
+              </p>
+              <div class="hero-cta">
+                <a
+                  class="btn btn-primary"
+                  href={`${APP_URL}/welcome`}
+                  data-cta="CTA: Create Pod"
+                  data-cta-loc="pricing-hero">start counting beans 🫘</a
                 >
-                  {c.label}
-                </button>
+                <a class="btn btn-ghost" href="#plans">see the plans</a>
+              </div>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="hero-halo"></div>
+              <img
+                src="/brand/beanies-pricing-pockets.webp"
+                alt=""
+                width="340"
+                height="348"
+                loading="eager"
+              />
+            </div>
+          </div>
+        </header>
+
+        <section class="dark-section">
+          <p class="section-label">before we talk money</p>
+          <h2 class="section-title">three things a price won't change</h2>
+          <div class="promises">
+            <div class="promise">
+              <div class="promise-icon">🚫</div>
+              <h3>no ads at any tier</h3>
+              <p>
+                there are no advertisers to answer to because there are no ads, period. annoying
+                popups be gone!
+              </p>
+            </div>
+            <div class="promise">
+              <div class="promise-icon">🔒</div>
+              <h3>you are not the product</h3>
+              <p>
+                your data lives in your own encrypted file. i can't read it, so i couldn't sell it
+                even if i wanted to.
+              </p>
+            </div>
+            <div class="promise">
+              <div class="promise-icon">📬</div>
+              <h3>you'll hear it here first</h3>
+              <p>if anything changes, it lands here and in your inbox. you'll know when i do.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="plans">
+          <div class="wrap">
+            <p class="section-label">what you pay</p>
+            <h2 class="section-title">
+              {TRIAL_DAYS} days of everything, 100% free. then three dollars a month.
+            </h2>
+            <p class="section-subtitle">
+              we don't run ads or sell your data. so after {TRIAL_DAYS} days, if you want to stick
+              around, it's three bucks a month for beanies basic. you can also self-host, which
+              will always be free.
+            </p>
+
+            <div class="currency" role="group" aria-label="currency">
+              <span class="currency-label">show prices in</span>
+              <div class="seg" id="currency-seg">
+                {
+                  currencies.map((c) => (
+                    <button
+                      type="button"
+                      data-currency={c.code}
+                      aria-pressed={c.code === DEFAULT_CURRENCY ? 'true' : 'false'}
+                    >
+                      {c.label}
+                    </button>
+                  ))
+                }
+              </div>
+            </div>
+
+            <div class="trial">
+              <div class="trial-num">{TRIAL_DAYS}<small>days</small></div>
+              <p>
+                <b>generous, if i do say so myself.</b> every feature, every family member, the
+                beanie wall, the finances, and more, plus one ai read a day. after that beanies
+                goes read-only until you pick a plan. no hard feelings either way: your data is
+                always yours, exportable any time.
+              </p>
+            </div>
+
+            <div class="plans plans--two">
+              <div class="plan plan--basic">
+                <h3>beanies basic</h3>
+                <p class="who">the whole app, except ai</p>
+                <p class="price">
+                  <span data-price="basicYearly">{p.basicYearly}</span><span class="per">/ year</span>
+                </p>
+                <p class="price-note">
+                  paid yearly, which works out to
+                  <span data-price="basicPerMonth">{p.basicPerMonth}</span> / mo
+                </p>
+                <ul>
+                  <li><span>✅</span><span>every feature, every world</span></li>
+                  <li><span>✅</span><span>your whole family, no seat limits</span></li>
+                  <li><span>✅</span><span>your data in your own encrypted file</span></li>
+                  <li><span>✅</span><span>export the lot, any time</span></li>
+                  <li class="muted">
+                    <span>🧪</span><span>one ai read a month, so it's there when you need it</span>
+                  </li>
+                  <li class="muted">
+                    <span>🔑</span><span>or bring your own openai key and use it as much as you like</span>
+                  </li>
+                </ul>
+                <a
+                  class="btn btn-ghost"
+                  href={`${APP_URL}/welcome`}
+                  data-cta="CTA: Create Pod"
+                  data-cta-loc="pricing-plan-basic">start counting beans 🫘</a
+                >
+              </div>
+
+              <div class="plan plan--paid">
+                <span class="tape">where most families land</span>
+                <h3>beanies + magic beans</h3>
+                <p class="who">
+                  the whole app, plus ai. you probably could have worked that out for yourself.
+                </p>
+                <p class="price">
+                  <span data-price="fullYearly">{p.fullYearly}</span><span class="per">/ year</span>
+                </p>
+                <p class="price-note">
+                  or <span data-price="fullMonthly">{p.fullMonthly}</span> / mo. yearly works out to
+                  <span data-price="fullPerMonth">{p.fullPerMonth}</span> / mo
+                </p>
+                <ul>
+                  <li><span>✅</span><span>everything in beanies basic</span></li>
+                  <li><span>✅</span><span>ten ai reads a day, and i pay the tokens</span></li>
+                  <li><span>✅</span><span>more room for photos in your family file</span></li>
+                  <li><span>✅</span><span>early access to exclusive new features</span></li>
+                </ul>
+                <a
+                  class="btn btn-primary"
+                  href={`${APP_URL}/welcome`}
+                  data-cta="CTA: Create Pod"
+                  data-cta-loc="pricing-plan-full">start counting beans 🫘</a
+                >
+              </div>
+            </div>
+
+            <div class="aibox">
+              <h3>what are magic beans?</h3>
+              <p class="aibox-lede">
+                that's just what we call ai features. it reads your invites, travel plans,
+                recipes, and more so you don't have to type them in one by one.
+              </p>
+              <ul class="ailist">
+                <li><span>📸</span><span>your invites or activities, in any form</span></li>
+                <li><span>✈️</span><span>your travel plans and itineraries</span></li>
+                <li>
+                  <span>🍳</span><span>your recipes (you can even share a url or youtube link)</span>
+                </li>
+                <li class="soon">
+                  <span>🏦</span><span>your bank transactions <b>coming soon</b></span>
+                </li>
+                <li class="soon"><span>🌱</span><span>lots more on the way</span></li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="whopays">
+          <div class="wrap">
+            <p class="section-label">a note from me (greg)</p>
+            <h2 class="section-title">i've been paying for this myself</h2>
+            <div class="handout letter">
+              <p>
+                Ok my beans - it's time to get down to brass tacks. Here are my thoughts on
+                pricing. And for those who are sick of hearing my thoughts, well... too bad.
+              </p>
+              <p>
+                First things first, the app is <span class="highlight">
+                  still free, and will remain free while it's in beta</span
+                >.
+              </p>
+              <p>
+                I would never dream of charging users for software that is not up to my standards
+                for a production app. We're still working out the kinks, together, and I'm
+                grateful for each and every one of my early beanies who helps to unearth all those
+                fiddly little bugs, issues, and snafus.
+              </p>
+              <p>
+                That said, I've been footing the bill for months. As I may have mentioned (once or
+                twice), we don't harvest user data, run ads, or do any other revenue-generating
+                things. So, at some point, Something's Gotta Give, which is a great movie with
+                Jack Nicholson, Diane Keaton, Frances McDormand, Jon Favreau, and about 10 other
+                absolute Hollywood legends that I highly recommend you watch if you're in the mood
+                to curl up on your couch with a blanket and some popcorn for a solid rom-com movie
+                night. A top-notch cast and a great film. In my (humble) opinion.
+              </p>
+              <p>
+                But getting back to the point - money. Yes, there will be pricing. And it will be
+                fair and transparent. The pricing plans are right here on this page. If they
+                change, you'll be the first to know.
+              </p>
+              <p>
+                For those who've helped make beanies better just by being here, know that I
+                appreciate everything you've done, and your contributions will not go unrewarded
+                (in fact, <a href="#early">see down below</a> for some interesting prizes for
+                early adopter beanies).
+              </p>
+              <p>
+                Together, let's make this platform the best that it can possibly be. I've said it
+                before, and I'll say it again - with our powers combined, we are: CAPTAIN BEANIE!
+              </p>
+              <p>Sorry, I meant: <em class="tagline">every bean counts</em></p>
+              <p class="signoff"><span class="g">greg</span></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section-tight" id="early">
+          <div class="wrap">
+            <p class="section-label">while you're early</p>
+            <h2 class="section-title">a little something for being an early bean</h2>
+            <p class="section-subtitle">a special surprise for my early adopter beanies</p>
+            <div class="offers">
+              <div class="offer offer--ten">
+                <p class="who">the first 10 families</p>
+                <p class="deal"><em data-price="one">{p.one}</em> a month, forever</p>
+                <p>
+                  rate the app and tell me you did. that's your price for good, on either plan,
+                  whatever the prices become. i'm actually keeping a list.
+                </p>
+              </div>
+              <div class="offer offer--rest">
+                <p class="who">everyone else who joins before v1</p>
+                <p class="deal"><em>half price</em>, forever</p>
+                <p>
+                  when your trial period is up, it's 50% off for as long as you stay. forever. no
+                  code needed.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section-tight">
+          <div class="wrap">
+            <p class="section-label">the rollout</p>
+            <h2 class="section-title">here's what to expect</h2>
+            <div class="steps">
+              <div class="step step--now">
+                <div class="step-rail"><span class="step-dot">1</span></div>
+                <div class="step-body">
+                  <span class="when">you are here</span>
+                  <h3>beta. everything free, no clock.</h3>
+                  <p>no charge while we're still testing. but that won't last forever.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-rail"><span class="step-dot">2</span></div>
+                <div class="step-body">
+                  <span class="when">before anything changes</span>
+                  <h3>i'll update you here and by email</h3>
+                  <p>
+                    you'll have time to decide, and the prices above will only take effect after
+                    your trial period.
+                  </p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-rail"><span class="step-dot">3</span></div>
+                <div class="step-body">
+                  <span class="when">v1</span>
+                  <h3>beta ends, subscriptions open</h3>
+                  <p>
+                    after the {TRIAL_DAYS} days trial period, pick one of the plans. if you sign
+                    up now, you'll keep your special price forever.
+                  </p>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-rail"><span class="step-dot">4</span></div>
+                <div class="step-body">
+                  <span class="when">after v1</span>
+                  <h3>new families pay the full price</h3>
+                  <p>which is why i'm telling you this now.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section-tight" id="faq">
+          <div class="wrap">
+            <p class="section-label">fair questions</p>
+            <h2 class="section-title">anything else you'd like to know?</h2>
+            {
+              PRICING_FAQS.map((f, i) => (
+                <details id={f.id} open={i === 0}>
+                  <summary>{f.q}</summary>
+                  <p>{f.a}</p>
+                </details>
               ))
             }
           </div>
-        </div>
+        </section>
 
-        <div class="trial">
-          <div class="trial-num" aria-hidden="true">{TRIAL_DAYS}<small>days</small></div>
-          <p>
-            <b>everyone starts with {TRIAL_DAYS} days of everything</b>, the ai helper included.
-            no card, no countdown nagging you, and the longest free run of any family app i
-            could find. when it's up, you pick a lane below. either one is fine by me.
+        <section class="final">
+          <h2 class="final-title">so... ready to count some beans? 🫘</h2>
+          <p class="hero-sub">
+            free while in beta, and <a href="#early">special rewards for those who sign up now</a>,
+            so <em>get in while the gettin's good.</em>
           </p>
-        </div>
-
-        <div class="plans">
-          <div class="plan plan-free">
-            <h3>free</h3>
-            <p class="who">after your {TRIAL_DAYS} days, for as long as you like</p>
-            <p class="price">
-              <span data-price="free">{p.free}</span><span class="per">/ forever</span>
-            </p>
-            <p class="price-note">the whole app. just not the ai helper.</p>
-            <ul>
-              <li><span aria-hidden="true">✅</span><span>every feature, every world</span></li>
-              <li><span aria-hidden="true">✅</span><span>your whole family, no seat limits</span></li>
-              <li><span aria-hidden="true">✅</span><span>your data in your own encrypted file</span></li>
-              <li><span aria-hidden="true">✅</span><span>export the lot, any time</span></li>
-              <li class="muted">
-                <span aria-hidden="true">🔑</span><span>the ai helper, if you bring your own key</span>
-              </li>
-            </ul>
-            <a
-              class="btn btn-ghost"
-              href={`${APP_URL}/welcome`}
-              data-cta="CTA: Create Pod"
-              data-cta-loc="pricing-plan-free">start for free</a
-            >
-          </div>
-
-          <div class="plan plan-paid">
-            <h3>monthly</h3>
-            <p class="who">the whole thing, one month at a time</p>
-            <p class="price">
-              <span data-price="monthly">{p.monthly}</span><span class="per">/ month</span>
-            </p>
-            <p class="price-note">cancel any time. you keep your data either way.</p>
-            <ul>
-              <li><span aria-hidden="true">✅</span><span>everything in free</span></li>
-              <li><span aria-hidden="true">✅</span><span>the ai helper, and i pay the tokens</span></li>
-              <li><span aria-hidden="true">✅</span><span>more room for photos in your family file</span></li>
-              <li><span aria-hidden="true">✅</span><span>first in line for new worlds</span></li>
-            </ul>
+          <div class="hero-cta">
             <a
               class="btn btn-primary"
               href={`${APP_URL}/welcome`}
               data-cta="CTA: Create Pod"
-              data-cta-loc="pricing-plan-monthly">subscribe monthly</a
+              data-cta-loc="pricing-final">create your bean pod 🫘</a
             >
           </div>
-
-          <div class="plan plan-paid">
-            <span class="tape">save <span data-price="savePct">{p.savePct}</span>%</span>
-            <h3>yearly</h3>
-            <p class="who">one bill, twelve months</p>
-            <p class="price">
-              <span data-price="yearly">{p.yearly}</span><span class="per">/ year</span>
-            </p>
-            <p class="price-note">
-              works out to <span data-price="yearlyPerMonth">{p.yearlyPerMonth}</span> a month.
-            </p>
-            <ul>
-              <li><span aria-hidden="true">✅</span><span>everything in monthly</span></li>
-              <li><span aria-hidden="true">✅</span><span>one bill a year, not twelve</span></li>
-              <li><span aria-hidden="true">✅</span><span>roughly three and a half months on the house</span></li>
-            </ul>
-            <a
-              class="btn btn-primary"
-              href={`${APP_URL}/welcome`}
-              data-cta="CTA: Create Pod"
-              data-cta-loc="pricing-plan-yearly">subscribe yearly</a
-            >
-          </div>
-        </div>
+          <img
+            class="final-dog"
+            src="/brand/beanies-pricing-dog.webp"
+            alt=""
+            width="140"
+            height="140"
+            loading="lazy"
+          />
+          <p class="ps">the beanie doggie says hello. and <em>every bean counts</em></p>
+        </section>
       </div>
-    </section>
+    </BaseLayout>
+  )
+}
 
-    <section class="whopays">
-      <p class="section-label">the honest bit</p>
-      <h2 class="section-title">so who's paying for the free tier?</h2>
-      <div class="handout">
-        <p>subscribers. that's the whole model, and i'd rather you heard it from me than wondered.</p>
-        <p>
-          the families who pay for beanies keep the lights on for the families who don't. no
-          ads quietly making up the difference, no data being sold out the back, no investor
-          waiting for a return. <span class="highlight">just the subscription, and nothing else.</span>
-        </p>
-        <p>
-          which means, said plainly: with no subscribers there's no free tier. actually, with
-          no subscribers there's no beanies at all. so if beanies is useful to your family, the
-          subscription isn't a paywall standing between you and the good stuff. it's the thing
-          that keeps the free tier free for the next family.
-        </p>
-        <p>
-          and if it's not for you? take your data and go. it's your file, it always was, and
-          there are no hard feelings. honestly.
-        </p>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <p class="section-label">a note from me (greg)</p>
-        <h2 class="section-title">i've been paying for this myself</h2>
-        <div class="handout narrow">
-          <p>ok, my beans. down to brass tacks.</p>
-          <p>
-            right now the app is <span class="highlight">free, and it stays that way while we're in beta</span>.
-            i wouldn't dream of charging for software that isn't up to my own standard for a
-            production app, and we're still finding the fiddly little bugs together. (thank you
-            for that, by the way. genuinely.)
-          </p>
-          <p>
-            but i've been footing the bill for months. no ads, no data harvesting, no venture
-            capital breathing down my neck. just me, a credit card, and an aws bill that only
-            goes one direction. so at some point, something's gotta give.
-          </p>
-          <p>
-            here's what that looks like. at v1.0 there'll be a subscription, and it'll be fair -
-            a little on the premium side, because privacy costs more to build than ads do, but
-            not silly. everyone still gets {TRIAL_DAYS} days of everything to work out whether
-            beanies is right for their family. after that, keep using it for free without the
-            ai, or subscribe and have the lot.
-          </p>
-          <p>the families who subscribe are what keep beanies alive. not just for themselves. for everyone.</p>
-          <p class="signoff">- <span class="g">greg</span></p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-tight">
-      <div class="wrap">
-        <p class="section-label">while you're early</p>
-        <h2 class="section-title">being here before v1.0 is worth something</h2>
-        <p class="section-subtitle">
-          two things are true for families who arrive before v1.0, and both of them are for
-          life. yes, for real.
-        </p>
-        <div class="offers">
-          <div class="offer offer-ten">
-            <p class="who">the first 10 families</p>
-            <p class="deal"><em data-price="one">{p.one}</em> a month, forever</p>
-            <p>
-              rate the app, give me a review, and tell me you did. that's your price for good,
-              whatever the price becomes. i'm actually keeping a list.
-            </p>
-          </div>
-          <div class="offer offer-rest">
-            <p class="who">everyone else who joins before v1.0</p>
-            <p class="deal"><em>half price</em>, forever</p>
-            <p>
-              if you ever subscribe, it's 50% off for as long as you stay.
-              <span class="works"
-                >that's <span data-price="halfMonthly">{p.halfMonthly}</span> a month, or
-                <span data-price="halfYearly">{p.halfYearly}</span> a year.</span
-              >
-              no code, no expiry, no renewal to remember.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-tight">
-      <div class="wrap">
-        <p class="section-label">the rollout</p>
-        <h2 class="section-title">the order it happens in</h2>
-        <ol class="steps">
-          <li class="step step-now">
-            <div class="step-rail"><span class="step-dot" aria-hidden="true">1</span></div>
-            <div class="step-body">
-              <span class="when">you are here</span>
-              <h3>beta. everything free, no clock.</h3>
-              <p>
-                every feature, every family member, the ai helper too. no card on file, no
-                {TRIAL_DAYS} days ticking. that starts at v1.0, not now.
-              </p>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-rail"><span class="step-dot" aria-hidden="true">2</span></div>
-            <div class="step-body">
-              <span class="when">before anything changes</span>
-              <h3>you get told, here and by email</h3>
-              <p>
-                nothing starts the day it's announced. you'll have time to decide, and the
-                prices above are the prices you'll see.
-              </p>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-rail"><span class="step-dot" aria-hidden="true">3</span></div>
-            <div class="step-body">
-              <span class="when">v1.0</span>
-              <h3>beta ends, subscriptions open</h3>
-              <p>
-                new families get {TRIAL_DAYS} days of everything, then choose free or paid.
-                families who were here before v1.0 keep what they were promised: $1 a month
-                for the first 10, half price for everybody else. for life.
-              </p>
-            </div>
-          </li>
-          <li class="step">
-            <div class="step-rail"><span class="step-dot" aria-hidden="true">4</span></div>
-            <div class="step-body">
-              <span class="when">after v1.0</span>
-              <h3>new families pay the full price</h3>
-              <p>which is the only reason any of the above is worth telling you now rather than later.</p>
-            </div>
-          </li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="section section-tight" id="faq">
-      <div class="wrap">
-        <p class="section-label">fair questions</p>
-        <h2 class="section-title">the ones you're actually asking</h2>
-        {
-          PRICING_FAQS.map((f, i) => (
-            <details id={f.id} open={i === 0}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
-            </details>
-          ))
-        }
-      </div>
-    </section>
-
-    <section class="final">
-      <h2 class="final-title">so... ready to count some beans? 🫘</h2>
-      <p class="hero-sub">it's free, <em>for now</em>. get in while the gettin's good.</p>
-      <div class="hero-cta">
-        <a
-          class="btn btn-primary"
-          href={`${APP_URL}/welcome`}
-          data-cta="CTA: Create Pod"
-          data-cta-loc="pricing-footer">create your bean pod 🫘</a
-        >
-      </div>
-      <p class="ps">every bean counts.</p>
-    </section>
-  </div>
-</BaseLayout>
-
-<script define:vars={{ PRICES, DEFAULT_CURRENCY }}>
+{
+  /*
+   * Inside the gate on purpose. A page-level <script> always ships, and
+   * `define:vars` serialises PRICES into the HTML, so leaving it outside put
+   * every price on the gated page for anyone reading source.
+   */
+}
+{
+  PRICING_LIVE && (
+    <script define:vars={{ PRICES, DEFAULT_CURRENCY }}>
   // One table, one currency at a time. The server rendered USD; this swaps
   // every `[data-price]` node when a person picks another, and remembers it.
   const seg = document.getElementById('currency-seg');
@@ -402,6 +445,8 @@ const faqSchema = {
   }
   if (initial !== DEFAULT_CURRENCY) show(initial);
 </script>
+  )
+}
 
 <style>
   /*
@@ -844,5 +889,147 @@ const faqSchema = {
     .pricing-page .whopays {
       padding: 48px 20px;
     }
+  }
+
+  /* ── hero art ────────────────────────────────────────────────────────
+     Follows the /guides + /help "library hero" pattern: text left, art
+     right, flipping to column-reverse at 900px so the scene leads on a
+     phone. Same 340 -> 260px sizing, halo and 6.5s bob as that pattern. */
+  .pricing-page .hero { text-align: left; }
+  .pricing-page .hero-inner {
+    align-items: center;
+    display: flex;
+    gap: 48px;
+    margin: 0 auto;
+    max-width: 1040px;
+  }
+  .pricing-page .hero-copy { flex: 1; min-width: 0; }
+  .pricing-page .hero h1 { margin-left: 0; margin-right: 0; }
+  /* Scoped to .hero deliberately: the closing section reuses .hero-sub and
+     .hero-cta, and unscoped overrides here left-align the final CTA. */
+  .pricing-page .hero .hero-sub { margin-left: 0; margin-right: 0; }
+  .pricing-page .hero .hero-cta { justify-content: flex-start; }
+  .pricing-page .hero-art { flex-shrink: 0; position: relative; width: 340px; }
+  .pricing-page .hero-halo {
+    background: radial-gradient(
+      circle,
+      rgb(241 93 34 / 18%) 0%,
+      rgb(230 126 34 / 10%) 35%,
+      transparent 68%
+    );
+    height: 340px;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 340px;
+  }
+  .pricing-page .hero-art img {
+    animation: pricing-bob 6.5s ease-in-out infinite;
+    display: block;
+    filter: drop-shadow(0 20px 40px rgb(44 62 80 / 18%));
+    height: auto;
+    pointer-events: none;
+    position: relative;
+    width: 100%;
+  }
+  @keyframes pricing-bob {
+    0%,
+    100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  /* Two plans, so cap the row rather than letting two cards sprawl across
+     the full width the three-card grid was built for. */
+  .pricing-page .plans--two { max-width: 700px; }
+
+  /* ── what are magic beans ───────────────────────────────────────────── */
+  .pricing-page .aibox {
+    background: #fff;
+    border-radius: var(--sq);
+    box-shadow: var(--card-shadow);
+    margin: 22px auto 0;
+    max-width: 700px;
+    padding: 28px 30px;
+  }
+  .pricing-page .aibox h3 {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin: 0 0 0.3rem;
+  }
+  .pricing-page .aibox-lede { font-size: 0.9rem; margin: 0 0 1.1rem; }
+  .pricing-page .ailist { list-style: none; margin: 0; padding: 0; }
+  .pricing-page .ailist li {
+    display: flex;
+    font-size: 0.92rem;
+    gap: 0.7rem;
+    margin-bottom: 0.6rem;
+  }
+  .pricing-page .ailist li:last-child { margin-bottom: 0; }
+  .pricing-page .ailist li span:first-child { flex-shrink: 0; }
+  /* Not shipped yet, and the page says so rather than hoping nobody asks. */
+  .pricing-page .ailist li.soon { color: var(--muted-text); }
+  .pricing-page .ailist li.soon b {
+    background: rgb(174 214 241 / 45%);
+    border-radius: 4px;
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    margin-left: 0.4rem;
+    padding: 2px 7px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* The full note runs long, so it gets a reading measure and more air
+     between paragraphs than the short handout cards. */
+  .pricing-page .handout.letter { max-width: 680px; padding: 40px 44px; }
+  .pricing-page .handout.letter p { margin-bottom: 1.35rem; }
+  .pricing-page .handout.letter p:first-of-type { font-size: 1.06rem; }
+  .pricing-page .tagline { color: var(--heritage-orange); font-style: italic; }
+
+  /* Inline links: preflight resets a{color:inherit}, so in-prose links are
+     invisible without this. Same defect the switching pages shipped. */
+  .pricing-page .handout a,
+  .pricing-page .final .hero-sub a {
+    color: var(--heritage-orange);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .pricing-page .handout a:hover,
+  .pricing-page .final .hero-sub a:hover { text-decoration-thickness: 2px; }
+  .pricing-page .handout a:focus-visible,
+  .pricing-page .final .hero-sub a:focus-visible {
+    outline: 3px solid var(--heritage-orange);
+    outline-offset: 2px;
+  }
+
+  /* Callback to the hero: the dog turned up with the wallet, and here he is
+     again having sorted it out. */
+  .pricing-page .final-dog {
+    display: block;
+    filter: drop-shadow(0 10px 20px rgb(44 62 80 / 16%));
+    height: auto;
+    margin: 2.4rem auto 0;
+    width: 140px;
+  }
+  .pricing-page .ps em { color: var(--heritage-orange); font-style: italic; }
+
+  @media (max-width: 900px) {
+    .pricing-page .hero { text-align: center; }
+    .pricing-page .hero-inner { flex-direction: column-reverse; gap: 28px; }
+    .pricing-page .hero h1,
+    .pricing-page .hero .hero-sub { margin-left: auto; margin-right: auto; }
+    .pricing-page .hero .hero-cta { justify-content: center; }
+    .pricing-page .hero-art { width: 260px; }
+    .pricing-page .hero-halo { height: 260px; width: 260px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pricing-page .hero-art img { animation: none; }
   }
 </style>

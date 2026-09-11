@@ -9,6 +9,12 @@
  *
  * Positioning (research, 2026-09-10): family-organiser annual mean $70.62
  * (n=7, ex-Maple); $84.99 is +20.3%, the top of the agreed 15-20% premium band.
+ *
+ * MODEL (revised 2026-09-11): there is no free tier. A 90-day trial of the whole
+ * app (AI capped at 1 read/day) lands on read-only until a plan is chosen. Two
+ * plans: `basic` is YEARLY ONLY, because $2.99/mo loses money to the 15% store
+ * cut plus twelve transaction fees; `full` adds the AI at 10 reads/day. Free
+ * forever still exists, but as self-hosting, not as a tier.
  */
 /**
  * THE GATE. While false, /pricing renders the site's draft placeholder with
@@ -26,40 +32,46 @@ export type CurrencyCode = 'USD' | 'SGD';
 export interface PriceTable {
   /** Button label on the switcher. */
   label: string;
-  free: string;
-  monthly: string;
-  yearly: string;
-  /** yearly / 12, for the "works out to" line. */
-  yearlyPerMonth: string;
-  /** The 50%-off-for-life figures for families who joined before v1.0. */
-  halfMonthly: string;
-  halfYearly: string;
+  /** beanies basic. Sold by the year only - see the MODEL note above. */
+  basicYearly: string;
+  /** basicYearly / 12, for the "works out to" line. */
+  basicPerMonth: string;
+  /** beanies + magic beans. */
+  fullYearly: string;
+  fullMonthly: string;
+  /** fullYearly / 12. */
+  fullPerMonth: string;
+  /** The 50%-off-for-life figures for families who joined before v1. */
+  halfBasicYearly: string;
+  halfFullYearly: string;
   /** The first-ten deal. $1 in whichever currency the family pays in. */
   one: string;
-  /** Yearly saving against 12x monthly, already rounded. */
+  /** Yearly saving against 12x monthly on the full plan, already rounded. */
   savePct: number;
 }
 
 export const PRICES: Record<CurrencyCode, PriceTable> = {
   USD: {
     label: 'USD $',
-    free: '$0',
-    monthly: '$9.99',
-    yearly: '$84.99',
-    yearlyPerMonth: '$7.08',
-    halfMonthly: '$4.99',
-    halfYearly: '$42.49',
+    basicYearly: '$30',
+    basicPerMonth: '$2.50',
+    fullYearly: '$84.99',
+    fullMonthly: '$9.99',
+    fullPerMonth: '$7.08',
+    halfBasicYearly: '$15',
+    halfFullYearly: '$42.49',
     one: '$1',
     savePct: 29,
   },
   SGD: {
     label: 'SGD S$',
-    free: 'S$0',
-    monthly: 'S$13',
-    yearly: 'S$110',
-    yearlyPerMonth: 'S$9.17',
-    halfMonthly: 'S$6.50',
-    halfYearly: 'S$55',
+    basicYearly: 'S$39',
+    basicPerMonth: 'S$3.25',
+    fullYearly: 'S$110',
+    fullMonthly: 'S$13',
+    fullPerMonth: 'S$9.17',
+    halfBasicYearly: 'S$19.50',
+    halfFullYearly: 'S$55',
     one: 'S$1',
     savePct: 29,
   },
@@ -67,8 +79,16 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
 
-/** Length of the everything-included trial that starts at v1.0. */
+/** Length of the everything-included trial that starts at v1. */
 export const TRIAL_DAYS = 90;
+
+/** Magic beans allowances. The trial gets a taste; basic keeps one a month so
+ *  the feature is discoverable rather than invisible. */
+export const MAGIC_BEANS = { trialPerDay: 1, basicPerMonth: 1, fullPerDay: 10 } as const;
+
+/** Competitor pricing cited on the page. Dated on purpose: a dated figure ages
+ *  into a historical fact, an undated one ages into a false claim. */
+export const COZI = { adFreeYearly: '$39', aiYearly: '$79', checked: 'sep 2026' } as const;
 
 export interface PricingFaq {
   id: string;
@@ -84,39 +104,44 @@ export interface PricingFaq {
  */
 export const PRICING_FAQS: PricingFaq[] = [
   {
-    id: 'why-free-tier',
-    q: 'wait, you keep saying "something\'s gotta give". so why is there a free tier?',
-    a: "because subscribers pay for it. that's the arrangement, and it's the same one proton and bitwarden run on. the free tier isn't me being generous with money i don't have; it's paying families keeping the door open for everyone else. if that ever stopped working, the free tier would go before beanies did - and you'd hear about it here first.",
+    id: 'trial-is-everything',
+    q: 'do i really get everything in the app for 90 days?',
+    a: "you do - all the features across the entire app for your whole family. the only cap is magic beans (beanies ai), where you'll get one read per day.",
   },
   {
     id: 'after-90-days',
-    q: 'what do i actually lose after 90 days?',
-    a: "one thing: the ai helper, because every time it runs it costs me real money. that's it. your calendar, lists, meals, money, the wall, your whole family - all still there, all still free. and if you've got your own openai or anthropic key, plug it in and the ai helper works on free too. you pay them instead of me.",
+    q: 'what happens when the 90 days are up?',
+    a: "beanies becomes read-only. everything's still there and still yours, you just can't add to it until you pick a plan. export works any time, paid or not. and if beanies isn't for you, take your data and go. no hard feelings.",
   },
   {
-    id: 'never-subscribe',
-    q: 'what if i never subscribe?',
-    a: "then you use beanies for free, minus the ai, for as long as you like. no nagging, no features quietly disappearing, no \"upgrade now\" popups. if it's useful, i'd love it if you subscribed one day. if it's not, i'd rather know why.",
+    id: 'subscribe-early',
+    q: 'if i subscribe before my trial period is done, what happens to the trial period?',
+    a: 'start now and billing begins today, the one-ai-per-day cap is removed, and your plan\'s full allowance kicks in. start later and nothing is charged until day 91, and the ai cap stays put until then.',
   },
   {
-    id: 'why-more-than-cozi',
-    q: 'why is it more than cozi?',
-    a: "because you're not the product. cozi is cheaper on the free tier because the ads are paying, and its paid tier is about the same as mine. beanies costs a little more than the average family app because there's nothing else propping it up - no ads, no data deals - and because you get the money side, the family side and the wall in one place. premium, not silly.",
+    id: 'one-magic-bean',
+    q: 'what counts as one ai read?',
+    a: "one document, invitation, itinerary, recipe, etc. with the trial you get one magic bean per day, beanies + magic beans gives you ten a day, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
+  },
+  {
+    id: 'compare-to-cozi',
+    q: 'how does this compare to cozi?',
+    a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and beanies + magic beans is ${PRICES.USD.fullYearly}, so we're about five dollars more. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
   },
   {
     id: 'here-now',
-    q: "i'm here now. what does that get me?",
-    a: "half price on any paid plan, permanently, for joining before v1.0. the first 10 families who rate the app and tell me they did get $1 a month instead. both are for as long as you stay, and there's no renewal to miss.",
+    q: "i'm an early adopter beanie. what does that get me?",
+    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for beanies + magic beans. the first 10 families who rate the app and tell me get ${PRICES.USD.one} a month instead. no renewal to miss.`,
   },
   {
     id: 'prove-early',
-    q: 'how do you know i was here before v1.0?',
+    q: 'how do you know i was here before v1?',
     a: "your pod has a creation date, and that's the whole test. no code, no coupon, no screenshot. you don't need to do anything today except be here.",
   },
   {
     id: 'data-if-i-leave',
     q: 'what happens to my data if i stop paying, or leave?',
-    a: "nothing. it's in your own encrypted file, not on my server, so there's nothing for me to lock or delete. stop paying and you're on the free tier. leave altogether and you take the file with you. export everything, whenever you like.",
+    a: "nothing happens to it. it's your own encrypted file, not on my server, so there's nothing for me to lock or delete. stop paying and beanies goes read-only. export everything whenever you like, or take the file and go.",
   },
   {
     id: 'self-host',
