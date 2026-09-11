@@ -1154,6 +1154,21 @@ export interface CalendarEventLink {
    * can restore the master's Google instance without the child record.
    */
   exceptionOriginalYmd?: ISODateString;
+  /**
+   * WHO CREATED this Google event. Set only by the one-time import (#94); absent
+   * (the only value before that feature) means beanies created the event and owns
+   * its whole lifecycle, exactly as before.
+   *  - 'adopted'   the user is the organizer and the event is on this connection's
+   *                destination calendar, so pushes PATCH the original in place.
+   *  - 'external'  the user is an invitee, the event lives on another calendar, or
+   *                its repeat pattern is one beanies cannot express. beanies never
+   *                writes it: no upsert, no instance exception.
+   *
+   * INVARIANT: a link with ANY `origin` value never produces a `deleteEvent` call.
+   * Do not branch on this field directly — use `beaniesMayPush` / `beaniesMayDelete`
+   * from `@/utils/calendar/linkOwnership`.
+   */
+  origin?: 'adopted' | 'external';
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
