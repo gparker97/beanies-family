@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-10",
-    "translationCount": 4647
+    "lastUpdated": "2026-09-11",
+    "translationCount": 4663
   },
   "translations": {
     "app.name": {
@@ -23240,6 +23240,86 @@
       "translation": "创建PIN码并登录",
       "hash": "jza8ht",
       "lastUpdated": "2026-09-10"
+    },
+    "wall.removeFailed.title": {
+      "translation": "未被移除",
+      "hash": "cyfgkr",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.removeFailed.message": {
+      "translation": "它可能已在其他设备上删除。下次同步时，墙壁将迎头赶上。",
+      "hash": "oi9lhb",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.undoFailed.title": {
+      "translation": "没有回来",
+      "hash": "h6zi20",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.undoFailed.message": {
+      "translation": "该项目无法还原。请重新添加，或在应用中打开列表。",
+      "hash": "kd54kq",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.job.removed": {
+      "translation": "已删除“{title}”",
+      "hash": "axl30",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.job.undo": {
+      "translation": "撤销",
+      "hash": "1klxg",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.job.rename": {
+      "translation": "重命名",
+      "hash": "ulvijm",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.job.renamePlaceholder": {
+      "translation": "它应该说什么？",
+      "hash": "49386g",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.lead": {
+      "translation": "在挂断之前，设备上有三件事：",
+      "hash": "g5rp6d",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.screenBacked": {
+      "translation": "将屏幕设置为永不锁定，以便墙壁在水龙头之间保持打开状态",
+      "hash": "j8w0j3",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.screenOnly": {
+      "translation": "将屏幕设置为永不锁定。一些平板电脑，特别是较旧的iPad ，不会停留在其他方面",
+      "hash": "wzwrd6",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.guidedAccess": {
+      "translation": "开启引导式访问，轻触屏幕即可进入其他应用",
+      "hash": "jr8p0n",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.screenPinning": {
+      "translation": "开启屏幕固定功能，轻触屏幕即可进入其他应用",
+      "hash": "kzeinw",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.lockGeneric": {
+      "translation": "将设备锁定到此应用程序，以便轻触后无法进入另一个应用程序",
+      "hash": "y5ga6a",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.tips.power": {
+      "translation": "将其悬挂在插座可触及的地方",
+      "hash": "4dkg2o",
+      "lastUpdated": "2026-09-11"
+    },
+    "wall.setup.help.link": {
+      "translation": "如何在墙上设置设备",
+      "hash": "5ypb5n",
+      "lastUpdated": "2026-09-11"
     }
   }
 }
