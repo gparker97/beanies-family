@@ -51,11 +51,12 @@ function getGoalIcon(goalType: GoalType): string {
 
 const milestones = computed<Milestone[]>(() => {
   const items: Milestone[] = [];
+  // Once, not once per member.
+  const todayYmd = toDateInputValue(new Date());
 
   // 1. Birthdays from family members with dateOfBirth (within 30 days)
   for (const member of familyStore.members) {
     if (!member.dateOfBirth) continue;
-    const todayYmd = toDateInputValue(new Date());
     const nextYmd = nextAnnualDate(todayYmd, member.dateOfBirth.month, member.dateOfBirth.day);
     const date = parseLocalDate(nextYmd);
     const daysAway = daysBetween(todayYmd, nextYmd);

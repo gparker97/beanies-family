@@ -383,11 +383,16 @@ function refColour(kind: 'birthday' | 'holiday'): string {
           }"
         >
           <span v-if="ref.reference.emoji" aria-hidden="true">{{ ref.reference.emoji }}</span>
-          <span
-            class="font-outfit truncate font-semibold"
-            :style="{ color: refColour(ref.reference.kind) }"
-            >{{ ref.reference.label }}</span
-          >
+          <!--
+            ⚠️ The label takes the pill's normal ink; the colour lives on the EDGE
+            only. Two reasons, and they agree. Style: the band's activity rows do
+            exactly this (an emoji plus an uncoloured title), so colouring the
+            text made these the one thing in the band that did not match it.
+            Contrast: `.wall-allday` is 0.85rem semibold, which is NOT AA "large
+            text", so it needs 4.5:1 — and clay on the white pill measures 4.26.
+            As an edge it carries no text and the rule does not apply.
+          -->
+          <span class="font-outfit truncate font-semibold">{{ ref.reference.label }}</span>
         </div>
 
         <button

@@ -144,7 +144,12 @@ const gridColumns = computed(() =>
  * `wallDayAllDay` and its test.
  */
 /** Birthdays + public holidays across the visible week, in the all-day band. */
-const { byDay: bandReferences } = useWallReferenceDays(visible);
+const { byDay: bandReferences } = useWallReferenceDays(
+  visible,
+  computed(() =>
+    props.visibleMemberIds ? (id: string) => props.visibleMemberIds!.includes(id) : null
+  )
+);
 
 const allDaySpans = computed(() => {
   const occurrences = visible.value.flatMap((ymd) => eventsFor(ymd));
