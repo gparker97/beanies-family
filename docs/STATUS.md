@@ -2356,6 +2356,7 @@ still bypass `helpLinks`; `platformLabel.formFactor()` keeps its own UA parse on
 > 💲 **The pricing page was excluded by construction**, not by the flag: it lives on
 > `pricing-page` and `/pricing` returns 404 on prod (verified post-deploy). Its
 > `/code-review` came back with 15 findings, none shipping — see the pending block.
+
 ### 💲 Session 2026-09-10 (7) — THE PRICING PAGE, on branch `pricing-page`. NOT on `main`, NOT deployed.
 
 > **Last updated:** 2026-09-10. Wall edit mode, the trip drawer and the celebration popper
