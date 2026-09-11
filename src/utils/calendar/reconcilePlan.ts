@@ -7,7 +7,8 @@
 
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { addDaysYmd } from '@/utils/date';
-import { deterministicEventId } from './deterministicEventId';
+import { masterEventId } from './deterministicEventId';
+import { beaniesMayDelete, beaniesMayPush } from './linkOwnership';
 import { computePushHash, computeExceptionHash } from './activityToGoogleEvent';
 import { overrideOccurrenceYmd } from './overrideOccurrenceYmd';
 
@@ -22,6 +23,11 @@ export interface ReconcileUpsert {
   hash: string;
   /** Hash from the existing link, if any — equal ⇒ unchanged (skip on a light pass). */
   existingHash?: string;
+  /** Carried from the link so `applyUpsert` can tell an ADOPTED event apart without a
+   *  second lookup. An adopted event that has vanished from Google must NOT be
+   *  re-inserted under its foreign id (not base32hex → permanent 400); the engine
+   *  drops the link and lets the next pass create a normal beanies-owned event. */
+  origin?: CalendarEventLink['origin'];
 }
 
 /** A per-occurrence recurring-instance EXCEPTION to apply to a synced master.
@@ -37,6 +43,10 @@ export interface ReconcileExceptionUpsert {
   existingHash?: string;
   existingInstanceId?: string;
   mode: 'modify' | 'cancel';
+  /** Where the MASTER lives in Google. Resolved here because `planReconcile` is the
+   *  only place holding the master links; the engine must not re-derive it, or an
+   *  adopted series would have its instances discovered against a stale id. */
+  masterEventId: string;
 }
 
 /** An exception link whose override child is gone (deleted/reverted) or whose master
@@ -53,6 +63,10 @@ export interface ReconcilePlan {
   upserts: ReconcileUpsert[];
   /** MASTER links whose activity is no longer pushable → remote event + link removed. */
   deletes: CalendarEventLink[];
+  /** Links to FORGET without touching Google, because beanies did not create the
+   *  event (#94 import). Never overlaps `deletes`: an imported link is never a
+   *  remote delete, or a disconnect would take the family's real events with it. */
+  unlinks: CalendarEventLink[];
   /** Per-occurrence overrides to apply as Google recurring-instance exceptions. */
   exceptionUpserts: ReconcileExceptionUpsert[];
   /** Exception links to restore/drop (override removed or master unpushable). */
@@ -131,22 +145,54 @@ export function planReconcile(
   const linkByActivity = new Map(masterLinks.map((l) => [l.activityId, l]));
   const pushable = activities.filter((a) => isPushable(a, todayYmd));
   const pushableIds = new Set(pushable.map((a) => a.id));
-  const mastersById = new Map(pushable.map((a) => [a.id, a]));
 
-  const upserts: ReconcileUpsert[] = pushable.map((activity) => ({
-    activity,
-    eventId: deterministicEventId(activity.id),
-    hash: computePushHash(activity, memberName),
-    existingHash: linkByActivity.get(activity.id)?.lastPushedHash,
-  }));
+  // Activities beanies may NOT write to Google (#94): an imported event created by
+  // someone else, living on another calendar, or repeating in a way beanies cannot
+  // express. Computed once and applied to BOTH upserts and the exception path — an
+  // override child of an invited series must never patch or cancel an instance of
+  // someone else's recurring event.
+  const suppressed = new Set(
+    masterLinks.filter((l) => !beaniesMayPush(l)).map((l) => l.activityId)
+  );
 
-  // A MASTER link whose activity is gone / inactive / out-of-window must be deleted.
-  const deletes = masterLinks.filter((l) => !pushableIds.has(l.activityId));
+  const mastersById = new Map(pushable.filter((a) => !suppressed.has(a.id)).map((a) => [a.id, a]));
+
+  const upserts: ReconcileUpsert[] = pushable
+    .filter((a) => !suppressed.has(a.id))
+    .map((activity) => {
+      const link = linkByActivity.get(activity.id);
+      return {
+        activity,
+        eventId: masterEventId(link, activity.id),
+        hash: computePushHash(activity, memberName),
+        existingHash: link?.lastPushedHash,
+        origin: link?.origin,
+      };
+    });
+
+  const activityIds = new Set(activities.map((a) => a.id));
+
+  // A MASTER link whose activity is gone / inactive / out-of-window is resolved one
+  // of two ways. For an event beanies created, delete it remotely and drop the link.
+  // For an IMPORTED event, never touch Google: only forget the link, and only once
+  // the activity itself is gone. While the activity merely sits inactive or outside
+  // the push window, KEEP the link — dropping it would let a later re-entry into the
+  // window mint a fresh deterministic id beside the user's original event, which is
+  // the duplicate again, arriving months later and unexplainably.
+  const deletes: CalendarEventLink[] = [];
+  const unlinks: CalendarEventLink[] = [];
+  for (const l of masterLinks) {
+    if (pushableIds.has(l.activityId) && !suppressed.has(l.activityId)) continue;
+    if (!beaniesMayDelete(l)) {
+      if (!activityIds.has(l.activityId)) unlinks.push(l);
+      continue;
+    }
+    deletes.push(l);
+  }
 
   // Per-occurrence override children whose master is synced → apply as instance
   // exceptions. A child whose master isn't pushable is skipped here (no instance to
   // except) and its stale link, if any, is handled by exceptionRestores below.
-  const activityIds = new Set(activities.map((a) => a.id));
   const exceptionLinkByChild = new Map(exceptionLinks.map((l) => [l.activityId, l]));
   const exceptionUpserts: ReconcileExceptionUpsert[] = [];
   for (const child of activities) {
@@ -164,6 +210,7 @@ export function planReconcile(
       existingHash: link?.lastPushedHash,
       existingInstanceId: link?.googleEventId,
       mode,
+      masterEventId: masterEventId(linkByActivity.get(master.id), master.id),
     });
   }
 
@@ -174,5 +221,5 @@ export function planReconcile(
     .filter((l) => !activityIds.has(l.activityId) || !mastersById.has(l.exceptionOf!))
     .map((link) => ({ link, master: mastersById.get(link.exceptionOf!) ?? null }));
 
-  return { upserts, deletes, exceptionUpserts, exceptionRestores };
+  return { upserts, deletes, unlinks, exceptionUpserts, exceptionRestores };
 }

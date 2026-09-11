@@ -79,7 +79,7 @@ import {
   type ReconcileUpsert,
   type ReconcileExceptionUpsert,
 } from '@/utils/calendar/reconcilePlan';
-import { deterministicEventId } from '@/utils/calendar/deterministicEventId';
+import { beaniesMayDelete } from '@/utils/calendar/linkOwnership';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
@@ -224,6 +224,31 @@ async function createOrResurrect(
   }
 }
 
+/**
+ * The ONLY place beanies deletes a Google event.
+ *
+ * Refuses for a link beanies did not create (#94 import), so the guard cannot be
+ * forgotten at a future fourth call site. There were three before this existed, and
+ * two of them (disconnect, destination switch) would have deleted a school's event
+ * from a parent's real calendar the first time anyone imported.
+ *
+ * Returns whether the remote delete actually happened. The CALLER decides what to do
+ * with the link: `reconcileConnection` and `finishDisconnect` drop it either way, but
+ * `setDestinationCalendar` KEEPS an imported link. Do not "simplify" this by having
+ * the helper remove the link itself, or the destination switch would silently regain
+ * the ability to recreate an invited event on the new calendar.
+ */
+async function deleteRemoteEventForLink(
+  client: CalendarClient,
+  connectionId: string,
+  calendarId: string,
+  link: CalendarEventLink
+): Promise<boolean> {
+  if (!beaniesMayDelete(link)) return false;
+  await client.deleteEvent(connectionId, calendarId, link.googleEventId);
+  return true;
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useCalendarSyncStore = defineStore('calendarSync', () => {
@@ -311,6 +336,31 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const resource = activityToGoogleEvent(u.activity, ctx);
     const hasLink = u.existingHash !== undefined;
 
+    /**
+     * An ADOPTED event that has vanished from Google must NOT be re-inserted (#94).
+     *
+     * `createOrResurrect` inserts under the SUPPLIED id, which has always been safe
+     * because `deterministicEventId` output is base32hex by construction. A foreign
+     * Google id is not: events that arrived by .ics import or migration routinely
+     * carry underscores or uppercase. Inserting one returns a 400 that repeats on
+     * every reconcile, forever, with nothing the user can do.
+     *
+     * So a missing adopted event is treated as a CONVERGENCE, not an error: the
+     * organizer deleted it in Google, so drop the link and return. The next pass
+     * sees an unlinked activity and creates a normal beanies-owned event under the
+     * deterministic id. A permanent unfixable error becomes a one-cycle self-heal.
+     */
+    const adoptedGone = async (): Promise<boolean> => {
+      await removeCalendarEventLinkById(connectionId, u.activity.id);
+      logEvent({
+        level: 'info',
+        surface: 'calendar-sync',
+        message: 'adopted_event_gone',
+        context: { action: 'adopted-event-gone' },
+      });
+      return true;
+    };
+
     if (!hasLink) {
       await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
       await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
@@ -322,6 +372,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         await client.patchEvent(connectionId, calendarId, u.eventId, resource);
       } catch (e) {
         if (e instanceof CalendarApiError && e.kind === 'not_found') {
+          if (u.origin === 'adopted') return adoptedGone();
           await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
         } else {
           throw e;
@@ -336,6 +387,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (verifyExisting) {
       const exists = await client.eventExists(connectionId, calendarId, u.eventId);
       if (!exists) {
+        if (u.origin === 'adopted') return adoptedGone();
         await createOrResurrect(client, connectionId, calendarId, u.eventId, resource);
         await recordLink(connectionId, u.activity.id, u.eventId, u.hash);
         return true;
@@ -385,7 +437,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // would fall outside an original-date re-window, so we must not re-discover).
     let instanceId = e.existingInstanceId;
     if (!instanceId) {
-      const masterEventId = deterministicEventId(e.master.id);
+      // Resolved by `planReconcile`, which is the only place holding the master
+      // links. Re-deriving it here would target a stale id for an adopted series.
+      const masterEventId = e.masterEventId;
       const [timeMin, timeMax] = paddedDayWindow(e.occurrenceYmd);
       let instances;
       try {
@@ -624,7 +678,17 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         }),
         ...plan.deletes.map((link) => async () => {
           try {
-            await client.deleteEvent(connectionId, calendarId, link.googleEventId);
+            await deleteRemoteEventForLink(client, connectionId, calendarId, link);
+            await removeCalendarEventLinkById(connectionId, link.activityId);
+            changed = true;
+          } catch (e) {
+            record(e, 'delete');
+          }
+        }),
+        // Imported events beanies did not create: forget the link, touch nothing in
+        // Google. No client call, so nothing here can fail against the network.
+        ...plan.unlinks.map((link) => async () => {
+          try {
             await removeCalendarEventLinkById(connectionId, link.activityId);
             changed = true;
           } catch (e) {
@@ -1071,7 +1135,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     let allCleared = true;
     const tasks = links.map((link) => async () => {
       try {
-        await client.deleteEvent(connectionId, calendarId, link.googleEventId);
+        // Cleans up what beanies made, never what the family already had: an
+        // imported link deletes nothing remotely and is simply forgotten.
+        await deleteRemoteEventForLink(client, connectionId, calendarId, link);
         await removeCalendarEventLinkById(connectionId, link.activityId);
       } catch {
         allCleared = false; // keep the link; stays 'disconnecting', retried next open
@@ -1112,7 +1178,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     let failures = 0;
     const tasks = links.map((link) => async () => {
       try {
-        await client.deleteEvent(connectionId, oldCalendarId, link.googleEventId);
+        await deleteRemoteEventForLink(client, connectionId, oldCalendarId, link);
       } catch {
         allCleared = false;
         failures++;
@@ -1131,7 +1197,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
 
     // Cleared → drop links, switch, re-sync onto the new calendar.
-    for (const link of links) await removeCalendarEventLinkById(connectionId, link.activityId);
+    // IMPORTED links are KEPT (#94). Their events were never on the old calendar to
+    // begin with and were not deleted above, so dropping the link would un-suppress
+    // an invited activity and let the re-sync create the school's event on the NEW
+    // calendar. An adopted event cannot follow the move either: it lives where its
+    // organizer put it, so its link keeps pointing at the original.
+    for (const link of links) {
+      if (!beaniesMayDelete(link)) continue;
+      await removeCalendarEventLinkById(connectionId, link.activityId);
+    }
     await updateCalendarConnection(connectionId, { destinationCalendarId: calendarId });
     void reconcileConnection(connectionId, { verifyExisting: true, force: true });
     return { ok: true };
