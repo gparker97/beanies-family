@@ -260,3 +260,33 @@ describe('end conditions', () => {
     expect(ok(parseRecurrence(['RRULE:FREQ=DAILY'], TUE_3RD)).end).toEqual({ kind: 'never' });
   });
 });
+
+describe('clamp vs skip: the two engines disagree past the 28th', () => {
+  // RFC 5545 SKIPs a month that lacks the day; the beanies engine CLAMPs to that
+  // month's last day. Accepting these would put beanies and Google on different
+  // schedules, and for an ADOPTED event the first ordinary edit would rewrite the
+  // user's real Google rule from "the 31st" to "the last day of the month".
+  it.each([29, 30, 31])('refuses an explicit BYMONTHDAY=%i', (day) => {
+    const start = `2026-01-${day}`;
+    expect(parseRecurrence([`RRULE:FREQ=MONTHLY;BYMONTHDAY=${day}`], start).ok).toBe(false);
+  });
+
+  it('refuses a BARE FREQ=MONTHLY anchored past the 28th', () => {
+    // This one has no BYMONTHDAY at all: the day is inherited from DTSTART, so the
+    // divergence is just as real and far easier to miss.
+    expect(parseRecurrence(['RRULE:FREQ=MONTHLY'], '2026-01-31').ok).toBe(false);
+  });
+
+  it('still accepts a day every month actually has', () => {
+    expect(parseRecurrence(['RRULE:FREQ=MONTHLY;BYMONTHDAY=28'], '2026-01-28').ok).toBe(true);
+    expect(parseRecurrence(['RRULE:FREQ=MONTHLY'], '2026-01-15').ok).toBe(true);
+  });
+
+  it('refuses a bare FREQ=YEARLY anchored on 29 February', () => {
+    expect(parseRecurrence(['RRULE:FREQ=YEARLY'], '2028-02-29').ok).toBe(false);
+  });
+
+  it('still accepts an ordinary yearly anchor', () => {
+    expect(parseRecurrence(['RRULE:FREQ=YEARLY'], '2026-06-10').ok).toBe(true);
+  });
+});

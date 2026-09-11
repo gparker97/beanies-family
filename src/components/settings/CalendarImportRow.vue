@@ -16,6 +16,7 @@
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import type { ImportCandidate } from '@/utils/calendar/planImport';
 
 const props = defineProps<{
@@ -26,6 +27,15 @@ const props = defineProps<{
 const emit = defineEmits<{ toggle: [] }>();
 
 const { t } = useTranslation();
+// The app's ONE recurrence summariser. The planner deliberately ships no string
+// of its own: a local one would be a fourth formatter and, living in a `.ts`
+// file, would have shipped hardcoded English past the template i18n lint.
+const { describe } = useRecurrenceLabel();
+
+const repeats = computed(() => {
+  const { rule, date } = props.candidate.draft;
+  return rule ? describe(rule, date) : '';
+});
 
 /**
  * Chip tones. Kept local rather than shared: the only other chip in the app that
@@ -71,10 +81,7 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
        ladder from it. The drawer is `bg-white dark:bg-surface-raised`
        (BeanieFormModal), so a row painting those same tokens would be invisible
        against its own container. -->
-  <li
-    class="dark:bg-surface-overlay flex items-center gap-3 rounded-[14px] bg-[#f8f9fa] px-3 py-2"
-    :class="candidate.alreadyImported ? 'opacity-50' : ''"
-  >
+  <li class="dark:bg-surface-overlay flex items-center gap-3 rounded-[14px] bg-[#f8f9fa] px-3 py-2">
     <button
       type="button"
       class="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 text-xs"
@@ -96,25 +103,48 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
     <div
       class="flex min-w-0 flex-1 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2"
     >
-      <!-- `flex-auto`, NOT `flex-1`. `flex-1` is `flex: 1 1 0%`, which starts the
+      <!-- ⚠️ An already-imported row is de-emphasised with a FAINTER INK, never an
+           opacity modifier: `opacity-50` composites the ink against the row ground
+           and drops dark-mode body text to roughly 1.2:1 (the CIG's fourth trap).
+
+           `flex-auto`, NOT `flex-1`. `flex-1` is `flex: 1 1 0%`, which starts the
            title at ZERO width and grows it only from leftover space, so a long
            location next to it truncates the title to a couple of characters.
-           `flex-auto` keeps a content-sized basis, and the location below gives up
-           space four times faster, so the title is the last thing to shrink. -->
+           `flex-auto` keeps a content-sized basis. The location below is the exact
+           opposite (`flex-1`, a ZERO basis) so it can only ever occupy LEFTOVER
+           space — see its own comment. -->
       <span
-        class="font-outfit text-secondary-500 dark:text-ink min-w-0 flex-auto truncate text-base font-semibold"
+        class="font-outfit min-w-0 flex-auto truncate text-base font-semibold"
+        :class="
+          candidate.alreadyImported
+            ? 'text-secondary-400 dark:text-ink-faint'
+            : 'text-secondary-500 dark:text-ink'
+        "
         :title="title"
         >{{ title }}</span
       >
       <span
-        v-if="candidate.recurrenceSummary"
-        class="bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+        v-if="repeats"
+        class="bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap"
       >
-        <span aria-hidden="true">↻</span> {{ candidate.recurrenceSummary }}
+        <!-- `whitespace-nowrap`: on the stacked phone layout "every 2 weeks on thu"
+             wrapped to two lines and turned a 40px row into a 100px one, exactly
+             where density matters most. -->
+        <span aria-hidden="true">↻</span> {{ repeats }}
       </span>
+      <!-- ⚠️ Shown only when there is NO repeat chip, and gated on `sm:` rather than
+           `lg:`. Both corrections come from measuring the real thing: this sits in a
+           fixed-width DRAWER (464px on a 1280px screen), so a viewport breakpoint
+           answers the wrong question, and a row carrying "every 2 weeks on thu"
+           simply has no room left for a place name. Sharing the line three ways
+           produced either a two-character title or a one-character location — a
+           stray "k" beside the time. At 40px density the place is supplementary;
+           the repeat pattern is what the import decision turns on, so the chip
+           wins and the location steps aside. The full title stays available in the
+           title attribute's tooltip either way. -->
       <span
-        v-if="candidate.draft.location"
-        class="text-secondary-400 dark:text-ink-faint hidden max-w-[8rem] min-w-0 shrink-[4] truncate text-xs lg:inline"
+        v-if="candidate.draft.location && !repeats"
+        class="text-secondary-400 dark:text-ink-faint hidden max-w-[8rem] min-w-0 shrink-[6] truncate text-xs sm:inline"
         >{{ candidate.draft.location }}</span
       >
     </div>
@@ -123,7 +153,7 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
       when
     }}</span>
     <span
-      class="font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+      class="font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap"
       :class="chip.tone"
       >{{ chip.label }}</span
     >

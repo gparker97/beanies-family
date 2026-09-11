@@ -20,6 +20,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **There is now a guide for setting a tablet up as the beanie wall.** Turning the wall on was the easy part; keeping the screen awake and stopping a child tapping their way into another app are settings on the tablet itself, and nothing explained them. The new guide covers both, with separate steps for iPads and Android tablets, plus which way up the wall works on each device, where to hang it, and why leaving it charging at 100% all day is bad for the battery.
 - **The Beanie Wall card in Settings now says what the tablet needs.** Three short lines, matched to the device you are on (Guided Access on an iPad, screen pinning on Android), and a link to the full guide. On a device whose browser cannot hold the screen awake by itself, the first line says so, because there the tablet's own screen-lock setting is the only thing keeping the wall lit.
 
+### Fixed
+
+- **A repeating event you have been pruning in Google comes across once, not whole.** Deleting a single lesson in Google's own app does not change the repeat pattern on the event, it just marks that one date as removed, so beanies had no way to tell a clean weekly series from one with four occurrences taken out of it, and would have put them all back. It now notices, and brings that event across on its next date instead.
+- **"Working Location", "Out of office" and "Focus time" are no longer offered for import.** Google returns these alongside real events and they repeat every day, so the review list filled with "Home" and "Office" rows, ticked, ahead of the family's actual events.
+- **An event that spans several days keeps its last day.** A three-day conference was arriving as one overnight, and an event exactly twenty-four hours long arrived with no length at all.
+- **Calendars someone else shares with you can now be imported.** The one most families want, the shared family calendar, was greyed out and labelled "read only", which was neither true nor what the label meant.
+- **The same event on two of your calendars is now one row.** An invitation appears on the organiser's calendar and on every guest's with the same identity, so scanning two calendars offered the school concert twice and would have brought across two of it.
+- **Re-running the import now shows what is new.** The list stopped at the first 200 events including ones already brought across, so a family who had imported once was shown 200 greyed-out rows and told there was nothing new.
+- **If beanies cannot read your calendars it now says so.** That message was tucked inside the list, so in the one case it explains, every calendar failing, it never appeared and you were told your calendar was empty instead.
+- **Two claims on the privacy page were wrong and have been corrected.** Disconnecting a calendar does remove the events beanies put there, which is the same clean-up-after-itself rule described elsewhere on the page, and the list of what beanies asks Google for was missing the permission that reads your calendars' names.
+- **Changing which calendar beanies writes to no longer duplicates events it had taken over.** Those events live on the calendar you moved away from, so beanies would look for them on the new one, decide they had been deleted, and make fresh copies.
+- **Buttons on a connected calendar now wait for each other.** "Sync now" stayed live all the way through a disconnect, and using it left events behind in Google that beanies no longer knew about.
+
 ## 2026-09-10
 
 ### Added

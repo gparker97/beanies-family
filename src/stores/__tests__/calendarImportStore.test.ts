@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { ALLOWED_CONTEXT_KEYS } from '@/utils/diagnosticContext';
 
 const {
   listEventsForImportMock,
@@ -46,10 +47,17 @@ const client = new Proxy({} as Record<string, unknown>, {
 });
 
 vi.mock('@/services/calendar/clientInstance', () => ({ getCalendarClient: () => client }));
-vi.mock('@/services/automerge/repositories/calendarRepository', () => ({
-  createImportedActivities: createImportedActivitiesMock,
-  getAllCalendarEventLinks: getAllLinksMock,
-}));
+vi.mock('@/services/automerge/repositories/calendarRepository', async (importOriginal) => {
+  // The REAL `ImportNotVisibleError`, because `commit()` narrows its catch on it
+  // and a stand-in class would make that branch untestable (and untested).
+  const actual =
+    await importOriginal<typeof import('@/services/automerge/repositories/calendarRepository')>();
+  return {
+    ImportNotVisibleError: actual.ImportNotVisibleError,
+    createImportedActivities: createImportedActivitiesMock,
+    getAllCalendarEventLinks: getAllLinksMock,
+  };
+});
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({ loadActivities: loadActivitiesMock }),
 }));
@@ -69,7 +77,8 @@ vi.mock('@/utils/calendar/memberNames', () => ({
   makeMemberNameResolver: () => (id: string) => (id === 'me' ? 'Greg' : undefined),
 }));
 
-import { useCalendarImportStore } from '../calendarImportStore';
+import { useCalendarImportStore, IMPORT_MAX_CANDIDATES } from '../calendarImportStore';
+import { ImportNotVisibleError } from '@/services/automerge/repositories/calendarRepository';
 import { computePushHash } from '@/utils/calendar/activityToGoogleEvent';
 
 const timedEvent = (over: Record<string, unknown> = {}) => ({
@@ -112,6 +121,19 @@ describe('choosing calendars', () => {
     const store = useCalendarImportStore();
     await store.open('c1');
     expect(store.chosenCalendarIds.has('dest')).toBe(true);
+  });
+
+  it('includes a calendar the user can WRITE to but does not own', async () => {
+    // The shared family calendar is exactly the one a parent most wants brought
+    // across. Restricting this to `owner` greyed it out as "read only", which was
+    // both false and the opposite of what the label meant.
+    listCalendarsForMock.mockResolvedValue([
+      { id: 'dest', summary: 'Greg', primary: true, accessRole: 'owner' },
+      { id: 'shared', summary: 'Family', primary: false, accessRole: 'writer' },
+    ]);
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    expect(store.chosenCalendarIds.has('shared')).toBe(true);
   });
 });
 
@@ -156,6 +178,35 @@ describe('scanning', () => {
     await store.scan();
     expect(clientCalls).toEqual(['listEventsForImport']);
   });
+
+  it('a throw outside the per-calendar loop returns the user to the chooser, not a latched spinner', async () => {
+    getAllLinksMock.mockRejectedValueOnce(new Error('doc worker gone'));
+    const store = useCalendarImportStore();
+    await store.open('c1');
+
+    expect(await store.scan()).toBe(false);
+    expect(store.phase).toBe('choosing');
+    expect(reportErrorMock).toHaveBeenCalled();
+  });
+
+  it('the cap counts only rows the user can ACT on', async () => {
+    // A family that already imported everything used to get 200 disabled rows and
+    // the message "nothing to bring across" from a calendar full of new things.
+    const already = Array.from({ length: IMPORT_MAX_CANDIDATES }, (_, i) =>
+      timedEvent({ id: `old-${i}`, start: { dateTime: '2026-09-15T16:00:00+08:00' } })
+    );
+    const fresh = timedEvent({ id: 'brand-new' });
+    listEventsForImportMock.mockResolvedValue([...already, fresh]);
+    getAllLinksMock.mockResolvedValue(already.map((e) => ({ googleEventId: e.id })));
+
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+
+    expect(store.candidates.some((c) => c.googleEventId === 'brand-new')).toBe(true);
+    expect(store.selectedCount).toBe(1);
+    expect(store.truncated).toBe(false);
+  });
 });
 
 describe('selection', () => {
@@ -182,7 +233,7 @@ describe('the commit', () => {
 
     const n = await store.commit();
 
-    expect(n).toBe(1);
+    expect(n).toEqual({ kind: 'ok', count: 1 });
     expect(createImportedActivitiesMock).toHaveBeenCalledTimes(1);
     // Adoption is achieved by recording a link, never by writing to Google.
     expect(clientCalls).toEqual([]);
@@ -230,10 +281,24 @@ describe('the commit', () => {
 
     const n = await store.commit();
 
-    expect(n).toBeNull();
+    expect(n).toEqual({ kind: 'failed' });
     expect(store.phase).toBe('reviewing');
     expect(reportErrorMock).toHaveBeenCalled();
     expect(loadActivitiesMock).not.toHaveBeenCalled();
+  });
+
+  it('a COMMITTED-BUT-UNVERIFIED batch is never reported as "nothing happened"', async () => {
+    // 🔴 `ImportNotVisibleError` is thrown AFTER the write lands. Calling this a
+    // failure invites a retry that makes a second full set of activities.
+    createImportedActivitiesMock.mockRejectedValueOnce(new ImportNotVisibleError(2, 3));
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+
+    expect(await store.commit()).toEqual({ kind: 'unverified' });
+    // Closed, not parked on a review list the user would naturally re-commit.
+    expect(store.phase).toBe('idle');
+    expect(reportErrorMock).toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
   it('does nothing when nothing is ticked', async () => {
@@ -241,7 +306,7 @@ describe('the commit', () => {
     await store.open('c1');
     await store.scan();
     store.toggleAll(); // deselect everything
-    expect(await store.commit()).toBe(0);
+    expect(await store.commit()).toEqual({ kind: 'ok', count: 0 });
     expect(createImportedActivitiesMock).not.toHaveBeenCalled();
   });
 });
@@ -255,7 +320,7 @@ describe('re-running', () => {
 
     expect(store.candidates[0].alreadyImported).toBe(true);
     expect(store.selectedCount).toBe(0);
-    expect(await store.commit()).toBe(0);
+    expect(await store.commit()).toEqual({ kind: 'ok', count: 0 });
   });
 });
 
@@ -279,10 +344,14 @@ describe('telemetry', () => {
     await store.scan();
     await store.commit();
 
-    const allowed = new Set(['action', 'kind', 'count', 'error_code']);
+    // The REAL allowlist, not a copy of it. A private copy passes forever after
+    // the shipped allowlist changes, which is the failure this test exists to catch.
     for (const [payload] of logEventMock.mock.calls) {
       for (const key of Object.keys(payload.context ?? {})) {
-        expect(allowed.has(key), `context key "${key}" is not allowlisted`).toBe(true);
+        expect(
+          ALLOWED_CONTEXT_KEYS.has(key),
+          `context key "${key}" is not in ALLOWED_CONTEXT_KEYS`
+        ).toBe(true);
       }
     }
   });
