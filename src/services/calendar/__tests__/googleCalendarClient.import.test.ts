@@ -3,7 +3,12 @@
  *
  *  1. `singleEvents=false`. A recurring series has to arrive as ONE master with its
  *     RRULE, or the import creates N copies of a weekly swim lesson.
- *  2. `attendees` is NOT in the field mask. Not requesting the guest list is the
+ *  2. `showDeleted=true` + `eventTypes=default`. Google records a REMOVED occurrence
+ *     as a separate cancelled instance rather than as an EXDATE on the master, so
+ *     without the first the planner cannot tell a clean weekly series from one the
+ *     family has been pruning. The second keeps Working Location / OOO / Focus Time
+ *     out of the review list.
+ *  3. `attendees` is NOT in the field mask. Not requesting the guest list is the
  *     entire mechanism by which other people's email addresses stay out of the
  *     family's encrypted file. A reviewer widening this mask "for completeness"
  *     would silently break a privacy promise, so the test states it as a promise.
@@ -25,7 +30,12 @@ function jsonResponse(status: number, body: unknown = {}): Response {
 
 describe('googleCalendarClient.listEventsForImport', () => {
   beforeEach(() => vi.restoreAllMocks());
-  afterEach(() => vi.restoreAllMocks());
+  // `restoreAllMocks` does NOT undo `stubGlobal`. Without this the stubbed fetch
+  // outlives the file and the next suite to run in this worker talks to it.
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   async function callOnce(body: unknown = { items: [] }) {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, body));
@@ -71,11 +81,20 @@ describe('googleCalendarClient.listEventsForImport', () => {
     expect(fields).toContain('creator(self)');
   });
 
-  it('passes the window through and excludes deleted events', async () => {
+  it('passes the window through', async () => {
     const { url } = await callOnce();
     expect(url.searchParams.get('timeMin')).toBe('2026-09-11T00:00:00Z');
     expect(url.searchParams.get('timeMax')).toBe('2027-09-11T00:00:00Z');
-    expect(url.searchParams.get('showDeleted')).toBe('false');
+  });
+
+  it('ASKS FOR deleted items, because that is how Google records a removed occurrence', async () => {
+    const { url } = await callOnce();
+    expect(url.searchParams.get('showDeleted')).toBe('true');
+  });
+
+  it('asks only for real events, not Working Location / OOO / Focus Time', async () => {
+    const { url } = await callOnce();
+    expect(url.searchParams.get('eventTypes')).toBe('default');
   });
 
   it('flattens organizer.self into isOrganizer', async () => {
@@ -93,7 +112,7 @@ describe('googleCalendarClient.listEventsForImport', () => {
     ]);
   });
 
-  it('skips a cancelled item and one with no start, without throwing', async () => {
+  it('drops a cancelled MASTER and an item with no start, without throwing', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { out } = await callOnce({
       items: [
@@ -105,6 +124,18 @@ describe('googleCalendarClient.listEventsForImport', () => {
     expect(out.map((e) => e.id)).toEqual(['ok']);
     // Never a silent drop.
     expect(warn).toHaveBeenCalled();
+  });
+
+  it('KEEPS a cancelled instance, which is the signal an occurrence was removed', async () => {
+    const { out } = await callOnce({
+      items: [
+        { id: 'm', start: { date: '2026-09-15' }, recurrence: ['RRULE:FREQ=WEEKLY'] },
+        { id: 'm_20260922', status: 'cancelled', recurringEventId: 'm' },
+      ],
+    });
+    // No `start` on a cancelled instance, and it still has to survive the read:
+    // the planner needs its `recurringEventId` to refuse the master.
+    expect(out.map((e) => e.id)).toEqual(['m', 'm_20260922']);
   });
 
   it('pages through nextPageToken', async () => {
@@ -132,6 +163,10 @@ describe('googleCalendarClient.listEventsForImport', () => {
 
 describe('listCalendars carries accessRole for the import chooser', () => {
   beforeEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   it('passes through the role so read-only feeds can be greyed out', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(

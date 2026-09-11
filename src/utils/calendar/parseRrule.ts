@@ -227,11 +227,21 @@ export function parseRecurrence(lines: string[] | undefined, startYmd: string): 
         }
         if (raw < 0) return refuse('unsupported-parts'); // -2 etc has no field
         if (raw !== start.getDate()) return refuse('anchor-mismatch');
+        // A day a short month lacks means two DIFFERENT series. RFC 5545 SKIPs
+        // February for BYMONTHDAY=31; the beanies engine CLAMPs to the 28th. The
+        // writer refuses to serialize this naively for exactly that reason
+        // (`clampedMonthDayParts`), so reading it back naively is the same bug in
+        // the other direction, and an adopted event would have its Google rule
+        // rewritten from "the 31st" to "the last day" on the first ordinary edit.
+        if (raw > 28) return refuse('unsupported-parts');
         return { ok: true, rule: { unit, interval, monthlyAnchor: 'date', monthlyDay: raw, end } };
       }
 
       // Bare FREQ=MONTHLY inherits the day from DTSTART, which is what
-      // `monthlyAnchor: 'date'` with the start's own day means.
+      // `monthlyAnchor: 'date'` with the start's own day means — but only while
+      // that day exists in every month. Past the 28th the two engines diverge
+      // (see above), so it is refused rather than quietly rescheduled.
+      if (start.getDate() > 28) return refuse('unsupported-parts');
       return {
         ok: true,
         rule: { unit, interval, monthlyAnchor: 'date', monthlyDay: start.getDate(), end },
@@ -242,6 +252,11 @@ export function parseRecurrence(lines: string[] | undefined, startYmd: string): 
       // BYMONTH is already refused above, which correctly rejects beanies' own
       // 29-Feb form. A bare FREQ=YEARLY inherits month and day from DTSTART.
       if (parts.BYDAY || parts.BYMONTHDAY) return refuse('unsupported-parts');
+      // Same clamp-vs-skip divergence as monthly: RFC 5545 SKIPs non-leap years
+      // for a 29 Feb anchor, the beanies engine clamps to 28 Feb. The writer emits
+      // `BYMONTH=2;BYMONTHDAY=28,29;BYSETPOS=-1` precisely because a bare
+      // FREQ=YEARLY would show 28 Feb in beanies and nothing in Google.
+      if (start.getMonth() === 1 && start.getDate() === 29) return refuse('unsupported-parts');
       return { ok: true, rule: { unit, interval, end } };
   }
 }

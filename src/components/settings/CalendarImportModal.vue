@@ -43,13 +43,24 @@ const days = computed(() => {
   return groups;
 });
 
+const hasUnsupported = computed(() =>
+  store.candidates.some((c) => c.outcome === 'unsupported-recurrence')
+);
+
 function close(): void {
+  // Never abandon a running write. The batch is atomic, so closing mid-commit
+  // would not corrupt anything, but the user would be left with no idea whether
+  // their events landed — and the natural next move is to run the import again.
+  if (store.phase === 'importing') return;
   store.reset();
   emit('close');
 }
 
 async function onScan(): Promise<void> {
-  await store.scan();
+  const ok = await store.scan();
+  if (!ok) {
+    showToast('error', t('calendarImport.scanFailed.title'), t('calendarImport.scanFailed.body'));
+  }
 }
 
 async function onCommit(): Promise<void> {
@@ -69,14 +80,25 @@ async function onCommit(): Promise<void> {
   });
   if (!okToGo) return;
 
-  const imported = await store.commit();
-  if (imported === null) {
-    // The write is one atomic batch, so nothing was half-created and the user can
-    // simply try again. `commit` has already reported this to CloudWatch.
+  const result = await store.commit();
+
+  if (result.kind === 'failed') {
+    // One atomic batch, so nothing was half-created and the user can simply try
+    // again from the list they are looking at. Already reported to CloudWatch.
     showToast('error', t('calendarImport.failed.title'), t('calendarImport.failed.body'));
     return;
   }
-  showToast('success', fillTemplate(t('calendarImport.done'), { count: String(imported) }));
+
+  if (result.kind === 'unverified') {
+    // 🔴 The write SUCCEEDED. Saying otherwise invites a retry that makes a second
+    // set of everything, so this is an info toast, not an error, and the drawer
+    // closes exactly as it does on success.
+    showToast('info', t('calendarImport.unverified.title'), t('calendarImport.unverified.body'));
+    close();
+    return;
+  }
+
+  showToast('success', fillTemplate(t('calendarImport.done'), { count: String(result.count) }));
   close();
 }
 </script>
@@ -102,7 +124,6 @@ async function onCommit(): Promise<void> {
           v-for="cal in store.calendars"
           :key="cal.id"
           class="border-secondary-50 dark:border-line flex items-center gap-3 border-b px-2 py-3 last:border-b-0"
-          :class="store.isReadable(cal) ? '' : 'opacity-55'"
         >
           <button
             type="button"
@@ -114,16 +135,23 @@ async function onCommit(): Promise<void> {
             "
             :disabled="!store.isReadable(cal)"
             :aria-pressed="store.chosenCalendarIds.has(cal.id)"
-            :aria-label="cal.summary || cal.id"
+            :aria-label="cal.summary || t('calendarImport.choose.untitled')"
             @click="store.toggleCalendar(cal.id)"
           >
             <span aria-hidden="true">✓</span>
           </button>
           <div class="min-w-0">
+            <!-- A fainter ink, never `opacity-*`: an opacity modifier on text is
+                 the CIG's fourth dark-mode trap. -->
             <div
-              class="font-outfit text-secondary-500 dark:text-ink truncate text-base font-semibold"
+              class="font-outfit truncate text-base font-semibold"
+              :class="
+                store.isReadable(cal)
+                  ? 'text-secondary-500 dark:text-ink'
+                  : 'text-secondary-400 dark:text-ink-faint'
+              "
             >
-              {{ cal.summary || cal.id }}
+              {{ cal.summary || t('calendarImport.choose.untitled') }}
             </div>
             <div
               v-if="!store.isReadable(cal)"
@@ -155,6 +183,22 @@ async function onCommit(): Promise<void> {
 
     <!-- 3. Review and pick -->
     <template v-else-if="store.phase === 'reviewing' || store.phase === 'importing'">
+      <!-- ⚠️ The skipped-calendars notice sits ABOVE the empty check, not inside the
+           `v-else`. When every read fails there are no candidates, so nested in the
+           `v-else` this line was unreachable in exactly the case it explains — and
+           the user was told their calendar was empty when beanies simply could not
+           read it. -->
+      <p
+        v-if="store.skippedCalendars.length > 0"
+        class="dark:bg-accent-lift/10 bg-primary-50 text-primary-700 dark:text-accent-lift mb-4 rounded-[18px] px-4 py-3 text-sm"
+      >
+        {{
+          fillTemplate(t('calendarImport.review.skipped'), {
+            count: String(store.skippedCalendars.length),
+          })
+        }}
+      </p>
+
       <p v-if="store.candidates.length === 0" class="text-secondary-400 dark:text-ink-soft text-sm">
         {{ t('calendarImport.review.empty') }}
       </p>
@@ -186,6 +230,17 @@ async function onCommit(): Promise<void> {
               t('calendarImport.legend.copy')
             }}</span>
           </div>
+          <!-- Shown only when a row actually carries this chip, so the legend never
+               explains something nobody can see. -->
+          <div v-if="hasUnsupported" class="flex items-baseline gap-2">
+            <span
+              class="bg-secondary-50 text-secondary-400 dark:bg-surface-hover dark:text-ink-faint font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              >{{ t('calendarImport.chip.once') }}</span
+            >
+            <span class="text-secondary-400 dark:text-ink-soft text-xs">{{
+              t('calendarImport.legend.once')
+            }}</span>
+          </div>
         </div>
 
         <div
@@ -214,16 +269,6 @@ async function onCommit(): Promise<void> {
           {{
             fillTemplate(t('calendarImport.review.truncated'), {
               count: String(IMPORT_MAX_CANDIDATES),
-            })
-          }}
-        </p>
-        <p
-          v-if="store.skippedCalendars.length > 0"
-          class="text-secondary-400 dark:text-ink-faint mt-2 text-xs"
-        >
-          {{
-            fillTemplate(t('calendarImport.review.skipped'), {
-              count: String(store.skippedCalendars.length),
             })
           }}
         </p>

@@ -9982,6 +9982,7 @@ const STRING_DEFS = {
     beanie:
       'beanies reads the title, time, place and repeat pattern of your events. it does not read your guest lists.',
   },
+  'calendarImport.choose.untitled': { en: 'Untitled calendar', beanie: 'untitled calendar' },
   'calendarImport.choose.scan': { en: 'Look at my calendar', beanie: 'look at my calendar' },
   'calendarImport.scanning': {
     en: 'Looking through your calendar…',
@@ -10059,6 +10060,26 @@ const STRING_DEFS = {
     en: 'Nothing was brought across, and nothing in your Google Calendar changed. Try again in a moment.',
     beanie:
       'nothing was brought across, and nothing in your google calendar changed. try again in a moment.',
+  },
+  // 🔴 This is the "it worked, but beanies could not see it yet" case. It must
+  // NEVER read like a failure: the events ARE saved, and a user who retries would
+  // end up with two of everything. The beanie values keep the real nouns.
+  'calendarImport.unverified.title': {
+    en: 'Your events are in',
+    beanie: 'your events are in',
+  },
+  'calendarImport.unverified.body': {
+    en: 'They were saved, but beanies could not show them straight away. Reopen your planner in a moment and they will be there. Do not bring them across again, or you will get two of everything.',
+    beanie:
+      'they were saved, but beanies could not show them straight away. reopen your planner in a moment and they will be there. do not bring them across again, or you will get two of everything.',
+  },
+  'calendarImport.scanFailed.title': {
+    en: "beanies couldn't read your calendar",
+    beanie: "beanies couldn't read your calendar",
+  },
+  'calendarImport.scanFailed.body': {
+    en: 'Nothing was changed here or in Google. Check your connection and try again.',
+    beanie: 'nothing was changed here or in google. check your connection and try again.',
   },
   'calendarSync.intro': {
     en: 'Connect a Google calendar and your family activities are pushed to it automatically. beanies stays your source of truth. Edits always happen here.',

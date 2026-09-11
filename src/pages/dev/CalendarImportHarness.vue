@@ -64,11 +64,33 @@ function makeCandidates(): ImportCandidate[] {
       calendarLabel: 'Greg Parker',
       outcome: mode === 1 ? 'copy' : mode === 3 ? 'unsupported-recurrence' : 'adopt',
       origin: mode === 0 || mode === 2 || mode === 4 ? 'adopted' : 'external',
-      recurrenceSummary: mode === 0 ? 'Weekly' : mode === 2 ? 'Fortnightly' : undefined,
       alreadyImported: i === 9,
       draft: {
         ...draft(title, date, i % 7 === 0),
         ...(i % 4 === 0 ? { location: 'Katong Swimming Complex' } : {}),
+        // A real `rule`, because the repeat chip now renders through the canonical
+        // `useRecurrenceLabel` rather than a string the planner used to invent.
+        ...(mode === 0
+          ? {
+              recurrence: 'weekly' as const,
+              rule: {
+                unit: 'week' as const,
+                interval: 1,
+                weekdays: [2],
+                end: { kind: 'never' as const },
+              },
+            }
+          : mode === 2
+            ? {
+                recurrence: 'biweekly' as const,
+                rule: {
+                  unit: 'week' as const,
+                  interval: 2,
+                  weekdays: [4],
+                  end: { kind: 'never' as const },
+                },
+              }
+            : {}),
       },
     });
   }

@@ -51,6 +51,34 @@ describe('the outcome a row promises', () => {
   });
 });
 
+describe('an occurrence the family deleted in Google', () => {
+  // Google does NOT add an EXDATE to the master when you delete one occurrence in
+  // its UI. It writes a separate cancelled instance. The master's own `recurrence[]`
+  // therefore looks perfectly clean, and adopting it verbatim would put the deleted
+  // lesson back on the family's planner.
+  const master = ev({ id: 'm', recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'] });
+  const tombstone = ev({ id: 'm_20260922T080000Z', status: 'cancelled', recurringEventId: 'm' });
+
+  it('refuses to adopt the series as recurring', () => {
+    const { candidates } = plan([master, tombstone]);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].outcome).toBe('unsupported-recurrence');
+    expect(candidates[0].draft.rule).toBeUndefined();
+  });
+
+  it('leaves an untouched series alone', () => {
+    const { candidates } = plan([master]);
+    expect(candidates[0].outcome).toBe('adopt');
+    expect(candidates[0].draft.rule).toBeDefined();
+  });
+
+  it('does not offer the tombstone itself as something to import', () => {
+    const { candidates, skipped } = plan([master, tombstone]);
+    expect(candidates.map((c) => c.googleEventId)).toEqual(['m']);
+    expect(skipped.some((s) => s.id === tombstone.id)).toBe(true);
+  });
+});
+
 describe('recurrence', () => {
   it('imports a readable weekly series as ONE recurring activity', () => {
     const { candidates } = plan([ev({ recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'] })]);
@@ -62,7 +90,6 @@ describe('recurrence', () => {
       end: { kind: 'never' },
     });
     expect(candidates[0].draft.recurrence).toBe('weekly');
-    expect(candidates[0].recurrenceSummary).toBe('Weekly');
   });
 
   it('derives the legacy shadow fields rather than inventing them', () => {
@@ -73,16 +100,37 @@ describe('recurrence', () => {
   });
 
   it('keeps a long-running series whose first occurrence is years ago', () => {
-    // The most valuable thing this feature imports.
+    // The most valuable thing this feature imports. Deliberately does NOT assert a
+    // literal date: `draft.date` is device-local wall clock by design (the activity
+    // model carries no timezone), so a +08:00 event genuinely lands a day earlier
+    // when read from a device west of that zone. Asserting the date here made this
+    // suite fail under TZ=Pacific/Honolulu, which is a test bug, not a product one.
     const { candidates } = plan([
       ev({
-        start: { dateTime: '2024-09-17T16:00:00+08:00' },
-        end: { dateTime: '2024-09-17T16:45:00+08:00' },
+        start: { dateTime: '2024-09-17T16:00:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2024-09-17T16:45:00+08:00', timeZone: 'Asia/Singapore' },
         recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'],
       }),
     ]);
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].draft.date).toBe('2024-09-17');
+    expect(candidates[0].draft.date < '2024-09-18').toBe(true);
+    // The point of the test: the SERIES survived, rather than being demoted.
+    expect(candidates[0].draft.recurrence).toBe('weekly');
+  });
+
+  it('anchors the RRULE on the EVENT’s zone, not the importing device’s', () => {
+    // A Singapore Tuesday series imported from a device far west of Singapore.
+    // Before this, `times.date` resolved to Monday, the BYDAY=TU agreement check
+    // failed, and a two-year weekly series was silently demoted to a single event.
+    const { candidates } = plan([
+      ev({
+        start: { dateTime: '2026-09-15T06:00:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2026-09-15T07:00:00+08:00', timeZone: 'Asia/Singapore' },
+        recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'],
+      }),
+    ]);
+    expect(candidates[0].outcome).not.toBe('unsupported-recurrence');
+    expect(candidates[0].draft.rule?.unit).toBe('week');
   });
 });
 
@@ -159,9 +207,21 @@ describe('field mapping', () => {
     expect(draft.assigneeIds).toEqual([ME]);
   });
 
-  it('never writes an attendee list, because it never requests one', () => {
-    const { draft } = plan([ev()]).candidates[0];
+  it('never carries an attendee list into the draft, even if one somehow arrives', () => {
+    // The fixture MUST carry attendee-shaped data or this test proves nothing: with
+    // a clean fixture "no @ in the draft" is true however the planner is written.
+    // `CalendarEventFull` has no `attendees` field by design (the client's field
+    // mask is the real guarantee, tested there); this asserts the second line of
+    // defence — the planner copies named fields and never spreads the event.
+    const withGuests = {
+      ...ev(),
+      attendees: [{ email: 'another.parent@example.com' }],
+      organizer: { email: 'head@school.example.com' },
+    } as unknown as CalendarEventFull;
+
+    const { draft } = plan([withGuests]).candidates[0];
     expect(JSON.stringify(draft)).not.toMatch(/@/);
+    expect(JSON.stringify(withGuests)).toMatch(/@/); // the fixture really is dirty
   });
 
   it('falls back to an empty title rather than dropping the event', () => {

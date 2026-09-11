@@ -1183,10 +1183,24 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // IMPORTED links are KEPT (#94). Their events were never on the old calendar to
     // begin with and were not deleted above, so dropping the link would un-suppress
     // an invited activity and let the re-sync create the school's event on the NEW
-    // calendar. An adopted event cannot follow the move either: it lives where its
-    // organizer put it, so its link keeps pointing at the original.
+    // calendar.
+    //
+    // ⚠️ An ADOPTED link is DEMOTED to `external` rather than kept as-is. A link
+    // carries no calendarId — every push targets the connection's one destination —
+    // so after the switch an adopted event's real home (the OLD calendar) is no
+    // longer anywhere beanies writes. Keeping it `adopted` meant the very next
+    // verify pass looked for it on the NEW calendar, did not find it, treated that
+    // as "the organizer deleted it" (`adoptedGone`), dropped the link, and created
+    // a beanies-owned copy — leaving the family with the original on one calendar
+    // and a duplicate on the other. `external` is the honest state: the event still
+    // exists in Google where its organizer put it, and beanies stops claiming it.
     for (const link of links) {
-      if (!beaniesMayDelete(link)) continue;
+      if (!beaniesMayDelete(link)) {
+        if (link.origin === 'adopted') {
+          await updateCalendarEventLink(link.id, { origin: 'external' });
+        }
+        continue;
+      }
       await removeCalendarEventLinkById(connectionId, link.activityId);
     }
     await updateCalendarConnection(connectionId, { destinationCalendarId: calendarId });

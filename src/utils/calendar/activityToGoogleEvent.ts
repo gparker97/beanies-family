@@ -218,7 +218,30 @@ export function computePushHash(
     // reminder-time edit re-push a byte-identical event to Google, forever.
     // Do not restore it as "obviously push-relevant"; it is not.
   };
-  let payload = JSON.stringify(relevant);
+  // ⚠️ CANONICAL, key-order-independent. `JSON.stringify` preserves insertion
+  // order, and `relevant.rule` is a nested object whose key order DIFFERS
+  // depending on where the activity came from: a freshly built object literal
+  // keeps its authored order, while the same activity read back through
+  // Automerge comes out with its map keys SORTED. Verified against the installed
+  // @automerge/automerge: `{unit,interval,weekdays,end}` reloads as
+  // `{end,interval,unit,weekdays}`.
+  //
+  // Without this the same activity hashes two different ways, and the damage is
+  // silent and delayed: the one-time import (#94) records a hash computed from a
+  // literal, the first reconcile matches because the projection delta echoes that
+  // literal, and then on the NEXT app load the projection returns the sorted form,
+  // the hashes disagree, and every imported activity is pushed to Google. For an
+  // ADOPTED event that patch rewrites the family's real event: their description
+  // body is replaced, their reminders are cleared, and beanies' RRULE is stamped
+  // over theirs. Sorting here fixes the class rather than the one caller.
+  let payload = JSON.stringify(relevant, (_key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : 1))
+      );
+    }
+    return value;
+  });
   // Fold the RESOLVED member names rendered into the description, so a member rename
   // (which changes no activity field) still changes the hash and re-pushes only the
   // activities that reference that member. (F3)
@@ -298,14 +321,20 @@ export function googleTimesToActivityFields(
   const endAt = end?.dateTime ? new Date(end.dateTime) : startAt;
   if (Number.isNaN(endAt.getTime())) return null;
 
+  const startYmd = toDateInputValue(startAt);
+  const endYmd = toDateInputValue(endAt);
+
   return {
-    date: toDateInputValue(startAt),
+    date: startYmd,
     isAllDay: false,
     startTime: toTimeInputValue(startAt),
     endTime: toTimeInputValue(endAt),
-    // An overnight span is expressed by `endTime < startTime`, exactly as the
-    // activity model already does it; a multi-day TIMED event is not representable
-    // and collapses to its first day, which `resolveActivityDays` then reads back
-    // consistently.
+    // A timed span that ends on a LATER day carries an explicit `endDate`. The
+    // model's implicit overnight roll (`endTime < startTime` with no `endDate`)
+    // only ever adds ONE day and only when the clock wraps, so relying on it alone
+    // truncated a three-day conference to one night — and, worse, collapsed an
+    // exactly-24-hour event to ZERO length, because 10:00 is not < 10:00.
+    // `resolveActivityDays` reads `endDate` back as the end day directly.
+    ...(endYmd > startYmd ? { endDate: endYmd } : {}),
   };
 }

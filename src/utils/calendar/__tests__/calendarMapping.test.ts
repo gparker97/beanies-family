@@ -4,7 +4,11 @@ import type { RecurrenceRule } from '@/types/recurrence';
 import { deterministicEventId } from '../deterministicEventId';
 import { buildRecurrenceRule } from '../recurrenceRrule';
 import { buildEventDescription, SYNCED_MARKER } from '../eventDescription';
-import { activityToGoogleEvent, computePushHash } from '../activityToGoogleEvent';
+import {
+  activityToGoogleEvent,
+  computePushHash,
+  googleTimesToActivityFields,
+} from '../activityToGoogleEvent';
 
 // Minimal FamilyActivity factory — only fields the mapper reads matter.
 function makeActivity(overrides: Partial<FamilyActivity> = {}): FamilyActivity {
@@ -283,5 +287,125 @@ describe('computePushHash covers the canonical rule (#70)', () => {
 
   it('an identical rule still hashes identically (no spurious re-push)', () => {
     expect(computePushHash(withRule(base))).toBe(computePushHash(withRule({ ...base })));
+  });
+});
+
+describe('computePushHash is key-order independent (#94)', () => {
+  // Automerge materializes map keys SORTED. So the same activity hashes one way
+  // when it is a freshly built literal (what the one-time import records on the
+  // link) and another way when it is read back through the projection (what every
+  // later reconcile sees). If those disagree, the reconcile patches the user's
+  // real adopted Google event on the next app load, rewriting its description and
+  // clearing its reminders. Do not "simplify" the canonical replacer away.
+  it('hashes identically regardless of the rule object’s key order', () => {
+    const base = {
+      id: 'a1',
+      title: 'Swim',
+      date: '2026-09-15',
+      recurrence: 'weekly',
+      category: 'sports',
+      feeSchedule: 'none',
+      reminderMinutes: 0,
+      isActive: true,
+      createdBy: 'm1',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    } as unknown as FamilyActivity;
+
+    const authored = {
+      ...base,
+      rule: { unit: 'week', interval: 1, weekdays: [2], end: { kind: 'never' } },
+    } as FamilyActivity;
+
+    // Exactly what @automerge/automerge returns for the same rule: keys sorted.
+    const roundTripped = {
+      ...base,
+      rule: { end: { kind: 'never' }, interval: 1, unit: 'week', weekdays: [2] },
+    } as FamilyActivity;
+
+    expect(computePushHash(roundTripped)).toBe(computePushHash(authored));
+  });
+
+  it('still changes when a rule VALUE changes', () => {
+    // The canonicalization must not flatten real differences into one hash.
+    const mk = (interval: number) =>
+      ({
+        id: 'a1',
+        title: 'Swim',
+        date: '2026-09-15',
+        recurrence: 'weekly',
+        category: 'sports',
+        feeSchedule: 'none',
+        reminderMinutes: 0,
+        isActive: true,
+        createdBy: 'm1',
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+        rule: { unit: 'week', interval, weekdays: [2], end: { kind: 'never' } },
+      }) as unknown as FamilyActivity;
+
+    expect(computePushHash(mk(1))).not.toBe(computePushHash(mk(2)));
+  });
+});
+
+describe('googleTimesToActivityFields — the inverse, for the one-time import (#94)', () => {
+  // The device zone is whatever the test runner has; every assertion below is
+  // written against an offset that matches it, so the wall clock is unambiguous.
+  const tz = new Date('2026-09-15T00:00:00Z').getTimezoneOffset();
+  const off = (min: number) => {
+    const sign = min <= 0 ? '+' : '-';
+    const a = Math.abs(min);
+    return `${sign}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
+  };
+  const local = (ymd: string, hm: string) => `${ymd}T${hm}:00${off(tz)}`;
+
+  it('keeps a same-day timed event on one day', () => {
+    expect(
+      googleTimesToActivityFields(
+        { dateTime: local('2026-09-15', '16:00') },
+        { dateTime: local('2026-09-15', '16:45') }
+      )
+    ).toEqual({ date: '2026-09-15', isAllDay: false, startTime: '16:00', endTime: '16:45' });
+  });
+
+  it('carries an explicit endDate for a MULTI-DAY timed event', () => {
+    // A three-day conference. Without endDate this collapsed to the first night.
+    expect(
+      googleTimesToActivityFields(
+        { dateTime: local('2026-09-15', '09:00') },
+        { dateTime: local('2026-09-17', '17:00') }
+      )
+    ).toEqual({
+      date: '2026-09-15',
+      endDate: '2026-09-17',
+      isAllDay: false,
+      startTime: '09:00',
+      endTime: '17:00',
+    });
+  });
+
+  it('does not produce a ZERO-LENGTH activity for an exactly-24-hour event', () => {
+    // 10:00 is not < 10:00, so the model's implicit overnight roll never fired and
+    // the span read back as start == end.
+    const out = googleTimesToActivityFields(
+      { dateTime: local('2026-09-15', '10:00') },
+      { dateTime: local('2026-09-16', '10:00') }
+    );
+    expect(out).toMatchObject({ date: '2026-09-15', endDate: '2026-09-16' });
+  });
+
+  it('maps an all-day span off Google exclusive end onto an inclusive endDate', () => {
+    expect(googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-18' })).toEqual({
+      date: '2026-09-15',
+      endDate: '2026-09-17',
+      isAllDay: true,
+    });
+  });
+
+  it('leaves a single all-day event without an endDate', () => {
+    expect(googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-16' })).toEqual({
+      date: '2026-09-15',
+      isAllDay: true,
+    });
   });
 });

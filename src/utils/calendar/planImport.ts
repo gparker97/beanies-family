@@ -31,7 +31,11 @@ export type ImportOutcome = 'adopt' | 'copy' | 'unsupported-recurrence';
 
 /** Why a candidate was dropped before the user ever saw it. */
 export type ImportSkipReason =
-  'cancelled' | 'series-instance' | 'beanies-own-event' | 'unreadable-times';
+  | 'cancelled'
+  | 'series-instance'
+  | 'beanies-own-event'
+  | 'unreadable-times'
+  | 'duplicate-across-calendars';
 
 /**
  * A beanies-created event id: `deterministicEventId` emits `b` + 32 base32hex
@@ -51,8 +55,6 @@ export interface ImportCandidate {
   outcome: ImportOutcome;
   /** What the ENGINE may do, recorded on the link. See the note at the top. */
   origin: NonNullable<CalendarEventLink['origin']>;
-  /** Repeat pattern for the chip. Absent for a one-off. Presentation only. */
-  recurrenceSummary?: string;
   /**
    * The ONLY copy of the activity fields. The review row renders from this, so the
    * list cannot disagree with what actually gets written.
@@ -60,6 +62,39 @@ export interface ImportCandidate {
   draft: CreateFamilyActivityInput;
   /** Already imported on a previous run: shown, disabled, never re-created. */
   alreadyImported: boolean;
+}
+
+/**
+ * Pin an `unsupported-recurrence` candidate to its NEXT occurrence instead of the
+ * master's DTSTART.
+ *
+ * A master's start is its ORIGINAL start, which for a long-running series is often
+ * years in the past. These candidates import as one-offs, so left on the DTSTART
+ * they would land on a date the family will never scroll to — while the row, the
+ * legend and the help article all promise "the next time it happens". The caller
+ * resolves the occurrence via `listInstances`; this applies it.
+ *
+ * Pure, and deliberately narrow: it re-dates and nothing else, so the title, notes,
+ * location, assignees and every other field stay exactly as planned.
+ */
+export function redateToOccurrence(
+  candidate: ImportCandidate,
+  start: { date?: string; dateTime?: string } | undefined,
+  end: { date?: string; dateTime?: string } | undefined
+): ImportCandidate {
+  const times = googleTimesToActivityFields(start, end);
+  if (!times) return candidate;
+  // Drop the OLD span fields before spreading the new ones, or a master that had
+  // an `endDate` would keep it while `date` moved forward.
+  const {
+    date: _d,
+    endDate: _e,
+    isAllDay: _a,
+    startTime: _s,
+    endTime: _t,
+    ...rest
+  } = candidate.draft as CreateFamilyActivityInput & { endDate?: string };
+  return { ...candidate, draft: { ...rest, ...times } as CreateFamilyActivityInput };
 }
 
 export interface ImportDefaults {
@@ -103,15 +138,44 @@ function activityDefaults(
   };
 }
 
-/** Human-readable repeat pattern for the row chip. Presentation only. */
-function summariseRecurrence(rule: { unit: string; interval: number }): string {
-  const { unit, interval } = rule;
-  if (interval === 1) {
-    return { day: 'Daily', week: 'Weekly', month: 'Monthly', year: 'Yearly' }[unit] ?? 'Repeats';
+/**
+ * The date an RRULE is anchored on, in the EVENT's own timezone.
+ *
+ * Google gives an offset-bearing `dateTime` plus the `timeZone` the series was
+ * authored in. `BYDAY=TU` means Tuesday THERE, not Tuesday on whatever device
+ * happens to be running the import, so the anchor-agreement checks in
+ * `parseRecurrence` have to use this rather than the device-local date.
+ * All-day events carry a bare `date`, which is already zone-free.
+ */
+function recurrenceAnchorYmd(ev: CalendarEventFull): string | null {
+  if (ev.start?.date) return ev.start.date.slice(0, 10);
+  const dt = ev.start?.dateTime;
+  if (!dt) return null;
+  const zone = ev.start?.timeZone;
+  const at = new Date(dt);
+  if (Number.isNaN(at.getTime())) return null;
+  if (!zone) {
+    // No zone given: the offset in the string is the best available truth, so
+    // read the wall-clock date straight out of it rather than re-projecting.
+    const m = /^(\d{4}-\d{2}-\d{2})/.exec(dt);
+    return m ? m[1] : null;
   }
-  if (unit === 'week' && interval === 2) return 'Fortnightly';
-  return `Every ${interval} ${unit}s`;
+  try {
+    // `en-CA` yields YYYY-MM-DD, which is the shape the rest of the app uses.
+    return new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at);
+  } catch {
+    // An unknown IANA zone must not fail the whole scan; fall back to the offset.
+    const m = /^(\d{4}-\d{2}-\d{2})/.exec(dt);
+    return m ? m[1] : null;
+  }
 }
+
+// NOTE: there is deliberately no local recurrence summariser here. The row's
+// repeat chip renders through `useRecurrenceLabel().describe`, which wraps the
+// one canonical `describeRule`. A second generator here would have been the
+// fourth such formatter in the app's history and — being a plain string in a
+// `.ts` file — would have shipped hardcoded English straight past the template
+// i18n lint.
 
 /**
  * Build the review list.
@@ -128,6 +192,19 @@ export function planImport(
   const linkedGoogleIds = new Set(existingLinks.map((l) => l.googleEventId));
   const candidates: ImportCandidate[] = [];
   const skipped: ImportPlan['skipped'] = [];
+
+  // Masters with at least one REMOVED occurrence. Google records those as separate
+  // cancelled instances rather than as an EXDATE on the master, so the master's
+  // own `recurrence[]` looks clean and would otherwise be adopted verbatim,
+  // putting back a lesson the family deliberately deleted.
+  const mastersWithRemovedOccurrences = new Set<string>();
+  for (const source of sources) {
+    for (const ev of source.events) {
+      if (ev.status === 'cancelled' && ev.recurringEventId) {
+        mastersWithRemovedOccurrences.add(ev.recurringEventId);
+      }
+    }
+  }
 
   for (const source of sources) {
     for (const ev of source.events) {
@@ -160,18 +237,26 @@ export function planImport(
       const onDestination = source.calendarId === defaults.destinationCalendarId;
       const adoptable = ev.isOrganizer && onDestination;
 
-      const parsed = parseRecurrence(ev.recurrence, times.date);
+      // ⚠️ The recurrence anchor is the event's OWN start date, not the importing
+      // device's local date. `times.date` is device-local wall clock (correct for
+      // the activity's own fields), but an RRULE's BYDAY/BYMONTHDAY is anchored in
+      // the event's zone. Using the device date meant a Singapore 16:00 Tuesday
+      // series, imported from a device west of that zone, resolved to Monday and
+      // was silently demoted to `unsupported-recurrence`; a bare FREQ=MONTHLY was
+      // worse, landing on the wrong day of every month with no refusal at all.
+      // Reproducible: TZ=Pacific/Honolulu turned three of this module's tests red.
+      const parsed = mastersWithRemovedOccurrences.has(ev.id)
+        ? ({ ok: false, reason: 'extra-date-lines' } as const)
+        : parseRecurrence(ev.recurrence, recurrenceAnchorYmd(ev) ?? times.date);
       const isRecurringInGoogle = (ev.recurrence?.length ?? 0) > 0;
 
       let outcome: ImportOutcome;
       let origin: NonNullable<CalendarEventLink['origin']>;
-      let recurrenceSummary: string | undefined;
       let recurrenceFields: Partial<FamilyActivity> = { recurrence: 'none' };
 
       if (parsed.ok) {
         outcome = adoptable ? 'adopt' : 'copy';
         origin = adoptable ? 'adopted' : 'external';
-        recurrenceSummary = summariseRecurrence(parsed.rule);
         recurrenceFields = {
           rule: parsed.rule,
           // The ONLY sanctioned derivation of the legacy shadow trio. Setting
@@ -200,7 +285,6 @@ export function planImport(
         calendarLabel: source.calendarLabel,
         outcome,
         origin,
-        recurrenceSummary,
         alreadyImported: linkedGoogleIds.has(ev.id),
         draft: {
           title: ev.summary?.trim() || '',
@@ -222,5 +306,28 @@ export function planImport(
   // `singleEvents=true`, and this read deliberately uses false to get masters.
   candidates.sort((a, b) => a.draft.date.localeCompare(b.draft.date));
 
-  return { candidates, skipped };
+  // ONE row per Google event id, whatever how many of the chosen calendars carry
+  // it. An invitation appears with the SAME id on the organizer's calendar and on
+  // every attendee's, so scanning two of the family's calendars would otherwise
+  // offer the school concert twice — and committing both would write two
+  // activities whose links share one `googleEventId`, which the reconcile engine
+  // has no way to tell apart. The ADOPTABLE copy wins (it is the one on the
+  // destination calendar, so beanies can keep it in step); otherwise the first by
+  // date, which the sort above has already settled.
+  const deduped: ImportCandidate[] = [];
+  const seen = new Map<string, number>();
+  for (const c of candidates) {
+    const at = seen.get(c.googleEventId);
+    if (at === undefined) {
+      seen.set(c.googleEventId, deduped.length);
+      deduped.push(c);
+      continue;
+    }
+    const keep = deduped[at].origin === 'adopted' ? deduped[at] : c;
+    const drop = keep === c ? deduped[at] : c;
+    deduped[at] = keep;
+    skipped.push({ id: drop.googleEventId, reason: 'duplicate-across-calendars' });
+  }
+
+  return { candidates: deduped, skipped };
 }
