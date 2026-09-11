@@ -228,10 +228,14 @@ async function onCommit(): Promise<void> {
           }}
         </p>
 
-        <div class="mt-1 max-h-[420px] overflow-y-auto">
+        <!-- No inner scroll container. The DRAWER body is the single scroll context,
+             so the sticky day headers stick against it and the action bar below sits
+             at the natural end of the list. Two nested scrollers would mean the user
+             can scroll the list to its end and still not see the button. -->
+        <div class="mt-1">
           <div v-for="day in days" :key="day.ymd">
             <div
-              class="dark:bg-surface-ground font-outfit text-secondary-400 dark:text-ink-faint sticky top-0 z-10 bg-[var(--cloud-white,#f8f9fa)] px-1 pt-3 pb-1 text-xs font-bold"
+              class="dark:bg-surface-raised font-outfit text-secondary-400 dark:text-ink-faint sticky top-0 z-10 bg-white px-1 pt-3 pb-1 text-xs font-bold"
             >
               {{ formatDayLong(day.ymd) }}
             </div>
@@ -248,7 +252,7 @@ async function onCommit(): Promise<void> {
         </div>
 
         <div
-          class="dark:bg-surface-ground border-secondary-50 dark:border-line sticky bottom-0 mt-2 flex items-center gap-3 border-t bg-[var(--cloud-white,#f8f9fa)] pt-3"
+          class="border-secondary-50 dark:border-line mt-3 flex items-center gap-3 border-t pt-3"
         >
           <BaseButton
             class="ml-auto"
