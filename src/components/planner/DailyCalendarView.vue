@@ -21,7 +21,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { birthdaysInRange } from '@/utils/birthdays';
+import { birthdaysInRange, birthdayPassesFilter } from '@/utils/birthdays';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
@@ -195,9 +195,18 @@ const holidayForCurrentDay = computed(() => holidayStore.holidayForDate(currentD
  * `DayTimeline`; a single-day window is the same call the month and week views
  * make over their own spans.
  */
-const birthdaysForCurrentDay = computed(() =>
-  birthdaysInRange(familyStore.members, currentDay.value.dateStr, currentDay.value.dateStr)
-);
+const birthdaysForCurrentDay = computed(() => {
+  // Null when everyone is shown. A birthday follows its member exactly as that
+  // member's activities do; pets pass regardless (see `birthdayPassesFilter`).
+  const visible = memberFilterStore.isAllSelected
+    ? null
+    : (id: string) => memberFilterStore.isMemberSelected(id);
+  return birthdaysInRange(
+    familyStore.members,
+    currentDay.value.dateStr,
+    currentDay.value.dateStr
+  ).filter((b) => birthdayPassesFilter(b, visible));
+});
 
 const hasAnyUntimedContent = computed(
   () =>
@@ -294,6 +303,25 @@ function handleSlotClick(memberId: string, hour: number) {
 
 // Grid template columns (dynamic based on member count)
 const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr)`);
+
+/**
+ * Column span for a FAMILY-SCOPE row in the all-day grid — a birthday, a
+ * vacation bar, a travel segment. They belong to the day rather than to one
+ * person, so they cross every member column.
+ *
+ * ⚠️ Floored at 1. `visibleMembers` is HUMANS filtered by the person filter, so
+ * it can legitimately be empty — a pet-only family, or a filter that lands on
+ * nobody — and `grid-column: 2 / span 0` is invalid CSS.
+ *
+ * Guarding the SPAN rather than the rows is deliberate, and the difference
+ * matters: suppressing the rows when there are no human columns would hide a
+ * pet-only family's birthdays on the one surface this feature exists to put
+ * them on, which is exactly the "pets always pass" invariant `birthdayPassesFilter`
+ * is named for. `activeVacations` and `segmentBuckets` filter by DATE alone and
+ * never consult the person filter, so they could reach `span 0` too; they share
+ * this value now, so the hazard is closed for all three rather than argued away.
+ */
+const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
 </script>
 
 <template>
@@ -374,7 +402,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
         <div
           v-for="b in birthdaysForCurrentDay"
           :key="'bday-' + b.memberId"
-          :style="{ gridColumn: `2 / span ${visibleMembers.length}` }"
+          :style="{ gridColumn: `2 / span ${familyRowSpan}` }"
           class="px-1"
         >
           <BirthdayChip :birthday="b" class="block w-full" />
@@ -386,7 +414,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
           :key="'vac-' + v.id"
           class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold text-white transition-opacity hover:opacity-80"
           :style="{
-            gridColumn: `2 / span ${visibleMembers.length}`,
+            gridColumn: `2 / span ${familyRowSpan}`,
             background: 'linear-gradient(to right, var(--vacation-teal), #0077B6)',
             borderLeft: '3px solid var(--vacation-teal)',
             opacity: 0.85,
@@ -400,7 +428,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
         <div
           v-for="seg in segmentBuckets.untimed"
           :key="'seg-untimed-' + seg.segmentId + '-' + seg.kind"
-          :style="{ gridColumn: `2 / span ${visibleMembers.length}` }"
+          :style="{ gridColumn: `2 / span ${familyRowSpan}` }"
         >
           <TravelSegmentChip
             :occurrence="seg"

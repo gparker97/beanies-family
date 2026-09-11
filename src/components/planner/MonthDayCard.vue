@@ -117,24 +117,50 @@ const timedOverflow = computed(() =>
 /**
  * The all-day lane, shared by three sources competing for `allDayCap`.
  *
- * Order is birthdays, then holidays, then the family's own all-day activities.
- * A birthday leads because it is about somebody in this family; a public holiday
- * is reference data about the country. Each source takes what the ones above it
- * left, which is why these are three computeds and not three inline `slice`s —
- * the holiday slice used to live in the template, and a third source sharing one
- * budget is exactly where that stops being readable.
+ * Order is birthdays, then holidays, then the family's own all-day activities: a
+ * birthday is about somebody in this family, a public holiday is reference data
+ * about the country, and both are context for the day.
+ *
+ * ⚠️ But REFERENCE DAYS GET A RESERVED SHARE, NOT PRIORITY OVER EVERYTHING.
+ * `ALL_DAY_VISIBLE_CAP` is 2. A straight priority order meant a day carrying a
+ * birthday AND a holiday consumed the entire budget and pushed every one of the
+ * family's own all-day events behind "+N" — on Christmas Day with somebody's
+ * birthday, their actual plans vanished. The family's own events are the answer
+ * to "what are we doing today"; the reference days are the caption.
+ *
+ * So reference days may claim at most half the cap (floored at one), and the
+ * family's events take the rest — EXCEPT that neither side may strand a slot the
+ * other is not using, which is what `Math.max(reserved, cap - allDayItems)`
+ * buys. At a cap of 2 that resolves to: one reference day plus one event on a
+ * contested day; both reference days when there are no events to show; and
+ * exactly today's behaviour whenever there are no reference days at all.
  */
-const visibleBirthdays = computed(() => props.cell.birthdays.slice(0, props.allDayCap));
+const REFERENCE_SHARE = computed(() => Math.max(1, Math.floor(props.allDayCap / 2)));
+
+const referenceDays = computed(() => [
+  ...props.cell.birthdays.map((b) => ({ kind: 'birthday' as const, birthday: b })),
+  ...props.cell.holidays.map((h) => ({ kind: 'holiday' as const, holiday: h })),
+]);
+
+/** How many of the reference days actually fit, given what the day is doing. */
+const visibleReferenceCount = computed(() =>
+  Math.min(
+    referenceDays.value.length,
+    Math.max(REFERENCE_SHARE.value, props.allDayCap - props.cell.allDayItems.length)
+  )
+);
+
+const visibleBirthdays = computed(() => props.cell.birthdays.slice(0, visibleReferenceCount.value));
 
 const visibleHolidays = computed(() =>
-  props.cell.holidays.slice(0, Math.max(0, props.allDayCap - props.cell.birthdays.length))
+  props.cell.holidays.slice(
+    0,
+    Math.max(0, visibleReferenceCount.value - props.cell.birthdays.length)
+  )
 );
 
 const visibleAllDayItems = computed(() =>
-  props.cell.allDayItems.slice(
-    0,
-    Math.max(0, props.allDayCap - props.cell.birthdays.length - props.cell.holidays.length)
-  )
+  props.cell.allDayItems.slice(0, Math.max(0, props.allDayCap - visibleReferenceCount.value))
 );
 
 const allDayOverflow = computed(() =>

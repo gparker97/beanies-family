@@ -116,7 +116,12 @@ const gridColumns = computed(() => [
  * instead of disappearing.
  */
 /** This view's one column is a DAY, so it takes the day-shaped placement. */
-const { byDay: bandReferences } = useWallReferenceDays(computed(() => [focusYmd.value]));
+const { byDay: bandReferences } = useWallReferenceDays(
+  computed(() => [focusYmd.value]),
+  computed(() =>
+    props.visibleMemberIds ? (id: string) => props.visibleMemberIds!.includes(id) : null
+  )
+);
 
 const allDaySpans = computed(() => {
   const days = [focusYmd.value];

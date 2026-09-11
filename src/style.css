@@ -184,7 +184,7 @@
   --holiday-clay: #c98c75;
   --holiday-clay-tint: rgb(201 140 117 / 12%);
 
-  /* 6.28:1 on surface-raised, 7.41:1 on surface-ground. */
+  /* 6.28:1 on surface-raised, 7.25:1 on surface-ground. */
   --birthday-orange: #ff8a5b;
   --birthday-orange-tint: rgb(241 93 34 / 14%);
   --tint-purple-6: rgb(155 89 182 / 10%);
