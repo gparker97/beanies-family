@@ -24,6 +24,8 @@ import { formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
@@ -55,12 +57,19 @@ interface Props {
   isToday?: boolean;
   /** Public holiday on this day, if any (rendered as a compact banner up top). */
   holiday?: HolidayOccurrence | null;
+  /**
+   * Family birthdays on this day — derived, read-only (see `utils/birthdays.ts`).
+   * A LIST, because two beans can share a date, and the one hidden would be the
+   * one the family noticed on exactly the day it mattered.
+   */
+  birthdays?: BirthdayOccurrence[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
   isToday: false,
   segments: () => [],
   holiday: null,
+  birthdays: () => [],
 });
 
 const emit = defineEmits<{
@@ -99,6 +108,7 @@ const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTime
 const untimedActivities = computed(() => props.activities.filter((o) => !o.activity.startTime));
 const hasUntimedRow = computed(
   () =>
+    props.birthdays.length > 0 ||
     props.vacations.length > 0 ||
     props.todos.length > 0 ||
     untimedActivities.value.length > 0 ||
@@ -231,6 +241,15 @@ const { identityFor } = useActivityIdentity();
       >
         {{ t('planner.allDay') }}
       </div>
+
+      <!-- Birthdays first: they are about somebody in this family, and they are
+           the reason the row exists on a day with nothing else on. -->
+      <BirthdayChip
+        v-for="b in birthdays"
+        :key="'bday-' + b.memberId"
+        :birthday="b"
+        class="block w-full"
+      />
 
       <!-- Vacations -->
       <div
