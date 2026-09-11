@@ -34,9 +34,10 @@ Beanstalk Blog (hub page)   33a247d9-a99f-813a-b36d-ff0c93eb3544
   └── Blog Posts (database) 33a247d9-a99f-814d-bdff-c554dcff3a0b
         data_source_id      33a247d9-a99f-815e-a53a-000b24c88de0   ← what API-query-data-source / API-patch-page use
 
-MCP namespace: mcp__notion__*  (verified working on this database)
-  If a call returns object_not_found, try mcp__notion-beanies__* — the issue tracker
-  needs that namespace, and the two are easy to confuse.
+MCP namespace: mcp__notion-beanies__*  (verified 2026-09-10 on this database)
+  Plain mcp__notion__* returns object_not_found on this data source, because the
+  integration behind it cannot see the page. Both namespaces expose identically-named
+  tools, so the failure looks like a bad id rather than a bad namespace. Use -beanies.
 
 Properties (read the LIVE schema at runtime; select options drift):
   ID            unique_id    ← "find the blog by id" means THIS
@@ -49,8 +50,10 @@ Properties (read the LIVE schema at runtime; select options drift):
   Substack      checkbox     ticked once cross-posted
   Notes         rich_text
 
-In practice greg uses only Idea → Draft → Published. `Ready` and `In Review` exist in
-the schema but no row has ever held them, so don't filter on them expecting results.
+All five Status values are live. Post #59 sat in `In Review`, moved to `Ready`, then
+`Published` (2026-09-11), so treat `Ready` as "greg has signed off, go build it" and
+`In Review` as "he is still reading". Older rows only ever used Idea → Draft →
+Published, so a filter on the middle two will still return few or no rows.
 
 Querying: filter to the ONE row you need by its `ID`. An unfiltered list of this
 database returns ~56k characters and blows the tool's token limit, and `has_more` is
@@ -99,17 +102,19 @@ File path: `content/blog/YYYY-MM-DD-<slug>.md` (repo root, **not** `web/src/cont
 
 ### Category map
 
-Three vocabularies exist and none of them match. Notion's `Category` select, the repo's
-freeform `category:` string, and the badge lookup in
-`web/src/pages/blog/[...slug].astro`. A category outside the badge map renders with **no
-badge at all** and throws no error — which is why `founder story`, `feature announcement`
-and `memoir` are already live on the site with missing badges. Map on the way in:
+Two vocabularies exist and they do not match. Notion's `Category` select, and the repo's
+`category:`, which is a Zod enum (`BLOG_CATEGORIES` in `web/src/content.config.ts`) whose
+every member has a matching entry in the `CATEGORIES` badge map in
+`web/src/pages/blog/[...slug].astro`. That map is typed `Record<BlogCategory, ...>`, so the
+two can no longer drift: an unknown category now fails the build loudly instead of
+silently rendering no badge, and `founder story` / `feature announcement` / `memoir` have
+their badges back. Map on the way in:
 
 | Notion Category      | repo `category:` |
 | -------------------- | ---------------- |
 | Founder Story        | `stories`        |
 | Use Case             | `use-case`       |
-| Feature Announcement | `updates`        |
+| Feature Announcement | `feature announcement` |
 | Update / Changelog   | `updates`        |
 | Tutorial             | `how-to`         |
 | SEO / Comparison     | `review`         |
@@ -141,8 +146,14 @@ node .claude/skills/beanies-blog/scripts/optimize-blog-image.mjs <file> [--name 
 It prints the exact `/blog/...` path to paste into the markdown. Name images after the
 post (`aloe-vera-big-island-2002.webp`), not `image1.png`.
 
+Animated input (gif, animated webp) is handled: the script detects it, keeps every frame,
+and asserts the frame count on the way out, printing `animated (N frames kept)`. Before
+2026-09-11 it silently flattened animations to their first frame and passed every check,
+so if you are reading an older post's images, check them. Pass `--quality 70` for long
+clips; 80 is noticeably bigger for no visible gain on video-sourced frames.
+
 Two things bite here. `web/src/lib/rehype-image-dims.mjs` injects `width`/`height` at
-build time so there's no layout shift — but if the file is missing it logs to the build
+build time so there's no layout shift, but if the file is missing it logs to the build
 console and ships a broken `<img>`. Nothing fails. So after writing the markdown,
 confirm every referenced image actually exists on disk. And the existing
 `scripts/convert-images.mjs` only re-encodes at q85; it does not resize, so don't reach
@@ -229,11 +240,11 @@ Normal commit to `main` (this project commits straight to main). Update `CHANGEL
 only if the post accompanies a product change — a blog post alone isn't a changelog
 entry.
 
-**Pushing does not publish.** `deploy-web.yml` is `workflow_dispatch:` only — there is no
-`push:` trigger. (`CLAUDE.md` line ~351 says "Commit + push → deploy-web ships it". That
-is wrong, and worth fixing when you next touch that file.) A pushed post with
-`draft: false` is *staged*, sitting in `main`, invisible to the world until someone
-dispatches the workflow.
+**Pushing does not publish.** `deploy-web.yml` is `workflow_dispatch:` only; there is no
+`push:` trigger. (`CLAUDE.md` states this correctly under the draft workflow. An earlier
+version of this skill claimed otherwise; verified against the workflow file 2026-09-11.)
+A pushed post with `draft: false` is *staged*, sitting in `main`, invisible to the world
+until someone dispatches the workflow.
 
 This is a feature: it means step 5 is safe and reversible, and step 6 is the only
 irreversible one.
