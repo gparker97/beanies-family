@@ -141,6 +141,24 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   </section>
 
   <section>
+    <h2>google calendar integration (optional)</h2>
+    <p>
+      if you connect Google Calendar, beanies keeps your family activities in step with a
+      calendar you choose. this section describes exactly what it reads, because the honest
+      answer changed when we added the one-time import.
+    </p>
+    <ul>
+      <li><strong>OAuth scope:</strong> we request <code>calendar.events.owned</code>, which covers events on calendars you own. we do not request access to calendars belonging to other people</li>
+      <li><strong>what we write:</strong> beanies creates and updates events for your beanies activities, and it only ever deletes an event it created itself. an event that existed before beanies is never deleted by us</li>
+      <li><strong>what we read, normally:</strong> when the clash nudge is on, we ask only whether you are busy at a given time. we request times, not content</li>
+      <li><strong>what we read during a one-time import:</strong> if you choose to bring your existing events across, we read the <strong>title, description, place, times and repeat pattern</strong> of events on the calendars you tick, for the next 12 months. this happens only when you ask for it, and you review every event before anything is added</li>
+      <li><strong>guest lists are never read:</strong> we do not request the attendee list of any event, at any time. other people's email addresses never enter your family file</li>
+      <li><strong>nothing is stored on our servers:</strong> imported events become ordinary activities inside your encrypted <code>.beanpod</code>, which we cannot read</li>
+      <li><strong>revocable:</strong> disconnect from Settings at any time, or revoke access entirely at <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>. disconnecting never deletes events from your Google Calendar</li>
+    </ul>
+  </section>
+
+  <section>
     <h2>google workspace marketplace</h2>
     <p>
       beanies.family is listed on the Google Workspace Marketplace. the listing enables the

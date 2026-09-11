@@ -1949,4 +1949,137 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'bring-your-google-calendar-across',
+    category: 'features',
+    title: 'Bring your Google Calendar across',
+    excerpt:
+      'Move the events you already have in Google into beanies, once, choosing exactly what comes and what happens to each one afterwards.',
+    icon: '\u{1F4C5}',
+    readTime: 5,
+    updatedDate: '2026-09-11',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'When you connect Google Calendar, beanies starts sending your beanies activities out to it. What it does not do on its own is bring your existing Google events IN. If you already have a year of swimming lessons, football and dentist appointments in Google, retyping them is a lot to ask, and typing them by hand leaves you with two of everything.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'So there is a one-time import. You choose which calendars to look at, beanies shows you what it found, and you tick what you want. Nothing is added until you pick it.',
+      },
+      {
+        type: 'callout',
+        content:
+          'This happens once. It is not an ongoing two-way sync: beanies will not keep watching your Google Calendar afterwards, and it will not pull in things you add there later. You can run the import again whenever you like, and it never re-creates anything it already brought across.',
+        title: 'A move, not a sync',
+        icon: '\u{1F9F3}',
+      },
+      {
+        type: 'heading',
+        content: 'Bringing your events across',
+        level: 2,
+        id: 'how-to-import',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Go to <strong>Settings</strong> and open the <strong>Google Calendar</strong> card',
+          'On your connected account, tap <strong>Bring your calendar across</strong>',
+          'Tick the calendars you want beanies to look at. Calendars you only subscribe to, like a holidays feed, are greyed out because beanies is not allowed to read them',
+          'Tap <strong>Look at my calendar</strong>. beanies reads the next 12 months',
+          'Everything it found is already ticked. Untick anything you would rather leave behind',
+          'Tap <strong>Bring them across</strong>, and confirm',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'What happens to each event afterwards',
+        level: 2,
+        id: 'what-happens',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'This is the part worth reading, because not every event can be treated the same way. Each row in the list tells you which it is.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>takes it over</strong> — you created this event, so beanies now looks after it. Editing it in beanies updates the original event in Google. There is no second copy, and nothing is duplicated.',
+          '<strong>copied</strong> — someone else created this one, so beanies is not allowed to change it. It comes across into beanies, the Google event is left exactly as it is, and your beanies edits stay in beanies. Their later changes stay in Google too.',
+          '<strong>comes across once</strong> — this one repeats in a way beanies cannot copy exactly. Rather than guess and get your schedule wrong, beanies brings it across as a single event on its next date.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'An event marked "copied" stays labelled in your planner afterwards, so months later you are never left wondering why an edit you made in beanies did not show up in Google. It is not a fault: beanies genuinely cannot change an event that someone else created.',
+        title: 'Why some edits do not reach Google',
+        icon: 'ℹ️',
+      },
+      {
+        type: 'heading',
+        content: 'Repeating events',
+        level: 2,
+        id: 'repeating-events',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A weekly swimming lesson comes across as <strong>one repeating activity</strong>, not as thirty separate ones. That holds even when the lesson started a long time ago: beanies looks at the next 12 months, but a series that began two years ago and is still running is still found.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A few repeat patterns cannot be copied faithfully, usually because Google allows shapes beanies has no way to describe. Those are the ones labelled <strong>comes across once</strong>. Nothing is lost in Google; the original series carries on exactly as before.',
+      },
+      {
+        type: 'heading',
+        content: 'What beanies reads, and what it does not',
+        level: 2,
+        id: 'what-it-reads',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'It reads the <strong>title, description, place, times and repeat pattern</strong> of your events.',
+          'It does <strong>not</strong> read your guest lists. Other people’s email addresses are never requested and never stored in your family file.',
+          'It only looks at the calendars you tick, and only at ones you own.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'beanies never deletes an event it did not create. Deleting an imported activity removes it from beanies and leaves the Google event where it was. The same is true if you disconnect the calendar, or change which calendar beanies syncs to: nothing you brought across is deleted from Google.',
+        title: 'Your Google events are safe',
+        icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'Things worth knowing',
+        level: 2,
+        id: 'good-to-know',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'beanies can only <strong>take over</strong> events on the calendar it syncs to. Events on your other calendars come across as copies.',
+          'Imported activities arrive assigned to you and without a category, so you may want to tidy a few of them afterwards.',
+          'If you have a great many events, beanies lists the soonest 200 and tells you it has done so.',
+          'Running the import again is safe. Anything already brought across is shown but cannot be picked twice.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once your events are in, they behave like any other beanies activity: they show up on the <strong>Family Planner</strong>, on the beanie wall, and in your daily briefing.',
+      },
+    ],
+  },
 ];

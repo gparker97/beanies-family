@@ -14,6 +14,8 @@ import { showToast } from '@/composables/useToast';
 import { confirm } from '@/composables/useConfirm';
 import { isFlagEnabled } from '@/config/flags';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
+import CalendarImportModal from '@/components/settings/CalendarImportModal.vue';
+import { useCalendarImportStore } from '@/stores/calendarImportStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CalendarConnection } from '@/types/models';
@@ -38,7 +40,38 @@ async function onToggleClash(enabled: boolean) {
 }
 
 const connecting = ref(false);
+/**
+ * `${connectionId}:${action}`, not a bare connection id. It used to be the id
+ * alone, so starting any per-connection action spun EVERY button on that card.
+ * With the import added that becomes four buttons pretending to be busy because
+ * one of them is. One helper, four buttons correct, no extra state.
+ */
 const busyId = ref<string | null>(null);
+type ConnAction = 'reconnect' | 'sync' | 'disconnect' | 'import';
+function busyKey(connectionId: string, action: ConnAction): string {
+  return `${connectionId}:${action}`;
+}
+function isBusy(connectionId: string, action: ConnAction): boolean {
+  return busyId.value === busyKey(connectionId, action);
+}
+
+/** The one-time import (#94). Its own drawer, opened per connection. */
+const importConnectionId = ref<string | null>(null);
+
+async function onImport(connection: CalendarConnection) {
+  busyId.value = busyKey(connection.id, 'import');
+  try {
+    await useCalendarImportStore().open(connection.id);
+    importConnectionId.value = connection.id;
+  } catch (e) {
+    showToast('error', t('calendarImport.failed.title'), t('calendarImport.failed.body'), {
+      surface: 'calendar-import',
+      error: e,
+    });
+  } finally {
+    busyId.value = null;
+  }
+}
 /** Bumped to remount the destination selects (revert to the store value on a failed switch). */
 const pickerRevertKey = ref(0);
 /** connectionId → destination calendar options for the picker. */
@@ -102,7 +135,7 @@ async function onConnect() {
 }
 
 async function onReconnect(connection: CalendarConnection) {
-  busyId.value = connection.id;
+  busyId.value = busyKey(connection.id, 'reconnect');
   try {
     const result = await store.reconnect(connection.id);
     if (result.status === 'connected') {
@@ -124,7 +157,7 @@ async function onReconnect(connection: CalendarConnection) {
 }
 
 async function onSyncNow(connection: CalendarConnection) {
-  busyId.value = connection.id;
+  busyId.value = busyKey(connection.id, 'sync');
   try {
     // syncNow swallows API errors into the connection status, so toast from the
     // returned outcome — NOT an unconditional "Synced!".
@@ -177,7 +210,7 @@ async function onDisconnect(connection: CalendarConnection) {
     confirmLabel: 'calendarSync.disconnect.confirm',
   });
   if (!ok) return;
-  busyId.value = connection.id;
+  busyId.value = busyKey(connection.id, 'disconnect');
   try {
     // disconnect returns whether teardown fully completed — a partial teardown
     // leaves the connection parked 'disconnecting', so don't claim success.
@@ -215,7 +248,7 @@ async function onDisconnect(connection: CalendarConnection) {
 
 async function onPickCalendar(connection: CalendarConnection, value: string | number) {
   if (String(value) === connection.destinationCalendarId) return;
-  busyId.value = connection.id;
+  busyId.value = busyKey(connection.id, 'sync');
   try {
     const { ok } = await store.setDestinationCalendar(connection.id, String(value));
     if (!ok) {
@@ -281,7 +314,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               v-if="connection.status === 'needs_reconnect'"
               variant="primary"
               size="sm"
-              :loading="busyId === connection.id"
+              :loading="isBusy(connection.id, 'reconnect')"
               @click="onReconnect(connection)"
             >
               {{ t('calendarSync.action.reconnect') }}
@@ -289,10 +322,18 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
             <BaseButton
               variant="secondary"
               size="sm"
-              :loading="busyId === connection.id"
+              :loading="isBusy(connection.id, 'sync')"
               @click="onSyncNow(connection)"
             >
               {{ t('calendarSync.action.syncNow') }}
+            </BaseButton>
+            <BaseButton
+              variant="secondary"
+              size="sm"
+              :loading="isBusy(connection.id, 'import')"
+              @click="onImport(connection)"
+            >
+              {{ t('calendarImport.start') }}
             </BaseButton>
             <BaseButton variant="ghost" size="sm" @click="onDisconnect(connection)">
               {{ t('calendarSync.action.disconnect') }}
@@ -322,4 +363,19 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
       </BaseButton>
     </div>
   </BeanieFormModal>
+
+  <!-- The one-time import (#94). A sibling drawer, not nested: it has its own
+       scroll container and sticky action bar, and nesting two drawers would put
+       two scroll contexts inside one another. -->
+  <!-- `v-if`, not just `:open`. The modal resolves its own Pinia store at setup,
+       so binding `:open` alone would construct the store and the whole component
+       every time anyone opens calendar settings, for a drawer most people never
+       use. Gating instantiation costs a close transition on a rare surface, which
+       is the better trade. -->
+  <CalendarImportModal
+    v-if="importConnectionId !== null"
+    :open="true"
+    :connection-id="importConnectionId"
+    @close="importConnectionId = null"
+  />
 </template>
