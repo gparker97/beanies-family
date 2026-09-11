@@ -21,11 +21,13 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { birthdaysInRange } from '@/utils/birthdays';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
 import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
@@ -187,8 +189,19 @@ const activeVacations = computed(() =>
 // `holiday` prop passed to the mobile DayTimeline.
 const holidayForCurrentDay = computed(() => holidayStore.holidayForDate(currentDay.value.dateStr));
 
+/**
+ * Family birthdays on this day — derived from each member's date of birth, so
+ * there is nothing to load. Feeds the desktop all-day row AND the mobile
+ * `DayTimeline`; a single-day window is the same call the month and week views
+ * make over their own spans.
+ */
+const birthdaysForCurrentDay = computed(() =>
+  birthdaysInRange(familyStore.members, currentDay.value.dateStr, currentDay.value.dateStr)
+);
+
 const hasAnyUntimedContent = computed(
   () =>
+    birthdaysForCurrentDay.value.length > 0 ||
     activeVacations.value.length > 0 ||
     dayTodos.value.length > 0 ||
     segmentBuckets.value.untimed.length > 0 ||
@@ -353,6 +366,18 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
           >
             {{ t('planner.allDay') }}
           </span>
+        </div>
+
+        <!-- Birthdays span all member columns: a birthday belongs to the family's
+             day, not to one person's lane. Same reasoning as the vacation bars
+             and travel segments below. -->
+        <div
+          v-for="b in birthdaysForCurrentDay"
+          :key="'bday-' + b.memberId"
+          :style="{ gridColumn: `2 / span ${visibleMembers.length}` }"
+          class="px-1"
+        >
+          <BirthdayChip :birthday="b" class="block w-full" />
         </div>
 
         <!-- Vacation bars (span all member columns) -->
@@ -599,6 +624,7 @@ const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr
         :members="visibleMembers"
         :is-today="currentDay.isToday"
         :holiday="holidayForCurrentDay"
+        :birthdays="birthdaysForCurrentDay"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
