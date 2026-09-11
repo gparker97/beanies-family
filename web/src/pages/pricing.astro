@@ -10,9 +10,8 @@
  * into this file.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
-import DraftPlaceholder from '../components/DraftPlaceholder.astro';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
-import { DEFAULT_CURRENCY, PRICES, PRICING_FAQS, PRICING_LIVE, TRIAL_DAYS } from '../lib/pricing';
+import { DEFAULT_CURRENCY, PRICES, PRICING_FAQS, TRIAL_DAYS } from '../lib/pricing';
 // Caveat: the CIG handwritten accent, for the tape label and the sign-off only.
 import '@fontsource-variable/caveat';
 import '../styles/switch-page.css';
@@ -32,26 +31,12 @@ const faqSchema = {
   })),
 };
 ---
-{
-  /*
-   * A ternary, not `{!LIVE && <DraftPlaceholder/>}` inside the layout.
-   * DraftPlaceholder IS a BaseLayout, so rendering it within one shipped two
-   * nested HTML documents: duplicate <nav>/<footer>, Plausible twice, repeated
-   * ids that left the mobile menu inert, and a second, wrong canonical. The
-   * old `hidden` attribute also only hid the page from sighted users - every
-   * price still shipped in the HTML to anyone reading source or a crawler.
-   */
-}
-{
-  !PRICING_LIVE ? (
-    <DraftPlaceholder backHref="/" backLabel="back home" />
-  ) : (
     <BaseLayout
       title="pricing - beanies.family"
       description="beanies.family is free while it's in beta. at v1: 90 days of the whole app, then beanies basic from $30 a year, or beanies + magic beans with the ai included. no ads, and your data stays in your own encrypted file."
       canonicalPath={canonicalPath}
-      jsonLd={faqSchema}
-    >
+  jsonLd={faqSchema}
+>
       <div class="welcome-page pricing-page">
         <header class="hero">
           <div class="hero-inner">
@@ -395,21 +380,10 @@ const faqSchema = {
           />
           <p class="ps">the beanie doggie says hello. and <em>every bean counts</em></p>
         </section>
-      </div>
-    </BaseLayout>
-  )
-}
+  </div>
+</BaseLayout>
 
-{
-  /*
-   * Inside the gate on purpose. A page-level <script> always ships, and
-   * `define:vars` serialises PRICES into the HTML, so leaving it outside put
-   * every price on the gated page for anyone reading source.
-   */
-}
-{
-  PRICING_LIVE && (
-    <script define:vars={{ PRICES, DEFAULT_CURRENCY }}>
+<script define:vars={{ PRICES, DEFAULT_CURRENCY }}>
   // One table, one currency at a time. The server rendered USD; this swaps
   // every `[data-price]` node when a person picks another, and remembers it.
   const seg = document.getElementById('currency-seg');
@@ -445,8 +419,6 @@ const faqSchema = {
   }
   if (initial !== DEFAULT_CURRENCY) show(initial);
 </script>
-  )
-}
 
 <style>
   /*

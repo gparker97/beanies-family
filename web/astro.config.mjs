@@ -2,7 +2,6 @@
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
-import { PRICING_LIVE } from './src/lib/pricing';
 import mdx from '@astrojs/mdx';
 import tailwindcss from '@tailwindcss/vite';
 import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
@@ -58,13 +57,7 @@ export default defineConfig({
     sitemap({
       // /oauth/* is the native OAuth return bridge — a machine-facing redirect
       // surface that must never be indexed or surfaced to a human via search.
-      // /pricing is excluded while PRICING_LIVE is false: the page renders the
-      // draft placeholder with noindex, and listing a noindex URL in the
-      // sitemap actively invites crawlers to a page telling them to go away.
-      filter: (page) =>
-        !page.includes('/og/') &&
-        !page.includes('/oauth/') &&
-        (PRICING_LIVE || !page.endsWith('/pricing')),
+      filter: (page) => !page.includes('/og/') && !page.includes('/oauth/'),
     }),
     // Fails the build if any link into the app lacks data-cta. See the file
     // header for why this is checked on built HTML rather than in lint.

@@ -1,6 +1,5 @@
 ---
 import { APP_URL } from '@beanies/brand/nav';
-import { PRICING_LIVE } from '../lib/pricing';
 
 const currentPath = Astro.url.pathname;
 const isHome = currentPath === '/';
@@ -13,7 +12,7 @@ const year = new Date().getFullYear();
     <a href={isHome ? '#features' : '/#features'}>what's inside</a>
     <a href="/blog">beanstalk</a>
     <a href="/guides">family library</a>
-    {PRICING_LIVE && <a href="/pricing">pricing</a>}
+    <a href="/pricing">pricing</a>
     <a href="/help">help</a>
     <a href="/help/faq">faq</a>
     <a href="/help/glossary">glossary</a>
