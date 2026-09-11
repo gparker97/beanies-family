@@ -27,7 +27,6 @@ import { reportError } from '@/utils/errorReporter';
 import { isFlagEnabled } from '@/config/flags';
 import { useToday } from '@/composables/useToday';
 import { useActivityStore } from '@/stores/activityStore';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -80,6 +79,7 @@ import {
   type ReconcileExceptionUpsert,
 } from '@/utils/calendar/reconcilePlan';
 import { beaniesMayDelete } from '@/utils/calendar/linkOwnership';
+import { makeMemberNameResolver } from '@/utils/calendar/memberNames';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
@@ -158,23 +158,6 @@ function paddedDayWindow(occurrenceYmd: string): [string, string] {
     `${addDaysYmd(occurrenceYmd, -1)}T00:00:00Z`,
     `${addDaysYmd(occurrenceYmd, 2)}T00:00:00Z`,
   ];
-}
-
-/**
- * A per-reconcile member-name resolver, memoized so resolving 1–3 ids × N
- * activities never re-scans `familyStore.members` (avoids O(N·M)). Reuses the
- * single-source family resolver (`useMemberInfo`) — preserves `undefined` for
- * unknown ids. Must be called within a store action (Pinia active).
- */
-function makeMemberNameResolver(): (id: string) => string | undefined {
-  const { getMemberById } = useMemberInfo();
-  const cache = new Map<string, string | undefined>();
-  return (id) => {
-    if (cache.has(id)) return cache.get(id);
-    const name = getMemberById(id)?.name;
-    cache.set(id, name);
-    return name;
-  };
 }
 
 /** App origin + timezone for the event mapper, with the (shared) member resolver. */

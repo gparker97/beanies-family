@@ -277,7 +277,7 @@ For reference, the current help center contains these articles:
 - Family holidays on the planner
 - Set up the beanie wall on a tablet *(device setup: screen lock, Guided Access / screen pinning, orientation, mounting and charging; linked from the Beanie Wall card in Settings)*
 
-**Features (16):**
+**Features (17):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
@@ -294,6 +294,7 @@ For reference, the current help center contains these articles:
 - The Family Cookbook *(in `the-pod.ts`)*
 - Emergency Contacts *(in `the-pod.ts`)*
 - Adding Photos *(in `the-pod.ts`)*
+- Bring your Google Calendar across *(the one-time import: what it reads, what happens to each event afterwards, and why some come across as copies)*
 
 > *Still unwritten (finance side) — Tracking Assets, Reports & Charts.*
 

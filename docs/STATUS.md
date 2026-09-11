@@ -2200,6 +2200,69 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > in `src/`); `provablyOlder` gone from the code (only a historical mention in a
 > comment at `driveTokenRecovery.ts:502`); `jojo` still inactive + disabled.
 
+### Session 2026-09-11 (2) — the one-time Google Calendar import, #94 (UNDEPLOYED)
+
+Notion #94, from an early adopter: they connected Google Calendar, expected their existing
+events to come across, and found a push-only link. Shipped in three stages, seamed at the
+first line of code able to write an `origin` link, so the riskiest change could be reviewed
+on its safety argument alone.
+
+**⚠️ THE TRACKER'S STATED MECHANISM DID NOT WORK.** Requirement 5 said to adopt by "linking
+the new activity to the existing Google event id so the next reconcile PATCHES instead of
+inserting". `reconcilePlan.ts:138` derived the target id from the ACTIVITY id and read only
+`lastPushedHash` from the link, so a link pointing at a foreign Google id was ignored and the
+engine inserted a duplicate. `masterEventId(link, activityId)` makes the link authoritative;
+a migration test drives the real producer to prove it is a no-op for every link ever written.
+
+**Five defects the four review passes caught before they shipped, two of them destructive:**
+
+1. **beanies deletes remote events from THREE places, not one.** A guard in `reconcilePlan`
+   alone would have left disconnect and destination-change live, and either would have
+   deleted a school's event from a parent's real Google Calendar. All three now funnel
+   through `deleteRemoteEventForLink`, and a source-scanning test asserts `client.deleteEvent`
+   appears exactly once so a fourth site cannot reopen it quietly.
+2. **A refused-recurrence event could still be adopted.** `GoogleEventResource.recurrence` is
+   REQUIRED and a non-recurring activity fills it with `[]`, so the user's first ordinary edit
+   would have PATCHED the Google master with an empty recurrence and collapsed their whole
+   series, destroying every future occurrence, silently. It is now pinned to
+   `origin: 'external'` whoever organizes it.
+3. `computePushHash` without the member-name resolver yields a different hash from the one the
+   next reconcile computes, so every imported event would have been pushed straight back,
+   rewriting adopted event bodies. The resolver moved to `utils/calendar/memberNames.ts` and
+   is mandatory; a test asserts the resolver-less hash genuinely differs.
+4. The "one atomic batch" was specified as two repository calls, which is two Automerge
+   changes, which is the partial state it existed to rule out. Now one
+   `createImportedActivities` with pre-generated ids across both collections.
+5. "No past events" would have dropped every long-running series, which is the single most
+   valuable thing this imports.
+
+**Also worth knowing:**
+
+- Google's description imports into `notes`, NOT `description`. Only `notes` is pushed back
+  out, so importing into `description` would have made the first push WIPE the user's event
+  body in Google. That one line is what makes adoption near-lossless.
+- Adoption is offered only for events on the connection's destination calendar, because
+  `CalendarEventLink` carries no `calendarId` and every push targets the destination.
+- `parseRrule` REFUSES on anchor disagreement rather than coercing. `BYDAY=2WE` against a
+  third-Wednesday start would have produced a different series in beanies than in Google,
+  silently, forever.
+- The review row is 42px, down from 130px in the first mockup. The row was tall because it
+  repeated its own explanation on every line; the explanation now appears once in a legend.
+
+**Copy shipped with it:** new help article `features/bring-your-google-calendar-across`, a
+Google Calendar section on the privacy page (there was none), the homepage line that said
+beanies "doesn't pull in stuff from google calendar", and **a correction to
+`content/blog/2026-07-03-google-calendar-integration.md:47`** per greg's explicit call. That
+paragraph had two problems: the busy-only claim became false, and its attribution of the limit
+to "the privacy scopes allowed by Google" was never true. Both fixed.
+
+**Verification:** lint and type-check clean, full suite 7472 passed across 607 files. Plan:
+`docs/plans/2026-09-11-google-calendar-one-time-import.md`. Mockup approved as an artifact.
+
+**Still owed:** `/code-review max`, browser testing, and the live probe confirming the widened
+field mask actually returns content and that `singleEvents:false` returns a past-anchored
+master whose instances fall in the window.
+
 ### Session 2026-09-11 (1) — the wall's "setup helper" now exists (UNDEPLOYED)
 
 > ### ⚠️ DEPLOY ORDER: WEB FIRST, OR THE NEW SETTINGS LINK IS A 404 ⚠️

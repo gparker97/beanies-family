@@ -174,6 +174,15 @@ describe('uiStrings', () => {
       // instruction a reader could act wrongly on. `wall.setup.help.` is
       // deliberately NOT here; that key is a link label, not an instruction.
       'wall.setup.tips.',
+      // The one-time Google Calendar import (#94). These tell a parent what will
+      // happen to events that already exist in their real Google Calendar, so
+      // "we'll bring your beans across" is an instruction a reader could act
+      // wrongly on. `calendarImport.chip.` is excluded: those are two-word labels
+      // whose meaning lives in the legend, which IS covered here.
+      'calendarImport.legend.',
+      'calendarImport.confirm.',
+      'calendarImport.choose.',
+      'calendarImport.failed.',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

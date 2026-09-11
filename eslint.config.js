@@ -96,6 +96,9 @@ export default [
             '×',
             '✕',
             '✓',
+            // Repeat marker on the calendar-import review row (#94). Decorative:
+            // it sits beside the pattern text ("Weekly") and is aria-hidden.
+            '↻',
             '○',
             // Archived-cycle tile: history is filed, not active (#cycle-history).
             '🗂',

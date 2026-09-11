@@ -12,6 +12,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **You can now bring your existing Google Calendar events into beanies.** Connecting a calendar used to send your beanies activities out to Google but never brought anything in, so a family with a year of swimming lessons already in Google had to retype them, and typing them by hand left two of everything. There is now a one-time import: pick which calendars to look at, see everything beanies found in the next 12 months, untick anything you would rather leave, and bring the rest across. Nothing is added until you pick it.
+- **An imported event you created is taken over rather than copied.** Editing it in beanies afterwards updates the original event in Google, so your calendar still holds exactly one of it. An event someone else created is copied across instead, because beanies is not allowed to change it, and it stays labelled in your planner so you are never left wondering why an edit did not reach Google.
+- **A weekly swimming lesson arrives as one repeating activity**, not thirty separate ones, even when the lesson started two years ago. A few repeat patterns cannot be copied exactly, and those come across once, on their next date, rather than being guessed at.
+- **Guest lists are never read.** The import asks Google for the title, time, place and repeat pattern of your events and nothing else, so other people's email addresses never enter your family file.
+
 - **There is now a guide for setting a tablet up as the beanie wall.** Turning the wall on was the easy part; keeping the screen awake and stopping a child tapping their way into another app are settings on the tablet itself, and nothing explained them. The new guide covers both, with separate steps for iPads and Android tablets, plus which way up the wall works on each device, where to hang it, and why leaving it charging at 100% all day is bad for the battery.
 - **The Beanie Wall card in Settings now says what the tablet needs.** Three short lines, matched to the device you are on (Guided Access on an iPad, screen pinning on Android), and a link to the full guide. On a device whose browser cannot hold the screen awake by itself, the first line says so, because there the tablet's own screen-lock setting is the only thing keeping the wall lit.
 
