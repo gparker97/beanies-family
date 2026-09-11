@@ -4,10 +4,13 @@ import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
+import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { birthdaysInRange } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   toDateInputValue,
@@ -41,6 +44,12 @@ const holidayStore = useHolidayStore();
 
 /** Public holiday on the selected day, if any. */
 const holidayForDay = computed(() => holidayStore.holidayForDate(props.date));
+
+/** Family birthdays on the selected day — derived, read-only. */
+const familyStore = useFamilyStore();
+const birthdaysForDay = computed(() =>
+  birthdaysInRange(familyStore.members, props.date, props.date)
+);
 
 /** Format the selected date as a readable header (e.g. "Wed, 6 Mar") */
 const dateHeader = computed(() => {
@@ -165,6 +174,17 @@ function formatGroupDate(dateStr: string): string {
       <h3 class="font-outfit text-secondary-500 dark:text-ink text-base font-bold">
         {{ dateHeader }}
       </h3>
+    </div>
+
+    <!-- Family birthdays (derived, read-only) — above the holiday, because this
+         one is about somebody in the family rather than about the country. -->
+    <div v-if="birthdaysForDay.length > 0" class="mb-4 space-y-1">
+      <BirthdayChip
+        v-for="b in birthdaysForDay"
+        :key="'bday-' + b.memberId"
+        :birthday="b"
+        class="block w-full"
+      />
     </div>
 
     <!-- Public holiday banner (read-only) -->

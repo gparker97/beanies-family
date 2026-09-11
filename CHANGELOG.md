@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Family birthdays now show on every calendar view.** They arrived on the month view only; the week view on a phone, the day view and the day agenda were all missed. All four now show them.
 - **Family birthdays are now on the planner.** beanies has always known everyone's birthday — it shows them on the Nook, reminds you to buy a present two weeks out, and rains confetti on the day — but the one place it never put them was the calendar. Every family member's birthday, including pets', now appears as an all-day entry on the month and week views: "Joey's 7th birthday", with the age worked out for you. Nothing to set up and nothing to maintain: they come from the birthday already on each bean's profile, so correcting a date fixes every year at once, and they cannot be accidentally deleted or duplicated. A birthday party, with a time and a place, is still an activity you add yourself.
 
 ### Fixed

@@ -979,6 +979,7 @@ function onStripDayClick(dateStr: string) {
         :members="familyStore.sortedHumans"
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
         :holiday="holidayForDay(selectedMobileDay) ?? null"
+        :birthdays="birthdaysForDay(selectedMobileDay)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
