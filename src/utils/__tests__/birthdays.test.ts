@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { birthdaysInRange, birthdaysByDate, nextAnnualDate } from '../birthdays';
+import {
+  birthdaysInRange,
+  birthdaysByDate,
+  nextAnnualDate,
+  birthdayLabel,
+  MAX_AGE_SHOWN_ON_CALENDAR,
+} from '../birthdays';
 import type { FamilyMember } from '@/types/models';
 
 function member(over: Partial<FamilyMember> = {}): FamilyMember {
@@ -130,5 +136,44 @@ describe('birthdaysByDate', () => {
     ];
     const map = birthdaysByDate(birthdaysInRange(twins, '2026-09-01', '2026-09-30'));
     expect(map.get('2026-09-15')).toHaveLength(2);
+  });
+});
+
+describe("birthdayLabel — the calendar only counts a child's years out loud", () => {
+  const t = ((k: string) =>
+    k === 'planner.birthday.withAge' ? "{name}'s {age} birthday" : "{name}'s birthday") as never;
+
+  it('names the age for a child', () => {
+    expect(birthdayLabel({ name: 'Joey', age: 7 }, t)).toBe("Joey's 7th birthday");
+  });
+
+  it('still names it AT the cutoff', () => {
+    expect(birthdayLabel({ name: 'Kit', age: MAX_AGE_SHOWN_ON_CALENDAR }, t)).toBe(
+      "Kit's 21st birthday"
+    );
+  });
+
+  it('goes quiet the year AFTER the cutoff', () => {
+    // "Sarah's 43rd birthday" announces something across the kitchen that an
+    // adult may not have chosen to announce.
+    expect(birthdayLabel({ name: 'Kit', age: MAX_AGE_SHOWN_ON_CALENDAR + 1 }, t)).toBe(
+      "Kit's birthday"
+    );
+    expect(birthdayLabel({ name: 'Sarah', age: 43 }, t)).toBe("Sarah's birthday");
+  });
+
+  it('uses the same plain form when the birth year is unknown', () => {
+    // One appearance for both cases, so an adult birthday is not distinguishable
+    // from a bean whose year nobody recorded.
+    expect(birthdayLabel({ name: 'Sam', age: undefined }, t)).toBe("Sam's birthday");
+  });
+
+  it('names a first birthday correctly, not "1th"', () => {
+    expect(birthdayLabel({ name: 'Mochi', age: 1 }, t)).toBe("Mochi's 1st birthday");
+  });
+
+  it("names a newborn's zeroth year rather than dropping to the plain form", () => {
+    // 0 is a real age and `age === 0` is falsy - the classic bug here.
+    expect(birthdayLabel({ name: 'Baby', age: 0 }, t)).toBe("Baby's 0th birthday");
   });
 });
