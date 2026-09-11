@@ -227,6 +227,78 @@ export function wallDayAllDay(
   return rows;
 }
 
+// ── Reference days in the all-day band (#birthdays + public holidays) ────────
+
+/**
+ * A read-only day the band shows beside the family's own all-day events.
+ *
+ * Labels arrive already resolved. These are the only two band items that need
+ * `t()`, and threading a translate function through the pure placement helpers
+ * below would make them the only impure things in this module — so the composable
+ * that reads the stores resolves the wording, and this layer only places it.
+ */
+export interface WallReferenceDay {
+  kind: 'birthday' | 'holiday';
+  /** Stable across renders — the member id, or the holiday's name + date. */
+  id: string;
+  ymd: string;
+  label: string;
+  /**
+   * Birthdays carry a cake. Holidays carry NOTHING, deliberately: `HolidayChip`
+   * and `HolidayBanner` both record why (a flag emoji renders differently on
+   * every device and looks cramped), and the wall should not be the one surface
+   * that disagrees.
+   */
+  emoji?: string;
+}
+
+/** One reference day placed in the band's column grid. */
+export interface WallBandReference {
+  reference: WallReferenceDay;
+  startCol: number;
+  span: number;
+}
+
+/**
+ * Place reference days on DAY-shaped columns (the days view, and the today
+ * view's single column). One column each, by date.
+ */
+export function wallDayReferences(
+  references: readonly WallReferenceDay[],
+  days: readonly string[]
+): WallBandReference[] {
+  const out: WallBandReference[] = [];
+  for (const reference of references) {
+    const startCol = days.indexOf(reference.ymd);
+    // Outside the visible columns: nowhere to draw it. The callers pass exactly
+    // the days they render, so this is a guard rather than an expected path.
+    if (startCol < 0) continue;
+    out.push({ reference, startCol, span: 1 });
+  }
+  return out;
+}
+
+/**
+ * Place reference days on MEMBER-shaped columns (the bean lanes), where every
+ * column is the same day.
+ *
+ * They span the whole width, for the reason `wallSharedAllDay` already gives
+ * about "everyone" items: a birthday belongs to the family's day, not to one
+ * bean's lane, and five lanes each saying "Joey's 7th birthday" is one sentence
+ * read five times. It is also the only honest placement — a birthday is ABOUT a
+ * member but not assigned TO one, so there is no lane it could claim.
+ */
+export function wallSharedReferences(
+  references: readonly WallReferenceDay[],
+  ymd: string,
+  columnCount: number
+): WallBandReference[] {
+  if (columnCount < 1) return [];
+  return references
+    .filter((reference) => reference.ymd === ymd)
+    .map((reference) => ({ reference, startCol: 0, span: columnCount }));
+}
+
 /**
  * All-day items for MEMBER-shaped columns (the bean lanes, and the today view's
  * single column).

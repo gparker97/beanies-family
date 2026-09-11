@@ -13,9 +13,7 @@
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { fillTemplate } from '@/utils/fillTemplate';
-import { getOrdinalSuffix } from '@/utils/format';
-import type { BirthdayOccurrence } from '@/utils/birthdays';
+import { birthdayLabel, type BirthdayOccurrence } from '@/utils/birthdays';
 import AllDayChip from '@/components/planner/AllDayChip.vue';
 
 const props = defineProps<{ birthday: BirthdayOccurrence }>();
@@ -27,14 +25,7 @@ const { t } = useTranslation();
  * `DateOfBirth.year` is optional and plenty of families record only the day and
  * month, so the label has to work without it.
  */
-const label = computed(() =>
-  props.birthday.age === undefined
-    ? fillTemplate(t('planner.birthday.noAge'), { name: props.birthday.name })
-    : fillTemplate(t('planner.birthday.withAge'), {
-        name: props.birthday.name,
-        age: getOrdinalSuffix(props.birthday.age),
-      })
-);
+const label = computed(() => birthdayLabel(props.birthday, t));
 </script>
 
 <template>

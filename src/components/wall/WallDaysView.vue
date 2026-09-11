@@ -23,6 +23,7 @@ import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { ARROW_GUTTER_PX } from '@/components/wall/wallLayout';
 import { useActivityStore } from '@/stores/activityStore';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
+import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
@@ -142,6 +143,9 @@ const gridColumns = computed(() =>
  * entirely: they are not timed, so they never reach the plot either. See
  * `wallDayAllDay` and its test.
  */
+/** Birthdays + public holidays across the visible week, in the all-day band. */
+const { byDay: bandReferences } = useWallReferenceDays(visible);
+
 const allDaySpans = computed(() => {
   const occurrences = visible.value.flatMap((ymd) => eventsFor(ymd));
   const result = computeAllDaySpans(
@@ -251,6 +255,7 @@ function colourFor(activity: FamilyActivity) {
         <WallTimeGrid
           :columns="gridColumns"
           :all-day-spans="allDaySpans"
+          :band-references="bandReferences"
           :now="now"
           :dim-past="true"
           :show-now="showsToday"

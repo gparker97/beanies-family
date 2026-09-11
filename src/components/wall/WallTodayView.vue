@@ -21,6 +21,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
+import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
@@ -114,6 +115,9 @@ const gridColumns = computed(() => [
  * both halves of `computeAllDaySpans`, so a multi-day trip clamps to this column
  * instead of disappearing.
  */
+/** This view's one column is a DAY, so it takes the day-shaped placement. */
+const { byDay: bandReferences } = useWallReferenceDays(computed(() => [focusYmd.value]));
+
 const allDaySpans = computed(() => {
   const days = [focusYmd.value];
   const result = computeAllDaySpans(
@@ -187,6 +191,7 @@ const focusLabel = computed(() =>
       <WallTimeGrid
         :columns="gridColumns"
         :all-day-spans="allDaySpans"
+        :band-references="bandReferences"
         :now="now"
         :dim-past="isToday"
         :show-now="isToday"
