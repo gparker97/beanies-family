@@ -4,6 +4,8 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { birthdaysInRange } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 
 import { monthCells, monthSpan } from '@/utils/monthCells';
@@ -39,6 +41,7 @@ const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 const holidayStore = useHolidayStore();
+const familyStore = useFamilyStore();
 
 // Reactive "today" from the app-wide singleton — updates on a DST-safe midnight
 // timer + visibilitychange + bfcache restore. Using a frozen `new Date()` here
@@ -109,6 +112,10 @@ const monthData = computed(() => {
     segments: vacationStore.travelSegmentOccurrencesInRange(startYmd, endYmd),
     vacations: vacationStore.vacations,
     holidays: holidayStore.holidaysInRange(startYmd, endYmd),
+    // Derived from each member's date of birth over the SAME span as everything
+    // else — nothing is stored, so there is no per-family setup and correcting a
+    // date of birth corrects every year at once.
+    birthdays: birthdaysInRange(familyStore.members, startYmd, endYmd),
   });
 });
 

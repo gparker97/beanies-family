@@ -19,7 +19,9 @@ import type { NotificationOccurrence } from '@/utils/notifications';
 import { ACTIVITY_GROUP_MAP } from '@/constants/activityCategories';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { normalizeAssignees } from '@/utils/assignees';
-import { daysBetween, extractDatePart, toDateInputValue } from '@/utils/date';
+import { daysBetween, extractDatePart } from '@/utils/date';
+// The ONE annual-date implementation. This file used to carry its own copy.
+import { nextAnnualDate } from '@/utils/birthdays';
 
 /** DEFAULT days before the event each hint type fires. Families can override
  *  per type in Settings (family-synced) — this is the fallback when unset. */
@@ -139,16 +141,6 @@ export function buildHintKey(
   eventDateISO: string
 ): string {
   return `${hintType}:${scopeId}:${eventDateISO}`;
-}
-
-/** The next annual occurrence (YYYY-MM-DD) of month/day on or after `today`.
- *  Uses the local-Date constructor for overflow correctness (e.g. Feb 29 in a
- *  non-leap year rolls to Mar 1, matching the app's date convention). */
-function nextAnnualDate(today: string, month: number, day: number): string {
-  const thisYear = Number(today.slice(0, 4));
-  const at = (year: number) => toDateInputValue(new Date(year, month - 1, day));
-  const candidate = at(thisYear);
-  return candidate >= today ? candidate : at(thisYear + 1);
 }
 
 /** Callback used by the source functions to tally why a candidate was skipped. */

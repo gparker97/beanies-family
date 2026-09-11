@@ -3,7 +3,12 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
-import { formatNookDate } from '@/utils/date';
+import { daysBetween, formatNookDate, parseLocalDate, toDateInputValue } from '@/utils/date';
+import { getOrdinalSuffix } from '@/utils/format';
+// The ONE annual-date implementation, shared with the planner's birthday chips
+// and the helpful-hints engine. This card used to carry its own copy of both
+// this and the ordinal formatter.
+import { nextAnnualDate } from '@/utils/birthdays';
 import type { GoalType } from '@/types/models';
 import NookSectionCard from './NookSectionCard.vue';
 
@@ -17,21 +22,6 @@ interface Milestone {
   date?: string;
   icon: string;
   daysAway: number;
-}
-
-function formatOrdinal(n: number): string {
-  const rem = n % 100;
-  if (rem >= 11 && rem <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1:
-      return `${n}st`;
-    case 2:
-      return `${n}nd`;
-    case 3:
-      return `${n}rd`;
-    default:
-      return `${n}th`;
-  }
 }
 
 function getGoalIcon(goalType: GoalType): string {
@@ -59,39 +49,23 @@ function getGoalIcon(goalType: GoalType): string {
   }
 }
 
-function getNextBirthday(month: number, day: number): { date: Date; daysAway: number } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const thisYear = today.getFullYear();
-  let nextBirthday = new Date(thisYear, month - 1, day);
-  nextBirthday.setHours(0, 0, 0, 0);
-
-  if (nextBirthday < today) {
-    nextBirthday = new Date(thisYear + 1, month - 1, day);
-    nextBirthday.setHours(0, 0, 0, 0);
-  }
-
-  const diffMs = nextBirthday.getTime() - today.getTime();
-  const daysAway = Math.round(diffMs / (1000 * 60 * 60 * 24));
-
-  return { date: nextBirthday, daysAway };
-}
-
 const milestones = computed<Milestone[]>(() => {
   const items: Milestone[] = [];
 
   // 1. Birthdays from family members with dateOfBirth (within 30 days)
   for (const member of familyStore.members) {
     if (!member.dateOfBirth) continue;
-    const { date, daysAway } = getNextBirthday(member.dateOfBirth.month, member.dateOfBirth.day);
+    const todayYmd = toDateInputValue(new Date());
+    const nextYmd = nextAnnualDate(todayYmd, member.dateOfBirth.month, member.dateOfBirth.day);
+    const date = parseLocalDate(nextYmd);
+    const daysAway = daysBetween(todayYmd, nextYmd);
     if (daysAway <= 30) {
       let label: string;
       if (member.dateOfBirth.year) {
         const age = date.getFullYear() - member.dateOfBirth.year;
         label = t('nook.birthdayWithAge')
           .replace('{name}', member.name)
-          .replace('{age}', formatOrdinal(age));
+          .replace('{age}', getOrdinalSuffix(age));
       } else {
         label = t('nook.birthday').replace('{name}', member.name) + '!';
       }
