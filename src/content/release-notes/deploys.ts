@@ -17,6 +17,49 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.11.2',
+    date: '2026-09-11',
+    month: '11 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Every birthday, on every calendar - including the beanie wall.',
+      beanie: 'every bean day, on every calendar - including the beanie wall.',
+    },
+    features: [
+      {
+        icon: '\u{1F382}',
+        title: { en: 'Birthdays everywhere you look', beanie: 'bean days everywhere you look' },
+        description: {
+          en: "Family birthdays now show on the month, week and day views, in the day agenda, and on the beanie wall - worked out from the date on each bean's profile, pets included. Nothing to add and nothing to keep up to date.",
+          beanie:
+            "family bean days now show on the month, week and day views, in the day agenda, and on the beanie wall - worked out from the date on each bean's profile, pets included. nothing to add and nothing to keep up to date.",
+        },
+      },
+      {
+        icon: '\u{1F4FA}',
+        title: { en: 'The wall knows what day it is', beanie: 'the wall knows what day it is' },
+        description: {
+          en: 'Public holidays join birthdays in the beanie wall\u2019s all-day band, so the screen in the kitchen says what the rest of the app already knew. A day whose only entry is a birthday no longer reads "nothing on".',
+          beanie:
+            'public holidays join bean days in the beanie wall\u2019s all-day band, so the screen in the kitchen says what the rest of the app already knew. a day whose only entry is a bean day no longer reads "nothing on".',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.11',
     date: '2026-09-11',
     month: '11 september 2026',
