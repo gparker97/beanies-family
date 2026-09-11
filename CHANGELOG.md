@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **You can type on the beanie wall again.** On an Android tablet, tapping an add box opened the on-screen keyboard and then closed it again immediately, so edit mode could not be used at all. Android shrinks the app to make room for its keyboard, and the wall read that as "this screen is too small to be a wall" and swapped itself for the come-back-wider message, taking the box you were typing in with it. A keyboard is not a smaller screen, and the wall now knows the difference.
+
 - **A repeating event you have been pruning in Google is imported once, not whole.** Deleting a single lesson in Google's own app does not change the repeat pattern on the event, it just marks that one date as removed, so beanies had no way to tell a clean weekly series from one with four occurrences taken out of it, and would have put them all back. It now notices, and imports that event on its next date instead.
 - **"Working Location", "Out of office" and "Focus time" are no longer offered for import.** Google returns these alongside real events and they repeat every day, so the review list filled with "Home" and "Office" rows, ticked, ahead of the family's actual events.
 - **An event that spans several days keeps its last day.** A three-day conference was arriving as one overnight, and an event exactly twenty-four hours long arrived with no length at all.
