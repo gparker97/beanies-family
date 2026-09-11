@@ -131,7 +131,7 @@ const faqSchema = {
             <div class="trial">
               <div class="trial-num">{TRIAL_DAYS}<small>days</small></div>
               <p>
-                <b>generous, if i do say so myself.</b> every feature, every family member, the
+                <b>a generous free trial (if i do say so myself).</b> every feature, every family member, the
                 beanie wall, the finances, and more, plus one ai read a day. after that beanies
                 goes read-only until you pick a plan. no hard feelings either way: your data is
                 always yours, exportable any time.
@@ -184,8 +184,7 @@ const faqSchema = {
                 </p>
                 <ul>
                   <li><span>✅</span><span>everything in beanies basic</span></li>
-                  <li><span>✅</span><span>ten ai reads a day, and i pay the tokens</span></li>
-                  <li><span>✅</span><span>more room for photos in your family file</span></li>
+                  <li><span>✅</span><span>ten ai reads per day</span></li>
                   <li><span>✅</span><span>early access to exclusive new features</span></li>
                 </ul>
                 <a
@@ -274,16 +273,8 @@ const faqSchema = {
             <h2 class="section-title">a little something for being an early bean</h2>
             <p class="section-subtitle">a special surprise for my early adopter beanies</p>
             <div class="offers">
-              <div class="offer offer--ten">
-                <p class="who">the first 10 families</p>
-                <p class="deal"><em data-price="one">{p.one}</em> a month, forever</p>
-                <p>
-                  rate the app and tell me you did. that's your price for good, on either plan,
-                  whatever the prices become. i'm actually keeping a list.
-                </p>
-              </div>
               <div class="offer offer--rest">
-                <p class="who">everyone else who joins before v1</p>
+                <p class="who">everyone who joins before v1</p>
                 <p class="deal"><em>half price</em>, forever</p>
                 <p>
                   when your trial period is up, it's 50% off for as long as you stay. forever. no
@@ -709,12 +700,14 @@ const faqSchema = {
   }
 
   /* early families */
+  /* One offer since the first-ten deal was retired, so the container is sized
+     for a single card rather than stretching it across the old two-up width. */
   .pricing-page .offers {
     display: grid;
     gap: 20px;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     margin: 0 auto;
-    max-width: 820px;
+    max-width: 520px;
   }
 
   .pricing-page .offer {
