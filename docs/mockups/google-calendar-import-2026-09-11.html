@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Google Calendar import — beanies.family mockup (#94)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+         TOKENS — lifted verbatim from packages/brand/theme.css.
+         Do not invent values here; the CIG is the authority.
+         ============================================================ */
+      :root {
+        --primary-50: #fef3ee;
+        --primary-100: #fde6d4;
+        --primary-200: #fbc9a8;
+        --primary-400: #f48347;
+        --primary-500: #f15d22;
+        --primary-600: #d14d1a;
+        --secondary-50: #edf0f3;
+        --secondary-100: #d2dae2;
+        --secondary-400: #506b7a;
+        --secondary-500: #2c3e50;
+        --secondary-700: #1a252f;
+        --cloud-white: #f8f9fa;
+        --silk-50: #f0f7fd;
+        --silk-100: #daeef9;
+        --silk-300: #aed6f1;
+        --terracotta-400: #e67e22;
+        --purple-400: #9b59b6;
+        --success: #27ae60;
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+        --sq: 24px;
+
+        /* semantic, light */
+        --ground: var(--cloud-white);
+        --raised: #ffffff;
+        --overlay: #ffffff;
+        --ink: var(--secondary-500);
+        --ink-soft: var(--secondary-400);
+        --ink-faint: #7b8b99;
+        --line: #e4e9ee;
+        --accent: var(--primary-500);
+        --accent-tint: var(--primary-50);
+        --silk-tint: var(--silk-50);
+
+        /* ⚠️ TEXT ON A TINT IS NOT THE SAME COLOUR AS THE ACCENT.
+           Heritage Orange #f15d22 on its own 50-tint #fef3ee measures 3.06:1,
+           which fails AA (4.5:1) for the 12px semibold chips below. primary-700
+           on the same tint measures 5.14:1. Same trap on the silk chip: #2d7ca8
+           on silk-50 is 3.98:1, while #1f5f80 is 6.46:1. Use these for any text
+           or meaningful icon sitting on a tinted pill in LIGHT mode. Dark mode
+           does not need them, because the -lift accents are built for it. */
+        --accent-on-tint: var(--primary-700);
+        --silk-on-tint: #1f5f80;
+      }
+
+      /* Dark scale — surface ladder + ink scale + the -lift accents.
+         CIG slides 8-9: accents get LIGHTER on dark, never darker. */
+      .theme-dark {
+        --ground: #151e27;
+        --raised: #1e2a36;
+        --overlay: #26343f;
+        --hover: #2f3e4b;
+        --ink: #f2f5f7;
+        --ink-soft: #c3ced6;
+        --ink-faint: #9aa9b4;
+        --line: #4a5b69;
+        --line-strong: #7a8a97;
+        --accent: #ff8b5e; /* accent-lift */
+        --accent-tint: rgba(255, 139, 94, 0.14);
+        --silk-tint: rgba(143, 199, 232, 0.14);
+        --accent-on-tint: #ff8b5e; /* already 7.30 on the dark ladder */
+        --silk-on-tint: #8fc7e8; /* silk-lift, 9.22 */
+        --silk-300: #8fc7e8; /* silk-lift */
+        --terracotta-400: #f0a05a; /* terracotta-lift */
+        --purple-400: #cb95dd; /* purple-lift */
+        --success: #5fd08a; /* success-lift */
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+        --soft-shadow: 0 8px 40px rgba(0, 0, 0, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #eef1f4;
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--secondary-500);
+      }
+
+      /* ---------- mockup sheet chrome (not part of the product) ---------- */
+      .sheet {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 40px 20px 96px;
+      }
+      .sheet-head {
+        margin-bottom: 40px;
+      }
+      .sheet-head h1 {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 2rem;
+        margin: 0 0 8px;
+        color: var(--secondary-500);
+      }
+      .sheet-head p {
+        margin: 0;
+        max-width: 70ch;
+        line-height: 1.6;
+        color: var(--secondary-400);
+        font-size: 0.9375rem;
+      }
+      .sheet-note {
+        margin-top: 16px;
+        padding: 14px 18px;
+        background: #fff;
+        border-left: 4px solid var(--primary-500);
+        border-radius: 0 14px 14px 0;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--secondary-400);
+        max-width: 78ch;
+      }
+      .step-label {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.8125rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #90a0ae;
+        margin: 52px 0 14px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+      .step-label span {
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+        font-family: Inter, sans-serif;
+        font-size: 0.8125rem;
+        color: #a4b2be;
+      }
+      .row {
+        display: flex;
+        gap: 28px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      /* ---------- device frames ---------- */
+      .screen {
+        background: var(--ground);
+        border-radius: var(--sq);
+        padding: 28px;
+        box-shadow: var(--soft-shadow);
+        flex: 1 1 560px;
+        min-width: 320px;
+      }
+      .phone {
+        width: 390px;
+        flex: 0 0 390px;
+        padding: 20px 16px;
+      }
+
+      /* ============================================================
+         PRODUCT UI
+         ============================================================ */
+      .h-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: var(--ink);
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      .h-sub {
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--ink-soft);
+        margin: 0 0 22px;
+        max-width: 62ch;
+      }
+      .phone .h-title {
+        font-size: 1.25rem;
+      }
+
+      .card {
+        background: var(--raised);
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 22px;
+      }
+      .card + .card {
+        margin-top: 16px;
+      }
+
+      /* calendar picker */
+      .cal {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 4px;
+      }
+      .cal + .cal {
+        border-top: 1px solid var(--line);
+      }
+      .tick {
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        border: 2px solid var(--accent);
+        background: var(--accent);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 0.75rem;
+        flex: 0 0 auto;
+      }
+      .theme-dark .tick {
+        color: #151e27;
+      }
+      .tick.off {
+        background: transparent;
+        border-color: var(--line-strong, #c3ccd4);
+        color: transparent;
+      }
+      .cal-name {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--ink);
+      }
+      .cal-meta {
+        font-size: 0.8125rem;
+        color: var(--ink-faint);
+        margin-top: 2px;
+      }
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 7px;
+        vertical-align: 1px;
+      }
+
+      .window-note {
+        margin-top: 18px;
+        background: var(--silk-tint);
+        border-radius: 18px;
+        padding: 16px 18px;
+        font-size: 0.875rem;
+        line-height: 1.6;
+        color: var(--ink-soft);
+      }
+      .window-note strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* buttons */
+      .btn {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        border-radius: 1rem;
+        border: none;
+        padding: 13px 26px;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.25);
+      }
+      .theme-dark .btn {
+        color: #151e27;
+        box-shadow: none;
+      }
+      .btn.ghost {
+        background: transparent;
+        color: var(--ink-soft);
+        box-shadow: none;
+        border: 1.5px solid var(--line);
+      }
+      .btn-row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 22px;
+        flex-wrap: wrap;
+      }
+      .btn-row .spacer {
+        flex: 1;
+      }
+
+      /* review list */
+      .daygroup + .daygroup {
+        margin-top: 22px;
+      }
+      .dayhead {
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 0.8125rem;
+        color: var(--ink-faint);
+        padding: 0 4px 9px;
+        letter-spacing: 0.04em;
+      }
+      .ev {
+        display: flex;
+        gap: 14px;
+        padding: 15px 16px;
+        background: var(--raised);
+        border-radius: 18px;
+        align-items: flex-start;
+      }
+      .ev + .ev {
+        margin-top: 9px;
+      }
+      .ev.off {
+        opacity: 0.55;
+      }
+      .ev-body {
+        flex: 1;
+        min-width: 0;
+      }
+      .ev-title {
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--ink);
+        margin-bottom: 3px;
+      }
+      .ev-when {
+        font-size: 0.8125rem;
+        color: var(--ink-soft);
+      }
+      .ev-where {
+        font-size: 0.8125rem;
+        color: var(--ink-faint);
+        margin-top: 2px;
+      }
+
+      /* the recurrence line — the thing that proves one series, not N copies */
+      .repeat {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        margin-top: 9px;
+        background: var(--accent-tint);
+        color: var(--accent-on-tint);
+        border-radius: 20px;
+        padding: 5px 13px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-family: Outfit, sans-serif;
+      }
+      .theme-dark .repeat {
+        color: var(--accent-on-tint);
+      }
+      .repeat-sub {
+        font-size: 0.75rem;
+        color: var(--ink-faint);
+        margin-top: 7px;
+        font-style: italic;
+      }
+
+      /* outcome chips — the crux: what happens to the Google event */
+      .outcome {
+        flex: 0 0 auto;
+        text-align: right;
+        max-width: 210px;
+      }
+      .chip {
+        display: inline-block;
+        border-radius: 20px;
+        padding: 5px 13px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        font-family: Outfit, sans-serif;
+        white-space: nowrap;
+      }
+      .chip.adopt {
+        background: var(--accent-tint);
+        color: var(--accent-on-tint);
+      }
+      .chip.copy {
+        background: var(--silk-tint);
+        color: var(--silk-on-tint);
+      }
+      .chip-note {
+        font-size: 0.75rem;
+        line-height: 1.5;
+        color: var(--ink-faint);
+        margin-top: 7px;
+      }
+
+      /* the invited-event explainer, which must survive past import */
+      .invited-note {
+        margin-top: 11px;
+        background: var(--silk-tint);
+        border-radius: 14px;
+        padding: 11px 14px;
+        font-size: 0.8125rem;
+        line-height: 1.55;
+        color: var(--ink-soft);
+      }
+      .invited-note b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* summary + result */
+      .tally {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin: 4px 0 18px;
+      }
+      .tally div {
+        flex: 1 1 150px;
+        background: var(--raised);
+        border-radius: 18px;
+        padding: 16px 18px;
+        box-shadow: var(--card-shadow);
+      }
+      .tally .n {
+        font-family: Outfit, sans-serif;
+        font-weight: 800;
+        font-size: 1.875rem;
+        color: var(--ink);
+        line-height: 1.1;
+      }
+      .tally .n.accent {
+        color: var(--accent);
+      }
+      .tally .k {
+        font-size: 0.8125rem;
+        color: var(--ink-soft);
+        margin-top: 5px;
+        line-height: 1.45;
+      }
+
+      .plainlist {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .plainlist li {
+        font-size: 0.875rem;
+        line-height: 1.65;
+        color: var(--ink-soft);
+        padding-left: 24px;
+        position: relative;
+        margin-bottom: 8px;
+      }
+      .plainlist li::before {
+        content: '';
+        position: absolute;
+        left: 4px;
+        top: 9px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+      .plainlist b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .bigcheck {
+        width: 56px;
+        height: 56px;
+        border-radius: 20px;
+        background: var(--accent-tint);
+        color: var(--accent);
+        display: grid;
+        place-items: center;
+        font-size: 1.75rem;
+        margin-bottom: 16px;
+      }
+
+      .scanbar {
+        height: 8px;
+        border-radius: 10px;
+        background: var(--secondary-100);
+        overflow: hidden;
+        margin-top: 6px;
+      }
+      .theme-dark .scanbar {
+        background: #2f3e4b;
+      }
+      .scanbar i {
+        display: block;
+        height: 100%;
+        width: 62%;
+        border-radius: 10px;
+        background: linear-gradient(90deg, var(--primary-500), var(--terracotta-400));
+      }
+
+      @media (max-width: 760px) {
+        .outcome {
+          text-align: left;
+          max-width: none;
+          flex-basis: 100%;
+          margin-top: 10px;
+        }
+        .ev {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="sheet-head">
+        <h1>Bringing your calendar across</h1>
+        <p>
+          The one-time Google Calendar import, issue #94. A migration, not a sync: one direction,
+          once, reviewed by the user, and then it ends. The screen that matters is step 2, because
+          it is where a parent decides what happens to events that already exist in Google.
+        </p>
+        <div class="sheet-note">
+          <b>The one idea this flow has to land.</b> Every row states its own outcome. An event you
+          created gets <em>taken over</em>, so beanies edits update the original and Google still
+          holds exactly one copy. An event someone else created gets <em>copied</em>, and beanies
+          says plainly that your edits will stay here. A recurring event is one row with its
+          pattern, never thirty-eight rows.
+        </div>
+      </div>
+
+      <!-- ============ STEP 1 ============ -->
+      <div class="step-label">Step 1 <span>Choose what to look at</span></div>
+      <div class="row">
+        <div class="screen">
+          <h2 class="h-title">Bring your calendar across</h2>
+          <p class="h-sub">
+            beanies will look at the next 12 months and show you what it finds. Nothing is added
+            until you pick it.
+          </p>
+          <div class="card">
+            <div class="cal">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="cal-name"><span class="swatch" style="background: #f15d22"></span>Greg Parker</div>
+                <div class="cal-meta">Your main calendar</div>
+              </div>
+            </div>
+            <div class="cal">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="cal-name"><span class="swatch" style="background: #9b59b6"></span>Family</div>
+                <div class="cal-meta">Shared with Sophia</div>
+              </div>
+            </div>
+            <div class="cal">
+              <div class="tick off">✓</div>
+              <div class="ev-body">
+                <div class="cal-name"><span class="swatch" style="background: #7b8b99"></span>Holidays in Singapore</div>
+                <div class="cal-meta">Read only, so beanies cannot bring these across</div>
+              </div>
+            </div>
+          </div>
+          <div class="window-note">
+            beanies reads the <strong>title, time, place and repeat pattern</strong> of your events.
+            It does not read your guest lists.
+          </div>
+          <div class="btn-row">
+            <button class="btn">Look at my calendar</button>
+            <button class="btn ghost">Not now</button>
+          </div>
+        </div>
+
+        <div class="screen phone">
+          <h2 class="h-title">Bring your calendar across</h2>
+          <p class="h-sub">Next 12 months. Nothing is added until you pick it.</p>
+          <div class="card" style="padding: 16px">
+            <div class="cal" style="padding: 11px 2px">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="cal-name" style="font-size: 0.9375rem"><span class="swatch" style="background: #f15d22"></span>Greg Parker</div>
+              </div>
+            </div>
+            <div class="cal" style="padding: 11px 2px">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="cal-name" style="font-size: 0.9375rem"><span class="swatch" style="background: #9b59b6"></span>Family</div>
+              </div>
+            </div>
+            <div class="cal" style="padding: 11px 2px">
+              <div class="tick off">✓</div>
+              <div class="ev-body">
+                <div class="cal-name" style="font-size: 0.9375rem"><span class="swatch" style="background: #7b8b99"></span>Holidays</div>
+                <div class="cal-meta">Read only</div>
+              </div>
+            </div>
+          </div>
+          <div class="window-note" style="font-size: 0.8125rem">
+            Reads title, time, place and repeat pattern. Not your guest lists.
+          </div>
+          <div class="btn-row">
+            <button class="btn" style="width: 100%">Look at my calendar</button>
+          </div>
+          <div class="card" style="margin-top: 16px">
+            <div class="cal-name" style="font-size: 0.9375rem">Looking through 2 calendars</div>
+            <div class="cal-meta" style="margin-bottom: 8px">34 things so far</div>
+            <div class="scanbar"><i></i></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STEP 2 ============ -->
+      <div class="step-label">Step 2 <span>Pick what comes across — the screen that matters</span></div>
+      <div class="row">
+        <div class="screen">
+          <h2 class="h-title">34 things in the next 12 months</h2>
+          <p class="h-sub">
+            Pick what you want in beanies. Each one tells you what happens to it in Google
+            afterwards.
+          </p>
+
+          <div class="daygroup">
+            <div class="dayhead">Tuesday 16 September</div>
+
+            <div class="ev">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="ev-title">Joey swimming</div>
+                <div class="ev-when">4:00pm to 4:45pm</div>
+                <div class="ev-where">Katong Swimming Complex</div>
+                <div class="repeat">↻ Every Tuesday until 9 December</div>
+                <div class="repeat-sub">Comes across as one repeating activity, not 13 separate ones.</div>
+              </div>
+              <div class="outcome">
+                <span class="chip adopt">beanies takes it over</span>
+                <div class="chip-note">Your edits here will update this event in Google. No second copy.</div>
+              </div>
+            </div>
+
+            <div class="ev">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="ev-title">Parents evening, Year 4</div>
+                <div class="ev-when">7:00pm to 8:30pm</div>
+                <div class="ev-where">Tanglin Trust School</div>
+                <div class="invited-note">
+                  <b>The school created this one</b>, so beanies cannot change it. It will come
+                  across, and anything you change here stays here.
+                </div>
+              </div>
+              <div class="outcome">
+                <span class="chip copy">Copied across</span>
+                <div class="chip-note">Left exactly as it is in Google.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="daygroup">
+            <div class="dayhead">Saturday 20 September</div>
+
+            <div class="ev">
+              <div class="tick">✓</div>
+              <div class="ev-body">
+                <div class="ev-title">Ollie football</div>
+                <div class="ev-when">9:00am to 10:30am</div>
+                <div class="repeat">↻ Every Saturday, no end date</div>
+              </div>
+              <div class="outcome">
+                <span class="chip adopt">beanies takes it over</span>
+              </div>
+            </div>
+
+            <div class="ev off">
+              <div class="tick off">✓</div>
+              <div class="ev-body">
+                <div class="ev-title">Dentist</div>
+                <div class="ev-when">All day</div>
+              </div>
+              <div class="outcome">
+                <span class="chip" style="background: var(--secondary-50); color: var(--ink-faint)">Leaving this one</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn ghost">Select none</button>
+            <div class="spacer"></div>
+            <button class="btn">Bring 31 across</button>
+          </div>
+        </div>
+
+        <div class="screen phone">
+          <h2 class="h-title">34 things found</h2>
+          <p class="h-sub">Pick what you want in beanies.</p>
+          <div class="dayhead">Tuesday 16 September</div>
+          <div class="ev" style="flex-wrap: wrap">
+            <div class="tick">✓</div>
+            <div class="ev-body">
+              <div class="ev-title" style="font-size: 0.9375rem">Joey swimming</div>
+              <div class="ev-when">4:00pm to 4:45pm</div>
+              <div class="repeat">↻ Every Tuesday until 9 Dec</div>
+            </div>
+            <div style="flex-basis: 100%; margin-top: 10px">
+              <span class="chip adopt">beanies takes it over</span>
+              <div class="chip-note">Your edits will update this event in Google.</div>
+            </div>
+          </div>
+          <div class="ev" style="flex-wrap: wrap">
+            <div class="tick">✓</div>
+            <div class="ev-body">
+              <div class="ev-title" style="font-size: 0.9375rem">Parents evening</div>
+              <div class="ev-when">7:00pm to 8:30pm</div>
+            </div>
+            <div style="flex-basis: 100%; margin-top: 10px">
+              <span class="chip copy">Copied across</span>
+              <div class="invited-note">
+                <b>The school created this one.</b> Anything you change here stays here.
+              </div>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" style="width: 100%">Bring 31 across</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STEP 2, DARK ============ -->
+      <div class="step-label">Step 2 in dark mode <span>Accents lift, nothing is a raw grey</span></div>
+      <div class="row">
+        <div class="screen theme-dark">
+          <h2 class="h-title">34 things in the next 12 months</h2>
+          <p class="h-sub">Pick what you want in beanies. Each one tells you what happens to it in Google afterwards.</p>
+          <div class="dayhead">Tuesday 16 September</div>
+          <div class="ev">
+            <div class="tick">✓</div>
+            <div class="ev-body">
+              <div class="ev-title">Joey swimming</div>
+              <div class="ev-when">4:00pm to 4:45pm</div>
+              <div class="ev-where">Katong Swimming Complex</div>
+              <div class="repeat">↻ Every Tuesday until 9 December</div>
+              <div class="repeat-sub">Comes across as one repeating activity, not 13 separate ones.</div>
+            </div>
+            <div class="outcome">
+              <span class="chip adopt">beanies takes it over</span>
+              <div class="chip-note">Your edits here will update this event in Google.</div>
+            </div>
+          </div>
+          <div class="ev">
+            <div class="tick">✓</div>
+            <div class="ev-body">
+              <div class="ev-title">Parents evening, Year 4</div>
+              <div class="ev-when">7:00pm to 8:30pm</div>
+              <div class="invited-note">
+                <b>The school created this one</b>, so beanies cannot change it. Anything you change
+                here stays here.
+              </div>
+            </div>
+            <div class="outcome">
+              <span class="chip copy">Copied across</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn ghost">Select none</button>
+            <div class="spacer"></div>
+            <button class="btn">Bring 31 across</button>
+          </div>
+        </div>
+
+        <div class="screen phone theme-dark">
+          <h2 class="h-title">All done</h2>
+          <p class="h-sub">31 things are in your planner.</p>
+          <div class="tally">
+            <div><div class="n accent">22</div><div class="k">taken over by beanies</div></div>
+            <div><div class="n">9</div><div class="k">copied across</div></div>
+          </div>
+          <ul class="plainlist">
+            <li><b>4 repeating activities</b> came across with their patterns.</li>
+            <li><b>9 are copies</b>, because someone else created them.</li>
+          </ul>
+          <div class="btn-row">
+            <button class="btn" style="width: 100%">See my planner</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ STEP 3 + 4 ============ -->
+      <div class="step-label">Steps 3 and 4 <span>Confirm, then what actually happened</span></div>
+      <div class="row">
+        <div class="screen">
+          <h2 class="h-title">Bring 31 things across?</h2>
+          <p class="h-sub">This happens once. You can edit or delete anything afterwards.</p>
+          <div class="card">
+            <ul class="plainlist">
+              <li><b>22 become beanies activities</b> and beanies looks after them from now on. Editing one here updates it in Google.</li>
+              <li><b>9 are copied across</b> and left alone in Google, because someone else created them. Your edits will stay in beanies.</li>
+              <li><b>4 of the 31 repeat</b>, and each comes across as one activity with its pattern.</li>
+              <li>Nothing in Google is deleted, and nothing is duplicated.</li>
+            </ul>
+          </div>
+          <div class="btn-row">
+            <button class="btn ghost">Back</button>
+            <div class="spacer"></div>
+            <button class="btn">Yes, bring them across</button>
+          </div>
+        </div>
+
+        <div class="screen">
+          <div class="bigcheck">🫘</div>
+          <h2 class="h-title">All done</h2>
+          <p class="h-sub">31 things are in your planner. Your Google Calendar still has exactly what it had before.</p>
+          <div class="tally">
+            <div><div class="n accent">22</div><div class="k">taken over by beanies</div></div>
+            <div><div class="n">9</div><div class="k">copied across</div></div>
+            <div><div class="n">3</div><div class="k">left behind, as you asked</div></div>
+          </div>
+          <div class="card">
+            <ul class="plainlist">
+              <li><b>Watch out for the 9 copies.</b> They carry a label in your planner, so you will always know why an edit did not reach Google.</li>
+              <li>This import is finished. beanies will not look at your calendar again unless you ask it to.</li>
+            </ul>
+          </div>
+          <div class="btn-row">
+            <button class="btn">See my planner</button>
+            <button class="btn ghost">Back to settings</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sheet-note" style="margin-top: 48px">
+        <b>Notes for the plan.</b> Chip wording is the part worth arguing about, since it is the
+        whole feature in two words. "beanies takes it over" reads as ownership without saying
+        "adopt", which means nothing to a parent. "Copied across" is honest that a second thing now
+        exists in beanies while the Google event is untouched. The invited explainer appears in the
+        review list <em>and</em> has to persist on the imported activity, so it is written as a
+        sentence that still makes sense months later, not as a one-off warning.
+      </div>
+    </div>
+  </body>
+</html>
