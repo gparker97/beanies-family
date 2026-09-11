@@ -17,6 +17,61 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.11',
+    date: '2026-09-11',
+    month: '11 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Bring your Google Calendar across, and see every birthday on the planner.',
+      beanie: 'bring your google calendar across, and see every birthday on the planner.',
+    },
+    features: [
+      {
+        icon: '\u{1F4C5}',
+        title: { en: 'Import your Google Calendar', beanie: 'import your google calendar' },
+        description: {
+          en: 'Connecting a calendar used to send your beanies activities out to Google but never bring anything in. Now it can: pick which calendars to read, see everything found in the next 12 months, untick anything you would rather leave, and import the rest. An event you created is kept in sync, so editing it here updates the original in Google - no second copy. Guest lists are never read.',
+          beanie:
+            'connecting a calendar used to send your beanies activities out to google but never bring anything in. now it can: pick which calendars to read, see everything found in the next 12 months, untick anything you would rather leave, and import the rest. an event you created is kept in sync, so editing it here updates the original in google - no second copy. guest lists are never read.',
+        },
+      },
+      {
+        icon: '\u{1F382}',
+        title: { en: 'Every birthday, on the calendar', beanie: 'every bean day, on the calendar' },
+        description: {
+          en: "Family birthdays now show on the month and week views, worked out from the date on each bean's profile - pets included. Nothing to add, nothing to keep up to date, and correcting a date of birth fixes every year at once.",
+          beanie:
+            "family bean days now show on the month and week views, worked out from the date on each bean's profile - pets included. nothing to add, nothing to keep up to date, and correcting a date of birth fixes every year at once.",
+        },
+      },
+      {
+        icon: '\u{1F4FA}',
+        title: {
+          en: 'The beanie wall takes typing again',
+          beanie: 'the beanie wall takes typing again',
+        },
+        description: {
+          en: 'On an Android tablet the on-screen keyboard closed the instant it opened, so nothing could be added from the wall. The wall now knows the difference between a keyboard covering the screen and a screen too small to be a wall.',
+          beanie:
+            'on an android tablet the on-screen keyboard closed the instant it opened, so nothing could be added from the wall. the wall now knows the difference between a keyboard covering the screen and a screen too small to be a wall.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.10',
     date: '2026-09-10',
     month: '10 september 2026',
