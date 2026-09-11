@@ -30,6 +30,7 @@ import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useMediaQuery } from '@/composables/useMediaQuery';
+import { useWallRoomGate } from '@/composables/useWallRoomGate';
 import { useToday } from '@/composables/useToday';
 import { useWakeLock } from '@/composables/useWakeLock';
 import { useWallAnchor } from '@/composables/useWallAnchor';
@@ -78,26 +79,17 @@ const { bursts, burst } = useWallBurst();
 useWakeLock(SURFACE);
 
 /**
- * The wall is a read-from-across-the-room display: bean lanes side by side, a
- * full week of columns, a time axis. It works in BOTH orientations — see
- * `wall-portrait` below — so this is deliberately not an orientation test. What
- * it needs is room on BOTH axes, which is a different question to "is this
- * portrait".
+ * Is there room here to BE a wall? Reactive, so rotating a device or resizing a
+ * browser window moves between the wall and the gate rather than stranding
+ * anyone on either.
  *
- * A width-only threshold gets it wrong twice, in opposite directions: an iPad
- * mini in portrait is 744px wide and would be refused a wall it renders
- * perfectly well, while a phone held sideways is 844px wide and would be handed
- * one it has only 390px of height to draw.
- *
- * So: a minimum on the smaller side, whichever side that currently is. 600px
- * is Android's own `sw600dp` tablet threshold and the same number
- * `isRotatableFormFactor()` uses, so "big enough to rotate" and "big enough for
- * a wall" stay one idea.
- *
- * Reactive via matchMedia, so rotating a device or resizing a browser window
- * moves between the wall and the gate rather than stranding anyone on either.
+ * ⚠️ Deliberately NOT a bare `useMediaQuery` any more. A soft keyboard shrinks
+ * the viewport below the floor, and unmounting this subtree while an `<input>`
+ * inside it has focus is what made edit mode unusable on Android. See
+ * `useWallRoomGate` — the whole reasoning lives there, next to the timer that
+ * implements it.
  */
-const hasRoom = useMediaQuery('(min-width: 600px) and (min-height: 600px)', true);
+const hasRoom = useWallRoomGate(SURFACE);
 const tooNarrow = computed(() => !hasRoom.value);
 
 // The wall may rotate; every other screen keeps the declarative default. Not
