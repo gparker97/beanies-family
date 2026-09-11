@@ -2035,7 +2035,23 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
-> **Validated 2026-09-10 (session 7 — the 0.19 deploy).** Every carried entry re-checked
+> **Validated 2026-09-11 (session 3 — the 0.20.1 deploy).** This session's work was net-new
+> (birthdays, the wall band, the calendar-import copy sweep) and orthogonal to the carried
+> block, so nothing below was superseded by it. Two entries ADDED at the top. The two
+> "(UNDEPLOYED)" markers on the 2026-09-11 session sections were corrected — both shipped.
+>
+> - ⚠️ **The deploy gate cannot be satisfied by a docs-only commit at HEAD.** `main-ci.yml` and
+>   `security.yml` both carry `paths-ignore: docs/**`, but `deploy.yml`'s gate demands a
+>   Security run on the EXACT head SHA and fails with "No Security Scanning run found". Hit
+>   twice today; worked around by dispatching both workflows by hand. Fix properly by either
+>   exempting `docs/**` from the format check or having the gate walk back to the last SHA that
+>   did run. Until then: never leave a docs-only commit at HEAD before a deploy.
+> - **The beanie wall now instantiates `holidayStore`**, so a kiosk that never opens the planner
+>   makes a same-origin fetch for the holiday file it previously never made. Offline-safe by
+>   that store's own contract (never-throws, retries on reconnect), but it is a genuinely new
+>   code path on the wall — worth a glance in `#beanies-errors` after 0.20.1 reaches devices.
+>
+> **Previously validated 2026-09-10 (session 7 — the 0.19 deploy).** Every carried entry re-checked
 > by fingerprint, not carried forward blind. **2 dropped as shipped, 2 corrected.**
 > **DROPPED:** old item 2 (raise the floor 0.17 → 0.18) — done AND published this session;
 > `web/public/min-app-version.json` reads `"0.18"` and `beanies.family/min-app-version.json`
@@ -2230,7 +2246,68 @@ plan, and `Family.createdAt` in IndexedDB is re-stamped per device so only
 Notion MCP namespace (`mcp__notion__*` 404s on that DB; `mcp__notion-beanies__*` works) and an
 instruction to "fix" a `CLAUDE.md` line that was already correct.
 
-### Session 2026-09-11 (2) — the one-time Google Calendar import, #94 (UNDEPLOYED)
+### Session 2026-09-11 (3) — birthdays on every calendar + the wall; 0.20 then 0.20.1 SHIPPED
+
+**Deployed.** Vue prod is `c3c36356` / **v0.20.1** (verified: `"0.20.1"` and the commit SHA in
+the served bundle). Android 0.20.1 uploaded to the Play **production** track. iOS 0.20.1
+(build 71) **submitted to App Store review with auto-release**, having cancelled the 0.20
+submission that was still pending ("Successfully cancelled previous submission!"). The Astro
+marketing site was deliberately NOT deployed — greg is working the pricing page in a parallel
+session, so apex still serves `ac7e9e9c` from 03:26.
+
+⚠️ **0.20 was cut earlier the same day and superseded within hours.** It carried the calendar
+import + wall keyboard fix but only month-view birthdays. 0.20.1 replaces it everywhere.
+
+**What shipped on top of 0.20:**
+
+1. **Family birthdays on the calendar** (`362a1484`) — DERIVED from each member's
+   `dateOfBirth`, never stored, following the `holidayStore`/`vacationStore` shape. Correcting
+   a date of birth fixes every year at once; nothing to migrate, nothing to duplicate. Pets
+   included (the Nook already showed them). NOT pushed to Google — most people already have
+   birthdays there via Contacts. `src/utils/birthdays.ts` + `BirthdayChip.vue`.
+2. **…on EVERY calendar surface** (`4d51b2d8`) — it first shipped month-only. greg found it on
+   his phone within the hour. The miss: surfaces were enumerated by grepping `HolidayChip`, and
+   the three that were missed render via `HolidayBanner`. `DayTimeline` (shared by week AND day
+   on a phone), the desktop daily grid, and the day agenda.
+3. **…and on the beanie wall** (`50aa34df`) — the wall carried NO reference days at all, not
+   birthdays and not public holidays; only two store imports existed across the whole wall.
+   Both now ride the all-day band on the wall's own pill in the planner's colours.
+4. **The wall takes typing again** (`db3a3fb8`) — greg's Lenovo IdeaTab: the keyboard opened and
+   shut instantly, so edit mode was unusable. Android resizes the web view for its keyboard,
+   which took 1280x800 under the wall's 600px floor, and `tooNarrow` unmounted the whole
+   subtree — including the focused `<input>`. New `useWallRoomGate` makes the gate asymmetric:
+   gaining room is immediate, losing it must hold 600ms AND have nothing focused for typing.
+5. **Calendar-import copy** (`7927562c`) — "bring across" → "import" throughout, at greg's
+   direction ("be clear and direct when it applies to something technical and important"). The
+   three outcome chips became `kept in sync` / `copy only` / `next date only`.
+
+**`/code-review` (plugin) findings, all fixed** (`4bce6dd4`). The plugin is PR-shaped and this
+repo has no PRs, so its five dimensions ran as parallel agents over the commit range. Six
+findings, all mine. The two that mattered:
+
+- `ALL_DAY_VISIBLE_CAP` is **2**, and reference days had straight priority — so a day with a
+  birthday AND a holiday hid every one of the family's own all-day events behind "+N".
+  Reference days now get a reserved share (half the cap, floored at 1) and neither side may
+  strand a slot the other is not using.
+- A `span 0` guard suppressed the birthday LIST when no human columns were visible, which hides
+  a pet-only family's birthdays — breaking the "pets always pass" invariant I had just written
+  down. The span is floored instead. The comment justifying it was also FALSE: the vacation and
+  travel-segment rows below are date-filtered only, so they could reach `span 0` too. All three
+  share one `familyRowSpan` now.
+
+**Two deploy landmines caught from the docs rather than by hitting them:** the version had to be
+`0.20.1` and not `0.20R2` (`derive-store-version.mjs` strips `R<n>` because
+`CFBundleShortVersionString` takes at most three integers, so `0.20R2` uploads as `0.20` and
+Apple rejects it as used — a past release failed exactly this way); and replacing an in-review
+build needs `replace_pending_submission=true`, which has a preflight that fails early and names
+the flag.
+
+**Also found and fixed in passing:** CI and Security both carry `paths-ignore: docs/**`, but
+`deploy.yml` requires a Security run on the EXACT SHA — so a docs-only commit at HEAD makes the
+deploy gate unsatisfiable until both are dispatched by hand. Hit it, worked around it by
+dispatching both. Worth fixing properly (see Pending).
+
+### Session 2026-09-11 (2) — the one-time Google Calendar import, #94 (SHIPPED in 0.20/0.20.1)
 
 Notion #94, from an early adopter: they connected Google Calendar, expected their existing
 events to come across, and found a push-only link. Shipped in three stages, seamed at the
@@ -2293,7 +2370,7 @@ to "the privacy scopes allowed by Google" was never true. Both fixed.
 field mask actually returns content and that `singleEvents:false` returns a past-anchored
 master whose instances fall in the window.
 
-### Session 2026-09-11 (1) — the wall's "setup helper" now exists (UNDEPLOYED)
+### Session 2026-09-11 (1) — the wall's "setup helper" now exists (SHIPPED in 0.20/0.20.1)
 
 > ### ⚠️ DEPLOY ORDER: WEB FIRST, OR THE NEW SETTINGS LINK IS A 404 ⚠️
 >
