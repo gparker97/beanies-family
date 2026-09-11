@@ -2249,7 +2249,7 @@ a migration test drives the real producer to prove it is a no-op for every link 
 - The review row is 42px, down from 130px in the first mockup. The row was tall because it
   repeated its own explanation on every line; the explanation now appears once in a legend.
 
-**Copy shipped with it:** new help article `features/bring-your-google-calendar-across`, a
+**Copy shipped with it:** new help article `features/import-your-google-calendar`, a
 Google Calendar section on the privacy page (there was none), the homepage line that said
 beanies "doesn't pull in stuff from google calendar", and **a correction to
 `content/blog/2026-07-03-google-calendar-integration.md:47`** per greg's explicit call. That

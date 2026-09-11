@@ -126,6 +126,10 @@ describe('uiStrings', () => {
       'join.loadingFromCloud',
       'googleDrive.',
       'googleDisconnect.',
+      // The whole one-time import surface. It is about the family's real Google
+      // Calendar data, and a reader who acts on a euphemism here ends up with two
+      // of everything or an edit that never reaches their calendar.
+      'calendarImport.',
       'calendarSync.reconnect.',
       'calendarSync.disconnect.',
       'calendarSync.toast.',

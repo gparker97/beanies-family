@@ -9956,54 +9956,41 @@ const STRING_DEFS = {
   // Google Calendar, so the beanie values keep the real nouns ("Google",
   // "calendar", "events", "changes"). A reader who does not know the joke must
   // not be able to act wrongly here. Enforced by `uiStrings.test.ts`.
-  'calendarImport.start': {
-    en: 'Bring your calendar across',
-    beanie: 'bring your calendar across',
-  },
-  'calendarImport.settingsHint': {
-    en: 'Bring events you already have in Google into beanies, once.',
-    beanie: 'bring events you already have in google into beanies, once.',
-  },
-  'calendarImport.choose.title': {
-    en: 'Bring your calendar across',
-    beanie: 'bring your calendar across',
-  },
+  'calendarImport.start': { en: 'Import my events', beanie: 'import my events' },
   'calendarImport.choose.body': {
-    en: 'beanies will look at the next 12 months and show you what it finds. Nothing is added until you pick it.',
+    en: 'beanies reads the next 12 months of the calendars you tick and shows you what it found. Nothing is imported until you choose it.',
     beanie:
-      'beanies will look at the next 12 months and show you what it finds. nothing is added until you pick it.',
+      'beanies reads the next 12 months of the calendars you tick and shows you what it found. nothing is imported until you choose it.',
   },
   'calendarImport.choose.readOnly': {
-    en: 'Read only, so beanies cannot bring these across',
-    beanie: 'read only, so beanies cannot bring these across',
+    en: 'Read-only, so beanies cannot import from it',
+    beanie: 'read-only, so beanies cannot import from it',
   },
   'calendarImport.choose.privacy': {
-    en: 'beanies reads the title, time, place and repeat pattern of your events. It does not read your guest lists.',
+    en: 'beanies reads only the title, time, place and repeat pattern of your events. It never reads your guest lists.',
     beanie:
-      'beanies reads the title, time, place and repeat pattern of your events. it does not read your guest lists.',
+      'beanies reads only the title, time, place and repeat pattern of your events. it never reads your guest lists.',
   },
   'calendarImport.choose.untitled': { en: 'Untitled calendar', beanie: 'untitled calendar' },
-  'calendarImport.choose.scan': { en: 'Look at my calendar', beanie: 'look at my calendar' },
-  'calendarImport.scanning': {
-    en: 'Looking through your calendar…',
-    beanie: 'looking through your calendar…',
+  'calendarImport.choose.scan': {
+    en: 'Find events to import',
+    beanie: 'find events to import',
   },
-  'calendarImport.review.title': {
-    en: '{count} things in the next 12 months',
-    beanie: '{count} things in the next 12 months',
+  'calendarImport.scanning': {
+    en: 'Reading your calendars…',
+    beanie: 'reading your calendars…',
   },
   'calendarImport.review.body': {
-    en: 'Everything is ticked. Untick anything you would rather leave behind.',
-    beanie: 'everything is ticked. untick anything you would rather leave behind.',
+    en: 'Everything is ticked. Untick anything you do not want imported.',
+    beanie: 'everything is ticked. untick anything you do not want imported.',
   },
   'calendarImport.review.empty': {
-    en: 'Nothing to bring across. Your calendar has no events beanies does not already know about.',
-    beanie:
-      'nothing to bring across. your calendar has no events beanies does not already know about.',
+    en: 'Nothing to import. beanies already has every event on the calendars you picked.',
+    beanie: 'nothing to import. beanies already has every event on the calendars you picked.',
   },
   'calendarImport.review.truncated': {
-    en: 'Showing the first {count}, soonest first.',
-    beanie: 'showing the first {count}, soonest first.',
+    en: 'Showing the first {count} events, soonest first.',
+    beanie: 'showing the first {count} events, soonest first.',
   },
   'calendarImport.review.skipped': {
     en: 'beanies could not read {count} of your calendars, so nothing from them is listed.',
@@ -10015,51 +10002,80 @@ const STRING_DEFS = {
     en: '{selected} of {total} ticked',
     beanie: '{selected} of {total} ticked',
   },
-  'calendarImport.bring': { en: 'Bring {count} across', beanie: 'bring {count} across' },
-  'calendarImport.chip.adopt': { en: 'takes it over', beanie: 'takes it over' },
-  'calendarImport.chip.copy': { en: 'copied', beanie: 'copied' },
-  'calendarImport.chip.once': { en: 'comes across once', beanie: 'comes across once' },
-  'calendarImport.chip.already': { en: 'already here', beanie: 'already here' },
+  // Pluralized pairs, chosen in-template by count (the app's `t()` takes a key
+  // only). "Import 1 events" on the primary button of an irreversible-feeling
+  // action is exactly the kind of sloppiness that makes a person hesitate.
+  'calendarImport.import.one': { en: 'Import 1 event', beanie: 'import 1 event' },
+  'calendarImport.import.other': {
+    en: 'Import {count} events',
+    beanie: 'import {count} events',
+  },
+  // The three outcomes, in the fewest words that still say what ONGOING
+  // relationship each event will have with Google. That relationship is the only
+  // thing that differs between them, and getting it wrong costs a person either a
+  // duplicate or an edit that silently never reaches their calendar.
+  'calendarImport.chip.adopt': { en: 'kept in sync', beanie: 'kept in sync' },
+  'calendarImport.chip.copy': { en: 'copy only', beanie: 'copy only' },
+  'calendarImport.chip.once': { en: 'next date only', beanie: 'next date only' },
+  'calendarImport.chip.already': { en: 'already imported', beanie: 'already imported' },
   'calendarImport.legend.adopt': {
-    en: 'Your edits here update the original event in Google. No second copy.',
-    beanie: 'your edits here update the original event in google. no second copy.',
+    en: 'Editing it here updates the original event in Google. There is no second copy.',
+    beanie: 'editing it here updates the original event in google. there is no second copy.',
   },
   'calendarImport.legend.copy': {
-    en: 'Someone else created it, so beanies cannot change it. Your edits stay here.',
-    beanie: 'someone else created it, so beanies cannot change it. your edits stay here.',
+    en: 'Someone else created it, so beanies cannot change it in Google. Your edits stay here.',
+    beanie: 'someone else created it, so beanies cannot change it in google. your edits stay here.',
   },
   'calendarImport.legend.once': {
-    en: 'It repeats in a way beanies cannot copy, so it comes across once.',
-    beanie: 'it repeats in a way beanies cannot copy, so it comes across once.',
+    en: 'It repeats in a way beanies cannot match, so only its next date is imported.',
+    beanie: 'it repeats in a way beanies cannot match, so only its next date is imported.',
   },
   'calendarImport.allDay': { en: 'All day', beanie: 'all day' },
   'calendarImport.noTitle': { en: '(no title)', beanie: '(no title)' },
   // `confirm()` takes translation KEYS for title and message, and only its
-  // `detail` is an interpolated plain string, so the counts live there.
+  // `detail` is an interpolated plain string, so the counts live there. The two
+  // halves are separate keys so a run that is all one kind does not read
+  // "0 events are copied into beanies".
   'calendarImport.confirm.title': {
-    en: 'Bring these across?',
-    beanie: 'bring these across?',
+    en: 'Import these events?',
+    beanie: 'import these events?',
   },
   'calendarImport.confirm.body': {
-    en: 'This happens once. Nothing in your Google Calendar is deleted, and nothing is duplicated.',
+    en: 'This import runs once. Nothing in your Google Calendar is deleted, and nothing is duplicated.',
     beanie:
-      'this happens once. nothing in your google calendar is deleted, and nothing is duplicated.',
+      'this import runs once. nothing in your google calendar is deleted, and nothing is duplicated.',
   },
-  'calendarImport.confirm.detail': {
-    en: '{adopt} become beanies activities, and editing one here updates it in Google. {copy} are copied across and left alone in Google.',
+  'calendarImport.confirm.sync.one': {
+    en: '1 event will be kept in sync with Google, so editing it here updates the original.',
+    beanie: '1 event will be kept in sync with google, so editing it here updates the original.',
+  },
+  'calendarImport.confirm.sync.other': {
+    en: '{count} events will be kept in sync with Google, so editing one here updates the original.',
     beanie:
-      '{adopt} become beanies activities, and editing one here updates it in google. {copy} are copied across and left alone in google.',
+      '{count} events will be kept in sync with google, so editing one here updates the original.',
   },
-  'calendarImport.confirm.go': { en: 'Yes, bring them across', beanie: 'yes, bring them across' },
-  'calendarImport.done': {
-    en: '{count} things are in your planner',
-    beanie: '{count} things are in your planner',
+  'calendarImport.confirm.copy.one': {
+    en: '1 event is copied into beanies and left untouched in Google.',
+    beanie: '1 event is copied into beanies and left untouched in google.',
+  },
+  'calendarImport.confirm.copy.other': {
+    en: '{count} events are copied into beanies and left untouched in Google.',
+    beanie: '{count} events are copied into beanies and left untouched in google.',
+  },
+  'calendarImport.confirm.go': { en: 'Import them', beanie: 'import them' },
+  'calendarImport.done.one': {
+    en: '1 event is in your planner',
+    beanie: '1 event is in your planner',
+  },
+  'calendarImport.done.other': {
+    en: '{count} events are in your planner',
+    beanie: '{count} events are in your planner',
   },
   'calendarImport.failed.title': { en: "That didn't work", beanie: "that didn't work" },
   'calendarImport.failed.body': {
-    en: 'Nothing was brought across, and nothing in your Google Calendar changed. Try again in a moment.',
+    en: 'Nothing was imported, and nothing in your Google Calendar changed. Try again in a moment.',
     beanie:
-      'nothing was brought across, and nothing in your google calendar changed. try again in a moment.',
+      'nothing was imported, and nothing in your google calendar changed. try again in a moment.',
   },
   // 🔴 This is the "it worked, but beanies could not see it yet" case. It must
   // NEVER read like a failure: the events ARE saved, and a user who retries would
@@ -10069,17 +10085,18 @@ const STRING_DEFS = {
     beanie: 'your events are in',
   },
   'calendarImport.unverified.body': {
-    en: 'They were saved, but beanies could not show them straight away. Reopen your planner in a moment and they will be there. Do not bring them across again, or you will get two of everything.',
+    en: 'They were saved, but beanies could not show them straight away. Reopen your planner in a moment and they will be there. Do not run the import again, or you will get two of everything.',
     beanie:
-      'they were saved, but beanies could not show them straight away. reopen your planner in a moment and they will be there. do not bring them across again, or you will get two of everything.',
+      'they were saved, but beanies could not show them straight away. reopen your planner in a moment and they will be there. do not run the import again, or you will get two of everything.',
   },
   'calendarImport.scanFailed.title': {
-    en: "beanies couldn't read your calendar",
-    beanie: "beanies couldn't read your calendar",
+    en: "beanies couldn't read your calendars",
+    beanie: "beanies couldn't read your calendars",
   },
   'calendarImport.scanFailed.body': {
-    en: 'Nothing was changed here or in Google. Check your connection and try again.',
-    beanie: 'nothing was changed here or in google. check your connection and try again.',
+    en: 'Nothing was imported, and nothing in your Google Calendar changed. Check your connection and try again.',
+    beanie:
+      'nothing was imported, and nothing in your google calendar changed. check your connection and try again.',
   },
   'calendarSync.intro': {
     en: 'Connect a Google calendar and your family activities are pushed to it automatically. beanies stays your source of truth. Edits always happen here.',

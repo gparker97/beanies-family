@@ -78,7 +78,7 @@ async function onImport(connection: CalendarConnection) {
     await useCalendarImportStore().open(connection.id);
     importConnectionId.value = connection.id;
   } catch (e) {
-    // NOT `calendarImport.failed.*` — that copy says "nothing was brought across",
+    // NOT `calendarImport.failed.*` — that copy says "nothing was imported",
     // which is about a COMMIT. Nothing has been offered yet at this point; the
     // chooser simply could not be opened.
     showToast('error', t('calendarImport.scanFailed.title'), t('calendarImport.scanFailed.body'), {
