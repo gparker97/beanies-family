@@ -4,7 +4,6 @@ import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
 import HeroShowcase from '../components/HeroShowcase.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL } from '@beanies/brand/nav';
-import { PRICING_LIVE } from '../lib/pricing';
 
 // The LCP element. Single source of truth: this same path feeds BOTH the
 // `<link rel="preload" as="image">` (via BaseLayout's `lcpImage`) and the
@@ -311,7 +310,8 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
         </p>
 
         <p class="reveal">
-          You can clone and install it for free if you want to run it locally. <a href="/blog/have-your-cake-and-eat-it-too" class="story__link">The data never leaves
+          You can clone and install it for <a href="/pricing" class="story__link">free, forever</a>, if you want to run it
+          locally. <a href="/blog/have-your-cake-and-eat-it-too" class="story__link">The data never leaves
           your machine</a> if you don't want it to. We don't even own a database (well, not a real one).
           I don't want your janky finance data anyway, and I'm not picking up your kid for you.
         </p>
@@ -391,8 +391,8 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       <div class="container">
         <h2 class="final-cta__title reveal">so... ready to count some beans? <em>🫘</em></h2>
         <p class="final-cta__sub reveal">
-          it's free. run it locally or login below. yes, it's really free.
-          {PRICING_LIVE ? <a href="/pricing" class="final-cta__pricing">probably not forever.</a> : 'probably not forever.'}
+          free while we're in beta. run it locally or login below.
+          <a href="/pricing" class="final-cta__pricing">here's what it'll cost later.</a>
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center" class="reveal">
           <a
