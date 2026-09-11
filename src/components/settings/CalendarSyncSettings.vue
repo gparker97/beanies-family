@@ -51,8 +51,22 @@ type ConnAction = 'reconnect' | 'sync' | 'disconnect' | 'import';
 function busyKey(connectionId: string, action: ConnAction): string {
   return `${connectionId}:${action}`;
 }
+/** Does THIS button show a spinner? One action, one spinner. */
 function isBusy(connectionId: string, action: ConnAction): boolean {
   return busyId.value === busyKey(connectionId, action);
+}
+/**
+ * Is ANY action running on this connection? Splitting `busyId` per action fixed
+ * four buttons spinning at once, but it also removed the mutual exclusion the old
+ * bare-id key gave for free — and the disconnect button never read the flag at
+ * all. So "Sync now" stayed live all through a teardown, and one click re-inserted
+ * events onto a calendar whose links were being deleted, leaving orphans in the
+ * user's Google account that beanies no longer knew about.
+ *
+ * The spinner stays per-action; DISABLING is per-connection.
+ */
+function isConnectionBusy(connectionId: string): boolean {
+  return busyId.value?.startsWith(`${connectionId}:`) === true;
 }
 
 /** The one-time import (#94). Its own drawer, opened per connection. */
@@ -64,7 +78,10 @@ async function onImport(connection: CalendarConnection) {
     await useCalendarImportStore().open(connection.id);
     importConnectionId.value = connection.id;
   } catch (e) {
-    showToast('error', t('calendarImport.failed.title'), t('calendarImport.failed.body'), {
+    // NOT `calendarImport.failed.*` — that copy says "nothing was brought across",
+    // which is about a COMMIT. Nothing has been offered yet at this point; the
+    // chooser simply could not be opened.
+    showToast('error', t('calendarImport.scanFailed.title'), t('calendarImport.scanFailed.body'), {
       surface: 'calendar-import',
       error: e,
     });
@@ -303,6 +320,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
             :key="`cal-${connection.id}-${pickerRevertKey}`"
             :model-value="connection.destinationCalendarId"
             :options="calendarOptions[connection.id]"
+            :disabled="isConnectionBusy(connection.id)"
             :label="t('calendarSync.destinationLabel')"
             @update:model-value="(v) => onPickCalendar(connection, v)"
           />
@@ -315,6 +333,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               variant="primary"
               size="sm"
               :loading="isBusy(connection.id, 'reconnect')"
+              :disabled="isConnectionBusy(connection.id)"
               @click="onReconnect(connection)"
             >
               {{ t('calendarSync.action.reconnect') }}
@@ -323,6 +342,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               variant="secondary"
               size="sm"
               :loading="isBusy(connection.id, 'sync')"
+              :disabled="isConnectionBusy(connection.id)"
               @click="onSyncNow(connection)"
             >
               {{ t('calendarSync.action.syncNow') }}
@@ -331,11 +351,18 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
               variant="secondary"
               size="sm"
               :loading="isBusy(connection.id, 'import')"
+              :disabled="isConnectionBusy(connection.id)"
               @click="onImport(connection)"
             >
               {{ t('calendarImport.start') }}
             </BaseButton>
-            <BaseButton variant="ghost" size="sm" @click="onDisconnect(connection)">
+            <BaseButton
+              variant="ghost"
+              size="sm"
+              :loading="isBusy(connection.id, 'disconnect')"
+              :disabled="isConnectionBusy(connection.id)"
+              @click="onDisconnect(connection)"
+            >
               {{ t('calendarSync.action.disconnect') }}
             </BaseButton>
           </div>

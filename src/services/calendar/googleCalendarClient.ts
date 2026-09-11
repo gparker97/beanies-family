@@ -504,7 +504,20 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
           // master whose DTSTART is in the past when any instance falls in the
           // window, which is how a long-running series is importable at all.
           singleEvents: 'false',
-          showDeleted: 'false',
+          // TRUE, deliberately, and NOT a copy-paste slip from listEventTimes.
+          // Deleting one occurrence in Google's own UI does NOT add an EXDATE to
+          // the master: Google writes a separate event carrying `recurringEventId`
+          // and `status:'cancelled'`. With showDeleted=false those never arrive,
+          // so the EXDATE refusal in `parseRrule` would almost never fire for a
+          // series authored in Google, and beanies would adopt a series showing
+          // occurrences the family deliberately removed. The planner uses these
+          // cancelled instances to detect exactly that; they are never imported.
+          showDeleted: 'true',
+          // Google returns Working Location, Out-of-office and Focus-time events
+          // by default. Those are synthetic, the signed-in user is their creator,
+          // and they recur daily, so without this filter a review list fills with
+          // "Home"/"Office" rows, ticked, ahead of the family's real events.
+          eventTypes: 'default',
           maxResults: '250',
           // The import's mask, deliberately WIDER than the clash-nudge read's. It
           // requests what an activity needs and nothing more. `attendees` is absent
@@ -531,7 +544,17 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
           >;
         };
         for (const it of data.items ?? []) {
-          if (it.status === 'cancelled') continue; // backstop; showDeleted handles most
+          // A cancelled INSTANCE (it carries `recurringEventId`) is meaningful: it
+          // is how Google records a removed occurrence, and the planner refuses to
+          // adopt a master that has any. A cancelled MASTER is genuinely gone.
+          if (it.status === 'cancelled' && !it.recurringEventId) continue;
+          // A cancelled instance carries no `start` — it is a tombstone, not an
+          // event. It is not a data anomaly and must not be warned about or
+          // dropped: the planner reads only its `recurringEventId`.
+          if (it.status === 'cancelled' && it.recurringEventId) {
+            out.push({ ...it, isOrganizer: false });
+            continue;
+          }
           if (!it.start) {
             // Never a silent drop. An item with no start cannot become an activity.
             // Same altitude as listEventTimes: the REST client holds no
@@ -557,7 +580,11 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
           });
         }
         pageToken = data.nextPageToken;
-        if (++pages >= MAX_EVENT_PAGES) {
+        pages += 1;
+        // `pageToken &&` matters: without it a read that ENDED exactly on the cap
+        // warned that it had truncated a complete result. Same shape as
+        // `listInstances`, deliberately.
+        if (pageToken && pages >= MAX_EVENT_PAGES) {
           console.warn('[calendarImport] events.list page cap reached; truncating', {
             calendarId,
             pages,

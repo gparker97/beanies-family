@@ -99,7 +99,12 @@ export interface CalendarEventFull {
   /** True when the signed-in user organizes it, so beanies may adopt it. */
   isOrganizer: boolean;
   status?: string;
-  /** Present on a modified/cancelled INSTANCE of a series; such items are skipped. */
+  /**
+   * Present on a modified or cancelled INSTANCE of a series. Such items are never
+   * imported as candidates. A CANCELLED one is still load-bearing: it is how Google
+   * records an occurrence the family removed, and the planner uses it to refuse to
+   * adopt the master (adopting would put the removed occurrence back).
+   */
   recurringEventId?: string;
 }
 

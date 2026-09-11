@@ -79,14 +79,25 @@ const EXTERNAL_LANDING_ROUTE_NAMES: ReadonlyArray<string> = ['ShareTarget', 'Sha
 const PUBLIC_ENTRY_ROUTE_NAMES: ReadonlyArray<string> = [
   ...ONBOARDING_ENTRY_ROUTE_NAMES,
   ...EXTERNAL_LANDING_ROUTE_NAMES,
-  // Dev-only ADR-032 worker spike — a standalone measurement page with no auth/pod.
-  // Harmless in the podless branch, which never reaches it anyway thanks to that
-  // branch's own `!route.path.startsWith('/dev')` guard.
-  'DevWorkerSpike',
 ];
+
+/**
+ * Every dev-only harness (`/dev/*`, registered only under `import.meta.env.DEV`)
+ * is a standalone measurement page with no auth and no pod.
+ *
+ * A PREFIX test rather than another hand-maintained name, because the list above
+ * warns in its own docblock that hand-maintained lists drift — and it promptly
+ * did: `DevWorkerSpike` was named here, the later `DevCalendarImport` was not, so
+ * that harness redirected to /welcome and could not be opened at all. The DEV
+ * guard keeps a production route that happens to start with "Dev" out of it.
+ */
+function isDevHarnessRoute(name: unknown): boolean {
+  return import.meta.env.DEV && typeof name === 'string' && name.startsWith('Dev');
+}
 
 /** May this session be on this route without auth or a pod? Suppresses both boot redirects. */
 export function isPublicEntryRoute(route: Pick<RouteLocationNormalizedLoaded, 'name'>): boolean {
+  if (isDevHarnessRoute(route.name)) return true;
   return typeof route.name === 'string' && PUBLIC_ENTRY_ROUTE_NAMES.includes(route.name);
 }
 
