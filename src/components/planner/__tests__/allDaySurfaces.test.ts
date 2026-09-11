@@ -19,6 +19,7 @@ import { join } from 'node:path';
  * and this test names it on the next run.
  */
 const PLANNER_DIR = join(process.cwd(), 'src/components/planner');
+const WALL_DIR = join(process.cwd(), 'src/components/wall');
 
 /** Renders a public holiday in any of its forms. */
 function showsHoliday(src: string): boolean {
@@ -68,5 +69,45 @@ describe('every planner surface that shows a holiday also shows a birthday', () 
       (f) => !(f in EXEMPT) && showsHoliday(readFileSync(join(PLANNER_DIR, f), 'utf8'))
     );
     expect(checked.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+/**
+ * The same rule, stated for the beanie wall — where it has to be checked
+ * DIFFERENTLY, which is exactly why it gets its own assertion rather than being
+ * assumed covered by the one above.
+ *
+ * The wall does not import chips. Its three calendar views hand `WallTimeGrid` a
+ * band of all-day content, and reference days ride the same band as a second
+ * prop. So the invariant is: a view that gives the grid the family's own all-day
+ * events must also give it the birthdays and holidays for the same window.
+ * Passing one without the other is how the wall would end up showing a family's
+ * events but not their birthdays - which is the state it shipped in.
+ */
+describe('every wall view that fills the all-day band also fills its reference days', () => {
+  const files = readdirSync(WALL_DIR).filter((f) => f.endsWith('.vue'));
+
+  it('finds the wall components at all', () => {
+    expect(files.length).toBeGreaterThan(5);
+  });
+
+  it('has no view passing all-day spans without reference days', () => {
+    const missing: string[] = [];
+    let checked = 0;
+    for (const file of files) {
+      const src = readFileSync(join(WALL_DIR, file), 'utf8');
+      // The GRID is the consumer, not a producer - it declares both props.
+      if (file === 'WallTimeGrid.vue') continue;
+      if (!/:all-day-spans=/.test(src)) continue;
+      checked += 1;
+      if (!/:band-references=/.test(src)) missing.push(file);
+    }
+    expect(
+      missing,
+      `these fill the wall's all-day band but pass no reference days: ${missing.join(', ')}`
+    ).toEqual([]);
+    // Three views today (days, today, lanes). If this ever reads 0 the scan has
+    // stopped matching and is asserting nothing.
+    expect(checked).toBeGreaterThanOrEqual(3);
   });
 });

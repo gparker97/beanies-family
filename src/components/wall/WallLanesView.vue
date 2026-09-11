@@ -24,6 +24,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
 import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
+import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
@@ -132,6 +133,17 @@ const gridColumns = computed(() =>
     occurrences: eventsFor(member.id).filter((e) => !e.activity.isAllDay),
   }))
 );
+/**
+ * The lanes are MEMBER-shaped and all show one day (`anchorYmd`), so a reference
+ * day spans the whole width rather than claiming a bean's lane — the same
+ * treatment `wallSharedAllDay` gives an "everyone" item.
+ */
+const { shared } = useWallReferenceDays(computed(() => [props.anchorYmd]));
+const bandReferences = shared(
+  computed(() => props.anchorYmd),
+  computed(() => gridColumns.value.length)
+);
+
 const allDaySpans = computed(() =>
   wallSharedAllDay(
     todayEvents.value.filter((e) => e.activity.isAllDay),
@@ -266,6 +278,7 @@ function subtitleFor(memberId: string) {
       <WallTimeGrid
         :columns="gridColumns"
         :all-day-spans="allDaySpans"
+        :band-references="bandReferences"
         :now="now"
         :dim-past="true"
         :show-now="isToday"

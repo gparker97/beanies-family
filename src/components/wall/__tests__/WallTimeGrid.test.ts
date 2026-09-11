@@ -216,3 +216,80 @@ describe('WallTimeGrid', () => {
     }
   });
 });
+
+/**
+ * Reference days in the all-day band. Rendered, because a source scan can prove
+ * the props are wired and nothing else — and the two bugs this feature has
+ * already produced were both "it is wired, and still not on the screen".
+ */
+describe('the all-day band shows reference days', () => {
+  const birthday = {
+    reference: {
+      kind: 'birthday' as const,
+      id: 'b:m-joey',
+      ymd: '2026-09-03',
+      label: "Joey's 7th birthday",
+      emoji: '🎂',
+    },
+    startCol: 0,
+    span: 1,
+  };
+  const holiday = {
+    reference: {
+      kind: 'holiday' as const,
+      id: 'h:vesak',
+      ymd: '2026-09-03',
+      label: 'Vesak Day (SG)',
+    },
+    startCol: 0,
+    span: 1,
+  };
+
+  it('renders a birthday, with its cake', async () => {
+    const w = await mountGrid({ bandReferences: [birthday] });
+    expect(w.text()).toContain("Joey's 7th birthday");
+    expect(w.text()).toContain('🎂');
+  });
+
+  it('opens the band for a day whose ONLY content is a reference day', async () => {
+    // The band is `v-if`'d on having rows. Gating it on the family's own events
+    // alone would hide a birthday on a day with nothing else on it - which is
+    // precisely the day it matters most.
+    const w = await mountGrid({
+      columns: [{ key: 'a', occurrences: [] }],
+      allDaySpans: [],
+      bandReferences: [birthday],
+    });
+    expect(w.text()).toContain("Joey's 7th birthday");
+  });
+
+  it('does not write "nothing on" over a day that is showing a birthday', async () => {
+    const w = await mountGrid({
+      columns: [{ key: 'a', occurrences: [] }],
+      allDaySpans: [],
+      bandReferences: [birthday],
+    });
+    expect(w.text()).not.toContain('wall.day.nothingOn');
+  });
+
+  it('gives a holiday NO emoji, matching the planner', async () => {
+    // `HolidayChip` and `HolidayBanner` both record why: a flag emoji renders
+    // differently on every device and looks cramped. The wall must not be the
+    // one surface that disagrees.
+    const w = await mountGrid({ bandReferences: [holiday] });
+    expect(w.text()).toContain('Vesak Day (SG)');
+    expect(w.text()).not.toContain('🎂');
+  });
+
+  it('colours each kind from the planner tokens, so the kitchen matches the phone', async () => {
+    const w = await mountGrid({ bandReferences: [birthday, holiday] });
+    const html = w.html();
+    expect(html).toContain('var(--birthday-orange)');
+    expect(html).toContain('var(--holiday-clay)');
+  });
+
+  it('still renders the band with no reference days at all', async () => {
+    const w = await mountGrid({ bandReferences: [] });
+    expect(w.exists()).toBe(true);
+  });
+});
