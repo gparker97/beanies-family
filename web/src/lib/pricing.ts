@@ -116,7 +116,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'subscribe-early',
     q: 'if i subscribe before my trial period is done, what happens to the trial period?',
-    a: 'start now and billing begins today, the one-ai-per-day cap is removed, and your plan\'s full allowance kicks in. start later and nothing is charged until day 91, and the ai cap stays put until then.',
+    a: "start now and billing begins today, the one-ai-per-day cap is removed, and your plan's full allowance kicks in. start later and nothing is charged until day 91, and the ai cap stays put until then.",
   },
   {
     id: 'one-magic-bean',
@@ -126,7 +126,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'compare-to-cozi',
     q: 'how does this compare to cozi?',
-    a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and beanies + magic beans is ${PRICES.USD.fullYearly}, so we're about five dollars more. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
+    a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and beanies + magic beans is ${PRICES.USD.fullYearly}. we're about five dollars more, which is roughly due to beanies providing privacy rather than advertising. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
   },
   {
     id: 'here-now',
