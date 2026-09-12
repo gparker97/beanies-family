@@ -1108,6 +1108,22 @@ export interface CalendarConnection {
   /** Cross-device freshness-claim: when / by which device this was last reconciled. */
   lastReconciledAt?: ISODateString;
   lastReconciledBy?: string;
+  /**
+   * The family member who set this integration up, so a dead grant can prompt the
+   * person who can actually repair it instead of every member at once.
+   *
+   * Absent on connections made before this field existed, and whenever the
+   * connecting member is unknown; `resolveConnectionOwner` then falls back to
+   * matching `googleAccountEmail`, then `email`, then pod managers.
+   *
+   * Written ONCE, on a FRESH connect — never on a reconnect, because the person
+   * repairing a connection is not necessarily its owner.
+   *
+   * ⚠️ NOT a verified claim. Nothing in the reconnect path checks which Google
+   * account actually consented, so this records who pressed connect, not who
+   * controls the account.
+   */
+  connectedBy?: UUID;
   /** Last classified error (for the Settings status line). */
   lastError?: string;
   createdAt: ISODateString;

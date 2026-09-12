@@ -80,6 +80,10 @@ import {
 } from '@/utils/calendar/reconcilePlan';
 import { beaniesMayDelete } from '@/utils/calendar/linkOwnership';
 import { makeMemberNameResolver } from '@/utils/calendar/memberNames';
+// Records who connected an integration, so a dead grant prompts the person who can
+// repair it. Not a new coupling in substance: `makeMemberNameResolver` above already
+// reaches `useFamilyStore()` through `useMemberInfo` inside these same actions.
+import { useFamilyStore } from '@/stores/familyStore';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
@@ -871,6 +875,15 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // Drive seam), so logging a calendar mint here would double-count one grant.
     opts?: { countMint?: boolean }
   ): Promise<void> {
+    // ONE name for the fresh-connect question, read by both the mint trigger and
+    // `connectedBy` below.
+    //
+    // ⚠️ NOT "is a reconnect". `connectionId` may be present here and still end in
+    // a fresh create: the reconnect branch falls through to `createCalendarConnection`
+    // when the target connection has vanished (removed, or remotely healed). Writing
+    // `connectedBy` on that path would hand ownership of the family's calendar to
+    // whoever happened to tap Reconnect.
+    const isFreshConnect = !connectionId;
     // A calendar consent just MINTED a new refresh token — count it so calendar
     // token-pressure is measurable alongside the calendar revokes (#62). Covers
     // both connect + reconnect, popup + redirect (all converge here).
@@ -879,7 +892,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         grant: 'calendar',
         op: 'mint',
         outcome: 'ok',
-        trigger: connectionId ? 'reconnect' : 'connect',
+        trigger: isFreshConnect ? 'connect' : 'reconnect',
       });
     }
     if (connectionId) {
@@ -910,6 +923,10 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       refreshToken: result.refreshToken,
       grantedScopes: result.grantedScopes,
       status: 'ok',
+      // Only on a genuine first connect — see `isFreshConnect` above. Reaching
+      // here WITH a `connectionId` means the original connection vanished, and
+      // the person re-consenting is not necessarily its owner.
+      connectedBy: isFreshConnect ? (useFamilyStore().currentMemberId ?? undefined) : undefined,
     });
     invalidGrantCounters.delete(connection.id);
     // Kick a full verify reconcile for the new connection (don't block the UI).
