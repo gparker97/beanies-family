@@ -49,10 +49,10 @@ export const SOFTWARE_APPLICATION = {
   description:
     'beanies.family is the focal point of your family — a local-first, privacy-first PWA for family planning, activity tracking, and finances.',
   url: SITE_URL,
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
   author: { '@id': `${SITE_URL}#org` },
+  // NO `offers` here on purpose. This package sits below web/src and cannot
+  // import lib/pricing.ts, so a price written here would be a second source of
+  // truth and would silently drift. The homepage composes the offers from
+  // PRICES at the call site. (Until 2026-09-12 this said `price: '0'`, which
+  // shipped "beanies is free" to every crawler reading the homepage.)
 } as const;
