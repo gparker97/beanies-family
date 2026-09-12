@@ -3,7 +3,13 @@
  * whole reason `buildCopySeeds` is a pure module rather than a block inside the store.
  */
 import { describe, it, expect } from 'vitest';
-import { buildCopySeeds, freshItems } from '../listSeed';
+import {
+  buildCopySeeds,
+  buildRecipeListSeed,
+  freshItems,
+  parseDraftItems,
+  splitRecipeIngredients,
+} from '../listSeed';
 import type { FamilyList } from '@/types/models';
 
 function source(overrides: Partial<FamilyList> = {}): FamilyList {
@@ -154,5 +160,118 @@ describe('buildCopySeeds', () => {
 
   it('returns nothing when no bean was selected', () => {
     expect(build(source(), '{bean}', [])).toEqual([]);
+  });
+});
+
+/**
+ * A shopping list from a recipe (#88).
+ *
+ * The asymmetry between the two parsers is the whole point and is asserted from
+ * both sides: the recipe's own formatting is stripped, the user's typing is not.
+ */
+describe('splitRecipeIngredients — recipe → draft', () => {
+  it('passes ordinary ingredients through unchanged, in order', () => {
+    const r = splitRecipeIngredients(['2 cups plain flour', 'Salt', '3 eggs']);
+    expect(r.titles).toEqual(['2 cups plain flour', 'Salt', '3 eggs']);
+    expect(r.headingsSkipped).toBe(0);
+  });
+
+  it('drops a section heading and counts it', () => {
+    const r = splitRecipeIngredients(['For the sauce:', 'Tomatoes', 'Basil']);
+    expect(r.titles).toEqual(['Tomatoes', 'Basil']);
+    expect(r.headingsSkipped).toBe(1);
+  });
+
+  it('🔴 KEEPS a line ending in a colon that contains a digit', () => {
+    // The narrow rule's reason for existing. The broad version ("ends with ':'")
+    // silently deletes a real ingredient, which the user cannot see happening.
+    const r = splitRecipeIngredients(['2 cups flour:', 'Salt']);
+    expect(r.titles).toEqual(['2 cups flour:', 'Salt']);
+    expect(r.headingsSkipped).toBe(0);
+  });
+
+  it('trims, and drops blanks WITHOUT counting them as headings', () => {
+    const r = splitRecipeIngredients(['  Salt  ', '', '   ', 'Pepper']);
+    expect(r.titles).toEqual(['Salt', 'Pepper']);
+    expect(r.headingsSkipped).toBe(0);
+  });
+
+  it('yields no titles for an all-headings recipe', () => {
+    // Which is why the entry point gates on `titles.length`, not `ingredients.length`.
+    const r = splitRecipeIngredients(['For the sauce:', 'To serve:']);
+    expect(r.titles).toEqual([]);
+    expect(r.headingsSkipped).toBe(2);
+  });
+
+  it('handles an empty recipe', () => {
+    expect(splitRecipeIngredients([])).toEqual({ titles: [], headingsSkipped: 0 });
+  });
+});
+
+describe('parseDraftItems — draft → items', () => {
+  it('🔴 KEEPS a line the user typed that ends in a colon', () => {
+    // The heading rule runs ONCE, at open. By this point every line is the user's
+    // own, so a trailing colon is a choice — deleting it here would be silently
+    // discarding typed input, the exact failure the visible skipped-count exists
+    // to prevent, arriving from the other direction.
+    expect(parseDraftItems('Marinade:\nSoy sauce')).toEqual(['Marinade:', 'Soy sauce']);
+  });
+
+  it('trims and drops blank lines', () => {
+    expect(parseDraftItems('  Salt  \n\n   \nPepper\n')).toEqual(['Salt', 'Pepper']);
+  });
+
+  it('is empty for empty or whitespace-only text', () => {
+    expect(parseDraftItems('')).toEqual([]);
+    expect(parseDraftItems('   \n  ')).toEqual([]);
+  });
+});
+
+describe('buildRecipeListSeed', () => {
+  const seed = () =>
+    buildRecipeListSeed({
+      recipeId: 'r1',
+      titles: ['Flour', 'Eggs'],
+      title: 'Shopping for Pancakes',
+      memberId: 'm1',
+    });
+
+  it('creates one item per title, fresh and unticked', () => {
+    const s = seed();
+    expect(s.items.map((i) => i.title)).toEqual(['Flour', 'Eggs']);
+    expect(s.items.every((i) => i.completed === false)).toBe(true);
+    expect(new Set(s.items.map((i) => i.id)).size).toBe(2);
+  });
+
+  it('is a ONEOFF shopping list, not a recurring one', () => {
+    // The curated grocery template repeats weekly because a weekly shop does; a
+    // shop for THIS recipe happens once, and recurring would reset its ticks forever.
+    const s = seed();
+    expect(s.lifecycle).toBe('oneoff');
+    expect(s.category).toBe('out');
+    expect(s.completed).toBe(false);
+  });
+
+  it('🔴 carries linkedRecipeId and NO other link field', () => {
+    const s = seed() as Record<string, unknown>;
+    expect(s.linkedRecipeId).toBe('r1');
+    expect(s.linkedActivityId).toBeUndefined();
+    expect(s.linkedVacationId).toBeUndefined();
+  });
+
+  it('🔴 OMITS cycleCelebrated entirely rather than setting it false', () => {
+    // `setLifecycle('oneoff')` clears that key — the authoritative statement that
+    // a oneoff list should not carry it.
+    expect(Object.keys(seed())).not.toContain('cycleCelebrated');
+  });
+
+  it('uses the member as both owner and creator', () => {
+    const s = seed();
+    expect(s.ownerId).toBe('m1');
+    expect(s.createdBy).toBe('m1');
+  });
+
+  it('reads the emoji from the category rather than hardcoding it', () => {
+    expect(seed().emoji).toBe('🛒');
   });
 });

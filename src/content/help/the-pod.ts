@@ -697,8 +697,8 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
     excerpt:
       'Keep the recipes that get passed down — the story behind them, the photos, and a log of every time someone makes them.',
     icon: '🍜',
-    readTime: 5,
-    updatedDate: '2026-08-25',
+    readTime: 6,
+    updatedDate: '2026-09-12',
     sections: [
       {
         type: 'heading',
@@ -799,6 +799,42 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Turn a recipe into a shopping list',
+        level: 2,
+        id: 'shopping-list',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once you have picked what you are cooking, tap <strong>Shopping List</strong> on the recipe. beanies fills a new list with that recipe’s ingredients so you do not have to type them out again.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the recipe and tap <strong>Shopping List</strong>.',
+          'Check the list over. Every ingredient is on its own line — edit any of them, delete what you already have in the cupboard, or add anything else you need while you are there.',
+          'Tap <strong>Create List</strong>. Your new list appears in Beanie Lists, ready to tick off as you shop.',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Nothing is created until you say so',
+        icon: '✏️',
+        content:
+          'Closing the window without tapping Create List leaves everything exactly as it was — no list is made.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Heading lines are left out.</strong> Recipes often group ingredients under headings like “For the sauce:”. Those are not things you buy, so beanies leaves them out and tells you how many it skipped — add them back if you want them.',
+          '<strong>You can make more than one.</strong> If you already made a list for this recipe, beanies says so and offers to open it — but you can still make a fresh one for the next time you cook it.',
+          '<strong>Your list is yours.</strong> Deleting the recipe later does not delete the list. It stays exactly as you left it.',
+        ],
+      },
+      {
+        type: 'heading',
         content: 'Related help',
         level: 2,
         id: 'related',
@@ -808,6 +844,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Add a Recipe From Anywhere</strong> — read a recipe in from a photo, a link or a video',
+          '<strong>Beanie Lists</strong> — where your shopping list lives once it is made',
           '<strong>Meet the Beans</strong> — link a recipe to a bean’s favourite food',
           '<strong>Adding Photos</strong> — attach pictures to recipes and cook-log entries',
         ],
