@@ -51,6 +51,7 @@ import {
   completeCalendarRedirectAuth,
   type CalendarConnectResult,
   type CalendarConnectSuccess,
+  type CalendarConnectFailure,
 } from '@/services/calendar/calendarAuth';
 import { shouldUseRedirectAuth } from '@/services/google/googleAuth';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
@@ -145,6 +146,26 @@ const reconcileErrorCounters = new Map<string, number>();
 // store). Re-export the test seam so this store's existing tests keep importing it
 // from here.
 export { setCalendarClientForTesting };
+
+/**
+ * Are these two POSITIVELY different Google accounts?
+ *
+ * Fail-safe, deliberately asymmetric: `true` only when both sides name a real,
+ * different account. An `'unknown'` sentinel or a missing email on either side
+ * returns `false` — "cannot confirm a mismatch" — because refusing on
+ * uncertainty would brick a connection that is otherwise repairable.
+ *
+ * Mirrors the shape of `calendarGrantIsSeparate`, which makes the same call for
+ * the same reason on the revoke side.
+ */
+function isPositivelyDifferentAccount(
+  stored: string | null | undefined,
+  consented: string | null | undefined
+): boolean {
+  if (!stored || stored === 'unknown') return false;
+  if (!consented || consented === 'unknown') return false;
+  return stored.toLowerCase() !== consented.toLowerCase();
+}
 
 function nowIso(): string {
   return toISODateString(new Date());
@@ -874,7 +895,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     // the calendar token is the SAME grant Drive just minted (counted once on the
     // Drive seam), so logging a calendar mint here would double-count one grant.
     opts?: { countMint?: boolean }
-  ): Promise<void> {
+  ): Promise<CalendarConnectFailure | null> {
     // ONE name for the fresh-connect question, read by both the mint trigger and
     // `connectedBy` below.
     //
@@ -898,6 +919,41 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     if (connectionId) {
       const existing = await getCalendarConnectionById(connectionId);
       if (existing) {
+        // ⚠️ A reconnect must not REPOINT the family's calendar at a different
+        // Google account.
+        //
+        // `loginHint` is only a hint: Google's account chooser lets the user pick
+        // any account they are signed in to. Without this guard the write below
+        // would overwrite `accountEmail` AND `refreshToken` with whoever happened
+        // to consent — and because the old grant is revoked before the consent
+        // (revoke-before-mint), there would be no way back to the original.
+        //
+        // Same FAIL-SAFE shape as `calendarGrantIsSeparate`: refuse only on a
+        // POSITIVE mismatch. An 'unknown' sentinel or a missing email on either
+        // side is treated as "cannot confirm a mismatch" and allowed through,
+        // because the alternative is bricking a repairable connection.
+        //
+        // The minted token is simply not stored. It belongs to the account that
+        // just consented, so it is theirs and expires on its own; revoking it here
+        // would need a whole-grant revoke that could kill their live Drive session.
+        const mismatch = isPositivelyDifferentAccount(existing.accountEmail, result.email);
+        if (mismatch) {
+          logEvent({
+            level: 'warn',
+            surface: 'calendar-sync',
+            message: 'calendar reconnect refused: different Google account',
+            context: { action: 'reconnect:account-mismatch' },
+          });
+          await updateCalendarConnection(connectionId, {
+            status: 'needs_reconnect',
+            lastError: `Reconnect was completed as a different Google account. Sign in as ${existing.accountEmail} to reconnect, or disconnect this calendar and connect the new account.`,
+          });
+          return {
+            status: 'failed',
+            code: 'account_mismatch',
+            message: existing.accountEmail,
+          };
+        }
         await updateCalendarConnection(connectionId, {
           accountEmail: result.email ?? existing.accountEmail ?? 'unknown',
           refreshToken: result.refreshToken,
@@ -912,7 +968,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         // re-consents sees calendar sync stay dead until they reload the page.
         getCalendarClient().invalidateConnection(connectionId);
         void reconcileConnection(connectionId, { verifyExisting: true, force: true });
-        return;
+        return null;
       }
       // connectionId gone (removed or remotely healed) — fall through to a create.
     }
@@ -931,6 +987,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     invalidGrantCounters.delete(connection.id);
     // Kick a full verify reconcile for the new connection (don't block the UI).
     void reconcileConnection(connection.id, { verifyExisting: true, force: true });
+    return null;
   }
 
   /**
@@ -1095,8 +1152,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     }
     const result = await connectGoogleCalendar({ loginHint });
     if (result.status !== 'connected') return result;
-    await finalizeConnected(result, connectionId);
-    return result;
+    return (await finalizeConnected(result, connectionId)) ?? result;
   }
 
   /**
@@ -1111,8 +1167,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     const result = await completeCalendarRedirectAuth();
     if (!result || result.status !== 'connected') return result;
     const connectionId = intent === 'connect' ? undefined : intent;
-    await finalizeConnected(result, connectionId);
-    return result;
+    return (await finalizeConnected(result, connectionId)) ?? result;
   }
 
   /** Remove the connection: delete its events first, then drop its token + record. */
