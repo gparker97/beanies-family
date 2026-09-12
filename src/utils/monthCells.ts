@@ -23,6 +23,7 @@ import type {
 } from '@/components/planner/MonthDayCard.vue';
 import type { FamilyActivity, FamilyVacation } from '@/types/models';
 import type { DayExtra } from '@/utils/calendarDay';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 
 /** One activity occurrence as `activityStore.activitiesInRange` yields it. */
 export interface ActivityOccurrenceInput {
@@ -95,7 +96,11 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
   for (const occ of input.occurrences) {
     // Vacation-linked activities render as the trailing vacation bar.
     if (occ.activity.vacationId) continue;
-    if (occ.activity.isAllDay) {
+    // ⚠️ `isAllDayActivity`, NOT the raw `isAllDay` flag. An activity can carry
+    // `isAllDay: true` AND a leftover `startTime`, and the week/day views split
+    // on `!startTime` — so the same event was an all-day chip here and a timed
+    // block there. One predicate, every surface.
+    if (isAllDayActivity(occ.activity)) {
       allDay.push({ activity: occ.activity, date: occ.date });
       continue;
     }

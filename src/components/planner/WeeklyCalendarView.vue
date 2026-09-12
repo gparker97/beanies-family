@@ -34,6 +34,7 @@ import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useDayExtras } from '@/composables/useDayExtras';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
@@ -220,7 +221,7 @@ const allTimedActivities = computed(() => {
   const items: { startTime?: string; endTime?: string }[] = [];
   for (const arr of weekActivities.value.values()) {
     for (const occ of arr) {
-      if (occ.activity.startTime) items.push(occ.activity);
+      if (!isAllDayActivity(occ.activity)) items.push(occ.activity);
     }
   }
   for (const occ of weekSegments.value) {
@@ -312,7 +313,7 @@ function dayAbbrev(date: Date): string {
 
 function getTimedForDay(dateStr: string): Occurrence[] {
   return (weekActivities.value.get(dateStr) ?? [])
-    .filter((o) => o.activity.startTime)
+    .filter((o) => !isAllDayActivity(o.activity))
     .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
 }
 
@@ -383,8 +384,9 @@ const vacationSpans = computed<VacationSpan[]>(() => {
 });
 
 function getUntimedForDay(dateStr: string): Occurrence[] {
+  // `isAllDayActivity`, the ONE predicate — see its use in `monthCells`.
   return (weekActivities.value.get(dateStr) ?? []).filter(
-    (o) => !o.activity.startTime && !spanningActivityIds.value.has(o.activity.id)
+    (o) => isAllDayActivity(o.activity) && !spanningActivityIds.value.has(o.activity.id)
   );
 }
 

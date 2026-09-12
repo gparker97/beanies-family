@@ -218,3 +218,56 @@ describe('a birthday chip is wired to something, everywhere it is rendered', () 
     expect(consumers.size).toBeGreaterThanOrEqual(3);
   });
 });
+
+/**
+ * ONE definition of "all-day", everywhere.
+ *
+ * There were three. The month grid tested `activity.isAllDay`; the week, day and
+ * mobile-timeline views tested `!activity.startTime`; and `isAllDayActivity` —
+ * the canonical one, which every other part of the app already used — is
+ * `isAllDay === true || !startTime`. An activity carrying BOTH the flag and a
+ * leftover time was therefore an all-day chip on the month and a timed block on
+ * the week and the day, which is what greg saw and correctly diagnosed as "an
+ * issue of showing all day events on the weekly and on the daily calendar".
+ *
+ * A predicate this easy to re-derive inline is one a future change WILL
+ * re-derive, so it is asserted rather than remembered.
+ */
+describe('one definition of all-day', () => {
+  /** Deciding all-day from `startTime` or the raw flag, instead of the helper. */
+  const HAND_ROLLED = /\.startTime\s*&&|!\s*\w+\.activity\.startTime|activity\.isAllDay\b/;
+
+  /** Files that legitimately read the raw fields. */
+  const EXEMPT = new Set([
+    // Renders a time and must ask whether there IS one.
+    'ActivityListCard.vue',
+    'ActivityModal.vue',
+    'ActivityViewEditModal.vue',
+    'DayTimeline.vue', // formats "9:00am" for a timed block; splits via the helper
+  ]);
+
+  it('no calendar surface re-derives it from raw fields', () => {
+    const offenders: string[] = [];
+    for (const dir of [PLANNER_DIR, WALL_DIR]) {
+      for (const file of readdirSync(dir).filter((f) => f.endsWith('.vue'))) {
+        if (EXEMPT.has(file)) continue;
+        const src = readFileSync(join(dir, file), 'utf8');
+        if (HAND_ROLLED.test(src)) offenders.push(file);
+      }
+    }
+    expect(
+      offenders,
+      `these decide "all-day" themselves instead of using isAllDayActivity: ${offenders.join(', ')}`
+    ).toEqual([]);
+  });
+
+  it('the surfaces that split timed from all-day DO use the helper', () => {
+    const users = ['WeeklyCalendarView.vue', 'DailyCalendarView.vue', 'DayTimeline.vue'].filter(
+      (f) => /isAllDayActivity/.test(readFileSync(join(PLANNER_DIR, f), 'utf8'))
+    );
+    expect(users).toHaveLength(3);
+    expect(
+      /isAllDayActivity/.test(readFileSync(join(process.cwd(), 'src/utils/monthCells.ts'), 'utf8'))
+    ).toBe(true);
+  });
+});

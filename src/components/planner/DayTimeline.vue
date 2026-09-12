@@ -21,6 +21,7 @@ import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 
 import { formatTime12, addHourToTime } from '@/utils/date';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
@@ -96,7 +97,7 @@ const segmentBuckets = computed(() => splitTimedUntimed(props.segments));
 // hour grid auto-extends past the 7am-7pm default for early/late flights.
 const timedRef = computed(() => {
   const items: { startTime?: string; endTime?: string }[] = props.activities
-    .filter((o) => o.activity.startTime)
+    .filter((o) => !isAllDayActivity(o.activity))
     .map((o) => o.activity as { startTime?: string; endTime?: string });
   for (const seg of segmentBuckets.value.timed) {
     if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
@@ -106,7 +107,12 @@ const timedRef = computed(() => {
 const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(timedRef);
 
 // ── Untimed content (all-day row) ──
-const untimedActivities = computed(() => props.activities.filter((o) => !o.activity.startTime));
+// The ONE all-day predicate, shared with the month grid and the wall. Splitting
+// on `!startTime` alone put an `isAllDay: true` activity that still carried a
+// time into the TIMED grid here while the month drew it as an all-day chip.
+const untimedActivities = computed(() =>
+  props.activities.filter((o) => isAllDayActivity(o.activity))
+);
 const hasUntimedRow = computed(
   () =>
     props.birthdays.length > 0 ||
@@ -126,7 +132,7 @@ interface PositionedEvent {
 }
 
 const positionedEvents = computed<PositionedEvent[]>(() => {
-  const timed = props.activities.filter((o) => o.activity.startTime);
+  const timed = props.activities.filter((o) => !isAllDayActivity(o.activity));
   if (timed.length === 0) return [];
   // groupOverlapping works on the bare activity shape
   const clusters = groupOverlapping(timed.map((o) => o.activity));
