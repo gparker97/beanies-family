@@ -13,10 +13,18 @@
  * because all four views render through one `<component :is>`. Both are replaced
  * by this.
  */
-import { addDaysYmd, isRealYmd, parseLocalDate, startOfWeekYmd } from '@/utils/date';
+import { addDaysYmd, isRealYmd, parseLocalDate } from '@/utils/date';
 
-/** How the arrows move, per view. `null` views (the jobs board) have no arrows. */
-export type WallStepUnit = 'week' | 'day';
+/**
+ * How the arrows move, per view. `null` views (the jobs board) have no arrows.
+ *
+ * `'page'` means ONE SCREENFUL — however many day columns that view is currently
+ * drawing. It was `'week'`, a fixed seven, which stopped being the right answer
+ * when the days view became responsive: a wall showing three columns jumped
+ * seven days per press, so four of every seven days could only be reached
+ * through the strip below. See `stepDaysFor`.
+ */
+export type WallStepUnit = 'page' | 'day';
 
 /**
  * Beyond a year either way the wall is browsing somewhere nobody meant to go, and
@@ -24,7 +32,14 @@ export type WallStepUnit = 'week' | 'day';
  */
 export const MAX_ANCHOR_DRIFT_DAYS = 366;
 
-/** Days in the wall's week. Not a tunable — the views assume seven columns. */
+/**
+ * How many days the wall keeps in hand, starting at the anchor.
+ *
+ * ⚠️ NOT the render width. The days view draws `MIN_DAY_COLUMNS`..`MAX_DAY_COLUMNS`
+ * (3-7, whatever the glass fits) and puts the remainder in the chip strip below,
+ * so this is the size of the WINDOW — columns plus strip — not of the grid. The
+ * arrows page by the column count, not by this.
+ */
 const WEEK_LENGTH = 7;
 
 const MS_PER_DAY = 86_400_000;
@@ -90,46 +105,52 @@ export function clampAnchorYmd(next: string, todayYmd: string): string {
 }
 
 /**
- * Where a step lands.
+ * How many days one press of an arrow moves, for a view stepping in `unit`.
  *
- * The rule the table encodes: **today is a special anchor, and leaving it enters
- * calendar weeks.** The wall's default is deliberately forward-biased — a rolling
- * `today + 6`, "what is coming, not what has gone" — so stepping forward from
- * today goes to the START of next calendar week rather than to `today + 7`, and
- * stepping back goes to the start of THIS calendar week, which is the first
- * gesture that shows a family the days they have already used. From there it is
- * plain ±7, because by then the wall is aligned to weeks.
+ * A `'page'` is however many day columns are on screen RIGHT NOW, so the arrow
+ * always lands the next unseen day in the first column and never skips one. A
+ * `'day'` is one day, whatever the layout.
  *
- * Day steps never snap: a day is a day.
- *
- * Note there is no `todayYmd` parameter: "am I on today" turned out to be the
- * wrong question. What matters is whether the anchor is ALIGNED to a week, which
- * covers the today case (an unaligned today steps into the adjacent week) and
- * the day-tap case (an arbitrary Thursday does the same) with one rule instead
- * of two.
+ * Total: a zero, negative, fractional or NaN column count falls back to one day.
+ * A step of zero would be an arrow that visibly does nothing, which on a kitchen
+ * tablet is indistinguishable from a frozen screen.
  */
-export function nextAnchorYmd(
-  anchor: string,
-  unit: WallStepUnit,
-  direction: -1 | 1,
-  weekStartDay: number
-): string {
-  if (unit === 'day') return addDaysYmd(anchor, direction);
-
-  // ⚠️ `startOfWeekYmd` fails OPEN — it returns its input unchanged when that
-  // input is not a real date — so an equality test alone reads garbage as
-  // "already week-aligned" and takes the blind ±7 branch.
-  const alignedToWeek = isRealYmd(anchor) && anchor === startOfWeekYmd(anchor, weekStartDay);
-  if (alignedToWeek) return addDaysYmd(anchor, direction * WEEK_LENGTH);
-
-  // Off-week — which on a fresh wall means anchored on today, and after a day tap
-  // means anchored on an arbitrary day. Either way the honest move is into the
-  // adjacent calendar week rather than a blind ±7 that would preserve the offset.
-  const thisWeek = startOfWeekYmd(anchor, weekStartDay);
-  return direction === -1 ? thisWeek : addDaysYmd(thisWeek, WEEK_LENGTH);
+export function stepDaysFor(unit: WallStepUnit, visibleDayColumns: number): number {
+  if (unit === 'day') return 1;
+  if (!Number.isFinite(visibleDayColumns)) return 1;
+  return Math.max(1, Math.floor(visibleDayColumns));
 }
 
-/** The seven consecutive ymds the week views render, starting at the anchor. */
+/**
+ * Where a step lands: exactly `stepDays` in the direction pressed.
+ *
+ * ⚠️ This REPLACES a calendar-week snapping rule, and the deletion is the point.
+ * The old rule read "today is a special anchor, and leaving it enters calendar
+ * weeks" — forward from today went to the START of next calendar week, back went
+ * to the start of THIS one, and thereafter it was a blind ±7.
+ *
+ * That was coherent only while the days view drew a fixed seven columns. Once the
+ * column count became responsive, a wall showing three columns still jumped seven
+ * days per press: days four to seven of each week could be reached ONLY by
+ * tapping a chip in the strip below, and pressing `›` then `‹` did not return you
+ * to where you started. greg reported it as unintuitive, and the intuition is
+ * right — a pager should page by what is on the page.
+ *
+ * So: no snapping, no week alignment, no `weekStartDay`. `‹` and `›` are exact
+ * inverses at every anchor, which is the property the old rule could not have
+ * (its own tests pinned the asymmetry as "documented, not accidental").
+ *
+ * The forward bias the old rule expressed is not lost — it lives where it always
+ * belonged, in the default anchor being today rather than the start of this week.
+ */
+export function nextAnchorYmd(anchor: string, stepDays: number, direction: -1 | 1): string {
+  return addDaysYmd(anchor, direction * stepDaysFor('page', stepDays));
+}
+
+/**
+ * The seven consecutive ymds the days view has in hand, starting at the anchor.
+ * It RENDERS the first `dayColumns` of them and lays the rest out as chips.
+ */
 export function anchorWeekDays(anchor: string): string[] {
   return Array.from({ length: WEEK_LENGTH }, (_, i) => addDaysYmd(anchor, i));
 }

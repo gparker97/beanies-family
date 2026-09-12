@@ -50,7 +50,7 @@ import { getWallReturnPath } from '@/router';
 import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
-import { anchorOffsetDays } from '@/utils/wallAnchor';
+import { anchorOffsetDays, stepDaysFor } from '@/utils/wallAnchor';
 import { bandFitsHeight, daysLayoutFor, railFits } from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
@@ -349,27 +349,58 @@ const canGoBack = computed(() =>
 );
 
 /**
- * The navigator's label — what period the wall is currently looking at.
+ * How far one press moves, in days — or `null` for a view that has no dates.
  *
- * `formatWeekRange` is the planner's own week label, shared here rather than
- * re-derived so the wall and the planner cannot describe the same seven days
- * differently. ⚠️ It takes `Date`, not ymd.
+ * The days view pages by what is ON the page: `daysLayout.columns`, the same
+ * number it renders, so the arrow always brings the next unseen day into the
+ * first column and `‹` exactly undoes `›`. Stepping a fixed week while drawing
+ * three columns is what made the arrows feel wrong — it skipped four days a press.
+ *
+ * Resolved HERE because the column count is a page-level layout fact; the anchor
+ * composable is deliberately handed a number of days rather than made to reach
+ * for a viewport.
+ *
+ * ⚠️ `null`, not `0`, and that is load-bearing. `stepDaysFor` coerces a broken
+ * count UP to 1 so an arrow can never be a no-op, so a `0` sentinel here would
+ * mean one thing to this file and the opposite one layer down — and the jobs
+ * board, which has no dates at all, would step a day if anything ever called
+ * through. `null` cannot be coerced, which lets the three readers below share
+ * ONE gate instead of each re-testing `currentView.stepUnit`.
  */
+const stepDays = computed<number | null>(() =>
+  currentView.value.stepUnit
+    ? stepDaysFor(currentView.value.stepUnit, daysLayout.value.columns)
+    : null
+);
+
 /**
  * Whether each arrow can still move. Without this the button at the range
  * boundary looks completely live and does nothing, which on a kitchen tablet is
  * indistinguishable from a frozen screen — and from a tap that simply missed.
  */
-const canStepBack = computed(() =>
-  currentView.value.stepUnit ? anchor.canStep(currentView.value.stepUnit, -1) : false
-);
-const canStepForward = computed(() =>
-  currentView.value.stepUnit ? anchor.canStep(currentView.value.stepUnit, 1) : false
-);
+const canStepBack = computed(() => stepDays.value !== null && anchor.canStep(stepDays.value, -1));
+const canStepForward = computed(() => stepDays.value !== null && anchor.canStep(stepDays.value, 1));
 
+/**
+ * The navigator's label — what period the wall is currently looking at.
+ *
+ * `formatWeekRange` is the planner's own range label, shared here rather than
+ * re-derived so the wall and the planner cannot describe the same days
+ * differently. ⚠️ It takes `Date`, not ymd.
+ */
 const anchorLabel = computed(() => {
-  if (currentView.value.stepUnit === 'week') {
-    const days = weekDays.value;
+  if (currentView.value.stepUnit === 'page') {
+    // ⚠️ The VISIBLE days, not all seven of `weekDays`. The wall draws
+    // `daysLayout.columns` of them and keeps the rest as chips in a strip, so a
+    // label spanning all seven names days that are not on screen — and now that
+    // the arrows page by three, consecutive presses would read "12–18" then
+    // "15–21", overlapping ranges that look like the wall failed to move.
+    //
+    // The `max(1, …)` keeps the non-null assertions below true by construction
+    // rather than by reasoning about another module: `daysLayoutFor` clamps to
+    // MIN_DAY_COLUMNS today, but an empty slice here would be a blank crash on
+    // the family's wall, which is too high a price for that dependency.
+    const days = weekDays.value.slice(0, Math.max(1, daysLayout.value.columns));
     return formatWeekRange(parseLocalDate(days[0]!), parseLocalDate(days[days.length - 1]!));
   }
   return isAnchoredToToday.value ? t('wall.today.today') : formatDayLong(anchorYmd.value);
@@ -400,12 +431,12 @@ function logAnchorChange(stage: string) {
 }
 
 function onStep(direction: -1 | 1) {
-  const unit = currentView.value.stepUnit;
-  if (!unit) return;
+  const days = stepDays.value;
+  if (days === null) return;
   // A refused step still emits — with its OWN stage, so it neither corrupts the
   // browse signal with an unchanged `count` after a `next`, nor goes silent.
   // Silence here is indistinguishable from the family walking away.
-  if (anchor.step(unit, direction)) logAnchorChange(direction === 1 ? 'next' : 'prev');
+  if (anchor.step(days, direction)) logAnchorChange(direction === 1 ? 'next' : 'prev');
   else logAnchorChange('range_limit');
 }
 
@@ -415,9 +446,12 @@ function onGoToToday() {
 }
 
 /**
- * A day tap places the anchor on that day EXACTLY — not snapped to its calendar
- * week. A week that starts Saturday, with Thursday tapped, redraws starting
- * Thursday. Week *stepping* snaps; a tap is a direct placement.
+ * A day tap places the anchor on that day EXACTLY. Tapping Thursday redraws
+ * starting Thursday, whatever day the family's week begins on.
+ *
+ * Nothing on the wall snaps to a calendar week any more — the arrows page by the
+ * columns on screen — so this is no longer the exception it once was; it is now
+ * simply the same rule the arrows follow, reached by a different gesture.
  */
 /**
  * A day the wall is ALREADY drawing opens the today view on it.

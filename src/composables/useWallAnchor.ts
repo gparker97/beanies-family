@@ -8,7 +8,6 @@ import {
   anchorWeekDays,
   clampAnchorYmd,
   nextAnchorYmd,
-  type WallStepUnit,
 } from '@/utils/wallAnchor';
 
 const SURFACE = 'beanie-wall';
@@ -16,7 +15,8 @@ const SURFACE = 'beanie-wall';
 export interface WallAnchor {
   /** The day the wall is looking at. Readonly — every write goes through a clamp. */
   anchorYmd: Readonly<Ref<string>>;
-  /** The seven days the week views render, starting at the anchor. */
+  /** The seven days the days view has in hand, starting at the anchor — it draws
+   *  the first `dayColumns` and puts the rest in its chip strip. */
   weekDays: ComputedRef<string[]>;
   /** True when the wall is showing the rolling `today + 6` default. */
   isAnchoredToToday: ComputedRef<boolean>;
@@ -27,13 +27,14 @@ export interface WallAnchor {
    */
   setAnchor: (next: string, reason: string) => boolean;
   /**
-   * Move by one week or one day. See `nextAnchorYmd` for the snapping rule.
-   * Returns false when the step would leave the browsable range, in which case
-   * the anchor does not move.
+   * Move `stepDays` days. The CALLER resolves how many a press is worth, because
+   * that depends on how many columns the view is currently drawing — see
+   * `stepDaysFor`. Returns false when the step would leave the browsable range,
+   * in which case the anchor does not move.
    */
-  step: (unit: WallStepUnit, direction: -1 | 1) => boolean;
+  step: (stepDays: number, direction: -1 | 1) => boolean;
   /** Whether that step would land inside the browsable range. */
-  canStep: (unit: WallStepUnit, direction: -1 | 1) => boolean;
+  canStep: (stepDays: number, direction: -1 | 1) => boolean;
   /** Return to the rolling default. */
   goToToday: () => void;
   /**
@@ -147,9 +148,9 @@ export function useWallAnchor(): WallAnchor {
    * nothing is reported. `setAnchor`'s clamp stays for what it was written for —
    * a value that should never have been constructed at all.
    */
-  function step(unit: WallStepUnit, direction: -1 | 1): boolean {
-    if (!canStep(unit, direction)) return false;
-    const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
+  function step(stepDays: number, direction: -1 | 1): boolean {
+    if (!canStep(stepDays, direction)) return false;
+    const next = nextAnchorYmd(anchorYmd.value, stepDays, direction);
     return setAnchor(next, direction === 1 ? 'next' : 'prev');
   }
 
@@ -176,8 +177,8 @@ export function useWallAnchor(): WallAnchor {
   const weekStart = computed(() => startOfWeekYmd(anchorYmd.value, settingsStore.weekStartDay));
   const weekOfAnchor = computed(() => anchorWeekDays(weekStart.value));
 
-  function canStep(unit: WallStepUnit, direction: -1 | 1): boolean {
-    const next = nextAnchorYmd(anchorYmd.value, unit, direction, settingsStore.weekStartDay);
+  function canStep(stepDays: number, direction: -1 | 1): boolean {
+    const next = nextAnchorYmd(anchorYmd.value, stepDays, direction);
     return clampAnchorYmd(next, today.value) === next;
   }
 
