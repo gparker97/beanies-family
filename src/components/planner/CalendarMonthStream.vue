@@ -21,9 +21,7 @@ import { computed, ref, watch, nextTick, onMounted } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useHolidayStore } from '@/stores/holidayStore';
-import { useFamilyStore } from '@/stores/familyStore';
-import { birthdaysInRange } from '@/utils/birthdays';
+import { useDayExtras } from '@/composables/useDayExtras';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatMonthYear } from '@/utils/date';
 import { monthCellsFrom, prepareCellData, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
@@ -84,8 +82,6 @@ const { t } = useTranslation();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
-const holidayStore = useHolidayStore();
-const familyStore = useFamilyStore();
 const { today: todayStr } = useToday();
 
 const rootRef = ref<HTMLElement | null>(null);
@@ -105,6 +101,25 @@ const { months, monthInView, resetWindow, syncNow } = useMonthStream(
  * pure `monthCells` helper per month — per-month store queries would multiply
  * the scans by the window size on every recompute.
  */
+/**
+ * The whole rendered window, hoisted so the shared day-extras query gets one
+ * range for all 3-5 months rather than one per month.
+ */
+const streamSpan = computed(() => {
+  const list = months.value;
+  if (list.length === 0) return { startYmd: '', endYmd: '' };
+  const weekStartDay = settingsStore.weekStartDay;
+  return {
+    startYmd: monthSpan(list[0]!.y, list[0]!.m, weekStartDay).startYmd,
+    endYmd: monthSpan(list[list.length - 1]!.y, list[list.length - 1]!.m, weekStartDay).endYmd,
+  };
+});
+/** Birthdays, holidays and trips — the ONE query the beanie wall asks too. */
+const { extras: dayExtras } = useDayExtras(
+  computed(() => streamSpan.value.startYmd),
+  computed(() => streamSpan.value.endYmd)
+);
+
 const renderedMonths = computed(() => {
   const list = months.value;
   if (list.length === 0) return [];
@@ -123,8 +138,7 @@ const renderedMonths = computed(() => {
     occurrences: activityStore.activitiesInRange(spanStart, spanEnd),
     segments: vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd),
     vacations: vacationStore.vacations,
-    holidays: holidayStore.holidaysInRange(spanStart, spanEnd),
-    birthdays: birthdaysInRange(familyStore.members, spanStart, spanEnd),
+    extras: dayExtras.value,
     spanStart,
     spanEnd,
   });

@@ -15,6 +15,7 @@
 import { computed } from 'vue';
 import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { addDaysYmd, weekdayShort } from '@/utils/date';
@@ -51,6 +52,8 @@ const props = defineProps<{
   visibleMemberIds: string[] | null;
 }>();
 const emit = defineEmits<{
+  /** Forwarded from the grid's band — the page opens the read-only drawer. */
+  'open-birthday': [birthday: BirthdayOccurrence];
   open: [WallSheetTarget];
   /**
    * ⚠️ A lane header names a PERSON, not a day, so it must not be wired to the
@@ -290,6 +293,7 @@ function subtitleFor(memberId: string) {
         :axis-width="AXIS_WIDTH_PX"
         view-id="lanes"
         @open="emit('open', $event)"
+        @open-birthday="emit('open-birthday', $event)"
       />
     </template>
   </WallViewShell>

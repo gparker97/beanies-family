@@ -17,6 +17,7 @@ import { birthdayLabel, type BirthdayOccurrence } from '@/utils/birthdays';
 import AllDayChip from '@/components/planner/AllDayChip.vue';
 
 const props = defineProps<{ birthday: BirthdayOccurrence }>();
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
 const { t } = useTranslation();
 
@@ -43,5 +44,6 @@ const label = computed(() => birthdayLabel(props.birthday, t));
     :is-start="true"
     :is-end="true"
     testid="birthday-chip"
+    @click="(e: MouseEvent) => emit('click', e)"
   />
 </template>

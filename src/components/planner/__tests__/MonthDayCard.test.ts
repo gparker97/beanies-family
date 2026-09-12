@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils';
+import type { DayExtra } from '@/utils/calendarDay';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import MonthDayCard from '../MonthDayCard.vue';
@@ -74,9 +75,31 @@ function makeCell(overrides: Partial<MonthDayCellData> = {}): MonthDayCellData {
     vacations: [],
     segments: [],
     allDayItems: [],
-    holidays: [],
-    birthdays: [],
+    extras: [],
     ...overrides,
+  };
+}
+
+/** A holiday as the shared `DayExtra` the cell now takes. */
+function holidayExtra(name = 'Vesak Day'): DayExtra {
+  return {
+    kind: 'holiday',
+    id: `h:${name}`,
+    ymd: '2026-05-19',
+    label: `${name} (SG)`,
+    holiday: makeHoliday(name),
+  };
+}
+
+/** A birthday as a `DayExtra`. */
+function birthdayExtra(memberId: string, name: string, age = 7): DayExtra {
+  return {
+    kind: 'birthday',
+    id: `b:${memberId}`,
+    ymd: '2026-05-19',
+    label: `${name}'s birthday`,
+    emoji: '🎂',
+    birthday: { date: '2026-05-19', memberId, name, age, isPet: false },
   };
 }
 
@@ -188,7 +211,7 @@ describe('MonthDayCard all-day lane', () => {
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          holidays: [makeHoliday()],
+          extras: [holidayExtra()],
           timedOccurrences: [{ activity: makeActivity({ title: 'Piano' }), date: '2026-05-19' }],
         }),
         ...baseProps,
@@ -225,12 +248,6 @@ describe('MonthDayCard all-day lane', () => {
  * plus a holiday eat the whole budget and push every real event behind "+N".
  */
 describe("the all-day cap, split between reference days and the family's own events", () => {
-  const bday = (memberId: string, name: string) => ({
-    date: '2026-05-19',
-    memberId,
-    name,
-    isPet: false,
-  });
   const allDay = (id: string, title: string) => ({
     activity: makeActivity({ id, title, isAllDay: true }),
     isStart: true,
@@ -241,8 +258,7 @@ describe("the all-day cap, split between reference days and the family's own eve
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          birthdays: [bday('m1', 'Joey')],
-          holidays: [makeHoliday()],
+          extras: [birthdayExtra('m1', 'Joey'), holidayExtra()],
           allDayItems: [allDay('ad-1', 'Bin night')],
         }),
         ...baseProps,
@@ -259,8 +275,7 @@ describe("the all-day cap, split between reference days and the family's own eve
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          birthdays: [bday('m1', 'Joey')],
-          holidays: [makeHoliday()],
+          extras: [birthdayExtra('m1', 'Joey'), holidayExtra()],
           allDayItems: [],
         }),
         ...baseProps,

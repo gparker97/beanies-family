@@ -21,6 +21,9 @@ import { validateSegmentTarget } from '@/utils/vacation';
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
+import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
+import { useToday } from '@/composables/useToday';
 import { useActivityStore } from '@/stores/activityStore';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -183,6 +186,20 @@ const defaultStartTime = ref<string | undefined>(undefined);
 const selectedHoliday = ref<HolidayOccurrence | null>(null);
 function handleHolidayClick(holiday: HolidayOccurrence) {
   selectedHoliday.value = holiday;
+}
+
+/** Reactive today, so an open birthday drawer does not go stale over midnight. */
+const { today: todayStr } = useToday();
+
+// Read-only birthday details popup. A birthday is DERIVED from the bean's
+// profile rather than stored, so this drawer shows and explains; it never edits.
+const selectedBirthday = ref<BirthdayOccurrence | null>(null);
+function handleBirthdayClick(birthday: BirthdayOccurrence) {
+  selectedBirthday.value = birthday;
+}
+function openBeanProfile(memberId: string) {
+  selectedBirthday.value = null;
+  void router.push({ name: 'BeanDetail', params: { id: memberId } });
 }
 
 // Activity created confirmation modal. `lastCreatedDate` holds the date the
@@ -788,6 +805,7 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @holiday-click="handleHolidayClick"
+      @birthday-click="handleBirthdayClick"
     />
 
     <CalendarGrid
@@ -801,6 +819,7 @@ function handleActivitySwapped(newId: string) {
       @view-segment="handleViewSegment"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @holiday-click="handleHolidayClick"
+      @birthday-click="handleBirthdayClick"
     />
 
     <WeeklyCalendarView
@@ -818,6 +837,7 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
+      @birthday-click="handleBirthdayClick"
     />
 
     <DailyCalendarView
@@ -835,6 +855,7 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
       @view-segment="handleViewSegment"
       @holiday-click="handleHolidayClick"
+      @birthday-click="handleBirthdayClick"
     />
 
     <!-- Connect-Google-Calendar nudge — below the calendar (month view), self-
@@ -891,6 +912,16 @@ function handleActivitySwapped(newId: string) {
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
       @holiday-click="handleHolidayClick"
+      @birthday-click="handleBirthdayClick"
+    />
+
+    <!-- Birthday details popup (read-only - see BirthdayDetailsModal) -->
+    <BirthdayDetailsModal
+      :birthday="selectedBirthday"
+      :open="selectedBirthday !== null"
+      :today-ymd="todayStr"
+      @close="selectedBirthday = null"
+      @open-profile="openBeanProfile"
     />
 
     <!-- Public-holiday details popup (read-only) -->
