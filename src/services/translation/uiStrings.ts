@@ -4246,6 +4246,7 @@ const STRING_DEFS = {
       'you already have a shopping list for this recipe. open it to carry on, or start a fresh one.',
   },
   'lists.fromRecipe.startAnother': { en: 'Start another list', beanie: 'start another list' },
+  'lists.fromRecipe.readOnly': { en: 'read only', beanie: 'read only' },
   'lists.fromRecipe.ingredientsLabel': {
     en: "What's in this recipe",
     beanie: "what's in this recipe",
