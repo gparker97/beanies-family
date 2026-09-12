@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-12
 
+### Changed
+
+- **The beanie wall's week arrows now move by what is on screen.** They used to jump a fixed seven days however many day columns the wall was drawing, so on a narrower screen showing three days, four of every seven days could only be reached by tapping a chip in the strip below. Pressing forward now brings the next unseen day into the first column, and pressing back returns you exactly where you were. The date label above the arrows describes the days actually on screen rather than a whole week.
+
 ### Fixed
 
 - **A disconnected Google Calendar no longer blocks the whole app for everyone.** When the Google grant is revoked, only the family member who set the integration up is asked to reconnect it. Everyone else now sees a dismissable note telling them the calendar is disconnected and who to ask, with no Reconnect button - that button opens a sign-in screen for an account they do not have.
