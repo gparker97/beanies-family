@@ -22,13 +22,13 @@
  * in `ListDetailModal` (`ListItemRow.vue`), which this change does not touch.
  */
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useListStore } from '@/stores/listStore';
+import { useRecipeShoppingLists } from '@/composables/useRecipeShoppingLists';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { buildRecipeListSeed, parseDraftItems, splitRecipeIngredients } from '@/utils/listSeed';
 import type { RecipeIngredientSplit } from '@/utils/listSeed';
@@ -41,7 +41,6 @@ const props = defineProps<{ open: boolean; recipe: Recipe }>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
-const router = useRouter();
 const familyStore = useFamilyStore();
 const listStore = useListStore();
 const recipesStore = useRecipesStore();
@@ -86,20 +85,15 @@ const skippedHint = computed(() => {
     : fillTemplate(t('lists.fromRecipe.headingsSkipped.other'), { count: String(n) });
 });
 
-/** Lists already built from this recipe. Offered, never enforced — a second shop is legitimate. */
-const existing = computed(() =>
-  listStore.lists.filter((l) => l.linkedRecipeId === props.recipe.id)
-);
+// Offered, never enforced — a second shop for the same dish is legitimate.
+const { lists: existing, openList } = useRecipeShoppingLists(computed(() => props.recipe.id));
 
 const items = computed(() => parseDraftItems(draft.value));
 const saveDisabled = computed(() => items.value.length === 0);
 
 function openExisting(id: string): void {
-  // NAVIGATE, don't mount. `BeanieListsPage` already opens `?view=<id>` immediately
-  // and strips the query on close, so this needs no component of its own — and the
-  // route's own `requiresFlag: 'familyLists'` is a second, free flag check.
   emit('close');
-  void router.push({ name: 'Lists', query: { view: id } });
+  openList(id);
 }
 
 async function onSave(): Promise<void> {
@@ -154,7 +148,17 @@ async function onSave(): Promise<void> {
         count: split.value.headingsSkipped,
       },
     });
-    showToast('success', t('lists.fromRecipe.created'));
+    // ⚠️ An action toast, not a bare one. Before this, creating a list ended in a
+    // message with nowhere to go — the user was told it existed and left on the
+    // recipe with no route to it. The longer dismiss is what the `durationMs`
+    // override exists for: an action nobody has time to tap is not an action.
+    // (Interactive toasts are exempt from dedupe, so two shops in a row both keep
+    // their own View.)
+    showToast('success', t('lists.fromRecipe.created'), undefined, {
+      actionLabel: t('lists.fromRecipe.view'),
+      actionFn: () => openList(created.id),
+      durationMs: 8000,
+    });
     emit('close');
   } finally {
     isSubmitting.value = false;

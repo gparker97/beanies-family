@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- **Turn a recipe into a shopping list.** Open a recipe and tap Shopping List: beanies fills a new list with its ingredients so you do not have to type them out again. Check it over, edit anything, remove what is already in the cupboard, then create it. Heading lines like "For the sauce:" are left out, and beanies tells you how many it skipped. Deleting the recipe later leaves your list exactly as it was.
+- **Turn a recipe into a shopping list.** Open a recipe and tap Shopping List: beanies fills a new list with its ingredients so you do not have to type them out again. Check it over, edit anything, remove what is already in the cupboard, then create it. Heading lines like "For the sauce:" are left out, and beanies tells you how many it skipped. While a shop is still going the recipe takes you straight back to it, with a small + to start another; once everything is ticked off it offers a fresh one instead. Deleting the recipe later leaves your list exactly as it was.
 
 ### Fixed
 
