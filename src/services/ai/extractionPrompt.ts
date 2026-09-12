@@ -9,6 +9,8 @@
 // the required keys, or the built messages diverge (see __tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
+import { isRealYmd, isWallClockTime } from '@/utils/date';
+import { logEvent } from '@/services/telemetry';
 import type {
   ExtractionResult,
   ExtractionSource,
@@ -231,6 +233,79 @@ function asBool(v: unknown): boolean {
   return v === true;
 }
 
+/**
+ * A model-supplied clock time, or `''`.
+ *
+ * ⚠️ The prompt ASKS for `24h HH:mm`; nothing until now CHECKED. A model answering
+ * `"9am"`, `"9:00"` or `"16:00-17:00"` flowed straight through `asString` into the
+ * prefill, into `mergeExtractionIntoActivity` — which writes it onto an EXISTING
+ * activity, bypassing the time input entirely — and so into the family's `.beanpod`.
+ * From there `${ymd}T${startTime}:00` is concatenated into an RFC3339 timestamp for
+ * Google Calendar, which refuses it with a 400 on every reconcile, forever. That is
+ * the production incident this validation exists to prevent at the source.
+ *
+ * Dropped rather than normalised: `"9am"` is unambiguous but `"11/12"` is not, and a
+ * field the user can still fill in is better than a plausible guess written into
+ * their data. The caller logs the rejection so a persistently sloppy model is
+ * visible rather than silent.
+ */
+function asWallClockTime(v: unknown, field: string, rejected: string[]): string {
+  const raw = asString(v, MODEL_FIELD_MAX);
+  if (isWallClockTime(raw)) return raw;
+  if (raw) rejected.push(field);
+  return '';
+}
+
+/** A model-supplied `YYYY-MM-DD`, or `''`. Same reasoning as {@link asWallClockTime} —
+ *  a bad date reaches Google through `dayOffset` → `NaN` → `addDaysYmd` and is refused
+ *  with the very same "Invalid start time". */
+function asYmd(v: unknown, field: string, rejected: string[]): string {
+  const raw = asString(v, MODEL_FIELD_MAX);
+  if (isRealYmd(raw)) return raw;
+  if (raw) rejected.push(field);
+  return '';
+}
+
+/**
+ * Report dropped model fields — ONE aggregated event, never one per field.
+ *
+ * Without this the drop is invisible: a model that starts answering "9:00 AM"
+ * would silently blank the time on every capture, the user would see an empty
+ * field with no explanation, and nothing anywhere would say the prompt had
+ * regressed. `error_code` carries the field names, which is what distinguishes
+ * "one odd document" from "the prompt is broken".
+ */
+function reportRejectedFields(rejected: string[]): void {
+  if (rejected.length === 0) return;
+  logEvent({
+    level: 'warn',
+    surface: 'recipe-extract',
+    message: `Model returned unusable values for ${rejected.length} field(s); they were dropped`,
+    context: { action: 'model-field-rejected', error_code: rejected.join(',') },
+  });
+}
+
+/** Keys in the nested travel sweep whose values are clock times / calendar dates.
+ *  The sweep is keyed by whatever the model returned, so validation has to be a
+ *  lookup rather than a call on two named fields. */
+const NESTED_TIME_KEYS = new Set([
+  'departureTime',
+  'arrivalTime',
+  'pickupTime',
+  'returnTime',
+  'embarkationTime',
+]);
+const NESTED_YMD_KEYS = new Set([
+  'departureDate',
+  'arrivalDate',
+  'checkInDate',
+  'checkOutDate',
+  'pickupDate',
+  'returnDate',
+  'embarkationDate',
+  'disembarkationDate',
+]);
+
 function clamp01(v: unknown): number {
   const n = typeof v === 'number' ? v : 0;
   if (Number.isNaN(n)) return 0;
@@ -273,12 +348,17 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
   const categoryHint = asString(obj.categoryHint, MODEL_FIELD_MAX);
   const category = asString(obj.category, MODEL_FIELD_MAX);
 
-  return {
+  // Collected rather than logged inline so one capture emits ONE event, however
+  // many fields the model got wrong.
+  const rejectedFields: string[] = [];
+  const result = {
     isEvent: asBool(obj.isEvent),
     title: asString(obj.title, MODEL_FIELD_MAX),
-    date: asString(obj.date, MODEL_FIELD_MAX),
-    startTime: asString(obj.startTime, MODEL_FIELD_MAX),
-    endTime: asString(obj.endTime, MODEL_FIELD_MAX),
+    // Shape-checked, not just trimmed — see `asWallClockTime`. A rejected value
+    // becomes '' so the user fills it in, rather than a 400 that repeats forever.
+    date: asYmd(obj.date, 'date', rejectedFields),
+    startTime: asWallClockTime(obj.startTime, 'startTime', rejectedFields),
+    endTime: asWallClockTime(obj.endTime, 'endTime', rejectedFields),
     isAllDay: asBool(obj.isAllDay),
     location: asString(obj.location, MODEL_FIELD_MAX),
     description: asString(obj.description),
@@ -286,6 +366,8 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
     ...(categoryHint ? { categoryHint } : {}),
     ...(category ? { category } : {}),
   };
+  reportRejectedFields(rejectedFields);
+  return result;
 }
 
 // ── Travel task (2nd AI wedge, #30) ─────────────────────────────────────────────
@@ -762,7 +844,9 @@ function collectScalarFields(
    * top-level junk and starve the nested pass of every mapped field (checkIn, flightNumber,
    * departureTime…), which then renders verbatim into segment.notes. Each sweep gets its own.
    */
-  budget: number = MODEL_LIST_MAX
+  budget: number = MODEL_LIST_MAX,
+  /** Time/date fields the model got wrong, collected for ONE aggregate log. */
+  rejectedFields: string[] = []
 ): void {
   let added = 0;
   for (const [k, v] of Object.entries(source)) {
@@ -776,7 +860,14 @@ function collectScalarFields(
     // enough to trip this is not a real field name.
     if (k.length > MODEL_FIELD_MAX) continue;
     if (typeof v === 'string') {
-      target[k] = asString(v, MODEL_TEXT_MAX);
+      // Times and dates are shape-checked; everything else is free text. Same
+      // reasoning as the activity fields — these render into `segment.notes` and a
+      // junk clock time is worse than an absent one.
+      target[k] = NESTED_TIME_KEYS.has(k)
+        ? asWallClockTime(v, k, rejectedFields)
+        : NESTED_YMD_KEYS.has(k)
+          ? asYmd(v, k, rejectedFields)
+          : asString(v, MODEL_TEXT_MAX);
       added += 1;
     } else if (typeof v === 'number') {
       target[k] = String(v);
@@ -786,7 +877,10 @@ function collectScalarFields(
 }
 
 /** Coerce one raw model segment into a defensively-typed {@link TravelSegmentDraft}. */
-function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
+function parseTravelSegment(
+  raw: unknown,
+  rejectedFields: string[] = []
+): TravelSegmentDraft | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const obj = raw as Record<string, unknown>;
   const kind = asString(obj.kind);
@@ -800,12 +894,18 @@ function parseTravelSegment(raw: unknown): TravelSegmentDraft | null {
   const fields: Record<string, string> = {};
   // Each sweep carries its OWN budget. Sharing one let a document with 100+ stray top-level
   // scalars fill it before the nested sweep ran, dropping every mapped detail field.
-  collectScalarFields(obj, fields, SEGMENT_STRUCTURAL_KEYS, MODEL_LIST_MAX);
+  collectScalarFields(obj, fields, SEGMENT_STRUCTURAL_KEYS, MODEL_LIST_MAX, rejectedFields);
   const nested: Record<string, unknown> = {};
   for (const nk of NESTED_FIELD_KEYS) {
     const sub = obj[nk];
     if (typeof sub === 'object' && sub !== null) {
-      collectScalarFields(sub as Record<string, unknown>, fields, undefined, MODEL_LIST_MAX);
+      collectScalarFields(
+        sub as Record<string, unknown>,
+        fields,
+        undefined,
+        MODEL_LIST_MAX,
+        rejectedFields
+      );
       Object.assign(nested, sub);
     }
   }
@@ -850,11 +950,14 @@ export function parseTravelExtractionResult(raw: unknown): TravelExtractionResul
   // (it sweeps every field), so walking 5000 of them to keep 100 is the costly case.
   const rawSegments = Array.isArray(obj.segments) ? obj.segments : [];
   const segments: TravelSegmentDraft[] = [];
+  // One collector across every segment, so a document with ten bad times logs once.
+  const rejectedFields: string[] = [];
   for (const raw of rawSegments) {
     if (segments.length >= MODEL_LIST_MAX) break;
-    const seg = parseTravelSegment(raw);
+    const seg = parseTravelSegment(raw, rejectedFields);
     if (seg) segments.push(seg);
   }
+  reportRejectedFields(rejectedFields);
 
   return {
     isTravel: asBool(obj.isTravel),

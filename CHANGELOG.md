@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **An event Google can't accept no longer blocks itself forever.** If an activity carries a malformed time or date, beanies now spots it before sending, leaves the event alone instead of retrying it every five minutes, and keeps the rest of your calendar syncing normally. Times and dates read from a photo or document are also checked when they're captured, so an unusable value never reaches your family file in the first place.
 - **Declining Google's file-access permission now explains itself instead of looking like a crash.** If you leave the file access box unticked when creating or resuming a pod, beanies tells you exactly what to allow and offers to try again or use a local file — and it no longer records the moment as an app error.
 
 ### Changed

@@ -36,13 +36,39 @@ function hostileEvent() {
 }
 
 describe('event extraction output caps', () => {
-  it('truncates every short field to MODEL_FIELD_MAX without throwing', () => {
+  it('truncates every free-form short field to MODEL_FIELD_MAX without throwing', () => {
     const r = parseExtractionResult(hostileEvent());
-    for (const key of ['title', 'date', 'startTime', 'endTime', 'location'] as const) {
+    for (const key of ['title', 'location'] as const) {
       expect(r[key]).toHaveLength(MODEL_FIELD_MAX);
     }
     expect(r.categoryHint).toHaveLength(MODEL_FIELD_MAX);
     expect(r.category).toHaveLength(MODEL_FIELD_MAX);
+  });
+
+  it('🔴 DROPS the date and time fields rather than truncating them', () => {
+    // Stronger than the cap, and deliberately different: a megabyte truncated to
+    // 200 characters is still not a time. These three are concatenated straight
+    // into an RFC3339 timestamp for Google Calendar, where anything malformed is a
+    // deterministic 400 that repeats on every reconcile forever — which is exactly
+    // what one family hit after a model answered "9am". An empty field is a prompt
+    // the user can fill; a junk one is a permanent sync failure.
+    const r = parseExtractionResult(hostileEvent());
+    expect(r.date).toBe('');
+    expect(r.startTime).toBe('');
+    expect(r.endTime).toBe('');
+  });
+
+  it('keeps well-formed date and time fields intact', () => {
+    // Anti-vacuity: the rule above must reject junk, not everything.
+    const r = parseExtractionResult({
+      ...hostileEvent(),
+      date: '2026-09-15',
+      startTime: '09:00',
+      endTime: '10:30',
+    });
+    expect(r.date).toBe('2026-09-15');
+    expect(r.startTime).toBe('09:00');
+    expect(r.endTime).toBe('10:30');
   });
 
   it('truncates free text to MODEL_TEXT_MAX', () => {
