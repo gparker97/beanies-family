@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-12
+
+### Added
+
+- **Tap a birthday to open it.** A birthday on the calendar or the beanie wall now opens like any other event, with confetti, the age, and how many sleeps away it is - the same wording the Nook already uses. It cannot be edited or deleted, because beanies works the date out from that bean's profile rather than storing it, so the drawer says so and offers to open their profile instead.
+
+### Changed
+
+- **Ages are only named for children.** Up to 21 a birthday reads "Joey's 7th birthday"; after that it is simply "Sarah's birthday". The age still shows inside the drawer if you open it.
+
+### Fixed
+
+- **Birthdays and public holidays now appear on every calendar view, and on the wall.** The planner and the beanie wall were working from separate ideas of what a day contains, which is why birthdays reached some views and not others and why the wall never showed public holidays at all. Both now ask the same question, so the two cannot drift apart again.
+
 ## 2026-09-11
 
 ### Added
