@@ -1,5 +1,5 @@
 import { createAutomergeRepository, stripUndefined, toPlain } from '../automergeRepository';
-import { getById as projectionGetById } from '../projection';
+import { getById as projectionGetById, list } from '../projection';
 import { mutate } from '../worker/docClient';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
@@ -94,4 +94,11 @@ export async function createLists(inputs: CreateFamilyListInput[]): Promise<Fami
   }
 
   return entities;
+}
+
+/** Lists (ids) linked to a given recipe — for the recipe-delete unlink (#88). */
+export function listIdsForRecipe(recipeId: string): string[] {
+  return list('lists')
+    .filter((l) => l.linkedRecipeId === recipeId)
+    .map((l) => l.id);
 }

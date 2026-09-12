@@ -828,6 +828,13 @@ export const useListStore = defineStore('lists', () => {
    * simply stops rendering it (no orphan, no crash). Called from the
    * vacation/activity delete paths.
    */
+  /**
+   * ⚠️ NO 'recipe' case, deliberately. Recipe links are cleared inside
+   * `recipeRepository.deleteRecipeCascade`'s ATOMIC batch (#88), because this loop
+   * is N separate writes and ignores every `updateList` return value — a failed
+   * unlink here leaves a permanently orphaned link with no telemetry, in a window
+   * after the parent has already atomically gone. Do not "fix" the asymmetry.
+   */
   async function clearLinksFor(kind: 'trip' | 'activity', id: string): Promise<void> {
     for (const l of lists.value) {
       if (kind === 'trip' && l.linkedVacationId === id) {

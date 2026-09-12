@@ -4,6 +4,7 @@ import { list } from '../projection';
 import { mutate } from '../worker/docClient';
 import type { MutationOp } from '../worker/protocol';
 import { mealIdsForRecipe } from './mealPlanRepository';
+import { listIdsForRecipe } from './listRepository';
 import { toISODateString } from '@/utils/date';
 
 const recipeRepo = createAutomergeRepository<'recipes', Recipe>('recipes');
@@ -40,6 +41,13 @@ export async function deleteRecipeCascade(recipeId: string): Promise<void> {
   // "recipe removed") in the SAME atomic batch, so the deletion + deref land
   // together. Already-recorded cook logs are their own deletes above.
   const mealIds = mealIdsForRecipe(recipeId);
+  // Shopping lists built from this recipe (#88) are UNLINKED, never deleted — the
+  // list is the family's own work and outlives the recipe it came from. Done here,
+  // in the same batch, rather than through `listStore.clearLinksFor`: that helper
+  // is a loop of N separate writes which ignores each return value, so a failed
+  // unlink would leave a permanently orphaned link with no telemetry, in a window
+  // AFTER the recipe had already atomically gone.
+  const linkedListIds = listIdsForRecipe(recipeId);
   const now = toISODateString(new Date());
   const ops: MutationOp[] = [
     ...childIds.map((id): MutationOp => ({ op: 'delete', collection: 'cookLogs', id })),
@@ -50,6 +58,16 @@ export async function deleteRecipeCascade(recipeId: string): Promise<void> {
       patch: {},
       deleteKeys: ['recipeId'],
       updatedAt: now,
+      onMissing: 'skip',
+    })),
+    ...linkedListIds.map((id): MutationOp => ({
+      op: 'patch',
+      collection: 'lists',
+      id,
+      patch: {},
+      deleteKeys: ['linkedRecipeId'],
+      updatedAt: now,
+      // A list deleted on another device mid-gesture must not fail the recipe delete.
       onMissing: 'skip',
     })),
     { op: 'delete', collection: 'recipes', id: recipeId },

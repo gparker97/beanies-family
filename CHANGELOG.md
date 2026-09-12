@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-12
 
+### Added
+
+- **Turn a recipe into a shopping list.** Open a recipe and tap Shopping List: beanies fills a new list with its ingredients so you do not have to type them out again. Check it over, edit anything, remove what is already in the cupboard, then create it. Heading lines like "For the sauce:" are left out, and beanies tells you how many it skipped. Deleting the recipe later leaves your list exactly as it was.
+
 ### Fixed
 
 - **An event Google can't accept no longer blocks itself forever.** If an activity carries a malformed time or date, beanies now spots it before sending, leaves the event alone instead of retrying it every five minutes, and keeps the rest of your calendar syncing normally. Times and dates read from a photo or document are also checked when they're captured, so an unusable value never reaches your family file in the first place.

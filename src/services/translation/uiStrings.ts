@@ -4221,6 +4221,54 @@ const STRING_DEFS = {
     beanie:
       'google needs permission to create your family file. try again and tick the file access box when google asks.',
   },
+  // Shopping list from a recipe (#88). Ordinary product copy, so playful beanie
+  // values are fine — EXCEPT `noMemberError`, whose `Error` suffix makes
+  // `uiStrings.test.ts`'s KEY_SUFFIXES classify it as an important surface
+  // automatically, so its beanie value keeps the real noun ("member").
+  'lists.fromRecipe.title': { en: 'Make a shopping list', beanie: 'make a shopping list' },
+  'lists.fromRecipe.body': {
+    en: 'Check the list over before it is created — edit anything, or add what you already need.',
+    beanie:
+      'check the list over before it is created — edit anything, or add what you already need.',
+  },
+  'lists.fromRecipe.itemsLabel': {
+    en: 'Shopping items, one per line',
+    beanie: 'shopping items, one per line',
+  },
+  'lists.fromRecipe.save': { en: 'Create List', beanie: 'create list' },
+  'lists.fromRecipe.listTitle': { en: 'Shopping for {recipe}', beanie: 'shopping for {recipe}' },
+  'lists.fromRecipe.created': { en: 'Shopping list ready!', beanie: 'shopping list ready!' },
+  // Explicit .one/.other, per the project's pluralization convention — `fillTemplate`
+  // is a plain replace and has no plural machinery of its own.
+  'lists.fromRecipe.headingsSkipped.one': {
+    en: '1 heading line from the recipe was left out. Add it back if you want it.',
+    beanie: '1 heading line from the recipe was left out. add it back if you want it.',
+  },
+  'lists.fromRecipe.headingsSkipped.other': {
+    en: '{count} heading lines from the recipe were left out. Add them back if you want them.',
+    beanie: '{count} heading lines from the recipe were left out. add them back if you want them.',
+  },
+  'lists.fromRecipe.existing': {
+    en: 'You already made a list for this recipe:',
+    beanie: 'you already made a list for this recipe:',
+  },
+  'lists.fromRecipe.noMemberError': {
+    en: "We couldn't tell who you are",
+    beanie: "we couldn't tell who you are",
+  },
+  'lists.fromRecipe.noMemberHelp': {
+    en: 'Your member profile has not loaded yet. Please reopen the app and try again.',
+    beanie: 'your member profile has not loaded yet. please reopen the app and try again.',
+  },
+  'lists.fromRecipe.recipeGoneError': {
+    en: 'This recipe has been deleted',
+    beanie: 'this recipe has been deleted',
+  },
+  'lists.fromRecipe.recipeGoneHelp': {
+    en: 'Someone in your family removed it while this was open, so no list was created.',
+    beanie: 'someone in your family removed it while this was open, so no list was created.',
+  },
+  'recipes.detail.makeShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
   'resumeSetup.driveConsentDenied': {
     en: 'Google needs permission to access your family file. Please reconnect Google Drive and allow file access when prompted.',
     beanie:

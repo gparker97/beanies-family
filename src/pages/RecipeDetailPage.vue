@@ -15,8 +15,11 @@
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { isFlagEnabled } from '@/config/flags';
+import { splitRecipeIngredients } from '@/utils/listSeed';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
+import RecipeListSheet from '@/components/pod/RecipeListSheet.vue';
 import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
@@ -64,6 +67,25 @@ const stats = computed(() =>
 const editRecipeOpen = ref(false);
 const shareRecipeOpen = ref(false);
 const cookLogOpen = ref(false);
+const shoppingListOpen = ref(false);
+
+/**
+ * Offer the shopping-list action only when it can actually produce something.
+ *
+ * Gated on the SPLIT's title count, not `ingredients.length`: a recipe whose every
+ * line is "For the sauce:" would otherwise open a sheet that yields zero items —
+ * a present-and-failing action.
+ *
+ * `?? []` is the codebase's own defensive read for this field
+ * (`recipeComparable.ts`, `RecipeFormModal`) — Automerge documents are not
+ * schema-validated, and this runs on every render, so an `undefined` here would
+ * blank the page rather than hide a button.
+ */
+const canMakeShoppingList = computed(
+  () =>
+    isFlagEnabled('familyLists') &&
+    splitRecipeIngredients(recipe.value?.ingredients ?? []).titles.length > 0
+);
 const editingEntry = ref<CookLogEntry | null>(null);
 
 // Photo lightbox — opens when the user taps the polaroid hero. Read-only:
@@ -334,6 +356,21 @@ watch(recipe, (now, before) => {
               <BeanieIcon name="share" size="xs" />
               <span>{{ t('recipeShare.action') }}</span>
             </button>
+            <!-- OUTSIDE the edit gate, for the same reason as Share above: creating a
+                 shopping list writes a FamilyList and leaves the recipe untouched. No
+                 lists surface in the app is permission-gated, so gating here would hand
+                 a view-only member a route they can use on /lists but not from a recipe.
+                 Hidden when the recipe has no usable ingredient lines — an action that
+                 can only produce an empty list is worse than no action. -->
+            <button
+              v-if="canMakeShoppingList"
+              type="button"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
+              data-testid="recipe-shopping-list-open"
+              @click="shoppingListOpen = true"
+            >
+              🛒 <span>{{ t('recipes.detail.makeShoppingList') }}</span>
+            </button>
             <button
               v-if="canEditActivities"
               type="button"
@@ -463,6 +500,11 @@ watch(recipe, (now, before) => {
         @deleted="onRecipeDeleted"
       />
       <RecipeShareModal :open="shareRecipeOpen" :recipe="recipe" @close="shareRecipeOpen = false" />
+      <RecipeListSheet
+        :open="shoppingListOpen"
+        :recipe="recipe"
+        @close="shoppingListOpen = false"
+      />
       <CookLogFormModal
         :open="cookLogOpen"
         :recipe-id="recipe.id"
