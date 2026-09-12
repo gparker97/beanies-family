@@ -79,7 +79,8 @@ export type CalendarAuthErrorCode =
   | 'cancelled' // user closed the window / declined
   | 'missing_scope' // granular consent dropped calendar.events.owned
   | 'no_refresh_token' // no offline access granted (should not happen with prompt=consent)
-  | 'exchange_failed'; // token exchange / network error
+  | 'exchange_failed' // token exchange / network error
+  | 'account_mismatch'; // re-consented as a DIFFERENT Google account than the connection holds
 
 export interface CalendarConnectSuccess {
   status: 'connected';

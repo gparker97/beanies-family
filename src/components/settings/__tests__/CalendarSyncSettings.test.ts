@@ -37,6 +37,14 @@ const mockStore = {
   listCalendarsFor: vi.fn(async () => []),
 };
 vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => mockStore }));
+// The Reconnect button is now offered only to whoever can actually complete the
+// consent (it is account-bound), so the card reads the roster and permissions.
+vi.mock('@/stores/familyStore', () => ({
+  useFamilyStore: () => ({ members: [], currentMemberId: 'm1' }),
+}));
+vi.mock('@/composables/usePermissions', () => ({
+  usePermissions: () => ({ canManagePod: { value: true } }),
+}));
 
 function mountDrawer() {
   return mount(CalendarSyncSettings, {

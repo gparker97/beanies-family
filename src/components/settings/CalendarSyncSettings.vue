@@ -17,6 +17,10 @@ import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import CalendarImportModal from '@/components/settings/CalendarImportModal.vue';
 import { useCalendarImportStore } from '@/stores/calendarImportStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { usePermissions } from '@/composables/usePermissions';
+import { resolveConnectionOwner, canViewerRepair } from '@/utils/calendar/connectionOwner';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CalendarConnection } from '@/types/models';
 
@@ -29,6 +33,29 @@ const store = useCalendarSyncStore();
 // #34 clash nudge — only surfaced when its flag is on (launch-coupled with sync).
 const clashNudgeFlagOn = isFlagEnabled('calendarClashNudge');
 const settingsStore = useSettingsStore();
+const familyStore = useFamilyStore();
+const { canManagePod } = usePermissions();
+
+/**
+ * Only offer the repair to whoever can actually complete it.
+ *
+ * The consent is account-bound — `finalizeConnected` refuses a reconnect made as
+ * a different Google account — so showing this button to a member who does not
+ * hold the account produces a sign-in screen they cannot get past, then an error.
+ * Same predicate as the reconnect toast (`canViewerRepair`), so the two surfaces
+ * cannot drift apart about who is asked.
+ */
+function canRepair(connection: CalendarConnection): boolean {
+  const verdict = resolveConnectionOwner(
+    {
+      connectionId: connection.id,
+      email: connection.accountEmail,
+      connectedBy: connection.connectedBy,
+    },
+    familyStore.members
+  );
+  return canViewerRepair(verdict, familyStore.currentMemberId ?? null, canManagePod.value);
+}
 
 async function onToggleClash(enabled: boolean) {
   try {
@@ -140,6 +167,14 @@ async function onConnect() {
       // Handed off to the redirect transport (PWA/iOS/native). The page is
       // navigating away (web) or the system browser is open (native); the resume
       // toasts the outcome post-redirect. Nothing to show here.
+    } else if (result.code === 'account_mismatch') {
+      // `message` carries the account the connection is bound to.
+      showToast(
+        'error',
+        t('calendarSync.toast.accountMismatch.title'),
+        fillTemplate(t('calendarSync.toast.accountMismatch.message'), { account: result.message }),
+        { silent: true } // user-recoverable: sign in as the right account
+      );
     } else if (result.code !== 'cancelled') {
       // missing_scope is user-recoverable input → silent (no Slack noise).
       showToast('error', t('calendarSync.toast.connectFailed.title'), result.message, {
@@ -163,6 +198,14 @@ async function onReconnect(connection: CalendarConnection) {
       );
     } else if (result.status === 'redirecting') {
       // Redirect transport handed off — resume toasts post-redirect.
+    } else if (result.code === 'account_mismatch') {
+      // `message` carries the account the connection is bound to.
+      showToast(
+        'error',
+        t('calendarSync.toast.accountMismatch.title'),
+        fillTemplate(t('calendarSync.toast.accountMismatch.message'), { account: result.message }),
+        { silent: true } // user-recoverable: sign in as the right account
+      );
     } else if (result.code !== 'cancelled') {
       showToast('error', t('calendarSync.toast.connectFailed.title'), result.message, {
         silent: true,
@@ -329,7 +372,7 @@ async function onPickCalendar(connection: CalendarConnection, value: string | nu
             <!-- Reconnect works on every surface (P2): desktop via popup, PWA/iOS/
                  native via the redirect transport. No desktop-only gate. -->
             <BaseButton
-              v-if="connection.status === 'needs_reconnect'"
+              v-if="connection.status === 'needs_reconnect' && canRepair(connection)"
               variant="primary"
               size="sm"
               :loading="isBusy(connection.id, 'reconnect')"

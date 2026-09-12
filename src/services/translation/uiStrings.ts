@@ -7090,6 +7090,15 @@ const STRING_DEFS = {
   // dismissable, because an obstruction they can't clear blocks the whole app.
   // Real nouns throughout — someone who acts on a euphemism here leaves the
   // family's calendar broken.
+  'calendarSync.toast.accountMismatch.title': {
+    en: 'That is a different Google account',
+    beanie: 'that is a different google account',
+  },
+  'calendarSync.toast.accountMismatch.message': {
+    en: 'This calendar is connected to {account}. Sign in as that account to reconnect, or disconnect this calendar and connect the new one.',
+    beanie:
+      'this calendar is connected to {account}. sign in as that account to reconnect, or disconnect this calendar and connect the new one.',
+  },
   'reconnectPrompt.calendar.noticeTitle': {
     en: 'Google Calendar is disconnected',
     beanie: 'google calendar is disconnected',

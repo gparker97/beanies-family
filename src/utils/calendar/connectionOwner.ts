@@ -147,6 +147,27 @@ export function resolveConnectionOwner(
   return { kind: 'managers', accountEmail: account };
 }
 
+/**
+ * Should this viewer be offered the repair action for a connection?
+ *
+ * The ONE predicate behind both surfaces that offer it — the reconnect toast and
+ * the Settings card — so the two can never disagree about who is asked to fix a
+ * dead grant.
+ *
+ * Managing the pod counts only on the `managers` rung, where nobody resolved. It
+ * is not an override: the consent is account-bound, so a manager who is not on
+ * that Google account cannot complete it, and offering them the button would be a
+ * dead end. The rung-4 fallback is what keeps a family from being stranded when
+ * the person who connected it leaves.
+ */
+export function canViewerRepair(
+  verdict: OwnerVerdict,
+  viewerId: string | null,
+  viewerCanManagePod: boolean
+): boolean {
+  return verdict.kind === 'member' ? verdict.memberId === viewerId : viewerCanManagePod;
+}
+
 export interface OutageAudienceInput {
   /**
    * The coordinator's own prompt variant.
@@ -207,7 +228,7 @@ export function decideOutageAudience(input: OutageAudienceInput): OutageAudience
   //    longer match anybody, and the connection lands on rung 4 — where managers DO
   //    get the button. So a family whose calendar-connector leaves is never stranded.
   const viewerOwnsAny = verdicts.some(({ verdict }) =>
-    verdict.kind === 'member' ? verdict.memberId === viewerId : viewerCanManagePod
+    canViewerRepair(verdict, viewerId, viewerCanManagePod)
   );
   if (viewerOwnsAny) return { mode: 'owner' };
 
