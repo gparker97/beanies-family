@@ -229,6 +229,26 @@ describe('🔴 when EVERYTHING is refused, the problem is not the records', () =
     expect(after?.lastError).toBe('invalid');
   });
 
+  it('🔴 STAYS broken across repeated reconciles, not just the first', async () => {
+    // The bug this test exists for: once every bad payload is memoised, nothing is
+    // re-attempted, so a naive counter sees zero attempts and zero rejections and
+    // reports the connection healthy from the SECOND poll onward — while not a
+    // single event is reaching Google. The guard has to count memo-skips too.
+    const { client } = rejectingClient('invalid');
+    setCalendarClientForTesting(client);
+    const conn = await connect();
+    await createActivity(activityInput({ title: 'One' }));
+    await createActivity(activityInput({ title: 'Two' }));
+    const store = useCalendarSyncStore();
+
+    await store.syncNow();
+    expect((await getCalendarConnectionById(conn.id))?.status).toBe('error');
+
+    await store.syncNow();
+    await store.syncNow();
+    expect((await getCalendarConnectionById(conn.id))?.status).toBe('error');
+  });
+
   it('but a SINGLE bad event still leaves the connection healthy', async () => {
     // The floor is two, precisely so one malformed record never trips it.
     const { client } = rejectingClient('invalid');
