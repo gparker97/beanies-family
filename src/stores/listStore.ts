@@ -627,6 +627,65 @@ export const useListStore = defineStore('lists', () => {
    * recurring list celebrates once per cycle (`cycleCelebrated` guard) but is
    * never filed. Un-checking an item on a filed one-off un-files it.
    */
+  /**
+   * Tick or untick EVERY item in one write (#88 follow-up).
+   *
+   * Deliberately routed through the same `deriveCompletion` that `toggleItem`,
+   * add and remove use, so filing, un-filing, the cycle flag and the celebration
+   * all behave exactly as they do when a family ticks the last box by hand. The
+   * tempting alternative — calling `toggleItem` per item — would be N CRDT
+   * writes, N worker round-trips and N Drive sync payloads, and would fire the
+   * celebration on the second-to-last one.
+   *
+   * Unticking everything un-files a completed list for the same reason: it is the
+   * same derivation, run on the opposite input.
+   */
+  async function setAllItemsCompleted(
+    listId: string,
+    completed: boolean,
+    byMemberId: string
+  ): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    if (!list) {
+      // Never silent: a bulk action on a list that vanished mid-gesture is worth
+      // one line in the console, and the caller gets null to act on.
+      logEvent({
+        level: 'warn',
+        surface: 'lists',
+        message: 'setAllItemsCompleted: list not found',
+        context: { action: 'set_all_missing_list' },
+      });
+      return null;
+    }
+
+    const now = toISODateString(new Date());
+    const items: FamilyListItem[] = list.items.map((it) => ({
+      ...it,
+      completed,
+      completedBy: completed ? byMemberId : undefined,
+      completedAt: completed ? now : undefined,
+    }));
+
+    const { patch: completion, shouldCelebrate } = deriveCompletion(list, items, byMemberId);
+    const updated = await updateList(listId, { items, ...completion });
+    if (updated && shouldCelebrate) {
+      const originalItems = list.items;
+      const wasRecurring = isRecurring(list);
+      celebrate('list-complete', {
+        onUndo: () => {
+          void updateList(listId, {
+            items: originalItems,
+            completed: false,
+            completedBy: undefined,
+            completedAt: undefined,
+            ...(wasRecurring ? { cycleCelebrated: false } : {}),
+          });
+        },
+      });
+    }
+    return updated;
+  }
+
   async function toggleItem(
     listId: string,
     itemId: string,
@@ -1007,6 +1066,7 @@ export const useListStore = defineStore('lists', () => {
     updateItemText,
     reorderItems,
     setLifecycle,
+    setAllItemsCompleted,
     clearLinksFor,
     reconcileRecurringLists,
     resetState,
