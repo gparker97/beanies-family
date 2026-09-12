@@ -817,6 +817,20 @@ export interface FamilyList {
   cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
   linkedActivityId?: UUID; // optional attach to an activity
   linkedVacationId?: UUID; // optional attach to a trip
+  /**
+   * The recipe this shopping list was built from (#88).
+   *
+   * One-directional in storage, on the MANY side deliberately: the alternative,
+   * `Recipe.listIds: string[]`, is a concurrently-edited array that merges badly
+   * under Automerge AND would owe a reverse cascade on list delete, which happens
+   * far more often than recipe delete.
+   *
+   * Cleared by `recipeRepository.deleteRecipeCascade`'s atomic batch — NOT by
+   * `listStore.clearLinksFor`, which is N separate writes that ignore their return
+   * values. Nothing renders this field today: it records provenance, and the
+   * list→recipe affordance is deliberately not in v1.
+   */
+  linkedRecipeId?: UUID;
   templateKey?: string; // which template seeded it (audit/analytics)
   completed: boolean; // one-off: filed when true; recurring: always false
   completedBy?: UUID;
