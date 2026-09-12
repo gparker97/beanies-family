@@ -4238,6 +4238,12 @@ const STRING_DEFS = {
   'lists.fromRecipe.save': { en: 'Create List', beanie: 'create list' },
   'lists.fromRecipe.listTitle': { en: 'Shopping for {recipe}', beanie: 'shopping for {recipe}' },
   'lists.fromRecipe.created': { en: 'Shopping list ready!', beanie: 'shopping list ready!' },
+  'lists.fromRecipe.view': { en: 'View', beanie: 'view' },
+  'recipes.detail.openShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
+  'recipes.detail.newShoppingList': {
+    en: 'Start another shopping list',
+    beanie: 'start another shopping list',
+  },
   // Explicit .one/.other, per the project's pluralization convention — `fillTemplate`
   // is a plain replace and has no plural machinery of its own.
   'lists.fromRecipe.headingsSkipped.one': {

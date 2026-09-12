@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   createList: vi.fn(async (_seed: unknown): Promise<unknown> => ({ id: 'new-list' })),
   push: vi.fn(),
   toasts: [] as string[],
+  toastOptions: [] as Array<Record<string, unknown> | undefined>,
   reported: [] as Array<Record<string, unknown>>,
   logged: [] as string[],
 }));
@@ -24,7 +25,10 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 vi.mock('@/composables/useToast', () => ({
-  showToast: (kind: string, title: string) => h.toasts.push(`${kind}:${title}`),
+  showToast: (kind: string, title: string, _msg?: string, opts?: Record<string, unknown>) => {
+    h.toasts.push(`${kind}:${title}`);
+    h.toastOptions.push(opts);
+  },
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
@@ -93,6 +97,7 @@ beforeEach(() => {
   h.lists = [];
   h.recipes = [{ id: 'r1' }];
   h.toasts = [];
+  h.toastOptions = [];
   h.reported = [];
   h.logged = [];
   h.createList.mockClear();
@@ -189,6 +194,25 @@ describe('failure modes', () => {
     release({ id: 'new-list' });
     await w.vm.$nextTick();
     expect(h.createList).toHaveBeenCalledOnce();
+  });
+
+  it('🔴 a successful create offers a way to GET to the list', async () => {
+    // Before this, a create ended in a message with nowhere to go: the user was
+    // told the list existed and left on the recipe with no route to it.
+    const w = mountSheet();
+    await save(w);
+    const opts = h.toastOptions[0];
+    expect(opts?.actionLabel).toBe('lists.fromRecipe.view');
+    (opts?.actionFn as () => void)();
+    expect(h.push).toHaveBeenCalledWith({ name: 'Lists', query: { view: 'new-list' } });
+  });
+
+  it('gives the user time to tap it', async () => {
+    // An action nobody has time to reach is not an action; `durationMs` exists
+    // for exactly this.
+    const w = mountSheet();
+    await save(w);
+    expect(h.toastOptions[0]?.durationMs).toBeGreaterThan(4000);
   });
 
   it('🔴 a failed create does NOT toast again and does NOT close', async () => {

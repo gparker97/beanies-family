@@ -814,7 +814,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         items: [
           'Open the recipe and tap <strong>Shopping List</strong>.',
           'Check the list over. Every ingredient is on its own line — edit any of them, delete what you already have in the cupboard, or add anything else you need while you are there.',
-          'Tap <strong>Create List</strong>. Your new list appears in Beanie Lists, ready to tick off as you shop.',
+          'Tap <strong>Create List</strong>. Your new list appears in Beanie Lists, ready to tick off as you shop — tap <strong>View</strong> on the message to go straight there.',
         ],
       },
       {
@@ -829,7 +829,8 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Heading lines are left out.</strong> Recipes often group ingredients under headings like “For the sauce:”. Those are not things you buy, so beanies leaves them out and tells you how many it skipped — add them back if you want them.',
-          '<strong>You can make more than one.</strong> If you already made a list for this recipe, beanies says so and offers to open it — but you can still make a fresh one for the next time you cook it.',
+          '<strong>The recipe remembers.</strong> While a shop is still going, the recipe’s button becomes <strong>Shopping List</strong> and takes you straight to it, with a small <strong>+</strong> beside it to start another. Once you have ticked everything off, the button goes back to offering a fresh one.',
+          '<strong>You can make more than one.</strong> Cooking the same thing next month? Start another list whenever you like — beanies tells you which ones already exist rather than quietly piling up duplicates.',
           '<strong>Your list is yours.</strong> Deleting the recipe later does not delete the list. It stays exactly as you left it.',
         ],
       },
