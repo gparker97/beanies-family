@@ -239,6 +239,33 @@ export function isRealYmd(value: string): boolean {
 }
 
 /**
+ * Is this a real 24-hour wall-clock time, exactly `HH:MM`?
+ *
+ * The shape AND the range, because both are load-bearing and each misses what the
+ * other catches. `24:00` and `09:60` match the regex and are not times; `9:00` is a
+ * time a person would write and is not this shape — and the shape is what matters,
+ * because the app's own storage format is zero-padded (`toTimeInputValue`) and every
+ * consumer assumes it:
+ *
+ *  - `${ymd}T${startTime}:00` is concatenated straight into an RFC3339 timestamp for
+ *    Google Calendar, where anything else is a deterministic HTTP 400;
+ *  - `endTime < startTime` is a STRING compare that decides the overnight roll
+ *    (`activityDays.ts`), and `'9:00' < '10:00'` is false;
+ *  - `setHours(...split(':'))` in clash detection yields `NaN` and a clash window
+ *    that silently matches nothing.
+ *
+ * Deliberately NOT a general "looks like a time" test — it is the gate on the one
+ * format the app stores, which is why a human-written `9:00` is rejected rather
+ * than normalised. Normalising here would hide the upstream bug that produced it.
+ */
+export function isWallClockTime(value: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+  const h = Number(value.slice(0, 2));
+  const m = Number(value.slice(3, 5));
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+/**
  * `YYYY-MM-DD` → the ymd of the first day of its week, per the user's `weekStartDay`.
  *
  * Returns the input unchanged if it is not a real date — see `isRealYmd`.

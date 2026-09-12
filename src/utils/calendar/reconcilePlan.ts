@@ -5,6 +5,7 @@
 // without a calendar client or the CRDT. The engine (calendarSyncStore) applies
 // the plan against the CalendarClient.
 
+import { pushBlockReason } from '@/utils/calendar/activityDays';
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { addDaysYmd } from '@/utils/date';
 import { masterEventId } from './deterministicEventId';
@@ -71,6 +72,16 @@ export interface ReconcilePlan {
   exceptionUpserts: ReconcileExceptionUpsert[];
   /** Exception links to restore/drop (override removed or master unpushable). */
   exceptionRestores: ReconcileExceptionRestore[];
+  /**
+   * How many activities were withheld because Google would deterministically
+   * refuse them (`pushBlockReason`).
+   *
+   * Returned rather than logged here — this module is pure — so the engine can
+   * emit ONE aggregate telemetry event per reconcile. Without it, a predicate that
+   * wrongly blocks a valid shape would stop events reaching Google with no signal
+   * anywhere: no error, no Slack, nothing in CloudWatch.
+   */
+  blockedCount: number;
 }
 
 /**
@@ -155,10 +166,33 @@ export function planReconcile(
     masterLinks.filter((l) => !beaniesMayPush(l)).map((l) => l.activityId)
   );
 
+  /**
+   * Activities Google would deterministically refuse (a malformed time or date).
+   *
+   * 🔴 APPLIED TO THE TWO OUTPUT ARRAYS ONLY — never to `pushableIds`, never to
+   * `suppressed`, and never to `mastersById`. Each of those three would DESTROY
+   * the family's data rather than merely skipping a push:
+   *
+   *  - `pushableIds`: the delete loop below keeps a link only via
+   *    `pushableIds.has(id) && !suppressed.has(id)`, so a blocked activity would
+   *    fall through to `deletes.push(l)` and its Google event would be DELETED
+   *    because somebody typed a bad time.
+   *  - `suppressed`: same fall-through, same outcome.
+   *  - `mastersById`: it is read a second time by `exceptionRestores`, which
+   *    qualifies any link whose master is absent and hands it a null master —
+   *    which `applyExceptionRestore` answers by DELETING the exception link,
+   *    orphaning the family's overridden instance in Google.
+   *
+   * Filtering the outputs alone leaves the link and the remote event untouched and
+   * merely stale, which is the correct conservative outcome: the event stops
+   * being UPDATED until someone fixes the data, and nothing is lost.
+   */
+  const blocked = new Set(activities.filter((a) => pushBlockReason(a) !== null).map((a) => a.id));
+
   const mastersById = new Map(pushable.filter((a) => !suppressed.has(a.id)).map((a) => [a.id, a]));
 
   const upserts: ReconcileUpsert[] = pushable
-    .filter((a) => !suppressed.has(a.id))
+    .filter((a) => !suppressed.has(a.id) && !blocked.has(a.id))
     .map((activity) => {
       const link = linkByActivity.get(activity.id);
       return {
@@ -199,6 +233,8 @@ export function planReconcile(
     if (!child.parentActivityId) continue;
     const master = mastersById.get(child.parentActivityId);
     if (!master) continue; // parent not synced → no instance to modify
+    // Skip HERE, not by removing the master from `mastersById` — see `blocked`.
+    if (blocked.has(child.id) || blocked.has(child.parentActivityId)) continue;
     const occurrenceYmd = overrideOccurrenceYmd(child);
     const mode: 'modify' | 'cancel' = child.isActive ? 'modify' : 'cancel';
     const link = exceptionLinkByChild.get(child.id);
@@ -221,5 +257,12 @@ export function planReconcile(
     .filter((l) => !activityIds.has(l.activityId) || !mastersById.has(l.exceptionOf!))
     .map((link) => ({ link, master: mastersById.get(link.exceptionOf!) ?? null }));
 
-  return { upserts, deletes, unlinks, exceptionUpserts, exceptionRestores };
+  return {
+    upserts,
+    deletes,
+    unlinks,
+    exceptionUpserts,
+    exceptionRestores,
+    blockedCount: blocked.size,
+  };
 }
