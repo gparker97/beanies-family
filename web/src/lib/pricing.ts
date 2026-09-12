@@ -71,6 +71,10 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
 
+/** Structured data wants a bare number, not a display string. Derived from
+ *  PRICES rather than retyped, so the JSON-LD cannot drift from the page. */
+export const numericPrice = (price: string): string => price.replace(/[^0-9.]/g, '');
+
 /** Length of the everything-included trial that starts at v1. */
 export const TRIAL_DAYS = 90;
 
