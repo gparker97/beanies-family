@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-12",
-    "translationCount": 4711
+    "translationCount": 4717
   },
   "translations": {
     "app.name": {
@@ -23559,6 +23559,36 @@
     "calendarImport.scanFailed.body": {
       "translation": "没有任何内容被导入，您的Google日历中也没有任何内容被更改。请检查您的网络连接，然后重试。",
       "hash": "46utx8",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarSync.toast.accountMismatch.title": {
+      "translation": "这是另一个Google帐户",
+      "hash": "wrt593",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarSync.toast.accountMismatch.message": {
+      "translation": "此日历已关联到{account}。以该账号登录以重新连接，或断开与此日历的连接并连接新日历。",
+      "hash": "s2xqo2",
+      "lastUpdated": "2026-09-12"
+    },
+    "reconnectPrompt.calendar.noticeTitle": {
+      "translation": "Google日历已断开连接",
+      "hash": "s15vo6",
+      "lastUpdated": "2026-09-12"
+    },
+    "reconnectPrompt.calendar.noticeBody": {
+      "translation": "新活动未到达Google。请{name}重新连接。",
+      "hash": "jysk49",
+      "lastUpdated": "2026-09-12"
+    },
+    "reconnectPrompt.calendar.noticeBodyAccount": {
+      "translation": "新活动未到达Google。请管理{account}的人重新连接。",
+      "hash": "oexqif",
+      "lastUpdated": "2026-09-12"
+    },
+    "reconnectPrompt.calendar.noticeBodyUnknown": {
+      "translation": "新活动未到达Google。询问设置日历的人重新连接日历。",
+      "hash": "vtm21o",
       "lastUpdated": "2026-09-12"
     }
   }
