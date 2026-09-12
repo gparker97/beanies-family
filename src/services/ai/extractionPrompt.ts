@@ -261,7 +261,12 @@ function asWallClockTime(v: unknown, field: string, rejected: string[]): string 
  *  with the very same "Invalid start time". */
 function asYmd(v: unknown, field: string, rejected: string[]): string {
   const raw = asString(v, MODEL_FIELD_MAX);
-  if (isRealYmd(raw)) return raw;
+  // ⚠️ Validate the SLICE, not the raw value. A date carrying a time component is
+  // legal throughout the app — every consumer slices to 10, and `pushBlockReason`
+  // validates `date.slice(0, 10)` for exactly this reason. Anchoring on the full
+  // string here would blank a perfectly usable "2026-09-12T00:00:00Z".
+  const ymd = raw.slice(0, 10);
+  if (isRealYmd(ymd)) return ymd;
   if (raw) rejected.push(field);
   return '';
 }
@@ -863,11 +868,16 @@ function collectScalarFields(
       // Times and dates are shape-checked; everything else is free text. Same
       // reasoning as the activity fields — these render into `segment.notes` and a
       // junk clock time is worse than an absent one.
-      target[k] = NESTED_TIME_KEYS.has(k)
+      const coerced = NESTED_TIME_KEYS.has(k)
         ? asWallClockTime(v, k, rejectedFields)
         : NESTED_YMD_KEYS.has(k)
           ? asYmd(v, k, rejectedFields)
           : asString(v, MODEL_TEXT_MAX);
+      // A rejected time/date stores '' and is dropped downstream, so charging it to
+      // the budget would let a document full of malformed dates starve the real
+      // fields this sweep's own per-sweep budget exists to protect.
+      if (!coerced) continue;
+      target[k] = coerced;
       added += 1;
     } else if (typeof v === 'number') {
       target[k] = String(v);

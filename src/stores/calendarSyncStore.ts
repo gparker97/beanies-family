@@ -771,10 +771,18 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
        * Only `invalid`. A 403 can be permission propagation, a 429 and a 5xx are
        * transient by definition, and widening this would quarantine a network blip.
        */
-      // How many pushes this run actually reached the network, and how many of those
-      // Google refused outright. See `systemicRejection` below.
-      let attemptedPushes = 0;
-      let rejectedPushes = 0;
+      /**
+       * How many work items would actually put a BODY on the wire this run, and how
+       * many of those are known-refused. See `systemicRejection` below.
+       *
+       * ⚠️ Both counts deliberately exclude no-ops (an unchanged hash sends nothing)
+       * and deliberately INCLUDE items skipped by the memo. Counting planned upserts
+       * instead would make a family of 200 activities with 5 broken ones look
+       * healthy; not counting memo-skips would make the whole guard die on the
+       * SECOND poll, once every bad payload is memoised and nothing is re-attempted.
+       */
+      let pushCandidates = 0;
+      let refusedPayloads = 0;
       /** The first refusal of the run, kept so a systemic failure can be reported honestly. */
       let firstRejection: CalendarApiError | null = null;
 
@@ -796,7 +804,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
        * Settings.
        */
       const notePayloadRejection = (key: string, hash: string, e: CalendarApiError) => {
-        rejectedPushes += 1;
+        refusedPayloads += 1;
         firstRejection ??= e;
         if (rejectedPushHashes.get(key) === hash) return;
         rejectedPushHashes.set(key, hash);
@@ -836,9 +844,16 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         ...plan.upserts.map((u) => async () => {
           const key = rejectionKey(connectionId, u.activity.id);
           const fingerprint = rejectionFingerprint(u.hash, ctx);
-          // Google already refused this exact body. Re-sending it cannot succeed.
-          if (rejectedPushHashes.get(key) === fingerprint) return;
-          attemptedPushes += 1;
+          // Would this item actually send a body? A new link inserts; a changed hash
+          // patches; an unchanged hash sends nothing and must not count either way.
+          // Mirrors `applyUpsert`'s own branching.
+          if (u.existingHash === undefined || u.existingHash !== u.hash) pushCandidates += 1;
+          // Google already refused this exact body. Re-sending it cannot succeed —
+          // but it is still a refused payload for the systemic test above.
+          if (rejectedPushHashes.get(key) === fingerprint) {
+            refusedPayloads += 1;
+            return;
+          }
           try {
             if (await applyUpsert(client, connectionId, calendarId, u, ctx, opts.verifyExisting)) {
               changed = true;
@@ -887,8 +902,12 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         ...plan.exceptionUpserts.map((e) => async () => {
           const key = rejectionKey(connectionId, e.child.id);
           const fingerprint = rejectionFingerprint(e.hash, ctx);
-          if (rejectedPushHashes.get(key) === fingerprint) return;
-          attemptedPushes += 1;
+          // `applyExceptionUpsert` returns early on an unchanged hash — no body sent.
+          if (e.existingHash !== e.hash) pushCandidates += 1;
+          if (rejectedPushHashes.get(key) === fingerprint) {
+            refusedPayloads += 1;
+            return;
+          }
           try {
             if (await applyExceptionUpsert(client, connectionId, calendarId, e, ctx)) {
               changed = true;
@@ -932,12 +951,20 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
        * So: one refusal is a record problem, and every refusal is ours. Two is the
        * floor because a single bad event must never trip it.
        */
-      const systemicRejection =
-        firstRejection !== null && attemptedPushes >= 2 && rejectedPushes === attemptedPushes;
-      if (systemicRejection) {
+      if (pushCandidates >= 2 && refusedPayloads >= pushCandidates) {
+        // ⚠️ `firstRejection` is null on every run AFTER the first: by then every bad
+        // payload is memoised, so nothing is re-attempted and no fresh error object
+        // exists. Synthesising one is what keeps the guard alive across polls — the
+        // alternative silently reports the connection healthy from the second poll
+        // onward while not a single event reaches Google.
         record(
-          firstRejection,
-          `upsert (ALL ${attemptedPushes} pushes refused — systemic, not a single bad record)`
+          firstRejection ??
+            new CalendarApiError(
+              'invalid',
+              'every pushable event on this connection is a payload Google has already refused',
+              400
+            ),
+          `upsert (ALL ${pushCandidates} pushes refused — systemic, not a single bad record)`
         );
       }
 
