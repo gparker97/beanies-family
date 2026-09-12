@@ -263,6 +263,11 @@ export function planReconcile(
     unlinks,
     exceptionUpserts,
     exceptionRestores,
-    blockedCount: blocked.size,
+    // ⚠️ Only what was actually WITHHELD, not every malformed activity in the pod.
+    // `blocked` spans all activities but is applied to `upserts` alone, so
+    // `blocked.size` would warn forever about a two-year-old inactive activity that
+    // was never a push candidate — and could never answer the question the event
+    // exists for: did the predicate wrongly hold something back?
+    blockedCount: pushable.filter((a) => !suppressed.has(a.id) && blocked.has(a.id)).length,
   };
 }
