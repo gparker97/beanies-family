@@ -4216,6 +4216,11 @@ const STRING_DEFS = {
     en: 'Set up my family',
     beanie: 'set up my family',
   },
+  'createPod.driveConsentDenied': {
+    en: 'Google needs permission to create your family file. Try again and tick the file access box when Google asks.',
+    beanie:
+      'google needs permission to create your family file. try again and tick the file access box when google asks.',
+  },
   'resumeSetup.driveConsentDenied': {
     en: 'Google needs permission to access your family file. Please reconnect Google Drive and allow file access when prompted.',
     beanie:
