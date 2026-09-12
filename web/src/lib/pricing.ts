@@ -135,6 +135,11 @@ export const PRICING_FAQS: PricingFaq[] = [
     a: "your pod has a creation date, and that's the whole test. no code, no coupon, no screenshot. you don't need to do anything today except be here.",
   },
   {
+    id: 'when-is-v1',
+    q: 'when is v1 coming?',
+    a: "as of now, i'd say roughly around october (2026), depending on how long it takes to plod through our issues list. i'll post updates here as we get closer.",
+  },
+  {
     id: 'data-if-i-leave',
     q: 'what happens to my data if i stop paying, or leave?',
     a: "nothing happens to it. it's your own encrypted file, not on my server, so there's nothing for me to lock or delete. stop paying and beanies goes read-only. export everything whenever you like, or take the file and go.",
