@@ -142,6 +142,58 @@ const invalidGrantCounters = new Map<string, number>();
  *  sustained-only Slack page; reset on clean success + wiped in stop(). */
 const reconcileErrorCounters = new Map<string, number>();
 
+/**
+ * Payloads Google refused with a deterministic 400, `${connectionId}:${activityId}`
+ * → the push hash it refused.
+ *
+ * Device-local for the same reason as the two counters above: this is sync-engine
+ * failure bookkeeping, not family data. A reload forgets it and costs at most ONE
+ * wasted call, against a 5-minute poll that would otherwise re-send the same doomed
+ * body ~288 times a day, on every device, forever.
+ *
+ * ⚠️ Keyed on the HASH, never on the activity id alone. An edit changes the hash,
+ * so the push is retried the moment the user fixes the data — no expiry, no timer,
+ * no clear path to forget. Keying on the id would turn a self-healing situation
+ * permanent, which is strictly worse than the bug.
+ *
+ * Two writers share it without colliding: master upserts key on `computePushHash`,
+ * exception upserts on `computeExceptionHash`, and the id spaces are disjoint by
+ * construction (`isPushable` excludes anything with a `parentActivityId`). Do not
+ * add a second map.
+ *
+ * Deliberately NOT cleared on disconnect/reconnect beside `invalidGrantCounters`: a
+ * 400 on the request BODY is grant-independent, so forgetting it there would only
+ * re-burn the call.
+ */
+const rejectedPushHashes = new Map<string, string>();
+
+function rejectionKey(connectionId: string, activityId: string): string {
+  return `${connectionId}:${activityId}`;
+}
+
+/**
+ * The memoised value: what Google refused, in enough detail that fixing ANY of it
+ * retries the push.
+ *
+ * ⚠️ `computePushHash` alone is not enough, and assuming it was is a real trap.
+ * It hashes the ACTIVITY's own fields and deliberately excludes the map context —
+ * but `timeZone` and `appOrigin` are both serialized into every body
+ * (`buildMapContext`). So a rejection CAUSED by the context (a device whose IANA
+ * zone Google rejects, a malformed origin) would have an unchanging activity hash,
+ * and the skip would hold forever even after the cause was fixed. Folding the
+ * context in means the memo is keyed on what was actually sent.
+ *
+ * Still not covered: an exception rejected because of its MASTER's recurrence.
+ * `computeExceptionHash` carries no master state, so fixing the master does not
+ * retry the child until the child itself changes or the app reloads. Accepted —
+ * the residual cost is one wasted call per device per session, and threading
+ * master state through the hash would couple two records that are otherwise
+ * independent.
+ */
+function rejectionFingerprint(hash: string, ctx: ActivityMapContext): string {
+  return `${hash}|${ctx.timeZone}|${ctx.appOrigin}`;
+}
+
 // The CalendarClient singleton lives in `clientInstance.ts` (shared with the clash
 // store). Re-export the test seam so this store's existing tests keep importing it
 // from here.
@@ -173,6 +225,27 @@ function nowIso(): string {
 
 function todayYmd(): string {
   return localToday(); // LOCAL date — the push window must reflect the user's day, not UTC (F8)
+}
+
+/**
+ * A readable message for anything that was thrown.
+ *
+ * ⚠️ `String(e)` on a plain object yields the literal "[object Object]", which is
+ * what CloudWatch received on the one occasion it mattered — so the non-`Error`
+ * case needs more than a cast. JSON is attempted first (a thrown response body is
+ * usually an object worth reading) and falls back to `String` for anything cyclic
+ * or exotic.
+ */
+function describeThrown(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'object' && e !== null) {
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return Object.prototype.toString.call(e);
+    }
+  }
+  return String(e);
 }
 
 /** A ±1-day UTC window around an occurrence date, for `listInstances` discovery.
@@ -656,6 +729,29 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       const links = await getCalendarEventLinksForConnection(connectionId);
       const plan = planReconcile(activities, links, todayYmd(), memberName);
 
+      /**
+       * How many activities the planner refused to push at all.
+       *
+       * Reported as ONE aggregate per reconcile, never one event per activity: the
+       * firehose caps at 50 events per surface per minute, and a per-activity loop
+       * would truncate itself silently on exactly the family it was meant to
+       * explain.
+       *
+       * This is the counterpart to `pushBlockReason`'s own warning that a false
+       * positive is "a SILENT REGRESSION — the event simply stops reaching Google
+       * with no error anywhere". Without this line that sentence describes the
+       * monitoring too.
+       */
+      const blockedCount = plan.blockedCount;
+      if (blockedCount > 0) {
+        logEvent({
+          level: 'warn',
+          surface: 'calendar-sync',
+          message: `[calendarSync] ${blockedCount} activities cannot be pushed (malformed date or time)`,
+          context: { action: 'push-blocked', count: blockedCount },
+        });
+      }
+
       const errors: CalendarApiError[] = [];
       // An `auth` error means the connection's refresh token is permanently
       // rejected: every remaining task in this run would fail identically. Stop
@@ -664,11 +760,73 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       let authAborted = false;
       // `task` names the reconcile task in the propagated message ("HTTP 400" alone
       // gave CloudWatch nothing to triage on when the exception loop hit prod).
+      /**
+       * Is this a rejection of the BODY, which no amount of retrying can fix?
+       *
+       * `CalendarErrorKind`'s own definition says it: `'invalid' // 400 → Google
+       * rejected the request body/params — deterministic, never retryable`. The
+       * reconcile loop simply never honoured it, which is what left one family
+       * re-sending the same doomed event every five minutes for days.
+       *
+       * Only `invalid`. A 403 can be permission propagation, a 429 and a 5xx are
+       * transient by definition, and widening this would quarantine a network blip.
+       */
+      // How many pushes this run actually reached the network, and how many of those
+      // Google refused outright. See `systemicRejection` below.
+      let attemptedPushes = 0;
+      let rejectedPushes = 0;
+      /** The first refusal of the run, kept so a systemic failure can be reported honestly. */
+      let firstRejection: CalendarApiError | null = null;
+
+      const isTerminalPayloadRejection = (e: unknown): e is CalendarApiError =>
+        e instanceof CalendarApiError && e.kind === 'invalid';
+
+      /**
+       * Remember a refused payload and report it ONCE.
+       *
+       * Mirrors `applyExceptionRestore`'s existing `invalid` branch: the case is
+       * RESOLVED here, so the error is deliberately never `record()`ed. That keeps
+       * `settleConnectionStatus` byte-identical — no new severity branch, no "are
+       * all errors invalid?" predicate — and lets the connection settle back to
+       * `ok`, because a connection with one unsendable event is not a broken
+       * connection.
+       *
+       * `warning`, not `critical`: nothing is at risk and no action of ours failed.
+       * One event is not syncing, and for a cause we can name the family is told in
+       * Settings.
+       */
+      const notePayloadRejection = (key: string, hash: string, e: CalendarApiError) => {
+        rejectedPushes += 1;
+        firstRejection ??= e;
+        if (rejectedPushHashes.get(key) === hash) return;
+        rejectedPushHashes.set(key, hash);
+        reportError({
+          surface: 'calendar-sync',
+          message: `[calendarSync] Google refused this event and will refuse it again: ${e.message}`,
+          error: e,
+          severity: 'warning',
+          context: { action: 'push-rejected', error_code: 'google_rejected' },
+        });
+      };
+
       const record = (e: unknown, task: string) => {
-        const err = e instanceof CalendarApiError ? e : new CalendarApiError('unknown', String(e));
+        const err =
+          e instanceof CalendarApiError ? e : new CalendarApiError('unknown', describeThrown(e));
         if (err.kind === 'auth') authAborted = true;
-        err.message = `[${task}] ${err.message}`;
-        errors.push(err);
+        // ⚠️ Build a NEW error rather than mutating `err.message`. The token
+        // provider latches a single `CalendarApiError` and re-throws THAT SAME
+        // INSTANCE to every task in the run, and every run for the rest of the
+        // session — so mutating it accreted the prefix without bound
+        // ("[upsert] [upsert] [delete] …"). Both readonly fields are carried over:
+        // `kind` because `settleConnectionStatus` writes it to `lastError`, and
+        // `status` because the Slack payload shows the HTTP code.
+        const tagged = new CalendarApiError(err.kind, `[${task}] ${err.message}`, err.status);
+        // Carry the ORIGINAL stack over. Rebuilding the error is what stops the
+        // prefix accreting, but a fresh instance's stack points at this function —
+        // and `errorReporter` puts that stack in the Slack block, so every reconcile
+        // error would arrive rooted here instead of at the client call that threw.
+        if (err.stack) tagged.stack = err.stack;
+        errors.push(tagged);
       };
       // Whether any actual Google write happened — gates the connection status write
       // so a no-op reconcile doesn't churn the CRDT (and re-trigger itself). (F1)
@@ -676,11 +834,20 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
       const tasks: Array<() => Promise<void>> = [
         ...plan.upserts.map((u) => async () => {
+          const key = rejectionKey(connectionId, u.activity.id);
+          const fingerprint = rejectionFingerprint(u.hash, ctx);
+          // Google already refused this exact body. Re-sending it cannot succeed.
+          if (rejectedPushHashes.get(key) === fingerprint) return;
+          attemptedPushes += 1;
           try {
             if (await applyUpsert(client, connectionId, calendarId, u, ctx, opts.verifyExisting)) {
               changed = true;
             }
           } catch (e) {
+            if (isTerminalPayloadRejection(e)) {
+              notePayloadRejection(key, fingerprint, e);
+              return;
+            }
             record(e, 'upsert');
           }
         }),
@@ -718,11 +885,19 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // Shares the same record/errors/changed/authAborted accounting + single settle.
       const exceptionTasks: Array<() => Promise<void>> = [
         ...plan.exceptionUpserts.map((e) => async () => {
+          const key = rejectionKey(connectionId, e.child.id);
+          const fingerprint = rejectionFingerprint(e.hash, ctx);
+          if (rejectedPushHashes.get(key) === fingerprint) return;
+          attemptedPushes += 1;
           try {
             if (await applyExceptionUpsert(client, connectionId, calendarId, e, ctx)) {
               changed = true;
             }
           } catch (err) {
+            if (isTerminalPayloadRejection(err)) {
+              notePayloadRejection(key, fingerprint, err);
+              return;
+            }
             record(err, `exception-${e.mode} ${e.occurrenceYmd}`);
           }
         }),
@@ -740,6 +915,30 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       ];
       if (exceptionTasks.length > 0) {
         await runPooled(exceptionTasks, MAX_INFLIGHT, () => authAborted);
+      }
+
+      /**
+       * ⚠️ When EVERYTHING is refused, the problem is not the records.
+       *
+       * Quarantining is right for one malformed event: the rest of the calendar
+       * keeps syncing and the connection is honestly healthy. But the same code
+       * path, applied to a systemic cause — a device timezone Google rejects, a
+       * malformed `appOrigin`, a serializer regression — would swallow every push
+       * in the run, leave `errors` empty, and report `status: 'ok'` with a fresh
+       * `lastSyncedAt` while the family's entire calendar silently stopped syncing.
+       * That is strictly worse than the bug this change set out to fix, because
+       * before it the same condition produced an honest `error` and a page.
+       *
+       * So: one refusal is a record problem, and every refusal is ours. Two is the
+       * floor because a single bad event must never trip it.
+       */
+      const systemicRejection =
+        firstRejection !== null && attemptedPushes >= 2 && rejectedPushes === attemptedPushes;
+      if (systemicRejection) {
+        record(
+          firstRejection,
+          `upsert (ALL ${attemptedPushes} pushes refused — systemic, not a single bad record)`
+        );
       }
 
       outcome = await settleConnectionStatus(connection, errors, changed);
@@ -819,12 +1018,16 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       reconcileErrorCounters.set(connection.id, n);
       reportError({
         surface: 'calendar-sync',
-        message: `[calendarSync] reconcile error (${worst.kind}): ${worst.message}${
+        message: `[calendarSync] reconcile error (${worst.kind}) on connection ${connection.id}: ${worst.message}${
           n >= RECONCILE_ERROR_THRESHOLD ? ` (sustained ×${n})` : ''
         }`,
         error: worst,
         severity: n === RECONCILE_ERROR_THRESHOLD ? 'critical' : CALENDAR_SYNC_ERRORS[worst.kind],
-        context: { connectionId: connection.id, consecutiveFailures: n },
+        // `consecutive_failures` is the allowlisted spelling — the camelCase one
+        // was silently dropped by `redactContext` and never once reached Slack.
+        // `connectionId` is not allowlisted at all and is device-local anyway, so
+        // it rides in the message, exactly as the `needs_reconnect` park above does.
+        context: { action: 'reconcile-error', consecutive_failures: n },
       });
       return 'error';
     }
@@ -1368,6 +1571,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     resetCalendarClient();
     invalidGrantCounters.clear();
     reconcileErrorCounters.clear();
+    rejectedPushHashes.clear();
   }
 
   return {
