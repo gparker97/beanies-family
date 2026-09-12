@@ -62,7 +62,7 @@ export const WALL_VIEWS: readonly WallViewDef[] = [
     labelKey: 'wall.view.days',
     glyph: '▦',
     component: WallDaysView,
-    stepUnit: 'week',
+    stepUnit: 'page',
     arrowsInView: true,
   },
   {

@@ -115,7 +115,7 @@ describe('useWallAnchor', () => {
         let moved = true;
         let presses = 0;
         while (moved && presses < 500) {
-          moved = anchor.step('week', 1);
+          moved = anchor.step(7, 1);
           presses++;
         }
 
@@ -127,36 +127,48 @@ describe('useWallAnchor', () => {
         expect(consoleError).not.toHaveBeenCalled();
 
         // And it is not stuck: the other direction still works.
-        expect(anchor.step('week', -1)).toBe(true);
+        expect(anchor.step(7, -1)).toBe(true);
       });
     } finally {
       consoleError.mockRestore();
     }
   });
 
-  it('honours the family’s weekStartDay when stepping by week', () => {
-    withAnchor((anchor) => {
-      anchor.step('week', 1);
-      expect(anchor.anchorYmd.value).toBe('2026-09-07'); // Monday-start
-    });
+  it('🔴 steps by exactly the days it was given, whatever the weekStartDay', () => {
+    // The old rule snapped to calendar weeks, so this same press landed on
+    // 2026-09-07 under a Monday-start week and 2026-09-13 under a Sunday-start
+    // one. Paging by what is on screen has no business consulting that setting —
+    // and a family who changed it would have found their arrows moved differently.
+    for (const start of [1, 0]) {
+      weekStartDay.value = start;
+      withAnchor((anchor) => {
+        anchor.step(7, 1);
+        expect(anchor.anchorYmd.value).toBe('2026-09-13');
+      });
+    }
+  });
 
-    weekStartDay.value = 0;
+  it('🔴 pages by three when three columns are drawn, and back again exactly', () => {
     withAnchor((anchor) => {
-      anchor.step('week', 1);
-      // 2026-09-06 IS a Sunday, so a Sunday-start week is already aligned.
-      expect(anchor.anchorYmd.value).toBe('2026-09-13');
+      anchor.step(3, 1);
+      expect(anchor.anchorYmd.value).toBe('2026-09-09');
+      anchor.step(3, 1);
+      expect(anchor.anchorYmd.value).toBe('2026-09-12');
+      anchor.step(3, -1);
+      anchor.step(3, -1);
+      expect(anchor.anchorYmd.value).toBe('2026-09-06'); // exactly where it began
     });
   });
 
   it('steps by a single day and returns to today on demand', () => {
     withAnchor((anchor) => {
-      anchor.step('day', 1);
+      anchor.step(1, 1);
       expect(anchor.anchorYmd.value).toBe('2026-09-07');
 
-      anchor.step('day', -1);
+      anchor.step(1, -1);
       expect(anchor.anchorYmd.value).toBe('2026-09-06');
 
-      anchor.step('week', 1);
+      anchor.step(7, 1);
       anchor.goToToday();
       expect(anchor.anchorYmd.value).toBe('2026-09-06');
       expect(anchor.isAnchoredToToday.value).toBe(true);
@@ -203,9 +215,9 @@ describe('useWallAnchor', () => {
 
   it('does not report anything on a valid step', () => {
     withAnchor((anchor) => {
-      anchor.step('week', 1);
-      anchor.step('week', 1);
-      anchor.step('day', -1);
+      anchor.step(7, 1);
+      anchor.step(7, 1);
+      anchor.step(1, -1);
       anchor.goToToday();
       expect(reportError).not.toHaveBeenCalled();
     });

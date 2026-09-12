@@ -6,14 +6,13 @@ import {
   anchorWeekDays,
   clampAnchorYmd,
   nextAnchorYmd,
-  type WallStepUnit,
+  stepDaysFor,
 } from '../wallAnchor';
 
-// 2026-09-06 is a Sunday. Monday-start weeks therefore begin 2026-08-31;
-// Sunday-start weeks begin 2026-09-06 itself. Both are exercised below.
+// 2026-09-06 is a Sunday — which used to matter a great deal here, because
+// stepping snapped to calendar weeks and so depended on the family's
+// weekStartDay. It no longer does: the arrows page by what is on screen.
 const TODAY = '2026-09-06';
-const MONDAY = 1;
-const SUNDAY = 0;
 
 describe('anchorOffsetDays', () => {
   it('is signed — the property daysBetween does not have', () => {
@@ -85,109 +84,124 @@ describe('clampAnchorYmd', () => {
   });
 });
 
+describe('stepDaysFor', () => {
+  it('a day step is one day, whatever the layout', () => {
+    expect(stepDaysFor('day', 3)).toBe(1);
+    expect(stepDaysFor('day', 7)).toBe(1);
+  });
+
+  it('a page step is however many columns are drawn', () => {
+    expect(stepDaysFor('page', 3)).toBe(3);
+    expect(stepDaysFor('page', 5)).toBe(5);
+    expect(stepDaysFor('page', 7)).toBe(7);
+  });
+
+  it('🔴 never returns zero, however broken the column count', () => {
+    // An arrow that moves nothing is indistinguishable from a frozen screen on a
+    // wall-mounted tablet, which is the failure this whole surface guards against.
+    for (const bad of [0, -3, NaN, Infinity, 0.4]) {
+      expect(stepDaysFor('page', bad)).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
 describe('nextAnchorYmd', () => {
-  describe('week steps from today (the forward-biased default)', () => {
-    it('goes to the start of NEXT calendar week, Monday-start', () => {
-      expect(nextAnchorYmd(TODAY, 'week', 1, MONDAY)).toBe('2026-09-07');
+  /**
+   * ⚠️ These replace a block that pinned calendar-week SNAPPING — forward from
+   * today to the start of next week, back to the start of this one, then blind
+   * ±7. That rule made sense only while the days view drew a fixed seven
+   * columns. Once the count became responsive, a wall showing three still jumped
+   * seven days a press, so four of every seven days were reachable only through
+   * the strip below, and the arrows were not inverses of each other.
+   */
+  describe('pages by exactly the days it is given', () => {
+    it('moves three days when three columns are drawn', () => {
+      // Visible is [06, 07, 08]; the next unseen day is the 9th, and it becomes
+      // the first column. No day is skipped and none is shown twice.
+      expect(nextAnchorYmd(TODAY, 3, 1)).toBe('2026-09-09');
+      expect(nextAnchorYmd(TODAY, 3, -1)).toBe('2026-09-03');
     });
 
-    it('goes to the start of THIS calendar week going back, Monday-start', () => {
-      // The first "back" shows the days already used, rather than jumping a
-      // whole week past them.
-      expect(nextAnchorYmd(TODAY, 'week', -1, MONDAY)).toBe('2026-08-31');
+    it.each([
+      [3, '2026-09-09', '2026-09-03'],
+      [4, '2026-09-10', '2026-09-02'],
+      [5, '2026-09-11', '2026-09-01'],
+      [7, '2026-09-13', '2026-08-30'],
+    ])('moves %i days a press, in both directions', (columns, forward, back) => {
+      expect(nextAnchorYmd(TODAY, columns, 1)).toBe(forward);
+      expect(nextAnchorYmd(TODAY, columns, -1)).toBe(back);
     });
 
-    it('treats today as already week-aligned on a Sunday-start week', () => {
-      // 2026-09-06 IS a Sunday, so with weekStartDay=0 it is the week start and
-      // stepping is plain ±7 immediately.
-      expect(nextAnchorYmd(TODAY, 'week', 1, SUNDAY)).toBe('2026-09-13');
-      expect(nextAnchorYmd(TODAY, 'week', -1, SUNDAY)).toBe('2026-08-30');
-    });
-  });
-
-  describe('week steps once aligned to a calendar week', () => {
-    it('moves a plain seven days forward and back', () => {
-      expect(nextAnchorYmd('2026-09-07', 'week', 1, MONDAY)).toBe('2026-09-14');
-      expect(nextAnchorYmd('2026-09-07', 'week', -1, MONDAY)).toBe('2026-08-31');
-    });
-
-    it('crosses a month boundary', () => {
-      expect(nextAnchorYmd('2026-09-28', 'week', 1, MONDAY)).toBe('2026-10-05');
-    });
-
-    it('crosses a year boundary', () => {
-      expect(nextAnchorYmd('2026-12-28', 'week', 1, MONDAY)).toBe('2027-01-04');
-    });
-  });
-
-  describe('week steps from an arbitrary day (after a day tap)', () => {
-    it('enters the adjacent calendar week rather than preserving the offset', () => {
-      // Anchored on Thursday 2026-09-10 (greg's day-tap case). Forward goes to
-      // the start of next week, not to the following Thursday.
-      expect(nextAnchorYmd('2026-09-10', 'week', 1, MONDAY)).toBe('2026-09-14');
-      expect(nextAnchorYmd('2026-09-10', 'week', -1, MONDAY)).toBe('2026-09-07');
-    });
-  });
-
-  describe('day steps', () => {
-    it('moves exactly one day and never snaps to a week', () => {
-      expect(nextAnchorYmd('2026-09-10', 'day', 1, MONDAY)).toBe('2026-09-11');
-      expect(nextAnchorYmd('2026-09-10', 'day', -1, MONDAY)).toBe('2026-09-09');
-      // Same answer regardless of week-start: a day is a day.
-      expect(nextAnchorYmd('2026-09-10', 'day', 1, SUNDAY)).toBe('2026-09-11');
+    it('a single-day step is still exactly one day', () => {
+      expect(nextAnchorYmd('2026-09-10', 1, 1)).toBe('2026-09-11');
+      expect(nextAnchorYmd('2026-09-10', 1, -1)).toBe('2026-09-09');
     });
 
     it('crosses month and year boundaries', () => {
-      expect(nextAnchorYmd('2026-09-30', 'day', 1, MONDAY)).toBe('2026-10-01');
-      expect(nextAnchorYmd('2027-01-01', 'day', -1, MONDAY)).toBe('2026-12-31');
+      expect(nextAnchorYmd('2026-09-28', 7, 1)).toBe('2026-10-05');
+      expect(nextAnchorYmd('2026-12-28', 7, 1)).toBe('2027-01-04');
+      expect(nextAnchorYmd('2027-01-01', 1, -1)).toBe('2026-12-31');
+    });
+  });
+
+  describe('🔴 the arrows are exact inverses', () => {
+    /**
+     * The property the old rule could NOT have — its own tests pinned the
+     * asymmetry as "documented, not accidental": `‹` from a Tuesday snapped back
+     * to Monday and `›` then moved a full seven, a net +6 rather than a round
+     * trip. greg reported the arrows as unintuitive; this is the property that
+     * makes them intuitive, so it is asserted at every anchor alignment.
+     */
+    it.each([
+      ['today', TODAY],
+      ['an aligned Monday', '2026-09-07'],
+      ['an arbitrary Thursday (after a day tap)', '2026-09-10'],
+      ['a month end', '2026-09-30'],
+      ['a year end', '2026-12-31'],
+    ])('back-then-forward returns to %s', (_label, from) => {
+      for (const columns of [3, 4, 5, 6, 7]) {
+        const back = nextAnchorYmd(from, columns, -1);
+        expect(nextAnchorYmd(back, columns, 1)).toBe(from);
+        const forward = nextAnchorYmd(from, columns, 1);
+        expect(nextAnchorYmd(forward, columns, -1)).toBe(from);
+      }
+    });
+  });
+
+  describe('no longer consults the week-start setting', () => {
+    it('🔴 gives the same answer whichever day the family starts their week on', () => {
+      // It used to differ: Monday-start sent this press to 2026-09-07 and
+      // Sunday-start to 2026-09-13. Paging by what is on screen has nothing to
+      // do with where a calendar week begins, and a family who changed that
+      // setting would have found their arrows silently moved differently.
+      expect(nextAnchorYmd(TODAY, 7, 1)).toBe('2026-09-13');
+      expect(nextAnchorYmd('2026-09-10', 7, 1)).toBe('2026-09-17');
+      expect(nextAnchorYmd('2026-09-10', 7, -1)).toBe('2026-09-03');
     });
   });
 
   describe('daylight saving', () => {
-    // Northern-hemisphere DST ends 2026-10-25 in most of Europe and
-    // 2026-11-01 in the US. Stepping across either must still be whole days —
-    // a naive +7*86400000 lands an hour out and can round to the wrong date.
+    // Northern-hemisphere DST ends 2026-10-25 in most of Europe and 2026-11-01
+    // in the US. Stepping across either must still be whole days — a naive
+    // +n*86400000 lands an hour out and can round to the wrong date.
     it.each([
       ['a spring transition', '2026-03-29'],
       ['an autumn transition', '2026-10-25'],
       ['the US autumn transition', '2026-11-01'],
     ])('steps whole days across %s', (_label, ymd) => {
-      const forward = nextAnchorYmd(ymd, 'day', 1, MONDAY);
-      const back = nextAnchorYmd(forward, 'day', -1, MONDAY);
-      expect(back).toBe(ymd);
-      expect(anchorOffsetDays(forward, ymd)).toBe(1);
-    });
-
-    it('keeps a week step exactly seven days across a transition', () => {
-      const from = '2026-10-19'; // a Monday, one week before the transition
-      expect(nextAnchorYmd(from, 'week', 1, MONDAY)).toBe('2026-10-26');
+      for (const columns of [1, 3, 7]) {
+        const forward = nextAnchorYmd(ymd, columns, 1);
+        expect(nextAnchorYmd(forward, columns, -1)).toBe(ymd);
+        expect(anchorOffsetDays(forward, ymd)).toBe(columns);
+      }
     });
   });
 
-  describe('asymmetry after a day tap — documented, not accidental', () => {
-    it('back-then-forward from an unaligned anchor lands a week start ahead', () => {
-      // greg's approved rule is "leaving today enters calendar weeks", and a day
-      // tap leaves an arbitrary anchor. So `‹` from Tuesday snaps to Monday, and
-      // `›` from an aligned Monday is a plain +7 — a net +6, not a round trip.
-      // That is the cost of snapping, and it is asserted here so a later reader
-      // meets it as a decision rather than discovering it as a surprise.
-      const tuesday = '2026-09-08';
-      const back = nextAnchorYmd(tuesday, 'week', -1, MONDAY);
-      expect(back).toBe('2026-09-07');
-      expect(nextAnchorYmd(back, 'week', 1, MONDAY)).toBe('2026-09-14');
-    });
-  });
-
-  describe('round-tripping', () => {
-    it.each<[WallStepUnit, number]>([
-      ['week', MONDAY],
-      ['week', SUNDAY],
-      ['day', MONDAY],
-    ])('forward then back returns to the week start (%s, weekStart=%i)', (unit, weekStart) => {
-      // From an already-aligned anchor, a step out and back is symmetric.
-      const start = weekStart === MONDAY ? '2026-09-07' : '2026-09-06';
-      const out = nextAnchorYmd(start, unit, 1, weekStart);
-      expect(nextAnchorYmd(out, unit, -1, weekStart)).toBe(start);
+  describe('totality', () => {
+    it('a broken column count still moves the wall rather than freezing it', () => {
+      expect(nextAnchorYmd(TODAY, 0, 1)).toBe('2026-09-07');
+      expect(nextAnchorYmd(TODAY, NaN, 1)).toBe('2026-09-07');
+      expect(nextAnchorYmd(TODAY, -4, 1)).toBe('2026-09-07');
     });
   });
 });
