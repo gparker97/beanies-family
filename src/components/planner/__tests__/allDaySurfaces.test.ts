@@ -111,3 +111,61 @@ describe('every wall view that fills the all-day band also fills its reference d
     expect(checked).toBeGreaterThanOrEqual(3);
   });
 });
+
+/**
+ * The rule that replaces the two above, and the reason they existed.
+ *
+ * Both of those guards check that a surface RENDERS the right things. Neither
+ * can catch the failure that actually happened twice: two calendars asking
+ * DIFFERENT questions about what a day contains. The wall read only
+ * `activityStore` and therefore had no concept of a public holiday at all, while
+ * the planner read holidays and trips separately - so there was no single place
+ * that knew the answer, and adding a kind meant remembering nine call sites.
+ *
+ * `useDayExtras` is now that single place. This asserts nothing else reaches
+ * around it.
+ */
+describe('one query for what a day contains', () => {
+  const OWNER = 'useDayExtras.ts';
+  /** Reaching past the shared query, in either calendar. */
+  const BYPASS = /birthdaysInRange\(|holidaysInRange\(/;
+
+  function scan(dir: string): string[] {
+    return readdirSync(dir)
+      .filter((f) => f.endsWith('.vue') || f.endsWith('.ts'))
+      .filter((f) => !f.endsWith('.test.ts'));
+  }
+
+  it('no planner or wall surface asks the stores directly', () => {
+    const offenders: string[] = [];
+    for (const dir of [PLANNER_DIR, WALL_DIR]) {
+      for (const file of scan(dir)) {
+        const src = readFileSync(join(dir, file), 'utf8');
+        if (BYPASS.test(src)) offenders.push(`${dir.split('/').pop()}/${file}`);
+      }
+    }
+    expect(
+      offenders,
+      `these bypass useDayExtras and can drift from the other calendar: ${offenders.join(', ')}`
+    ).toEqual([]);
+  });
+
+  it('the owner really does make those calls, so the rule is not vacuous', () => {
+    const owner = readFileSync(join(process.cwd(), 'src/composables', OWNER), 'utf8');
+    expect(BYPASS.test(owner)).toBe(true);
+  });
+
+  it('both calendars consume it', () => {
+    const users: string[] = [];
+    for (const dir of [PLANNER_DIR, WALL_DIR, join(process.cwd(), 'src/composables')]) {
+      for (const file of scan(dir)) {
+        if (file === OWNER) continue;
+        if (/useDayExtras/.test(readFileSync(join(dir, file), 'utf8'))) users.push(file);
+      }
+    }
+    // The planner's month/week/day/agenda surfaces plus the wall's placement
+    // composable. If this collapses toward zero, the shared query has been
+    // routed around rather than deleted.
+    expect(users.length).toBeGreaterThanOrEqual(4);
+  });
+});

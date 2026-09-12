@@ -15,6 +15,7 @@
 import { computed } from 'vue';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
@@ -52,6 +53,8 @@ const props = defineProps<{
 // `openDay` is deliberately NOT declared: in THIS view tapping a day moves the
 // panel to that day rather than opening a sheet over it.
 const emit = defineEmits<{
+  /** Forwarded from the grid's band — the page opens the read-only drawer. */
+  'open-birthday': [birthday: BirthdayOccurrence];
   /** Move the wall's shared anchor to this day. See `useWallAnchor`. */
   focusDay: [string];
   /** Return to the view this one was opened from. */
@@ -203,6 +206,7 @@ const focusLabel = computed(() =>
         :axis-width="AXIS_WIDTH_PX"
         view-id="today"
         @open="emit('open', $event)"
+        @open-birthday="emit('open-birthday', $event)"
       />
 
       <div class="grid shrink-0 gap-2" style="grid-template-columns: repeat(7, 1fr)">

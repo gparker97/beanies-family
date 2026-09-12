@@ -18,6 +18,7 @@
  */
 import { computed } from 'vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { ARROW_GUTTER_PX } from '@/components/wall/wallLayout';
@@ -63,6 +64,8 @@ const props = defineProps<{
   canStepForward: boolean;
 }>();
 const emit = defineEmits<{
+  /** Forwarded from the grid's band — the page opens the read-only drawer. */
+  'open-birthday': [birthday: BirthdayOccurrence];
   /**
    * A day the wall is NOT already drawing in full — a chip in the strip below —
    * RE-ANCHORS the week to start at that day. The tapped day is used AS-IS,
@@ -267,6 +270,7 @@ function colourFor(activity: FamilyActivity) {
           :axis-width="AXIS_WIDTH_PX"
           view-id="days"
           @open="emit('open', $event)"
+          @open-birthday="emit('open-birthday', $event)"
         />
 
         <!-- the days that did not fit as columns, tappable. Landscape too, now. -->

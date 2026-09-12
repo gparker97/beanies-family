@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { wallDayReferences, wallSharedReferences, type WallReferenceDay } from '../wallActivities';
+import { wallDayReferences, wallSharedReferences } from '../wallActivities';
+import type { DayExtra } from '@/utils/calendarDay';
 
-function ref(over: Partial<WallReferenceDay> = {}): WallReferenceDay {
+function ref(over: Partial<DayExtra> = {}): DayExtra {
   return {
     kind: 'birthday',
     id: 'b:m-joey:2026-09-15',

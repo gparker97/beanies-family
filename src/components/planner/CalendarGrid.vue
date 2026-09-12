@@ -3,9 +3,7 @@ import { ref, computed } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useHolidayStore } from '@/stores/holidayStore';
-import { useFamilyStore } from '@/stores/familyStore';
-import { birthdaysInRange } from '@/utils/birthdays';
+import { useDayExtras } from '@/composables/useDayExtras';
 import { useTranslation } from '@/composables/useTranslation';
 
 import { monthCells, monthSpan } from '@/utils/monthCells';
@@ -40,8 +38,6 @@ const { t } = useTranslation();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
-const holidayStore = useHolidayStore();
-const familyStore = useFamilyStore();
 
 // Reactive "today" from the app-wide singleton — updates on a DST-safe midnight
 // timer + visibilitychange + bfcache restore. Using a frozen `new Date()` here
@@ -95,6 +91,19 @@ const todayWeekRow = computed(() => {
 // Desktop month grid cells. The heavy lifting lives in the pure `monthCells`
 // module, shared with the mobile stream (`CalendarMonthStream.vue`) — one
 // implementation of the calendar maths, two surfaces rendering it.
+/**
+ * The grid's full span INCLUDING padding cells, hoisted so the shared day-extras
+ * query can be given a window. Same numbers `monthData` uses below.
+ */
+const gridSpan = computed(() =>
+  monthSpan(currentYear.value, currentMonth.value, settingsStore.weekStartDay)
+);
+/** Birthdays, holidays and trips — the ONE query the beanie wall asks too. */
+const { extras: dayExtras } = useDayExtras(
+  computed(() => gridSpan.value.startYmd),
+  computed(() => gridSpan.value.endYmd)
+);
+
 const monthData = computed(() => {
   const year = currentYear.value;
   const month = currentMonth.value;
@@ -111,11 +120,10 @@ const monthData = computed(() => {
     occurrences: activityStore.activitiesInRange(startYmd, endYmd),
     segments: vacationStore.travelSegmentOccurrencesInRange(startYmd, endYmd),
     vacations: vacationStore.vacations,
-    holidays: holidayStore.holidaysInRange(startYmd, endYmd),
     // Derived from each member's date of birth over the SAME span as everything
     // else — nothing is stored, so there is no per-family setup and correcting a
     // date of birth corrects every year at once.
-    birthdays: birthdaysInRange(familyStore.members, startYmd, endYmd),
+    extras: dayExtras.value,
   });
 });
 

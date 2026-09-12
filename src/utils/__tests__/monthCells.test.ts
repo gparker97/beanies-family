@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { monthCells, monthSpan } from '../monthCells';
-import type { FamilyActivity, FamilyVacation, HolidayOccurrence } from '@/types/models';
-import type { BirthdayOccurrence } from '@/utils/birthdays';
+import type { FamilyActivity, FamilyVacation } from '@/types/models';
+import type { DayExtra } from '@/utils/calendarDay';
 
 // `monthCells` is the pure extraction of what used to be CalendarGrid's 180-line
 // `calendarDays` computed. These tests pin the behaviour BOTH surfaces now share
@@ -34,8 +34,7 @@ const BASE = {
   occurrences: [],
   segments: [],
   vacations: [] as FamilyVacation[],
-  holidays: [] as HolidayOccurrence[],
-  birthdays: [] as BirthdayOccurrence[],
+  extras: [] as DayExtra[],
 };
 
 describe('monthSpan', () => {
@@ -148,13 +147,39 @@ describe('monthCells — tint sets', () => {
     expect(vacationDates.size).toBe(0);
   });
 
-  it('collects holiday dates', () => {
+  it('collects holiday dates from the extras, for the cell tint', () => {
     const { holidayDates, days } = monthCells({
       ...BASE,
-      holidays: [{ date: '2026-08-09', name: 'National Day' } as HolidayOccurrence],
+      extras: [
+        {
+          kind: 'holiday',
+          id: 'h:nd',
+          ymd: '2026-08-09',
+          label: 'National Day (SG)',
+          holiday: { date: '2026-08-09', name: 'National Day', countryCode: 'SG' },
+        } as DayExtra,
+      ],
     });
     expect(holidayDates.has('2026-08-09')).toBe(true);
-    expect(days.find((d) => d.date === '2026-08-09')!.holidays).toHaveLength(1);
+    expect(days.find((d) => d.date === '2026-08-09')!.extras).toHaveLength(1);
+  });
+
+  it('does NOT tint a day whose only extra is a birthday', () => {
+    // `holidayDates` drives the cell background; a birthday is a chip, not a
+    // reason to repaint the day.
+    const { holidayDates, days } = monthCells({
+      ...BASE,
+      extras: [
+        {
+          kind: 'birthday',
+          id: 'b:1',
+          ymd: '2026-08-09',
+          label: "Joey's 7th birthday",
+        } as DayExtra,
+      ],
+    });
+    expect(holidayDates.has('2026-08-09')).toBe(false);
+    expect(days.find((d) => d.date === '2026-08-09')!.extras).toHaveLength(1);
   });
 });
 

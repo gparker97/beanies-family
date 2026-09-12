@@ -21,7 +21,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { birthdaysInRange, birthdayPassesFilter } from '@/utils/birthdays';
+import { useDayExtras } from '@/composables/useDayExtras';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
@@ -195,18 +195,24 @@ const holidayForCurrentDay = computed(() => holidayStore.holidayForDate(currentD
  * `DayTimeline`; a single-day window is the same call the month and week views
  * make over their own spans.
  */
-const birthdaysForCurrentDay = computed(() => {
-  // Null when everyone is shown. A birthday follows its member exactly as that
-  // member's activities do; pets pass regardless (see `birthdayPassesFilter`).
-  const visible = memberFilterStore.isAllSelected
-    ? null
-    : (id: string) => memberFilterStore.isMemberSelected(id);
-  return birthdaysInRange(
-    familyStore.members,
-    currentDay.value.dateStr,
-    currentDay.value.dateStr
-  ).filter((b) => birthdayPassesFilter(b, visible));
-});
+const { byDate: extrasByDate } = useDayExtras(
+  computed(() => currentDay.value.dateStr),
+  computed(() => currentDay.value.dateStr),
+  {
+    isMemberVisible: computed(() =>
+      memberFilterStore.isAllSelected
+        ? null
+        : (id: string) => memberFilterStore.isMemberSelected(id)
+    ),
+  }
+);
+
+/** Birthdays on the day in view, from the shared query. */
+const birthdaysForCurrentDay = computed(() =>
+  (extrasByDate.value.get(currentDay.value.dateStr) ?? [])
+    .filter((e) => e.kind === 'birthday' && e.birthday)
+    .map((e) => e.birthday!)
+);
 
 const hasAnyUntimedContent = computed(
   () =>

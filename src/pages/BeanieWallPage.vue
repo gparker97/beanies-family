@@ -16,6 +16,8 @@ import WallFooter from '@/components/wall/WallFooter.vue';
 import WallLockMenu from '@/components/wall/WallLockMenu.vue';
 import WallNightScreen from '@/components/wall/WallNightScreen.vue';
 import WallSheet from '@/components/wall/WallSheet.vue';
+import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallStatusStamp from '@/components/wall/WallStatusStamp.vue';
@@ -71,6 +73,18 @@ const nightNow = ref(false);
 const focusedMemberId = ref<string | null>(null);
 /** The open drill-in sheet, or null. One at a time — this is a wall, not a desktop. */
 const sheet = ref<WallSheetTarget | null>(null);
+
+/**
+ * The read-only birthday drawer, shared with the planner. A birthday is derived
+ * from the bean's profile rather than stored, so this shows and explains; the
+ * wall never offers to edit it, which is also the right call on a screen that is
+ * locked by default and read by children.
+ */
+const birthdaySheet = ref<BirthdayOccurrence | null>(null);
+function onOpenBirthday(birthday: BirthdayOccurrence) {
+  lock.noteActivity();
+  birthdaySheet.value = birthday;
+}
 
 const jobs = useWallJobs();
 const lock = useWallLock();
@@ -786,11 +800,20 @@ watch(activeView, () => (sheet.value = null));
         @toggle="onToggle"
         @back="onGoBack"
         @open-day="onOpenDay"
+        @open-birthday="onOpenBirthday"
         @focus-member="onFocusMember"
         @focus-day="onFocusDay"
         @step="onStep"
         @open="openSheet"
         @open-chores="selectView('jobs')"
+      />
+
+      <BirthdayDetailsModal
+        :birthday="birthdaySheet"
+        :open="birthdaySheet !== null"
+        :today-ymd="today"
+        @close="birthdaySheet = null"
+        @open-profile="birthdaySheet = null"
       />
 
       <WallSheet

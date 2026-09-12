@@ -9,8 +9,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useHolidayStore } from '@/stores/holidayStore';
-import { useFamilyStore } from '@/stores/familyStore';
-import { birthdaysInRange } from '@/utils/birthdays';
+import { useDayExtras } from '@/composables/useDayExtras';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   toDateInputValue,
@@ -45,10 +44,15 @@ const holidayStore = useHolidayStore();
 /** Public holiday on the selected day, if any. */
 const holidayForDay = computed(() => holidayStore.holidayForDate(props.date));
 
-/** Family birthdays on the selected day — derived, read-only. */
-const familyStore = useFamilyStore();
+/** Family birthdays on the selected day, from the shared query. */
+const { byDate: extrasByDate } = useDayExtras(
+  computed(() => props.date),
+  computed(() => props.date)
+);
 const birthdaysForDay = computed(() =>
-  birthdaysInRange(familyStore.members, props.date, props.date)
+  (extrasByDate.value.get(props.date) ?? [])
+    .filter((e) => e.kind === 'birthday' && e.birthday)
+    .map((e) => e.birthday!)
 );
 
 /** Format the selected date as a readable header (e.g. "Wed, 6 Mar") */

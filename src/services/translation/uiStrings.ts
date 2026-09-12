@@ -6923,6 +6923,19 @@ const STRING_DEFS = {
     beanie: "{name}'s {age} bean day",
   },
   'planner.birthday.noAge': { en: "{name}'s birthday", beanie: "{name}'s bean day" },
+  // The read-only drawer a birthday opens. It is NOT an activity - there is
+  // nothing stored to edit or delete - so the copy says where it comes from
+  // rather than offering controls that cannot exist.
+  'planner.birthday.today': { en: 'Today!', beanie: 'today!' },
+  'planner.birthday.tomorrow': { en: 'Tomorrow', beanie: 'tomorrow' },
+  'planner.birthday.sleeps': { en: '{count} sleeps away', beanie: '{count} sleeps away' },
+  'planner.birthday.turns': { en: 'Turns {age}', beanie: 'turns {age}' },
+  'planner.birthday.source': {
+    en: 'beanies works this out from the birthday on their profile, so there is nothing here to edit.',
+    beanie:
+      'beanies works this out from the birthday on their profile, so there is nothing here to edit.',
+  },
+  'planner.birthday.openProfile': { en: 'Open their profile', beanie: 'open their profile' },
   'nook.birthday': { en: "{name}'s Birthday", beanie: "{name}'s bean day" },
   'nook.birthdayWithAge': { en: "{name}'s {age} Birthday!", beanie: "{name}'s {age} bean day!" },
   'nook.taskCompleted': { en: 'completed a task', beanie: 'task completed' },
