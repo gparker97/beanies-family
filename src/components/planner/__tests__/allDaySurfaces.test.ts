@@ -128,7 +128,7 @@ describe('every wall view that fills the all-day band also fills its reference d
 describe('one query for what a day contains', () => {
   const OWNER = 'useDayExtras.ts';
   /** Reaching past the shared query, in either calendar. */
-  const BYPASS = /birthdaysInRange\(|holidaysInRange\(/;
+  const BYPASS = /birthdaysInRange\(|holidaysInRange\(|holidayForDate\(/;
 
   function scan(dir: string): string[] {
     return readdirSync(dir)
@@ -167,5 +167,54 @@ describe('one query for what a day contains', () => {
     // composable. If this collapses toward zero, the shared query has been
     // routed around rather than deleted.
     expect(users.length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+/**
+ * The bug this exists for: the birthday drawer shipped reachable ONLY from the
+ * beanie wall. `MonthDayCard` emitted `birthday-click`, `BirthdayChip` emitted
+ * `click`, and `FamilyPlannerPage` listened for `birthday-click` on five
+ * components - but nothing in between ever re-emitted it. A listener bound to an
+ * event a child never emits is legal Vue, invisible to the typechecker and the
+ * linter, and invisible to unit tests that mount each component in isolation.
+ * Two review agents found it independently; none of the 27 tests did.
+ *
+ * So the wiring is asserted as SOURCE, at the two places it can break: a chip
+ * rendered without a handler, and an emit a parent forgets to forward.
+ */
+describe('a birthday chip is wired to something, everywhere it is rendered', () => {
+  const files = readdirSync(PLANNER_DIR).filter((f) => f.endsWith('.vue'));
+
+  it('every <BirthdayChip> carries a click handler', () => {
+    const unwired: string[] = [];
+    for (const file of files) {
+      if (file === 'BirthdayChip.vue') continue;
+      const src = readFileSync(join(PLANNER_DIR, file), 'utf8');
+      for (const tag of src.match(/<BirthdayChip[\s\S]*?\/>/g) ?? []) {
+        if (!/@click/.test(tag)) unwired.push(file);
+      }
+    }
+    expect(
+      unwired,
+      `these render a birthday chip that does nothing when tapped: ${unwired.join(', ')}`
+    ).toEqual([]);
+  });
+
+  it('every component emitting birthday-click has a parent that forwards it', () => {
+    // A `birthday-click` emit is only useful if somebody above re-emits or
+    // handles it. Anything declaring the emit must also be consumed somewhere.
+    const emitters = files.filter((f) =>
+      /'birthday-click':/.test(readFileSync(join(PLANNER_DIR, f), 'utf8'))
+    );
+    expect(emitters.length).toBeGreaterThanOrEqual(4);
+
+    const consumers = new Set<string>();
+    for (const dir of [PLANNER_DIR, join(process.cwd(), 'src/pages')]) {
+      for (const f of readdirSync(dir).filter((x) => x.endsWith('.vue'))) {
+        if (/@birthday-click=/.test(readFileSync(join(dir, f), 'utf8'))) consumers.add(f);
+      }
+    }
+    // The page plus the month parents, at minimum.
+    expect(consumers.size).toBeGreaterThanOrEqual(3);
   });
 });

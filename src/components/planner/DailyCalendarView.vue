@@ -20,7 +20,6 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
-import { useHolidayStore } from '@/stores/holidayStore';
 import { useDayExtras } from '@/composables/useDayExtras';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
@@ -28,6 +27,7 @@ import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
 import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
@@ -46,6 +46,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  'birthday-click': [birthday: BirthdayOccurrence];
   'select-date': [date: string];
   'add-activity': [date: string, time?: string, memberId?: string];
   'view-activity': [id: string, date: string];
@@ -82,7 +83,6 @@ const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
-const holidayStore = useHolidayStore();
 
 const referenceDate = computed(() => props.referenceDate);
 // Read-only derivations only — the mutating nav functions are intentionally
@@ -187,7 +187,12 @@ const activeVacations = computed(() =>
 
 // Public holiday on this day (if any) — drives the desktop banner + the
 // `holiday` prop passed to the mobile DayTimeline.
-const holidayForCurrentDay = computed(() => holidayStore.holidayForDate(currentDay.value.dateStr));
+/** From the SHARED day query, so this agrees with the month, week and wall. */
+const holidayForCurrentDay = computed(
+  () =>
+    (extrasByDate.value.get(currentDay.value.dateStr) ?? []).find((e) => e.kind === 'holiday')
+      ?.holiday
+);
 
 /**
  * Family birthdays on this day — derived from each member's date of birth, so
@@ -411,7 +416,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
           :style="{ gridColumn: `2 / span ${familyRowSpan}` }"
           class="px-1"
         >
-          <BirthdayChip :birthday="b" class="block w-full" />
+          <BirthdayChip :birthday="b" class="block w-full" @click="emit('birthday-click', b)" />
         </div>
 
         <!-- Vacation bars (span all member columns) -->
@@ -659,6 +664,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
         :is-today="currentDay.isToday"
         :holiday="holidayForCurrentDay"
         :birthdays="birthdaysForCurrentDay"
+        @birthday-click="(b) => emit('birthday-click', b)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
