@@ -29,19 +29,19 @@ import { startUnifiedReconnect } from '@/services/google/unifiedReconnect';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
+// Case-folded Google-account comparison. Lifted out of this file so the pure
+// `connectionOwner` module can share it without importing a store-bound composable.
+import { sameAccount } from '@/utils/email';
+import type { CalendarDownDescriptor } from '@/utils/calendar/connectionOwner';
 
 type DriveDown = { kind: 'drive'; email: string | null };
-type CalendarDown = { kind: 'calendar'; connectionId: string; email: string };
-type DownFeature = DriveDown | CalendarDown;
+/** ONE shape for a down calendar connection, defined once in the pure module that
+ *  reasons about ownership and re-used here so no adapter mapping exists. */
+type CalendarDown = { kind: 'calendar' } & CalendarDownDescriptor;
+export type DownFeature = DriveDown | CalendarDown;
 interface ReconnectGroup {
   accountEmail: string | null;
   features: DownFeature[];
-}
-
-/** Google account emails are case-insensitive — compare case-folded so a stored
- *  connection email that differs only in case still matches the live session. */
-function sameAccount(a: string | null | undefined, b: string | null | undefined): boolean {
-  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
 }
 
 export function useReconnectCoordinator() {
@@ -73,7 +73,12 @@ export function useReconnectCoordinator() {
     if (!isFlagEnabled('googleCalendarSync')) return [];
     return calendarStore.connections
       .filter((c) => c.status === 'needs_reconnect')
-      .map((c) => ({ kind: 'calendar', connectionId: c.id, email: c.accountEmail }));
+      .map((c) => ({
+        kind: 'calendar' as const,
+        connectionId: c.id,
+        email: c.accountEmail,
+        connectedBy: c.connectedBy,
+      }));
   });
 
   const downFeatures = computed<DownFeature[]>(() => [

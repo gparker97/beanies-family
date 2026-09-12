@@ -15,20 +15,38 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue';
 
+// Keys pass through as-is EXCEPT the notice bodies, which carry `{placeholder}`
+// tokens — returning a bare key there would make the interpolation assertions
+// vacuous (there is nothing to fill).
+const TEMPLATES: Record<string, string> = {
+  'reconnectPrompt.calendar.noticeBody':
+    'New activities are not reaching Google. Ask {name} to reconnect it.',
+  'reconnectPrompt.calendar.noticeBodyAccount':
+    'New activities are not reaching Google. Ask whoever manages {account} to reconnect it.',
+};
+
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => TEMPLATES[k] ?? k }),
 }));
+
+type Audience =
+  { mode: 'owner' } | { mode: 'notice'; owner: Record<string, unknown> } | { mode: 'hidden' };
 
 const holder = vi.hoisted(() => ({
   routeName: 'Dashboard' as string | null,
   prompt: null as { titleKey: string; bodyKey: string; variant: string } | null,
   reconnectAll: vi.fn(),
+  audience: { mode: 'owner' } as Audience,
+  dismiss: vi.fn(),
 }));
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ name: holder.routeName }) }));
 
 vi.mock('@/composables/useReconnectCoordinator', () => ({
   useReconnectCoordinator: () => ({
+    // `downFeatures` is read by `useCalendarOutageAudience`; a mock without it
+    // breaks every test in this file the moment the component asks for it.
+    downFeatures: { value: [] },
     activeReconnectPrompt: { value: holder.prompt },
     reconnectAll: holder.reconnectAll,
     isReconnecting: { value: false },
@@ -36,12 +54,37 @@ vi.mock('@/composables/useReconnectCoordinator', () => ({
   }),
 }));
 
+// The audience DECISION is covered exhaustively (and mutation-checked) in
+// `utils/calendar/__tests__/connectionOwner.test.ts`. What belongs here is the
+// component's own job: which props it hands down for each verdict.
+// A real `computed`, not a `{ value }` lookalike: the template reads `audience.mode`
+// and relies on Vue unwrapping the ref, which only happens for an actual ref.
+vi.mock('@/composables/useCalendarOutageAudience', async () => {
+  const { computed } = await import('vue');
+  return {
+    useCalendarOutageAudience: () => ({
+      audience: computed(() => holder.audience),
+      dismiss: holder.dismiss,
+    }),
+  };
+});
+
+vi.mock('@/composables/useMemberInfo', () => ({
+  useMemberInfo: () => ({ getMemberName: (id: string) => (id === 'm-mum' ? 'Mum' : 'Someone') }),
+}));
+
 function mountToast() {
   return mount(UnifiedReconnectToast, {
     global: {
       stubs: {
+        // ⚠️ The stub MUST declare every prop under assertion. It used to take only
+        // title/subtitle, so "the bystander gets no reconnect button" would have
+        // passed vacuously — there is no <button> in this template at all. The real
+        // component's two `v-if`s are pinned in `reconnectToast.test.ts`; here we
+        // assert on what gets handed down.
         ReconnectToast: {
-          props: ['title', 'subtitle'],
+          name: 'ReconnectToast',
+          props: ['title', 'subtitle', 'reconnectLabel', 'dismissLabel', 'busy'],
           template: '<div class="toast">{{ title }}|{{ subtitle }}</div>',
         },
       },
@@ -59,6 +102,7 @@ describe('UnifiedReconnectToast — suppressed on external landing routes', () =
   beforeEach(() => {
     holder.routeName = 'Dashboard';
     holder.prompt = null;
+    holder.audience = { mode: 'owner' };
     vi.clearAllMocks();
   });
 
@@ -101,5 +145,94 @@ describe('UnifiedReconnectToast — suppressed on external landing routes', () =
 
   it('renders nothing when there is no prompt at all', () => {
     expect(mountToast().find('.toast').exists()).toBe(false);
+  });
+});
+
+/**
+ * The second audience (tracker: targeted reconnect prompt).
+ *
+ * A revoked grant is true on every member's device at once, and the prompt sits
+ * over the mobile tab bar. For a member who never set the integration up, its one
+ * button opens a consent screen for an account they don't have — so it was an
+ * obstruction with no exit. They now get a dismissable notice naming who to ask.
+ */
+describe('UnifiedReconnectToast — owner vs bystander', () => {
+  const CAL = {
+    titleKey: 'reconnectPrompt.calendar.title',
+    bodyKey: 'reconnectPrompt.calendar.body',
+    variant: 'calendar',
+  };
+
+  beforeEach(() => {
+    holder.routeName = 'Dashboard';
+    holder.prompt = CAL;
+    holder.audience = { mode: 'owner' };
+    vi.clearAllMocks();
+  });
+
+  function toast() {
+    return mountToast().findComponent({ name: 'ReconnectToast' });
+  }
+
+  it('hands the owner an action and NO dismiss', () => {
+    const t = toast();
+    expect(t.props('reconnectLabel')).toBe('reconnectPrompt.action');
+    expect(t.props('dismissLabel')).toBeUndefined();
+    expect(t.props('title')).toBe('reconnectPrompt.calendar.title');
+  });
+
+  it('🔴 hands a bystander a dismiss and NO action', () => {
+    holder.audience = {
+      mode: 'notice',
+      owner: { kind: 'member', memberId: 'm-mum', via: 'connected-by' },
+    };
+    const t = toast();
+    expect(t.props('reconnectLabel')).toBeUndefined();
+    expect(t.props('dismissLabel')).toBe('action.dismiss');
+  });
+
+  it('names the person to ask', () => {
+    holder.audience = {
+      mode: 'notice',
+      owner: { kind: 'member', memberId: 'm-mum', via: 'connected-by' },
+    };
+    expect(toast().props('subtitle')).toContain('Mum');
+  });
+
+  it('names the ACCOUNT when no member resolved', () => {
+    holder.audience = {
+      mode: 'notice',
+      owner: { kind: 'managers', accountEmail: 'mum@gmail.com' },
+    };
+    expect(toast().props('subtitle')).toContain('mum@gmail.com');
+  });
+
+  it("🔴 names NEITHER when the account is the 'unknown' sentinel", () => {
+    // Otherwise this reads "ask whoever manages unknown to reconnect it".
+    holder.audience = { mode: 'notice', owner: { kind: 'managers', accountEmail: null } };
+    const subtitle = toast().props('subtitle') as string;
+    expect(subtitle).toBe('reconnectPrompt.calendar.noticeBodyUnknown');
+    expect(subtitle).not.toContain('unknown@');
+  });
+
+  it('renders nothing at all once dismissed', () => {
+    holder.audience = { mode: 'hidden' };
+    expect(mountToast().find('.toast').exists()).toBe(false);
+  });
+
+  it('forwards the dismiss', async () => {
+    holder.audience = { mode: 'notice', owner: { kind: 'managers', accountEmail: null } };
+    toast().vm.$emit('dismiss');
+    expect(holder.dismiss).toHaveBeenCalledOnce();
+  });
+
+  it('🔴 a reconnect ERROR never overwrites the bystander notice', () => {
+    // The error is about an action the bystander cannot take; showing it instead
+    // of "ask Mum" would leave them with a failure and no next step.
+    holder.audience = {
+      mode: 'notice',
+      owner: { kind: 'member', memberId: 'm-mum', via: 'connected-by' },
+    };
+    expect(toast().props('subtitle')).toContain('Mum');
   });
 });

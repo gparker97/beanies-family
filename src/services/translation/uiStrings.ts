@@ -7085,6 +7085,29 @@ const STRING_DEFS = {
     en: 'Reconnect to keep your activities in sync.',
     beanie: 'reconnect to keep your activities in sync.',
   },
+  // The same outage, told to a member who CANNOT repair it: no reconnect button
+  // (it would open a consent screen for an account they don't have), and
+  // dismissable, because an obstruction they can't clear blocks the whole app.
+  // Real nouns throughout — someone who acts on a euphemism here leaves the
+  // family's calendar broken.
+  'reconnectPrompt.calendar.noticeTitle': {
+    en: 'Google Calendar is disconnected',
+    beanie: 'google calendar is disconnected',
+  },
+  'reconnectPrompt.calendar.noticeBody': {
+    en: 'New activities are not reaching Google. Ask {name} to reconnect it.',
+    beanie: 'new activities are not reaching google. ask {name} to reconnect it.',
+  },
+  'reconnectPrompt.calendar.noticeBodyAccount': {
+    en: 'New activities are not reaching Google. Ask whoever manages {account} to reconnect it.',
+    beanie:
+      'new activities are not reaching google. ask whoever manages {account} to reconnect it.',
+  },
+  'reconnectPrompt.calendar.noticeBodyUnknown': {
+    en: 'New activities are not reaching Google. Ask whoever set up the calendar to reconnect it.',
+    beanie:
+      'new activities are not reaching google. ask whoever set up the calendar to reconnect it.',
+  },
   'reconnectPrompt.action': { en: 'Reconnect', beanie: 'reconnect' },
   'reconnectPrompt.error': {
     en: "Reconnect didn't finish. Please try again.",
