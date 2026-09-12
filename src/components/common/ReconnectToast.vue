@@ -1,9 +1,15 @@
 <script setup lang="ts">
 /**
- * Shared, presentational reconnect toast — the one surface both Google Drive and
- * Google Calendar use when a grant dies and needs re-consent. Purely visual: it
- * owns no store/composable state. Each feature binds its own title/labels and a
- * reconnect handler (see `GoogleReconnectToast.vue`, `CalendarReconnectToast.vue`).
+ * Shared, presentational status toast — the one surface both Google Drive and
+ * Google Calendar use when a grant dies. Purely visual: it owns no
+ * store/composable state. Each feature binds its own title and labels.
+ *
+ * OPTIONALLY actionable, and optionally dismissable: each affordance renders only
+ * when its label is bound. That is deliberate — the absence of a label IS the
+ * absence of the affordance, so an unlabelled button cannot exist. A member who
+ * did not set up an integration gets the notice WITHOUT a reconnect button,
+ * because that button opens a consent screen for an account they do not have.
+ * `role="status"` below is already correct for a non-actionable toast.
  *
  * CIG: Heritage Orange is the alert colour (never red; amber is not a brand
  * colour). White/slate squircle card, Heritage-Orange left rule + tinted icon
@@ -23,21 +29,24 @@ withDefaults(
     subtitleIsError?: boolean;
     /** Reconnect in progress — disables the button and shows the busy label. */
     busy?: boolean;
-    /** Action button label (idle). */
-    reconnectLabel: string;
+    /** Action button label (idle). ABSENT ⇒ informational only, no button rendered. */
+    reconnectLabel?: string;
     /** Action button label while busy (defaults to an ellipsis). */
     busyLabel?: string;
-    /** Show a dismiss (✕) affordance. */
-    dismissible?: boolean;
-    /** Accessible label for the dismiss button. */
+    /**
+     * Accessible label for the dismiss (✕) button. ABSENT ⇒ no ✕ rendered.
+     *
+     * The label is the switch, rather than a separate `dismissible` boolean, so
+     * the ✕ can never render without an `aria-label`.
+     */
     dismissLabel?: string;
   }>(),
   {
     subtitle: undefined,
     subtitleIsError: false,
     busy: false,
+    reconnectLabel: undefined,
     busyLabel: '…',
-    dismissible: false,
     dismissLabel: undefined,
   }
 );
@@ -88,6 +97,7 @@ defineEmits<{
     </div>
 
     <button
+      v-if="reconnectLabel"
       type="button"
       :disabled="busy"
       class="font-outfit bg-primary-500 hover:bg-primary-600 flex-shrink-0 rounded-[13px] px-3.5 py-2 text-xs font-semibold text-white transition-colors disabled:opacity-60"
@@ -97,9 +107,9 @@ defineEmits<{
     </button>
 
     <button
-      v-if="dismissible"
+      v-if="dismissLabel"
       type="button"
-      class="dark:hover:text-ink flex-shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-slate-600"
+      class="dark:text-ink-faint dark:hover:text-ink flex-shrink-0 rounded-lg p-1 text-slate-400 transition-colors hover:text-slate-600"
       :aria-label="dismissLabel"
       @click="$emit('dismiss')"
     >

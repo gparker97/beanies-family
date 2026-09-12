@@ -1928,9 +1928,24 @@ watch(
          `ErrorBanner` renders inline and is not `position: fixed`. -->
     <PodUnreadableBanner />
 
-    <!-- Bottom-right toast stack -->
+    <!-- Bottom-right toast stack.
+         The raised offset clears `MobileBottomNav` (fixed, bottom-0, z-40), which
+         every toast here used to sit on top of — a non-dismissable reconnect prompt
+         over the tab bar left one family member unable to tap anything in the menu.
+         `env(safe-area-inset-bottom)` is added because the nav adds the same inset
+         to its OWN height, so a flat 6rem leaves residual overlap on a device with a
+         home indicator.
+
+         Bound to the SAME condition as the nav (`isMobile && showLayout`, cf. the
+         `MobileBottomNav v-if` below) rather than to a `md:` breakpoint. This stack
+         sits outside `showLayout` deliberately, so a media query alone would also
+         raise it on the chrome-less routes — Login, Join, SharedRecipe — where there
+         is no nav to clear and `InstallPrompt` would just float above a dead gap. -->
     <div
-      class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
+      class="fixed right-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
+      :class="
+        isMobile && showLayout ? 'bottom-[calc(6rem+env(safe-area-inset-bottom))]' : 'bottom-4'
+      "
     >
       <!-- Unified reconnect toast (tracker #62, commit 5): ONE prompt for Drive
            and/or Calendar. Names what's down and reconnects both in one consent

@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-12
 
+### Fixed
+
+- **A disconnected Google Calendar no longer blocks the whole app for everyone.** When the Google grant is revoked, only the family member who set the integration up is asked to reconnect it. Everyone else now sees a dismissable note telling them the calendar is disconnected and who to ask, with no Reconnect button - that button opens a sign-in screen for an account they do not have.
+- **Toasts no longer sit on top of the bottom tab bar on a phone.** Every toast in the bottom-right stack, not just the reconnect one, now clears the navigation and the home indicator.
+
 ### Added
 
 - **Tap a birthday to open it.** A birthday on the calendar or the beanie wall now opens like any other event, with confetti, the age, and how many sleeps away it is - the same wording the Nook already uses. It cannot be edited or deleted, because beanies works the date out from that bean's profile rather than storing it, so the drawer says so and offers to open their profile instead.

@@ -40,3 +40,22 @@ export function isUnshareableEmail(email: string): boolean {
     domain === 'example.org'
   );
 }
+
+/**
+ * Do these two strings name the same Google account?
+ *
+ * Google account emails are case-insensitive, so compare case-folded: a stored
+ * connection email that differs only in case still matches the live session.
+ * Null/undefined/empty on either side is never a match — in particular the
+ * `'unknown'` sentinel `calendarSyncStore` writes when consent returns no
+ * address must never be matched against anything, so callers pass it through
+ * this helper rather than comparing by hand.
+ *
+ * Lives here rather than beside either caller because it is an EMAIL question,
+ * not a reconnect or an ownership one. Both `useReconnectCoordinator` (grouping
+ * down features by account) and `connectionOwner` (resolving who owns a
+ * connection) import it.
+ */
+export function sameAccount(a: string | null | undefined, b: string | null | undefined): boolean {
+  return !!a && !!b && a.toLowerCase() === b.toLowerCase();
+}

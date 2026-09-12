@@ -131,6 +131,9 @@ describe('uiStrings', () => {
       // of everything or an edit that never reaches their calendar.
       'calendarImport.',
       'calendarSync.reconnect.',
+      // Connection loss, told to someone who may not be able to fix it — they need
+      // the real nouns to know who to go to.
+      'reconnectPrompt.',
       'calendarSync.disconnect.',
       'calendarSync.toast.',
       'confirm.',
