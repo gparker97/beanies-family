@@ -26,6 +26,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
 import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 defineOptions({ inheritAttrs: false });
@@ -133,7 +134,7 @@ const gridColumns = computed(() =>
     // the cards inside it do not. See `WallTimeBlock`'s `washed` prop.
     tint: member.color,
     isToday: isToday.value,
-    occurrences: eventsFor(member.id).filter((e) => !e.activity.isAllDay),
+    occurrences: eventsFor(member.id).filter((e) => !isAllDayActivity(e.activity)),
   }))
 );
 /**
@@ -154,7 +155,7 @@ const bandReferences = shared(
 
 const allDaySpans = computed(() =>
   wallSharedAllDay(
-    todayEvents.value.filter((e) => e.activity.isAllDay),
+    todayEvents.value.filter((e) => isAllDayActivity(e.activity)),
     memberIds.value
   )
 );

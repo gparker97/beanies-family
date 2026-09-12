@@ -25,6 +25,7 @@ import { ARROW_GUTTER_PX } from '@/components/wall/wallLayout';
 import { useActivityStore } from '@/stores/activityStore';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
@@ -134,7 +135,7 @@ const gridColumns = computed(() =>
     key: ymd,
     // Timed only — the all-day items go to the band, via `wallDayAllDay`. All
     // three views pass the same shape, so the grid's contract does not vary.
-    occurrences: eventsFor(ymd).filter((e) => !e.activity.isAllDay),
+    occurrences: eventsFor(ymd).filter((e) => !isAllDayActivity(e.activity)),
     isToday: ymd === props.todayYmd,
   }))
 );

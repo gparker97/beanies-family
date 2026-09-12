@@ -23,6 +23,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { dayOfMonth, weekdayShort } from '@/utils/date';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import type { FamilyActivity } from '@/types/models';
@@ -104,7 +105,7 @@ const gridColumns = computed(() => [
   {
     key: focusYmd.value,
     isToday: isToday.value,
-    occurrences: events.value.filter((e) => !e.activity.isAllDay),
+    occurrences: events.value.filter((e) => !isAllDayActivity(e.activity)),
   },
 ]);
 /**

@@ -22,6 +22,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useDayExtras } from '@/composables/useDayExtras';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
@@ -135,13 +136,15 @@ function memberActivities(memberId: string): Occurrence[] {
 
 function memberTimedActivities(memberId: string): FamilyActivity[] {
   return memberActivities(memberId)
-    .filter((o) => o.activity.startTime)
+    .filter((o) => !isAllDayActivity(o.activity))
     .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''))
     .map((o) => o.activity);
 }
 
 function memberUntimedActivities(memberId: string): Occurrence[] {
-  return memberActivities(memberId).filter((o) => !o.activity.startTime);
+  // The ONE all-day predicate — an `isAllDay: true` activity that still carries
+  // a time belongs in this row, not in the timed grid.
+  return memberActivities(memberId).filter((o) => isAllDayActivity(o.activity));
 }
 
 // Todos for today
@@ -163,7 +166,7 @@ const segmentBuckets = computed(() => splitTimedUntimed(daySegments.value));
 // of {startTime, endTime} entries and auto-extends the hour range.
 const allTimedActivities = computed(() => {
   const items: { startTime?: string; endTime?: string }[] = dayActivities.value
-    .filter((o) => o.activity.startTime)
+    .filter((o) => !isAllDayActivity(o.activity))
     .map((o) => o.activity as { startTime?: string; endTime?: string });
   for (const seg of segmentBuckets.value.timed) {
     if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });

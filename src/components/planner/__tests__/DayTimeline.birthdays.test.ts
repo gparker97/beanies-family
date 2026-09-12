@@ -91,3 +91,56 @@ describe('DayTimeline — birthdays in the all-day row', () => {
     expect(w.find('[data-testid="birthday-chip"]').exists()).toBe(false);
   });
 });
+
+/**
+ * The bug greg found by reasoning about it: "I believe it's more of an issue of
+ * showing all day events on the weekly and on the daily calendar."
+ *
+ * He was right, and it was bigger than birthdays. There were THREE definitions
+ * of "all-day" in the planner: the month grid tested `activity.isAllDay`, the
+ * week/day views tested `!activity.startTime`, and `isAllDayActivity` — the
+ * canonical one — is `isAllDay === true || !startTime`. So an activity carrying
+ * BOTH the flag and a leftover time was an all-day chip on the month and a timed
+ * block on the week and the day. Every surface now uses the one predicate.
+ */
+describe('all-day activities reach the all-day row, however they are marked', () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  const occ = (over: Record<string, unknown>) => ({
+    activity: {
+      id: 'a1',
+      title: 'Sports day',
+      date: '2026-09-15',
+      category: 'other',
+      assigneeIds: [],
+      recurrence: 'none',
+      createdAt: '',
+      updatedAt: '',
+      ...over,
+    },
+    date: '2026-09-15',
+  });
+
+  it('🔴 shows one flagged all-day that ALSO still carries a start time', () => {
+    // The regression case. Splitting on `!startTime` alone dropped this from the
+    // all-day row and drew it as a timed block instead.
+    const w = mountTimeline({ activities: [occ({ isAllDay: true, startTime: '09:00' })] });
+    expect(w.text()).toContain('planner.allDay');
+    expect(w.text()).toContain('Sports day');
+  });
+
+  it('shows an all-day with no time at all', () => {
+    const w = mountTimeline({ activities: [occ({ isAllDay: true })] });
+    expect(w.text()).toContain('Sports day');
+  });
+
+  it('shows an activity with no time and no flag, which is all-day by convention', () => {
+    const w = mountTimeline({ activities: [occ({})] });
+    expect(w.text()).toContain('planner.allDay');
+  });
+
+  it('leaves a genuinely timed activity OUT of the all-day row', () => {
+    const w = mountTimeline({ activities: [occ({ startTime: '09:00', endTime: '10:00' })] });
+    expect(w.text()).not.toContain('planner.allDay');
+  });
+});
