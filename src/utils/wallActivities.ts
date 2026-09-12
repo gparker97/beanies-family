@@ -15,6 +15,7 @@ import { minutesOfDay } from '@/utils/date';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { AllDaySpansResult } from '@/utils/allDaySpans';
 import { SHARED_EVENT_COLOR, resolveMemberColor } from '@/constants/memberColors';
+import type { DayExtra } from '@/utils/calendarDay';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 export interface WallOccurrence {
@@ -237,24 +238,9 @@ export function wallDayAllDay(
  * below would make them the only impure things in this module — so the composable
  * that reads the stores resolves the wording, and this layer only places it.
  */
-export interface WallReferenceDay {
-  kind: 'birthday' | 'holiday';
-  /** Stable across renders — the member id, or the holiday's name + date. */
-  id: string;
-  ymd: string;
-  label: string;
-  /**
-   * Birthdays carry a cake. Holidays carry NOTHING, deliberately: `HolidayChip`
-   * and `HolidayBanner` both record why (a flag emoji renders differently on
-   * every device and looks cramped), and the wall should not be the one surface
-   * that disagrees.
-   */
-  emoji?: string;
-}
-
 /** One reference day placed in the band's column grid. */
 export interface WallBandReference {
-  reference: WallReferenceDay;
+  reference: DayExtra;
   startCol: number;
   span: number;
 }
@@ -264,7 +250,7 @@ export interface WallBandReference {
  * view's single column). One column each, by date.
  */
 export function wallDayReferences(
-  references: readonly WallReferenceDay[],
+  references: readonly DayExtra[],
   days: readonly string[]
 ): WallBandReference[] {
   const out: WallBandReference[] = [];
@@ -289,7 +275,7 @@ export function wallDayReferences(
  * member but not assigned TO one, so there is no lane it could claim.
  */
 export function wallSharedReferences(
-  references: readonly WallReferenceDay[],
+  references: readonly DayExtra[],
   ymd: string,
   columnCount: number
 ): WallBandReference[] {

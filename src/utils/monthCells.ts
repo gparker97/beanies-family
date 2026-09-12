@@ -21,8 +21,8 @@ import type {
   CellTimedOccurrence,
   CellVacation,
 } from '@/components/planner/MonthDayCard.vue';
-import type { FamilyActivity, FamilyVacation, HolidayOccurrence } from '@/types/models';
-import { birthdaysByDate, type BirthdayOccurrence } from '@/utils/birthdays';
+import type { FamilyActivity, FamilyVacation } from '@/types/models';
+import type { DayExtra } from '@/utils/calendarDay';
 
 /** One activity occurrence as `activityStore.activitiesInRange` yields it. */
 export interface ActivityOccurrenceInput {
@@ -49,9 +49,13 @@ export interface MonthCellsInput {
   segments: TravelSegmentOccurrence[];
   /** All vacations — filtered to the span (the store holds few). */
   vacations: FamilyVacation[];
-  holidays: HolidayOccurrence[];
-  /** Derived family birthdays over the SAME window — see `birthdaysInRange`. */
-  birthdays: BirthdayOccurrence[];
+  /**
+   * Everything on these days that is NOT one of the family's own activities:
+   * birthdays, public holidays, trips. ONE list, from `useDayExtras`, which the
+   * beanie wall asks too — see `utils/calendarDay.ts` for why these stopped
+   * being separate arrays.
+   */
+  extras: DayExtra[];
 }
 
 /**
@@ -69,17 +73,16 @@ export interface PreparedCellData {
   segments: Map<string, TravelSegmentOccurrence[]>;
   vacations: Map<string, CellVacation[]>;
   vacationDates: Set<string>;
-  holidays: Map<string, HolidayOccurrence[]>;
+  extras: Map<string, DayExtra[]>;
+  /** Dates carrying a public holiday — drives the cell tint, not the chips. */
   holidayDates: Set<string>;
-  birthdays: Map<string, BirthdayOccurrence[]>;
 }
 
 export interface PrepareCellDataInput {
   occurrences: ActivityOccurrenceInput[];
   segments: TravelSegmentOccurrence[];
   vacations: FamilyVacation[];
-  holidays: HolidayOccurrence[];
-  birthdays: BirthdayOccurrence[];
+  extras: DayExtra[];
   /** Inclusive window bounds — vacations are clipped to this, so a trip with a
    *  mistyped multi-decade end date cannot expand into a six-figure loop. */
   spanStart: string;
@@ -137,12 +140,12 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     }
   }
 
-  const holidays = new Map<string, HolidayOccurrence[]>();
+  const extras = new Map<string, DayExtra[]>();
   const holidayDates = new Set<string>();
-  for (const h of input.holidays) {
-    if (!holidays.has(h.date)) holidays.set(h.date, []);
-    holidays.get(h.date)!.push(h);
-    holidayDates.add(h.date);
+  for (const h of input.extras) {
+    if (!extras.has(h.ymd)) extras.set(h.ymd, []);
+    extras.get(h.ymd)!.push(h);
+    if (h.kind === 'holiday') holidayDates.add(h.ymd);
   }
 
   return {
@@ -151,10 +154,8 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     segments,
     vacations,
     vacationDates,
-    holidays,
+    extras,
     holidayDates,
-    // Already windowed and sorted by `birthdaysInRange`; this only buckets them.
-    birthdays: birthdaysByDate(input.birthdays),
   };
 }
 
@@ -204,8 +205,7 @@ export function monthCells(input: MonthCellsInput): MonthCellsResult {
       occurrences: input.occurrences,
       segments: input.segments,
       vacations: input.vacations,
-      holidays: input.holidays,
-      birthdays: input.birthdays,
+      extras: input.extras,
       spanStart: startYmd,
       spanEnd: endYmd,
     })
@@ -229,8 +229,7 @@ export function monthCellsFrom(
   const allDayOccurrences = data.allDay;
   const dateSegments = data.segments;
   const dateVacations = data.vacations;
-  const dateHolidays = data.holidays;
-  const dateBirthdays = data.birthdays;
+  const dateExtras = data.extras;
 
   const pushCell = (dateStr: string, day: number, isCurrentMonth: boolean): void => {
     days.push({
@@ -243,8 +242,7 @@ export function monthCellsFrom(
       vacations: dateVacations.get(dateStr) ?? [],
       segments: dateSegments.get(dateStr) ?? [],
       allDayItems: [],
-      holidays: dateHolidays.get(dateStr) ?? [],
-      birthdays: dateBirthdays.get(dateStr) ?? [],
+      extras: dateExtras.get(dateStr) ?? [],
     });
   };
 

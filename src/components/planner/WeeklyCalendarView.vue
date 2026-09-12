@@ -17,7 +17,6 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
-import { useHolidayStore } from '@/stores/holidayStore';
 import { matchesAssigneeFilter } from '@/utils/assignees';
 import {
   toDateInputValue,
@@ -33,7 +32,7 @@ import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
-import { birthdaysInRange, birthdaysByDate, birthdayPassesFilter } from '@/utils/birthdays';
+import { useDayExtras } from '@/composables/useDayExtras';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
@@ -92,7 +91,6 @@ const memberVisibility = computed<((id: string) => boolean) | null>(() =>
 );
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
-const holidayStore = useHolidayStore();
 
 // Controlled period — the page owns the canonical date; we derive the
 // timeline week + label from it and never mutate it (one-way data flow).
@@ -121,19 +119,13 @@ useCalendarSlide(swipeRef, {
 // the strip's strongest "selected" pill). Derived from the page-owned date.
 const selectedMobileDay = computed(() => toDateInputValue(props.referenceDate));
 
-// Public holidays in the visible week, keyed by date (read-only reference data;
-// empty when no country is set or holidays are hidden). Almost always ≤1/day.
-const holidaysByDate = computed(() => {
-  const days = weekDays.value;
-  const map = new Map<string, HolidayOccurrence>();
-  if (days.length === 0) return map;
-  for (const h of holidayStore.holidaysInRange(days[0]!.dateStr, days[days.length - 1]!.dateStr)) {
-    if (!map.has(h.date)) map.set(h.date, h);
-  }
-  return map;
-});
+// Public holidays in the visible week, from the SHARED day-extras query rather
+// than a second read of the holiday store. At most one is rendered per day (the
+// week's untimed lane has room for one), but the query is the same one the month
+// views and the beanie wall ask, so the three can no longer disagree about
+// whether a day is a holiday.
 function holidayForDay(dateStr: string): HolidayOccurrence | undefined {
-  return holidaysByDate.value.get(dateStr);
+  return (extrasByDate.value.get(dateStr) ?? []).find((e) => e.kind === 'holiday')?.holiday;
 }
 
 /**
@@ -143,17 +135,17 @@ function holidayForDay(dateStr: string): HolidayOccurrence | undefined {
  * share a birthday, and one of them being hidden would be a bug the family would
  * notice on exactly the day it mattered.
  */
-const birthdaysForWeek = computed(() => {
-  const days = weekDays.value;
-  if (days.length === 0) return new Map<string, ReturnType<typeof birthdaysInRange>>();
-  return birthdaysByDate(
-    birthdaysInRange(familyStore.members, days[0]!.dateStr, days[days.length - 1]!.dateStr).filter(
-      (b) => birthdayPassesFilter(b, memberVisibility.value)
-    )
-  );
-});
+const { byDate: extrasByDate } = useDayExtras(
+  computed(() => weekDays.value[0]?.dateStr ?? ''),
+  computed(() => weekDays.value[weekDays.value.length - 1]?.dateStr ?? ''),
+  { isMemberVisible: memberVisibility }
+);
+
+/** Birthdays on one day, from the shared query. */
 function birthdaysForDay(dateStr: string) {
-  return birthdaysForWeek.value.get(dateStr) ?? [];
+  return (extrasByDate.value.get(dateStr) ?? [])
+    .filter((e) => e.kind === 'birthday' && e.birthday)
+    .map((e) => e.birthday!);
 }
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -396,8 +388,8 @@ function getUntimedForDay(dateStr: string): Occurrence[] {
 
 function hasUntimedContent(dateStr: string): boolean {
   return (
-    holidaysByDate.value.has(dateStr) ||
-    birthdaysForWeek.value.has(dateStr) ||
+    holidayForDay(dateStr) !== undefined ||
+    birthdaysForDay(dateStr).length > 0 ||
     getUntimedForDay(dateStr).length > 0 ||
     (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
     getUntimedSegmentsForDay(dateStr).length > 0 ||
@@ -415,8 +407,7 @@ const hasAnyUntimedContent = computed(
     spanningActivities.value.length > 0 ||
     vacationSpans.value.length > 0 ||
     weekSegmentBuckets.value.untimed.length > 0 ||
-    holidaysByDate.value.size > 0 ||
-    birthdaysForWeek.value.size > 0 ||
+    extrasByDate.value.size > 0 ||
     weekDays.value.some((d) => hasUntimedContent(d.dateStr))
 );
 

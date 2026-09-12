@@ -21,6 +21,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { parseLocalDate } from '@/utils/date';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { DayExtra } from '@/utils/calendarDay';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
@@ -60,9 +61,8 @@ export interface MonthDayCellData {
   vacations: CellVacation[];
   segments: TravelSegmentOccurrence[];
   allDayItems: CellAllDayItem[];
-  holidays: HolidayOccurrence[];
-  /** Derived family birthdays — read-only labels, not activities. */
-  birthdays: BirthdayOccurrence[];
+  /** Birthdays, public holidays, trips — one list, from `useDayExtras`. */
+  extras: DayExtra[];
 }
 
 const props = defineProps<{
@@ -82,6 +82,8 @@ const emit = defineEmits<{
   'select-date': [date: string];
   'view-activity': [activityId: string, date: string];
   'holiday-click': [holiday: HolidayOccurrence];
+  /** A derived birthday was tapped — the parent opens the read-only drawer. */
+  'birthday-click': [birthday: BirthdayOccurrence];
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
 }>();
@@ -137,40 +139,23 @@ const timedOverflow = computed(() =>
  */
 const REFERENCE_SHARE = computed(() => Math.max(1, Math.floor(props.allDayCap / 2)));
 
-const referenceDays = computed(() => [
-  ...props.cell.birthdays.map((b) => ({ kind: 'birthday' as const, birthday: b })),
-  ...props.cell.holidays.map((h) => ({ kind: 'holiday' as const, holiday: h })),
-]);
-
-/** How many of the reference days actually fit, given what the day is doing. */
+/** How many of the day's extras actually fit, given what else the day is doing. */
 const visibleReferenceCount = computed(() =>
   Math.min(
-    referenceDays.value.length,
+    props.cell.extras.length,
     Math.max(REFERENCE_SHARE.value, props.allDayCap - props.cell.allDayItems.length)
   )
 );
 
-const visibleBirthdays = computed(() => props.cell.birthdays.slice(0, visibleReferenceCount.value));
-
-const visibleHolidays = computed(() =>
-  props.cell.holidays.slice(
-    0,
-    Math.max(0, visibleReferenceCount.value - props.cell.birthdays.length)
-  )
-);
+/** The extras that fit, already in the shared cross-surface order. */
+const visibleExtras = computed(() => props.cell.extras.slice(0, visibleReferenceCount.value));
 
 const visibleAllDayItems = computed(() =>
   props.cell.allDayItems.slice(0, Math.max(0, props.allDayCap - visibleReferenceCount.value))
 );
 
 const allDayOverflow = computed(() =>
-  Math.max(
-    0,
-    props.cell.birthdays.length +
-      props.cell.holidays.length +
-      props.cell.allDayItems.length -
-      props.allDayCap
-  )
+  Math.max(0, props.cell.extras.length + props.cell.allDayItems.length - props.allDayCap)
 );
 
 /** A day with nothing on it — collapsed to a thin "nothing planned" line on
@@ -179,8 +164,7 @@ const isEmptyDay = computed(
   () =>
     props.cell.timedOccurrences.length === 0 &&
     props.cell.allDayItems.length === 0 &&
-    props.cell.holidays.length === 0 &&
-    props.cell.birthdays.length === 0 &&
+    props.cell.extras.length === 0 &&
     props.cell.segments.length === 0 &&
     props.cell.vacations.length === 0
 );
@@ -245,8 +229,7 @@ function onMoreClick(event: MouseEvent) {
           cell.isToday &&
           cell.timedOccurrences.length === 0 &&
           cell.allDayItems.length === 0 &&
-          cell.holidays.length === 0 &&
-          cell.birthdays.length === 0
+          cell.extras.length === 0
         "
         class="text-primary-500 dark:text-accent-lift mt-0.5 text-[0.5625rem] font-bold tracking-[0.12em] uppercase"
       >
@@ -269,24 +252,23 @@ function onMoreClick(event: MouseEvent) {
     <!-- Events column — right of day-num on mobile, stacked below on desktop -->
     <div class="flex min-w-0 flex-1 flex-col gap-1 md:w-full md:gap-px">
       <!-- Birthdays + holidays + all-day chips share a lane, capped to `allDayCap`. -->
-      <template
-        v-if="cell.birthdays.length > 0 || cell.holidays.length > 0 || cell.allDayItems.length > 0"
-      >
-        <BirthdayChip
-          v-for="b in visibleBirthdays"
-          :key="'b:' + b.memberId"
-          :birthday="b"
-          class="block w-full"
-        />
-        <HolidayChip
-          v-for="(h, hi) in visibleHolidays"
-          :key="'h:' + hi"
-          :holiday="h"
-          :is-start="true"
-          :is-end="true"
-          class="block w-full"
-          @click.stop="emit('holiday-click', h)"
-        />
+      <template v-if="cell.extras.length > 0 || cell.allDayItems.length > 0">
+        <template v-for="extra in visibleExtras" :key="extra.id">
+          <BirthdayChip
+            v-if="extra.kind === 'birthday' && extra.birthday"
+            :birthday="extra.birthday"
+            class="block w-full"
+            @click.stop="emit('birthday-click', extra.birthday)"
+          />
+          <HolidayChip
+            v-else-if="extra.kind === 'holiday' && extra.holiday"
+            :holiday="extra.holiday"
+            :is-start="true"
+            :is-end="true"
+            class="block w-full"
+            @click.stop="emit('holiday-click', extra.holiday!)"
+          />
+        </template>
         <AllDayActivityChip
           v-for="(item, i) in visibleAllDayItems"
           :key="item.activity.id + ':' + i"

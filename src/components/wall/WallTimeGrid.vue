@@ -28,6 +28,8 @@ import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import type { WallAllDaySpan, WallBandReference, WallOccurrence } from '@/utils/wallActivities';
+import type { DayExtraKind } from '@/utils/calendarDay';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { FamilyActivity } from '@/types/models';
 import type { WallSheetTarget } from '@/types/wall';
 
@@ -71,7 +73,11 @@ const props = defineProps<{
   /** Names this grid in telemetry — the wall view id. */
   viewId: string;
 }>();
-const emit = defineEmits<{ open: [WallSheetTarget] }>();
+const emit = defineEmits<{
+  open: [WallSheetTarget];
+  /** A birthday pill was tapped — the page opens the read-only drawer. */
+  'open-birthday': [birthday: BirthdayOccurrence];
+}>();
 
 const { t } = useTranslation();
 const { identityFor } = useActivityIdentity();
@@ -341,8 +347,18 @@ function openActivity(occurrence: WallOccurrence): void {
  * it is on a phone. Both carry a light and a dark value (see `style.css`), which
  * is what keeps them readable on the wall's night mode.
  */
-function refColour(kind: 'birthday' | 'holiday'): string {
-  return kind === 'birthday' ? 'var(--birthday-orange)' : 'var(--holiday-clay)';
+function refColour(kind: DayExtraKind): string {
+  // Exhaustive on purpose. `DayExtraKind` is the union every calendar shares, so
+  // adding a kind breaks HERE at compile time rather than rendering a colourless
+  // pill on the one surface somebody forgot.
+  switch (kind) {
+    case 'birthday':
+      return 'var(--birthday-orange)';
+    case 'holiday':
+      return 'var(--holiday-clay)';
+    case 'trip':
+      return 'var(--vacation-teal)';
+  }
 }
 </script>
 
@@ -373,14 +389,17 @@ function refColour(kind: 'birthday' | 'holiday'): string {
           the kitchen screen as it is on a phone. A `div`, not a `button`: there
           is nothing behind them to open.
         -->
-        <div
+        <component
+          :is="ref.reference.kind === 'birthday' ? 'button' : 'div'"
           v-for="ref in bandReferences ?? []"
           :key="ref.reference.id"
+          :type="ref.reference.kind === 'birthday' ? 'button' : undefined"
           class="wall-allday dark:bg-surface-raised flex min-w-0 items-center gap-1.5 rounded-[10px] bg-white px-2 py-1 text-left"
           :style="{
             gridColumn: `${ref.startCol + 1} / span ${ref.span}`,
             borderLeft: `3px solid ${refColour(ref.reference.kind)}`,
           }"
+          @click="ref.reference.birthday && emit('open-birthday', ref.reference.birthday)"
         >
           <span v-if="ref.reference.emoji" aria-hidden="true">{{ ref.reference.emoji }}</span>
           <!--
@@ -393,7 +412,7 @@ function refColour(kind: 'birthday' | 'holiday'): string {
             As an edge it carries no text and the rule does not apply.
           -->
           <span class="font-outfit truncate font-semibold">{{ ref.reference.label }}</span>
-        </div>
+        </component>
 
         <button
           v-for="(row, i) in bandRows"
