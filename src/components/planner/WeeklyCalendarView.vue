@@ -32,6 +32,7 @@ import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useDayExtras } from '@/composables/useDayExtras';
 import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
@@ -54,6 +55,7 @@ const props = defineProps<{
   todayTick?: number;
 }>();
 const emit = defineEmits<{
+  'birthday-click': [birthday: BirthdayOccurrence];
   /** Desktop day-header click → drill into Day view (page switches view). */
   'select-date': [date: string];
   /** Mobile strip day-pill tap → change the focused day, staying in Week view. */
@@ -781,6 +783,7 @@ function onStripDayClick(dateStr: string) {
               :key="'b:' + b.memberId"
               :birthday="b"
               class="mb-0.5 block w-full"
+              @click="emit('birthday-click', b)"
             />
             <HolidayChip
               v-if="holidayForDay(day.dateStr)"
@@ -983,6 +986,7 @@ function onStripDayClick(dateStr: string) {
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
         :holiday="holidayForDay(selectedMobileDay) ?? null"
         :birthdays="birthdaysForDay(selectedMobileDay)"
+        @birthday-click="(b) => emit('birthday-click', b)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"

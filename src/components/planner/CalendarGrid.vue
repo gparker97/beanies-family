@@ -4,6 +4,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDayExtras } from '@/composables/useDayExtras';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 
 import { monthCells, monthSpan } from '@/utils/monthCells';
@@ -29,6 +30,7 @@ const emit = defineEmits<{
   'view-segment': [vacationId: string, segmentIndex: number];
   'view-activity': [activityId: string, date: string];
   'holiday-click': [holiday: HolidayOccurrence];
+  'birthday-click': [birthday: BirthdayOccurrence];
   /** Swipe navigation — the page advances the shared reference date. */
   prev: [];
   next: [];
@@ -214,6 +216,7 @@ useCalendarSlide(swipeRef, {
           @select-date="handleDayClick"
           @view-activity="(id, date) => emit('view-activity', id, date)"
           @holiday-click="(h) => emit('holiday-click', h)"
+          @birthday-click="(b) => emit('birthday-click', b)"
           @vacation-click="(vid) => emit('vacation-click', vid)"
           @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
         />

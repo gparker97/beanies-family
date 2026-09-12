@@ -5,10 +5,10 @@ import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
+import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
-import { useHolidayStore } from '@/stores/holidayStore';
 import { useDayExtras } from '@/composables/useDayExtras';
 import { useTranslation } from '@/composables/useTranslation';
 import {
@@ -27,6 +27,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  'birthday-click': [birthday: BirthdayOccurrence];
   close: [];
   'add-activity': [];
   'edit-activity': [id: string, date: string];
@@ -39,10 +40,12 @@ const { t } = useTranslation();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
-const holidayStore = useHolidayStore();
 
 /** Public holiday on the selected day, if any. */
-const holidayForDay = computed(() => holidayStore.holidayForDate(props.date));
+/** From the SHARED day query, so this agrees with the month, week and wall. */
+const holidayForDay = computed(
+  () => (extrasByDate.value.get(props.date) ?? []).find((e) => e.kind === 'holiday')?.holiday
+);
 
 /** Family birthdays on the selected day, from the shared query. */
 const { byDate: extrasByDate } = useDayExtras(
@@ -188,6 +191,7 @@ function formatGroupDate(dateStr: string): string {
         :key="'bday-' + b.memberId"
         :birthday="b"
         class="block w-full"
+        @click="emit('birthday-click', b)"
       />
     </div>
 

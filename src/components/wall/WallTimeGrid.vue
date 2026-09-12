@@ -386,8 +386,12 @@ function refColour(kind: DayExtraKind): string {
           "what are we doing" and these read as the day's context. Same pill as
           the rows below - the wall's shape, at the wall's size - but carrying
           the planner's colour for each kind, so a birthday is the same colour on
-          the kitchen screen as it is on a phone. A `div`, not a `button`: there
-          is nothing behind them to open.
+          the kitchen screen as it is on a phone.
+
+          A BIRTHDAY is a `button` and opens the read-only drawer; a holiday or a
+          trip stays a `div`, because there is genuinely nothing behind those to
+          open on the wall. Hence `<component :is>` rather than a button with a
+          disabled state: a non-interactive thing should not be a control at all.
         -->
         <component
           :is="ref.reference.kind === 'birthday' ? 'button' : 'div'"

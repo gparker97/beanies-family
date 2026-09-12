@@ -812,8 +812,8 @@ watch(activeView, () => (sheet.value = null));
         :birthday="birthdaySheet"
         :open="birthdaySheet !== null"
         :today-ymd="today"
+        :can-open-profile="false"
         @close="birthdaySheet = null"
-        @open-profile="birthdaySheet = null"
       />
 
       <WallSheet

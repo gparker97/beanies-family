@@ -73,6 +73,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
+  'birthday-click': [birthday: BirthdayOccurrence];
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
@@ -249,6 +250,7 @@ const { identityFor } = useActivityIdentity();
         :key="'bday-' + b.memberId"
         :birthday="b"
         class="block w-full"
+        @click="emit('birthday-click', b)"
       />
 
       <!-- Vacations -->
