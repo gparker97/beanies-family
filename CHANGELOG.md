@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - **A disconnected Google Calendar no longer blocks the whole app for everyone.** When the Google grant is revoked, only the family member who set the integration up is asked to reconnect it. Everyone else now sees a dismissable note telling them the calendar is disconnected and who to ask, with no Reconnect button - that button opens a sign-in screen for an account they do not have.
+- **A reconnect can no longer switch the family's calendar to a different Google account.** Signing in as another account during a reconnect is now refused, with a message naming the account the calendar is actually connected to. The Reconnect button in Settings is also only shown to the family member who set the connection up, since the sign-in is tied to that account.
 - **Toasts no longer sit on top of the bottom tab bar on a phone.** Every toast in the bottom-right stack, not just the reconnect one, now clears the navigation and the home indicator.
 
 ### Added
