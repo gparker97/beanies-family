@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-12
 
+### Fixed
+
+- **Declining Google's file-access permission now explains itself instead of looking like a crash.** If you leave the file access box unticked when creating or resuming a pod, beanies tells you exactly what to allow and offers to try again or use a local file — and it no longer records the moment as an app error.
+
 ### Changed
 
 - **The beanie wall's week arrows now move by what is on screen.** They used to jump a fixed seven days however many day columns the wall was drawing, so on a narrower screen showing three days, four of every seven days could only be reached by tapping a chip in the strip below. Pressing forward now brings the next unseen day into the first column, and pressing back returns you exactly where you were. The date label above the arrows describes the days actually on screen rather than a whole week.

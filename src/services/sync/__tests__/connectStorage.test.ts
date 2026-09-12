@@ -41,10 +41,13 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
 
 import {
   connectLocalStorage,
+  connectDriveStorage,
   beginDriveAuthRedirectIfNeeded,
   resolveExistingBeanpod,
   adoptDriveStub,
 } from '../connectStorage';
+import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
+import { DriveConsentDeniedError, FileNameCollisionError } from '@/types/sync';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import {
   shouldUseRedirectAuth,
@@ -272,4 +275,55 @@ describe('isStubBeanpod is structural: any populated file is adopt-existing, wha
       expect(r).toEqual({ kind: 'adopt-stub', fileId: 'f1' });
     });
   }
+});
+
+/**
+ * A user who leaves Google's file-access checkbox unticked has made a DECISION,
+ * not hit a fault — but the message Google gives us ("…file access was not
+ * granted") contains none of the words `isUserCancellation` looks for
+ * (/cancel|dismiss|popup_closed|user_cancel/). So it used to fall through to the
+ * generic failure branch, where `CreatePodView` reported it at `critical` and
+ * paged #beanies-errors, while `App.vue` classified the identical condition as
+ * `warning` and `ResumePodSetup` as `error`. Three callers, three answers.
+ *
+ * Typing it here is what makes all three agree.
+ */
+describe('connectDriveStorage — a declined consent is typed, not sniffed', () => {
+  beforeEach(() => {
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(false);
+    vi.mocked(isTokenValid).mockReturnValue(true);
+  });
+
+  it('🔴 reports a denied file-access scope as errorKind consent-denied', async () => {
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new DriveConsentDeniedError('Google Drive file access was not granted.')
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'consent-denied' });
+  });
+
+  it('does NOT mark it `cancelled` — there IS something to tell the user', async () => {
+    // `cancelled` means "nothing happened, say nothing". A consent denial needs
+    // the "tick the file access box" guidance, so the two must stay distinct.
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new DriveConsentDeniedError('Google Drive file access was not granted.')
+    );
+    const r = await connectDriveStorage('my-family');
+    expect((r as { cancelled?: boolean }).cancelled).toBeUndefined();
+  });
+
+  it('leaves a genuine failure unclassified, so it still surfaces as an error', async () => {
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', error: 'Drive 500' });
+    expect((r as { errorKind?: string }).errorKind).toBeUndefined();
+  });
+
+  it('does not shadow the collision classification', async () => {
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new FileNameCollisionError('exists', 'file-1', 'my-family.beanpod', true)
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'name-collision' });
+  });
 });

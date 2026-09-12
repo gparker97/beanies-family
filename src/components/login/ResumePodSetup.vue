@@ -810,8 +810,12 @@ async function finishOnDrive() {
       phase.value = 'storage';
       return;
     }
-    const cancelled = r.cancelled || isUserCancellation(r.error);
-    if (cancelled) console.warn('[ResumePodSetup] Drive connect cancelled:', r.error);
+    // A consent denial is a user DECISION, so it is classified with the aborts
+    // rather than the faults — and it carries its own guidance, because unlike a
+    // plain cancel there is something specific to tell them to do.
+    const consentDenied = r.errorKind === 'consent-denied';
+    const cancelled = consentDenied || r.cancelled || isUserCancellation(r.error);
+    if (cancelled) console.warn('[ResumePodSetup] Drive connect declined:', r.error);
     else console.error('[ResumePodSetup] Drive connect failed:', r.error);
     reportError({
       surface: 'resumeSetup.connectDrive',
@@ -821,7 +825,9 @@ async function finishOnDrive() {
     });
     // Translated copy only (finding 13): never assign the raw Drive message —
     // it's English-only and a name-collision message leaks an internal fileId.
-    formError.value = t('googleDrive.authFailed');
+    formError.value = consentDenied
+      ? t('resumeSetup.driveConsentDenied')
+      : t('googleDrive.authFailed');
     phase.value = 'storage';
     return;
   }

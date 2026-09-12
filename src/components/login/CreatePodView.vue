@@ -324,6 +324,22 @@ async function handleChooseGoogleDriveStorage() {
           showDriveResultModal.value = true;
           break;
       }
+    } else if (r.errorKind === 'consent-denied') {
+      // A DECISION, not a fault: the user left Google's file-access box unticked.
+      // Report at `warning` so it never pages Slack — matching `App.vue`'s
+      // redirect-auth path, which has classified this identically since
+      // 2026-06-19. This site used to fall through to `critical` below, because
+      // `isUserCancellation` looks for the word "cancel" and Google's message
+      // does not contain it.
+      driveResultError.value = t('createPod.driveConsentDenied');
+      console.warn('[CreatePodView] Drive file access not granted:', r.error);
+      reportError({
+        surface: 'createPod.connectDrive',
+        message: r.error || 'Google Drive file access was not granted',
+        severity: 'warning',
+        context: { provider_type: 'google_drive' },
+      });
+      showDriveResultModal.value = true; // Try again / Use a local file
     } else if (r.errorKind === 'collision-check-unavailable') {
       // Couldn't verify the user's Drive for existing files — we refused to
       // create blindly (avoids a second orphan). Retryable.

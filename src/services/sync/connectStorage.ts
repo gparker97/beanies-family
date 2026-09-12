@@ -24,7 +24,11 @@ import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvid
 import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
-import { FileNameCollisionError, CollisionCheckUnavailableError } from '@/types/sync';
+import {
+  FileNameCollisionError,
+  CollisionCheckUnavailableError,
+  DriveConsentDeniedError,
+} from '@/types/sync';
 
 // `RESUME_SETUP_PATH` now lives in the lightweight `resumePaths.ts` (so it can
 // be imported without this module's heavy Drive/sync graph). Imported for this
@@ -103,10 +107,16 @@ export interface StorageConnectFailed {
    *   (Chromium-only); this browser (e.g. Firefox/Safari) can't do it, so a
    *   retry is futile. Steer the user to Google Drive (works everywhere) or
    *   Chrome/Edge instead of showing the generic "try again".
+   * - `consent-denied` — the user reached Google's consent screen and left the
+   *   file-access checkbox unticked. A DECISION, not a fault: callers must show
+   *   the "allow file access" guidance and must NOT report it as a code error.
+   *   Distinct from `cancelled` (which means nothing happened at all, so there
+   *   is nothing to explain); here there IS something specific to tell them.
    * Other failures pass through with no `errorKind` set and the caller shows
    * the generic error.
    */
-  errorKind?: 'name-collision' | 'collision-check-unavailable' | 'unsupported-browser';
+  errorKind?:
+    'name-collision' | 'collision-check-unavailable' | 'unsupported-browser' | 'consent-denied';
   /**
    * Present iff `errorKind === 'name-collision'`. Grouped into one object
    * (rather than loose `collision*` siblings) so the failure shape stays
@@ -188,6 +198,17 @@ export async function connectDriveStorage(
         errorKind: 'collision-check-unavailable',
         retryable: true,
       };
+    }
+    if (e instanceof DriveConsentDeniedError) {
+      // Granular consent came back without `drive.file`. The user made a
+      // choice; the caller explains what to allow and offers a retry.
+      //
+      // ⚠️ Typed here rather than sniffed at the call sites. It used to be left
+      // to `isUserCancellation`, whose regex (/cancel|dismiss|popup_closed/)
+      // matches none of the words in this message — so the same decision was
+      // classified three different ways by three callers, and exactly one of
+      // them paged Slack as `critical` for a user ticking a box differently.
+      return { status: 'failed', error: e.message, errorKind: 'consent-denied' };
     }
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
