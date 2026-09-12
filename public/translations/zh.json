@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-11",
-    "translationCount": 4663
+    "lastUpdated": "2026-09-12",
+    "translationCount": 4711
   },
   "translations": {
     "app.name": {
@@ -23320,6 +23320,246 @@
       "translation": "如何在墙上设置设备",
       "hash": "5ypb5n",
       "lastUpdated": "2026-09-11"
+    },
+    "planner.birthday.withAge": {
+      "translation": "{name}的{age}生日",
+      "hash": "r1txq7",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.noAge": {
+      "translation": "{name}的生日",
+      "hash": "2xmsyu",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.today": {
+      "translation": "今天！",
+      "hash": "tigpgg",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.tomorrow": {
+      "translation": "明天",
+      "hash": "g30o2j",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.sleeps": {
+      "translation": "{count}个睡眠",
+      "hash": "qwov7p",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.turns": {
+      "translation": "年满{age}",
+      "hash": "bvo3zj",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.source": {
+      "translation": "beanies从他们的个人资料中的生日算起，所以这里没有什么可编辑的。",
+      "hash": "jj64ph",
+      "lastUpdated": "2026-09-12"
+    },
+    "planner.birthday.openProfile": {
+      "translation": "打开他们的个人资料",
+      "hash": "9g1qvn",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.start": {
+      "translation": "导入我的活动",
+      "hash": "f7tdhq",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.choose.body": {
+      "translation": "beanies会读取您勾选的日历中接下来的12个月，并显示其发现的内容。在您选择之前，不会导入任何内容。",
+      "hash": "1decia",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.choose.readOnly": {
+      "translation": "只读，因此beanies无法从中导入",
+      "hash": "digj0j",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.choose.privacy": {
+      "translation": "beanies仅读取活动的标题、时间、地点和重复模式。它永远不会读取您的房客名单。",
+      "hash": "4fiy76",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.choose.untitled": {
+      "translation": "未命名日历",
+      "hash": "384ird",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.choose.scan": {
+      "translation": "查找要导入的事件",
+      "hash": "c0vb4a",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.scanning": {
+      "translation": "正在读取您的日历……",
+      "hash": "81dzje",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.review.body": {
+      "translation": "一切都被勾选。取消勾选您不想导入的任何内容。",
+      "hash": "8vmc0",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.review.empty": {
+      "translation": "没有要导入的内容。Beanies已经在您选择的日历上有每个活动。",
+      "hash": "pgi7m5",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.review.truncated": {
+      "translation": "显示前{count}个事件，最快在前。",
+      "hash": "ggoy8f",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.review.skipped": {
+      "translation": "beanies无法读取您的{count}个日历，因此没有列出任何日历。",
+      "hash": "podr1z",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.selectAll": {
+      "translation": "全部选中",
+      "hash": "5k0m8t",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.deselectAll": {
+      "translation": "取消全选",
+      "hash": "sh1ntq",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.ticked": {
+      "translation": "已勾选{selected}项，共{total}项",
+      "hash": "dq63x4",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.import.one": {
+      "translation": "导入1个事件",
+      "hash": "e7nqfk",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.import.other": {
+      "translation": "导入{count}个事件",
+      "hash": "8hkuob",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.chip.adopt": {
+      "translation": "保持同步",
+      "hash": "vbhto4",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.chip.copy": {
+      "translation": "仅复制",
+      "hash": "nxpnqv",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.chip.once": {
+      "translation": "仅限下一个日期",
+      "hash": "lzgrv3",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.chip.already": {
+      "translation": "已經匯入",
+      "hash": "2i7x70",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.legend.adopt": {
+      "translation": "在此处编辑它会更新Google中的原始事件。没有第二份副本。",
+      "hash": "za8xd7",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.legend.copy": {
+      "translation": "其他人创建了它，因此beanies无法在Google中更改它。您的编辑将停留在此处。",
+      "hash": "5jm8ae",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.legend.once": {
+      "translation": "它以一种无法匹配的方式重复，因此仅导入其下一个日期。",
+      "hash": "vbibbw",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.allDay": {
+      "translation": "所有",
+      "hash": "cf37nh",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.noTitle": {
+      "translation": "（无标题）",
+      "hash": "nddbl4",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.title": {
+      "translation": "导入这些活动？",
+      "hash": "bm6vle",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.body": {
+      "translation": "此导入运行一次。您的Google日历中没有任何内容被删除，也没有任何重复的内容。",
+      "hash": "82j84k",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.sync.one": {
+      "translation": "1个活动将与Google保持同步，因此在此处编辑它会更新原始内容。",
+      "hash": "yorvm8",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.sync.other": {
+      "translation": "{count}个活动将与Google保持同步，因此在此处编辑一个活动将更新原始活动。",
+      "hash": "83fufo",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.copy.one": {
+      "translation": "1个事件被复制到Bean中，并在Google中保持不变。",
+      "hash": "2qmi6f",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.copy.other": {
+      "translation": "{count}个事件被复制到Bean中，并在Google中保持不变。",
+      "hash": "9kld2s",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.confirm.go": {
+      "translation": "导入",
+      "hash": "k458ix",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.done.one": {
+      "translation": "您的计划表中有1个活动",
+      "hash": "bz0okf",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.done.other": {
+      "translation": "{count}个活动在您的计划器中",
+      "hash": "8rsfh8",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.failed.title": {
+      "translation": "那没有工作。",
+      "hash": "7w3pt0",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.failed.body": {
+      "translation": "没有任何内容被导入，您的Google日历中也没有任何内容被更改。请稍后重试。",
+      "hash": "d8vch8",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.unverified.title": {
+      "translation": "您的活动即将开始",
+      "hash": "a73ux7",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.unverified.body": {
+      "translation": "他们得救了，但帽子不能马上给他们看。稍后重新打开您的计划员，他们将到达那里。不要再次运行导入，否则您将获得所有内容中的两个。",
+      "hash": "zh4f7o",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.scanFailed.title": {
+      "translation": "beanies无法读取您的日历",
+      "hash": "hechl1",
+      "lastUpdated": "2026-09-12"
+    },
+    "calendarImport.scanFailed.body": {
+      "translation": "没有任何内容被导入，您的Google日历中也没有任何内容被更改。请检查您的网络连接，然后重试。",
+      "hash": "46utx8",
+      "lastUpdated": "2026-09-12"
     }
   }
 }
