@@ -189,6 +189,38 @@ describe('review mode — a list already exists', () => {
     expect(h.push).toHaveBeenCalledWith({ name: 'Lists', query: { view: 'l9' } });
   });
 
+  it('🔴 marks the ingredients box read-only, in words and in style', () => {
+    // greg: "it looks editable". A read-only box that wears the editable box's
+    // clothes is worse than no box — so it says so, and it drops the white fill,
+    // the 2px border and the focus ring that make the editable one look typeable.
+    h.lists = [existingList()];
+    const w = mountSheet();
+    expect(w.text()).toContain('lists.fromRecipe.readOnly');
+    const box = w.find('ul[aria-readonly="true"]');
+    expect(box.exists()).toBe(true);
+    expect(box.classes().join(' ')).not.toContain('bg-white');
+    expect(box.classes()).not.toContain('border-2');
+  });
+
+  it('🔴 the read-only look CLEARS when they start another list', () => {
+    h.lists = [existingList()];
+    const w = mountSheet();
+    return w
+      .find('[data-testid="recipe-list-start-another"]')
+      .trigger('click')
+      .then(() => {
+        expect(w.find('ul[aria-readonly="true"]').exists()).toBe(false);
+        expect(w.find('textarea').exists()).toBe(true);
+      });
+  });
+
+  it('🔴 each existing list carries a visible "open" affordance', () => {
+    // It was a button that did not look like one; the row gave no sign it was
+    // tappable at all.
+    h.lists = [existingList()];
+    expect(mountSheet().text()).toContain('lists.embed.open');
+  });
+
   it('shows each list’s progress, so a finished shop is obvious unopened', () => {
     h.lists = [existingList()];
     expect(mountSheet().text()).toContain('1/2');

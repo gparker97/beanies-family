@@ -246,12 +246,21 @@ async function onSave(): Promise<void> {
           @click="openExisting(l.id)"
         >
           <span aria-hidden="true">{{ l.emoji }}</span>
-          <span class="font-inter dark:text-ink min-w-0 flex-1 truncate text-sm font-semibold">
-            {{ l.title }}
+          <span class="min-w-0 flex-1">
+            <span class="font-inter dark:text-ink block truncate text-sm font-semibold">
+              {{ l.title }}
+            </span>
+            <span class="font-inter dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
+              {{ progressFor(l) }}
+            </span>
           </span>
-          <span class="font-inter dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
-            {{ progressFor(l) }}
-          </span>
+          <!-- The house "Open list ›" affordance (`LinkedLists`). Without it the row
+               is a button that does not look like one — greg could not tell it was
+               tappable. -->
+          <span
+            class="font-outfit text-primary-600 dark:text-accent-lift inline-flex flex-shrink-0 items-center gap-0.5 text-xs font-semibold"
+            >{{ t('lists.embed.open') }}<span aria-hidden="true">›</span></span
+          >
         </button>
       </div>
 
@@ -262,14 +271,22 @@ async function onSave(): Promise<void> {
           class="font-inter dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)] uppercase"
         >
           {{ t('lists.fromRecipe.ingredientsLabel') }}
+          <span class="font-inter normal-case">· {{ t('lists.fromRecipe.readOnly') }}</span>
         </p>
+        <!-- ⚠️ Deliberately NOT the textarea's look. A tinted fill, a 1px border and
+             no focus ring are what say "you cannot type here" — the editable box is
+             white, 2px, with a focus ring. Muted INK rather than an opacity, because
+             this is text the user is meant to READ (CLAUDE.md: never put an opacity
+             modifier on readable text). It disappears the moment they start another
+             list and the editable box takes its place. -->
         <ul
-          class="dark:border-line dark:bg-surface-overlay max-h-56 overflow-y-auto rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3"
+          class="dark:border-line dark:bg-surface-ground max-h-56 overflow-y-auto rounded-xl border border-[var(--tint-slate-10)] bg-[var(--tint-slate-04)] px-4 py-3"
+          aria-readonly="true"
         >
           <li
             v-for="(line, i) in split.titles"
             :key="i"
-            class="font-inter dark:text-ink-soft py-0.5 text-sm leading-relaxed text-[var(--color-text)]"
+            class="font-inter dark:text-ink-soft py-0.5 text-sm leading-relaxed text-[var(--color-text-muted)]"
           >
             {{ line }}
           </li>
