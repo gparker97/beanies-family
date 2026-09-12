@@ -142,10 +142,12 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
 
   const extras = new Map<string, DayExtra[]>();
   const holidayDates = new Set<string>();
-  for (const h of input.extras) {
-    if (!extras.has(h.ymd)) extras.set(h.ymd, []);
-    extras.get(h.ymd)!.push(h);
-    if (h.kind === 'holiday') holidayDates.add(h.ymd);
+  for (const extra of input.extras) {
+    if (!extras.has(extra.ymd)) extras.set(extra.ymd, []);
+    extras.get(extra.ymd)!.push(extra);
+    // ONLY a holiday tints the cell. A birthday is a chip, not a reason to
+    // repaint the day — the tint means "the country is off today".
+    if (extra.kind === 'holiday') holidayDates.add(extra.ymd);
   }
 
   return {

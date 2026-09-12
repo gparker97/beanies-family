@@ -21,12 +21,24 @@ import { formatDayLong } from '@/utils/date';
 import { sleepsUntil } from '@/utils/calendarDay';
 import { birthdayLabel, type BirthdayOccurrence } from '@/utils/birthdays';
 
-const props = defineProps<{
-  open: boolean;
-  birthday: BirthdayOccurrence | null;
-  /** Reactive today, so an open drawer does not go stale over midnight. */
-  todayYmd: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    birthday: BirthdayOccurrence | null;
+    /** Reactive today, so an open drawer does not go stale over midnight. */
+    todayYmd: string;
+    /**
+     * Offer the "open their profile" link. TRUE in the app; FALSE on the beanie
+     * wall, which is a locked kiosk with no member profiles to navigate to.
+     *
+     * ⚠️ A prop rather than always rendering it: the wall handled `open-profile`
+     * by merely closing the drawer, so the button accepted a tap and discarded it.
+     * An accepted-and-discarded control is the shape of a defect, not a feature.
+     */
+    canOpenProfile?: boolean;
+  }>(),
+  { canOpenProfile: true }
+);
 
 const emit = defineEmits<{ close: []; 'open-profile': [memberId: string] }>();
 
@@ -68,11 +80,14 @@ const turns = computed(() =>
            ACTIVITY. A derived birthday is the same occasion; it would be odd for
            the one beanies works out itself to be the quiet one.
 
-           The synthetic `activity-id` is what keys the once-per-session claim,
-           so a birthday showers on the first open and stays calm on the second.
-           It carries the DATE as well as the member, or next year's birthday
-           would inherit this year's spent claim. A past birthday gets no
-           confetti: scrolling back through the year should not celebrate. -->
+           ⚠️ The `activity-id` here is SYNTHETIC and, for a drawer, inert:
+           `CelebrationConfetti` short-circuits with
+           `variant === 'drawer' || claimConfetti(id)`, so a drawer never spends
+           the once-per-session claim and rains on EVERY open by design (see its
+           "A DRAWER NEVER CLAIMS" note). The id still carries the member and the
+           date so that it cannot collide with a real activity's id if that ever
+           stops being true. A past birthday gets no confetti at all: scrolling
+           back through the year should not celebrate. -->
       <CelebrationConfetti
         v-if="sleeps >= 0"
         :activity-id="`birthday:${birthday.memberId}:${birthday.date}`"
@@ -90,7 +105,10 @@ const turns = computed(() =>
         {{ turns }}
       </p>
 
-      <p class="font-inter text-secondary-400 dark:text-ink-soft text-sm">
+      <!-- Skipped when the countdown already IS the date. A past birthday shows
+           its date instead of "-30 sleeps away", and printing it twice in a row
+           reads as a rendering fault. -->
+      <p v-if="sleeps >= 0" class="font-inter text-secondary-400 dark:text-ink-soft text-sm">
         {{ formatDayLong(birthday.date) }}
       </p>
 
@@ -101,6 +119,7 @@ const turns = computed(() =>
       </p>
 
       <button
+        v-if="canOpenProfile"
         type="button"
         class="font-outfit text-primary-500 dark:text-accent-lift mt-1 text-sm font-semibold underline underline-offset-2"
         @click="emit('open-profile', birthday.memberId)"

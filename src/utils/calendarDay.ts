@@ -105,8 +105,14 @@ export function dayExtrasFor(extras: readonly DayExtra[], ymd: string): DayExtra
  *
  * "Sleeps" rather than "days" because that is how the Nook already says it to a
  * family, and the two surfaces must not describe the same wait differently.
- * Negative for a past date; 0 is today. Pure string arithmetic on local dates —
- * no `Date` maths, so a DST boundary cannot make it 0.96 of a day.
+ * Negative for a past date; 0 is today.
+ *
+ * ⚠️ `Date.UTC` on the date PARTS, never a local `Date`. Both are "Date maths",
+ * but only one is safe: two local midnights either side of a DST change are 23
+ * or 25 hours apart, so the obvious `(b - a) / 86400000` yields 6.958 and rounds
+ * differently depending on which way the clocks went. UTC midnights are always
+ * an exact multiple of a day apart, which makes the `Math.round` a safety net
+ * rather than the thing holding it together.
  */
 export function sleepsUntil(todayYmd: string, ymd: string): number {
   const at = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10));
