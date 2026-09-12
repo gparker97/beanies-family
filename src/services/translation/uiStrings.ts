@@ -4239,6 +4239,17 @@ const STRING_DEFS = {
   'lists.fromRecipe.listTitle': { en: 'Shopping for {recipe}', beanie: 'shopping for {recipe}' },
   'lists.fromRecipe.created': { en: 'Shopping list ready!', beanie: 'shopping list ready!' },
   'lists.fromRecipe.view': { en: 'View', beanie: 'view' },
+  'lists.fromRecipe.openExisting': { en: 'Open Shopping List', beanie: 'open shopping list' },
+  'lists.fromRecipe.reviewBody': {
+    en: 'You already have a shopping list for this recipe. Open it to carry on, or start a fresh one.',
+    beanie:
+      'you already have a shopping list for this recipe. open it to carry on, or start a fresh one.',
+  },
+  'lists.fromRecipe.startAnother': { en: 'Start another list', beanie: 'start another list' },
+  'lists.fromRecipe.ingredientsLabel': {
+    en: "What's in this recipe",
+    beanie: "what's in this recipe",
+  },
   'recipes.detail.openShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
   'recipes.detail.newShoppingList': {
     en: 'Start another shopping list',
@@ -6107,6 +6118,8 @@ const STRING_DEFS = {
   'lists.detail.itemPlaceholder': { en: 'What needs doing?', beanie: 'what needs doing?' },
   'lists.detail.dragHandle': { en: 'Drag to reorder', beanie: 'drag to reorder' },
   'lists.detail.editTitle': { en: 'Edit list name', beanie: 'edit list name' },
+  'lists.detail.checkAll': { en: 'Tick all', beanie: 'tick all' },
+  'lists.detail.uncheckAll': { en: 'Clear all ticks', beanie: 'clear all ticks' },
   'lists.detail.editItem': { en: 'Edit item', beanie: 'edit item' },
   'lists.detail.repeatsLabel': { en: 'Repeats?', beanie: 'repeats?' },
   'lists.detail.oneoff': { en: 'One-off', beanie: 'one-off' },

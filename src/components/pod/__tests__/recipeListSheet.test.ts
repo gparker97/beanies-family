@@ -150,26 +150,76 @@ describe('the prefilled draft', () => {
   });
 });
 
-describe('the existing-list notice', () => {
-  it('offers to open a list already built from this recipe', async () => {
-    h.lists = [{ id: 'l9', title: 'Shopping for Pancakes', emoji: '🛒', linkedRecipeId: 'r1' }];
+function existingList(over: Record<string, unknown> = {}) {
+  return {
+    id: 'l9',
+    title: 'Shopping for Pancakes',
+    emoji: '🛒',
+    linkedRecipeId: 'r1',
+    completed: false,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    items: [{ completed: true }, { completed: false }],
+    ...over,
+  };
+}
+
+describe('review mode — a list already exists', () => {
+  it('🔴 does NOT navigate on open; it shows the choice instead', () => {
+    // The whole point of the redesign: a button reading "Shopping List" must not
+    // silently take the user out of the cookbook.
+    h.lists = [existingList()];
+    mountSheet();
+    expect(h.push).not.toHaveBeenCalled();
+  });
+
+  it('shows the ingredients READ-ONLY — no textarea to type into', () => {
+    h.lists = [existingList()];
     const w = mountSheet();
-    expect(w.text()).toContain('lists.fromRecipe.existing');
-    await w.findAll('button')[0]!.trigger('click');
-    // NAVIGATES rather than mounting a second copy of the 700-line list drawer.
+    expect(w.find('textarea').exists()).toBe(false);
+    expect(w.text()).toContain('2 cups flour');
+  });
+
+  it('makes OPENING the primary action', () => {
+    h.lists = [existingList()];
+    const w = mountSheet();
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
+      'lists.fromRecipe.openExisting'
+    );
+    save(w);
     expect(h.push).toHaveBeenCalledWith({ name: 'Lists', query: { view: 'l9' } });
   });
 
-  it('says nothing when no list exists for this recipe', () => {
-    h.lists = [{ id: 'l9', linkedRecipeId: 'other' }];
-    expect(mountSheet().text()).not.toContain('lists.fromRecipe.existing');
+  it('shows each list’s progress, so a finished shop is obvious unopened', () => {
+    h.lists = [existingList()];
+    expect(mountSheet().text()).toContain('1/2');
   });
 
-  it('🔴 still allows a SECOND list — offered, never enforced', async () => {
-    h.lists = [{ id: 'l9', title: 'Old shop', emoji: '🛒', linkedRecipeId: 'r1' }];
+  it('🔴 reviews a COMPLETED list too — it still answers "have I made one?"', () => {
+    h.lists = [existingList({ completed: true })];
     const w = mountSheet();
+    expect(w.find('textarea').exists()).toBe(false);
+  });
+
+  it('🔴 unlocks editing in place, without navigating or a second modal', async () => {
+    h.lists = [existingList()];
+    const w = mountSheet();
+    await w.find('[data-testid="recipe-list-start-another"]').trigger('click');
+    expect(w.find('textarea').exists()).toBe(true);
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
+      'lists.fromRecipe.save'
+    );
+    expect(h.push).not.toHaveBeenCalled();
     await save(w);
     expect(h.createList).toHaveBeenCalledOnce();
+  });
+
+  it('goes straight to create when no list exists', () => {
+    h.lists = [{ id: 'l9', linkedRecipeId: 'other' }];
+    const w = mountSheet();
+    expect(w.find('textarea').exists()).toBe(true);
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
+      'lists.fromRecipe.save'
+    );
   });
 });
 

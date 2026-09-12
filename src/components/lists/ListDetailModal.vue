@@ -262,6 +262,24 @@ const dueText = computed(() => {
 function toggleItem(itemId: string): void {
   if (list.value) void listStore.toggleItem(list.value.id, itemId, meId.value);
 }
+
+/**
+ * All-or-nothing ticking.
+ *
+ * One control, not two: the label says which way it will go, so there is nothing
+ * to read twice and no pair of buttons where one is always a no-op. When every
+ * item is already done it offers to clear them — which is the honest way back to
+ * a list you filed by accident, and un-files it through the same derivation that
+ * filed it.
+ */
+const allItemsDone = computed(
+  () => !!list.value && list.value.items.length > 0 && list.value.items.every((i) => i.completed)
+);
+
+function toggleAllItems(): void {
+  if (!list.value) return;
+  void listStore.setAllItemsCompleted(list.value.id, !allItemsDone.value, meId.value);
+}
 function removeItem(itemId: string): void {
   if (list.value) void listStore.removeItem(list.value.id, itemId);
 }
@@ -445,6 +463,19 @@ async function handleDelete(): Promise<void> {
            (`reorderItems`) which re-renders authoritatively. NEVER mutate
            `list.items` in place (it's the Automerge projection). -->
       <div>
+        <!-- Bulk tick. Hidden on an empty list, where it would do nothing, and
+             deliberately quiet: it sits beside the items rather than competing
+             with the modal's own actions. -->
+        <div v-if="list.items.length" class="mb-1 flex justify-end">
+          <button
+            type="button"
+            class="font-inter text-primary-600 dark:text-accent-lift text-xs font-semibold underline underline-offset-2"
+            data-testid="list-toggle-all"
+            @click="toggleAllItems"
+          >
+            {{ allItemsDone ? t('lists.detail.uncheckAll') : t('lists.detail.checkAll') }}
+          </button>
+        </div>
         <draggable
           v-model="itemsDraft"
           item-key="id"

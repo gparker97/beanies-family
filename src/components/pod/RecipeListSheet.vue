@@ -49,6 +49,27 @@ const draft = ref('');
 const isSubmitting = ref(false);
 
 /**
+ * `review` when this recipe already has a list, `create` otherwise.
+ *
+ * The ingredients are shown either way — that is the point. A family arriving
+ * here wants to know what is already on the list before deciding between opening
+ * it and starting another, and answering that by navigating them out of the
+ * cookbook made the choice for them. In `review` the lines are read-only, because
+ * editing text that is not going to be saved anywhere is a lie.
+ */
+const mode = ref<'review' | 'create'>('create');
+
+// Offered, never enforced — a second shop for the same dish is legitimate.
+// ⚠️ Declared ABOVE the `immediate: true` watch below, which reads `existing` on
+// mount. `<script setup>` is ordinary top-to-bottom execution, so a later `const`
+// is in its temporal dead zone and the watch throws.
+const {
+  lists: existing,
+  activeList,
+  openList,
+} = useRecipeShoppingLists(computed(() => props.recipe.id));
+
+/**
  * The recipe → draft map, SNAPSHOT at open. Never recomputed while the sheet is up.
  *
  * A `computed` over `props.recipe.ingredients` would look equivalent and is not: the
@@ -66,6 +87,10 @@ watch(
     split.value = splitRecipeIngredients(props.recipe.ingredients ?? []);
     draft.value = split.value.titles.join('\n');
     isSubmitting.value = false;
+    // Any existing list counts, finished or not: a done shop is still the answer
+    // to "have I already made one of these?", and the row shows its progress so
+    // the user can tell at a glance.
+    mode.value = existing.value.length > 0 ? 'review' : 'create';
     logEvent({
       level: 'info',
       surface: 'list-from-recipe',
@@ -85,11 +110,37 @@ const skippedHint = computed(() => {
     : fillTemplate(t('lists.fromRecipe.headingsSkipped.other'), { count: String(n) });
 });
 
-// Offered, never enforced — a second shop for the same dish is legitimate.
-const { lists: existing, openList } = useRecipeShoppingLists(computed(() => props.recipe.id));
-
 const items = computed(() => parseDraftItems(draft.value));
-const saveDisabled = computed(() => items.value.length === 0);
+
+/** The list the primary action opens: the newest still being shopped, else the newest. */
+const openTarget = computed(() => activeList.value ?? existing.value[0] ?? null);
+
+const saveDisabled = computed(() =>
+  mode.value === 'review' ? !openTarget.value : items.value.length === 0
+);
+const saveLabel = computed(() =>
+  mode.value === 'review' ? t('lists.fromRecipe.openExisting') : t('lists.fromRecipe.save')
+);
+
+/** Progress for a row, so a finished shop is obvious without opening it. */
+function progressFor(l: { items: Array<{ completed: boolean }> }): string {
+  const done = l.items.filter((i) => i.completed).length;
+  return `${done}/${l.items.length}`;
+}
+
+/** Leave review and let the user edit — the lines become theirs to change. */
+function startNewList(): void {
+  mode.value = 'create';
+}
+
+/** The modal's one primary action, whichever mode we are in. */
+function onPrimary(): void {
+  if (mode.value === 'review') {
+    if (openTarget.value) openExisting(openTarget.value.id);
+    return;
+  }
+  void onSave();
+}
 
 function openExisting(id: string): void {
   emit('close');
@@ -173,36 +224,60 @@ async function onSave(): Promise<void> {
     icon="🛒"
     icon-bg="var(--tint-orange-8)"
     size="narrow"
-    :save-label="t('lists.fromRecipe.save')"
+    :save-label="saveLabel"
     :save-disabled="saveDisabled"
     :is-submitting="isSubmitting"
     @close="emit('close')"
-    @save="onSave"
+    @save="onPrimary"
   >
     <div class="space-y-4">
       <p class="font-inter dark:text-ink-soft text-sm text-[var(--color-text-muted)]">
-        {{ t('lists.fromRecipe.body') }}
+        {{ mode === 'review' ? t('lists.fromRecipe.reviewBody') : t('lists.fromRecipe.body') }}
       </p>
 
-      <!-- Only when a list already exists. Offered, not enforced: cooking the same
-           dish again next month is a real case, so blocking would be wrong — but
-           accumulating silent duplicates would be wrong too. -->
-      <div v-if="existing.length" class="space-y-1">
-        <p class="font-inter dark:text-ink-soft text-sm text-[var(--color-text-muted)]">
-          {{ t('lists.fromRecipe.existing') }}
-        </p>
+      <!-- The lists this recipe has already produced. Each row carries its own
+           progress, so a shop that is finished is obvious without opening it. -->
+      <div v-if="mode === 'review'" class="space-y-1">
         <button
           v-for="l in existing"
           :key="l.id"
           type="button"
-          class="font-inter text-primary-600 dark:text-accent-lift block text-left text-sm underline underline-offset-2"
+          class="dark:border-line dark:hover:bg-surface-hover flex w-full items-center gap-2 rounded-xl border-2 border-[var(--tint-slate-10)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-04)]"
           @click="openExisting(l.id)"
         >
-          {{ l.emoji }} {{ l.title }}
+          <span aria-hidden="true">{{ l.emoji }}</span>
+          <span class="font-inter dark:text-ink min-w-0 flex-1 truncate text-sm font-semibold">
+            {{ l.title }}
+          </span>
+          <span class="font-inter dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
+            {{ progressFor(l) }}
+          </span>
         </button>
       </div>
 
+      <!-- Read-only in review: these lines are not going anywhere, and an editable
+           box that discards what you type is worse than a plain one. -->
+      <div v-if="mode === 'review'" class="space-y-1">
+        <p
+          class="font-inter dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)] uppercase"
+        >
+          {{ t('lists.fromRecipe.ingredientsLabel') }}
+        </p>
+        <ul
+          class="dark:border-line dark:bg-surface-overlay max-h-56 overflow-y-auto rounded-xl border-2 border-[var(--tint-slate-10)] bg-white px-4 py-3"
+        >
+          <li
+            v-for="(line, i) in split.titles"
+            :key="i"
+            class="font-inter dark:text-ink-soft py-0.5 text-sm leading-relaxed text-[var(--color-text)]"
+          >
+            {{ line }}
+          </li>
+        </ul>
+      </div>
+
       <textarea
+        v-else
         v-model="draft"
         rows="10"
         :aria-label="t('lists.fromRecipe.itemsLabel')"
@@ -210,7 +285,19 @@ async function onSave(): Promise<void> {
       ></textarea>
 
       <!-- Renders nothing when there is nothing to say, so no `v-if` here. -->
-      <InferredHint :text="skippedHint" />
+      <InferredHint v-if="mode === 'create'" :text="skippedHint" />
+
+      <!-- The quieter half of the choice. Editing is unlocked in place: no second
+           modal, no navigation, and the lines they were just reading stay put. -->
+      <button
+        v-if="mode === 'review'"
+        type="button"
+        class="font-inter text-primary-600 dark:text-accent-lift text-sm font-semibold underline underline-offset-2"
+        data-testid="recipe-list-start-another"
+        @click="startNewList"
+      >
+        {{ t('lists.fromRecipe.startAnother') }}
+      </button>
     </div>
   </BeanieFormModal>
 </template>

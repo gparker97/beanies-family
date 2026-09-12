@@ -786,3 +786,67 @@ describe('listStore', () => {
     });
   });
 });
+
+/**
+ * Ticking or clearing every item at once (#88 follow-up).
+ *
+ * Routed through the same `deriveCompletion` as `toggleItem`, so filing,
+ * un-filing and the celebration behave exactly as they do when a family ticks
+ * the last box by hand — and it is ONE write, not one per item.
+ */
+describe('setAllItemsCompleted', () => {
+  function seed(items: FamilyListItem[]) {
+    const store = useListStore();
+    store.lists = [list({ id: 'l1', items })];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      const next = { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+      store.lists = store.lists.map((x) => (x.id === id ? next : x));
+      return next;
+    });
+    return store;
+  }
+  const item = (id: string, completed = false): FamilyListItem => ({ id, title: id, completed });
+
+  it('ticks every item in ONE write, and files the list', async () => {
+    const store = seed([item('a'), item('b')]);
+    const updated = await store.setAllItemsCompleted('l1', true, 'm1');
+    expect(updated?.items.every((i) => i.completed)).toBe(true);
+    // Filing comes from the shared derivation, not a second code path.
+    expect(updated?.completed).toBe(true);
+    expect(updated?.completedBy).toBe('m1');
+    // One write for the whole list — not one per item.
+    expect(vi.mocked(listRepo.updateList)).toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 clears every tick AND un-files a completed list', async () => {
+    // The way back from a list filed by accident: the same derivation, run on the
+    // opposite input.
+    const store = seed([item('a', true), item('b', true)]);
+    store.lists = [list({ id: 'l1', items: [item('a', true), item('b', true)], completed: true })];
+    const cleared = await store.setAllItemsCompleted('l1', false, 'm1');
+    expect(cleared?.items.every((i) => !i.completed)).toBe(true);
+    expect(cleared?.completed).toBe(false);
+    expect(cleared?.completedAt).toBeUndefined();
+  });
+
+  it('records who ticked them, and forgets on a clear', async () => {
+    const store = seed([item('a')]);
+    const done = await store.setAllItemsCompleted('l1', true, 'm2');
+    expect(done?.items[0]?.completedBy).toBe('m2');
+    const undone = await store.setAllItemsCompleted('l1', false, 'm2');
+    expect(undone?.items[0]?.completedBy).toBeUndefined();
+  });
+
+  it('returns null for a list that vanished, rather than throwing', async () => {
+    const store = seed([item('a')]);
+    await expect(store.setAllItemsCompleted('gone', true, 'm1')).resolves.toBeNull();
+  });
+
+  it('leaves an empty list unfiled', async () => {
+    // `deriveCompletion` requires items.length > 0 — an empty list never files.
+    const store = seed([]);
+    const updated = await store.setAllItemsCompleted('l1', true, 'm1');
+    expect(updated?.completed).toBe(false);
+  });
+});

@@ -17,7 +17,6 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { isFlagEnabled } from '@/config/flags';
 import { splitRecipeIngredients } from '@/utils/listSeed';
-import { useRecipeShoppingLists } from '@/composables/useRecipeShoppingLists';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
 import RecipeListSheet from '@/components/pod/RecipeListSheet.vue';
@@ -88,21 +87,6 @@ const canMakeShoppingList = computed(
     splitRecipeIngredients(recipe.value?.ingredients ?? []).titles.length > 0
 );
 
-/**
- * Once a shop is under way, OPENING it is the first-class action and making
- * another is the quiet one.
- *
- * The read is shared with the review sheet through `useRecipeShoppingLists`, so
- * the page and the sheet cannot disagree about whether a list exists — and the
- * page still owns no list WRITE, which is what keeps it from becoming a second
- * lists client.
- *
- * `activeList` deliberately ignores completed lists: a finished shop is not one
- * you want the recipe to send you back to. When every list is done, the page
- * falls back to offering a new one, and the finished ones stay reachable from
- * inside the sheet.
- */
-const { activeList, openList } = useRecipeShoppingLists(computed(() => recipe.value?.id));
 const editingEntry = ref<CookLogEntry | null>(null);
 
 // Photo lightbox — opens when the user taps the polaroid hero. Read-only:
@@ -380,38 +364,19 @@ watch(recipe, (now, before) => {
                  Hidden when the recipe has no usable ingredient lines — an action that
                  can only produce an empty list is worse than no action.
 
-                 Two shapes, one slot. With a shop under way the button OPENS it and a
-                 small + starts another; with none it simply makes the first. The user
-                 is never moved anywhere they did not ask to go. -->
-            <template v-if="canMakeShoppingList">
-              <button
-                v-if="activeList"
-                type="button"
-                class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
-                data-testid="recipe-shopping-list-open"
-                @click="openList(activeList.id)"
-              >
-                🛒 <span>{{ t('recipes.detail.openShoppingList') }}</span>
-              </button>
-              <button
-                type="button"
-                class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
-                :class="activeList ? 'px-3' : ''"
-                :data-testid="
-                  activeList ? 'recipe-shopping-list-new' : 'recipe-shopping-list-create'
-                "
-                :aria-label="activeList ? t('recipes.detail.newShoppingList') : undefined"
-                :title="activeList ? t('recipes.detail.newShoppingList') : undefined"
-                @click="shoppingListOpen = true"
-              >
-                <template v-if="activeList">
-                  <span aria-hidden="true">＋</span>
-                </template>
-                <template v-else>
-                  🛒 <span>{{ t('recipes.detail.makeShoppingList') }}</span>
-                </template>
-              </button>
-            </template>
+                 ONE button, always opening the sheet. It deliberately does NOT navigate:
+                 a label reading "Shopping List" that silently left the cookbook was a
+                 destination the user had not asked for. The sheet shows what the list
+                 holds and lets them choose. -->
+            <button
+              v-if="canMakeShoppingList"
+              type="button"
+              class="font-outfit text-secondary-500 dark:bg-surface-raised/80 dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white"
+              data-testid="recipe-shopping-list-open"
+              @click="shoppingListOpen = true"
+            >
+              🛒 <span>{{ t('recipes.detail.makeShoppingList') }}</span>
+            </button>
             <button
               v-if="canEditActivities"
               type="button"
