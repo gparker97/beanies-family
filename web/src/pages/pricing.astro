@@ -200,7 +200,7 @@ const faqSchema = {
               <h3>what are magic beans?</h3>
               <p class="aibox-lede">
                 they're what jack traded his cow for, carefully cultivated to actually improve
-                your life and reduce your mental load by using <em>private and secure ai</em> to
+                your life and reduce your mental load by using <a href="/help/security/how-beanies-ai-handles-your-photos"><em>private and secure ai</em></a> to
                 input your data auto-magically:
               </p>
               <ul class="ailist">
@@ -969,6 +969,7 @@ const faqSchema = {
   /* Inline links: preflight resets a{color:inherit}, so in-prose links are
      invisible without this. Same defect the switching pages shipped. */
   .pricing-page .handout a,
+  .pricing-page .aibox a,
   .pricing-page .final .hero-sub a {
     color: var(--heritage-orange);
     text-decoration: underline;
@@ -976,8 +977,10 @@ const faqSchema = {
     text-underline-offset: 3px;
   }
   .pricing-page .handout a:hover,
+  .pricing-page .aibox a:hover,
   .pricing-page .final .hero-sub a:hover { text-decoration-thickness: 2px; }
   .pricing-page .handout a:focus-visible,
+  .pricing-page .aibox a:focus-visible,
   .pricing-page .final .hero-sub a:focus-visible {
     outline: 3px solid var(--heritage-orange);
     outline-offset: 2px;
