@@ -806,6 +806,14 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       const notePayloadRejection = (key: string, hash: string, e: CalendarApiError) => {
         refusedPayloads += 1;
         firstRejection ??= e;
+        // `hash` trips `security/detect-possible-timing-attacks`, which matches on
+        // the NAME. There is no secret and no adversary here: this is a
+        // device-local memo of the content digest of a calendar payload Google has
+        // already refused, compared to decide whether we have already reported this
+        // exact body. Nothing is confidential, it never leaves the device, and
+        // anyone able to time this comparison is already executing in the page.
+        // Renaming `hash` to dodge the heuristic would read worse for no gain.
+        // eslint-disable-next-line security/detect-possible-timing-attacks -- see above
         if (rejectedPushHashes.get(key) === hash) return;
         rejectedPushHashes.set(key, hash);
         reportError({
