@@ -399,21 +399,40 @@ describe('who shops and by when', () => {
     expect(hints().at(-1)!.props('text')).toContain('dueHint');
   });
 
-  it('🔴 does not promise a notification on web, where none is ever armed', async () => {
-    // `useLocalNotifications` returns at `if (!isNative()) return` and there is no
-    // service-worker fallback — so on web/PWA the OS reminder does not exist and
-    // the hint must say what DOES happen instead.
+  it('uses ONE wording on every platform', async () => {
+    // The hint used to split native vs web, because off-native no OS reminder is
+    // armed. Lists now file a `list-due` bell entry too, and the drawer works
+    // everywhere, so the promise holds on both and the split is gone.
     h.native = false;
     const w = mountSheet();
     await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
-    const text = w.findAllComponents({ name: 'InferredHint' }).at(-1)!.props('text');
-    expect(text).toContain('dueHintWeb');
-    expect(text).not.toContain("lists.fromRecipe.dueHint'");
+    expect(w.findAllComponents({ name: 'InferredHint' }).at(-1)!.props('text')).toContain(
+      'lists.fromRecipe.dueHint'
+    );
   });
 
-  it('🔴 offers no past due date, which would arm nothing', async () => {
+  it('🔴 puts NO floor on the due date, so "today" is selectable', async () => {
+    // This shipped broken. A `:min` was added here (and nowhere else) on the
+    // reasoning that a past date arms no reminder — but it was computed with
+    // `toISODateString`, which returns a full ISO TIMESTAMP despite its name, and
+    // `BeanieDatePicker` compares `min` to a `YYYY-MM-DD` lexicographically:
+    // '2026-09-13' < '2026-09-13T06:05:52.123Z' is TRUE, so today and every past
+    // day were disabled while tomorrow onwards worked.
+    //
+    // The floor is gone rather than corrected: a list due today is the most common
+    // case of all, back-dating is legitimate, and `ListDetailModal` — the same
+    // field on the other surface — has never had one.
     const w = mountSheet();
-    expect(w.findComponent({ name: 'BeanieDatePicker' }).props('min')).toBeTruthy();
+    expect(w.findComponent({ name: 'BeanieDatePicker' }).props('min')).toBeFalsy();
+  });
+
+  it('accepts today as a due date, end to end', async () => {
+    // The user-facing assertion, independent of how the floor is implemented.
+    const today = new Date().toISOString().slice(0, 10);
+    const w = mountSheet();
+    await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', today);
+    await save(w);
+    expect((h.createList.mock.calls[0][0] as Record<string, unknown>).dueDate).toBe(today);
   });
 
   it('🔴 renders exactly ONE label for the date field', async () => {

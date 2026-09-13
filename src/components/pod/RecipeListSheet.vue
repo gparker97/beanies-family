@@ -30,8 +30,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
-import { isNative } from '@/services/sync/capabilities';
-import { toISODateString } from '@/utils/date';
 import { useListStore } from '@/stores/listStore';
 import { useRecipeShoppingLists } from '@/composables/useRecipeShoppingLists';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -165,27 +163,22 @@ function setOwner(value: string | string[]): void {
  * the next morning. Names the OWNER, not "you" — the whole point of the picker
  * above is that those are often different people.
  *
- * ⚠️ Two things it must NOT do, both found in review:
- *  • Promise a notification on a platform that never arms one.
- *    `useLocalNotifications` returns at `if (!isNative()) return`, and there is no
- *    service-worker fallback — on web and the PWA no OS reminder exists at all, so
- *    there the hint says what DOES happen (the list shows up as due) and nothing
- *    about notifications.
- *  • Name a literal time. "9am" would duplicate `ALL_DAY_REMINDER_HOUR` across
- *    three locales, so tuning the constant would silently make the copy lie. The
- *    string says "that morning"; the constant stays the single source of truth.
+ * ⚠️ It deliberately names no literal time. "9am" would duplicate
+ * `ALL_DAY_REMINDER_HOUR` across three locales, so tuning the constant would
+ * silently make the copy lie; the string says "on the due date" instead.
+ *
+ * ⚠️ It is ONE wording for every platform (greg's call, 2026-09-13), which means
+ * it currently overstates on web and the PWA: `useLocalNotifications` returns at
+ * `if (!isNative()) return` and there is no service-worker fallback, so no
+ * reminder is delivered there. A `list-due` bell entry would make it true
+ * everywhere, since the drawer works on every platform.
  */
 const dueHint = computed(() => {
   if (mode.value !== 'create' || !dueDate.value) return '';
-  const key = isNative() ? 'lists.fromRecipe.dueHint' : 'lists.fromRecipe.dueHintWeb';
-  return fillTemplate(t(key), {
+  return fillTemplate(t('lists.fromRecipe.dueHint'), {
     name: getMemberName(ownerId.value, t('lists.fromRecipe.someone')),
   });
 });
-
-/** Today, ymd — the date picker's floor. A due date in the past arms no reminder
- *  (`listFireTime`'s moment is already gone), so offering one is a trap. */
-const todayYmd = computed(() => toISODateString(new Date()));
 
 /** Progress for a row, so a finished shop is obvious without opening it. */
 function progressFor(l: { items: Array<{ completed: boolean }> }): string {
@@ -426,10 +419,15 @@ async function onSave(): Promise<void> {
              auto-translation read "Needed by" as "by whom" and labelled a date
              picker with a person. -->
         <div class="space-y-1.5">
+          <!-- ⚠️ NO `:min`. A list due TODAY is the single most common case, and
+               back-dating one is legitimate (you shopped yesterday, you are
+               recording it now) — an overdue list is a state the app models
+               everywhere else, it simply arms no reminder. `ListDetailModal`, the
+               other place this same field is edited, has never had a floor, and a
+               floor here made the two surfaces disagree about the same list. -->
           <BeanieDatePicker
             v-model="dueDate"
             :label="t('lists.detail.dueDateLabel')"
-            :min="todayYmd"
             :placeholder="t('lists.fromRecipe.dueDatePlaceholder')"
           />
           <InferredHint :text="dueHint" />

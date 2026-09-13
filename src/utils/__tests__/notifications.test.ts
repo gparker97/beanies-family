@@ -579,6 +579,84 @@ function flist(overrides: Partial<FamilyList> = {}): FamilyList {
 const listNotifs = (overrides: Partial<FamilyList>) =>
   derive({ lists: [flist(overrides)] }).filter((n) => n.kind === 'list-completed');
 
+// ── Beanie Lists: list-due (mirrors todo-due) ────────────────────────────────
+/** A live, dated, unfinished list owned by the viewer. */
+function dueList(overrides: Partial<FamilyList> = {}): FamilyList {
+  return flist({
+    completed: false,
+    completedBy: undefined,
+    completedAt: undefined,
+    dueDate: '2026-05-27', // today, per NOW
+    items: [{ id: 'i1', title: 'Milk', completed: false }],
+    ...overrides,
+  });
+}
+const dueNotifs = (overrides: Partial<FamilyList> = {}) =>
+  derive({ lists: [dueList(overrides)] }).filter((n) => n.kind === 'list-due');
+
+describe('list-due', () => {
+  it('🔴 a list due today reaches the drawer, the way a to-do does', () => {
+    // The reported gap: a list due today showed nothing in the notifications
+    // drawer, because lists only ever filed a `list-completed` entry.
+    const [n] = dueNotifs();
+    expect(n).toBeDefined();
+    expect(n.title).toBe('Groceries');
+    expect(n.eventDate).toBe('2026-05-27');
+    expect(n.route).toBe('/lists');
+    expect(n.query).toEqual({ view: 'l1' });
+    expect(n.overdue).toBe(false);
+  });
+
+  it('marks a past due date overdue on the SAME id, not a second entry', () => {
+    // Same rule as `todo-due`: overdue is a style, so the read state survives.
+    const past = dueNotifs({ dueDate: '2026-05-25' });
+    expect(past).toHaveLength(1);
+    expect(past[0]!.overdue).toBe(true);
+    expect(past[0]!.id).toBe('list-due:l1:2026-05-25');
+  });
+
+  it('yields none for an undated list', () => {
+    // The rule the whole feature rests on: assigned-only stays briefing-only.
+    expect(dueNotifs({ dueDate: undefined })).toHaveLength(0);
+  });
+
+  it('yields none for a recurring or an already-filed list', () => {
+    expect(dueNotifs({ lifecycle: 'recurring', frequency: 'weekly' })).toHaveLength(0);
+    expect(dueNotifs({ completed: true })).toHaveLength(0);
+  });
+
+  it('yields none when every item is ticked, or there are none', () => {
+    expect(dueNotifs({ items: [{ id: 'i1', title: 'Milk', completed: true }] })).toHaveLength(0);
+    expect(dueNotifs({ items: [] })).toHaveLength(0);
+  });
+
+  it('🔴 yields none for another adult’s list', () => {
+    expect(dueNotifs({ ownerId: 'o' })).toHaveLength(0);
+  });
+
+  it('🔴 yields none for a list owned by nobody', () => {
+    // 'unassigned' is a data defect for a single-owner item, not a shared task —
+    // surfacing it would put an unowned list in every family member's drawer.
+    expect(dueNotifs({ ownerId: '' })).toHaveLength(0);
+    expect(dueNotifs({ ownerId: 'ghost' })).toHaveLength(0);
+  });
+
+  it('shows a CHILD’s list to an adult, naming the child', () => {
+    const [n] = dueNotifs({ ownerId: 'c' });
+    expect(n).toBeDefined();
+    expect(n.subtitle).toBe('C'); // the child's name, so it is not read as the viewer's own
+  });
+
+  it('skips a malformed list without losing the rest', () => {
+    const bad = { id: 'bad', dueDate: '2026-05-27', lifecycle: 'oneoff', ownerId: 'v' };
+    const out = derive({
+      lists: [bad as unknown as FamilyList, dueList({ id: 'good' })],
+    }).filter((n) => n.kind === 'list-due');
+    expect(out).toHaveLength(1);
+    expect(out[0]!.sourceId).toBe('good');
+  });
+});
+
 describe('list-completed', () => {
   it('notifies the creator when someone else finishes their list', () => {
     const out = listNotifs({});

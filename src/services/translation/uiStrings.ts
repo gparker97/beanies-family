@@ -4272,15 +4272,19 @@ const STRING_DEFS = {
   // Deliberately says "that morning", never a literal hour: the hour lives in
   // `ALL_DAY_REMINDER_HOUR`, and spelling it here would put a copy of it in every
   // locale for the constant to drift away from.
+  // ONE wording for every platform, at greg's request (2026-09-13). Says "on the
+  // due date" rather than a literal hour, so `ALL_DAY_REMINDER_HOUR` stays the
+  // single source of truth for when.
+  //
+  // ⚠️ On web and the PWA this is currently a promise the app does not keep:
+  // `useLocalNotifications` returns early off-native and there is no
+  // service-worker fallback, so no reminder is delivered there. It becomes true
+  // everywhere once lists get a `list-due` bell entry (the drawer works on every
+  // platform). Until then this overstates on web — deliberately, and recorded
+  // here so it is not mistaken for an oversight.
   'lists.fromRecipe.dueHint': {
-    en: '{name} gets a reminder on their device that morning.',
-    beanie: '{name} gets a reminder on their device that morning.',
-  },
-  // Web and the PWA arm no OS reminder at all (`useLocalNotifications` returns
-  // early off-native), so there the hint must not promise one.
-  'lists.fromRecipe.dueHintWeb': {
-    en: 'Shows up as due for {name} that morning.',
-    beanie: 'shows up as due for {name} that morning.',
+    en: 'A reminder will be sent to {name} on the due date.',
+    beanie: 'a reminder will be sent to {name} on the due date.',
   },
   'lists.fromRecipe.someone': { en: 'Whoever owns it', beanie: 'whoever owns it' },
   // An owner removed on another device while this sheet was open. Important
@@ -8741,6 +8745,9 @@ const STRING_DEFS = {
   'notifications.unread': { en: 'unread', beanie: 'unread' },
   'notifications.kindTodoDue': { en: 'Coming due', beanie: 'coming due' },
   'notifications.kindTodoDueOverdue': { en: 'Overdue', beanie: 'overdue' },
+  // Same register as the to-do pair above — a due list is the same shape of event.
+  'notifications.kindListDue': { en: 'Coming due', beanie: 'coming due' },
+  'notifications.kindListDueOverdue': { en: 'Overdue', beanie: 'overdue' },
   'notifications.kindTodoAssigned': { en: 'Assigned to you', beanie: 'assigned to you' },
   'notifications.kindActivityReminder': { en: 'Coming up', beanie: 'coming up' },
   'notifications.kindListCompleted': { en: 'List completed', beanie: 'list completed' },
@@ -8754,6 +8761,7 @@ const STRING_DEFS = {
   'notifications.kindTip': { en: "Today's tip", beanie: "today's tip" },
   'notifications.due': { en: 'Due', beanie: 'due' },
   'notifications.yourTask': { en: 'Your task', beanie: 'your task' },
+  'notifications.yourList': { en: 'Your list', beanie: 'your list' },
   'notifications.assignedByYou': {
     en: '{name} assigned this to you',
     beanie: '{name} assigned this to you',
@@ -8916,6 +8924,11 @@ const STRING_DEFS = {
   // "Due today" is unconditional by construction — `listFireTime` can only ever
   // return a moment on the due day itself.
   'reminders.listBody': { en: 'Due today — {n} left', beanie: 'due today — {n} left' },
+  // A parent seeing a child's list: name the child, or it reads as their own.
+  'reminders.listBodyForChild': {
+    en: '{who}’s list — {n} left',
+    beanie: '{who}’s list — {n} left',
+  },
 
   // Navigation
   'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
