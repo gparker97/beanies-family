@@ -14,23 +14,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **A list that's due now appears in your notifications, like a to-do does.** Lists with a due date show up in the notifications drawer on the morning they're due — and stay there, marked overdue, if they slip. A parent seeing a child's list is told whose it is. Previously a due list only ever reached the daily briefing, so there was nothing to see in the drawer.
 
+- **Set who's shopping and when it's needed, right in the recipe's shopping list.** Building a list from a recipe now asks who it's for and when it's needed before you create it, so the list arrives with its details already filled in. Adding or changing either later works the same way.
+
+- **Lists with a due date now remind the person they belong to on the morning they're due.** Give a list a due date and beanies sends its owner a reminder at 9am that day, saying how many items are still left; tapping it opens the list. Set a list up later in the day for that same day, or add the date to an existing list, and the reminder still arrives a few minutes afterwards. Lists that are only assigned, with no due date, stay in the daily briefing and do not notify. A parent seeing a child's list is told whose it is.
+
+---
+
 ### Fixed
 
 - **You can set a shopping list's due date to today again.** Creating a list from a recipe wouldn't let you pick today or any earlier day, while the same field in the lists view would. Every date is selectable again, in both places.
 
 - **A busy moment on Google's side no longer makes your photos look missing.** Google Drive answers a burst of requests with the same code it uses for "this file is gone", so a brief rate limit could mark healthy photos as missing across the app and tell families they lacked permission to their own family file. The two are now told apart, and a busy moment is treated as what it is: something to wait out.
+
 - **An untimed to-do you add later in the day still reminds you.** A to-do due today with no set time only ever scheduled its reminder for 9am, so adding one in the afternoon — or dating an older one "today" — quietly scheduled nothing. It now arrives a few minutes later instead.
+
 - **Close buttons on full-screen panels are reachable again on iPhone.** The X at the top of a full-screen modal, the close button in the mobile menu, and the search box all sat partly under the status bar on phones with a notch, so they were hard or impossible to tap. Every panel that fills the screen now keeps clear of the status bar and the home indicator.
+
 - **The meal picker now uses the whole screen on phones and tablets.** Adding a meal to the planner showed only a few recipes in a short box with the rest of the screen empty below it. The list now fills the space that is actually there, so you see far more of your cookbook without scrolling, and the quick-add box stays where you can reach it.
 
 - **A busy moment on Google's side no longer looks like a permissions problem.** When Google briefly rate-limits calendar syncing it answers with the same code it uses for "you don't have access", so beanies was treating a short, self-correcting delay as a broken connection: it stopped retrying, marked the calendar as errored, and raised an alert. It now tells the two apart, waits and retries as it should, and keeps quiet about something that fixes itself.
-
-### Added
-
-- **Set who's shopping and when it's needed, right in the recipe's shopping list.** Building a list from a recipe now asks who it's for and when it's needed before you create it, so the list arrives with its details already filled in. Adding or changing either later works the same way.
-- **Lists with a due date now remind the person they belong to on the morning they're due.** Give a list a due date and beanies sends its owner a reminder at 9am that day, saying how many items are still left; tapping it opens the list. Set a list up later in the day for that same day, or add the date to an existing list, and the reminder still arrives a few minutes afterwards. Lists that are only assigned, with no due date, stay in the daily briefing and do not notify. Only the owner is reminded, and only on phones and tablets — the reminder is a device notification, so the browser version shows the list as due instead.
-
----
 
 ## 2026-09-12
 
@@ -38,36 +40,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Turn a recipe into a shopping list.** Open a recipe and tap Shopping List: beanies fills a new list with its ingredients so you do not have to type them out again. Check it over, edit anything, remove what is already in the cupboard, then create it. Heading lines like "For the sauce:" are left out, and beanies tells you how many it skipped. Tap it again later and beanies shows you the list you already made and how far through it you are — open it to carry on, or start another, without leaving the cookbook until you choose to. Deleting the recipe later leaves your list exactly as it was.
 
+- **Tick or clear a whole list at once.** Any Beanie List now has a Tick all / Clear all ticks control, so you can finish a shop in one tap or reset one you ticked off by mistake. Finishing this way celebrates and files the list exactly as ticking the last box by hand does.
+
+- **Tap a birthday to open it.** A birthday on the calendar or the beanie wall now opens like any other event, with confetti, the age, and how many sleeps away it is - the same wording the Nook already uses. It cannot be edited or deleted, because beanies works the date out from that bean's profile rather than storing it, so the drawer says so and offers to open their profile instead.
+
 ### Fixed
 
 - **An event Google can't accept no longer blocks itself forever.** If an activity carries a malformed time or date, beanies now spots it before sending, leaves the event alone instead of retrying it every five minutes, and keeps the rest of your calendar syncing normally. Times and dates read from a photo or document are also checked when they're captured, so an unusable value never reaches your family file in the first place.
+
 - **Declining Google's file-access permission now explains itself instead of looking like a crash.** If you leave the file access box unticked when creating or resuming a pod, beanies tells you exactly what to allow and offers to try again or use a local file — and it no longer records the moment as an app error.
 
-### Added
+- **A disconnected Google Calendar no longer blocks the whole app for everyone.** When the Google grant is revoked, only the family member who set the integration up is asked to reconnect it. Everyone else now sees a dismissable note telling them the calendar is disconnected and who to ask, with no Reconnect button - that button opens a sign-in screen for an account they do not have.
 
-- **Tick or clear a whole list at once.** Any Beanie List now has a Tick all / Clear all ticks control, so you can finish a shop in one tap or reset one you ticked off by mistake. Finishing this way celebrates and files the list exactly as ticking the last box by hand does.
+- **A reconnect can no longer switch the family's calendar to a different Google account.** Signing in as another account during a reconnect is now refused, with a message naming the account the calendar is actually connected to. The Reconnect button in Settings is also only shown to the family member who set the connection up, since the sign-in is tied to that account.
+
+- **Toasts no longer sit on top of the bottom tab bar on a phone.** Every toast in the bottom-right stack, not just the reconnect one, now clears the navigation and the home indicator.
+
+- **Birthdays and public holidays now appear on every calendar view, and on the wall.** The planner and the beanie wall were working from separate ideas of what a day contains, which is why birthdays reached some views and not others and why the wall never showed public holidays at all. Both now ask the same question, so the two cannot drift apart again.
 
 ### Changed
 
 - **The beanie wall's week arrows now move by what is on screen.** They used to jump a fixed seven days however many day columns the wall was drawing, so on a narrower screen showing three days, four of every seven days could only be reached by tapping a chip in the strip below. Pressing forward now brings the next unseen day into the first column, and pressing back returns you exactly where you were. The date label above the arrows describes the days actually on screen rather than a whole week.
 
-### Fixed
-
-- **A disconnected Google Calendar no longer blocks the whole app for everyone.** When the Google grant is revoked, only the family member who set the integration up is asked to reconnect it. Everyone else now sees a dismissable note telling them the calendar is disconnected and who to ask, with no Reconnect button - that button opens a sign-in screen for an account they do not have.
-- **A reconnect can no longer switch the family's calendar to a different Google account.** Signing in as another account during a reconnect is now refused, with a message naming the account the calendar is actually connected to. The Reconnect button in Settings is also only shown to the family member who set the connection up, since the sign-in is tied to that account.
-- **Toasts no longer sit on top of the bottom tab bar on a phone.** Every toast in the bottom-right stack, not just the reconnect one, now clears the navigation and the home indicator.
-
-### Added
-
-- **Tap a birthday to open it.** A birthday on the calendar or the beanie wall now opens like any other event, with confetti, the age, and how many sleeps away it is - the same wording the Nook already uses. It cannot be edited or deleted, because beanies works the date out from that bean's profile rather than storing it, so the drawer says so and offers to open their profile instead.
-
-### Changed
-
 - **Ages are only named for children.** Up to 21 a birthday reads "Joey's 7th birthday"; after that it is simply "Sarah's birthday". The age still shows inside the drawer if you open it.
-
-### Fixed
-
-- **Birthdays and public holidays now appear on every calendar view, and on the wall.** The planner and the beanie wall were working from separate ideas of what a day contains, which is why birthdays reached some views and not others and why the wall never showed public holidays at all. Both now ask the same question, so the two cannot drift apart again.
 
 ## 2026-09-11
 

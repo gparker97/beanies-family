@@ -32,6 +32,7 @@
 // 29 test mock factories do not provide — see `driveStatusOf` below.
 import { PayloadLoadError, payloadErrorKind, type PayloadErrorKind } from '@/types/sync';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
+import { isGoogleThrottleReason } from '@/utils/googleApiError';
 
 export type PodAccessErrorCode =
   | 'OFFLINE'
@@ -184,6 +185,19 @@ const VERSION_CODE_FOR_KIND = {
  * on a class identity surviving a mock factory. Same reasoning as
  * `isRemoteBlocker`, which CLAUDE.md records as duck-typed by design.
  */
+/**
+ * Was this Drive failure a THROTTLE rather than a refusal?
+ *
+ * Duck-typed on `.reason` for the same reason `driveStatusOf` is duck-typed on
+ * `.status`: this module is imported by components whose tests replace the Drive
+ * service wholesale, so `instanceof DriveApiError` would answer `false` for a
+ * perfectly real error.
+ */
+export function isDriveThrottle(e: unknown): boolean {
+  const reason = (e as { reason?: unknown } | null | undefined)?.reason;
+  return typeof reason === 'string' && isGoogleThrottleReason(reason);
+}
+
 export function driveStatusOf(e: unknown): number | null {
   const status = (e as { status?: unknown } | null | undefined)?.status;
   return typeof status === 'number' ? status : null;
@@ -228,6 +242,12 @@ export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
   // offering the reconnect that fixes it.
   const status = driveStatusOf(e);
   if (status === 401) return 'CONSENT_EXPIRED';
+  // ⚠️ ABOVE the 403 branch, and duck-typed like everything else here. Google
+  // answers THROTTLING with 403, so without this a rate limit told a family at
+  // `critical` severity that they lacked permission to their own `.beanpod` and
+  // offered them `pickFamilyFile`, which can fork the pod. `VERIFY_UNAVAILABLE`
+  // is the retryable warning, which is what a self-healing condition deserves.
+  if (status === 403 && isDriveThrottle(e)) return 'VERIFY_UNAVAILABLE';
   if (status === 403) return 'PERMISSION_DENIED';
   if (status === 404) return 'FILE_NOT_FOUND';
 

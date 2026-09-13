@@ -289,6 +289,53 @@ describe('googleCalendarClient authedFetch — 403 is ambiguous (2026-09-13)', (
     }
   );
 
+  it('🔴 a 5xx is STILL retried, whatever reason its body carries', async () => {
+    // Regression. Narrowing `isRetryable` by reason for every kind — not just
+    // throttles — killed the backoff for all 5xx, because Google's 5xx bodies say
+    // `reason: 'backendError'`, which is not a throttle reason. A routine backend
+    // blip then failed the whole reconcile on the first attempt.
+    const { provider } = makeTokenProvider();
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(503, {
+        error: { message: 'Backend Error', errors: [{ reason: 'backendError' }] },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(provider);
+
+    const err = await withTimers(() =>
+      client
+        .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+        .catch((e: unknown) => e)
+    );
+    expect((err as CalendarApiError).kind).toBe('transient');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('a 5xx with an unreadable body is retried too', async () => {
+    // Anti-vacuity: behaviour must not depend on whether the load balancer
+    // answers with HTML or the API answers with JSON.
+    const { provider } = makeTokenProvider();
+    const fetchMock = vi.fn(
+      async () =>
+        ({
+          status: 503,
+          ok: false,
+          json: async () => {
+            throw new Error('not json');
+          },
+        }) as unknown as Response
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(provider);
+    await withTimers(() =>
+      client
+        .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+        .catch((e: unknown) => e)
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it('🔴 still classifies a PERMISSION 403 as forbidden, and does NOT retry', async () => {
     // The other half of the split. A dropped granular scope must stay terminal —
     // retrying it three times a poll helps nobody and hides the real problem.

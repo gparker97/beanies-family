@@ -697,12 +697,23 @@ export const useListStore = defineStore('lists', () => {
     }
 
     const now = toISODateString(new Date());
-    const items: FamilyListItem[] = list.items.map((it) => ({
-      ...it,
-      completed,
-      completedBy: completed ? byMemberId : undefined,
-      completedAt: completed ? now : undefined,
-    }));
+    // ⚠️ Only items whose state ACTUALLY CHANGES are rewritten. Stamping every
+    // item unconditionally erased who-did-what: a child ticks three of five, a
+    // parent taps "Tick all", and all five then read as the parent's, re-dated to
+    // now. On a recurring list that is permanent — `listCycles` archives
+    // `completedBy` into the cycle history at rollover, and ADR-032 says history
+    // is never truncated. `toggleItem` has always been careful this way; this is
+    // the same care, applied to the bulk path.
+    const items: FamilyListItem[] = list.items.map((it) =>
+      it.completed === completed
+        ? it
+        : {
+            ...it,
+            completed,
+            completedBy: completed ? byMemberId : undefined,
+            completedAt: completed ? now : undefined,
+          }
+    );
 
     const { patch: completion, shouldCelebrate } = deriveCompletion(list, items, byMemberId);
     const updated = await updateList(listId, { items, ...completion });

@@ -42,7 +42,6 @@ import {
   minusMinutes,
   allDayAnchor,
   allDayFireTime,
-  lastTouchedAt,
   resolveOsActivityLead,
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
@@ -324,7 +323,7 @@ export function buildTodoReminders(
       // arming nothing — the same hole that was found in the list builder.
       const at = todo.dueTime
         ? localDateTime(todo.dueDate, todo.dueTime)
-        : allDayFireTime(dateISO, lastTouchedAt(todo));
+        : allDayFireTime(dateISO, todo.createdAt);
       if (!at) continue;
       const fireAt = todo.dueTime ? minusMinutes(at, prefs.todoReminderLead) : at;
       if (fireAt.getTime() <= nowMs) continue;
@@ -472,10 +471,9 @@ export function buildListReminders(
       }
       const dateISO = list.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
-      // The last TOUCH, not creation — see `allDayFireTime`. Setting "due today"
-      // at 11am on a list made last week is the primary editing flow, and keying
-      // on `createdAt` alone armed nothing at all for it.
-      const fireAt = allDayFireTime(dateISO, lastTouchedAt(list));
+      // `createdAt`, never `updatedAt` — see the warning on `allDayFireTime`. A
+      // value that moves on every write re-arms an already-delivered reminder.
+      const fireAt = allDayFireTime(dateISO, list.createdAt);
       // Both drops are counted: they are the two most likely answers to "my list
       // reminder never fired", and a silent `continue` makes them undiagnosable
       // from CloudWatch. (`withinWindow` above stays uncounted, matching the other

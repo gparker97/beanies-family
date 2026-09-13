@@ -2521,7 +2521,7 @@ const STRING_DEFS = {
   'settings.discordCtaAction': { en: 'Join', beanie: 'join' },
   'settings.card.reminders': { en: 'Reminders', beanie: 'reminders' },
   'settings.card.remindersDesc': {
-    en: 'Notification timing for activities, travel, to-dos & lists',
+    en: 'Notification timing for activities, travel & to-dos',
     beanie: 'when we nudge you',
   },
   'settings.card.appearance': { en: 'Appearance', beanie: 'appearance' },

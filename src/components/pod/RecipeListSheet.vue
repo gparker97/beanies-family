@@ -38,7 +38,8 @@ import type { RecipeIngredientSplit } from '@/utils/listSeed';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
-import type { Recipe } from '@/types/models';
+import { listProgress } from '@/utils/listLifecycle';
+import type { FamilyList, Recipe } from '@/types/models';
 
 const props = defineProps<{ open: boolean; recipe: Recipe }>();
 const emit = defineEmits<{ close: [] }>();
@@ -180,10 +181,16 @@ const dueHint = computed(() => {
   });
 });
 
-/** Progress for a row, so a finished shop is obvious without opening it. */
-function progressFor(l: { items: Array<{ completed: boolean }> }): string {
-  const done = l.items.filter((i) => i.completed).length;
-  return `${done}/${l.items.length}`;
+/**
+ * Progress for a row, so a finished shop is obvious without opening it.
+ *
+ * Routed through the shared `listProgress` + the `lists.progress` key rather than
+ * interpolating "3/5" here: six other call sites already render it that way, and
+ * a hand-rolled string is one the translator never sees.
+ */
+function progressFor(l: FamilyList): string {
+  const { done, total } = listProgress(l);
+  return fillTemplate(t('lists.progress'), { done: String(done), total: String(total) });
 }
 
 /** Leave review and let the user edit — the lines become theirs to change. */
@@ -329,7 +336,7 @@ async function onSave(): Promise<void> {
           v-for="l in existing"
           :key="l.id"
           type="button"
-          class="dark:border-line dark:hover:bg-surface-hover flex w-full items-center gap-2 rounded-xl border-2 border-[var(--tint-slate-10)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-04)]"
+          class="dark:border-line dark:hover:bg-surface-hover flex w-full items-center gap-2 rounded-xl border-2 border-[var(--tint-slate-10)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-5)]"
           @click="openExisting(l.id)"
         >
           <span aria-hidden="true">{{ l.emoji }}</span>
@@ -367,7 +374,7 @@ async function onSave(): Promise<void> {
              modifier on readable text). It disappears the moment they start another
              list and the editable box takes its place. -->
         <ul
-          class="dark:border-line dark:bg-surface-ground max-h-56 overflow-y-auto rounded-xl border border-[var(--tint-slate-10)] bg-[var(--tint-slate-04)] px-4 py-3"
+          class="dark:border-line dark:bg-surface-ground max-h-56 overflow-y-auto rounded-xl border border-[var(--tint-slate-10)] bg-[var(--tint-slate-5)] px-4 py-3"
           aria-readonly="true"
         >
           <li

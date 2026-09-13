@@ -130,7 +130,10 @@ export function notificationWhen(n: AppNotification, t: T): string {
   if (n.eventDate) {
     const rel = relativeDayLabel(n.eventDate, t);
     const base = n.eventTime ? `${rel} · ${formatTime12(n.eventTime)}` : rel;
-    return n.kind === 'todo-due' ? `${t('notifications.due')} ${base}` : base;
+    // Both due kinds, not just to-dos — a `list-due` row otherwise read as a bare
+    // "Today" with no hint that it is a deadline.
+    const isDue = n.kind === 'todo-due' || n.kind === 'list-due';
+    return isDue ? `${t('notifications.due')} ${base}` : base;
   }
   return timeAgo(n.occurredAt);
 }

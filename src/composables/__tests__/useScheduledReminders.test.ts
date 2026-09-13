@@ -677,18 +677,35 @@ describe('list created after 09:00 on the day it is due', () => {
     expect(r.fireAt).toEqual(new Date('2026-05-22T15:15:00'));
   });
 
-  it('🔴 is a pure function of stored data, never of `now`', () => {
-    // Load-bearing. Every reschedule re-arms the WHOLE desired set under the same
-    // stable ids, so a fire time derived from `now` would be pushed further out on
-    // every foreground and the reminder would walk forward forever, never firing.
-    const l = list({
+  it('🔴 does NOT move when the record is edited — `updatedAt` must not reach it', () => {
+    // The bug this replaces was real and user-felt. Keying the catch-up on
+    // `max(createdAt, updatedAt)` meant every checkbox tick moved the fire time:
+    // a list due today fired at 09:00, the shopper ticked an item at 09:30, the
+    // schedule recomputed to 09:45 and re-armed the SAME stable id, so it buzzed
+    // again — after every tick, for the whole shop. A tick after 23:44 pushed it
+    // past midnight and cancelled the alarm outright.
+    const created = new Date('2026-05-22T15:00:00').toISOString();
+    const before = list({ dueDate: '2026-05-22', createdAt: created, updatedAt: created });
+    const afterEdit = list({
       dueDate: '2026-05-22',
-      createdAt: new Date('2026-05-22T15:00:00').toISOString(),
+      createdAt: created,
+      // ticked an hour later, and again near midnight
+      updatedAt: new Date('2026-05-22T16:00:00').toISOString(),
     });
-    const early = allDayFireTime('2026-05-22', l.createdAt);
-    const late = allDayFireTime('2026-05-22', l.createdAt);
-    expect(early).toEqual(late);
-    expect(early).toEqual(new Date('2026-05-22T15:15:00'));
+    const fireOf = (l: FamilyList) =>
+      buildReminderSchedule(input({ lists: [l] }), NOW, PREFS).reminders.find(
+        (r) => r.kind === 'list'
+      )?.fireAt;
+    expect(fireOf(before)).toEqual(new Date('2026-05-22T15:15:00'));
+    expect(fireOf(afterEdit)).toEqual(new Date('2026-05-22T15:15:00'));
+
+    const nearMidnight = list({
+      dueDate: '2026-05-22',
+      createdAt: created,
+      updatedAt: new Date('2026-05-22T23:55:00').toISOString(),
+    });
+    // 🔴 Must NOT vanish: the old keying returned null here and cancelled the alarm.
+    expect(fireOf(nearMidnight)).toEqual(new Date('2026-05-22T15:15:00'));
   });
 
   it('keeps the morning anchor when the list predates it', () => {
@@ -764,12 +781,13 @@ describe('who a list reminder is armed for — the review’s findings', () => {
 });
 
 describe('a due date added to a list made days ago', () => {
-  it('🔴 still fires the same day, keyed on the last touch', () => {
-    // The primary editing flow: a standing "Groceries" list given "due today" at
-    // 11am. Keyed on `createdAt` alone this armed NOTHING — the 09:00 anchor was
-    // past and creation was days behind it — while the changelog claimed the
-    // opposite.
-    const [r] = buildReminderSchedule(
+  it('a list made days ago does NOT get a same-day catch-up', () => {
+    // The accepted cost of keying on an immutable timestamp. Dating an older list
+    // "today" after 09:00 arms no OS reminder — but it DOES file a `list-due` bell
+    // entry immediately (derived, not scheduled), which is the surface that covers
+    // this case on every platform. See `allDayFireTime`'s warning for why the
+    // alternative — keying on `updatedAt` — was strictly worse.
+    const out = buildReminderSchedule(
       input({
         lists: [
           list({
@@ -782,11 +800,10 @@ describe('a due date added to a list made days ago', () => {
       NOW,
       PREFS
     ).reminders.filter((x) => x.kind === 'list');
-    expect(r).toBeDefined();
-    expect(r.fireAt).toEqual(new Date('2026-05-22T11:15:00'));
+    expect(out).toEqual([]);
   });
 
-  it('ignores an updatedAt that trails createdAt (clock-skewed peer)', () => {
+  it('keeps the plain morning anchor when the list predates the due day', () => {
     expect(allDayFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
       new Date('2026-05-24T09:00:00')
     );
@@ -857,7 +874,10 @@ describe('an untimed to-do dated after the morning anchor', () => {
     expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T15:15:00'));
   });
 
-  it('🔴 still fires when an OLD to-do is dated "today" this afternoon', () => {
+  it('an OLD to-do dated "today" this afternoon gets no catch-up', () => {
+    // Deliberate. The catch-up keys on `createdAt`, which never moves — keying it
+    // on `updatedAt` so this case worked re-armed already-delivered reminders on
+    // every edit, which was far worse. See `allDayFireTime`.
     const { reminders } = buildReminderSchedule(
       input({
         todos: [
@@ -872,8 +892,7 @@ describe('an untimed to-do dated after the morning anchor', () => {
       NOW,
       PREFS
     );
-    expect(reminders).toHaveLength(1);
-    expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T11:15:00'));
+    expect(reminders).toEqual([]);
   });
 
   it('keeps the plain 09:00 anchor for a to-do dated in the future', () => {
