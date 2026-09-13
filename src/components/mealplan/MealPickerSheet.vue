@@ -109,15 +109,39 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
     fullscreen-mobile
     @close="emit('close')"
   >
-    <div class="space-y-4">
+    <!-- A flex COLUMN, not `space-y-4`, so the recipe list can take whatever room
+         the modal actually has. On mobile and native `fullscreen-mobile` makes the
+         modal full height, and a fixed `max-h-64` list left most of that screen
+         empty below the quick-add card while the recipes themselves were cut off
+         after a few rows.
+
+         `h-full` resolves against BaseModal's `flex-1` body, which has a definite
+         height only when the modal is fullscreen — exactly when we want the list
+         to shrink into. On desktop the body is content-sized and `h-full` degrades
+         to auto, so the list falls back to the `md:` cap below. Measured in a
+         browser at 390×760 and 1280×820, with a long cookbook and a short one. -->
+    <div class="flex h-full flex-col gap-4">
       <input
         v-model="query"
         type="search"
         :placeholder="t('mealPlanner.search')"
-        class="font-inter dark:bg-surface-ground dark:text-ink w-full rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2.5 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1]"
+        class="font-inter dark:bg-surface-ground dark:text-ink w-full flex-none rounded-xl border border-[rgba(44,62,80,0.14)] px-3 py-2.5 text-sm outline-none focus:border-[#AED6F1] focus:ring-2 focus:ring-[#AED6F1]"
       />
 
-      <div class="grid max-h-64 gap-1.5 overflow-y-auto">
+      <!-- Sizes to its CONTENT and shrinks only when it has to — `min-h-0` is what
+           allows that (a flex child's default `min-height: auto` refuses to shrink
+           below its content, which is why the list used to need a hard cap).
+           Deliberately NOT `flex-1`: growing it would strand the quick-add card at
+           the bottom of the screen with a gap above it whenever the cookbook has
+           only a few recipes.
+
+           The `md:` cap is the desktop half. There the modal is content-sized
+           rather than fullscreen, so nothing bounds the column and the list would
+           otherwise run to its full height and push the quick-add below the fold.
+           `md` is min-width 768px, the exact complement of BaseModal's
+           `isMobile` (`max-width: 767px`), so the cap applies precisely when the
+           modal is NOT fullscreen. -->
+      <div class="grid min-h-0 content-start gap-1.5 overflow-y-auto md:max-h-[50vh]">
         <button
           v-for="recipe in results"
           :key="recipe.id"
@@ -134,7 +158,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
       </div>
 
       <div
-        class="dark:bg-surface-raised rounded-[14px] border border-[rgba(241,93,34,0.3)] bg-white p-3 shadow-[var(--card-shadow)]"
+        class="dark:bg-surface-raised flex-none rounded-[14px] border border-[rgba(241,93,34,0.3)] bg-white p-3 shadow-[var(--card-shadow)]"
       >
         <p class="quick-hint dark:text-accent-lift text-[#F15D22]">
           {{ t('mealPlanner.picker.quickAddHint') }}
@@ -159,7 +183,7 @@ async function pickType(kind: Exclude<MealKind, 'recipe'>): Promise<void> {
         </div>
       </div>
 
-      <div>
+      <div class="flex-none">
         <div
           class="font-outfit dark:text-ink-faint text-xs font-semibold tracking-[0.09em] text-[rgba(44,62,80,0.4)] uppercase"
         >
