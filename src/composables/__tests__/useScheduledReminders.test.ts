@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildReminderSchedule,
+  listFireTime,
   MAX_SCHEDULED,
   type ReminderInput,
   type ReminderPrefs,
 } from '../useScheduledReminders';
-import type { FamilyActivity, FamilyMember, TodoItem, UUID } from '@/types/models';
+import type { FamilyActivity, FamilyList, FamilyMember, TodoItem, UUID } from '@/types/models';
 import type { NotificationOccurrence } from '@/utils/notifications';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -30,6 +31,7 @@ const T: Partial<Record<string, string>> = {
   'reminders.todoBody': 'Due at {time}',
   'reminders.todoBodyAllDay': 'Due today',
   'reminders.travelBody': 'Departs at {time}',
+  'reminders.listBody': 'Due today — {n} left',
 };
 const t = (k: UIStringKey): string => T[k] ?? String(k);
 
@@ -80,6 +82,7 @@ function input(over: Partial<ReminderInput> = {}): ReminderInput {
     occurrencesByDate: {},
     travelOccurrences: [],
     todos: [],
+    lists: [],
     currentMember: me,
     resolveMember,
     windowStartISO: '2026-05-22',
@@ -547,5 +550,155 @@ describe('buildReminderSchedule — resilience, cap, gating', () => {
     );
     expect(reminders).toHaveLength(1);
     expect(reminders[0].id).toContain('good');
+  });
+});
+
+// ── Beanie List due-date reminders ────────────────────────────────────────────
+// The rule in one line: an explicit due date earns a morning reminder for the
+// list's OWNER; being merely assigned does not. NOW is 2026-05-22T10:00 local,
+// which is deliberately AFTER the 09:00 anchor — the same-day cases below turn
+// on that.
+
+function list(over: Partial<FamilyList> = {}): FamilyList {
+  return {
+    id: 'l-1' as UUID,
+    title: 'Shopping',
+    emoji: '🛒',
+    category: 'out',
+    ownerId: 'me',
+    items: [{ id: 'i1', title: 'Milk', completed: false }],
+    lifecycle: 'oneoff',
+    dueDate: '2026-05-24',
+    completed: false,
+    createdBy: 'me' as UUID,
+    createdAt: '2026-05-20T08:00:00.000Z',
+    updatedAt: '2026-05-20T08:00:00.000Z',
+    ...over,
+  } as FamilyList;
+}
+
+const listsOf = (...ls: FamilyList[]) =>
+  buildReminderSchedule(input({ lists: ls }), NOW, PREFS).reminders.filter(
+    (r) => r.kind === 'list'
+  );
+
+describe('list due-date reminders', () => {
+  it('fires at the 09:00 morning anchor on the due date', () => {
+    const [r] = listsOf(list());
+    expect(r).toBeDefined();
+    expect(r.fireAt).toEqual(new Date('2026-05-24T09:00:00'));
+    expect(r.kind).toBe('list');
+    expect(r.title).toBe('Shopping');
+  });
+
+  it('carries a stable id and a deep link into the list drawer', () => {
+    const [r] = listsOf(list());
+    expect(r.id).toBe('list-due:l-1:2026-05-24');
+    expect(r.deepLink).toEqual({ path: '/lists', query: { view: 'l-1' } });
+  });
+
+  it('says how many items are left, with no plural split', () => {
+    const two = list({
+      items: [
+        { id: 'i1', title: 'Milk', completed: false },
+        { id: 'i2', title: 'Eggs', completed: false },
+        { id: 'i3', title: 'Jam', completed: true },
+      ],
+    });
+    // Only OPEN items count — a ticked one is not "left".
+    expect(listsOf(two)[0].body).toBe('Due today — 2 left');
+    expect(listsOf(list())[0].body).toBe('Due today — 1 left');
+  });
+
+  it('🔴 schedules NOTHING for a list with no due date', () => {
+    // The whole point of the rule: an assigned-but-undated list stays in the
+    // daily briefing and never wakes a phone. Regressing this turns every list
+    // a family owns into a notification.
+    expect(listsOf(list({ dueDate: undefined }))).toEqual([]);
+  });
+
+  it('🔴 schedules NOTHING for another adult’s list', () => {
+    // `input.lists` is the whole family's corpus. Without the owner gate, a list
+    // Neil owns is pushed to Greg's lock screen.
+    expect(listsOf(list({ ownerId: 'neil' }))).toEqual([]);
+    expect(
+      buildReminderSchedule(input({ lists: [list({ ownerId: 'neil' })] }), NOW, PREFS).gated
+    ).toBe(1);
+  });
+
+  it('schedules nothing for a recurring list', () => {
+    expect(listsOf(list({ lifecycle: 'recurring', frequency: 'weekly' }))).toEqual([]);
+  });
+
+  it('schedules nothing for a list already ticked off', () => {
+    expect(listsOf(list({ completed: true, completedAt: '2026-05-23T10:00:00.000Z' }))).toEqual([]);
+  });
+
+  it('schedules nothing when every item is done, or there are none', () => {
+    expect(listsOf(list({ items: [{ id: 'i1', title: 'Milk', completed: true }] }))).toEqual([]);
+    expect(listsOf(list({ items: [] }))).toEqual([]);
+  });
+
+  it('schedules nothing for an overdue list — the briefing carries those', () => {
+    expect(listsOf(list({ dueDate: '2026-05-21' }))).toEqual([]);
+  });
+
+  it('schedules nothing beyond the 14-day window', () => {
+    expect(listsOf(list({ dueDate: '2026-06-30' }))).toEqual([]);
+  });
+
+  it('skips a malformed list without aborting the rest', () => {
+    const bad = { id: 'bad', dueDate: '2026-05-24', lifecycle: 'oneoff' } as unknown as FamilyList;
+    const res = buildReminderSchedule(
+      input({ lists: [bad, list({ id: 'good' as UUID })] }),
+      NOW,
+      PREFS
+    );
+    expect(res.reminders.filter((r) => r.kind === 'list')).toHaveLength(1);
+    expect(res.skipped).toBe(1);
+  });
+});
+
+describe('list created after 09:00 on the day it is due', () => {
+  // The case that would otherwise fire nothing at all: you make a shopping list
+  // at 3pm for tonight's dinner. The morning anchor is long gone.
+  it('🔴 still fires, shortly after the list was created', () => {
+    const [r] = listsOf(
+      list({ dueDate: '2026-05-22', createdAt: new Date('2026-05-22T15:00:00').toISOString() })
+    );
+    expect(r).toBeDefined();
+    expect(r.fireAt).toEqual(new Date('2026-05-22T15:15:00'));
+  });
+
+  it('🔴 is a pure function of stored data, never of `now`', () => {
+    // Load-bearing. Every reschedule re-arms the WHOLE desired set under the same
+    // stable ids, so a fire time derived from `now` would be pushed further out on
+    // every foreground and the reminder would walk forward forever, never firing.
+    const l = list({
+      dueDate: '2026-05-22',
+      createdAt: new Date('2026-05-22T15:00:00').toISOString(),
+    });
+    const early = listFireTime('2026-05-22', l.createdAt);
+    const late = listFireTime('2026-05-22', l.createdAt);
+    expect(early).toEqual(late);
+    expect(early).toEqual(new Date('2026-05-22T15:15:00'));
+  });
+
+  it('keeps the morning anchor when the list predates it', () => {
+    // A list made days earlier must NOT be dragged to createdAt + grace.
+    expect(listFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
+      new Date('2026-05-24T09:00:00')
+    );
+  });
+
+  it('🔴 refuses to spill past midnight into the wrong day', () => {
+    // A list made at 23:55 must not fire "due today" at 00:10 tomorrow.
+    expect(listFireTime('2026-05-22', new Date('2026-05-22T23:55:00').toISOString())).toBeNull();
+  });
+
+  it('degrades to the plain morning anchor when createdAt is unusable', () => {
+    // Never schedule an alarm at an Invalid Date.
+    expect(listFireTime('2026-05-24', 'not-a-date')).toEqual(new Date('2026-05-24T09:00:00'));
+    expect(listFireTime('2026-05-24', undefined)).toEqual(new Date('2026-05-24T09:00:00'));
   });
 });

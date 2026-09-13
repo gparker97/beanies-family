@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-12",
-    "translationCount": 4717
+    "lastUpdated": "2026-09-13",
+    "translationCount": 4743
   },
   "translations": {
     "app.name": {
@@ -23590,6 +23590,136 @@
       "translation": "新活动未到达Google。询问设置日历的人重新连接日历。",
       "hash": "vtm21o",
       "lastUpdated": "2026-09-12"
+    },
+    "createPod.driveConsentDenied": {
+      "translation": "Google需要权限才能创建您的家庭文件。请重试，并在Google询问时勾选文件访问框。",
+      "hash": "jclq2t",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.title": {
+      "translation": "制作购物清单",
+      "hash": "nz4e2j",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.body": {
+      "translation": "在创建列表之前检查列表—编辑任何内容，或添加您已经需要的内容。",
+      "hash": "bgjnd4",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.itemsLabel": {
+      "translation": "购物商品，每行一件",
+      "hash": "7tblf1",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.save": {
+      "translation": "建立名單",
+      "hash": "ifsmrm",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.listTitle": {
+      "translation": "{recipe}购物",
+      "hash": "u8wyl9",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.created": {
+      "translation": "购物清单已准备就绪！",
+      "hash": "g64kc8",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.view": {
+      "translation": "查看",
+      "hash": "1l58l",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.openExisting": {
+      "translation": "采购清单",
+      "hash": "u1kxcw",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.reviewBody": {
+      "translation": "您已经拥有此食谱的购物清单。打开它以继续，或重新开始。",
+      "hash": "cc9o9j",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.startAnother": {
+      "translation": "开始另一个心愿单",
+      "hash": "gtq153",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.readOnly": {
+      "translation": "只读",
+      "hash": "jdn0ne",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.ingredientsLabel": {
+      "translation": "此食谱包含哪些内容",
+      "hash": "73d1y3",
+      "lastUpdated": "2026-09-13"
+    },
+    "recipes.detail.openShoppingList": {
+      "translation": "购物单",
+      "hash": "f12je2",
+      "lastUpdated": "2026-09-13"
+    },
+    "recipes.detail.newShoppingList": {
+      "translation": "开始另一个购物清单",
+      "hash": "n7tlej",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.headingsSkipped.one": {
+      "translation": "配方中的1条标题行被省略。如果需要，请重新添加。",
+      "hash": "jl99e2",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.headingsSkipped.other": {
+      "translation": "配方中的{count}条标题行被省略。如果需要，请重新添加。",
+      "hash": "6xvoen",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.existing": {
+      "translation": "您已经为此配方创建了一个列表：",
+      "hash": "spohlq",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.noMemberError": {
+      "translation": "我们无法分辨您的身份",
+      "hash": "lgxmyy",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.noMemberHelp": {
+      "translation": "您的会员资料尚未加载。请重新打开应用，然后重试。",
+      "hash": "mrj0o7",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.recipeGoneError": {
+      "translation": "此配方已被删除",
+      "hash": "q4jgo5",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.recipeGoneHelp": {
+      "translation": "您的家庭成员在此打开时将其删除，因此未创建任何列表。",
+      "hash": "hayn1n",
+      "lastUpdated": "2026-09-13"
+    },
+    "recipes.detail.makeShoppingList": {
+      "translation": "购物单",
+      "hash": "f12je2",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.detail.checkAll": {
+      "translation": "全部勾选",
+      "hash": "x2pmm6",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.detail.uncheckAll": {
+      "translation": "清除所有勾选",
+      "hash": "flxo1w",
+      "lastUpdated": "2026-09-13"
+    },
+    "reminders.listBody": {
+      "translation": "今天到期—剩余{n}个",
+      "hash": "wvxit0",
+      "lastUpdated": "2026-09-13"
     }
   }
 }

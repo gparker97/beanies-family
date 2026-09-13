@@ -8867,6 +8867,12 @@ const STRING_DEFS = {
   'reminders.todoBody': { en: 'Due at {time}', beanie: 'due at {time}' },
   'reminders.todoBodyAllDay': { en: 'Due today', beanie: 'due today' },
   'reminders.travelBody': { en: 'Departs at {time}', beanie: 'departs at {time}' },
+  // List due-date reminder. Nounless "{n} left" mirrors the briefing's own
+  // `lists.briefing.*` phrasing, so one wording covers singular and plural with
+  // no `.one`/`.other` split, and beanie mode needs no euphemism for "item".
+  // "Due today" is unconditional by construction — `listFireTime` can only ever
+  // return a moment on the due day itself.
+  'reminders.listBody': { en: 'Due today — {n} left', beanie: 'due today — {n} left' },
 
   // Navigation
   'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },

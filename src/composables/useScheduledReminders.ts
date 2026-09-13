@@ -16,6 +16,7 @@ import { computed, type ComputedRef } from 'vue';
 import type {
   FamilyMember,
   TodoItem,
+  FamilyList,
   SupportedTravelType,
   FamilyActivity,
   HelpfulHintType,
@@ -28,6 +29,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useListStore } from '@/stores/listStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useToday } from '@/composables/useToday';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
@@ -42,12 +44,14 @@ import {
   resolveOsActivityLead,
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
-import { activityReminderId, todoDueId, travelReminderId } from '@/utils/notifications';
+import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/utils/notifications';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
-import { classifyAudience, isDutyDone } from '@/utils/audience';
+import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
 import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
+import { isFiled, isRecurring } from '@/utils/listLifecycle';
+import { isFlagEnabled } from '@/config/flags';
 
 /** How far ahead we arm reminders. Kept < the OS pending-notification ceiling via MAX_SCHEDULED. */
 export const REMINDER_WINDOW_DAYS = 14;
@@ -69,7 +73,7 @@ export const REMINDER_WINDOW_DAYS = 14;
  */
 export const MAX_SCHEDULED = 60;
 
-export type ReminderKind = 'activity' | 'travel' | 'todo';
+export type ReminderKind = 'activity' | 'travel' | 'todo' | 'list';
 
 export interface ScheduledReminder {
   /** Stable id (shared scheme with the in-app system → future unification). */
@@ -102,6 +106,14 @@ export interface ReminderInput {
   occurrencesByDate: Record<string, NotificationOccurrence[]>;
   travelOccurrences: TravelSegmentOccurrence[];
   todos: TodoItem[];
+  /**
+   * The family's UNFILTERED lists. Deliberately not `listStore.activeLists`,
+   * which applies the global member filter — that is a per-device *display*
+   * preference, and letting it reach the scheduler would silently stop a
+   * parent's own reminders the moment they filtered the Lists page to a child.
+   * Empty when the `familyLists` flag is off.
+   */
+  lists: FamilyList[];
   currentMember: FamilyMember;
   resolveMember: (id: string) => FamilyMember | undefined;
   /** Inclusive local-day window bounds (YYYY-MM-DD) — occurrences outside are ignored. */
@@ -376,6 +388,138 @@ export function buildTravelReminders(
 }
 
 /**
+ * How long after a list is created its same-day catch-up reminder waits.
+ *
+ * Long enough that building a list item-by-item doesn't buzz the phone you are
+ * typing on; short enough that a list made at 3pm for tonight's dinner is still
+ * useful. Also the window that absorbs sync latency to the OWNER's device — see
+ * the caveat on `listFireTime`.
+ */
+export const LIST_SAME_DAY_GRACE_MINUTES = 15;
+
+/**
+ * When a list's due-date reminder should fire — the 09:00 morning anchor, or a
+ * catch-up shortly after creation when the list was made after 09:00 on the very
+ * day it is due.
+ *
+ * That second case is the common one and the whole reason this isn't a bare
+ * `allDayAnchor`: a shopping list created at 3pm for tonight has already missed
+ * its 09:00, and firing nothing would silently drop exactly the reminder the
+ * family wanted most.
+ *
+ * ⚠️ BOTH inputs are IMMUTABLE (`dueDate`, `createdAt`) and `now` is deliberately
+ * NOT one of them. Every reschedule re-arms the entire desired set under the same
+ * stable ids (`reconcileScheduled`), so a fire time of "now + 15 minutes" would be
+ * pushed further out on every foreground and data change and the reminder would
+ * walk forward forever without ever arriving. Keep this a pure function of stored
+ * data.
+ *
+ * Returns null when the catch-up would spill past the due day itself — a list
+ * created at 23:55 must not fire "due today" at ten past midnight tomorrow.
+ *
+ * KNOWN LIMIT: a device that only receives the list after the catch-up time has
+ * passed schedules nothing, because a device cannot arm an alarm for a list it
+ * has not seen yet. The daily briefing still carries it. Widening the grace trades
+ * that window against buzzing the author mid-edit; 15 minutes is the balance.
+ */
+export function listFireTime(dueDateISO: string, createdAt: string | undefined): Date | null {
+  const anchor = allDayAnchor(dueDateISO);
+  if (!anchor) return null;
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+  // A malformed/absent `createdAt` degrades to the plain morning anchor rather
+  // than producing an Invalid Date — never schedule an alarm at NaN.
+  if (Number.isNaN(createdMs)) return anchor;
+  const fireMs = Math.max(anchor.getTime(), createdMs + LIST_SAME_DAY_GRACE_MINUTES * 60_000);
+  const endOfDueDay = localDateTime(dueDateISO, '23:59');
+  if (endOfDueDay && fireMs > endOfDueDay.getTime()) return null;
+  return new Date(fireMs);
+}
+
+/**
+ * Due-date reminders for one-off Beanie Lists — morning-of, owner only.
+ *
+ * The rule, and why each half of it is deliberate:
+ *
+ *  • ONLY an explicit `dueDate` schedules anything. A list that is merely
+ *    *assigned* stays briefing-only. A due date is a commitment the family made;
+ *    ownership alone is not, and waking a phone for every assigned list would
+ *    make the ones that matter unreadable.
+ *  • Recurring lists NEVER schedule. `dueDate` is one-off-only by model, so
+ *    `isRecurring` is belt-and-braces — but a recurring list has no single day
+ *    to fire on, and a weekly shop that alerted every morning would be the
+ *    fastest way to get reminders switched off wholesale.
+ *  • The 09:00 morning anchor, or a short catch-up for a list created after it.
+ *    A list has no `dueTime` field at all, so every list reminder is an all-day
+ *    one and fires AT `ALL_DAY_REMINDER_HOUR` with no lead subtracted — the same
+ *    morning moment as an all-day activity or a dated-but-untimed to-do, rather
+ *    than a second convention to learn. `listFireTime` owns the one exception:
+ *    a list created at 3pm for tonight has already missed 09:00, and it fires
+ *    shortly after creation instead.
+ *
+ * An OVERDUE list still schedules nothing: every candidate fire time on a past
+ * day is behind `nowMs`, so the guard drops it. That is correct, not a gap — the
+ * daily briefing is what carries overdue lists, and it says so with an `⏰`. It is
+ * also what lets the body read "Due today" unconditionally: `listFireTime` can
+ * only ever return a moment on the due day itself.
+ *
+ * `classifyOwnerAudience` is NOT optional, for exactly the reason spelled out on
+ * `buildTodoReminders`: `input.lists` is the whole family's corpus, so without it
+ * a list one parent owns is pushed to every family member's lock screen.
+ */
+export function buildListReminders(
+  input: ReminderInput,
+  now: Date,
+  /** Unused: a list has no time and so no lead to configure. Kept so all four
+   *  builders share one `(input, now, prefs)` signature. */
+  _prefs: ReminderPrefs
+): ReminderBuildResult {
+  const out: ScheduledReminder[] = [];
+  let skipped = 0;
+  let gated = 0;
+  const nowMs = now.getTime();
+  for (const list of input.lists) {
+    try {
+      if (isRecurring(list) || !list.dueDate) continue;
+      if (isFiled(list)) continue; // ticked off already — nothing left to say
+      const audience = classifyOwnerAudience(
+        list.ownerId,
+        input.currentMember,
+        input.resolveMember
+      );
+      if (audience.kind === 'hidden') {
+        gated++;
+        continue; // someone else's — never surface it
+      }
+      // Mirrors the briefing's `remaining === 0` rule (`useCriticalItems.ts`):
+      // an empty or fully-ticked-but-unfiled list has nothing to shop for, and
+      // "0 items left" is a worse notification than none.
+      const remaining = list.items.filter((i) => !i.completed).length;
+      if (remaining === 0) {
+        gated++;
+        continue;
+      }
+      const dateISO = list.dueDate.slice(0, 10);
+      if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
+      const fireAt = listFireTime(dateISO, list.createdAt);
+      if (!fireAt) continue;
+      if (fireAt.getTime() <= nowMs) continue;
+      out.push({
+        id: listDueId(list.id, dateISO),
+        fireAt,
+        title: list.title,
+        body: fillTemplate(input.t('reminders.listBody'), { n: String(remaining) }),
+        kind: 'list',
+        deepLink: entityDeepLink('list', list.id),
+      });
+    } catch (err) {
+      skipped++;
+      console.warn(`[buildReminderSchedule] skipped list ${list?.id ?? '?'}:`, err);
+    }
+  }
+  return { reminders: out, skipped, gated };
+}
+
+/**
  * Assemble the full reminder schedule: soonest-first, capped to MAX_SCHEDULED.
  * Returns `[]` (never null) when reminders are off or there is no input.
  */
@@ -390,6 +534,7 @@ export function buildReminderSchedule(
     buildActivityReminders(input, now, prefs),
     buildTravelReminders(input, now, prefs),
     buildTodoReminders(input, now, prefs),
+    buildListReminders(input, now, prefs),
   ];
   const all = parts.flatMap((p) => p.reminders);
   // Surfaced as `notif_skipped`: a non-zero count against a healthy
@@ -411,6 +556,7 @@ export function useScheduledReminders(): {
   const activityStore = useActivityStore();
   const todoStore = useTodoStore();
   const vacationStore = useVacationStore();
+  const listStore = useListStore();
   const { t } = useTranslation();
   const { today } = useToday();
 
@@ -445,6 +591,10 @@ export function useScheduledReminders(): {
       // a duplicated hint is not scheduled — and thus notified — twice. Non-hint
       // to-dos pass through untouched.
       todos: dedupeHintsByKey(todoStore.activeTodos),
+      // RAW `lists`, not `activeLists` — see the note on `ReminderInput.lists`.
+      // Flag-gated here, at the single point of entry, so the pure builder never
+      // has to know about feature flags.
+      lists: isFlagEnabled('familyLists') ? listStore.lists : [],
       currentMember,
       resolveMember: (id: string) => familyStore.members.find((m) => m.id === id),
       windowStartISO,

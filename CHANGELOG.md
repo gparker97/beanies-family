@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-13
+
+### Added
+
+- **Lists with a due date now remind you on the morning they're due.** Give a list a due date and beanies sends the person it belongs to a reminder at 9am that day, saying how many items are still left, and tapping it opens the list. Make a list later in the day for the same day and the reminder still arrives, a few minutes after you finish it. Lists that are only assigned, with no due date, stay in the daily briefing and do not notify, and nobody gets reminded about somebody else's list.
+
+---
+
 ## 2026-09-12
 
 ### Added
