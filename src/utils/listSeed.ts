@@ -149,10 +149,10 @@ export function parseDraftItems(text: string): string[] {
 /**
  * The seed for a shopping list built from a recipe.
  *
- * Writes a CLOSED set of eight keys, so "carries no other link field" is a
- * property a test can assert rather than a promise. In particular it sets
- * `linkedRecipeId` and NEITHER `linkedActivityId` NOR `linkedVacationId` — the
- * same discipline `buildCopySeeds` states above, for the same reason.
+ * Writes a CLOSED set of keys, so "carries no other link field" is a property a
+ * test can assert rather than a promise. In particular it sets `linkedRecipeId`
+ * and NEITHER `linkedActivityId` NOR `linkedVacationId` — the same discipline
+ * `buildCopySeeds` states above, for the same reason.
  *
  * `lifecycle: 'oneoff'`, not recurring: the curated `grocery` template repeats
  * weekly because a weekly shop does, but a shop for THIS recipe happens once, and
@@ -160,26 +160,44 @@ export function parseDraftItems(text: string): string[] {
  * omitted entirely rather than set to false — `setLifecycle('oneoff')` clears that
  * key, which is the authoritative statement that a oneoff list should not carry it.
  *
+ * ⚠️ `ownerId` and `createdBy` are SEPARATE arguments and must stay separate. The
+ * owner is who will do the shopping — pickable in the sheet, because the person
+ * making the list usually already knows who it is for. `createdBy` is who made it,
+ * and it is load-bearing elsewhere: the `list-completed` bell entry
+ * (`utils/notifications.ts`) fires for the CREATOR when somebody else finishes
+ * their list, so collapsing the two back into one id would silently delete that
+ * notification for every delegated list.
+ *
+ * `dueDate` is OMITTED when empty rather than written as `undefined` — that keeps
+ * the closed-key set honest and means an undated list carries no due-date key at
+ * all, which is what `buildListReminders` reads to decide it stays briefing-only.
+ *
  * `title` arrives resolved and interpolated: i18n stays out of pure code.
  */
 export function buildRecipeListSeed(args: {
   recipeId: string;
   titles: string[];
   title: string;
-  memberId: string;
+  /** Who will do the shop. */
+  ownerId: string;
+  /** Who made the list — NOT necessarily the owner. */
+  createdBy: string;
+  /** ymd, or empty/absent for no due date. */
+  dueDate?: string;
 }): CreateFamilyListInput {
-  const { recipeId, titles, title, memberId } = args;
+  const { recipeId, titles, title, ownerId, createdBy, dueDate } = args;
   return {
     title,
     // Read, not hardcoded — `getListCategory` is nullable, and the fallback is
     // unreachable by construction (same shape as `NewListSheet.startBlank`).
     emoji: getListCategory('out')?.emoji ?? '🛒',
     category: 'out',
-    ownerId: memberId,
+    ownerId,
     items: freshItems(titles),
     lifecycle: 'oneoff',
     completed: false,
-    createdBy: memberId,
+    createdBy,
     linkedRecipeId: recipeId,
+    ...(dueDate ? { dueDate } : {}),
   };
 }
