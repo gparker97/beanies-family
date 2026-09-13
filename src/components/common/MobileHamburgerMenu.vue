@@ -228,8 +228,15 @@ const encryptionLabel = computed(() => {
             <!-- Close button -->
             <button
               type="button"
-              class="absolute top-3 right-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+              class="absolute right-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-white/50 transition-colors hover:bg-white/10 hover:text-white"
               :aria-label="t('mobile.closeMenu')"
+              :style="{
+                // The drawer is `inset-y-0`, so a bare `top-3` (12px) puts this
+                // under the ~47-59px iOS status bar and out of reach. `absolute`
+                // ignores the parent's padding, so the inset belongs here rather
+                // than on the drawer. 0 on web — no visual change there.
+                top: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
+              }"
               @click="close"
             >
               <svg

@@ -61,6 +61,15 @@ const { badgeFor } = useNavBadges();
 // Stable id so the trigger tab can reference us via aria-controls.
 const stackId = `mobile-nav-stack-${props.category.id}`;
 
+/**
+ * Clears MobileBottomNav (~56px) AND the iOS home indicator.
+ *
+ * The bare `92px` this replaces omitted the inset, so the lowest bean sat over the
+ * home indicator on a notched iPhone. Same expression as `QuickAddFab`, which
+ * anchors to the same nav from the same edge — the two must not drift apart.
+ */
+const STACK_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 92px)';
+
 // Side-flip state: which side of the bean does the text card extend toward?
 const side = ref<'left' | 'right'>('right');
 
@@ -285,8 +294,8 @@ const sideClass = computed(() => (side.value === 'left' ? 'side-left' : 'side-ri
       :class="sideClass"
       :style="
         side === 'left'
-          ? { left: offset + 'px', bottom: '92px' }
-          : { right: offset + 'px', bottom: '92px' }
+          ? { left: offset + 'px', bottom: STACK_BOTTOM }
+          : { right: offset + 'px', bottom: STACK_BOTTOM }
       "
     >
       <button
