@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The meal picker now uses the whole screen on phones and tablets.** Adding a meal to the planner showed only a few recipes in a short box with the rest of the screen empty below it. The list now fills the space that is actually there, so you see far more of your cookbook without scrolling, and the quick-add box stays where you can reach it.
+
 - **A busy moment on Google's side no longer looks like a permissions problem.** When Google briefly rate-limits calendar syncing it answers with the same code it uses for "you don't have access", so beanies was treating a short, self-correcting delay as a broken connection: it stopped retrying, marked the calendar as errored, and raised an alert. It now tells the two apart, waits and retries as it should, and keeps quiet about something that fixes itself.
 
 ### Added
