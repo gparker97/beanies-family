@@ -152,6 +152,71 @@ export const ALL_DAY_REMINDER_HOUR = '09:00';
 export function allDayAnchor(dateISO: string): Date | null {
   return localDateTime(dateISO, ALL_DAY_REMINDER_HOUR);
 }
+/**
+ * How long after an item is last touched its same-day catch-up reminder waits.
+ *
+ * Long enough that building a list item-by-item, or editing a to-do, doesn't buzz
+ * the phone you are typing on; short enough that something set up at 3pm for
+ * tonight is still useful. Also the window that absorbs sync latency to the
+ * OWNER's device — see the caveat on `allDayFireTime`.
+ */
+export const SAME_DAY_GRACE_MINUTES = 15;
+
+/**
+ * When an ALL-DAY item due on `dateISO` should actually fire — the 09:00 morning
+ * anchor, or a catch-up shortly after it was last touched when that happened
+ * after 09:00 on the day it is due.
+ *
+ * The second case is the common one and the whole reason this is not a bare
+ * `allDayAnchor`. Two flows land in it: something created at 3pm for tonight, and
+ * a standing item given "due today" at 11am. Both have already missed 09:00, and
+ * firing nothing silently drops exactly the reminder the family wanted most.
+ *
+ * ⚠️ BOTH inputs are STORED DATA and `now` is deliberately NOT one of them. Every
+ * reschedule re-arms the entire desired set under the same stable ids
+ * (`reconcileScheduled`), so a fire time of "now + 15 minutes" would be pushed
+ * further out on every foreground and data change and the reminder would walk
+ * forward forever without ever arriving. Keep this a pure function of stored data.
+ *
+ * `touchedAt` should be the LATER of the record's `createdAt` and `updatedAt`:
+ * keying on creation alone means adding a due date to an older record arms
+ * nothing, which is the primary editing flow.
+ *
+ * Returns null when the catch-up would spill past the due day itself — something
+ * touched at 23:55 must not fire "due today" at ten past midnight tomorrow.
+ *
+ * KNOWN LIMIT: a device that only receives the record after the catch-up time has
+ * passed schedules nothing, because a device cannot arm an alarm for something it
+ * has not seen yet. The daily briefing still carries it. Widening the grace trades
+ * that window against buzzing the author mid-edit; 15 minutes is the balance.
+ */
+export function allDayFireTime(dateISO: string, touchedAt: string | undefined): Date | null {
+  const anchor = allDayAnchor(dateISO);
+  if (!anchor) return null;
+  const touchedMs = touchedAt ? new Date(touchedAt).getTime() : NaN;
+  // A malformed/absent timestamp degrades to the plain morning anchor rather than
+  // producing an Invalid Date — never schedule an alarm at NaN.
+  if (Number.isNaN(touchedMs)) return anchor;
+  const fireMs = Math.max(anchor.getTime(), touchedMs + SAME_DAY_GRACE_MINUTES * 60_000);
+  const endOfDay = localDateTime(dateISO, '23:59');
+  if (endOfDay && fireMs > endOfDay.getTime()) return null;
+  return new Date(fireMs);
+}
+
+/**
+ * The later of a record's two timestamps, for `allDayFireTime`. `Math.max` in
+ * spirit because a clock-skewed peer can leave `updatedAt` behind `createdAt`.
+ */
+export function lastTouchedAt(record: {
+  createdAt?: string;
+  updatedAt?: string;
+}): string | undefined {
+  const { createdAt, updatedAt } = record;
+  if (!createdAt) return updatedAt;
+  if (!updatedAt) return createdAt;
+  return updatedAt > createdAt ? updatedAt : createdAt;
+}
+
 /** Timed-to-do reminder lead when the device hasn't overridden it. */
 export const DEFAULT_TODO_LEAD = 30;
 /**

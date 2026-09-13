@@ -41,6 +41,8 @@ import {
   localDateTime,
   minusMinutes,
   allDayAnchor,
+  allDayFireTime,
+  lastTouchedAt,
   resolveOsActivityLead,
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
@@ -311,8 +313,13 @@ export function buildTodoReminders(
       }
       const dateISO = todo.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
-      // Untimed but dated → morning-of anchor, no lead subtracted.
-      const at = todo.dueTime ? localDateTime(todo.dueDate, todo.dueTime) : allDayAnchor(dateISO);
+      // Untimed but dated → morning-of anchor, no lead subtracted. `allDayFireTime`
+      // rather than a bare `allDayAnchor` so a to-do created or dated AFTER 09:00
+      // on its own due day still fires, shortly afterwards, instead of silently
+      // arming nothing — the same hole that was found in the list builder.
+      const at = todo.dueTime
+        ? localDateTime(todo.dueDate, todo.dueTime)
+        : allDayFireTime(dateISO, lastTouchedAt(todo));
       if (!at) continue;
       const fireAt = todo.dueTime ? minusMinutes(at, prefs.todoReminderLead) : at;
       if (fireAt.getTime() <= nowMs) continue;
@@ -385,55 +392,6 @@ export function buildTravelReminders(
     }
   }
   return { reminders: out, skipped, gated };
-}
-
-/**
- * How long after a list is created its same-day catch-up reminder waits.
- *
- * Long enough that building a list item-by-item doesn't buzz the phone you are
- * typing on; short enough that a list made at 3pm for tonight's dinner is still
- * useful. Also the window that absorbs sync latency to the OWNER's device — see
- * the caveat on `listFireTime`.
- */
-export const LIST_SAME_DAY_GRACE_MINUTES = 15;
-
-/**
- * When a list's due-date reminder should fire — the 09:00 morning anchor, or a
- * catch-up shortly after the list was last touched, when that happened after
- * 09:00 on the very day it is due.
- *
- * That second case is the common one and the whole reason this isn't a bare
- * `allDayAnchor`. Two flows land in it: a shopping list created at 3pm for
- * tonight, and — the one the first cut of this function missed — a standing list
- * given "due today" at 11am. Both have already missed 09:00, and firing nothing
- * would silently drop exactly the reminder the family wanted most.
- *
- * ⚠️ Both inputs are STORED DATA (`dueDate`, a list timestamp) and `now` is
- * deliberately NOT one of them. Every reschedule re-arms the entire desired set under the same
- * stable ids (`reconcileScheduled`), so a fire time of "now + 15 minutes" would be
- * pushed further out on every foreground and data change and the reminder would
- * walk forward forever without ever arriving. Keep this a pure function of stored
- * data.
- *
- * Returns null when the catch-up would spill past the due day itself — a list
- * created at 23:55 must not fire "due today" at ten past midnight tomorrow.
- *
- * KNOWN LIMIT: a device that only receives the list after the catch-up time has
- * passed schedules nothing, because a device cannot arm an alarm for a list it
- * has not seen yet. The daily briefing still carries it. Widening the grace trades
- * that window against buzzing the author mid-edit; 15 minutes is the balance.
- */
-export function listFireTime(dueDateISO: string, touchedAt: string | undefined): Date | null {
-  const anchor = allDayAnchor(dueDateISO);
-  if (!anchor) return null;
-  const touchedMs = touchedAt ? new Date(touchedAt).getTime() : NaN;
-  // A malformed/absent timestamp degrades to the plain morning anchor rather
-  // than producing an Invalid Date — never schedule an alarm at NaN.
-  if (Number.isNaN(touchedMs)) return anchor;
-  const fireMs = Math.max(anchor.getTime(), touchedMs + LIST_SAME_DAY_GRACE_MINUTES * 60_000);
-  const endOfDueDay = localDateTime(dueDateISO, '23:59');
-  if (endOfDueDay && fireMs > endOfDueDay.getTime()) return null;
-  return new Date(fireMs);
 }
 
 /**
@@ -511,14 +469,10 @@ export function buildListReminders(
       }
       const dateISO = list.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
-      // The last TOUCH, not creation. Setting "due today" at 11am on a list made
-      // last week is the primary editing flow, and keying on `createdAt` alone
-      // armed nothing at all for it — the 09:00 anchor was already past and the
-      // creation date was days behind it. `Math.max` of the two because a
-      // clock-skewed peer can leave `updatedAt` behind `createdAt`.
-      const touchedAt =
-        (list.updatedAt ?? '') > (list.createdAt ?? '') ? list.updatedAt : list.createdAt;
-      const fireAt = listFireTime(dateISO, touchedAt);
+      // The last TOUCH, not creation — see `allDayFireTime`. Setting "due today"
+      // at 11am on a list made last week is the primary editing flow, and keying
+      // on `createdAt` alone armed nothing at all for it.
+      const fireAt = allDayFireTime(dateISO, lastTouchedAt(list));
       // Both drops are counted: they are the two most likely answers to "my list
       // reminder never fired", and a silent `continue` makes them undiagnosable
       // from CloudWatch. (`withinWindow` above stays uncounted, matching the other
