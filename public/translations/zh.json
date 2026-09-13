@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-13",
-    "translationCount": 4752
+    "translationCount": 4755
   },
   "translations": {
     "app.name": {
@@ -23757,13 +23757,28 @@
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.dueHint": {
-      "translation": "{name}会在当天早上收到设备提醒。",
-      "hash": "ubqdf9",
+      "translation": "将在到期日向{name}发送提醒。",
+      "hash": "bfc2mq",
       "lastUpdated": "2026-09-13"
     },
-    "lists.fromRecipe.dueHintWeb": {
-      "translation": "当天早上会显示为{name}的待办清单。",
-      "hash": "mi90vk",
+    "notifications.kindListDue": {
+      "translation": "即将到期",
+      "hash": "6rbu17",
+      "lastUpdated": "2026-09-13"
+    },
+    "notifications.kindListDueOverdue": {
+      "translation": "超期",
+      "hash": "9hd20w",
+      "lastUpdated": "2026-09-13"
+    },
+    "notifications.yourList": {
+      "translation": "您的清单",
+      "hash": "x98ed1",
+      "lastUpdated": "2026-09-13"
+    },
+    "reminders.listBodyForChild": {
+      "translation": "{who}的清单 — 剩余{n}项",
+      "hash": "6c4wov",
       "lastUpdated": "2026-09-13"
     }
   }

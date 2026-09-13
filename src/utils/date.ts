@@ -19,6 +19,24 @@ const MONTHS_SHORT = [
 ];
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/**
+ * A full ISO **timestamp** — `2026-09-13T06:05:52.123Z`, not `2026-09-13`.
+ *
+ * ⚠️ THE NAME LIES, and it has cost twice. This is the right helper for the
+ * `createdAt` / `updatedAt` / `completedAt` / `lastLoginAt` fields that ~70 call
+ * sites use it for, and the WRONG one any time a bare `YYYY-MM-DD` is wanted —
+ * because ymd comparisons in this codebase are lexicographic, and a date string
+ * is a PREFIX of its own timestamp:
+ *
+ *     '2026-09-13' < '2026-09-13T06:05:52.123Z'   // true — "today" reads as past
+ *
+ * That silently disabled today (and every past day) in a date picker given this as
+ * its `min`, and made a calendar master dated today read as past-dated.
+ *
+ * For a ymd, use `useToday().today` in components/composables, or `.slice(0, 10)`
+ * on this. Deliberately not renamed: 70 correct call sites is a large blast radius
+ * for a naming fix, and this warning costs nothing.
+ */
 export function toISODateString(date: Date): ISODateString {
   return date.toISOString();
 }

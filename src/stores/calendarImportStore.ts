@@ -189,7 +189,14 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
     // change nothing. Narrowing to PAST-dated masters is also what keeps the cap
     // from binding in practice, which matters because the row says "next date
     // only" — a promise that would not hold for anything the cap dropped.
-    const today = toISODateString(new Date());
+    // ⚠️ `.slice(0, 10)`, because `toISODateString` returns a full ISO TIMESTAMP
+    // despite its name. `draft.date` is a bare `YYYY-MM-DD`, and the comparison is
+    // lexicographic: '2026-09-13' < '2026-09-13T06:05:52.123Z' is TRUE, so a master
+    // dated TODAY read as past-dated and spent a lookup request to re-date it to a
+    // date it already had. Bounded by the cap, but contrary to the rule stated
+    // directly above — today's date is a sensible date. (The same misreading of
+    // this helper disabled "today" in the recipe sheet's due-date picker.)
+    const today = toISODateString(new Date()).slice(0, 10);
     const targets = list
       .map((c, i) => ({ c, i }))
       .filter(({ c }) => c.outcome === 'unsupported-recurrence' && c.draft.date < today)

@@ -48,6 +48,25 @@ export function classifyAudience(
 }
 
 /**
+ * Should a single-owner item surface to this viewer at all?
+ *
+ * `assignee` (mine) or `forChild` (an adult seeing a child's) — the same two the
+ * to-do surfaces show. Deliberately EXCLUDES `unassigned`, which for a
+ * single-owner item is not a meaningful state but a data defect: an empty or
+ * unresolvable `ownerId`. `classifyOwnerAudience` cannot tell those apart from
+ * "nobody is assigned", so gating on `!== 'hidden'` (the shape the to-do builders
+ * use, where unassigned genuinely means a shared family task) would put a list
+ * owned by nobody on every device in the house. `listStore.createList` now refuses
+ * to create one, but existing data can still carry it.
+ *
+ * Shared by the in-app deriver and the OS reminder builder so they cannot drift —
+ * a review caught them disagreeing about exactly this.
+ */
+export function ownerItemSurfaces(audience: BriefingAudience): boolean {
+  return audience.kind === 'assignee' || audience.kind === 'forChild';
+}
+
+/**
  * Single-owner sibling of `classifyAudience` for Beanie Lists (#33), which have
  * one `ownerId` rather than an `assigneeIds` array. Returns the SAME
  * `BriefingAudience` union so the briefing's message-key selection works
