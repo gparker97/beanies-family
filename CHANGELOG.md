@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A busy moment on Google's side no longer makes your photos look missing.** Google Drive answers a burst of requests with the same code it uses for "this file is gone", so a brief rate limit could mark healthy photos as missing across the app and tell families they lacked permission to their own family file. The two are now told apart, and a busy moment is treated as what it is: something to wait out.
+- **An untimed to-do you add later in the day still reminds you.** A to-do due today with no set time only ever scheduled its reminder for 9am, so adding one in the afternoon — or dating an older one "today" — quietly scheduled nothing. It now arrives a few minutes later instead.
 - **Close buttons on full-screen panels are reachable again on iPhone.** The X at the top of a full-screen modal, the close button in the mobile menu, and the search box all sat partly under the status bar on phones with a notch, so they were hard or impossible to tap. Every panel that fills the screen now keeps clear of the status bar and the home indicator.
 - **The meal picker now uses the whole screen on phones and tablets.** Adding a meal to the planner showed only a few recipes in a short box with the rest of the screen empty below it. The list now fills the space that is actually there, so you see far more of your cookbook without scrolling, and the quick-add box stays where you can reach it.
 

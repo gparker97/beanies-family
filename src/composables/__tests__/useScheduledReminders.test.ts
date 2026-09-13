@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildReminderSchedule,
-  listFireTime,
   MAX_SCHEDULED,
   type ReminderInput,
   type ReminderPrefs,
@@ -10,7 +9,7 @@ import type { FamilyActivity, FamilyList, FamilyMember, TodoItem, UUID } from '@
 import type { NotificationOccurrence } from '@/utils/notifications';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { DEFAULT_TRAVEL_LEADS } from '@/utils/reminderSchedule';
+import { allDayFireTime, DEFAULT_TRAVEL_LEADS } from '@/utils/reminderSchedule';
 
 const NOW = new Date('2026-05-22T10:00:00'); // local 10am
 
@@ -685,28 +684,28 @@ describe('list created after 09:00 on the day it is due', () => {
       dueDate: '2026-05-22',
       createdAt: new Date('2026-05-22T15:00:00').toISOString(),
     });
-    const early = listFireTime('2026-05-22', l.createdAt);
-    const late = listFireTime('2026-05-22', l.createdAt);
+    const early = allDayFireTime('2026-05-22', l.createdAt);
+    const late = allDayFireTime('2026-05-22', l.createdAt);
     expect(early).toEqual(late);
     expect(early).toEqual(new Date('2026-05-22T15:15:00'));
   });
 
   it('keeps the morning anchor when the list predates it', () => {
     // A list made days earlier must NOT be dragged to createdAt + grace.
-    expect(listFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
+    expect(allDayFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
       new Date('2026-05-24T09:00:00')
     );
   });
 
   it('🔴 refuses to spill past midnight into the wrong day', () => {
     // A list made at 23:55 must not fire "due today" at 00:10 tomorrow.
-    expect(listFireTime('2026-05-22', new Date('2026-05-22T23:55:00').toISOString())).toBeNull();
+    expect(allDayFireTime('2026-05-22', new Date('2026-05-22T23:55:00').toISOString())).toBeNull();
   });
 
   it('degrades to the plain morning anchor when createdAt is unusable', () => {
     // Never schedule an alarm at an Invalid Date.
-    expect(listFireTime('2026-05-24', 'not-a-date')).toEqual(new Date('2026-05-24T09:00:00'));
-    expect(listFireTime('2026-05-24', undefined)).toEqual(new Date('2026-05-24T09:00:00'));
+    expect(allDayFireTime('2026-05-24', 'not-a-date')).toEqual(new Date('2026-05-24T09:00:00'));
+    expect(allDayFireTime('2026-05-24', undefined)).toEqual(new Date('2026-05-24T09:00:00'));
   });
 });
 
@@ -785,7 +784,7 @@ describe('a due date added to a list made days ago', () => {
   });
 
   it('ignores an updatedAt that trails createdAt (clock-skewed peer)', () => {
-    expect(listFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
+    expect(allDayFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
       new Date('2026-05-24T09:00:00')
     );
   });
@@ -828,5 +827,68 @@ describe('a dropped list reminder is visible in telemetry', () => {
     );
     expect(res.reminders.filter((r) => r.kind === 'list')).toEqual([]);
     expect(res.gated).toBe(1);
+  });
+});
+
+describe('an untimed to-do dated after the morning anchor', () => {
+  // The same hole the list builder had, on a far more used feature: an untimed
+  // to-do due today whose 09:00 has already passed armed nothing at all.
+  // `buildTodoReminders` now shares `allDayFireTime` with the list builder.
+  it('🔴 still fires when it was created this afternoon for today', () => {
+    const t3pm = new Date('2026-05-22T15:00:00').toISOString();
+    const { reminders } = buildReminderSchedule(
+      input({
+        todos: [
+          todo({
+            dueDate: '2026-05-22',
+            dueTime: undefined,
+            createdAt: t3pm,
+            updatedAt: t3pm,
+          } as Partial<TodoItem>),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T15:15:00'));
+  });
+
+  it('🔴 still fires when an OLD to-do is dated "today" this afternoon', () => {
+    const { reminders } = buildReminderSchedule(
+      input({
+        todos: [
+          todo({
+            dueDate: '2026-05-22',
+            dueTime: undefined,
+            createdAt: '2026-05-18T08:00:00.000Z',
+            updatedAt: new Date('2026-05-22T11:00:00').toISOString(),
+          } as Partial<TodoItem>),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-22T11:15:00'));
+  });
+
+  it('keeps the plain 09:00 anchor for a to-do dated in the future', () => {
+    // Anti-vacuity: the catch-up must not drag a future reminder forward.
+    const { reminders } = buildReminderSchedule(
+      input({
+        todos: [
+          todo({
+            dueDate: '2026-05-24',
+            dueTime: undefined,
+            createdAt: '2026-05-18T08:00:00.000Z',
+            updatedAt: '2026-05-18T08:00:00.000Z',
+          } as Partial<TodoItem>),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders[0].fireAt).toEqual(new Date('2026-05-24T09:00:00'));
   });
 });
