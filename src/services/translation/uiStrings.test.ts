@@ -117,6 +117,14 @@ describe('uiStrings', () => {
       'loginV6.pickBeanInfoText',
       'loginV6.signInPasswordHint',
       'join.error.',
+      // #88 — the three refusal surfaces in RecipeListSheet. A reader who does
+      // not know the joke must still learn that a real family member is gone and
+      // that nothing was created. The rest of `lists.fromRecipe.*` is cosmetic
+      // (labels, hints) and deliberately NOT covered.
+      'lists.error.',
+      'lists.fromRecipe.ownerGone',
+      'lists.fromRecipe.noMember',
+      'lists.fromRecipe.recipeGone',
       'join.inviteToken',
       'join.fileMismatch',
       'join.needsFile',

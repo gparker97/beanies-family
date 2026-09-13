@@ -50,14 +50,18 @@ function activityInput(over: Partial<CreateFamilyActivityInput> = {}) {
 }
 
 /** A client whose insert always fails the way Google fails a malformed body. */
-function rejectingClient(kind: 'invalid' | 'rate_limited') {
+function rejectingClient(kind: 'invalid' | 'rate_limited' | 'transient') {
   const attempts: string[] = [];
+  const MESSAGES: Record<typeof kind, [string, number]> = {
+    invalid: ['Google Calendar HTTP 400 (Invalid start time.)', 400],
+    rate_limited: ['Google Calendar HTTP 429', 429],
+    transient: ['Google Calendar HTTP 503', 503],
+  };
   const client = makeCalendarClientStub({
     async insertEvent(_c, _cal, eventId) {
       attempts.push(eventId);
-      throw kind === 'invalid'
-        ? new CalendarApiError('invalid', 'Google Calendar HTTP 400 (Invalid start time.)', 400)
-        : new CalendarApiError('rate_limited', 'Google Calendar HTTP 429', 429);
+      const [message, status] = MESSAGES[kind];
+      throw new CalendarApiError(kind, message, status);
     },
     async eventExists() {
       return false;
@@ -152,7 +156,11 @@ describe('a deterministic 400 is not retried', () => {
 
   it('🔴 a transient failure DOES still mark the connection', async () => {
     // Anti-vacuity for the assertion above.
-    const { client } = rejectingClient('rate_limited');
+    // ⚠️ 'transient', not 'rate_limited'. A throttle is deliberately the ONE
+    // non-auth kind that does NOT park the connection (it is self-healing and
+    // offers the user nothing to do) — see calendarSyncStore's `throttled` branch
+    // and its own tests. Using it here would assert the opposite of that rule.
+    const { client } = rejectingClient('transient');
     setCalendarClientForTesting(client);
     const conn = await connect();
     await createActivity(activityInput());

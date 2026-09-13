@@ -30,6 +30,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { isNative } from '@/services/sync/capabilities';
+import { toISODateString } from '@/utils/date';
 import { useListStore } from '@/stores/listStore';
 import { useRecipeShoppingLists } from '@/composables/useRecipeShoppingLists';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -162,13 +164,28 @@ function setOwner(value: string | string[]): void {
  * consequence is stated at the moment the user chooses it rather than discovered
  * the next morning. Names the OWNER, not "you" — the whole point of the picker
  * above is that those are often different people.
+ *
+ * ⚠️ Two things it must NOT do, both found in review:
+ *  • Promise a notification on a platform that never arms one.
+ *    `useLocalNotifications` returns at `if (!isNative()) return`, and there is no
+ *    service-worker fallback — on web and the PWA no OS reminder exists at all, so
+ *    there the hint says what DOES happen (the list shows up as due) and nothing
+ *    about notifications.
+ *  • Name a literal time. "9am" would duplicate `ALL_DAY_REMINDER_HOUR` across
+ *    three locales, so tuning the constant would silently make the copy lie. The
+ *    string says "that morning"; the constant stays the single source of truth.
  */
 const dueHint = computed(() => {
   if (mode.value !== 'create' || !dueDate.value) return '';
-  return fillTemplate(t('lists.fromRecipe.dueHint'), {
+  const key = isNative() ? 'lists.fromRecipe.dueHint' : 'lists.fromRecipe.dueHintWeb';
+  return fillTemplate(t(key), {
     name: getMemberName(ownerId.value, t('lists.fromRecipe.someone')),
   });
 });
+
+/** Today, ymd — the date picker's floor. A due date in the past arms no reminder
+ *  (`listFireTime`'s moment is already gone), so offering one is a trap. */
+const todayYmd = computed(() => toISODateString(new Date()));
 
 /** Progress for a row, so a finished shop is obvious without opening it. */
 function progressFor(l: { items: Array<{ completed: boolean }> }): string {
@@ -204,7 +221,13 @@ async function onSave(): Promise<void> {
   if (!memberId) {
     // A list with a dangling ownerId is worse than a failure the user can retry —
     // the same call `copyListForMembers` makes. Refuse, explain, report.
-    showToast('error', t('lists.fromRecipe.noMemberError'), t('lists.fromRecipe.noMemberHelp'));
+    // `silent` because we report this ourselves below under a precise surface —
+    // an un-silenced error toast auto-reports on the catch-all `app` surface, so
+    // one failure would emit two firehose events and double any rate built on
+    // `action`. Same discipline as `CalendarSyncSettings.vue`.
+    showToast('error', t('lists.fromRecipe.noMemberError'), t('lists.fromRecipe.noMemberHelp'), {
+      silent: true,
+    });
     reportError({
       surface: 'list-from-recipe',
       message:
@@ -229,7 +252,9 @@ async function onSave(): Promise<void> {
   // one's briefing and arms no one's reminder, which is a silent loss.
   const owner = ownerId.value || memberId;
   if (!familyStore.members.some((m) => m.id === owner)) {
-    showToast('error', t('lists.fromRecipe.ownerGoneError'), t('lists.fromRecipe.ownerGoneHelp'));
+    showToast('error', t('lists.fromRecipe.ownerGoneError'), t('lists.fromRecipe.ownerGoneHelp'), {
+      silent: true, // see the note on the no-member guard above
+    });
     reportError({
       surface: 'list-from-recipe',
       message:
@@ -392,15 +417,19 @@ async function onSave(): Promise<void> {
           />
         </div>
 
+        <!-- ⚠️ NO sibling <p> label here. `BeanieDatePicker` renders its own visible
+             <label> from `:label`, so adding one stacked "NEEDED BY" above
+             "NEEDED BY" in two different faces and announced it twice. The owner
+             block above has no such built-in, which is why it keeps its <p>.
+             The key is `lists.detail.dueDateLabel`, reused from ListDetailModal
+             rather than a new one: it is the same field, and the new string's zh
+             auto-translation read "Needed by" as "by whom" and labelled a date
+             picker with a person. -->
         <div class="space-y-1.5">
-          <p
-            class="font-inter dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)] uppercase"
-          >
-            {{ t('lists.fromRecipe.dueDateLabel') }}
-          </p>
           <BeanieDatePicker
             v-model="dueDate"
-            :label="t('lists.fromRecipe.dueDateLabel')"
+            :label="t('lists.detail.dueDateLabel')"
+            :min="todayYmd"
             :placeholder="t('lists.fromRecipe.dueDatePlaceholder')"
           />
           <InferredHint :text="dueHint" />
