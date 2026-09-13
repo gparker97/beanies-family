@@ -14,6 +14,12 @@ describe('entityDeepLink', () => {
     });
   });
 
+  it('list → /lists?view=', () => {
+    // Must match what `useRecipeShoppingLists.openList` pushes, or a tapped
+    // reminder and an in-app "open list" land in two different places.
+    expect(entityDeepLink('list', 'l1')).toEqual({ path: '/lists', query: { view: 'l1' } });
+  });
+
   // Spot-check the rest match the pre-extraction selectResult switch.
   it('maps the remaining entity types to their original paths', () => {
     expect(entityDeepLink('vacation', 'x')).toEqual({ path: '/travel', query: { vacation: 'x' } });

@@ -5,7 +5,15 @@
  * `?edit=`). Adding a new linkable entity is a single switch case here.
  */
 export type DeepLinkType =
-  'activity' | 'vacation' | 'todo' | 'account' | 'transaction' | 'goal' | 'asset' | 'member';
+  | 'activity'
+  | 'vacation'
+  | 'todo'
+  | 'list'
+  | 'account'
+  | 'transaction'
+  | 'goal'
+  | 'asset'
+  | 'member';
 
 export interface DeepLink {
   path: string;
@@ -20,6 +28,11 @@ export function entityDeepLink(type: DeepLinkType, id: string): DeepLink {
       return { path: '/travel', query: { vacation: id } };
     case 'todo':
       return { path: '/todo', query: { view: id } };
+    // `/lists` opens `?view=<id>` straight into the list drawer — the same param
+    // `useRecipeShoppingLists.openList` pushes, so a tapped reminder and an
+    // in-app "open list" land in exactly the same place.
+    case 'list':
+      return { path: '/lists', query: { view: id } };
     case 'account':
       return { path: '/accounts', query: { view: id } };
     case 'transaction':
