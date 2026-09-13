@@ -4251,6 +4251,28 @@ const STRING_DEFS = {
     en: "What's in this recipe",
     beanie: "what's in this recipe",
   },
+  // Who shops and by when, set at creation. The due date is what arms the 9am
+  // reminder, so `dueHint` states that consequence at the moment it is chosen
+  // rather than leaving it to be discovered the next morning.
+  'lists.fromRecipe.ownerLabel': { en: 'Who’s shopping', beanie: 'who’s shopping' },
+  'lists.fromRecipe.dueDateLabel': { en: 'Needed by', beanie: 'needed by' },
+  'lists.fromRecipe.dueDatePlaceholder': { en: 'No due date', beanie: 'no due date' },
+  'lists.fromRecipe.dueHint': {
+    en: '{name} will get a reminder at 9am that morning.',
+    beanie: '{name} will get a reminder at 9am that morning.',
+  },
+  'lists.fromRecipe.someone': { en: 'Whoever owns it', beanie: 'whoever owns it' },
+  // An owner removed on another device while this sheet was open. Important
+  // surface: keeps the real noun ("family member") in beanie mode.
+  'lists.fromRecipe.ownerGoneError': {
+    en: 'That family member is no longer in your pod',
+    beanie: 'that family member is no longer in your pod',
+  },
+  'lists.fromRecipe.ownerGoneHelp': {
+    en: 'They were removed while this was open. Pick someone else to shop, then create the list.',
+    beanie:
+      'they were removed while this was open. pick someone else to shop, then create the list.',
+  },
   'recipes.detail.openShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
   'recipes.detail.newShoppingList': {
     en: 'Start another shopping list',

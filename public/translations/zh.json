@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-13",
-    "translationCount": 4743
+    "translationCount": 4750
   },
   "translations": {
     "app.name": {
@@ -23612,7 +23612,7 @@
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.save": {
-      "translation": "建立名單",
+      "translation": "创建清单",
       "hash": "ifsmrm",
       "lastUpdated": "2026-09-13"
     },
@@ -23719,6 +23719,41 @@
     "reminders.listBody": {
       "translation": "今天到期—剩余{n}个",
       "hash": "wvxit0",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.ownerLabel": {
+      "translation": "谁在购物",
+      "hash": "m0b7xs",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.dueDateLabel": {
+      "translation": "需求提供人：",
+      "hash": "k04sxq",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.dueDatePlaceholder": {
+      "translation": "无到期日期",
+      "hash": "i6tjg9",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.dueHint": {
+      "translation": "{name}将在当天上午9点收到提醒。",
+      "hash": "x1v3wl",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.someone": {
+      "translation": "无论谁拥有它",
+      "hash": "xxas4m",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.ownerGoneError": {
+      "translation": "该家庭成员已不在您的Pod中",
+      "hash": "3c9260",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.ownerGoneHelp": {
+      "translation": "它们在打开时被移除。选择其他人购物，然后创建列表。",
+      "hash": "st47oq",
       "lastUpdated": "2026-09-13"
     }
   }

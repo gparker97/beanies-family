@@ -11,6 +11,7 @@ import { mount } from '@vue/test-utils';
 
 const h = vi.hoisted(() => ({
   currentMember: { id: 'm1' } as { id: string } | undefined,
+  members: [{ id: 'm1' }, { id: 'm2' }] as Array<{ id: string }>,
   lists: [] as Array<Record<string, unknown>>,
   recipes: [{ id: 'r1' }] as Array<{ id: string }>,
   createList: vi.fn(async (_seed: unknown): Promise<unknown> => ({ id: 'new-list' })),
@@ -35,7 +36,13 @@ vi.mock('@/stores/familyStore', () => ({
     get currentMember() {
       return h.currentMember;
     },
+    get members() {
+      return h.members;
+    },
   }),
+}));
+vi.mock('@/composables/useMemberInfo', () => ({
+  useMemberInfo: () => ({ getMemberName: (id: string, fallback: string) => id || fallback }),
 }));
 vi.mock('@/stores/listStore', () => ({
   useListStore: () => ({
@@ -84,6 +91,17 @@ function mountSheet(recipe: TestRecipe = RECIPE) {
           template: '<div><slot /></div>',
         },
         InferredHint: { name: 'InferredHint', props: ['text'], template: '<p>{{ text }}</p>' },
+        // Stubbed: this file is about the SHEET's rules, not the pickers' internals.
+        FamilyChipPicker: {
+          name: 'FamilyChipPicker',
+          props: ['modelValue', 'mode', 'compact'],
+          template: '<div />',
+        },
+        BeanieDatePicker: {
+          name: 'BeanieDatePicker',
+          props: ['modelValue', 'label', 'placeholder'],
+          template: '<div />',
+        },
       },
     },
   });
@@ -94,6 +112,7 @@ const save = (w: ReturnType<typeof mountSheet>) =>
 
 beforeEach(() => {
   h.currentMember = { id: 'm1' };
+  h.members = [{ id: 'm1' }, { id: 'm2' }];
   h.lists = [];
   h.recipes = [{ id: 'r1' }];
   h.toasts = [];
@@ -336,5 +355,67 @@ describe('telemetry', () => {
     const w = mountSheet();
     await save(w);
     expect(h.logged).not.toContain('list_created');
+  });
+});
+
+describe('who shops and by when', () => {
+  const seedOf = () => h.createList.mock.calls[0][0] as Record<string, unknown>;
+
+  it('defaults the owner to the current member and leaves the date empty', async () => {
+    const w = mountSheet();
+    await save(w);
+    expect(seedOf().ownerId).toBe('m1');
+    // 🔴 No default due date. A due date arms a reminder, so defaulting one would
+    // notify a family about a deadline they never set.
+    expect(Object.keys(seedOf())).not.toContain('dueDate');
+  });
+
+  it('creates the list for the member the user picked', async () => {
+    const w = mountSheet();
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', 'm2');
+    await save(w);
+    expect(seedOf().ownerId).toBe('m2');
+    // 🔴 …but the CREATOR is still whoever is standing here. The `list-completed`
+    // bell entry fires for the creator when someone else finishes their list.
+    expect(seedOf().createdBy).toBe('m1');
+  });
+
+  it('carries the chosen due date through to the seed', async () => {
+    const w = mountSheet();
+    await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
+    await save(w);
+    expect(seedOf().dueDate).toBe('2026-09-20');
+  });
+
+  it('says what the due date will do, and only once one is set', async () => {
+    const w = mountSheet();
+    const hints = () => w.findAllComponents({ name: 'InferredHint' });
+    // Two hints render: the skipped-headings one, then the due-date one.
+    expect(hints().at(-1)!.props('text')).toBe('');
+    await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
+    expect(hints().at(-1)!.props('text')).toContain('dueHint');
+  });
+
+  it('🔴 refuses when the chosen owner has left the family mid-sheet', async () => {
+    const w = mountSheet();
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', 'm2');
+    h.members = [{ id: 'm1' }]; // m2 removed on another device
+    await save(w);
+    expect(h.createList).not.toHaveBeenCalled();
+    expect(h.toasts.some((t) => t.startsWith('error:'))).toBe(true);
+    expect(h.reported[0].context).toMatchObject({ action: 'owner_unresolved' });
+  });
+
+  it('🔴 resets owner and due date when reopened for another recipe', async () => {
+    const w = mountSheet();
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', 'm2');
+    await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
+    // The sheet instance is reused across recipes; inheriting the last one's due
+    // date would schedule a reminder for a shop the user never dated.
+    await w.setProps({ open: false });
+    await w.setProps({ open: true, recipe: { ...RECIPE, id: 'r1', name: 'Waffles' } as never });
+    await save(w);
+    expect(seedOf().ownerId).toBe('m1');
+    expect(Object.keys(seedOf())).not.toContain('dueDate');
   });
 });

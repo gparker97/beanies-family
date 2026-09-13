@@ -228,12 +228,14 @@ describe('parseDraftItems — draft → items', () => {
 });
 
 describe('buildRecipeListSeed', () => {
-  const seed = () =>
+  const seed = (over: Partial<Parameters<typeof buildRecipeListSeed>[0]> = {}) =>
     buildRecipeListSeed({
       recipeId: 'r1',
       titles: ['Flour', 'Eggs'],
       title: 'Shopping for Pancakes',
-      memberId: 'm1',
+      ownerId: 'm1',
+      createdBy: 'm1',
+      ...over,
     });
 
   it('creates one item per title, fresh and unticked', () => {
@@ -265,10 +267,30 @@ describe('buildRecipeListSeed', () => {
     expect(Object.keys(seed())).not.toContain('cycleCelebrated');
   });
 
-  it('uses the member as both owner and creator', () => {
+  it('uses the member as both owner and creator when they are the same person', () => {
     const s = seed();
     expect(s.ownerId).toBe('m1');
     expect(s.createdBy).toBe('m1');
+  });
+
+  it('🔴 keeps a delegated owner SEPARATE from the creator', () => {
+    // Collapsing these back into one id would silently delete the `list-completed`
+    // bell entry, which fires for the CREATOR when somebody else finishes their
+    // list — the exact case a delegated shopping list creates.
+    const s = seed({ ownerId: 'm-wife', createdBy: 'm-greg' });
+    expect(s.ownerId).toBe('m-wife');
+    expect(s.createdBy).toBe('m-greg');
+  });
+
+  it('carries a due date when one was chosen', () => {
+    expect(seed({ dueDate: '2026-09-20' }).dueDate).toBe('2026-09-20');
+  });
+
+  it('🔴 OMITS dueDate entirely when none was chosen', () => {
+    // Not `dueDate: undefined`. `buildListReminders` reads the ABSENCE of the key
+    // to decide the list stays briefing-only and arms no notification.
+    expect(Object.keys(seed())).not.toContain('dueDate');
+    expect(Object.keys(seed({ dueDate: '' }))).not.toContain('dueDate');
   });
 
   it('reads the emoji from the category rather than hardcoding it', () => {

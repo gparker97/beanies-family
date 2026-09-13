@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Set who's shopping and when it's needed, right in the recipe's shopping list.** Building a list from a recipe now asks who it's for and when it's needed before you create it, so the list arrives with its details already filled in and the reminder is set from the moment it exists. Adding or changing either later works exactly the same way.
 - **Lists with a due date now remind you on the morning they're due.** Give a list a due date and beanies sends the person it belongs to a reminder at 9am that day, saying how many items are still left, and tapping it opens the list. Make a list later in the day for the same day and the reminder still arrives, a few minutes after you finish it. Lists that are only assigned, with no due date, stay in the daily briefing and do not notify, and nobody gets reminded about somebody else's list.
 
 ---

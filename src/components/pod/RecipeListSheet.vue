@@ -24,9 +24,12 @@
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useListStore } from '@/stores/listStore';
 import { useRecipeShoppingLists } from '@/composables/useRecipeShoppingLists';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -42,11 +45,30 @@ const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const { getMemberName } = useMemberInfo();
 const listStore = useListStore();
 const recipesStore = useRecipesStore();
 
 const draft = ref('');
 const isSubmitting = ref(false);
+
+/**
+ * Who will do the shop, and when it needs doing.
+ *
+ * Both are set HERE rather than left to a follow-up edit in the list drawer,
+ * because whoever builds a shopping list from a recipe generally already knows
+ * both answers — and because the due date is what arms the reminder
+ * (`buildListReminders`). Filling them in afterwards works identically (the
+ * store replaces the lists array, the schedule recomputes), but it is a second
+ * trip the user should not have to make.
+ *
+ * `ownerId` defaults to the current member on every open, matching
+ * `NewListSheet.startBlank`. `dueDate` deliberately defaults to EMPTY: a due date
+ * is a commitment, and defaulting one would arm a reminder the family never
+ * asked for.
+ */
+const ownerId = ref('');
+const dueDate = ref('');
 
 /**
  * `review` when this recipe already has a list, `create` otherwise.
@@ -87,6 +109,11 @@ watch(
     split.value = splitRecipeIngredients(props.recipe.ingredients ?? []);
     draft.value = split.value.titles.join('\n');
     isSubmitting.value = false;
+    // Reset BOTH on every open, not just the first: the sheet instance is reused
+    // across recipes, and inheriting the last recipe's due date would silently
+    // schedule a reminder for a shop the user never dated.
+    ownerId.value = familyStore.currentMember?.id ?? '';
+    dueDate.value = '';
     // Any existing list counts, finished or not: a done shop is still the answer
     // to "have I already made one of these?", and the row shows its progress so
     // the user can tell at a glance.
@@ -121,6 +148,27 @@ const saveDisabled = computed(() =>
 const saveLabel = computed(() =>
   mode.value === 'review' ? t('lists.fromRecipe.openExisting') : t('lists.fromRecipe.save')
 );
+
+/** `FamilyChipPicker` emits `string | string[]`; single mode gives a string. */
+function setOwner(value: string | string[]): void {
+  const id = Array.isArray(value) ? value[0] : value;
+  if (id) ownerId.value = id;
+}
+
+/**
+ * Says out loud what a due date actually does, and only once one is set.
+ *
+ * Arming a notification is not something a date field normally implies, so the
+ * consequence is stated at the moment the user chooses it rather than discovered
+ * the next morning. Names the OWNER, not "you" — the whole point of the picker
+ * above is that those are often different people.
+ */
+const dueHint = computed(() => {
+  if (mode.value !== 'create' || !dueDate.value) return '';
+  return fillTemplate(t('lists.fromRecipe.dueHint'), {
+    name: getMemberName(ownerId.value, t('lists.fromRecipe.someone')),
+  });
+});
 
 /** Progress for a row, so a finished shop is obvious without opening it. */
 function progressFor(l: { items: Array<{ completed: boolean }> }): string {
@@ -175,6 +223,23 @@ async function onSave(): Promise<void> {
     return;
   }
 
+  // Same hazard, the other field: the chosen owner can be removed from the family
+  // on another device while this sheet is open. The picker cannot offer a bad id,
+  // so this only fires on that race — but a list owned by nobody shows up in no
+  // one's briefing and arms no one's reminder, which is a silent loss.
+  const owner = ownerId.value || memberId;
+  if (!familyStore.members.some((m) => m.id === owner)) {
+    showToast('error', t('lists.fromRecipe.ownerGoneError'), t('lists.fromRecipe.ownerGoneHelp'));
+    reportError({
+      surface: 'list-from-recipe',
+      message:
+        'chosen list owner is no longer a family member — refusing to create a list nobody owns. Likely a member removed on another device while the sheet was open.',
+      severity: 'error',
+      context: { action: 'owner_unresolved' },
+    });
+    return;
+  }
+
   isSubmitting.value = true;
   try {
     const created = await listStore.createList(
@@ -182,7 +247,11 @@ async function onSave(): Promise<void> {
         recipeId: props.recipe.id,
         titles: items.value,
         title: fillTemplate(t('lists.fromRecipe.listTitle'), { recipe: props.recipe.name }),
-        memberId,
+        ownerId: owner,
+        // NOT `owner` — the creator is whoever is standing here, and the
+        // `list-completed` bell entry depends on the two being distinguishable.
+        createdBy: memberId,
+        dueDate: dueDate.value,
       })
     );
     // Falsy, not `=== null`: the store folds a throw and a graceful stop into one
@@ -303,6 +372,40 @@ async function onSave(): Promise<void> {
 
       <!-- Renders nothing when there is nothing to say, so no `v-if` here. -->
       <InferredHint v-if="mode === 'create'" :text="skippedHint" />
+
+      <!-- Who is shopping, and by when. Asked HERE because the person building a
+           list from a recipe usually already knows both, and because the due date
+           is what arms the reminder — making them go and find the list afterwards
+           to add it is the trip this section removes. -->
+      <div v-if="mode === 'create'" class="space-y-3 border-t border-[var(--color-border)] pt-4">
+        <div class="space-y-1.5">
+          <p
+            class="font-inter dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)] uppercase"
+          >
+            {{ t('lists.fromRecipe.ownerLabel') }}
+          </p>
+          <FamilyChipPicker
+            :model-value="ownerId"
+            mode="single"
+            compact
+            @update:model-value="setOwner"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <p
+            class="font-inter dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)] uppercase"
+          >
+            {{ t('lists.fromRecipe.dueDateLabel') }}
+          </p>
+          <BeanieDatePicker
+            v-model="dueDate"
+            :label="t('lists.fromRecipe.dueDateLabel')"
+            :placeholder="t('lists.fromRecipe.dueDatePlaceholder')"
+          />
+          <InferredHint :text="dueHint" />
+        </div>
+      </div>
 
       <!-- The quieter half of the choice. Editing is unlocked in place: no second
            modal, no navigation, and the lines they were just reading stay put. -->
