@@ -313,13 +313,58 @@ describe('driveService', () => {
 
     it('throws DriveFileNotFoundError on 403 (permission)', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Permission denied' } }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        new Response(
+          JSON.stringify({
+            error: {
+              message: 'Permission denied',
+              errors: [{ reason: 'insufficientPermissions' }],
+            },
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
       );
 
       await expect(getFileMetadata(mockToken, 'forbidden', 'parents')).rejects.toThrow(
+        DriveFileNotFoundError
+      );
+    });
+
+    it.each(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'])(
+      '🔴 a 403 %s is NOT a missing file',
+      async (reason) => {
+        // Google answers throttling with 403. Reporting it as "file not found"
+        // makes `photoStore.markUnresolved` flip a healthy photo to "missing"
+        // app-wide — and a burst of per-photo metadata calls is precisely how a
+        // family earns a `userRateLimitExceeded` in the first place.
+        globalThis.fetch = vi
+          .fn()
+          .mockResolvedValue(
+            new Response(
+              JSON.stringify({ error: { message: 'Rate Limit Exceeded', errors: [{ reason }] } }),
+              { status: 403, headers: { 'Content-Type': 'application/json' } }
+            )
+          );
+
+        const err = await getFileMetadata(mockToken, 'throttled', 'parents').catch(
+          (e: unknown) => e
+        );
+        expect(err).toBeInstanceOf(DriveApiError);
+        expect(err).not.toBeInstanceOf(DriveFileNotFoundError);
+        expect((err as DriveApiError).status).toBe(403);
+      }
+    );
+
+    it('a 403 with an unreadable body stays a missing file', async () => {
+      // Conservative default: without a reason we cannot know, so keep the
+      // pre-fix answer rather than guessing "throttle".
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response('not json at all', {
+          status: 403,
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      );
+
+      await expect(getFileMetadata(mockToken, 'weird', 'parents')).rejects.toThrow(
         DriveFileNotFoundError
       );
     });

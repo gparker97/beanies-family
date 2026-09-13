@@ -7,6 +7,7 @@
 
 import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
 import { isSafetyCopyName } from '@/constants/compaction';
+import { extractGoogleError, isGoogleThrottleReason } from '@/utils/googleApiError';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
@@ -658,9 +659,14 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
   if (!res.ok) {
     const status = res.status;
     let message: string;
+    // `reason` is read, not just `message`. It is the ONLY thing that separates a
+    // throttle from a refusal on a 403 — see the guard below and
+    // `@/utils/googleApiError`.
+    let reason: string | undefined;
     try {
-      const errorData = await res.json();
-      message = errorData.error?.message ?? `Drive API error ${status}`;
+      const { reason: r, message: m } = extractGoogleError(await res.json());
+      reason = r;
+      message = m ?? `Drive API error ${status}`;
     } catch {
       message = `Drive API error ${status}`;
     }
@@ -700,8 +706,26 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     // succeeds if the grant is live.
     if (status === 401) invalidateAccessToken();
 
-    // 404 Not Found or 403 Forbidden both mean "the file isn't accessible to this
-    // caller" — photoStore treats these identically (flags the photo as unresolved).
+    // ⚠️ A THROTTLE IS NOT A MISSING FILE. Google answers rate limiting with 403,
+    // so without this guard "you are going too fast" arrived as
+    // `DriveFileNotFoundError` — and `photoStore` reacts to that by calling
+    // `markUnresolved`, which flips a healthy photo to "missing" app-wide: the
+    // save button vanishes, the footer offers "Replace photo", every thumbnail
+    // blanks. One burst of per-photo metadata calls is exactly how a family earns
+    // a `userRateLimitExceeded`, so the failure mode was self-inflicted and
+    // arrived in bulk. `podAccess` had the matching problem on the other side,
+    // telling a family they lacked permission to their own `.beanpod`.
+    //
+    // One `photoStore` call site was already narrowed to `status === 404` for this
+    // reason. That patched one symptom; classifying correctly here fixes the other
+    // three without each having to know.
+    if (status === 403 && isGoogleThrottleReason(reason)) {
+      throw new DriveApiError(message, status);
+    }
+
+    // 404 Not Found or a genuine 403 Forbidden both mean "the file isn't accessible
+    // to this caller" — photoStore treats these identically (flags the photo as
+    // unresolved).
     if (status === 404 || status === 403) {
       throw new DriveFileNotFoundError(message, status);
     }

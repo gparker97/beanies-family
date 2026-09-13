@@ -10,6 +10,11 @@ import {
 import { refreshCalendarToken } from './calendarAuth';
 import { isPermanentRefreshFailure } from '@/services/google/refreshFailure';
 import { delay, withTimeout } from '@/utils/timing';
+import {
+  extractGoogleError,
+  isGoogleRetryableThrottleReason,
+  isGoogleThrottleReason,
+} from '@/utils/googleApiError';
 import { parseLocalDate } from '@/utils/date';
 import {
   CalendarApiError,
@@ -34,49 +39,18 @@ const MAX_EVENT_PAGES = 20;
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
 /**
- * The 403 `reason` values that mean "you are going too fast", not "you may not".
- *
- * ⚠️ Google Calendar answers throttling with **403**, not 429 — the status alone
- * cannot tell a dropped scope from a rate limit, and only this reason string
- * separates them. Getting it wrong is not cosmetic: 'forbidden' is terminal, so a
- * throttled request skipped its backoff retries entirely, parked the connection
- * as `lastError: 'forbidden'`, and paged Slack critical on the third consecutive
- * poll for something that heals itself.
- *
- * `quotaExceeded` / `dailyLimitExceeded` are project-level rather than per-user,
- * and a day's quota will not come back inside the retry budget — but they are
- * still throttling, not permission, and the poll retrying later is the right
- * response to both. See `docs/adr/` on the sync engine's error kinds.
+ * ⚠️ Google Calendar answers THROTTLING with **403**, not 429 — the status alone
+ * cannot tell a dropped scope from a rate limit, and only the `reason` string
+ * separates them. The sets live in `@/utils/googleApiError` because Drive hits the
+ * identical trap from the other direction (there a throttle read as "file not
+ * found"). See that module for the full argument.
  */
-const USER_RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
-  'rateLimitExceeded',
-  'userRateLimitExceeded',
-]);
-/**
- * Project-level quota: the whole app's allowance, not this user's burst rate.
- *
- * Still a throttle — so it must never park the connection or page — but NOT
- * retryable. A day's quota cannot return inside a 2-second backoff budget, so the
- * two extra attempts are guaranteed-futile requests fired at an allowance that is
- * already exhausted, on every device at once, every poll. Google's own guidance is
- * to back off on the per-user reasons and not to retry `dailyLimitExceeded`.
- */
-const PROJECT_QUOTA_403_REASONS: ReadonlySet<string> = new Set([
-  'quotaExceeded',
-  'dailyLimitExceeded',
-]);
-const RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
-  ...USER_RATE_LIMIT_403_REASONS,
-  ...PROJECT_QUOTA_403_REASONS,
-]);
-
 function classifyStatus(status: number, reason?: string): CalendarErrorKind {
   if (status === 400) return 'invalid';
   if (status === 401) return 'auth';
   // See RATE_LIMIT_403_REASONS — a 403 is only 'forbidden' when the reason is not
   // a throttle. An absent/unparseable reason keeps the conservative old answer.
-  if (status === 403)
-    return reason && RATE_LIMIT_403_REASONS.has(reason) ? 'rate_limited' : 'forbidden';
+  if (status === 403) return isGoogleThrottleReason(reason) ? 'rate_limited' : 'forbidden';
   if (status === 404 || status === 410) return 'not_found';
   if (status === 409) return 'conflict';
   if (status === 429) return 'rate_limited';
@@ -103,7 +77,9 @@ function isRetryableKind(kind: CalendarErrorKind): boolean {
  */
 function isRetryable(kind: CalendarErrorKind, reason?: string): boolean {
   if (!isRetryableKind(kind)) return false;
-  return !(reason && PROJECT_QUOTA_403_REASONS.has(reason));
+  // A 429 carries no reason and stays retryable; a 403 must name a per-user
+  // throttle. Project-level quota is a throttle but not a retryable one.
+  return reason === undefined || isGoogleRetryableThrottleReason(reason);
 }
 
 /** One `events.list` item, restricted to the masked fields (times-only read). */
@@ -341,15 +317,12 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
         // response whose headers land but whose body stalls would otherwise hang
         // the re-mint, the authedFetch promise, and — reconcile awaiting
         // connections in turn — the whole poll, indefinitely.
-        const body = (await withTimeout(
+        const body = await withTimeout(
           res.json(),
           REQUEST_TIMEOUT_MS,
           'Google Calendar error body timed out'
-        )) as {
-          error?: { message?: string; errors?: Array<{ reason?: string }> };
-        };
-        reason = body?.error?.errors?.[0]?.reason;
-        detail = [reason, body?.error?.message].filter(Boolean).join(': ');
+        );
+        ({ reason, detail } = extractGoogleError(body));
       } catch {
         // Body absent or not JSON — the status alone will have to do.
       }
