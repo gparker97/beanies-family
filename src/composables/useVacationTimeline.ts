@@ -6,7 +6,9 @@ import {
   extractDatePart,
   formatTime12,
 } from '@/utils/date';
+import { fillTemplate } from '@/utils/fillTemplate';
 import {
+  arrivalDayOffset,
   computeAccommodationGaps,
   buildTravelSegmentTitle,
   buildAccommodationTitle,
@@ -241,6 +243,20 @@ function enrichRows(rows: DetailRow[]): DetailRow[] {
   return rows;
 }
 
+/**
+ * "Arrives", "Arrives (+1)" or "Arrives (+2)" — derived from the DATES.
+ *
+ * `+2` is a real itinerary, not an edge case: a westbound date-line crossing
+ * leaves one evening and lands two calendar days later. This read the
+ * `arrivesNextDay` boolean, so such a flight showed the right arrival date beside
+ * the label "(+1)".
+ */
+function arrivalOffsetLabel(seg: VacationTravelSegment, t: T): string {
+  const n = arrivalDayOffset(seg);
+  if (n === 0) return t('segmentRow.arrives');
+  return fillTemplate(t('segmentRow.arrivesPlusDays'), { n: String(n) });
+}
+
 export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
@@ -275,7 +291,9 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
       });
     if (seg.arrivalTime)
       rows.push({
-        label: seg.arrivesNextDay ? t('segmentRow.arrivesNextDay') : t('segmentRow.arrives'),
+        // Derived from the DATES, not the `arrivesNextDay` shadow — a flight saved
+        // as +2 rendered "Arrives (+1)" here while showing the right date.
+        label: arrivalOffsetLabel(seg, t),
         value: seg.arrivalTime,
         field: 'arrivalTime',
         inputType: 'time',

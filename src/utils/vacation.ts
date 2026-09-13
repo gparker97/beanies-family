@@ -12,6 +12,7 @@ import {
   toDateInputValue,
   detectNightFlight,
   daysBetween,
+  addDaysYmd,
 } from '@/utils/date';
 import { AIRLINES } from '@/constants/airlines';
 import { AIRPORTS } from '@/constants/airports';
@@ -935,6 +936,42 @@ export function buildTransportationTitle(trans: {
   const label = typeLabels[trans.type ?? ''] ?? 'transport';
   const detail = trans.agencyName || trans.operator;
   return detail ? `${label} — ${detail}` : label;
+}
+
+/** The most calendar days after departure a flight can be offered as arriving. */
+export const MAX_ARRIVAL_DAY_OFFSET = 2;
+
+/**
+ * How many CALENDAR days after departure a segment arrives: 0, 1 or 2.
+ *
+ * THE one place that question is answered. It was previously answered three
+ * different ways — the edit modal, the trip wizard and the timeline row each read
+ * the boolean `arrivesNextDay` — which is why a westbound date-line crossing
+ * (LAX Monday night → SYD Wednesday morning) could be SAVED as +2 and still
+ * rendered "+1" in the strip.
+ *
+ * Derived from the two dates that are already stored, so there is no new CRDT
+ * field and no third source of truth. `arrivesNextDay` survives only as the
+ * fallback for pre-update records that never stored an `arrivalDate`, and as a
+ * shadow written for pre-update clients.
+ *
+ * Pure ymd string maths: `addDaysYmd`, never a local `Date` read back through
+ * `toISOString` — that pattern cancels the +1 east of UTC (see
+ * `utils/__tests__/travelArrivalDate.test.ts`). A stored arrival beyond the range
+ * is clamped, never rewritten.
+ */
+export function arrivalDayOffset(seg: {
+  departureDate?: string;
+  arrivalDate?: string;
+  arrivesNextDay?: boolean;
+}): number {
+  const dep = extractDatePart(seg.departureDate ?? '');
+  const arr = extractDatePart(seg.arrivalDate ?? '');
+  if (!dep || !arr) return seg.arrivesNextDay ? 1 : 0;
+  for (let n = 0; n <= MAX_ARRIVAL_DAY_OFFSET; n++) {
+    if (addDaysYmd(dep, n) === arr) return n;
+  }
+  return arr > dep ? MAX_ARRIVAL_DAY_OFFSET : 0;
 }
 
 /**
