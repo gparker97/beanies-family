@@ -33,10 +33,35 @@ const MAX_EVENT_PAGES = 20;
 /** Access-token expiry skew — refresh a little early so a request never races expiry. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
-function classifyStatus(status: number): CalendarErrorKind {
+/**
+ * The 403 `reason` values that mean "you are going too fast", not "you may not".
+ *
+ * ⚠️ Google Calendar answers throttling with **403**, not 429 — the status alone
+ * cannot tell a dropped scope from a rate limit, and only this reason string
+ * separates them. Getting it wrong is not cosmetic: 'forbidden' is terminal, so a
+ * throttled request skipped its backoff retries entirely, parked the connection
+ * as `lastError: 'forbidden'`, and paged Slack critical on the third consecutive
+ * poll for something that heals itself.
+ *
+ * `quotaExceeded` / `dailyLimitExceeded` are project-level rather than per-user,
+ * and a day's quota will not come back inside the retry budget — but they are
+ * still throttling, not permission, and the poll retrying later is the right
+ * response to both. See `docs/adr/` on the sync engine's error kinds.
+ */
+const RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
+  'rateLimitExceeded',
+  'userRateLimitExceeded',
+  'quotaExceeded',
+  'dailyLimitExceeded',
+]);
+
+function classifyStatus(status: number, reason?: string): CalendarErrorKind {
   if (status === 400) return 'invalid';
   if (status === 401) return 'auth';
-  if (status === 403) return 'forbidden';
+  // See RATE_LIMIT_403_REASONS — a 403 is only 'forbidden' when the reason is not
+  // a throttle. An absent/unparseable reason keeps the conservative old answer.
+  if (status === 403)
+    return reason && RATE_LIMIT_403_REASONS.has(reason) ? 'rate_limited' : 'forbidden';
   if (status === 404 || status === 410) return 'not_found';
   if (status === 409) return 'conflict';
   if (status === 429) return 'rate_limited';
@@ -269,7 +294,26 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
 
       if (res.ok) return res;
 
-      const kind = classifyStatus(res.status);
+      // Google's error body names the rejected field/value ("Invalid value for:
+      // recurrence"). Without it a 400 in CloudWatch says nothing actionable —
+      // this loop ran blind for a day in prod for exactly that reason.
+      //
+      // ⚠️ Read BEFORE classifying, not after: `reason` is what separates a
+      // rate-limit 403 from a permission 403 (see RATE_LIMIT_403_REASONS), so
+      // classification cannot happen until the body has been parsed.
+      let detail = '';
+      let reason: string | undefined;
+      try {
+        const body = (await res.json()) as {
+          error?: { message?: string; errors?: Array<{ reason?: string }> };
+        };
+        reason = body?.error?.errors?.[0]?.reason;
+        detail = [reason, body?.error?.message].filter(Boolean).join(': ');
+      } catch {
+        // Body absent or not JSON — the status alone will have to do.
+      }
+
+      const kind = classifyStatus(res.status, reason);
       if (kind === 'auth') {
         tokenProvider.invalidate(connectionId);
         // A per-request 401 is usually a just-expired access token, not a dead
@@ -283,26 +327,13 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
         }
       }
 
-      // Google's error body names the rejected field/value ("Invalid value for:
-      // recurrence"). Without it a 400 in CloudWatch says nothing actionable —
-      // this loop ran blind for a day in prod for exactly that reason.
-      let detail = '';
-      try {
-        const body = (await res.json()) as {
-          error?: { message?: string; errors?: Array<{ reason?: string }> };
-        };
-        detail = [body?.error?.errors?.[0]?.reason, body?.error?.message]
-          .filter(Boolean)
-          .join(': ');
-      } catch {
-        // Body absent or not JSON — the status alone will have to do.
-      }
       const err = new CalendarApiError(
         kind,
         `Google Calendar HTTP ${res.status}${detail ? ` (${detail})` : ''}`,
         res.status
       );
-      // Only 429 / 5xx are worth retrying; everything else is the caller's to handle.
+      // Only rate limits (429 AND throttling 403s) and 5xx are worth retrying;
+      // everything else is the caller's to handle.
       if (isRetryableKind(kind) && i < RETRY_BACKOFF_MS.length) {
         lastErr = err;
         await delay(RETRY_BACKOFF_MS[i]);

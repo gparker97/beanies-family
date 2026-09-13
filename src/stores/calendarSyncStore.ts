@@ -1043,13 +1043,26 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // a connection that stays broken pages. Counter resets on clean success.
       const n = (reconcileErrorCounters.get(connection.id) ?? 0) + 1;
       reconcileErrorCounters.set(connection.id, n);
+      // ⚠️ A throttle NEVER escalates to a critical page, however long it lasts.
+      // Two reasons, either of which is sufficient. It is self-healing by
+      // definition — nothing is broken and no user action exists — so it fails the
+      // "user action failed / data at risk" bar `critical` is reserved for. And
+      // rate limiting is a property of OUR shared API quota, not of this family's
+      // connection, so the one condition that would trip it trips it for every
+      // syncing family at once: the escalation would arrive as a Slack storm
+      // precisely when the channel most needs to stay readable. The rate is the
+      // thing worth alerting on, and CloudWatch can see it from the `warning`s.
+      const throttled = worst.kind === 'rate_limited';
       reportError({
         surface: 'calendar-sync',
         message: `[calendarSync] reconcile error (${worst.kind}) on connection ${connection.id}: ${worst.message}${
           n >= RECONCILE_ERROR_THRESHOLD ? ` (sustained ×${n})` : ''
         }`,
         error: worst,
-        severity: n === RECONCILE_ERROR_THRESHOLD ? 'critical' : CALENDAR_SYNC_ERRORS[worst.kind],
+        severity:
+          n === RECONCILE_ERROR_THRESHOLD && !throttled
+            ? 'critical'
+            : CALENDAR_SYNC_ERRORS[worst.kind],
         // `consecutive_failures` is the allowlisted spelling — the camelCase one
         // was silently dropped by `redactContext` and never once reached Slack.
         // `connectionId` is not allowlisted at all and is device-local anyway, so
