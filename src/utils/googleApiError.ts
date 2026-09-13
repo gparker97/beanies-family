@@ -23,6 +23,11 @@
 export const GOOGLE_USER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
   'rateLimitExceeded',
   'userRateLimitExceeded',
+  // Drive's sharing-specific throttle. `useEnsurePhotosPublic` calls
+  // `permissions.create` once per photo in a loop, so this is the throttle this
+  // app earns most easily — and it was being counted as "someone else's file",
+  // which silently left the remaining photos without their public link.
+  'sharingRateLimitExceeded',
 ]);
 
 /**

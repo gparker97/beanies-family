@@ -40,6 +40,26 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('a Drive THROTTLE is not a permission problem', () => {
+  // Google answers rate limiting with 403. Before the reason rode along on the
+  // error, a throttle on a `.beanpod` read told a family at `critical` severity
+  // that they lacked permission to their own family file, and offered them
+  // `pickFamilyFile` — which can fork the pod.
+  it.each(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'])(
+    '🔴 403 %s → VERIFY_UNAVAILABLE, not PERMISSION_DENIED',
+    (reason) => {
+      expect(classifyDriveFailure({ status: 403, reason })).toBe('VERIFY_UNAVAILABLE');
+    }
+  );
+
+  it('🔴 a genuine 403 is STILL permission denied', () => {
+    expect(classifyDriveFailure({ status: 403, reason: 'insufficientPermissions' })).toBe(
+      'PERMISSION_DENIED'
+    );
+    expect(classifyDriveFailure({ status: 403 })).toBe('PERMISSION_DENIED');
+  });
+});
+
 describe('classifyDriveFailure', () => {
   it('reports an HTTP STATUS over `navigator.onLine`, because a status proves we got through', () => {
     // ⚠️ THIS ASSERTION IS REVERSED FROM THE ONE IT REPLACES, and the old

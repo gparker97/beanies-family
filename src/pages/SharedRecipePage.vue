@@ -245,8 +245,13 @@ function keep() {
       </div>
 
       <!-- The offer. Always on screen, never in front of the recipe. -->
+      <!-- Padded for the home indicator: this is the only CTA on the page and it
+           is pinned to the bottom edge, so on a notched iPhone it sat in the 34px
+           indicator strip. Padding rather than an offset keeps the bar's blurred
+           background running to the screen edge. 0 on the web. -->
       <div
         class="dark:border-line-strong dark:bg-surface-raised/95 fixed inset-x-0 bottom-0 border-t border-[var(--color-sky-silk-300)]/40 bg-white/95 px-4 py-3 backdrop-blur-sm sm:px-6"
+        style="padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px))"
       >
         <div class="mx-auto flex max-w-2xl flex-col gap-2">
           <button

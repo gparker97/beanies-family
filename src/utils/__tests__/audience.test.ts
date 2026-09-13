@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
+import { readFileSync } from 'node:fs';
+import { resolve as resolve_ } from 'node:path';
+import {
+  classifyAudience,
+  classifyOwnerAudience,
+  ownerItemSurfaces,
+  isDutyDone,
+} from '@/utils/audience';
 import type { FamilyMember } from '@/types/models';
 
 function member(
@@ -89,5 +96,52 @@ describe('classifyOwnerAudience (single-owner, for Beanie Lists)', () => {
   it('unowned → unassigned for a non-pet; hidden for a pet', () => {
     expect(classifyOwnerAudience(undefined, adult, resolve).kind).toBe('unassigned');
     expect(classifyOwnerAudience(null, pet, resolve).kind).toBe('hidden');
+  });
+});
+
+describe('ownerItemSurfaces — one rule for all three list surfaces', () => {
+  // The daily briefing, the notifications drawer and the OS scheduler each answer
+  // "should this list reach this person?". A review caught them giving three
+  // different answers, so the rule was extracted here. These assertions exist so
+  // it stays extracted.
+  const adult = { id: 'a', name: 'Adult', role: 'owner' } as FamilyMember;
+  const kid = { id: 'k', name: 'Joey' } as FamilyMember;
+  const resolve = (id: string) => (id === 'a' ? adult : id === 'k' ? kid : undefined);
+
+  it('surfaces a list you own', () => {
+    expect(ownerItemSurfaces(classifyOwnerAudience('a', adult, resolve))).toBe(true);
+  });
+
+  it("surfaces a child's list to an adult", () => {
+    expect(ownerItemSurfaces(classifyOwnerAudience('k', adult, resolve))).toBe(true);
+  });
+
+  it('🔴 does NOT surface a list owned by nobody', () => {
+    // The whole reason the predicate exists. `classifyOwnerAudience` maps an empty
+    // or unresolvable ownerId to 'unassigned', NOT 'hidden' — so a `!== 'hidden'`
+    // test puts a list owned by nobody on every device in the house, and
+    // `deleteMember` does not cascade to lists, so that state is permanent.
+    expect(ownerItemSurfaces(classifyOwnerAudience('', adult, resolve))).toBe(false);
+    expect(ownerItemSurfaces(classifyOwnerAudience('ghost', adult, resolve))).toBe(false);
+    expect(ownerItemSurfaces(classifyOwnerAudience(undefined, adult, resolve))).toBe(false);
+  });
+
+  it("does NOT surface another adult's list", () => {
+    const other = { id: 'o', name: 'Other', role: 'owner' } as FamilyMember;
+    const r = (id: string) => (id === 'o' ? other : id === 'a' ? adult : undefined);
+    expect(ownerItemSurfaces(classifyOwnerAudience('o', adult, r))).toBe(false);
+  });
+
+  it('🔴 is the predicate ALL THREE list surfaces actually call', () => {
+    // Source-level on purpose: the drift this prevents is three files each making
+    // a defensible-looking local choice, which no single unit test can see.
+    const read = (rel: string) => readFileSync(resolve_(process.cwd(), 'src', rel), 'utf-8');
+    for (const f of [
+      'composables/useCriticalItems.ts', // the daily briefing
+      'utils/notifications.ts', // the notifications drawer
+      'composables/useScheduledReminders.ts', // the OS scheduler
+    ]) {
+      expect(read(f)).toContain('ownerItemSurfaces(');
+    }
   });
 });

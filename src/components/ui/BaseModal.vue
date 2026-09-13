@@ -64,14 +64,34 @@ const isFullscreen = computed(() => props.fullscreenMobile && isMobile.value);
  */
 const safeAreaStyle = computed<CSSProperties>(() =>
   isFullscreen.value
-    ? {
-        paddingTop: 'env(safe-area-inset-top, 0px)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }
+    ? {}
     : {
         maxHeight:
           'calc(100vh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
       }
+);
+
+/**
+ * Fullscreen insets go on the CHROME, not on the shell.
+ *
+ * ⚠️ Padding the shell looked simpler and was wrong. The shell paints
+ * `bg-white` / `dark:bg-surface-raised`, so the inset band takes THAT colour —
+ * and consumers paint their own body background over the middle. `PhotoViewer`
+ * (flush-body, near-black) grew a white bar across the top and bottom of an
+ * edge-to-edge photo, and every `BeanieFormModal` grew a mismatched strip below
+ * its footer. Worse, `PhotoViewer` positions its own close button with
+ * `calc(env(safe-area-inset-top) + 1rem)` against a containing block that the
+ * shell padding had already pushed down, double-counting the inset.
+ *
+ * Padding the header and footer keeps every background edge-to-edge, leaves a
+ * consumer's own env() offsets measured from the screen, and still moves the one
+ * thing that was unreachable: the close button in the header row.
+ */
+const fullscreenHeaderStyle = computed<CSSProperties>(() =>
+  isFullscreen.value ? { paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))' } : {}
+);
+const fullscreenFooterStyle = computed<CSSProperties>(() =>
+  isFullscreen.value ? { paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' } : {}
 );
 
 const emit = defineEmits<{
@@ -143,6 +163,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
                   ? ''
                   : 'dark:border-line flex items-center justify-between border-b border-gray-200 px-6 py-4'
               "
+              :style="fullscreenHeaderStyle"
             >
               <slot name="header">
                 <h2 class="dark:text-ink text-lg font-semibold text-gray-900">
@@ -169,6 +190,7 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             <div
               v-if="$slots.footer"
               class="dark:border-line dark:bg-surface-ground shrink-0 rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4"
+              :style="fullscreenFooterStyle"
             >
               <slot name="footer" />
             </div>

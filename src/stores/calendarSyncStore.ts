@@ -1052,12 +1052,17 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // and in Settings — a real failure beats a throttle that shares the batch.
       const worst = otherErrors.find((e) => e.kind !== 'rate_limited') ?? otherErrors[0];
       await updateCalendarConnection(connection.id, {
-        // A throttle is not a broken connection. Parking `status: 'error'` would
-        // flip the Settings row red and tell the family their calendar is broken
-        // for a condition that heals itself and offers them nothing to do — the
-        // support load this whole branch exists to avoid. `lastError` still
-        // records what happened, so the diagnosis survives.
-        status: throttled ? connection.status : 'error',
+        // A throttle is not a broken connection, so it does NOT park the
+        // connection: flipping the Settings row red would tell the family their
+        // calendar is broken for a condition that heals itself and offers them
+        // nothing to do. `lastError` still records what happened.
+        //
+        // ⚠️ The key is OMITTED rather than set to `connection.status`. That
+        // snapshot is read BEFORE the connection lock and the reconcile then runs
+        // for tens of seconds — long enough for the user to tap Reconnect and for
+        // `reconnect()` to write `ok`. Writing the stale value back resurrected
+        // `needs_reconnect` seconds after they had fixed it.
+        ...(throttled ? {} : { status: 'error' as const }),
         lastError: worst.kind,
         lastReconciledAt: nowIso(),
         lastReconciledBy: deviceId,

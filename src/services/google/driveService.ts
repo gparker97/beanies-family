@@ -720,7 +720,7 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     // reason. That patched one symptom; classifying correctly here fixes the other
     // three without each having to know.
     if (status === 403 && isGoogleThrottleReason(reason)) {
-      throw new DriveApiError(message, status);
+      throw new DriveApiError(message, status, reason);
     }
 
     // 404 Not Found or a genuine 403 Forbidden both mean "the file isn't accessible
@@ -741,10 +741,20 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
  */
 export class DriveApiError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  /**
+   * Google's `error.errors[0].reason`, when the body carried one.
+   *
+   * Load-bearing for 403, which Google uses for BOTH "you may not" and "you are
+   * going too fast". Consumers duck-type on `.status` (see `podAccess.ts`), so
+   * without the reason riding along they cannot tell a throttle from a refusal
+   * and a rate limit reads as "you lack permission to your own family file".
+   */
+  readonly reason?: string;
+  constructor(message: string, status: number, reason?: string) {
     super(message);
     this.name = 'DriveApiError';
     this.status = status;
+    this.reason = reason;
   }
 }
 
