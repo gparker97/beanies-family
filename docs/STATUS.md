@@ -2035,6 +2035,57 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Validated 2026-09-13 (the 0.21 deploy).** Pending block re-checked entry by entry.
+> **1 dropped, 1 corrected, 6 added.**
+>
+> - DROPPED: `packages/brand/schema.ts` `offers: { price: '0' }` — fixed 2026-09-12; the file
+>   now carries a comment explaining why there is no `offers` there at all.
+> - CORRECTED: the pricing page's "**NOT YET DEPLOYED**" marker. It shipped today — `Deploy
+web` ran green and `/pricing` is live, with the kicker pill removed and the currency
+>   switcher moved above the plans at greg's request.
+> - The docs-only deploy-gate warning (`paths-ignore: docs/**`) is UNCHANGED and still applies.
+>
+> **Shipped today as 0.21** (`03c8c690`, release note `2026.09.13`, no spotlight): web + Astro
+> to prod, Android to Play **open testing** (`beta`), iOS to **TestFlight**. Update floor
+> deliberately left at 0.18.
+>
+> **What shipped:** a shopping list built from a recipe, with owner + due date set at creation
+> (Notion #88); list due-date reminders — an OS notification AND a `list-due` bell entry,
+> mirroring `todo-due`; a Google 403 throttle/refusal split shared by the calendar and Drive
+> clients (`utils/googleApiError.ts`); safe-area insets across six full-height surfaces; the
+> meal picker using the height it has; and flights that land two calendar days later.
+>
+> ⚠️ **Two code reviews ran over the same day's work and the SECOND still found three
+> release-blocking regressions in code the first had passed** — every 5xx silently stopped
+> being retried, an already-delivered reminder re-armed after every checkbox tick, and the
+> Drive 403 fix never reached the `.beanpod` path. All three were introduced by fixes for
+> earlier review findings. Worth remembering before the next "one more small thing" day.
+>
+> - 📱 **BOTH APPS ARE ON TEST TRACKS, NOT PRODUCTION.** Android `beta` (open testing) is in
+>   Google review; iOS is on TestFlight (no review). Promote each from its console once
+>   validated. This was greg's call after the second review's findings.
+> - ⏰ **List reminder catch-up keys on `createdAt`, deliberately.** Dating an OLDER list
+>   "due today" after 09:00 files the `list-due` bell entry but arms no OS push. The
+>   alternative (keying on `updatedAt`) re-armed already-delivered reminders on every tick —
+>   see the warning on `allDayFireTime`. Revisit only with a way to know when the DUE DATE was
+>   set, which is not stored.
+> - 🔕 **Lists have no per-kind reminder toggle.** `RemindersSettings` shows leads for
+>   activities, travel and timed to-dos only; a family that wants list reminders off has only
+>   the master switch, which kills the other three too. The Settings card copy was reverted so
+>   it no longer promises otherwise, but the gap is real.
+> - 💾 **Drive `storageQuotaExceeded` still reads as "file not found."** It is NOT a throttle
+>   (a full Drive does not heal by waiting), so it was deliberately left out of the throttle
+>   set. Telling the family their Drive is full needs its own error code + copy.
+> - 🔁 **Every list-item tick fires a full OS reschedule.** `reminderInput` is deep-watched and
+>   `updateList` replaces the array, so ticking a 30-item shop re-runs the whole schedule and a
+>   full AlarmManager reconcile per tick. Pre-existing for to-dos; lists now reach it too. Fix
+>   shape: hash the desired set and skip the reconcile when unchanged.
+> - 📵 **OS reminders are native-only.** `useLocalNotifications` returns at `if (!isNative())`
+>   with no service-worker fallback, so on web/PWA a dated list reaches the briefing and the
+>   bell but never the lock screen.
+> - 🔒 **70 Dependabot advisories on `main`** (2 critical, 38 high) and 19 open PRs. Untouched
+>   today. `/review-dependabot-prs`.
+
 > **Validated 2026-09-11 (session 3 — the 0.20.1 deploy).** This session's work was net-new
 > (birthdays, the wall band, the calendar-import copy sweep) and orthogonal to the carried
 > block, so nothing below was superseded by it. Two entries ADDED at the top. The two
@@ -2091,8 +2142,9 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >   rebased onto `main`, merged fast-forward, and **deleted (local + remote)**. `PRICING_LIVE`
 >   is **gone entirely** — the constant, the `DraftPlaceholder` branch, the gated switcher
 >   script and the sitemap exclusion. `/pricing` is now an ordinary indexed page.
->   **NOT YET DEPLOYED** — it goes live on the next `Deploy web` dispatch, which is
->   deliberate and greg's call.
+>   ~~**NOT YET DEPLOYED**~~ — **DEPLOYED 2026-09-13** with the 0.21 release. `/pricing` is
+>   live, minus the "🫘 pricing" kicker pill and with the currency switcher moved to sit
+>   directly above the plans.
 >
 >   **The model changed shape.** No free tier. 90-day trial of the whole app (magic beans
 >   capped at 1 read/day) landing on **read-only**, then `beanies basic` **$30/yr, yearly
@@ -2111,7 +2163,10 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 >   promise "the free tier stays"; `help/faq` carries both plans; `terms.astro` no longer
 >   claims "provided free of charge". Every remaining free line routes to `/pricing`.
 >
->   ⚠️ **STILL OPEN, and the sweep missed it:** `packages/brand/schema.ts:54` declares
+>   ✅ **RESOLVED 2026-09-12** (was: "STILL OPEN, and the sweep missed it"). The file now has
+>   no `offers` block at all, with a comment explaining why the homepage composes it from
+>   `PRICES` at the call site instead. Original text kept for the reasoning:
+>   `packages/brand/schema.ts:54` declared
 >   `offers: { price: '0' }` in the sitewide SoftwareApplication JSON-LD, and it ships in the
 >   built homepage. It is still TRUE during beta, so it is not wrong today — but it must change
 >   when charging starts or answer engines will keep reporting beanies as free. Needs a
