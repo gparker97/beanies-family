@@ -10908,7 +10908,8 @@ const STRING_DEFS = {
   'segmentRow.date': { en: 'Date', beanie: 'date' },
   'segmentRow.departs': { en: 'Departs', beanie: 'departs' },
   'segmentRow.arrives': { en: 'Arrives', beanie: 'arrives' },
-  'segmentRow.arrivesNextDay': { en: 'Arrives (+1)', beanie: 'arrives (+1)' },
+  // Replaces the hardcoded `(+1)` pair: a date-line crossing arrives (+2).
+  'segmentRow.arrivesPlusDays': { en: 'Arrives (+{n})', beanie: 'arrives (+{n})' },
   'segmentRow.cruiseLine': { en: 'Cruise line', beanie: 'cruise line' },
   'segmentRow.ship': { en: 'Ship', beanie: 'ship' },
   'segmentRow.port': { en: 'Port', beanie: 'port' },

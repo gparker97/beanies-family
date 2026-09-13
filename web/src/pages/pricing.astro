@@ -41,7 +41,10 @@ const faqSchema = {
         <header class="hero">
           <div class="hero-inner">
             <div class="hero-copy">
-              <span class="kicker-pill">🫘 pricing</span>
+              <!-- No kicker pill here. On the switching pages it earns its place
+                   ("switching from cozi" is news); on /pricing it just tells you
+                   the name of the page you already chose. The shared
+                   `.kicker-pill` style stays — those pages still use it. -->
               <h1>no ads. no data. <em>no surprises.</em></h1>
               <p class="hero-sub">
                 free for now, while we're in beta. v1 won't be, but i promise it won't burn a
@@ -111,6 +114,17 @@ const faqSchema = {
               will always be free.
             </p>
 
+            <div class="trial">
+              <div class="trial-num">{TRIAL_DAYS}<small>days</small></div>
+              <p>
+                <b>a generous (if i do say so myself) free trial.</b> every feature, every family member, the
+                beanie wall, the finances, and more. the only limitation is one magic bean per
+                day, because i have to pay for those. after that, beanies goes read-only until you
+                pick a plan. no hard feelings either way: your data is
+                always yours, exportable any time.
+              </p>
+            </div>
+
             <div class="currency" role="group" aria-label="currency">
               <span class="currency-label">show prices in</span>
               <div class="seg" id="currency-seg">
@@ -126,17 +140,6 @@ const faqSchema = {
                   ))
                 }
               </div>
-            </div>
-
-            <div class="trial">
-              <div class="trial-num">{TRIAL_DAYS}<small>days</small></div>
-              <p>
-                <b>a generous (if i do say so myself) free trial.</b> every feature, every family member, the
-                beanie wall, the finances, and more. the only limitation is one magic bean per
-                day, because i have to pay for those. after that, beanies goes read-only until you
-                pick a plan. no hard feelings either way: your data is
-                always yours, exportable any time.
-              </p>
             </div>
 
             <div class="plans plans--two">
@@ -518,7 +521,11 @@ const faqSchema = {
     display: flex;
     gap: 0.6rem;
     justify-content: center;
-    margin: -1.2rem auto 1.8rem;
+
+    /* No negative top margin. The -1.2rem was tuned to tuck this under the
+       section subtitle; it now sits between the trial card and the plans, where
+       a negative pull would clamp it against the card above. */
+    margin: 0 auto 1.4rem;
   }
 
   .pricing-page .currency-label {

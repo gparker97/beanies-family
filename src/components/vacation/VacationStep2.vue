@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
 import { addHourToTime, addDaysYmd } from '@/utils/date';
+import { arrivalDayOffset, MAX_ARRIVAL_DAY_OFFSET } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
@@ -193,6 +194,39 @@ function addFlightSegments(returnFlight: boolean) {
   }
 }
 
+/** Badge + label mirror the edit drawer so the two controls read identically. */
+function offsetBadge(seg: {
+  departureDate?: string;
+  arrivalDate?: string;
+  arrivesNextDay?: boolean;
+}) {
+  return arrivalDayOffset(seg) === 2
+    ? t('vacation.field.twoDayBadge')
+    : t('vacation.field.nextDayBadge');
+}
+function offsetLabel(seg: {
+  departureDate?: string;
+  arrivalDate?: string;
+  arrivesNextDay?: boolean;
+}) {
+  return arrivalDayOffset(seg) === 2
+    ? t('vacation.field.arrivesTwoDays')
+    : t('vacation.field.arrivesNextDay');
+}
+/**
+ * 0 → +1 → +2 → 0. Writes through `arrivesNextDay` because that is the field
+ * `updateSegment` watches to recompute `arrivalDate`; the offset itself is then
+ * read back off the dates, which is what lets +2 survive.
+ */
+function cycleArrivalOffset(
+  idx: number,
+  seg: { departureDate?: string; arrivalDate?: string; arrivesNextDay?: boolean }
+) {
+  const next = (arrivalDayOffset(seg) + 1) % (MAX_ARRIVAL_DAY_OFFSET + 1);
+  updateSegment(idx, 'arrivalDate', seg.departureDate ? addDaysYmd(seg.departureDate, next) : '');
+  updateSegment(idx, 'arrivesNextDay', next >= 1);
+}
+
 function updateSegment(index: number, field: keyof VacationTravelSegment, value: string | boolean) {
   const updated = [...props.segments];
   const current = updated[index]!;
@@ -203,15 +237,22 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
     updated[index] = { ...updated[index]!, sortDate: String(value) };
   }
 
-  // Compute arrivalDate from departureDate + arrivesNextDay
+  // Compute arrivalDate from departureDate + the arrival-day offset
   if (field === 'departureDate' || field === 'arrivesNextDay') {
     const seg = updated[index]!;
     if (seg.departureDate) {
-      if (seg.arrivesNextDay) {
+      // The offset is derived from the dates by `arrivalDayOffset`, so it survives
+      // a +2 here exactly as it does in the edit drawer. `arrivesNextDay` stays a
+      // shadow for pre-update clients.
+      const offset = arrivalDayOffset(seg);
+      if (offset > 0) {
         // See the note in TravelSegmentEditModal: a local Date read back via toISOString
         // silently drops the +1 everywhere from UTC+0 eastward. Step 3 seeds the first
         // hotel check-in from this value, so the error propagated into accommodation too.
-        updated[index] = { ...updated[index]!, arrivalDate: addDaysYmd(seg.departureDate, 1) };
+        updated[index] = {
+          ...updated[index]!,
+          arrivalDate: addDaysYmd(seg.departureDate, offset),
+        };
       } else {
         updated[index] = { ...updated[index]!, arrivalDate: seg.departureDate };
       }
@@ -446,19 +487,23 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                     class="min-w-0 flex-1"
                     @update:model-value="updateSegment(idx, 'arrivalTime', $event)"
                   />
+                  <!-- Cycles 0 → +1 → +2, matching the edit drawer. A wizard that
+                       could only say +1 would make a date-line flight wrong from
+                       the moment the trip was created. -->
                   <button
                     type="button"
-                    :aria-pressed="seg.arrivesNextDay ?? false"
-                    :title="t('vacation.field.arrivesNextDay')"
+                    :aria-pressed="arrivalDayOffset(seg) > 0"
+                    :aria-label="offsetLabel(seg)"
+                    :title="offsetLabel(seg)"
                     class="font-outfit shrink-0 rounded-full border-2 px-2 py-1 text-xs font-bold transition-all"
                     :class="
-                      seg.arrivesNextDay
+                      arrivalDayOffset(seg) > 0
                         ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
                         : 'dark:bg-surface-overlay dark:text-ink-soft border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
                     "
-                    @click="updateSegment(idx, 'arrivesNextDay', !(seg.arrivesNextDay ?? false))"
+                    @click="cycleArrivalOffset(idx, seg)"
                   >
-                    {{ t('vacation.field.nextDayBadge') }}
+                    {{ offsetBadge(seg) }}
                   </button>
                 </div>
               </FormFieldGroup>
