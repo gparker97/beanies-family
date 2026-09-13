@@ -1030,9 +1030,26 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
     const otherErrors = errors.filter((e) => e.kind !== 'auth');
     if (otherErrors.length > 0) {
-      const worst = otherErrors[0];
+      /**
+       * A batch counts as throttled only when EVERY error in it is a throttle.
+       *
+       * ⚠️ Deliberately `every`, not `otherErrors[0].kind`. That array is in
+       * `record()` insertion order, NOT severity order, and under throttling the
+       * throttle is systematically first — so keying the decision off the first
+       * element would let one rate-limited task mask a co-occurring revoked scope
+       * on the other thirty-nine, for as long as the throttle lasted.
+       */
+      const throttled = otherErrors.every((e) => e.kind === 'rate_limited');
+      // The most ACTIONABLE error, which is the one worth naming in `lastError`
+      // and in Settings — a real failure beats a throttle that shares the batch.
+      const worst = otherErrors.find((e) => e.kind !== 'rate_limited') ?? otherErrors[0];
       await updateCalendarConnection(connection.id, {
-        status: 'error',
+        // A throttle is not a broken connection. Parking `status: 'error'` would
+        // flip the Settings row red and tell the family their calendar is broken
+        // for a condition that heals itself and offers them nothing to do — the
+        // support load this whole branch exists to avoid. `lastError` still
+        // records what happened, so the diagnosis survives.
+        status: throttled ? connection.status : 'error',
         lastError: worst.kind,
         lastReconciledAt: nowIso(),
         lastReconciledBy: deviceId,
@@ -1041,18 +1058,18 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // page Slack exactly ONCE, when we cross the threshold (=== , not >=). A
       // lone transient stays log-only (telemetry still records every reconcile);
       // a connection that stays broken pages. Counter resets on clean success.
-      const n = (reconcileErrorCounters.get(connection.id) ?? 0) + 1;
-      reconcileErrorCounters.set(connection.id, n);
-      // ⚠️ A throttle NEVER escalates to a critical page, however long it lasts.
-      // Two reasons, either of which is sufficient. It is self-healing by
-      // definition — nothing is broken and no user action exists — so it fails the
-      // "user action failed / data at risk" bar `critical` is reserved for. And
-      // rate limiting is a property of OUR shared API quota, not of this family's
-      // connection, so the one condition that would trip it trips it for every
-      // syncing family at once: the escalation would arrive as a Slack storm
-      // precisely when the channel most needs to stay readable. The rate is the
-      // thing worth alerting on, and CloudWatch can see it from the `warning`s.
-      const throttled = worst.kind === 'rate_limited';
+      //
+      // ⚠️ A throttle does NOT advance the counter. The gate is a one-shot exact
+      // match, and the counter only resets on a clean success — so counting
+      // throttles would let a ten-minute quota blip silently spend this
+      // connection's single critical alert, and a genuinely revoked scope arriving
+      // afterwards could then never page at all. (Found in review; the first cut
+      // of this carve-out suppressed the page but still advanced the counter.)
+      let n = reconcileErrorCounters.get(connection.id) ?? 0;
+      if (!throttled) {
+        n += 1;
+        reconcileErrorCounters.set(connection.id, n);
+      }
       reportError({
         surface: 'calendar-sync',
         message: `[calendarSync] reconcile error (${worst.kind}) on connection ${connection.id}: ${worst.message}${

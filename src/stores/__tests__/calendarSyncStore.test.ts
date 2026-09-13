@@ -319,9 +319,132 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
       .filter((a) => a.surface === 'calendar-sync');
     expect(calls).toHaveLength(4);
     expect(calls.map((a) => a.severity)).not.toContain('critical');
-    // Anti-vacuity: it still REPORTS, and still says it is sustained — the signal
-    // is preserved for CloudWatch, only the page is withheld.
-    expect(calls[2].message).toContain('sustained ×3');
+    // Anti-vacuity: it still REPORTS every poll, so the RATE stays visible in
+    // CloudWatch — that is the right instrument for a fleet-wide quota problem.
+    // It deliberately does NOT say "sustained ×N": the escalation counter is not
+    // advanced by a throttle, so the connection's one-shot critical page is still
+    // available for a real failure (see the streak test below).
+    expect(calls.every((a) => a.message?.includes('rate_limited'))).toBe(true);
+    expect(calls.some((a) => a.message?.includes('sustained'))).toBe(false);
+  });
+
+  it('🔴 a throttle streak does not spend the connection’s one-shot critical page', async () => {
+    // Found in review. The counter is one-shot (`n === THRESHOLD`) and resets only
+    // on a clean success, so counting throttles let a quota blip silently consume
+    // the single alert — and a genuinely revoked scope arriving afterwards could
+    // then never page at all. This is the regression test for that.
+    const { reportError } = await import('@/utils/errorReporter');
+    const mockReport = vi.mocked(reportError);
+    mockReport.mockClear();
+
+    let kind: 'rate_limited' | 'forbidden' = 'rate_limited';
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async insertEvent() {
+          throw new CalendarApiError(kind, `Google Calendar HTTP 403`, 403);
+        },
+        async eventExists() {
+          return false;
+        },
+      })
+    );
+
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    const store = useCalendarSyncStore();
+
+    await store.syncNow(); // throttled
+    await store.syncNow();
+    await store.syncNow();
+    kind = 'forbidden'; // the scope is genuinely revoked
+    await store.syncNow(); // n=1
+    await store.syncNow(); // n=2
+    await store.syncNow(); // n=3 → MUST still page
+
+    const sev = mockReport.mock.calls
+      .map((c) => c[0] as { surface: string; severity?: string })
+      .filter((a) => a.surface === 'calendar-sync')
+      .map((a) => a.severity);
+    expect(sev).toHaveLength(6);
+    expect(sev.slice(0, 3)).not.toContain('critical'); // throttles stay quiet
+    expect(sev[5]).toBe('critical'); // the real failure still escalates
+  });
+
+  it('🔴 a throttle does not mark the connection errored in Settings', async () => {
+    // The other half the first cut missed: the page was suppressed but the
+    // connection was still parked `status: 'error'`, so every affected family's
+    // Settings row went red for a self-healing condition.
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async insertEvent() {
+          throw new CalendarApiError('rate_limited', 'Google Calendar HTTP 403', 403);
+        },
+        async eventExists() {
+          return false;
+        },
+      })
+    );
+    const conn = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    await useCalendarSyncStore().syncNow();
+
+    const after = await getCalendarConnectionById(conn!.id);
+    expect(after?.status).toBe('ok');
+    // …but what happened is still recorded, so the diagnosis survives.
+    expect(after?.lastError).toBe('rate_limited');
+  });
+
+  it('🔴 a real failure sharing the batch with a throttle is NOT masked', async () => {
+    // `otherErrors` is insertion order, and under throttling the throttle is
+    // systematically first — so keying off `otherErrors[0]` would hide a revoked
+    // scope behind a rate limit for as long as the rate limit lasted.
+    const { reportError } = await import('@/utils/errorReporter');
+    const mockReport = vi.mocked(reportError);
+    mockReport.mockClear();
+
+    let first = true;
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async insertEvent() {
+          const kind = first ? 'rate_limited' : 'forbidden';
+          first = false;
+          throw new CalendarApiError(kind, 'Google Calendar HTTP 403', 403);
+        },
+        async eventExists() {
+          return false;
+        },
+      })
+    );
+    const conn = await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    await createActivity(activityInput('Second'));
+    await useCalendarSyncStore().syncNow();
+
+    const after = await getCalendarConnectionById(conn!.id);
+    // The mixed batch is NOT treated as a throttle: it parks and names the real one.
+    expect(after?.status).toBe('error');
+    expect(after?.lastError).toBe('forbidden');
   });
 
   it('parks needs_reconnect (single warning, never sustained-critical) when the token is dead', async () => {

@@ -144,6 +144,25 @@ describe('listStore', () => {
     expect(store.lists.map((l) => l.id)).toEqual(['new']);
   });
 
+  it('🔴 refuses to create a list whose owner is not in the family', async () => {
+    // A list owned by nobody reaches no briefing and, before the audience gate in
+    // `buildListReminders` was tightened, armed the 09:00 reminder on EVERY device.
+    // The rule lives here because four call sites create lists and only one checked.
+    const { useFamilyStore } = await import('@/stores/familyStore');
+    useFamilyStore().members = [{ id: 'm1', name: 'Greg' }] as never;
+    const store = useListStore();
+    vi.mocked(listRepo.createList).mockResolvedValue(list({ id: 'new' }));
+
+    expect(
+      await store.createList({ ...list({ id: 'new' }), ownerId: 'ghost' } as never)
+    ).toBeNull();
+    expect(await store.createList({ ...list({ id: 'new' }), ownerId: '' } as never)).toBeNull();
+    expect(listRepo.createList).not.toHaveBeenCalled();
+
+    // Anti-vacuity: a real member still creates.
+    expect(await store.createList({ ...list({ id: 'new' }), ownerId: 'm1' } as never)).toBeTruthy();
+  });
+
   it('createFromTemplate seeds correctly (grocery → 5 items recurring/weekly; honey-do → 0; unknown → null)', async () => {
     const store = useListStore();
     vi.mocked(listRepo.createList).mockImplementation(

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-13",
-    "translationCount": 4750
+    "translationCount": 4752
   },
   "translations": {
     "app.name": {
@@ -18787,9 +18787,9 @@
       "lastUpdated": "2026-07-23"
     },
     "settings.card.remindersDesc": {
-      "translation": "活动、旅行和待办事项的通知时间",
-      "hash": "rhafy5",
-      "lastUpdated": "2026-07-23"
+      "translation": "活动、差旅、待办事项和列表的通知时间",
+      "hash": "7uw3zc",
+      "lastUpdated": "2026-09-13"
     },
     "settings.discordCtaAction": {
       "translation": "加入",
@@ -23642,7 +23642,7 @@
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.startAnother": {
-      "translation": "开始另一个心愿单",
+      "translation": "再建一个清单",
       "hash": "gtq153",
       "lastUpdated": "2026-09-13"
     },
@@ -23726,19 +23726,9 @@
       "hash": "m0b7xs",
       "lastUpdated": "2026-09-13"
     },
-    "lists.fromRecipe.dueDateLabel": {
-      "translation": "需求提供人：",
-      "hash": "k04sxq",
-      "lastUpdated": "2026-09-13"
-    },
     "lists.fromRecipe.dueDatePlaceholder": {
       "translation": "无到期日期",
       "hash": "i6tjg9",
-      "lastUpdated": "2026-09-13"
-    },
-    "lists.fromRecipe.dueHint": {
-      "translation": "{name}将在当天上午9点收到提醒。",
-      "hash": "x1v3wl",
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.someone": {
@@ -23752,8 +23742,28 @@
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.ownerGoneHelp": {
-      "translation": "它们在打开时被移除。选择其他人购物，然后创建列表。",
+      "translation": "该成员在此打开时已被移除。请另选一位购物的人，然后创建清单。",
       "hash": "st47oq",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.error.unknownOwner": {
+      "translation": "该列表需要家庭成员",
+      "hash": "lcehx1",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.error.unknownOwnerHelp": {
+      "translation": "请选择这份清单是给谁的，然后重试。没有归属的清单不会送到任何人手中。",
+      "hash": "8ssnb6",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.dueHint": {
+      "translation": "{name}会在当天早上收到设备提醒。",
+      "hash": "ubqdf9",
+      "lastUpdated": "2026-09-13"
+    },
+    "lists.fromRecipe.dueHintWeb": {
+      "translation": "当天早上会显示为{name}的待办清单。",
+      "hash": "mi90vk",
       "lastUpdated": "2026-09-13"
     }
   }

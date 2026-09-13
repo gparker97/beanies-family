@@ -48,11 +48,26 @@ const TOKEN_EXPIRY_SKEW_MS = 60_000;
  * still throttling, not permission, and the poll retrying later is the right
  * response to both. See `docs/adr/` on the sync engine's error kinds.
  */
-const RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
+const USER_RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
   'rateLimitExceeded',
   'userRateLimitExceeded',
+]);
+/**
+ * Project-level quota: the whole app's allowance, not this user's burst rate.
+ *
+ * Still a throttle — so it must never park the connection or page — but NOT
+ * retryable. A day's quota cannot return inside a 2-second backoff budget, so the
+ * two extra attempts are guaranteed-futile requests fired at an allowance that is
+ * already exhausted, on every device at once, every poll. Google's own guidance is
+ * to back off on the per-user reasons and not to retry `dailyLimitExceeded`.
+ */
+const PROJECT_QUOTA_403_REASONS: ReadonlySet<string> = new Set([
   'quotaExceeded',
   'dailyLimitExceeded',
+]);
+const RATE_LIMIT_403_REASONS: ReadonlySet<string> = new Set([
+  ...USER_RATE_LIMIT_403_REASONS,
+  ...PROJECT_QUOTA_403_REASONS,
 ]);
 
 function classifyStatus(status: number, reason?: string): CalendarErrorKind {
@@ -70,9 +85,25 @@ function classifyStatus(status: number, reason?: string): CalendarErrorKind {
 }
 
 /** Kinds worth retrying within the backoff budget; every other kind is terminal
- *  and must propagate with its true kind (notably 'auth' → parks needs_reconnect). */
+ *  and must propagate with its true kind (notably 'auth' → parks needs_reconnect).
+ *
+ *  ⚠️ Kind alone is not sufficient for a 403 throttle — see `isRetryable`, which
+ *  this delegates to for the response path. Kept for the THROW path (token mint /
+ *  network), where there is no response body and so no reason to consult. */
 function isRetryableKind(kind: CalendarErrorKind): boolean {
   return kind === 'rate_limited' || kind === 'transient';
+}
+
+/**
+ * Retry decision for a classified RESPONSE, where Google's reason is available.
+ *
+ * Identical to `isRetryableKind` except that a project-level quota throttle is
+ * terminal: see PROJECT_QUOTA_403_REASONS. A 429 carries no reason and stays
+ * retryable, as before.
+ */
+function isRetryable(kind: CalendarErrorKind, reason?: string): boolean {
+  if (!isRetryableKind(kind)) return false;
+  return !(reason && PROJECT_QUOTA_403_REASONS.has(reason));
 }
 
 /** One `events.list` item, restricted to the masked fields (times-only read). */
@@ -304,7 +335,17 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
       let detail = '';
       let reason: string | undefined;
       try {
-        const body = (await res.json()) as {
+        // ⚠️ Its OWN timeout. `withTimeout` in `attempt()` covers only the fetch;
+        // `json()` is a deferred closure over a body that may never finish
+        // arriving. This read now sits IN FRONT of the 401 one-shot re-mint, so a
+        // response whose headers land but whose body stalls would otherwise hang
+        // the re-mint, the authedFetch promise, and — reconcile awaiting
+        // connections in turn — the whole poll, indefinitely.
+        const body = (await withTimeout(
+          res.json(),
+          REQUEST_TIMEOUT_MS,
+          'Google Calendar error body timed out'
+        )) as {
           error?: { message?: string; errors?: Array<{ reason?: string }> };
         };
         reason = body?.error?.errors?.[0]?.reason;
@@ -332,9 +373,9 @@ function createAuthedFetch(tokenProvider: TokenProvider) {
         `Google Calendar HTTP ${res.status}${detail ? ` (${detail})` : ''}`,
         res.status
       );
-      // Only rate limits (429 AND throttling 403s) and 5xx are worth retrying;
-      // everything else is the caller's to handle.
-      if (isRetryableKind(kind) && i < RETRY_BACKOFF_MS.length) {
+      // Only per-user rate limits (429 AND throttling 403s) and 5xx are worth
+      // retrying; a project-level quota and every other kind is the caller's.
+      if (isRetryable(kind, reason) && i < RETRY_BACKOFF_MS.length) {
         lastErr = err;
         await delay(RETRY_BACKOFF_MS[i]);
         continue;

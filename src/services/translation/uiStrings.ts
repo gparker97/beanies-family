@@ -2521,7 +2521,7 @@ const STRING_DEFS = {
   'settings.discordCtaAction': { en: 'Join', beanie: 'join' },
   'settings.card.reminders': { en: 'Reminders', beanie: 'reminders' },
   'settings.card.remindersDesc': {
-    en: 'Notification timing for activities, travel & to-dos',
+    en: 'Notification timing for activities, travel, to-dos & lists',
     beanie: 'when we nudge you',
   },
   'settings.card.appearance': { en: 'Appearance', beanie: 'appearance' },
@@ -4255,11 +4255,32 @@ const STRING_DEFS = {
   // reminder, so `dueHint` states that consequence at the moment it is chosen
   // rather than leaving it to be discovered the next morning.
   'lists.fromRecipe.ownerLabel': { en: 'Who’s shopping', beanie: 'who’s shopping' },
-  'lists.fromRecipe.dueDateLabel': { en: 'Needed by', beanie: 'needed by' },
+  // No `dueDateLabel` of its own — the sheet reuses `lists.detail.dueDateLabel`,
+  // the same field's label in the list drawer. The short-lived duplicate was
+  // auto-translated into zh as a PERSON ("requirement provider"), because
+  // "Needed by" reads as "by whom" without the field for context.
+  'lists.error.unknownOwner': {
+    en: 'That list needs a family member',
+    beanie: 'that list needs a family member',
+  },
+  'lists.error.unknownOwnerHelp': {
+    en: 'Pick who the list is for, then try again. A list with no one attached would not reach anybody.',
+    beanie:
+      'pick who the list is for, then try again. a list with no one attached would not reach anybody.',
+  },
   'lists.fromRecipe.dueDatePlaceholder': { en: 'No due date', beanie: 'no due date' },
+  // Deliberately says "that morning", never a literal hour: the hour lives in
+  // `ALL_DAY_REMINDER_HOUR`, and spelling it here would put a copy of it in every
+  // locale for the constant to drift away from.
   'lists.fromRecipe.dueHint': {
-    en: '{name} will get a reminder at 9am that morning.',
-    beanie: '{name} will get a reminder at 9am that morning.',
+    en: '{name} gets a reminder on their device that morning.',
+    beanie: '{name} gets a reminder on their device that morning.',
+  },
+  // Web and the PWA arm no OS reminder at all (`useLocalNotifications` returns
+  // early off-native), so there the hint must not promise one.
+  'lists.fromRecipe.dueHintWeb': {
+    en: 'Shows up as due for {name} that morning.',
+    beanie: 'shows up as due for {name} that morning.',
   },
   'lists.fromRecipe.someone': { en: 'Whoever owns it', beanie: 'whoever owns it' },
   // An owner removed on another device while this sheet was open. Important

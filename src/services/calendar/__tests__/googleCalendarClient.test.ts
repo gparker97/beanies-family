@@ -247,7 +247,7 @@ describe('googleCalendarClient authedFetch — 403 is ambiguous (2026-09-13)', (
     error: { message: 'Rate Limit Exceeded', errors: [{ reason }] },
   });
 
-  it.each(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'])(
+  it.each(['rateLimitExceeded', 'userRateLimitExceeded'])(
     '🔴 classifies a 403 %s as rate_limited, and RETRIES it',
     async (reason) => {
       const { provider } = makeTokenProvider();
@@ -264,6 +264,28 @@ describe('googleCalendarClient authedFetch — 403 is ambiguous (2026-09-13)', (
       expect((err as CalendarApiError).kind).toBe('rate_limited');
       // 🔴 The backoff budget was spent — 'forbidden' is terminal and would be 1.
       expect(fetchMock).toHaveBeenCalledTimes(3);
+    }
+  );
+
+  it.each(['quotaExceeded', 'dailyLimitExceeded'])(
+    '🔴 classifies a 403 %s as rate_limited but does NOT retry it',
+    async (reason) => {
+      // Project-level quota: still a throttle (so it never parks the connection and
+      // never pages) but the allowance cannot return inside a 2-second backoff, so
+      // retrying spends two more guaranteed-futile requests against an already
+      // exhausted SHARED quota — on every device, every poll.
+      const { provider } = makeTokenProvider();
+      const fetchMock = vi.fn(async () => jsonResponse(403, rateLimitBody(reason)));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = createGoogleCalendarClient(provider);
+
+      const err = await withTimers(() =>
+        client
+          .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+          .catch((e: unknown) => e)
+      );
+      expect((err as CalendarApiError).kind).toBe('rate_limited');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     }
   );
 

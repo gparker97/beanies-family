@@ -12,6 +12,7 @@ import { mount } from '@vue/test-utils';
 const h = vi.hoisted(() => ({
   currentMember: { id: 'm1' } as { id: string } | undefined,
   members: [{ id: 'm1' }, { id: 'm2' }] as Array<{ id: string }>,
+  native: true,
   lists: [] as Array<Record<string, unknown>>,
   recipes: [{ id: 'r1' }] as Array<{ id: string }>,
   createList: vi.fn(async (_seed: unknown): Promise<unknown> => ({ id: 'new-list' })),
@@ -41,6 +42,7 @@ vi.mock('@/stores/familyStore', () => ({
     },
   }),
 }));
+vi.mock('@/services/sync/capabilities', () => ({ isNative: () => h.native }));
 vi.mock('@/composables/useMemberInfo', () => ({
   useMemberInfo: () => ({ getMemberName: (id: string, fallback: string) => id || fallback }),
 }));
@@ -99,7 +101,7 @@ function mountSheet(recipe: TestRecipe = RECIPE) {
         },
         BeanieDatePicker: {
           name: 'BeanieDatePicker',
-          props: ['modelValue', 'label', 'placeholder'],
+          props: ['modelValue', 'label', 'placeholder', 'min'],
           template: '<div />',
         },
       },
@@ -113,6 +115,7 @@ const save = (w: ReturnType<typeof mountSheet>) =>
 beforeEach(() => {
   h.currentMember = { id: 'm1' };
   h.members = [{ id: 'm1' }, { id: 'm2' }];
+  h.native = true;
   h.lists = [];
   h.recipes = [{ id: 'r1' }];
   h.toasts = [];
@@ -394,6 +397,34 @@ describe('who shops and by when', () => {
     expect(hints().at(-1)!.props('text')).toBe('');
     await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
     expect(hints().at(-1)!.props('text')).toContain('dueHint');
+  });
+
+  it('🔴 does not promise a notification on web, where none is ever armed', async () => {
+    // `useLocalNotifications` returns at `if (!isNative()) return` and there is no
+    // service-worker fallback — so on web/PWA the OS reminder does not exist and
+    // the hint must say what DOES happen instead.
+    h.native = false;
+    const w = mountSheet();
+    await w.findComponent({ name: 'BeanieDatePicker' }).vm.$emit('update:modelValue', '2026-09-20');
+    const text = w.findAllComponents({ name: 'InferredHint' }).at(-1)!.props('text');
+    expect(text).toContain('dueHintWeb');
+    expect(text).not.toContain("lists.fromRecipe.dueHint'");
+  });
+
+  it('🔴 offers no past due date, which would arm nothing', async () => {
+    const w = mountSheet();
+    expect(w.findComponent({ name: 'BeanieDatePicker' }).props('min')).toBeTruthy();
+  });
+
+  it('🔴 renders exactly ONE label for the date field', async () => {
+    // BeanieDatePicker renders its own visible <label> from `:label`; a sibling
+    // <p> stacked the same words twice in two faces and announced it twice.
+    const w = mountSheet();
+    const labels = w.findAll('p, label').map((n) => n.text());
+    expect(labels.filter((x) => x.includes('dueDateLabel'))).toHaveLength(0);
+    expect(w.findComponent({ name: 'BeanieDatePicker' }).props('label')).toBe(
+      'lists.detail.dueDateLabel'
+    );
   });
 
   it('🔴 refuses when the chosen owner has left the family mid-sheet', async () => {

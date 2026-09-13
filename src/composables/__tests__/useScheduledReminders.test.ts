@@ -648,7 +648,14 @@ describe('list due-date reminders', () => {
   });
 
   it('skips a malformed list without aborting the rest', () => {
-    const bad = { id: 'bad', dueDate: '2026-05-24', lifecycle: 'oneoff' } as unknown as FamilyList;
+    // Owned by the viewer, so it passes the audience gate and actually reaches
+    // the `.items` deref that throws — otherwise this asserts nothing.
+    const bad = {
+      id: 'bad',
+      dueDate: '2026-05-24',
+      lifecycle: 'oneoff',
+      ownerId: 'me',
+    } as unknown as FamilyList;
     const res = buildReminderSchedule(
       input({ lists: [bad, list({ id: 'good' as UUID })] }),
       NOW,
@@ -700,5 +707,126 @@ describe('list created after 09:00 on the day it is due', () => {
     // Never schedule an alarm at an Invalid Date.
     expect(listFireTime('2026-05-24', 'not-a-date')).toEqual(new Date('2026-05-24T09:00:00'));
     expect(listFireTime('2026-05-24', undefined)).toEqual(new Date('2026-05-24T09:00:00'));
+  });
+});
+
+describe('who a list reminder is armed for — the review’s findings', () => {
+  // `classifyOwnerAudience` answers 'hidden' ONLY for an adult owner. Gating on
+  // `!== 'hidden'` — the shape the to-do builder uses — therefore lets an empty,
+  // stale or child owner through onto every device in the house. These are the
+  // regression tests for that; each returned a reminder before the fix.
+  const listsFor = (l: FamilyList, viewer = me) =>
+    buildReminderSchedule(
+      input({ lists: [l], currentMember: viewer }),
+      NOW,
+      PREFS
+    ).reminders.filter((r) => r.kind === 'list');
+
+  it('🔴 arms NOTHING for a list whose owner no longer exists', () => {
+    // `familyStore.deleteMember` does not cascade to lists, so this is permanent
+    // stored state, not a race. Pre-fix this armed on every remaining phone.
+    expect(listsFor(list({ ownerId: 'ghost' }))).toEqual([]);
+  });
+
+  it('🔴 arms NOTHING for a list with an empty ownerId', () => {
+    // `NewListSheet` writes `currentMember?.id ?? ''`, so this is reachable.
+    expect(listsFor(list({ ownerId: '' }))).toEqual([]);
+  });
+
+  it('🔴 does not arm a CHILD’s list on a parent’s device', () => {
+    // The briefing shows this to parents framed with the child's name. A lock
+    // screen cannot, and "Due today — 2 left" reads as the parent's own list.
+    const kid = { id: 'kid', name: 'Joey', isPet: false } as FamilyMember;
+    // ⚠️ The viewer must be an ADULT (`isAdultMember` needs role/ageGroup), or
+    // `classifyAudience` answers 'hidden' for the sibling case and this test
+    // passes for the wrong reason — it did, until a mutation check caught it.
+    const parent = { id: 'me', name: 'Greg', role: 'owner' } as FamilyMember;
+    const resolve = (id: string) => (id === 'kid' ? kid : id === 'me' ? parent : undefined);
+    expect(
+      buildReminderSchedule(
+        input({
+          lists: [list({ ownerId: 'kid' })],
+          currentMember: parent,
+          resolveMember: resolve,
+        }),
+        NOW,
+        PREFS
+      ).reminders.filter((r) => r.kind === 'list')
+    ).toEqual([]);
+  });
+
+  it('still arms it on the OWNER’s own device', () => {
+    // Anti-vacuity for all three above.
+    expect(listsFor(list())).toHaveLength(1);
+  });
+});
+
+describe('a due date added to a list made days ago', () => {
+  it('🔴 still fires the same day, keyed on the last touch', () => {
+    // The primary editing flow: a standing "Groceries" list given "due today" at
+    // 11am. Keyed on `createdAt` alone this armed NOTHING — the 09:00 anchor was
+    // past and creation was days behind it — while the changelog claimed the
+    // opposite.
+    const [r] = buildReminderSchedule(
+      input({
+        lists: [
+          list({
+            dueDate: '2026-05-22',
+            createdAt: '2026-05-18T08:00:00.000Z',
+            updatedAt: new Date('2026-05-22T11:00:00').toISOString(),
+          }),
+        ],
+      }),
+      NOW,
+      PREFS
+    ).reminders.filter((x) => x.kind === 'list');
+    expect(r).toBeDefined();
+    expect(r.fireAt).toEqual(new Date('2026-05-22T11:15:00'));
+  });
+
+  it('ignores an updatedAt that trails createdAt (clock-skewed peer)', () => {
+    expect(listFireTime('2026-05-24', '2026-05-20T08:00:00.000Z')).toEqual(
+      new Date('2026-05-24T09:00:00')
+    );
+  });
+});
+
+describe('a dropped list reminder is visible in telemetry', () => {
+  // CLAUDE.md makes "could I diagnose this from the logs alone?" an acceptance
+  // criterion. These two branches are the likeliest answers to "it never fired".
+  it('counts a list whose moment has already passed today as gated', () => {
+    // Due today, untouched since Monday: the 09:00 anchor is behind NOW (10:00).
+    const res = buildReminderSchedule(
+      input({
+        lists: [
+          list({
+            dueDate: '2026-05-22',
+            createdAt: '2026-05-20T08:00:00.000Z',
+            updatedAt: '2026-05-20T08:00:00.000Z',
+          }),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(res.reminders.filter((r) => r.kind === 'list')).toEqual([]);
+    expect(res.gated).toBe(1);
+  });
+
+  it('counts a catch-up that would spill past midnight as gated', () => {
+    const res = buildReminderSchedule(
+      input({
+        lists: [
+          list({
+            dueDate: '2026-05-22',
+            updatedAt: new Date('2026-05-22T23:55:00').toISOString(),
+          }),
+        ],
+      }),
+      NOW,
+      PREFS
+    );
+    expect(res.reminders.filter((r) => r.kind === 'list')).toEqual([]);
+    expect(res.gated).toBe(1);
   });
 });

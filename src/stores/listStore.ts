@@ -402,7 +402,45 @@ export const useListStore = defineStore('lists', () => {
     });
   }
 
+  /**
+   * Create a list.
+   *
+   * ⚠️ Refuses an `ownerId` that does not resolve to a family member, INCLUDING the
+   * empty string. This lives here, not in the callers, because there are four of
+   * them (`NewListSheet` — which passes `currentMember?.id ?? ''` —
+   * `createFromTemplate` with its arbitrary `overrides.ownerId`, `RecipeListSheet`,
+   * and the copy path) and only one had the check. `copyListForMembers` already
+   * states the same rule one layer down with `CopyFailure('unknown-member')`;
+   * stating it in the store makes it one rule with one behaviour.
+   *
+   * A list owned by nobody is not a cosmetic defect. `classifyOwnerAudience` maps
+   * an unresolvable owner to 'unassigned', which is how an unowned dated list ended
+   * up arming the 09:00 reminder on every device in the house — the audience gate
+   * in `buildListReminders` now refuses it, and this refuses to create it.
+   */
   async function createList(input: CreateFamilyListInput): Promise<FamilyList | null> {
+    const roster = useFamilyStore().members;
+    // ⚠️ Only enforced once the roster is actually LOADED. Refusing against an
+    // empty `members` would block list creation in any flow that seeds before the
+    // family store has hydrated (first-run, template seeding) — a total failure,
+    // and a strictly worse one than the dangling owner this prevents. With a
+    // loaded roster, an empty or unresolvable `ownerId` is a genuine bug.
+    if (roster.length > 0 && (!input.ownerId || !roster.some((m) => m.id === input.ownerId))) {
+      const t = useTranslationStore().t;
+      // `silent`: reported here under a precise surface, so the toast must not
+      // also auto-report on the catch-all `app` surface.
+      showToast('error', t('lists.error.unknownOwner'), t('lists.error.unknownOwnerHelp'), {
+        silent: true,
+      });
+      reportError({
+        surface: 'lists',
+        message:
+          'refused to create a list whose ownerId does not resolve to a family member. Check the caller resolves an owner before calling createList — an unowned list reaches nobody and arms reminders on every device.',
+        severity: 'error',
+        context: { action: 'create_unknown_owner' },
+      });
+      return null;
+    }
     const result = await wrapAsync(
       isLoading,
       error,

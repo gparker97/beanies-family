@@ -399,16 +399,17 @@ export const LIST_SAME_DAY_GRACE_MINUTES = 15;
 
 /**
  * When a list's due-date reminder should fire — the 09:00 morning anchor, or a
- * catch-up shortly after creation when the list was made after 09:00 on the very
- * day it is due.
+ * catch-up shortly after the list was last touched, when that happened after
+ * 09:00 on the very day it is due.
  *
  * That second case is the common one and the whole reason this isn't a bare
- * `allDayAnchor`: a shopping list created at 3pm for tonight has already missed
- * its 09:00, and firing nothing would silently drop exactly the reminder the
- * family wanted most.
+ * `allDayAnchor`. Two flows land in it: a shopping list created at 3pm for
+ * tonight, and — the one the first cut of this function missed — a standing list
+ * given "due today" at 11am. Both have already missed 09:00, and firing nothing
+ * would silently drop exactly the reminder the family wanted most.
  *
- * ⚠️ BOTH inputs are IMMUTABLE (`dueDate`, `createdAt`) and `now` is deliberately
- * NOT one of them. Every reschedule re-arms the entire desired set under the same
+ * ⚠️ Both inputs are STORED DATA (`dueDate`, a list timestamp) and `now` is
+ * deliberately NOT one of them. Every reschedule re-arms the entire desired set under the same
  * stable ids (`reconcileScheduled`), so a fire time of "now + 15 minutes" would be
  * pushed further out on every foreground and data change and the reminder would
  * walk forward forever without ever arriving. Keep this a pure function of stored
@@ -422,14 +423,14 @@ export const LIST_SAME_DAY_GRACE_MINUTES = 15;
  * has not seen yet. The daily briefing still carries it. Widening the grace trades
  * that window against buzzing the author mid-edit; 15 minutes is the balance.
  */
-export function listFireTime(dueDateISO: string, createdAt: string | undefined): Date | null {
+export function listFireTime(dueDateISO: string, touchedAt: string | undefined): Date | null {
   const anchor = allDayAnchor(dueDateISO);
   if (!anchor) return null;
-  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
-  // A malformed/absent `createdAt` degrades to the plain morning anchor rather
+  const touchedMs = touchedAt ? new Date(touchedAt).getTime() : NaN;
+  // A malformed/absent timestamp degrades to the plain morning anchor rather
   // than producing an Invalid Date — never schedule an alarm at NaN.
-  if (Number.isNaN(createdMs)) return anchor;
-  const fireMs = Math.max(anchor.getTime(), createdMs + LIST_SAME_DAY_GRACE_MINUTES * 60_000);
+  if (Number.isNaN(touchedMs)) return anchor;
+  const fireMs = Math.max(anchor.getTime(), touchedMs + LIST_SAME_DAY_GRACE_MINUTES * 60_000);
   const endOfDueDay = localDateTime(dueDateISO, '23:59');
   if (endOfDueDay && fireMs > endOfDueDay.getTime()) return null;
   return new Date(fireMs);
@@ -481,14 +482,24 @@ export function buildListReminders(
     try {
       if (isRecurring(list) || !list.dueDate) continue;
       if (isFiled(list)) continue; // ticked off already — nothing left to say
+      // ⚠️ STRICT: only the owner, i.e. only `assignee`. Gating on `!== 'hidden'`
+      // (the shape `buildTodoReminders` uses) is WRONG for a list, and silently so:
+      // `classifyOwnerAudience` answers 'hidden' only for an ADULT owner. An empty
+      // or unresolvable `ownerId` degrades to 'unassigned' and a child owner to
+      // 'forChild', and NEITHER is hidden — so every phone in the house would be
+      // armed. `familyStore.deleteMember` does not cascade to lists, so a dangling
+      // ownerId is permanent stored state, not a transient race: one removed member
+      // who owned a dated list would wake the whole family at 09:00, forever.
+      // A child-owned list still reaches their parents through the daily briefing,
+      // which frames it with the child's name; a lock-screen reminder cannot.
       const audience = classifyOwnerAudience(
         list.ownerId,
         input.currentMember,
         input.resolveMember
       );
-      if (audience.kind === 'hidden') {
+      if (audience.kind !== 'assignee') {
         gated++;
-        continue; // someone else's — never surface it
+        continue; // not the owner's device — never surface it
       }
       // Mirrors the briefing's `remaining === 0` rule (`useCriticalItems.ts`):
       // an empty or fully-ticked-but-unfiled list has nothing to shop for, and
@@ -500,9 +511,27 @@ export function buildListReminders(
       }
       const dateISO = list.dueDate.slice(0, 10);
       if (!withinWindow(dateISO, input.windowStartISO, input.windowEndISO)) continue;
-      const fireAt = listFireTime(dateISO, list.createdAt);
-      if (!fireAt) continue;
-      if (fireAt.getTime() <= nowMs) continue;
+      // The last TOUCH, not creation. Setting "due today" at 11am on a list made
+      // last week is the primary editing flow, and keying on `createdAt` alone
+      // armed nothing at all for it — the 09:00 anchor was already past and the
+      // creation date was days behind it. `Math.max` of the two because a
+      // clock-skewed peer can leave `updatedAt` behind `createdAt`.
+      const touchedAt =
+        (list.updatedAt ?? '') > (list.createdAt ?? '') ? list.updatedAt : list.createdAt;
+      const fireAt = listFireTime(dateISO, touchedAt);
+      // Both drops are counted: they are the two most likely answers to "my list
+      // reminder never fired", and a silent `continue` makes them undiagnosable
+      // from CloudWatch. (`withinWindow` above stays uncounted, matching the other
+      // three builders — a future-dated list is not yet in range, not a drop.)
+      if (!fireAt) {
+        gated++; // the catch-up would have spilled past the due day itself
+        continue;
+      }
+      if (fireAt.getTime() <= nowMs) {
+        gated++; // today's moment has already passed (an OVERDUE list exits at
+        // `withinWindow` above, before this — it is out of range, not a drop)
+        continue;
+      }
       out.push({
         id: listDueId(list.id, dateISO),
         fireAt,
