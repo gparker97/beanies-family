@@ -116,7 +116,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   },
   {
     id: 'one-magic-bean',
-    q: 'what counts as one ai read?',
+    q: 'what counts as one magic bean?',
     a: "one document, invitation, itinerary, recipe, etc. with the trial you get one magic bean per day, beanies + magic beans gives you ten a day, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
   },
   {
