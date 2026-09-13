@@ -9010,6 +9010,10 @@ const STRING_DEFS = {
   'vacation.travel.addFerry': { en: 'Ferry', beanie: 'ferry' },
   'vacation.travel.addCar': { en: 'Car', beanie: 'car' },
   'vacation.field.arrivesNextDay': { en: 'Arrives next day', beanie: 'arrives next day' },
+  'vacation.field.arrivesTwoDays': {
+    en: 'Arrives two days later',
+    beanie: 'arrives two days later',
+  },
   'vacation.field.embarkationTime': { en: 'Departure Time', beanie: 'departure time' },
   'vacation.field.carType': { en: 'Car Type', beanie: 'car type' },
   'vacation.field.carLabel': { en: 'Car Name', beanie: 'car name' },
@@ -10741,6 +10745,8 @@ const STRING_DEFS = {
   },
   'settings.exchangeRates.fetch': { en: 'Fetch Rates', beanie: 'fetch rates' },
   'vacation.field.nextDayBadge': { en: '+1', beanie: '+1' },
+  // A westbound date-line crossing lands two calendar days after it leaves.
+  'vacation.field.twoDayBadge': { en: '+2', beanie: '+2' },
   'vacation.field.flightNumberPlaceholder': { en: 'e.g. 1842', beanie: 'e.g. 1842' },
   'vacation.field.carLabelPlaceholder': { en: 'e.g. Tesla Model Y', beanie: 'e.g. tesla model y' },
   'vacation.field.durationPlaceholder': { en: 'e.g. 2 hours', beanie: 'e.g. 2 hours' },

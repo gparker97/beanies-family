@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-13",
-    "translationCount": 4755
+    "translationCount": 4757
   },
   "translations": {
     "app.name": {
@@ -8307,7 +8307,7 @@
       "lastUpdated": "2026-03-21"
     },
     "vacation.field.arrivesNextDay": {
-      "translation": "次日入住",
+      "translation": "次日抵达",
       "hash": "t7n9ot",
       "lastUpdated": "2026-03-21"
     },
@@ -16177,7 +16177,7 @@
       "lastUpdated": "2026-06-15"
     },
     "vacation.field.nextDayBadge": {
-      "translation": "1",
+      "translation": "+1",
       "hash": "12e",
       "lastUpdated": "2026-06-15"
     },
@@ -18787,8 +18787,8 @@
       "lastUpdated": "2026-07-23"
     },
     "settings.card.remindersDesc": {
-      "translation": "活动、差旅、待办事项和列表的通知时间",
-      "hash": "7uw3zc",
+      "translation": "活动、旅行和待办事项的通知时间",
+      "hash": "rhafy5",
       "lastUpdated": "2026-09-13"
     },
     "settings.discordCtaAction": {
@@ -23779,6 +23779,16 @@
     "reminders.listBodyForChild": {
       "translation": "{who}的清单 — 剩余{n}项",
       "hash": "6c4wov",
+      "lastUpdated": "2026-09-13"
+    },
+    "vacation.field.arrivesTwoDays": {
+      "translation": "两天后抵达",
+      "hash": "9a62hn",
+      "lastUpdated": "2026-09-13"
+    },
+    "vacation.field.twoDayBadge": {
+      "translation": "+2",
+      "hash": "12f",
       "lastUpdated": "2026-09-13"
     }
   }

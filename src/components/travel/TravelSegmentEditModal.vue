@@ -20,7 +20,7 @@ import {
   type BookingValidationRules,
 } from '@/composables/useBookingValidation';
 import { useVacationStore } from '@/stores/vacationStore';
-import { addHourToTime, addDaysYmd } from '@/utils/date';
+import { addHourToTime, addDaysYmd, extractDatePart } from '@/utils/date';
 import {
   buildAirlineOptions,
   buildAirportOptions,
@@ -78,7 +78,23 @@ const arrivalAirport = ref('');
 const departureDate = ref('');
 const departureTime = ref('');
 const arrivalTime = ref('');
-const arrivesNextDay = ref(false);
+/**
+ * How many CALENDAR days after departure the flight lands: 0, 1 or 2.
+ *
+ * Replaces a boolean `arrivesNextDay`, which could not express a westbound
+ * date-line crossing (LAX Mon night → SYD Wed morning is +2). That was not just a
+ * missing option: `computeAccommodationGaps` covers the nights from departure up
+ * to arrival, so with arrival pinned at +1 the second night was reported as
+ * unbooked accommodation with no control that could clear it — and the arrival
+ * occurrence, its reminder and `extendTripDates` all landed a day early too.
+ *
+ * Deliberately NOT a new CRDT field: the offset is derived from the two dates
+ * already stored. `arrivesNextDay` is still WRITTEN as a shadow for pre-update
+ * clients, the same way a recurring list writes `frequency` beside `cadence`.
+ */
+const arrivalDayOffset = ref(0);
+/** 0 → +1 → +2 → 0. One tap cycles, so the control keeps its original footprint. */
+const MAX_ARRIVAL_OFFSET = 2;
 const terminal = ref('');
 const cruiseLine = ref('');
 const shipName = ref('');
@@ -128,7 +144,13 @@ const { isSubmitting } = useFormModal(
       departureDate.value = seg.departureDate ?? '';
       departureTime.value = seg.departureTime ?? '';
       arrivalTime.value = seg.arrivalTime ?? '';
-      arrivesNextDay.value = seg.arrivesNextDay ?? false;
+      // Derived from the stored dates, so a +2 arrival round-trips. Falls back to
+      // the legacy boolean only when there is no arrivalDate to measure.
+      arrivalDayOffset.value = deriveArrivalOffset(
+        extractDatePart(seg.departureDate ?? ''),
+        extractDatePart(seg.arrivalDate ?? ''),
+        seg.arrivesNextDay ?? false
+      );
       terminal.value = seg.terminal ?? '';
       cruiseLine.value = seg.cruiseLine ?? '';
       shipName.value = seg.shipName ?? '';
@@ -165,7 +187,7 @@ const { isSubmitting } = useFormModal(
       departureDate.value = '';
       departureTime.value = '';
       arrivalTime.value = '';
-      arrivesNextDay.value = false;
+      arrivalDayOffset.value = 0;
       terminal.value = '';
       cruiseLine.value = '';
       shipName.value = '';
@@ -362,10 +384,36 @@ function handleDepartureTimeChange(val: string | number) {
   }
 }
 
-/** Compute arrivalDate from departureDate + arrivesNextDay */
+/**
+ * Days between two ymd strings, clamped to what the control offers.
+ *
+ * Pure string maths on purpose — see the warning in `computedArrivalDate` about
+ * the local-Date-then-toISOString pattern. A stored value beyond the range is
+ * clamped for DISPLAY only; it is rewritten only if the user saves.
+ */
+function deriveArrivalOffset(dep: string, arr: string, legacyNextDay: boolean): number {
+  if (!dep || !arr) return legacyNextDay ? 1 : 0;
+  for (let n = 0; n <= MAX_ARRIVAL_OFFSET; n++) {
+    if (addDaysYmd(dep, n) === arr) return n;
+  }
+  return arr > dep ? MAX_ARRIVAL_OFFSET : 0;
+}
+
+/** The badge shows what the CURRENT value is; at 0 it shows the +1 it offers. */
+const arrivalOffsetBadge = computed(() =>
+  arrivalDayOffset.value === 2 ? t('vacation.field.twoDayBadge') : t('vacation.field.nextDayBadge')
+);
+/** Spoken/hover label, so the badge is not a bare "+2" to a screen reader. */
+const arrivalOffsetLabel = computed(() =>
+  arrivalDayOffset.value === 2
+    ? t('vacation.field.arrivesTwoDays')
+    : t('vacation.field.arrivesNextDay')
+);
+
+/** Compute arrivalDate from departureDate + the arrival-day offset */
 const computedArrivalDate = computed(() => {
   if (!departureDate.value) return '';
-  if (arrivesNextDay.value) {
+  if (arrivalDayOffset.value > 0) {
     // addDaysYmd, NOT a local Date read back through toISOString. That pattern builds the
     // date in LOCAL time, adds a day, then reads the UTC calendar date — which cancels the
     // +1 for every user at UTC+0 or east of it. Measured: Europe/London and Asia/Singapore
@@ -376,7 +424,7 @@ const computedArrivalDate = computed(() => {
     // day, extendTripDates never widens to the real arrival, and computeAccommodationGaps
     // needs arrival > departure to treat an overnight flight as covering that night — so the
     // night the family is in the air was reported as an unbooked gap.
-    return addDaysYmd(departureDate.value, 1);
+    return addDaysYmd(departureDate.value, arrivalDayOffset.value);
   }
   return departureDate.value;
 });
@@ -416,7 +464,8 @@ async function handleSave() {
         departureTime: departureTime.value,
         arrivalDate: computedArrivalDate.value,
         arrivalTime: arrivalTime.value,
-        arrivesNextDay: arrivesNextDay.value,
+        // Shadow for pre-update clients, which only understand the boolean.
+        arrivesNextDay: arrivalDayOffset.value >= 1,
         terminal: terminal.value,
         cruiseLine: cruiseLine.value,
         shipName: shipName.value,
@@ -666,19 +715,23 @@ async function handleSave() {
               >
                 <div class="flex items-center gap-1.5">
                   <BeanieTimeInput v-model="arrivalTime" class="min-w-0 flex-1" />
+                  <!-- One tap cycles 0 → +1 → +2 → 0. A westbound date-line crossing
+                       lands two calendar days later, which the old boolean could not
+                       say — and an uncoverable night then showed as unbooked. -->
                   <button
                     type="button"
-                    :aria-pressed="arrivesNextDay"
-                    :title="t('vacation.field.arrivesNextDay')"
+                    :aria-pressed="arrivalDayOffset > 0"
+                    :aria-label="arrivalOffsetLabel"
+                    :title="arrivalOffsetLabel"
                     class="font-outfit shrink-0 rounded-full border-2 px-2 py-1 text-xs font-bold transition-all"
                     :class="
-                      arrivesNextDay
+                      arrivalDayOffset > 0
                         ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
                         : 'dark:bg-surface-overlay dark:text-ink-soft border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
                     "
-                    @click="arrivesNextDay = !arrivesNextDay"
+                    @click="arrivalDayOffset = (arrivalDayOffset + 1) % (MAX_ARRIVAL_OFFSET + 1)"
                   >
-                    {{ t('vacation.field.nextDayBadge') }}
+                    {{ arrivalOffsetBadge }}
                   </button>
                 </div>
               </FormFieldGroup>

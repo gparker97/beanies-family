@@ -50,9 +50,9 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
         icon: '\u{1F527}',
         title: { en: 'Other minor bugs and fixes', beanie: 'other minor bugs and fixes' },
         description: {
-          en: 'Plus a batch of smaller fixes: calendar syncing, photos that could look missing, and a few buttons that were hard to reach on a phone.',
+          en: 'Plus a batch of smaller fixes: calendar syncing, photos that could look missing, long-haul flights that land two days later, and a few buttons that were hard to reach on a phone.',
           beanie:
-            'plus a batch of smaller fixes: calendar syncing, photos that could look missing, and a few buttons that were hard to reach on a phone.',
+            'plus a batch of smaller fixes: calendar syncing, photos that could look missing, long-haul flights that land two days later, and a few buttons that were hard to reach on a phone.',
         },
       },
       {
