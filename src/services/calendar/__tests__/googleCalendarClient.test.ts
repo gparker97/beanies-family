@@ -223,3 +223,112 @@ describe('googleCalendarClient authedFetch — HTTP 400 classification + reason 
     ).rejects.toMatchObject({ kind: 'invalid', message: 'Google Calendar HTTP 400' });
   });
 });
+
+describe('googleCalendarClient authedFetch — 403 is ambiguous (2026-09-13)', () => {
+  // The defect this block exists for: Google Calendar answers THROTTLING with 403,
+  // not 429. Classifying every 403 as 'forbidden' made a self-healing rate limit
+  // terminal — no backoff retry, connection parked as `lastError: 'forbidden'`,
+  // and a critical Slack page on the third consecutive poll.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Run `fn` while auto-advancing timers, so the backoff delays resolve. */
+  async function withTimers<T>(fn: () => Promise<T>): Promise<T> {
+    const p = fn();
+    await vi.runAllTimersAsync();
+    return p;
+  }
+
+  const rateLimitBody = (reason: string) => ({
+    error: { message: 'Rate Limit Exceeded', errors: [{ reason }] },
+  });
+
+  it.each(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'])(
+    '🔴 classifies a 403 %s as rate_limited, and RETRIES it',
+    async (reason) => {
+      const { provider } = makeTokenProvider();
+      const fetchMock = vi.fn(async () => jsonResponse(403, rateLimitBody(reason)));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = createGoogleCalendarClient(provider);
+
+      const err = await withTimers(() =>
+        client
+          .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+          .catch((e: unknown) => e)
+      );
+      expect(err).toBeInstanceOf(CalendarApiError);
+      expect((err as CalendarApiError).kind).toBe('rate_limited');
+      // 🔴 The backoff budget was spent — 'forbidden' is terminal and would be 1.
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    }
+  );
+
+  it('🔴 still classifies a PERMISSION 403 as forbidden, and does NOT retry', async () => {
+    // The other half of the split. A dropped granular scope must stay terminal —
+    // retrying it three times a poll helps nobody and hides the real problem.
+    const { provider } = makeTokenProvider();
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(403, {
+        error: {
+          message: 'Insufficient Permission',
+          errors: [{ reason: 'insufficientPermissions' }],
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(provider);
+
+    const err = await withTimers(() =>
+      client
+        .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+        .catch((e: unknown) => e)
+    );
+    expect((err as CalendarApiError).kind).toBe('forbidden');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to forbidden when the 403 body carries no readable reason', async () => {
+    // Conservative default: an unparseable body keeps the pre-fix answer rather
+    // than guessing "throttle" and retrying a genuine permission failure.
+    const { provider } = makeTokenProvider();
+    const fetchMock = vi.fn(
+      async () =>
+        ({
+          status: 403,
+          ok: false,
+          json: async () => {
+            throw new Error('not json');
+          },
+        }) as unknown as Response
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(provider);
+
+    const err = await withTimers(() =>
+      client
+        .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+        .catch((e: unknown) => e)
+    );
+    expect((err as CalendarApiError).kind).toBe('forbidden');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Google’s reason in the message either way', async () => {
+    const { provider } = makeTokenProvider();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse(403, rateLimitBody('rateLimitExceeded')))
+    );
+    const client = createGoogleCalendarClient(provider);
+    const err = await withTimers(() =>
+      client
+        .patchEventFields('c1', 'primary', 'inst_1', { status: 'cancelled' })
+        .catch((e: unknown) => e)
+    );
+    expect((err as Error).message).toContain('rateLimitExceeded: Rate Limit Exceeded');
+  });
+});

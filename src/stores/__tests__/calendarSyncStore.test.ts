@@ -277,6 +277,53 @@ describe('calendarSyncStore reconcile engine (fake client)', () => {
     expect(sev[3]).not.toBe('critical'); // does not keep paging
   });
 
+  it('🔴 NEVER pages critical for a rate limit, however long it lasts', async () => {
+    // Google answers throttling with 403, so this arrives on the same path as a
+    // permission failure and would otherwise cross the same threshold. It must
+    // not: a throttle is self-healing (no user action exists to take) and it is a
+    // property of our SHARED quota, so the one condition that trips it trips it
+    // for every syncing family at once — a Slack storm exactly when the channel
+    // needs to stay readable.
+    const { reportError } = await import('@/utils/errorReporter');
+    const mockReport = vi.mocked(reportError);
+    mockReport.mockClear();
+
+    const throttled = makeCalendarClientStub({
+      async insertEvent() {
+        throw new CalendarApiError('rate_limited', 'Google Calendar HTTP 403', 403);
+      },
+      async eventExists() {
+        return false;
+      },
+    });
+    setCalendarClientForTesting(throttled);
+
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity(activityInput());
+    const store = useCalendarSyncStore();
+
+    await store.syncNow();
+    await store.syncNow();
+    await store.syncNow(); // would be the escalation poll for any other kind
+    await store.syncNow();
+
+    const calls = mockReport.mock.calls
+      .map((c) => c[0] as { surface: string; severity?: string; message?: string })
+      .filter((a) => a.surface === 'calendar-sync');
+    expect(calls).toHaveLength(4);
+    expect(calls.map((a) => a.severity)).not.toContain('critical');
+    // Anti-vacuity: it still REPORTS, and still says it is sustained — the signal
+    // is preserved for CloudWatch, only the page is withheld.
+    expect(calls[2].message).toContain('sustained ×3');
+  });
+
   it('parks needs_reconnect (single warning, never sustained-critical) when the token is dead', async () => {
     // Regression guard (2026-07-08): a dead refresh token reaches the engine as a
     // classified 'auth' error (googleCalendarClient no longer clobbers it to

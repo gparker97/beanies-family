@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-13
 
+### Fixed
+
+- **A busy moment on Google's side no longer looks like a permissions problem.** When Google briefly rate-limits calendar syncing it answers with the same code it uses for "you don't have access", so beanies was treating a short, self-correcting delay as a broken connection: it stopped retrying, marked the calendar as errored, and raised an alert. It now tells the two apart, waits and retries as it should, and keeps quiet about something that fixes itself.
+
 ### Added
 
 - **Set who's shopping and when it's needed, right in the recipe's shopping list.** Building a list from a recipe now asks who it's for and when it's needed before you create it, so the list arrives with its details already filled in and the reminder is set from the moment it exists. Adding or changing either later works exactly the same way.
