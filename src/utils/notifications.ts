@@ -117,6 +117,14 @@ export const activityReminderId = (
 // departure occurrence; the date keeps it stable across reschedules.
 export const travelReminderId = (segmentId: string, occurrenceDate: string): string =>
   `travel-reminder:${segmentId}:${occurrenceDate}`;
+/**
+ * OS due-date reminder for a one-off list (no in-app equivalent kind — a dated
+ * list already reaches the bell's owner through the daily briefing, and a third
+ * surface would be the triple-surfacing this file's `helpfulHints` rule avoids).
+ * The date keeps it stable across reschedules, exactly like `todoDueId`.
+ */
+export const listDueId = (listId: string, dueDate: string): string =>
+  `list-due:${listId}:${dueDate}`;
 // One per completion event (encodes completedAt so a re-completion is a new id).
 export const listCompletedId = (listId: string, completedAt: string): string =>
   `list-completed:${listId}:${completedAt}`;
