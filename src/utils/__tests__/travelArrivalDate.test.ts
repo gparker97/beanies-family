@@ -60,3 +60,53 @@ describe('overnight arrival date', () => {
     }
   });
 });
+
+describe('a flight that lands two calendar days later', () => {
+  /**
+   * The reported bug. A westbound date-line crossing (LAX Monday night → SYD
+   * Wednesday morning) lands +2. Arrival was modelled as a BOOLEAN, so it could
+   * only ever say +1 — and `computeAccommodationGaps` covers the nights from
+   * departure up to arrival, so the second night was reported as unbooked
+   * accommodation with no control in the app that could clear it.
+   *
+   * This mirrors the editor's `deriveArrivalOffset` + `computedArrivalDate` pair,
+   * which is where the round-trip has to hold.
+   */
+  const deriveOffset = (dep: string, arr: string, legacy: boolean): number => {
+    if (!dep || !arr) return legacy ? 1 : 0;
+    for (let n = 0; n <= 2; n++) if (addDaysYmd(dep, n) === arr) return n;
+    return arr > dep ? 2 : 0;
+  };
+
+  it('🔴 a +2 arrival round-trips through the editor', () => {
+    const dep = '2026-10-05';
+    const arr = '2026-10-07';
+    const offset = deriveOffset(dep, arr, false);
+    expect(offset).toBe(2);
+    expect(addDaysYmd(dep, offset)).toBe(arr);
+  });
+
+  it('🔴 covers BOTH airborne nights, so neither reads as unbooked', () => {
+    // What `computeAccommodationGaps` walks: departure up to (not including) arrival.
+    const dep = '2026-10-05';
+    const arr = addDaysYmd(dep, 2);
+    const covered: string[] = [];
+    for (let d = dep; d < arr; d = addDaysYmd(d, 1)) covered.push(d);
+    expect(covered).toEqual(['2026-10-05', '2026-10-06']);
+  });
+
+  it('still round-trips 0 and +1', () => {
+    expect(deriveOffset('2026-10-05', '2026-10-05', false)).toBe(0);
+    expect(deriveOffset('2026-10-05', '2026-10-06', false)).toBe(1);
+  });
+
+  it('falls back to the legacy boolean when there is no arrival date to measure', () => {
+    // Pre-update records stored only `arrivesNextDay`.
+    expect(deriveOffset('2026-10-05', '', true)).toBe(1);
+    expect(deriveOffset('2026-10-05', '', false)).toBe(0);
+  });
+
+  it('clamps an out-of-range stored arrival rather than showing a wrong badge', () => {
+    expect(deriveOffset('2026-10-05', '2026-10-20', false)).toBe(2);
+  });
+});

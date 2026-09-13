@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **A flight that lands two days later can say so.** Crossing the international date line westbound, a flight leaves one evening and arrives two calendar days later. beanies could only record "arrives next day", so the extra night showed as missing accommodation with a warning nothing could clear - and the arrival, its reminder and the trip's end date were all a day early. Tap the +1 beside the arrival time again for +2.
+
 - **You can set a shopping list's due date to today again.** Creating a list from a recipe wouldn't let you pick today or any earlier day, while the same field in the lists view would. Every date is selectable again, in both places.
 
 - **A busy moment on Google's side no longer makes your photos look missing.** Google Drive answers a burst of requests with the same code it uses for "this file is gone", so a brief rate limit could mark healthy photos as missing across the app and tell families they lacked permission to their own family file. The two are now told apart, and a busy moment is treated as what it is: something to wait out.
