@@ -31,6 +31,7 @@ const T: Partial<Record<string, string>> = {
   'reminders.todoBodyAllDay': 'Due today',
   'reminders.travelBody': 'Departs at {time}',
   'reminders.listBody': 'Due today — {n} left',
+  'reminders.listBodyForChild': '{who}’s list — {n} left',
 };
 const t = (k: UIStringKey): string => T[k] ?? String(k);
 
@@ -732,26 +733,28 @@ describe('who a list reminder is armed for — the review’s findings', () => {
     expect(listsFor(list({ ownerId: '' }))).toEqual([]);
   });
 
-  it('🔴 does not arm a CHILD’s list on a parent’s device', () => {
-    // The briefing shows this to parents framed with the child's name. A lock
-    // screen cannot, and "Due today — 2 left" reads as the parent's own list.
+  it('🔴 arms a CHILD’s list on a parent’s device, NAMING the child', () => {
+    // Consistent with to-dos, at greg's request. The child's name is what makes it
+    // safe to show: "Due today — 2 left" alone would read as the parent's own list,
+    // which is why the body switches key for the `forChild` audience.
     const kid = { id: 'kid', name: 'Joey', isPet: false } as FamilyMember;
     // ⚠️ The viewer must be an ADULT (`isAdultMember` needs role/ageGroup), or
     // `classifyAudience` answers 'hidden' for the sibling case and this test
     // passes for the wrong reason — it did, until a mutation check caught it.
     const parent = { id: 'me', name: 'Greg', role: 'owner' } as FamilyMember;
     const resolve = (id: string) => (id === 'kid' ? kid : id === 'me' ? parent : undefined);
-    expect(
-      buildReminderSchedule(
-        input({
-          lists: [list({ ownerId: 'kid' })],
-          currentMember: parent,
-          resolveMember: resolve,
-        }),
-        NOW,
-        PREFS
-      ).reminders.filter((r) => r.kind === 'list')
-    ).toEqual([]);
+    const [r] = buildReminderSchedule(
+      input({
+        lists: [list({ ownerId: 'kid' })],
+        currentMember: parent,
+        resolveMember: resolve,
+      }),
+      NOW,
+      PREFS
+    ).reminders.filter((x) => x.kind === 'list');
+    expect(r).toBeDefined();
+    expect(r.body).toContain('Joey');
+    expect(r.body).not.toBe('1 left');
   });
 
   it('still arms it on the OWNER’s own device', () => {

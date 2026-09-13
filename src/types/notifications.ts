@@ -18,6 +18,7 @@ export type NotificationKind =
   | 'todo-due'
   | 'todo-assigned'
   | 'activity-reminder'
+  | 'list-due'
   | 'list-completed'
   | 'calendar-reconnect'
   | 'whats-new'

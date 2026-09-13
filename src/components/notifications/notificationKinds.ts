@@ -23,6 +23,9 @@ export const NOTIFICATION_KIND_PRESENTATION: Record<NotificationKind, KindPresen
   'todo-due': { accent: 'todo', icon: '✅' },
   'todo-assigned': { accent: 'assigned', icon: '📌' },
   'activity-reminder': { accent: 'activity', icon: '📅' },
+  // Same accent + icon as its sibling: it is the same entity, and the overdue
+  // ⏰ variant is carried by the label, exactly as `todo-due` does it.
+  'list-due': { accent: 'list', icon: '🧾' },
   'list-completed': { accent: 'list', icon: '🧾' },
   'calendar-reconnect': { accent: 'calendar-reconnect', icon: '📅' },
   'whats-new': { accent: 'whats-new', icon: '✨', detailBody: WhatsNewBody },
@@ -55,6 +58,8 @@ export function kindLabelKey(kind: NotificationKind, overdue?: boolean): UIStrin
       return 'notifications.kindTodoAssigned';
     case 'activity-reminder':
       return 'notifications.kindActivityReminder';
+    case 'list-due':
+      return overdue ? 'notifications.kindListDueOverdue' : 'notifications.kindListDue';
     case 'list-completed':
       return 'notifications.kindListCompleted';
     case 'calendar-reconnect':
@@ -95,6 +100,10 @@ export function notificationSummary(n: AppNotification, t: T): string {
         : t('notifications.yourTask');
     case 'todo-due':
       return n.subtitle ?? t('notifications.yourTask');
+    // `subtitle` carries the child's name when an adult is seeing a child's list
+    // (the `forChild` audience); otherwise it is the viewer's own.
+    case 'list-due':
+      return n.subtitle ?? t('notifications.yourList');
     case 'list-completed':
       // Fall back to a generic "someone" when the finisher member was deleted
       // (n.subtitle is then empty) — never render a dangling "Finished by ".

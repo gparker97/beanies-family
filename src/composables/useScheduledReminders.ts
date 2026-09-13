@@ -49,7 +49,12 @@ import {
 import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/utils/notifications';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
-import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
+import {
+  classifyAudience,
+  classifyOwnerAudience,
+  isDutyDone,
+  ownerItemSurfaces,
+} from '@/utils/audience';
 import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { isFiled, isRecurring } from '@/utils/listLifecycle';
@@ -440,24 +445,22 @@ export function buildListReminders(
     try {
       if (isRecurring(list) || !list.dueDate) continue;
       if (isFiled(list)) continue; // ticked off already — nothing left to say
-      // ⚠️ STRICT: only the owner, i.e. only `assignee`. Gating on `!== 'hidden'`
-      // (the shape `buildTodoReminders` uses) is WRONG for a list, and silently so:
-      // `classifyOwnerAudience` answers 'hidden' only for an ADULT owner. An empty
-      // or unresolvable `ownerId` degrades to 'unassigned' and a child owner to
-      // 'forChild', and NEITHER is hidden — so every phone in the house would be
-      // armed. `familyStore.deleteMember` does not cascade to lists, so a dangling
-      // ownerId is permanent stored state, not a transient race: one removed member
-      // who owned a dated list would wake the whole family at 09:00, forever.
-      // A child-owned list still reaches their parents through the daily briefing,
-      // which frames it with the child's name; a lock-screen reminder cannot.
+      // `ownerItemSurfaces` — the SAME predicate the in-app deriver uses, so the
+      // drawer and the lock screen can never disagree about the same list (a review
+      // caught them doing exactly that). Gating on `!== 'hidden'`, the shape
+      // `buildTodoReminders` uses, would be wrong here: `classifyOwnerAudience`
+      // answers 'hidden' only for an ADULT owner, so an empty or unresolvable
+      // `ownerId` degrades to 'unassigned' and would arm every phone in the house.
+      // `deleteMember` does not cascade to lists, so that is permanent stored
+      // state, not a transient race.
       const audience = classifyOwnerAudience(
         list.ownerId,
         input.currentMember,
         input.resolveMember
       );
-      if (audience.kind !== 'assignee') {
+      if (!ownerItemSurfaces(audience)) {
         gated++;
-        continue; // not the owner's device — never surface it
+        continue; // not this viewer's to act on — never surface it
       }
       // Mirrors the briefing's `remaining === 0` rule (`useCriticalItems.ts`):
       // an empty or fully-ticked-but-unfiled list has nothing to shop for, and
@@ -490,7 +493,15 @@ export function buildListReminders(
         id: listDueId(list.id, dateISO),
         fireAt,
         title: list.title,
-        body: fillTemplate(input.t('reminders.listBody'), { n: String(remaining) }),
+        // The `forChild` case names the child, mirroring the drawer's subtitle —
+        // "Due today — 2 left" alone reads as the parent's own list.
+        body:
+          audience.kind === 'forChild'
+            ? fillTemplate(input.t('reminders.listBodyForChild'), {
+                n: String(remaining),
+                who: audience.childNames.join(' · '),
+              })
+            : fillTemplate(input.t('reminders.listBody'), { n: String(remaining) }),
         kind: 'list',
         deepLink: entityDeepLink('list', list.id),
       });

@@ -10,7 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-13
 
+### Added
+
+- **A list that's due now appears in your notifications, like a to-do does.** Lists with a due date show up in the notifications drawer on the morning they're due — and stay there, marked overdue, if they slip. A parent seeing a child's list is told whose it is. Previously a due list only ever reached the daily briefing, so there was nothing to see in the drawer.
+
 ### Fixed
+
+- **You can set a shopping list's due date to today again.** Creating a list from a recipe wouldn't let you pick today or any earlier day, while the same field in the lists view would. Every date is selectable again, in both places.
 
 - **A busy moment on Google's side no longer makes your photos look missing.** Google Drive answers a burst of requests with the same code it uses for "this file is gone", so a brief rate limit could mark healthy photos as missing across the app and tell families they lacked permission to their own family file. The two are now told apart, and a busy moment is treated as what it is: something to wait out.
 - **An untimed to-do you add later in the day still reminds you.** A to-do due today with no set time only ever scheduled its reminder for 9am, so adding one in the afternoon — or dating an older one "today" — quietly scheduled nothing. It now arrives a few minutes later instead.

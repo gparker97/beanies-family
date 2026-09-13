@@ -17,7 +17,8 @@ import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
 import { normalizeAssignees } from '@/utils/assignees';
-import { classifyAudience } from '@/utils/audience';
+import { classifyAudience, classifyOwnerAudience, ownerItemSurfaces } from '@/utils/audience';
+import { isFiled, isRecurring } from '@/utils/listLifecycle';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import {
@@ -262,6 +263,45 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       }
     } catch (err) {
       console.warn(`[deriveNotifications] skipped todo ${todo?.id ?? '?'}:`, err);
+    }
+  }
+
+  // ── list-due: a dated one-off list, for the person it belongs to. Mirrors
+  //    `todo-due` exactly — same trigger shape (start of the due day; a list has
+  //    no time), same overdue-is-a-style-on-the-SAME-id rule, same `forChild`
+  //    subtitle. A list that is due should reach the drawer the way a to-do does.
+  for (const list of lists) {
+    try {
+      if (!list?.id || !list.dueDate) continue;
+      if (isRecurring(list) || isFiled(list)) continue; // recurring never files; a done one has nothing to say
+      // Every item ticked but not yet filed → nothing left to shop for. Same rule
+      // the briefing and the OS builder apply, so the three cannot disagree.
+      if (list.items.filter((i) => !i.completed).length === 0) continue;
+      const audience = classifyOwnerAudience(list.ownerId, currentMember, resolveMember);
+      if (!ownerItemSurfaces(audience)) continue;
+
+      const dueDay = localDateTime(list.dueDate);
+      if (!dueDay) continue;
+      const trigger = startOfLocalDay(dueDay);
+      if (!inWindow(trigger.getTime())) continue;
+      const id = listDueId(list.id, list.dueDate);
+      out.push({
+        id,
+        kind: 'list-due',
+        title: list.title,
+        // For a child's list an adult sees (forChild), surface whose it is —
+        // otherwise "Coming due" reads as the parent's own.
+        subtitle: audience.kind === 'forChild' ? audience.childNames.join(' · ') : undefined,
+        occurredAt: trigger.toISOString(),
+        eventDate: list.dueDate,
+        overdue: nowMs > endOfLocalDay(dueDay).getTime(),
+        route: '/lists',
+        query: { view: list.id },
+        sourceId: list.id,
+        read: isRead(id),
+      });
+    } catch (err) {
+      console.warn(`[deriveNotifications] skipped due list ${list?.id ?? '?'}:`, err);
     }
   }
 
