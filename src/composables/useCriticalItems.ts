@@ -15,7 +15,12 @@ import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isTodoOverdue } from '@/utils/todo';
-import { classifyAudience, classifyOwnerAudience, isDutyDone } from '@/utils/audience';
+import {
+  classifyAudience,
+  classifyOwnerAudience,
+  isDutyDone,
+  ownerItemSurfaces,
+} from '@/utils/audience';
 import { isListDue } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
@@ -319,7 +324,12 @@ export function useCriticalItems() {
     if (isFlagEnabled('familyLists')) {
       for (const list of listStore.activeLists) {
         const audience = classifyOwnerAudience(list.ownerId, currentMember, getMemberById);
-        if (audience.kind === 'hidden') continue;
+        // `ownerItemSurfaces`, not `!== 'hidden'` — the SAME predicate the bell
+        // deriver and the OS scheduler use. `classifyOwnerAudience` maps an empty
+        // or unresolvable `ownerId` to 'unassigned', so the looser test put a list
+        // owned by nobody on every member's plate while producing no bell entry
+        // and no reminder for anyone: three surfaces, two answers.
+        if (!ownerItemSurfaces(audience)) continue;
         const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
         if (due === null) continue; // future-dated or recurring → not on the plate
 

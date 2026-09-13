@@ -252,7 +252,17 @@ const transitionName = computed(() =>
   inset: 0;
   justify-content: center;
   opacity: 1;
-  padding: 0;
+
+  /*
+   * Top inset only. This is a `fixed; inset: 0` full-screen overlay and it is the
+   * FIRST screen of a fresh install, including the App Review path — so on a
+   * notched iPhone the step content ran under the status bar. It is not a
+   * BaseModal/BaseSidePanel consumer, so it inherits none of their handling.
+   * The bottom is left to `.ob-nav`, which paints its own background and must
+   * extend INTO the home-indicator strip rather than float above it.
+   * `env()` is 0 on the web, so this is a no-op there.
+   */
+  padding: env(safe-area-inset-top, 0) 0 0;
   position: fixed;
   transition: opacity 0.3s ease;
 
@@ -345,7 +355,10 @@ const transitionName = computed(() =>
   border-top: 1px solid rgb(44 62 80 / 5%);
   display: flex;
   justify-content: space-between;
-  padding: 12px 16px;
+
+  /* Back / Skip / Next sat in the 34px home-indicator strip. Padded rather than
+     offset so the bar's own background still reaches the screen edge. */
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   position: relative;
   z-index: 1;
 }

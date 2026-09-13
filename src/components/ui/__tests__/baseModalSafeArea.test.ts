@@ -67,9 +67,17 @@ describe('a WINDOWED modal cannot reach the notch', () => {
   });
 
   it('is NOT what a fullscreen mobile modal gets', () => {
-    // Anti-vacuity for the branch: proves the two shapes are actually distinct,
-    // even though the padding itself is invisible to this DOM.
+    // Anti-vacuity for the branch: proves the two shapes are actually distinct.
     expect(dialogStyle(mountModal({ fullscreenMobile: true }))).not.toContain('max-height');
+  });
+
+  it('🔴 never pads the SHELL, whose background would show through the band', () => {
+    // The regression this replaced: a white/`surface-raised` strip across the top
+    // and bottom of PhotoViewer's near-black, edge-to-edge photo view, and a
+    // mismatched strip under every form modal's footer.
+    const style = dialogStyle(mountModal({ fullscreenMobile: true }));
+    expect(style).not.toContain('padding-top');
+    expect(style).not.toContain('padding-bottom');
   });
 });
 
@@ -87,7 +95,13 @@ describe('every full-height overlay declares its safe-area inset', () => {
     // The reported bug: the header X in a fullscreen modal.
     [
       'components/ui/BaseModal.vue',
-      [/paddingTop:\s*'env\(safe-area-inset-top/, /paddingBottom:\s*'env\(safe-area-inset-bottom/],
+      [
+        // On the HEADER and FOOTER, never the shell: the shell paints its own
+        // background, so an inset band there takes the wrong colour over any
+        // consumer that paints its body (PhotoViewer, every BeanieFormModal).
+        /fullscreenHeaderStyle[\s\S]{0,240}?paddingTop:\s*'calc\(1rem \+ env\(safe-area-inset-top/,
+        /fullscreenFooterStyle[\s\S]{0,240}?paddingBottom:\s*'calc\(1rem \+ env\(safe-area-inset-bottom/,
+      ],
     ],
     // Its sibling, fixed earlier — kept here so the pair cannot drift apart again.
     [
@@ -104,6 +118,15 @@ describe('every full-height overlay declares its safe-area inset', () => {
     ['components/common/GlobalSearch.vue', [/paddingTop:\s*'env\(safe-area-inset-top/]],
     // Bottom-anchored beside QuickAddFab, which already accounts for the indicator.
     ['components/common/MobileNavBeanStack.vue', [/env\(safe-area-inset-bottom, 0px\) \+ 92px/]],
+    // The FIRST screen of a fresh install, and the App Review path: a `fixed;
+    // inset: 0` overlay with Back/Skip/Next on the bottom edge. Missed by the
+    // first sweep because it is not a BaseModal/BaseSidePanel consumer.
+    [
+      'components/onboarding/OnboardingWizard.vue',
+      [/padding:\s*env\(safe-area-inset-top/, /env\(safe-area-inset-bottom, 0px\)\)/],
+    ],
+    // The only CTA on a shared-recipe landing page, pinned to the bottom edge.
+    ['pages/SharedRecipePage.vue', [/env\(safe-area-inset-bottom, 0px\)/]],
   ];
 
   it.each(SURFACES)('%s', (file, needs) => {

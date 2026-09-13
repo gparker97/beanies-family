@@ -24,7 +24,12 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({
+    // Keys echo back, EXCEPT the ones whose template the assertions care about —
+    // otherwise a test that checks the rendered "1/2" can only check the key name,
+    // which would pass even if the numbers were wrong.
+    t: (k: string) => (k === 'lists.progress' ? '{done}/{total}' : k),
+  }),
 }));
 vi.mock('@/composables/useToast', () => ({
   showToast: (kind: string, title: string, _msg?: string, opts?: Record<string, unknown>) => {

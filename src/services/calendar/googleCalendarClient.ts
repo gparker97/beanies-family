@@ -77,7 +77,15 @@ function isRetryableKind(kind: CalendarErrorKind): boolean {
  */
 function isRetryable(kind: CalendarErrorKind, reason?: string): boolean {
   if (!isRetryableKind(kind)) return false;
-  // A 429 carries no reason and stays retryable; a 403 must name a per-user
+  // ⚠️ The reason only ever narrows a THROTTLE. Applying it to every retryable
+  // kind silently killed the backoff for all 5xx: Google's 5xx bodies carry
+  // `reason: 'backendError'`, which is not in the throttle set, so a routine
+  // backend blip failed the whole reconcile on the first attempt instead of
+  // retrying — and then parked the connection and paged Slack on the third poll.
+  // Worse, it split on whether the load balancer answered with HTML (no reason →
+  // retried) or the API with JSON (reason → not retried).
+  if (kind !== 'rate_limited') return true;
+  // A 429 carries no reason and stays retryable; a 403 must name a PER-USER
   // throttle. Project-level quota is a throttle but not a retryable one.
   return reason === undefined || isGoogleRetryableThrottleReason(reason);
 }

@@ -17,6 +17,60 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.13',
+    date: '2026-09-13',
+    month: '13 september 2026',
+    summary: {
+      en: 'Turn a recipe into a shopping list, and get reminded when a list is due.',
+      beanie: 'turn a recipe into a shopping list, and get reminded when a list is due.',
+    },
+    features: [
+      {
+        icon: '\u{1F6D2}',
+        title: {
+          en: 'Turn a recipe into a shopping list',
+          beanie: 'turn a recipe into a shopping list',
+        },
+        description: {
+          en: 'Open a recipe, tap Shopping List, and beanies fills a new list with its ingredients so you do not have to type them out. Check it over, remove what is already in the cupboard, say who is shopping and when it is needed, then create it. Tap it again later and beanies shows you the list you already started, so you can carry on where you left off.',
+          beanie:
+            'open a recipe, tap shopping list, and beanies fills a new list with its ingredients so you do not have to type them out. check it over, remove what is already in the cupboard, say who is shopping and when it is needed, then create it. tap it again later and beanies shows you the list you already started, so you can carry on where you left off.',
+        },
+      },
+      {
+        icon: '\u{1F9FE}',
+        title: { en: 'Lists that remind you', beanie: 'lists that remind you' },
+        description: {
+          en: 'Give a list a due date and the person it belongs to gets a reminder on the morning it is due, saying how many items are still left. It shows up in your notifications too, and tapping it opens the list. Lists with no due date stay in the daily briefing and keep quiet.',
+          beanie:
+            'give a list a due date and the person it belongs to gets a reminder on the morning it is due, saying how many items are still left. it shows up in your notifications too, and tapping it opens the list. lists with no due date stay in the daily briefing and keep quiet.',
+        },
+      },
+      {
+        icon: '\u{1F527}',
+        title: { en: 'Other minor bugs and fixes', beanie: 'other minor bugs and fixes' },
+        description: {
+          en: 'Plus a batch of smaller fixes: calendar syncing, photos that could look missing, and a few buttons that were hard to reach on a phone.',
+          beanie:
+            'plus a batch of smaller fixes: calendar syncing, photos that could look missing, and a few buttons that were hard to reach on a phone.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.12',
     date: '2026-09-12',
     month: '12 september 2026',

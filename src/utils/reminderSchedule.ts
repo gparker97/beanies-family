@@ -178,9 +178,21 @@ export const SAME_DAY_GRACE_MINUTES = 15;
  * further out on every foreground and data change and the reminder would walk
  * forward forever without ever arriving. Keep this a pure function of stored data.
  *
- * `touchedAt` should be the LATER of the record's `createdAt` and `updatedAt`:
- * keying on creation alone means adding a due date to an older record arms
- * nothing, which is the primary editing flow.
+ * ⚠️ `createdAt`, and ONLY `createdAt`. It must be a value that NEVER MOVES for
+ * the life of the record. This briefly keyed on `max(createdAt, updatedAt)` so
+ * that adding a due date to an older record would still arm something — and that
+ * was a bad bug, because `updatedAt` is stamped on every write, including every
+ * checkbox tick. A list due today fired at 09:00, the shopper ticked milk at
+ * 09:30, the schedule recomputed to 09:45 and re-armed the SAME stable id (no
+ * longer pending, because it had already fired), so it buzzed again — and again
+ * after every subsequent tick, for the whole shop. The mirror case was worse: a
+ * tick after 23:44 pushed the catch-up past midnight, `allDayFireTime` returned
+ * null, and the alarm was cancelled outright.
+ *
+ * The cost of `createdAt` alone is that dating an OLDER record "today" after 09:00
+ * arms no OS reminder. That is the lesser harm, and it is now largely covered:
+ * lists also file a `list-due` bell entry, which is derived rather than scheduled
+ * and appears immediately on every platform.
  *
  * Returns null when the catch-up would spill past the due day itself — something
  * touched at 23:55 must not fire "due today" at ten past midnight tomorrow.
@@ -190,31 +202,17 @@ export const SAME_DAY_GRACE_MINUTES = 15;
  * has not seen yet. The daily briefing still carries it. Widening the grace trades
  * that window against buzzing the author mid-edit; 15 minutes is the balance.
  */
-export function allDayFireTime(dateISO: string, touchedAt: string | undefined): Date | null {
+export function allDayFireTime(dateISO: string, createdAt: string | undefined): Date | null {
   const anchor = allDayAnchor(dateISO);
   if (!anchor) return null;
-  const touchedMs = touchedAt ? new Date(touchedAt).getTime() : NaN;
+  const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
   // A malformed/absent timestamp degrades to the plain morning anchor rather than
   // producing an Invalid Date — never schedule an alarm at NaN.
-  if (Number.isNaN(touchedMs)) return anchor;
-  const fireMs = Math.max(anchor.getTime(), touchedMs + SAME_DAY_GRACE_MINUTES * 60_000);
+  if (Number.isNaN(createdMs)) return anchor;
+  const fireMs = Math.max(anchor.getTime(), createdMs + SAME_DAY_GRACE_MINUTES * 60_000);
   const endOfDay = localDateTime(dateISO, '23:59');
   if (endOfDay && fireMs > endOfDay.getTime()) return null;
   return new Date(fireMs);
-}
-
-/**
- * The later of a record's two timestamps, for `allDayFireTime`. `Math.max` in
- * spirit because a clock-skewed peer can leave `updatedAt` behind `createdAt`.
- */
-export function lastTouchedAt(record: {
-  createdAt?: string;
-  updatedAt?: string;
-}): string | undefined {
-  const { createdAt, updatedAt } = record;
-  if (!createdAt) return updatedAt;
-  if (!updatedAt) return createdAt;
-  return updatedAt > createdAt ? updatedAt : createdAt;
 }
 
 /** Timed-to-do reminder lead when the device hasn't overridden it. */
