@@ -89,3 +89,50 @@ describe('terminal display', () => {
     });
   });
 });
+
+describe('the arrival row says how many days later the flight lands', () => {
+  /**
+   * Reported: a westbound date-line crossing saved as +2 showed the right arrival
+   * DATE but was labelled "Arrives (+1)". The row read the `arrivesNextDay`
+   * boolean, which cannot say +2 — so the label and the date disagreed.
+   *
+   * The offset is derived from the two dates by `arrivalDayOffset`, the single
+   * helper the edit drawer, the trip wizard and this row now share.
+   */
+  const t = ((k: string) => k) as unknown as Parameters<typeof travelDetailRows>[1];
+  const flight = (over: Record<string, unknown> = {}) =>
+    ({
+      type: 'flight_outbound',
+      arrivalTime: '06:20',
+      departureDate: '2026-10-05',
+      ...over,
+    }) as unknown as Parameters<typeof travelDetailRows>[0];
+
+  const arrivalLabel = (over: Record<string, unknown> = {}) =>
+    travelDetailRows(flight(over), t).find((r) => r.field === 'arrivalTime')?.label;
+
+  it('🔴 says +2 for a flight that lands two calendar days later', () => {
+    expect(arrivalLabel({ arrivalDate: '2026-10-07' })).toContain('arrivesPlusDays');
+  });
+
+  it('says +1 for an overnight flight', () => {
+    expect(arrivalLabel({ arrivalDate: '2026-10-06' })).toContain('arrivesPlusDays');
+  });
+
+  it('says a plain "Arrives" for a same-day flight', () => {
+    expect(arrivalLabel({ arrivalDate: '2026-10-05' })).toBe('segmentRow.arrives');
+  });
+
+  it('🔴 does not read the stale boolean when the dates disagree with it', () => {
+    // The exact shape of the bug: saved as +2, but the shadow still says "next
+    // day". The dates win.
+    expect(arrivalLabel({ arrivalDate: '2026-10-07', arrivesNextDay: true })).toContain(
+      'arrivesPlusDays'
+    );
+  });
+
+  it('falls back to the boolean for a pre-update record with no arrival date', () => {
+    expect(arrivalLabel({ arrivesNextDay: true })).toContain('arrivesPlusDays');
+    expect(arrivalLabel({ arrivesNextDay: false })).toBe('segmentRow.arrives');
+  });
+});
