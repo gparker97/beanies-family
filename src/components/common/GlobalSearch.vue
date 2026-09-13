@@ -293,6 +293,12 @@ const resultCount = computed(() => results.value.length);
       <div
         v-if="open"
         class="fixed inset-x-0 top-0 z-50 mx-auto mt-14 w-full max-w-lg px-4 sm:mt-20 md:max-w-xl lg:max-w-2xl"
+        :style="{
+          // `mt-14` is 56px, which is LESS than the status-bar inset on a notched
+          // iPhone (~59px) — the search field landed under it. Padding rather than
+          // a bigger margin so the responsive `sm:mt-20` still applies on top.
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        }"
         @keydown="handleKeydown"
       >
         <div

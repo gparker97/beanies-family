@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CSSProperties } from 'vue';
 import { computed, toRef } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
@@ -40,6 +41,38 @@ const layerClass = computed(() => {
 
 const { isMobile } = useBreakpoint();
 const isFullscreen = computed(() => props.fullscreenMobile && isMobile.value);
+
+/**
+ * Keeps the modal clear of the notch / status bar and the home indicator.
+ *
+ * On native iOS the overlay is `fixed inset-0` with only `p-4` around it, which is
+ * 16px — less than the ~47-59px status-bar inset on a notched iPhone. The header's
+ * close button therefore sat UNDER the status bar and could not be tapped. Mirrors
+ * `BaseSidePanel`, which already had this; `BaseModal` never did, so every modal
+ * tier in the app inherited the bug.
+ *
+ * Two shapes because the two layouts fail differently:
+ *  • FULLSCREEN — the shell already spans the viewport, so it pads ITSELF. The
+ *    white surface then runs under the status bar (which looks right) while the
+ *    header inside it starts below the inset.
+ *  • WINDOWED — the shell is centred, so padding it would inset the card's own
+ *    contents. Bounding its height instead means a full-height modal simply cannot
+ *    reach the notch. This replaces the old `max-h-[calc(100vh-2rem)]` class; it is
+ *    the same rule with the insets subtracted.
+ *
+ * `env()` is 0 on web and on non-notched devices, so both are no-ops there.
+ */
+const safeAreaStyle = computed<CSSProperties>(() =>
+  isFullscreen.value
+    ? {
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }
+    : {
+        maxHeight:
+          'calc(100vh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+      }
+);
 
 const emit = defineEmits<{
   close: [];
@@ -96,10 +129,9 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             aria-modal="true"
             class="dark:bg-surface-raised relative flex w-full flex-col overflow-hidden bg-white shadow-xl"
             :class="
-              isFullscreen
-                ? 'h-full max-h-full rounded-none'
-                : ['max-h-[calc(100vh-2rem)] rounded-3xl', sizeClasses[size]]
+              isFullscreen ? 'h-full max-h-full rounded-none' : ['rounded-3xl', sizeClasses[size]]
             "
+            :style="safeAreaStyle"
             @click.stop
           >
             <!-- Header -->

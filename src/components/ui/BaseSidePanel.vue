@@ -93,8 +93,8 @@ useFullscreenOverlay(toRef(props, 'open'), close);
           // header + close button and its footer would sit UNDER the status bar /
           // home indicator. Inset padding keeps both tappable. 0 on web/non-notched
           // (no-op). Mirrors the App.vue content-column + MobileBottomNav pattern.
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }"
       >
         <!-- Header -->
