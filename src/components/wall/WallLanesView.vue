@@ -200,14 +200,17 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
  * every view already receives it, so a second channel for the same fact could disagree with the
  * one that filters.
  *
- * ⚠️ MEMBERSHIP, not `length === 1`. It tested for a single focused bean, which was true while
- * the footer was single-select and silently wrong the moment it was not: with two focused, both
- * lane headers went dark and reported `aria-pressed="false"` while the wall was filtered to
- * exactly those two — and tapping one then DROPPED it from a header that looked unselected.
+ * ⚠️ It is simply "is a filter on", and that is not a simplification to undo. `members` above is
+ * ALREADY the roster filtered by `visibleMemberIds`, so every lane rendered here is by
+ * definition focused — an `includes` per lane would be an O(n) way to compute a constant, on a
+ * view the clock tick re-renders three times a minute.
+ *
+ * It read `visibleMemberIds?.length === 1`, which was true while the footer was single-select
+ * and silently wrong the moment it was not: with two focused, both lane headers went dark and
+ * reported `aria-pressed="false"` while the wall was filtered to exactly those two — and tapping
+ * one then DROPPED it from a header that looked unselected.
  */
-function isFocused(memberId: string) {
-  return props.visibleMemberIds?.includes(memberId) ?? false;
-}
+const isFocused = computed(() => props.visibleMemberIds !== null);
 
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
@@ -276,8 +279,8 @@ function subtitleFor(memberId: string) {
           :key="member.id"
           type="button"
           class="min-w-0 rounded-2xl px-1.5 py-1"
-          :class="isFocused(member.id) ? 'bg-[var(--tint-orange-8)]' : ''"
-          :aria-pressed="isFocused(member.id)"
+          :class="isFocused ? 'bg-[var(--tint-orange-8)]' : ''"
+          :aria-pressed="isFocused"
           @click="emit('focusMember', member.id)"
         >
           <WallBeanHeader

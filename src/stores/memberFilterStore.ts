@@ -13,27 +13,51 @@ import { useFamilyStore } from './familyStore';
  *
  * SCOPED TO HUMANS: pets never own finance entities, so they're
  * excluded from the filter universe. `isAllSelected` compares against
- * `familyStore.humans.length`; initialize/syncWithMembers operate on
+ * `familyStore.humans.length`; `initialize` operates on
  * humans only. Prevents the "all selected" chip from flipping off
  * when a pet is added.
+ *
+ * RECONCILED ON READ (see `liveSelectedIds`): a member who leaves stops counting the moment the
+ * roster says so, with no sync call for anyone to forget.
  */
 export const useMemberFilterStore = defineStore('memberFilter', () => {
   // State
   const selectedMemberIds = ref<Set<string>>(new Set());
   const isInitialized = ref(false);
 
+  /**
+   * The selection, intersected with the CURRENT roster. Every getter reads this, never the raw
+   * set.
+   *
+   * ⚠️ RECONCILE ON READ. There was a `syncWithMembers()` for this, dormant for years with no
+   * caller, and wiring it to a roster watch made things worse rather than better: it has no
+   * memory of the previous roster, so it cannot tell "this member just arrived" from "the user
+   * deselected this member", and its post-condition is always all-humans. Any roster change —
+   * including one that removed an unrelated person — silently reset a narrowed filter to
+   * everyone, on every page that reads it.
+   *
+   * A derived intersection has no such ambiguity and no lifecycle: a departed member stops
+   * counting the instant the roster says so, a returning one is still selected if they were,
+   * and there is nothing for a future caller to forget to call.
+   */
+  const liveSelectedIds = computed(() => {
+    const familyStore = useFamilyStore();
+    const present = new Set(familyStore.humans.map((m) => m.id));
+    return new Set([...selectedMemberIds.value].filter((id) => present.has(id)));
+  });
+
   // Getters
   const isAllSelected = computed(() => {
     const familyStore = useFamilyStore();
     if (!isInitialized.value || familyStore.humans.length === 0) return true;
-    return selectedMemberIds.value.size === familyStore.humans.length;
+    return liveSelectedIds.value.size === familyStore.humans.length;
   });
 
-  const selectedCount = computed(() => selectedMemberIds.value.size);
+  const selectedCount = computed(() => liveSelectedIds.value.size);
 
   const selectedMembers = computed(() => {
     const familyStore = useFamilyStore();
-    return familyStore.humans.filter((m) => selectedMemberIds.value.has(m.id));
+    return familyStore.humans.filter((m) => liveSelectedIds.value.has(m.id));
   });
 
   // Actions
@@ -46,48 +70,6 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
     const familyStore = useFamilyStore();
     selectedMemberIds.value = new Set(familyStore.humans.map((m) => m.id));
     isInitialized.value = true;
-  }
-
-  /**
-   * Reconcile the selection with the roster: drop members who have gone, select members who
-   * have arrived.
-   *
-   * ⚠️ CALL THIS whenever the roster can change under a live session. It existed for years with
-   * NO caller — `initialize()` runs only on app load and family open — so a member removed on
-   * another device mid-session left a ghost id here. Narrowed to that member, the Transactions
-   * page then resolved an empty account set and rendered EMPTY with no chip lit to explain it;
-   * on "all", `isAllSelected` flipped false (N ids against N-1 humans) so every chip lit at once
-   * and the All chip went dark, which `useMemberFilterChips` documents as reading like
-   * "everything is filtered" rather than "no filter".
-   *
-   * The beanie wall hit the same bug and fixed it wall-locally in `useWallMemberFocus`; this is
-   * the shared half, and it is the one with the bigger blast radius.
-   */
-  function syncWithMembers() {
-    const familyStore = useFamilyStore();
-    const currentIds = new Set(familyStore.humans.map((m) => m.id));
-
-    // Remove selections for deleted members
-    for (const id of selectedMemberIds.value) {
-      if (!currentIds.has(id)) {
-        selectedMemberIds.value.delete(id);
-      }
-    }
-
-    // Add new members to selection
-    for (const member of familyStore.humans) {
-      if (!selectedMemberIds.value.has(member.id)) {
-        selectedMemberIds.value.add(member.id);
-      }
-    }
-
-    // Ensure at least one is selected
-    if (selectedMemberIds.value.size === 0 && familyStore.humans.length > 0) {
-      selectedMemberIds.value.add(familyStore.humans[0]!.id);
-    }
-
-    // Trigger reactivity
-    selectedMemberIds.value = new Set(selectedMemberIds.value);
   }
 
   /**
@@ -130,7 +112,9 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
   function isMemberSelected(memberId: string): boolean {
     // Before initialization, treat as all selected
     if (!isInitialized.value) return true;
-    return selectedMemberIds.value.has(memberId);
+    // ⚠️ `liveSelectedIds`, so a member removed on another device mid-session stops counting
+    // immediately rather than leaving a ghost id that filters every page down to nothing.
+    return liveSelectedIds.value.has(memberId);
   }
 
   /**
@@ -159,7 +143,6 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
     selectedMembers,
     // Actions
     initialize,
-    syncWithMembers,
     toggleMember,
     selectAll,
     selectOnly,
