@@ -760,13 +760,34 @@ watch(activeView, () => (sheet.value = null));
           `arrowsInView` in the registry. The label and the Today chip stay here
           in every view, because they NAME where you are rather than moving you.
 
-          Still not the shared `PeriodNavigator` the planner would want: two
-          other clusters exist, but `CalendarCommandBar` cannot adopt one (its
-          label sits outside the cluster behind a load-bearing Transition), so an
-          extraction would consolidate two of three while putting a regression
-          surface on the transactions page. One owner, one follow-up.
+          NOT shared markup with the planner's `CalendarPeriodNav`: that one has
+          a Today button between two chevrons and emits three plain events, while
+          this has a `WallNavArrow` pair sized for a mounted tablet, a label the
+          days view also uses, and a `direction` step contract. They share the
+          RULE, not the component — and the rule is the comment below, which is
+          the part that was actually missing.
         -->
-        <div v-if="currentView.stepUnit" class="flex items-center gap-1.5">
+        <div v-if="currentView.stepUnit" class="flex min-w-0 items-center gap-1.5">
+          <!--
+            `--muted-text` has no definition anywhere in the app, so the #4d5d6c
+            fallback is what always renders — about 2.5:1 on the dark ground.
+            The dark partner is the thing doing the work here. `truncate` stops
+            the label spilling over its neighbours in a long locale or in Large
+            reading mode.
+
+            ⚠️ AHEAD of the arrows, not between them — THE CALENDAR ARROW RULE;
+            see `CalendarPeriodNav`'s header for the measurements. Stepping is a
+            REPEATED tap, and between them the label's own width moved both
+            arrows on every press, out from under a finger already coming down.
+            Ahead of them it can only move itself: everything to the arrows'
+            right has a fixed width, and this cluster is `ml-auto`, so the arrows
+            now sit at a constant x whatever the label says.
+          -->
+          <p
+            class="font-inter wall-nav-label dark:text-ink-soft min-w-0 truncate text-right text-[var(--muted-text,#4d5d6c)]"
+          >
+            {{ anchorLabel }}
+          </p>
           <WallNavArrow
             v-if="!currentView.arrowsInView"
             :direction="-1"
@@ -774,39 +795,29 @@ watch(activeView, () => (sheet.value = null));
             @step="onStep"
           />
           <!--
-            `--muted-text` has no definition anywhere in the app, so the #4d5d6c
-            fallback is what always renders — about 2.5:1 on the dark ground.
-            The dark partner is the thing doing the work here.
-            `truncate` (nowrap + overflow-hidden + ellipsis) stops the label
-            spilling OVER the arrows in a long locale or in Large reading mode.
-            `period-label-stable` is what stops it MOVING them: this cluster is
-            `ml-auto`, so without a reserved width "Today" → "Wednesday, 10
-            September" drags both arrows left between presses, out from under a
-            finger already coming down. 28ch clears `formatDayLong` ("Wednesday, 10
-            September"), the longest of the three labels. Deliberately generous: over-reserving
-            costs invisible space inside a right-anchored cluster, under-reserving costs the
-            whole fix, and unlike the planner this one cannot be measured in the harness. See `.period-label-stable` in style.css.
+            Offered only when it would do something — but it KEEPS ITS SPACE when
+            it would not. `v-if` moved both arrows every time the wall arrived at
+            or left today, which is the same defect as a label between them and
+            would have undone the reorder above. Hidden rather than removed, and
+            taken out of the tab order and the a11y tree with it so nothing
+            invisible is still reachable.
           -->
-          <p
-            class="period-label-stable font-inter wall-nav-label dark:text-ink-soft min-w-0 truncate text-center text-[var(--muted-text,#4d5d6c)] [--period-label-w:28ch]"
+          <button
+            type="button"
+            class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
+            :class="isAnchoredToToday ? 'pointer-events-none invisible' : ''"
+            :aria-hidden="isAnchoredToToday || undefined"
+            :tabindex="isAnchoredToToday ? -1 : undefined"
+            @click="onGoToToday"
           >
-            {{ anchorLabel }}
-          </p>
+            {{ t('date.today') }}
+          </button>
           <WallNavArrow
             v-if="!currentView.arrowsInView"
             :direction="1"
             :enabled="canStepForward"
             @step="onStep"
           />
-          <!-- Only offered when it would do something. -->
-          <button
-            v-if="!isAnchoredToToday"
-            type="button"
-            class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
-            @click="onGoToToday"
-          >
-            {{ t('date.today') }}
-          </button>
         </div>
         <WallViewSwitcher :active="activeView" @select="selectView" />
         <!-- Beside the switcher, not inside it: night is an action, the switcher is a radio
