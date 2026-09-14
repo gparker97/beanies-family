@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calendar navigation — arrows that stay put</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --slate: #2c3e50;
+        --cloud: #f8f9fa;
+        --silk: #aed6f1;
+        --line: rgb(44 62 80 / 10%);
+        --muted: rgb(44 62 80 / 55%);
+        --sq: 18px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--cloud);
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--slate);
+        padding: 28px 20px 60px;
+      }
+      h1 { font-family: Outfit, sans-serif; font-size: 1.6rem; margin: 0 0 4px; }
+      .lede { color: var(--muted); max-width: 62ch; line-height: 1.55; margin: 0 0 26px; font-size: .9rem; }
+      h2 {
+        font-family: Outfit, sans-serif; font-size: 1.05rem; margin: 32px 0 2px;
+        display: flex; align-items: center; gap: 9px;
+      }
+      .tag {
+        font-family: Outfit, sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .06em;
+        text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+      }
+      .rec { background: var(--orange); color: #fff; }
+      .alt { background: rgb(44 62 80 / 8%); color: var(--muted); }
+      .no  { background: rgb(44 62 80 / 6%); color: var(--muted); }
+      .why { color: var(--muted); font-size: .84rem; line-height: 1.55; margin: 6px 0 14px; max-width: 74ch; }
+      .why b { color: var(--slate); }
+
+      .frames { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+      .frame {
+        background: #fff; border: 1px solid var(--line); border-radius: var(--sq);
+        overflow: hidden; box-shadow: 0 8px 22px -18px rgb(44 62 80 / 45%);
+      }
+      .frame.desk { width: 720px; }
+      .frame.phone { width: 300px; }
+      .cap {
+        font-family: Outfit, sans-serif; font-size: .62rem; font-weight: 700; letter-spacing: .06em;
+        text-transform: uppercase; color: var(--muted); padding: 7px 12px; border-bottom: 1px dashed var(--line);
+      }
+
+      /* ── the command bar ── */
+      .bar { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+      .title { font-family: Outfit, sans-serif; font-weight: 800; font-size: 1.25rem; white-space: nowrap; }
+      .phone .title { font-size: 1.05rem; }
+      .grow { flex: 1; min-width: 0; }
+      .nav { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+      .arrow {
+        width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px;
+        border: 0; background: transparent; color: rgb(44 62 80 / 50%); cursor: pointer; font-size: 15px;
+      }
+      .arrow:hover { background: rgb(44 62 80 / 6%); }
+      .today {
+        font-family: Outfit, sans-serif; font-weight: 600; font-size: .8rem; color: var(--orange);
+        background: transparent; border: 0; padding: 5px 10px; border-radius: 10px; cursor: pointer;
+      }
+      .seg { display: flex; background: rgb(44 62 80 / 5%); border-radius: 12px; padding: 3px; flex-shrink: 0; }
+      .seg span {
+        font-family: Outfit, sans-serif; font-size: .76rem; font-weight: 600; padding: 4px 11px;
+        border-radius: 9px; color: var(--muted);
+      }
+      .seg span.on { background: var(--orange); color: #fff; }
+      .cta {
+        font-family: Outfit, sans-serif; font-size: .76rem; font-weight: 700; color: #fff;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        padding: 7px 12px; border-radius: 12px; flex-shrink: 0; white-space: nowrap;
+      }
+
+      /* ── the grid ── */
+      .gridwrap { position: relative; padding: 10px 12px 14px; }
+      .dow { display: grid; grid-template-columns: repeat(7, 1fr); }
+      .dow span {
+        font-family: Outfit, sans-serif; font-size: .58rem; font-weight: 700; letter-spacing: .07em;
+        text-transform: uppercase; color: var(--muted); text-align: center; padding: 5px 0;
+      }
+      .cells { display: grid; grid-template-columns: repeat(7, 1fr); }
+      .cells i {
+        font-style: normal; font-family: Outfit, sans-serif; font-size: .7rem; font-weight: 600;
+        color: rgb(44 62 80 / 42%); text-align: center; padding: 11px 0;
+      }
+      .phone .cells i { padding: 8px 0; font-size: .64rem; }
+
+      /* option B: arrows flanking the grid */
+      .flank { display: grid; grid-template-columns: 34px 1fr 34px; align-items: stretch; gap: 2px; }
+      .edge {
+        display: grid; place-items: center; border-radius: 12px; background: rgb(44 62 80 / 4%);
+        color: rgb(44 62 80 / 55%); font-size: 15px; cursor: pointer;
+      }
+      .edge:hover { background: rgb(241 93 34 / 10%); color: var(--orange); }
+
+      .drift { margin-top: 10px; font-size: .76rem; color: var(--muted); }
+      .drift code { background: rgb(44 62 80 / 6%); padding: 1px 5px; border-radius: 5px; font-size: .72rem; }
+      .pin { color: #1d8a4e; font-weight: 600; }
+      .bad { color: #c0392b; font-weight: 600; }
+      .ruler { position: relative; height: 0; }
+      .ruler span {
+        position: absolute; top: -2px; width: 2px; height: 44px; background: rgb(241 93 34 / 55%);
+      }
+      table { border-collapse: collapse; margin: 10px 0 0; font-size: .82rem; }
+      td, th { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+      th { font-family: Outfit, sans-serif; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <h1>Calendar navigation — arrows that stay put</h1>
+    <p class="lede">
+      Stepping a calendar is a <b>repeated</b> tap. Today the desktop planner sizes the period
+      label to its own text, so the arrows slide out from under a finger already coming down.
+      Mobile has never had this — its label absorbs the slack and the cluster is pinned. The job
+      is to give desktop what mobile already has, without moving the month name off the top left.
+    </p>
+
+    <h2>How the industry solves it <span class="tag alt">research</span></h2>
+    <table>
+      <tr><th>Product</th><th>Layout</th><th>Why the arrows never move</th></tr>
+      <tr><td>Google Calendar (web)</td><td><code>Today ‹ ›</code> then the title</td><td>The cluster PRECEDES the variable-width label</td></tr>
+      <tr><td>Outlook (web)</td><td><code>Today ‹ ›</code> then the title</td><td>Same</td></tr>
+      <tr><td>Notion Calendar</td><td><code>Today ‹ ›</code> then the title</td><td>Same</td></tr>
+      <tr><td>Apple Calendar (macOS)</td><td>Title left, <code>‹ Today ›</code> far right</td><td>The cluster is pinned to the toolbar's right edge</td></tr>
+      <tr><td>Fantastical</td><td>Title left, nav right</td><td>Same</td></tr>
+      <tr><td>iOS / Android Calendar</td><td>Title left, no arrows</td><td>Navigation is swipe only</td></tr>
+    </table>
+    <p class="why">
+      Two conventions, and only one keeps the month name first: <b>title left, navigation pinned
+      right</b>. That is Apple's, and it is also what beanies already does on mobile.
+    </p>
+
+    <h2>Option A — navigation joins the view controls <span class="tag rec">recommended</span></h2>
+    <p class="why">
+      The month name stays the first thing you read. <code>‹ Today ›</code> moves to the right-hand
+      control group, immediately before Month/Week/Day. Its position then depends only on controls
+      whose widths never change, so it is <b class="pin">pinned in every locale, at every text
+      size, for every label</b> — no reserved width to keep in step. It also groups the three
+      things that change what you are looking at, and makes desktop behave exactly like mobile.
+    </p>
+    <div class="frames">
+      <div class="frame desk">
+        <div class="cap">desktop — September</div>
+        <div class="bar">
+          <div class="title">September 2026</div>
+          <div class="grow"></div>
+          <div class="nav"><button class="arrow">‹</button><button class="today">Today</button><button class="arrow">›</button></div>
+          <div class="seg"><span class="on">Month</span><span>Week</span><span>Day</span></div>
+          <div class="cta">✨ Magic beans</div>
+        </div>
+        <div class="gridwrap">
+          <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+          <div class="cells"><i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i></div>
+        </div>
+      </div>
+      <div class="frame desk">
+        <div class="cap">desktop — a much longer label, arrows have not moved</div>
+        <div class="bar">
+          <div class="title">Wednesday, 25 February 2026</div>
+          <div class="grow"></div>
+          <div class="nav"><button class="arrow">‹</button><button class="today">Today</button><button class="arrow">›</button></div>
+          <div class="seg"><span>Month</span><span>Week</span><span class="on">Day</span></div>
+          <div class="cta">✨ Magic beans</div>
+        </div>
+        <div class="gridwrap">
+          <div class="dow"><span>Wed 25 Feb</span></div>
+          <div class="cells"><i>—</i></div>
+        </div>
+      </div>
+      <div class="frame phone">
+        <div class="cap">phone — unchanged, already correct</div>
+        <div class="bar" style="gap: 8px">
+          <div class="title">September 2026</div>
+          <div class="grow"></div>
+          <div class="nav"><button class="arrow">‹</button><button class="arrow">›</button></div>
+        </div>
+        <div class="gridwrap">
+          <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+          <div class="cells"><i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i></div>
+        </div>
+      </div>
+    </div>
+    <p class="drift">
+      Measured in the browser, stepping back six months: before —
+      <code>473 438 438 438 438 438</code> <span class="bad">drifts</span>; day view —
+      <code>525 596 566 599 623 587</code> <span class="bad">drifts up to 98px</span>. With the
+      cluster pinned right, every reading is identical. <span class="pin">One position, always.</span>
+    </p>
+
+    <h2>Option B — arrows flank the grid, wall-style <span class="tag alt">your suggestion</span></h2>
+    <p class="why">
+      Chevrons sit in reserved gutters either side of the day-name row, exactly as
+      <code>WallDaysView</code> already does on the beanie wall (<code>arrowsInView: true</code>).
+      <b class="pin">Also perfectly stable</b> — the gutters are container edges, so nothing about
+      the label can reach them — and the arrows sit beside the thing they actually move. Big,
+      forgiving touch targets, and the app would match the wall.
+      <br /><br />
+      The trade: on a wide desktop the two arrows end up far apart and far from the title, which
+      is a long mouse journey for a repeated action, and putting controls inside a header row is
+      unusual on the web outside of date pickers. It is strongest on touch, which is exactly why
+      the wall uses it.
+    </p>
+    <div class="frames">
+      <div class="frame desk">
+        <div class="cap">desktop</div>
+        <div class="bar">
+          <div class="title">September 2026</div>
+          <div class="grow"></div>
+          <button class="today">Today</button>
+          <div class="seg"><span class="on">Month</span><span>Week</span><span>Day</span></div>
+          <div class="cta">✨ Magic beans</div>
+        </div>
+        <div class="gridwrap">
+          <div class="flank">
+            <div class="edge">‹</div>
+            <div>
+              <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+              <div class="cells"><i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i></div>
+            </div>
+            <div class="edge">›</div>
+          </div>
+        </div>
+      </div>
+      <div class="frame phone">
+        <div class="cap">phone — gutters cost real width here</div>
+        <div class="bar" style="gap: 8px">
+          <div class="title">September 2026</div>
+          <div class="grow"></div>
+          <button class="today">Today</button>
+        </div>
+        <div class="gridwrap">
+          <div class="flank" style="grid-template-columns: 26px 1fr 26px">
+            <div class="edge">‹</div>
+            <div>
+              <div class="dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <div class="cells"><i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i></div>
+            </div>
+            <div class="edge">›</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Option C — <code>Today ‹ ›</code> before the title <span class="tag no">rejected</span></h2>
+    <p class="why">
+      The most common web convention (Google, Outlook, Notion) and perfectly stable, because the
+      cluster precedes the label. <b>Rejected on your constraint</b>: it puts navigation, not the
+      month, in the top-left corner.
+    </p>
+    <div class="frames">
+      <div class="frame desk">
+        <div class="cap">desktop</div>
+        <div class="bar">
+          <button class="today" style="background: rgb(44 62 80 / 5%); color: var(--slate)">Today</button>
+          <div class="nav"><button class="arrow">‹</button><button class="arrow">›</button></div>
+          <div class="title">September 2026</div>
+          <div class="grow"></div>
+          <div class="seg"><span class="on">Month</span><span>Week</span><span>Day</span></div>
+        </div>
+        <div class="gridwrap">
+          <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+          <div class="cells"><i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i>12</i><i>13</i></div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Recommendation</h2>
+    <p class="why">
+      <b>Option A</b>, applied to the planner and the wall's header views. It is the only one that
+      satisfies all four constraints at once: the month name stays first; the arrows are pinned by
+      structure rather than by a reserved width that a long locale would break; desktop starts
+      behaving like mobile already does; and navigation sits with the other controls that change
+      what you are looking at.
+      <br /><br />
+      <b>Option B is worth keeping for the wall</b>, where it already exists and where a big edge
+      target on a mounted tablet beats a tidy toolbar. The two are not in conflict — the wall
+      already chooses per view with <code>arrowsInView</code>, and this just means the app picks A
+      and the wall keeps choosing.
+    </p>
+  </body>
+</html>
