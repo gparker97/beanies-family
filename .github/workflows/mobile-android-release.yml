@@ -70,6 +70,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # The action's default `packages` is "tools platform-tools", and the
+          # legacy `tools` package no longer exists in the SDK repository - the
+          # runner image rotated cmdline-tools to 20.0 on 2026-09-14 and both
+          # Android lanes started failing at setup with "Failed to find package
+          # 'tools'". Nothing here needs it: the Android Gradle Plugin resolves
+          # the platform + build-tools it wants on its own, so install nothing.
+          packages: ''
 
       - name: Install dependencies
         run: npm ci
