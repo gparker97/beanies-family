@@ -16,7 +16,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Every AI read is now counted, per family.** A magic bean is spent exactly when beanies answers you — once per thing you hand over, including when it cannot work out what it is. Refusals, timeouts and unreadable answers cost nothing, and a free correction is recorded separately so it can never be billed.
 
+- **The beanie wall can show more than one person at a time.** The wall's person chips now add up: tap Leo and Mia to see just their day, tap either again to drop them, or "everyone" to clear. Tapping the last one off goes back to everyone rather than leaving a wall showing nothing.
+
 ### Fixed
+
+- **A wall filtered to someone who has left no longer shows an empty screen.** If a member was removed on another device while the wall was open, the wall kept filtering to them and quietly showed nothing at all.
 
 - **The end time from an invitation is the one it actually says.** An invite reading "2pm to 4:30pm" filled the form in as 2pm to 3pm — the end time was being overwritten with the usual one-hour default a moment after it was read.
 
