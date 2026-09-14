@@ -85,6 +85,55 @@ resource "aws_dynamodb_table" "rate" {
   }
 }
 
+# ── Usage meter (the magic-bean count) ───────────────────────────────────────────────────────
+# One item per (family, UTC day), created by an unconditional UpdateItem. Unlike the rate table
+# above this is BILLING EVIDENCE, which is why the two deliberately diverge on three settings —
+# do not "reconcile" them:
+#
+#   * TTL ~400 days, not one hour. A monthly plan is billed on this; an hourly bucket is not.
+#   * point_in_time_recovery ON. There is no backfill path — a lost row is a lost fact.
+#   * deletion_protection in prod. A stray `terraform destroy -target` would erase the meter.
+#
+# Sort key, unlike the rate table, because week and month must be RANGE QUERIES rather than a
+# second counter to keep in step. The item carries exactly three attributes — `n` (reads
+# charged), `c` (free corrections) and `expires_at`. A fourth counter is a new attribute here,
+# never a second item shape: `pull_ai_usage.mjs` scans and sums on the `d#` sort-key grammar.
+
+resource "aws_dynamodb_table" "usage" {
+  name         = "${var.app_name}-ai-usage-${var.environment}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  # Environment-gated: the module is applied per environment, and an unconditional `true` makes
+  # `terraform destroy` fail in any non-prod workspace with a console-only unblock.
+  deletion_protection_enabled = var.environment == "prod"
+
+  tags = {
+    Name        = "${var.app_name}-ai-usage"
+    Environment = var.environment
+  }
+}
+
 resource "aws_iam_role_policy" "rate_table" {
   name = "${var.app_name}-ai-extract-rate-${var.environment}"
   role = aws_iam_role.lambda.id
@@ -93,10 +142,15 @@ resource "aws_iam_role_policy" "rate_table" {
     Version = "2012-10-17"
     Statement = [{
       Effect = "Allow"
-      # UpdateItem ONLY. The limiter increments and lets a ConditionExpression refuse; it
-      # never reads a counter back, so anything more would be unused permission.
-      Action   = ["dynamodb:UpdateItem"]
-      Resource = aws_dynamodb_table.rate.arn
+      # UpdateItem ONLY, on both tables. The limiter increments and lets a ConditionExpression
+      # refuse; the meter increments unconditionally. NEITHER reads a counter back — usage is
+      # read by `/beanies-metrics` with a human's credentials, not by this function — so
+      # anything more would be unused permission.
+      Action = ["dynamodb:UpdateItem"]
+      Resource = [
+        aws_dynamodb_table.rate.arn,
+        aws_dynamodb_table.usage.arn,
+      ]
     }]
   })
 }
@@ -140,6 +194,9 @@ resource "aws_lambda_function" "ai_extract" {
       # logs nothing, which is what keeps the existing handler test suite (every case a POST)
       # from attempting a real DynamoDB call per test.
       RATE_TABLE = aws_dynamodb_table.rate.name
+      # Same supported-no-op posture as RATE_TABLE: unset ⇒ `countUsage` returns immediately and
+      # logs nothing, which is what keeps the handler suite off a real DynamoDB call per test.
+      USAGE_TABLE = aws_dynamodb_table.usage.name
     }
   }
 
@@ -220,6 +277,92 @@ resource "aws_cloudwatch_metric_alarm" "rate_store_unavailable" {
 
   tags = {
     Name        = "${var.app_name}-ai-extract-rate-store-unavailable"
+    Environment = var.environment
+  }
+}
+
+# ── Meter integrity ──────────────────────────────────────────────────────────
+# Two filters, because the two failures mean different things and need different responses.
+# ⚠️ Both patterns are the EXACT prefixes `countUsage.mjs` exports. `meter.test.mjs` reads this
+# file and asserts they match, so a drifted prefix is a test failure rather than an alarm that
+# quietly stopped firing — which is indistinguishable from one with nothing to report.
+
+resource "aws_cloudwatch_log_metric_filter" "usage_count_failed" {
+  name           = "${var.app_name}-ai-extract-usage-count-failed-${var.environment}"
+  log_group_name = aws_cloudwatch_log_group.ai_extract.name
+  pattern        = "\"[ai-extract] usage-count write failed\""
+
+  metric_transformation {
+    name          = "UsageCountFailed"
+    namespace     = "${var.app_name}/ai-extract"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "usage_count_failed" {
+  count = var.alerts_topic_arn == "" ? 0 : 1
+
+  alarm_name        = "${var.app_name}-ai-extract-usage-count-failed-${var.environment}"
+  alarm_description = "A magic-bean read succeeded but was NOT counted. Usage is under-reported and an allowance built on it would be wrong. Check the ${aws_dynamodb_table.usage.name} table and the Lambda's dynamodb:UpdateItem permission."
+
+  namespace           = aws_cloudwatch_log_metric_filter.usage_count_failed.metric_transformation[0].namespace
+  metric_name         = aws_cloudwatch_log_metric_filter.usage_count_failed.metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [var.alerts_topic_arn]
+  ok_actions    = [var.alerts_topic_arn]
+
+  tags = {
+    Name        = "${var.app_name}-ai-extract-usage-count-failed"
+    Environment = var.environment
+  }
+}
+
+# A read the Lambda could not attribute to a family. Expected at a low rate from old cached
+# bundles; a RISING rate means the client-side no-family fence has been breached. This is the
+# only signal that catches it, because a skipped count writes no row at all and is therefore
+# invisible to the metrics unattributed bucket, which can only see hashes that fail to join.
+# Threshold is higher than the write-failure alarm: a trickle is the expected steady state.
+
+resource "aws_cloudwatch_log_metric_filter" "usage_count_skipped" {
+  name           = "${var.app_name}-ai-extract-usage-count-skipped-${var.environment}"
+  log_group_name = aws_cloudwatch_log_group.ai_extract.name
+  pattern        = "\"[ai-extract] usage-count skipped\""
+
+  metric_transformation {
+    name          = "UsageCountSkipped"
+    namespace     = "${var.app_name}/ai-extract"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "usage_count_skipped" {
+  count = var.alerts_topic_arn == "" ? 0 : 1
+
+  alarm_name        = "${var.app_name}-ai-extract-usage-count-skipped-${var.environment}"
+  alarm_description = "Magic-bean reads are arriving with no family id and going uncounted. A few are expected from old cached bundles; a sustained rate means the client-side no_family fence has been breached and reads are free."
+
+  namespace           = aws_cloudwatch_log_metric_filter.usage_count_skipped.metric_transformation[0].namespace
+  metric_name         = aws_cloudwatch_log_metric_filter.usage_count_skipped.metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 20
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [var.alerts_topic_arn]
+  ok_actions    = [var.alerts_topic_arn]
+
+  tags = {
+    Name        = "${var.app_name}-ai-extract-usage-count-skipped"
     Environment = var.environment
   }
 }

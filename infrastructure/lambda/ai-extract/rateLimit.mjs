@@ -59,7 +59,7 @@
  * This module NEVER throws. It owns its own try/catch so the handler gains exactly one `if`.
  */
 
-import { createHash } from 'node:crypto';
+import { countOne, hash, resolveClient } from './ddb.mjs';
 
 /** Requests per family per hour. */
 export const FAMILY_LIMIT = 80;
@@ -71,45 +71,20 @@ const WINDOW_SECONDS = 3600;
 const TTL_SLACK_SECONDS = WINDOW_SECONDS;
 
 /**
- * Lazily-created DynamoDB client, cached at module scope.
- *
- * There is no bundling step — `archive_file` zips this directory and `@aws-sdk/client-dynamodb`
- * resolves from the nodejs20.x runtime, the same pattern `lambda/registry/index.mjs` uses. A
- * STATIC top-level import would put SDK initialisation into every cold start, including the
- * image path this feature explicitly does not touch. So: `await import(...)`, after the
- * RATE_TABLE early return.
- *
- * (Note for whoever bumps the runtime: AWS has signalled it will stop providing the SDK. A
- * runtime bump means vendoring it, same as registry.)
- */
-let ddbPromise = null;
-function defaultClient() {
-  ddbPromise ??= import('@aws-sdk/client-dynamodb').then((sdk) => {
-    const client = new sdk.DynamoDBClient({});
-    return { send: (cmd) => client.send(cmd), commands: sdk };
-  });
-  return ddbPromise;
-}
-
-/**
  * Test-only seam for the DEFAULT client.
  *
- * `checkLimits` already takes an injected `ddb`, which covers this module's own suite — but
- * the HANDLER calls it with no client, so `handler.test.mjs` had no way to exercise a refused
- * verdict at all. That gap let the entire rate-limit call site be deleted from `index.mjs`
- * with every handler test still green. Matches the `__resetAttemptBudgetForTests` /
- * `__resetPinAttemptsForTests` convention used on the client.
+ * `checkLimits` already takes an injected `ddb`, which covers this module's own suite — but the
+ * HANDLER calls it with no client, so `handler.test.mjs` had no way to exercise a refused verdict
+ * at all. That gap let the entire rate-limit call site be deleted from `index.mjs` with every
+ * handler test still green.
+ *
+ * Re-exported from `ddb.mjs` under this module's original name, so `handler.test.mjs` is unchanged
+ * and — more importantly — there is exactly ONE cached client to override. Two seams over one
+ * client is how a test stubs one module while the other quietly reaches AWS.
  *
  * Pass `null` to restore the real lazily-loaded client.
  */
-let testClient = null;
-export function __setRateLimitClientForTests(client) {
-  testClient = client;
-}
-
-function hash(value) {
-  return createHash('sha256').update(String(value)).digest('hex');
-}
+export { __setDdbClientForTests as __setRateLimitClientForTests } from './ddb.mjs';
 
 /**
  * Reduce a source address to the unit an ATTACKER cannot trivially multiply.
@@ -134,41 +109,6 @@ function ipKey(ip) {
   // more machinery than this needs, so an already-short address is used as-is (it cannot be
   // multiplied without lengthening it, at which point the /64 slice applies).
   return hextets.length <= 4 ? value : `${hextets.slice(0, 4).join(':')}::/64`;
-}
-
-/**
- * Count one request against one key, returning whether it is within `max`.
- *
- * `ADD n :one` with `ConditionExpression attribute_not_exists(n) OR n < :max` is the whole
- * limit: DynamoDB applies the condition and the increment atomically, so concurrent Lambda
- * invocations cannot both see "79" and both proceed. A `ConditionalCheckFailedException` is
- * the AT-LIMIT signal, not an error — it is caught by the caller and turned into a refusal.
- *
- * TTL is written on every update rather than only on create: an `ADD` on a missing item
- * creates it, and there is no cheap "only if new" for the sibling attribute. Rewriting the
- * same value is harmless and keeps the reap guaranteed.
- */
-async function countOne(send, commands, table, pk, max, ttl) {
-  const { UpdateItemCommand } = commands;
-  await send(
-    new UpdateItemCommand({
-      TableName: table,
-      Key: { pk: { S: pk } },
-      // `#n` via ExpressionAttributeNames rather than a bare `n`. DynamoDB's reserved-word
-      // list is long and easy to be wrong about, and being wrong here fails EVERY request with
-      // a ValidationException — which this module's outer catch cannot distinguish from a
-      // transient store error, so it would fail open silently-but-loudly forever. The alias
-      // costs one line and removes the question.
-      UpdateExpression: 'ADD #n :one SET expires_at = :ttl',
-      ConditionExpression: 'attribute_not_exists(#n) OR #n < :max',
-      ExpressionAttributeNames: { '#n': 'n' },
-      ExpressionAttributeValues: {
-        ':one': { N: '1' },
-        ':max': { N: String(max) },
-        ':ttl': { N: String(ttl) },
-      },
-    })
-  );
 }
 
 /**
@@ -210,14 +150,20 @@ export async function checkLimits({ familyId, ip, now = Date.now(), ddb } = {}) 
   const retryAfterSeconds = Math.max(1, (bucket + 1) * WINDOW_SECONDS - Math.floor(now / 1000));
 
   try {
-    const { send, commands } = ddb ?? testClient ?? (await defaultClient());
+    const { send, commands } = await resolveClient(ddb);
 
     // Family FIRST: it is the limit a legitimate heavy user meets, and the one whose refusal
     // is most informative. Checking it first also means a forged-id flood still consumes its
     // own family bucket before reaching the IP one.
     if (familyId) {
       try {
-        await countOne(send, commands, table, `f#${hash(familyId)}#${bucket}`, FAMILY_LIMIT, ttl);
+        await countOne(
+          send,
+          commands,
+          table,
+          { pk: `f#${hash(familyId)}#${bucket}` },
+          { max: FAMILY_LIMIT, ttl }
+        );
       } catch (err) {
         if (err?.name !== 'ConditionalCheckFailedException') throw err;
         // Never the identifier — only WHICH limit tripped. A NAT false-positive must show as
@@ -229,7 +175,13 @@ export async function checkLimits({ familyId, ip, now = Date.now(), ddb } = {}) 
 
     if (ip) {
       try {
-        await countOne(send, commands, table, `i#${hash(ipKey(ip))}#${bucket}`, IP_LIMIT, ttl);
+        await countOne(
+          send,
+          commands,
+          table,
+          { pk: `i#${hash(ipKey(ip))}#${bucket}` },
+          { max: IP_LIMIT, ttl }
+        );
       } catch (err) {
         if (err?.name !== 'ConditionalCheckFailedException') throw err;
         console.warn('[ai-extract] rate_limited limit=ip');

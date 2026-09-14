@@ -4,6 +4,42 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A cost objection is not a reason to cut a feature greg asked for
+
+**Date:** 2026-09-14
+**Context:** Planning the magic-beans "not right?" affordance — a way to re-route an AI extraction
+when the model infers the wrong entity kind. I discovered that `SharePayload` is discriminated per
+kind, so the model only ever returns the branch it chose; an honest re-route therefore needs a second
+model call, i.e. a second magic bean. I cut the feature from the plan and recorded it as a follow-up,
+and told greg twice that it "costs no second read" before that (which was also wrong).
+
+greg put it straight back: _"in the case that the model infers the wrong type of event, let's write
+logic to ensure that this is not counted against the user quota — if the model infers wrong, allow
+another run without charging against quota."_
+
+That dissolved the objection completely. The cost was real; the conclusion was not. I had framed it as
+an engineering constraint ("this costs a bean, so it can't ship") when it was a **product** question
+("who pays when we get it wrong?"), and the product answer — we do — is both cheap and a better
+promise than the one it replaced. The pricing page now says _one bean per thing you hand over_, which
+is stronger than what we had before the feature existed.
+
+The tell I missed: I was deciding on greg's behalf about something only he could decide. Cost,
+pricing, what we eat versus what we bill — none of that is mine to settle in a plan.
+
+**Rule:** when a requested feature runs into a cost, quota, or billing objection, **state the
+objection and hand back the options** — do not cut the feature. Say what it costs, say what the
+choices are (charge it, absorb it, bound it), and let greg pick. Cutting is only right when the thing
+is technically impossible, and "it costs money" never is. The same applies to anything where the
+constraint is commercial rather than technical: scope, pricing, what a limit should be, what we
+promise. Flag it, price it, ask.
+
+Corollary that earned its place: the free-correction mechanism then needed four review passes of its
+own and produced a prompt-injection hole, a meter bypass and two silent data-loss paths before it was
+safe. A feature reinstated on a product decision still gets the full engineering discipline — the
+decision settles _whether_, never _how carefully_.
+
+---
+
 ## A release note is never a spotlight unless greg asks for one
 
 **Date:** 2026-09-11
