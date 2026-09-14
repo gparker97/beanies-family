@@ -16,11 +16,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Every AI read is now counted, per family.** A magic bean is spent exactly when beanies answers you — once per thing you hand over, including when it cannot work out what it is. Refusals, timeouts and unreadable answers cost nothing, and a free correction is recorded separately so it can never be billed.
 
+- **Night mode is one tap on the beanie wall.** The 🌙 button sits beside the view switcher, instead of two taps down in the ⋯ menu.
+
+- **Calendar arrows stay where you put your finger.** Stepping back through months, weeks or days no longer moves the ‹ › arrows as the date label changes length, so several steps in a row is one repeated tap rather than a moving target. The month name stays where it was, top left.
+
 - **The beanie wall can show more than one person at a time.** The wall's person chips now add up: tap Leo and Mia to see just their day, tap either again to drop them, or "everyone" to clear. Tapping the last one off goes back to everyone rather than leaving a wall showing nothing.
 
 ### Fixed
 
-- **A wall filtered to someone who has left no longer shows an empty screen.** If a member was removed on another device while the wall was open, the wall kept filtering to them and quietly showed nothing at all.
+- **A view filtered to someone who has left no longer shows an empty screen.** If a member was removed on another device while you were using beanies, the member filter kept filtering to them — the beanie wall showed nothing at all, and Transactions showed an empty list with nothing to explain why.
+
+- **On the wall, a lane belonging to a focused person is shown as focused.** With two or more people selected, the lanes view lit none of them, and tapping a lane that looked unselected quietly dropped that person from the filter.
 
 - **The end time from an invitation is the one it actually says.** An invite reading "2pm to 4:30pm" filled the form in as 2pm to 3pm — the end time was being overwritten with the usual one-hour default a moment after it was read.
 
