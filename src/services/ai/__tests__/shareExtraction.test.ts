@@ -170,14 +170,34 @@ describe('the share path carries inferredTimes too (#93)', () => {
     expect(out.kind === 'recipe' && out.recipe.inferredTimes).toEqual(['prepTime', 'servings']);
   });
 
-  it('tells the model about the exception in the kind="recipe" block', () => {
-    // The rule the shape needs in order to ever be filled. Without it the share prompt is
-    // self-contradictory: a field it must fill and a blanket rule forbidding it.
+  it('carries EVERY recipe policy in the kind="recipe" block, not just the exception', () => {
+    // The share prompt used to carry ONLY the inferredTimes exception, so a recipe extracted
+    // through this path came back with no per-ingredient `inferred` flags at all — and the
+    // form's "we guessed this" highlighting silently stopped being accurate. Unifying the
+    // magic-beans doors routes every recipe link through `share`, which would have made that
+    // the normal case rather than the edge one. All four policies now come from one
+    // declaration (RECIPE_POLICY_LINES), so this asserts the whole set, not one line of it.
     const [system] = buildShareExtractionMessages(
       { kind: 'text', text: 'some page text' },
       '2026-09-07'
     );
-    expect(system.content).toContain('inferredTimes');
-    expect(String(system.content)).toMatch(/When kind="recipe", ONE EXCEPTION/);
+    const content = String(system.content);
+
+    expect(content).toContain('inferredTimes');
+    expect(content).toMatch(/When kind="recipe": ONE EXCEPTION/);
+    expect(content).toMatch(/When kind="recipe": Set inferred=true on any ingredient or step/);
+    expect(content).toMatch(/When kind="recipe": Write the recipe in your own words/);
+    expect(content).toMatch(/When kind="recipe": For "notes", write each distinct fact/);
+  });
+
+  it('does NOT carry isRecipe=false, which the share task expresses as kind="none"', () => {
+    // The one recipe policy that is deliberately not shared. Asserted so a future edit that
+    // "completes the set" has to argue with a test rather than silently teach the model two
+    // contradictory ways to say "this is not a recipe".
+    const [system] = buildShareExtractionMessages(
+      { kind: 'text', text: 'some page text' },
+      '2026-09-07'
+    );
+    expect(String(system.content)).not.toContain('Set isRecipe=false');
   });
 });
