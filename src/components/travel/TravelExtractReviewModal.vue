@@ -236,14 +236,6 @@ function onSave(): void {
     @save="onSave"
   >
     <div class="space-y-4">
-      <!-- "not right?" — renders itself only when a correction is actually available. -->
-      <MagicMiscategorisedBanner
-        v-if="ready"
-        :env="ready.env"
-        from="travel"
-        @close="emit('close')"
-      />
-
       <p class="font-inter text-xs text-gray-400">
         {{ t('travelExtract.reviewSubtitle') }}
       </p>
@@ -353,6 +345,16 @@ function onSave(): void {
           />
         </div>
       </div>
+
+      <!-- "not right?" — at the FOOT, where someone ends up after scanning the segments and
+           finding they are not a trip at all. Renders itself only when a correction is
+           actually available. -->
+      <MagicMiscategorisedBanner
+        v-if="ready"
+        :env="ready.env"
+        from="travel"
+        @close="emit('close')"
+      />
     </div>
   </BeanieFormModal>
 </template>

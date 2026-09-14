@@ -9,6 +9,8 @@ interface Props {
   side?: 'left' | 'right';
   size?: 'narrow' | 'medium' | 'wide' | 'full';
   closable?: boolean;
+  /** Render the `header` slot edge-to-edge, with no padding and no rule beneath it. */
+  customHeader?: boolean;
   /**
    * Stacking layer. 'base' (z-40) is a normal panel; 'overlay' (z-[60])
    * sits above another open drawer/modal — use it when this panel opens on
@@ -28,6 +30,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'narrow',
   closable: true,
   layer: 'base',
+  customHeader: false,
 });
 
 const sizeClasses: Record<string, string> = {
@@ -116,10 +119,20 @@ useFullscreenOverlay(toRef(props, 'open'), close);
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }"
       >
-        <!-- Header -->
+        <!-- Header.
+
+             `customHeader` drops the padding and the rule so a caller's own block can occupy
+             the whole header area edge-to-edge — the same contract `BaseModal` has. The close
+             button stays, absolutely positioned over the slot, because a drawer with no way out
+             is not a variant anyone should be able to ask for. -->
         <div
           v-if="title || $slots.header"
-          class="dark:border-line flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4"
+          class="relative shrink-0"
+          :class="
+            customHeader
+              ? ''
+              : 'dark:border-line flex items-center justify-between border-b border-gray-200 px-6 py-4'
+          "
         >
           <slot name="header">
             <h2 class="font-outfit text-secondary-500 dark:text-ink text-lg font-semibold">
@@ -130,8 +143,11 @@ useFullscreenOverlay(toRef(props, 'open'), close);
           <button
             type="button"
             class="dark:hover:bg-surface-hover dark:hover:text-ink-soft rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            :class="[
+              { 'cursor-not-allowed opacity-50': !closable },
+              customHeader ? 'absolute top-4 right-5 z-[2]' : '',
+            ]"
             :disabled="!closable"
-            :class="{ 'cursor-not-allowed opacity-50': !closable }"
             @click="close"
           >
             <BeanieIcon name="close" size="md" />
