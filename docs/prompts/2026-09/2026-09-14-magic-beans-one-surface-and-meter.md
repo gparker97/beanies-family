@@ -294,3 +294,22 @@ different picture on every platform, cannot take a brand colour, and scattered r
 **Meter verification.** Confirmed counting end to end, with two things worth knowing: the day key is
 **UTC**, so greg's 06:00 SGT reads land on the previous UTC day's row; and CloudWatch shows **three**
 successful reads in his morning window, not the two he recalls.
+
+**Follow-up, same session.**
+
+> just a small thing - you mentioned above you added stars flashing/shimmering to the spinner
+> surface, but i don't see them at all. not sure if that is a bug (i.e. they are showing at the
+> wrong layer, etc) or they are just very subtle, can you pls check
+
+Not a layering bug: they rendered, in the right place, at the right z-order. They were simply below
+the threshold where a person notices anything — four stars at 10-14px, hugging the card's corners,
+with a peak opacity held for a single instant of a 2.6s cycle and no glow, on a blurred dark scrim.
+
+Three changes, all needed: size (14-24px, pushed further out so they read as sparks _around_ the
+card), a dwell in the keyframes (the flash now holds near peak from 18% to 38% rather than touching
+it once), and a `drop-shadow` glow in the sparkle's own colour, which is what lifts Heritage Orange
+off the scrim. Six of them now, still staggered.
+
+The harness missed it because it screenshotted one arbitrary instant. It now samples the brightest
+sparkle across twelve frames of the cycle and fails if any frame has nothing visible — the check
+that would have caught this the first time.

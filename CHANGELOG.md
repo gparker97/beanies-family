@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **The magic-beans wait now says "counting magic beans…", and looks like it means it.** Every other loader in beanies still says "counting beans…"; this one screen is the exception, because the waiting is the feature. A light travels through the words while beanies reads, and a few small sparkles drift behind the card. All of it stops for anyone who has asked their device for less motion, and the message stays perfectly readable either way.
+- **The magic-beans wait now says "counting magic beans…", and looks like it means it.** Every other loader in beanies still says "counting beans…"; this one screen is the exception, because the waiting is the feature. A light travels through the words while beanies reads, and sparkles flash around the card. All of it stops for anyone who has asked their device for less motion, and the message stays perfectly readable either way.
 
 ## 2026-09-14
 
