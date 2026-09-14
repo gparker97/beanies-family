@@ -336,9 +336,11 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       ⚠️ No beans at all. A BACKSTOP now rather than a live path: the wall's person filter used
       not to be reconciled when the roster changed underneath a mounted wall, so a cross-device
       merge that removed a member — or re-tagged a human as a pet — left `visibleMemberIds`
-      pointing at nobody with no chip lit to explain it. `useWallMemberFocus` prunes departed
-      members and falls back to everyone, so that route is closed; this stays because a board
-      with a title, a 0 / 0 bar and an empty void is never the right thing to render.
+      pointing at nobody with no chip lit to explain it. `useWallMemberFocus` now derives the
+      focus from the live roster, so THAT route is closed — but this is still LIVE, not a relic:
+      an all-pets family, or the first frames before the doc loads, both give an empty
+      `sortedHumans` and land here. A board with a title, a 0 / 0 bar and an empty void is never
+      the right thing to render.
     -->
     <p
       v-if="!hasBoard && !partitioned.idle.length"

@@ -47,12 +47,17 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
-  <!-- ⚠️ `flex-wrap`. The row cannot scroll — `.wall-root` is `overflow-hidden` — so without
-       this a sixth chip is CLIPPED, and a clipped chip can be a LIT one. That would defeat the
-       only mitigation this control actually relies on: the wall's own floor is 600px, which
-       leaves ~544px after the padding, and "everyone" plus five avatar chips plus the brand
-       lockup does not fit. Wrapping costs a second row on a big family and never hides state. -->
-  <div class="flex shrink-0 flex-wrap items-center gap-2 px-7 pt-3 pb-4">
+  <!-- ⚠️ `overflow-x-auto`, and deliberately NOT `flex-wrap`.
+       A clipped chip can be a LIT one, and every focused bean being visible is the one
+       mitigation this control relies on — `.wall-root` is `overflow-hidden`, the wall's floor is
+       600px, and "everyone" plus five avatar chips plus the brand lockup does not fit in the
+       ~544px left after the padding.
+       Wrapping was tried and is worse: a second chip row adds ~46px to a `shrink-0` footer
+       inside a `100dvh` column, taken out of `<main>` — but every layout decision on this page
+       measures `window.innerHeight`, which does not move, so the band and the time grid keep
+       being sized for height that is no longer there. Scrolling costs nothing vertically and
+       reaches every chip. -->
+  <div class="flex shrink-0 items-center gap-2 overflow-x-auto px-7 pt-3 pb-4">
     <button
       type="button"
       class="font-outfit wall-chip-person rounded-full px-3.5 py-1.5 font-semibold shadow-[var(--card-shadow)]"

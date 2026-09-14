@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Every AI read is now counted, per family.** A magic bean is spent exactly when beanies answers you — once per thing you hand over, including when it cannot work out what it is. Refusals, timeouts and unreadable answers cost nothing, and a free correction is recorded separately so it can never be billed.
 
-- **Night mode is one tap on the beanie wall.** The 🌙 button sits beside the view switcher, instead of two taps down in the ⋯ menu.
+- **Night mode is one tap on the beanie wall.** The 🌙 button sits beside the view switcher, as well as in the ⋯ menu where it has always been.
 
 - **Calendar arrows stay where you put your finger.** Stepping back through months, weeks or days no longer moves the ‹ › arrows as the date label changes length, so several steps in a row is one repeated tap rather than a moving target. The month name stays where it was, top left.
 

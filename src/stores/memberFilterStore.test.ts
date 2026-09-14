@@ -202,37 +202,56 @@ describe('memberFilterStore', () => {
     });
   });
 
-  // ── syncWithMembers ──
+  // ── reconciliation with the roster ──
 
-  describe('syncWithMembers', () => {
-    it('should add newly added members to selection', () => {
-      seedMembers(ALICE, BOB);
-      const store = useMemberFilterStore();
-      store.initialize();
-
-      expect(store.selectedCount).toBe(2);
-
-      // Add a new member
-      const familyStore = useFamilyStore();
-      familyStore.members.push(CHARLIE);
-      store.syncWithMembers();
-
-      expect(store.selectedCount).toBe(3);
-      expect(store.isMemberSelected('charlie')).toBe(true);
-    });
-
-    it('should remove selections for deleted members', () => {
+  describe('when the roster changes under a live session', () => {
+    it('drops a member who has gone, without being told', () => {
+      // ⚠️ No sync call. There WAS one, dormant for years, and wiring it to a roster watch made
+      // things worse: it has no memory of the previous roster, so it could not tell "arrived"
+      // from "deselected" and its post-condition was always all-humans — any roster change
+      // silently reset a narrowed filter to everyone. Derived on read instead.
       seedMembers(ALICE, BOB, CHARLIE);
       const store = useMemberFilterStore();
       store.initialize();
 
-      // Remove charlie from family
-      const familyStore = useFamilyStore();
-      familyStore.members.splice(2, 1); // remove CHARLIE
-      store.syncWithMembers();
+      useFamilyStore().members.splice(2, 1); // Charlie leaves
 
       expect(store.selectedCount).toBe(2);
       expect(store.isMemberSelected('charlie')).toBe(false);
+      expect(store.isAllSelected).toBe(true);
+    });
+
+    it('KEEPS a narrowed filter narrow when someone unrelated arrives', () => {
+      // The regression the derivation exists to make impossible: a merge landing on the 10s
+      // poll used to widen "just Alice" back to everyone, on seven pages at once.
+      seedMembers(ALICE, BOB);
+      const store = useMemberFilterStore();
+      store.initialize();
+      store.selectOnly('alice');
+
+      useFamilyStore().members.push(CHARLIE);
+
+      expect(store.selectedCount).toBe(1);
+      expect(store.isMemberSelected('alice')).toBe(true);
+      expect(store.isMemberSelected('charlie')).toBe(false);
+      expect(store.isAllSelected).toBe(false);
+    });
+
+    it('remembers a member who leaves and comes back', () => {
+      // A departed id is not deleted, only ignored — so a transient roster reload does not
+      // quietly rewrite what the user chose.
+      seedMembers(ALICE, BOB, CHARLIE);
+      const store = useMemberFilterStore();
+      store.initialize();
+      store.selectOnly('charlie');
+      const familyStore = useFamilyStore();
+
+      const [charlie] = familyStore.members.splice(2, 1);
+      expect(store.selectedCount).toBe(0);
+
+      familyStore.members.push(charlie!);
+      expect(store.isMemberSelected('charlie')).toBe(true);
+      expect(store.selectedCount).toBe(1);
     });
   });
 
