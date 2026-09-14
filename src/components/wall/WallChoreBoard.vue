@@ -333,12 +333,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     </div>
 
     <!--
-      ⚠️ No beans at all. Reachable without anyone doing anything odd: the wall's
-      person filter is never reconciled when the roster changes underneath a
-      mounted wall, so a cross-device merge that removes a member — or re-tags a
-      human as a pet — leaves `visibleMemberIds` pointing at nobody, with no
-      filter chip lit to explain it. Without this the board rendered a title, a
-      0 / 0 bar and an empty void.
+      ⚠️ No beans at all. A BACKSTOP now rather than a live path: the wall's person filter used
+      not to be reconciled when the roster changed underneath a mounted wall, so a cross-device
+      merge that removed a member — or re-tagged a human as a pet — left `visibleMemberIds`
+      pointing at nobody with no chip lit to explain it. `useWallMemberFocus` prunes departed
+      members and falls back to everyone, so that route is closed; this stays because a board
+      with a title, a 0 / 0 bar and an empty void is never the right thing to render.
     -->
     <p
       v-if="!hasBoard && !partitioned.idle.length"

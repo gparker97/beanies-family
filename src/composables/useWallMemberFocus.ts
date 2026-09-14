@@ -13,15 +13,23 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue';
  * phone. This one is wall-local and lives only as long as the page.
  */
 export interface WallMemberFocus {
-  /** The focused bean ids. EMPTY means everyone. */
-  focusedMemberIds: Ref<string[]>;
+  /**
+   * The focused bean ids. EMPTY means everyone.
+   *
+   * ⚠️ READONLY. It used to be handed out as a writable `Ref<string[]>` and passed straight to
+   * `WallFooter` as a prop, so the footer's `props.focused` WAS the live array — and Vue does
+   * not warn about mutating a prop's elements in place. Both invariants this module exists to
+   * hold ("empty means everyone", "removing the last falls back to everyone") were one `.push()`
+   * from being bypassed, silently.
+   */
+  focusedMemberIds: Readonly<Ref<readonly string[]>>;
   /**
    * What the views consume.
    *
    * `null` means "no filter" and is kept distinct from an empty array so a view can tell it
    * apart from "a filter that matches nobody" without a second flag.
    */
-  visibleMemberIds: ComputedRef<string[] | null>;
+  visibleMemberIds: ComputedRef<readonly string[] | null>;
   /** Add or remove one bean. Removing the last falls back to everyone. */
   toggle: (memberId: string) => void;
   /** Back to everyone. */
@@ -31,7 +39,11 @@ export interface WallMemberFocus {
 export function useWallMemberFocus(roster: () => string[]): WallMemberFocus {
   const focusedMemberIds = ref<string[]>([]);
 
-  const visibleMemberIds = computed(() =>
+  // ⚠️ A computed CACHES, so the spread runs once per change and every view is handed the SAME
+  // array — a "defensive copy" that defends nothing, because one view pushing to it poisons the
+  // cache for all of them until an unrelated toggle invalidates it. `readonly` in the type is
+  // the actual guard; the spread is only here so the identity differs from the source ref.
+  const visibleMemberIds = computed<readonly string[] | null>(() =>
     focusedMemberIds.value.length === 0 ? null : [...focusedMemberIds.value]
   );
 
@@ -58,10 +70,17 @@ export function useWallMemberFocus(roster: () => string[]): WallMemberFocus {
    * so an identity watch would fire constantly and a deep watch would walk every member object.
    */
   watch(
-    () => roster().join(','),
+    // ⚠️ The cheap guard belongs in the SOURCE, not the callback. `roster()` forces a sort, a
+    // filter and a map, and `reloadAllStores` runs on a 10s poll — so on a wall left up with
+    // nobody filtering (the default, and near-permanent) this was thousands of full roster
+    // passes a day that all returned on the callback's first line.
+    //
+    // `\u0000` rather than a comma: ids joined by a comma make `['a,b','c']` and `['a','b','c']`
+    // hash identically, so a roster change between those two would never fire at all.
+    () => (focusedMemberIds.value.length === 0 ? '' : roster().join('\u0000')),
     (joined) => {
-      if (focusedMemberIds.value.length === 0) return;
-      const present = new Set(joined ? joined.split(',') : []);
+      if (!joined) return;
+      const present = new Set(joined.split('\u0000'));
       const kept = focusedMemberIds.value.filter((id) => present.has(id));
       // Assign only on a real change, or this writes a new array on every roster touch and
       // re-renders every view with the same ids.

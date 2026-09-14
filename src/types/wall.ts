@@ -92,7 +92,15 @@ export interface WallPeripheralData {
   listsFor: (memberId: string) => WallListGroup[];
   orphanLists: WallListGroup[];
   /** The wall's person filter, so a card agrees with the view above it. */
-  visibleMemberIds: string[] | null;
+  /**
+   * Who the wall is showing; `null` is "everyone", kept distinct from an empty list so a view
+   * can tell it apart from "a filter that matches nobody".
+   *
+   * ⚠️ `readonly`. Every view is handed the SAME array — `useWallMemberFocus` returns a cached
+   * computed — so one view sorting or pushing to its own prop would poison the filter for all
+   * of them. The type is the guard; nothing copies per consumer.
+   */
+  visibleMemberIds: readonly string[] | null;
 }
 
 export interface WallJobsInput {
