@@ -44,6 +44,7 @@ import { resetCelebrationMode, setCelebrationMode } from '@/composables/useCeleb
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useWallMemberFocus } from '@/composables/useWallMemberFocus';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
@@ -69,8 +70,16 @@ const activeView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 /** Where "back" from the jobs board returns to — never the jobs board itself. */
 const lastCalendarView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 const nightNow = ref(false);
-/** Which bean the wall is focused on, or null for everyone. Wall-local. */
-const focusedMemberId = ref<string | null>(null);
+/**
+ * Who the wall is showing. Wall-local, never persisted, and never the account holder's filter.
+ * The two rules that make it safe on a glanceable screen live in the composable.
+ */
+const {
+  focusedMemberIds,
+  visibleMemberIds,
+  toggle: onFocusMember,
+  clear: clearFocus,
+} = useWallMemberFocus(() => familyStore.sortedHumans.map((m) => m.id));
 /** The open drill-in sheet, or null. One at a time — this is a wall, not a desktop. */
 const sheet = ref<WallSheetTarget | null>(null);
 
@@ -141,10 +150,6 @@ const tomorrowYmd = computed(() => addDaysYmd(today.value, 1));
  * `null` means everyone — kept distinct from "an empty list" so a view can tell
  * "no filter" apart from "a filter that matches nobody" without a second flag.
  */
-const visibleMemberIds = computed(() =>
-  focusedMemberId.value === null ? null : [focusedMemberId.value]
-);
-
 const todayCount = computed(() => activityStore.activitiesForDate(today.value).length);
 const tomorrowCount = computed(() => activityStore.activitiesForDate(tomorrowYmd.value).length);
 
@@ -528,9 +533,20 @@ function onGoBack() {
   selectView(lastCalendarView.value);
 }
 
-function onFocusMember(memberId: string) {
-  // The footer chips' own semantics: tapping the focused bean clears the filter.
-  focusedMemberId.value = focusedMemberId.value === memberId ? null : memberId;
+/**
+ * Waking from the night screen returns the wall to everyone.
+ *
+ * ⚠️ Night mode is MANUAL — it is only ever entered from the lock menu's "night now", and
+ * nothing schedules it. So this clears the filter when someone has actually put the wall to
+ * bed; it is not a nightly reset, and must not be described as one.
+ *
+ * Deliberately NOT a timer: a parent standing at the wall reading one child's day must not have
+ * it change under them. What keeps a half-filtered wall honest the rest of the time is that
+ * every focused bean is a LIT chip — see `WallFooter`.
+ */
+function onWake() {
+  nightNow.value = false;
+  clearFocus();
 }
 
 function onFocusDay(ymd: string) {
@@ -865,7 +881,7 @@ watch(activeView, () => (sheet.value = null));
       />
     </main>
 
-    <WallFooter :focused="focusedMemberId" @select="focusedMemberId = $event" />
+    <WallFooter :focused="focusedMemberIds" @select="onFocusMember" @clear="clearFocus" />
 
     <WallTickBurst :bursts="bursts" />
 
@@ -893,7 +909,7 @@ watch(activeView, () => (sheet.value = null));
         })
       "
       :tomorrow-count="tomorrowCount"
-      @wake="nightNow = false"
+      @wake="onWake"
     />
   </div>
 </template>
