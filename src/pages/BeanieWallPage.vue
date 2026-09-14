@@ -447,6 +447,9 @@ function onStep(direction: -1 | 1) {
 }
 
 function onGoToToday() {
+  // The chip is `aria-disabled` rather than `disabled` so it can keep focus (see its comment in
+  // the template), which means the handler has to be the thing that actually refuses.
+  if (isAnchoredToToday.value) return;
   anchor.goToToday();
   logAnchorChange('today');
 }
@@ -556,8 +559,8 @@ function enterNight(source: 'face' | 'lock-menu') {
 /**
  * Waking from the night screen returns the wall to everyone.
  *
- * ⚠️ Night mode is MANUAL — it is only ever entered from the lock menu's "night now", and
- * nothing schedules it. So this clears the filter when someone has actually put the wall to
+ * ⚠️ Night mode is MANUAL — entered only from the lock menu or the face button, and nothing
+ * schedules it. So this clears the filter when someone has actually put the wall to
  * bed; it is not a nightly reset, and must not be described as one.
  *
  * Deliberately NOT a timer: a parent standing at the wall reading one child's day must not have
@@ -825,22 +828,22 @@ watch(activeView, () => (sheet.value = null));
             or left today, which is the same defect as a label between them and
             would have undone the reorder above.
 
-            ⚠️ `disabled` + `opacity-0`, NOT `invisible` + `aria-hidden`. Its
-            sibling `WallNavArrow` already solves the identical "this control
-            would do nothing" case this way, and says why: a control that
-            vanishes under your finger is worse than one that plainly will not
-            move. `aria-hidden` was also actively wrong here — press Today and
-            the condition flips on the element that currently HOLDS FOCUS, which
-            WAI-ARIA forbids and which drops the keyboard user back to
-            `<body>`. `disabled` alone takes it out of hit-testing and the tab
-            order, so the three extra bindings that restated the same boolean
-            are gone with it.
+            ⚠️ `aria-disabled` + `pointer-events-none`, and it STAYS FOCUSABLE.
+            Two earlier attempts both broke the keyboard: `aria-hidden` on the
+            element that currently holds focus is forbidden outright by
+            WAI-ARIA, and `disabled` blurs a focused element too — measured, in
+            Chromium it drops to `<body>` and the next Tab restarts at the top
+            of the wall, while WebKit keeps focus, so the two target browsers
+            disagreed. Pressing Today is exactly when the condition flips, so
+            this is the common path, not an edge case. Keeping it focusable and
+            merely inert means focus stays put; `onGoToToday` returns early, so
+            the Enter key cannot act on it either.
           -->
           <button
             type="button"
             class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold transition-opacity"
-            :class="isAnchoredToToday ? 'opacity-0' : ''"
-            :disabled="isAnchoredToToday"
+            :class="isAnchoredToToday ? 'pointer-events-none opacity-0' : ''"
+            :aria-disabled="isAnchoredToToday || undefined"
             @click="onGoToToday"
           >
             {{ t('date.today') }}
@@ -860,9 +863,15 @@ watch(activeView, () => (sheet.value = null));
              action: the clock is proportional (9:59 → 10:00) and `WallStatusStamp` rebuilds its
              label every 30s ("Saved just now" → "Saved 24 minutes ago" → "Can't reach your
              family file"). This group is `ml-auto`, so every wobble moved the nav arrows to its
-             left — measured at up to 81px, on an unattended display, twice a minute. Reserving
-             the column is what makes the arrow reservation two siblings over mean anything. -->
-        <div class="wall-clock-col min-w-[9.5rem] text-right tabular-nums">
+             left — measured at up to 81px, on an unattended display, twice a minute.
+
+             ⚠️ `.wall-clock-col` is a FIXED width, not a floor. A floor was tried first and
+             measured: the stamp strings the comment above quotes are 158-187px against a 152px
+             floor, and "9:59 PM" -> "10:00 PM" is a 20px jump on its own — so the column simply
+             exceeded its own reservation and the arrows moved anyway. Fixed, with the stamp
+             truncating inside it, there is nothing left to exceed. `tabular-nums` equalises
+             digit WIDTHS, not digit counts, which is why it was not enough by itself. -->
+        <div class="wall-clock-col text-right tabular-nums">
           <p class="font-outfit wall-clock leading-none font-extrabold">
             {{ clockNow.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) }}
           </p>
@@ -1135,6 +1144,12 @@ watch(activeView, () => (sheet.value = null));
   font-size: 1.35rem;
 }
 
+.wall-root .wall-clock-col {
+  /* A FIXED reservation, not a floor — see the template. Wide enough for a 12-hour clock at
+     2.3rem plus the longest status stamp, and the stamp truncates inside it. */
+  width: 11.5rem;
+}
+
 .wall-root :deep(.wall-switch-btn) {
   font-size: 1.2rem;
   height: 2.75rem;
@@ -1332,6 +1347,13 @@ watch(activeView, () => (sheet.value = null));
 .wall-portrait :deep(.wall-nav-today) {
   font-size: 0.78rem;
   min-height: 2.5rem;
+}
+
+.wall-portrait .wall-clock-col {
+  /* Narrower upright, exactly as .wall-clock and .wall-nav-arrow are — an upright tablet has
+     about 60% of the width, and a reservation that does not shrink with them steals it from the
+     date. Every other header hook has this partner; this one existed without it for one commit. */
+  width: 8.5rem;
 }
 
 .wall-portrait :deep(.wall-switch-btn) {

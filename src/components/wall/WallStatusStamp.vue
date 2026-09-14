@@ -136,7 +136,7 @@ watch(attention, (isDegraded, was) => {
 <template>
   <p
     v-if="visible"
-    class="font-inter wall-stamp flex items-center justify-end gap-1.5"
+    class="font-inter wall-stamp flex min-w-0 items-center justify-end gap-1.5"
     :class="
       attention
         ? 'text-primary-500 dark:text-accent-lift font-semibold'
@@ -148,6 +148,10 @@ watch(attention, (isDegraded, was) => {
       :class="attention ? 'bg-[var(--heritage-orange)]' : 'bg-[#27AE60]'"
       aria-hidden="true"
     />
-    {{ label }}
+    <!-- ⚠️ `truncate`. This sits in the wall header's FIXED-width clock column, and its label is
+         rebuilt by a 30s ticker: "Saved just now" through "Your family file needs attention"
+         span ~100px to ~187px. Without truncation the widest states burst the reservation and
+         push the nav arrows sideways twice a minute, with nobody touching the wall. -->
+    <span class="truncate">{{ label }}</span>
   </p>
 </template>

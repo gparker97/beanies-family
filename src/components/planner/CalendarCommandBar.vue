@@ -142,12 +142,12 @@ onBeforeUnmount(() => {
              633 → 704 → 674 → 707 → 731 → 695 px across six presses. Shrinkable, `truncate`
              finally has a constrained width to bite on, the row never overflows, and the
              right-hand controls stay where `sm:ml-auto` puts them. -->
-        <!-- ⚠️ A FLOOR as well as `flex-1`. Both the group and this wrapper have
-             `flex-basis: 0`, which gives them a shrink weight of 0 — so the controls sibling
-             absorbs all negative free space and this can be squeezed to literally nothing,
-             losing the month entirely. The floor is on the TITLE, not on the arrows: it cannot
-             move them, because the group beside it still takes the slack. -->
-        <div class="min-w-[6rem] flex-1">
+        <!-- ⚠️ NO width floor here, deliberately. One was tried (`min-w-[6rem]`) to stop the
+             title being squeezed to nothing, and measured: at 360/375/390px it pushed the bell
+             and search 50/35/20px past the page edge, because every other child of this row is
+             `flex-shrink-0` and nothing could absorb it. A truncated month beats controls off
+             the screen, and `truncate` has handled the narrow case on phones all along. -->
+        <div class="min-w-0 flex-1">
           <Transition name="cal-label" mode="out-in">
             <h1
               :key="label"
@@ -161,13 +161,15 @@ onBeforeUnmount(() => {
         <!-- RECLAIMED-HEADER WIDTHS ONLY. This row has always been stable here — the title
              above is `flex-1`, so it absorbs the slack and the cluster is already pinned.
 
-             ⚠️ `md:`, not `sm:`. `headerReclaimed` follows `useBreakpoint`'s 767px, while
-             Tailwind's `sm:` is 640px — so an `sm:` split left a 128px band where the desktop
-             nav rendered AND the mobile member filter and trip chip rendered to its right,
-             both of which change width when a member is selected. `useMobileMenu`'s header
-             warns about exactly this collision. -->
+             ⚠️ `v-if="headerReclaimed"`, NOT a breakpoint class. The mobile filter and the
+             inline trip chip — the two things whose width moves the arrows — are themselves
+             `v-if="headerReclaimed"`, so the nav has to key on the SAME condition or the two
+             disagree. `sm:` (640px) left a 128px band rendering both; `md:` narrowed it but is
+             a `rem` breakpoint against `useBreakpoint`'s `px`, so at a non-default browser font
+             size the band simply reopens, wider. This also means one nav exists at a time
+             instead of two, so a `getByLabel` query cannot go ambiguous. -->
         <CalendarPeriodNav
-          class="md:hidden"
+          v-if="headerReclaimed"
           @prev="emit('prev')"
           @today="emit('today')"
           @next="emit('next')"
@@ -209,14 +211,18 @@ onBeforeUnmount(() => {
             <span class="hidden sm:inline">{{ t('planner.agenda') }}</span>
           </button>
 
-          <!-- md AND UP — the same 767px boundary `headerReclaimed` uses, so the mobile-only
-               filter and trip chip are genuinely absent rather than merely usually absent.
-               Placed BEFORE the view toggle, so everything to its right has a fixed width: the
-               toggle, the magic pill and Add. Its x is therefore a constant —
-               in every locale, at every text size, whatever the period label says, and the same
-               across a view switch. That is the whole fix. -->
+          <!-- The other arm of the same condition, so the mobile-only filter and trip chip are
+               genuinely absent rather than merely usually absent. Placed BEFORE the view toggle,
+               so everything to its right has a fixed width: the toggle, the magic pill and Add.
+               Its x is therefore a constant — in every locale, at every text size, whatever the
+               period label says, and the same across a view switch.
+
+               ⚠️ `v-if="!headerReclaimed"`, NOT `v-else`. Vue pairs `v-else` with the
+               IMMEDIATELY PRECEDING `v-if`, which here is the agenda button's
+               `activeView === 'day'` — so the nav rendered in month view and vanished in day
+               view. Caught by measuring; the suite was green. -->
           <CalendarPeriodNav
-            class="hidden md:flex"
+            v-if="!headerReclaimed"
             @prev="emit('prev')"
             @today="emit('today')"
             @next="emit('next')"
