@@ -744,12 +744,68 @@
 
 .magic-shimmer::after {
   animation: magic-sheen 4.4s ease-in-out infinite;
-  background: linear-gradient(105deg, transparent 32%, rgb(255 255 255 / 32%) 50%, transparent 68%);
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    var(--magic-sheen-color, rgb(255 255 255 / 32%)) 50%,
+    transparent 68%
+  );
   content: '';
   inset: 0;
   pointer-events: none;
   position: absolute;
   transform: translateX(-120%);
+}
+
+/* Speed + count modifiers.
+ *
+ * ⚠️ Three things here are silently wrong if guessed:
+ *  1. They target ::after, not the element. The animation lives on the pseudo-element; written
+ *     on the element they compile, pass lint, and do NOTHING.
+ *  2. They are declared AFTER the base rule. Identical specificity (0,1,1) means source order
+ *     alone decides, and above it these longhands are wiped by the base `animation:` shorthand.
+ *  3. `-once` overrides ITERATION-COUNT, not duration. The base is `infinite`, so a
+ *     duration-only modifier on a resolved tile would sweep forever behind the review modal.
+ *
+ * The colour is a custom property with the original white as its fallback, so the four existing
+ * callers are unchanged by construction — a tinted surface sets --magic-sheen-color instead,
+ * because white on a light tint is invisible.
+ */
+.magic-shimmer-slow::after {
+  animation-duration: 7s;
+}
+
+.magic-shimmer-busy::after {
+  animation-duration: 1.3s;
+}
+
+.magic-shimmer-once::after {
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
+
+/* ───── Magic tagline band ───────────────────────────────────────────────────
+   The Caveat tagline's home in the magic-beans sheet: a soft Heritage Orange →
+   Terracotta tint the sheen travels across, rather than the textarea (a shimmer
+   over an input is the skeleton-loader idiom — it reads as loading or disabled,
+   and it fights the caret).
+
+   A CLASS, not an inline style, deliberately. An inline `background` outranks
+   any `dark:` utility, so a tinted band written inline is exactly how a surface
+   ends up with no dark partner. The dark values are stronger because a 10% tint
+   is invisible on `surface-raised`, and --magic-sheen-color is set here because
+   the shared sheen is white, which cannot be seen on a light tint.
+──────────────────────────────────────────────────────────────────────────── */
+.magic-tagline-band {
+  --magic-sheen-color: rgb(241 93 34 / 13%);
+
+  background: linear-gradient(135deg, rgb(241 93 34 / 10%), rgb(230 126 34 / 6%) 62%, transparent);
+}
+
+html.dark .magic-tagline-band {
+  --magic-sheen-color: rgb(255 139 94 / 16%);
+
+  background: linear-gradient(135deg, rgb(255 139 94 / 16%), rgb(240 160 90 / 9%) 62%, transparent);
 }
 
 /* ── Family Scrapbook decorative utilities ─────────────────────────────

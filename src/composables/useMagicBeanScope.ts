@@ -21,11 +21,19 @@
  *
  * ⚠️ Never write `familyId: … ?? undefined` at a call site again. The optional-with-fallback
  * shape is what made the type say one thing and the runtime do another.
+ *
+ * ⚠️ NO VALUE IMPORT FROM `useSharedDocumentIngest`. The spine imports this module, so taking
+ * its `notReady` back would be a cycle — and under Vite a cycle can leave one binding
+ * `undefined` at call time, which throws inside the ingest. `withIngestLock`'s catch turns any
+ * throw into "Couldn't read that", so the symptom is a generic failure on EVERY capture with
+ * nothing pointing at the cause. The type-only import above is erased at build and is fine.
  */
 
 import type { IngestEnv } from '@/composables/useSharedDocumentIngest';
-import { notReady } from '@/composables/useSharedDocumentIngest';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { useToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
 
 /**
  * The family this read is billed to, or `null` if there is none.
@@ -36,7 +44,18 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 export function resolveBillableFamilyId(env: IngestEnv): string | null {
   const familyId = useFamilyContextStore().activeFamilyId;
   if (!familyId) {
-    notReady(env, 'no_family', 'shareTarget.notReady.title', 'shareTarget.notReady.message');
+    // Deliberately a local copy of `notReady`'s two lines rather than an import: see the cycle
+    // warning above. Same surface, same action, same strings — a CloudWatch filter on
+    // `action: 'not_ready'` still catches both.
+    const { showToast } = useToast();
+    const { t } = useTranslation();
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'ingest not ready',
+      context: { action: 'not_ready', detail: 'no_family' },
+    });
+    showToast('info', t('shareTarget.notReady.title'), t('shareTarget.notReady.message'));
     return null;
   }
   return familyId;

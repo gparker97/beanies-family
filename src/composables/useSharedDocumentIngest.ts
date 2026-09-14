@@ -46,6 +46,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
 import { assertNever } from '@/utils/assertNever';
@@ -109,7 +110,35 @@ export interface ShareMeta {
  * there doing nothing visible for four or five seconds. This is the state the global overlay
  * in `App.vue` watches.
  */
-const isIngesting = ref(false);
+/**
+ * Everything the reading UI needs, as ONE value.
+ *
+ * It was a single boolean until the resolve beat needed a kind and the recipe form needed to
+ * keep its own overlay. Three sibling refs reset together, in a `finally` in a different
+ * function from where two of them are set, is the shape a future change half-updates — so a
+ * reset is one assignment, and a new fact is a FIELD here rather than a fourth ref.
+ */
+type IngestState =
+  | { phase: 'idle' }
+  | { phase: 'reading'; presentation: 'global' | 'local' }
+  | { phase: 'resolved'; presentation: 'global' | 'local'; kind: ShareKind };
+
+const ingestState = ref<IngestState>({ phase: 'idle' });
+
+/** Read-only view for the overlay, which renders the tiles from `phase` and `kind`. */
+export const magicIngestState = computed<IngestState>(() => ingestState.value);
+
+const isIngesting = computed(() => ingestState.value.phase !== 'idle');
+
+/**
+ * How long the resolved tile is held before the review modal opens.
+ *
+ * ⚠️ The ONLY deliberate latency in this pipeline. Without it the resolve renders for zero
+ * frames: `dispatchSharePayload` routes and `withIngestLock`'s `finally` clears the state in
+ * the same tick, so "two tiles fade and one lifts" would never be seen by anyone. Zero under
+ * reduced motion.
+ */
+const RESOLVE_HOLD_MS = 700;
 
 /**
  * Whether a shared document is being read right now, for the app-shell overlay.
@@ -117,7 +146,12 @@ const isIngesting = ref(false);
  * False while the consent prompt is up: that modal IS the feedback at that moment, and the
  * overlay sits above it.
  */
-export const isReadingSharedDocument = computed(() => isIngesting.value && !consentOpen.value);
+export const isReadingSharedDocument = computed(() => {
+  // Read ONCE into a local: re-reading `ingestState.value` in each operand does not narrow the
+  // union, and an `as` at this call site would defeat the point of discriminating it.
+  const state = ingestState.value;
+  return state.phase !== 'idle' && !consentOpen.value && state.presentation === 'global';
+});
 
 /**
  * Is an ingest already running?
@@ -180,11 +214,14 @@ async function waitUntilReady(): Promise<void> {
 /**
  * Tell the user why nothing happened, and record it. Never a silent return.
  *
- * EXPORTED for `useMagicBeanScope`, which refuses a read with no family id. It needs the same
- * log+toast pair, and a second implementation of "explain why nothing happened" is how the two
- * drift into two dialects of the same message.
+ * ⚠️ NOT exported. `useMagicBeanScope` needs the same log+toast pair and briefly imported it —
+ * but that module is imported BY this one, so the import was a cycle, and under Vite a cycle
+ * can leave a binding `undefined` at call time. The throw lands in `withIngestLock`'s catch,
+ * which turns it into "Couldn't read that" on every capture with nothing naming the cause.
+ * It carries its own two lines instead; the shared contract is the `action: 'not_ready'`
+ * context key, which is what a CloudWatch filter actually keys on.
  */
-export function notReady(
+function notReady(
   env: IngestEnv,
   detail: string,
   titleKey: UIStringKey,
@@ -973,7 +1010,18 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
     const source = await prepare(content, meta);
     if (!source) return; // already logged and toasted
 
-    await runIngest(source, SHARE_ENV);
+    const grant = await requestConsent();
+    if (!grant) {
+      logEvent({
+        level: 'info',
+        surface: SHARE_ENV.surface,
+        message: 'consent declined',
+        context: { action: 'consent_declined' },
+      });
+      return;
+    }
+
+    await runIngest(source, SHARE_ENV, grant);
   });
 }
 
@@ -1005,7 +1053,7 @@ async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise
     showToast('info', t('shareTarget.busy.title'), t('shareTarget.busy.message'));
     return;
   }
-  isIngesting.value = true;
+  ingestState.value = { phase: 'reading', presentation: 'global' };
 
   try {
     await run();
@@ -1022,7 +1070,7 @@ async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise
     });
     showToast('error', t('ai.error.title'), t('ai.error.generic'));
   } finally {
-    isIngesting.value = false;
+    ingestState.value = { phase: 'idle' };
   }
 }
 
@@ -1033,9 +1081,20 @@ async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise
  * exactly why it is one function. The ONLY thing the two entry points disagree about is how a
  * `ShareSource` was obtained.
  */
-async function runIngest(source: ShareSource, env: IngestEnv): Promise<void> {
+async function runIngest(
+  source: ShareSource,
+  env: IngestEnv,
+  grant: ConsentGrant,
+  destination?: InAppDestination
+): Promise<void> {
   const { showToast } = useToast();
   const { t } = useTranslation();
+
+  // `local` when a door will consume the payload itself (the recipe form, which keeps an
+  // overlay scoped to its own fields). Derived from the claim rather than configured
+  // separately: a door that keeps the payload IS the door the user is looking at, so the
+  // global overlay cannot double up by construction rather than by a check to remember.
+  if (destination) ingestState.value = { phase: 'reading', presentation: 'local' };
 
   // Offline sits between triage and consent — every `ShareSource` is produced without a
   // network call, so the file path's original ordering (triage → offline → consent → extract)
@@ -1046,20 +1105,11 @@ async function runIngest(source: ShareSource, env: IngestEnv): Promise<void> {
     return;
   }
 
-  // ADR-030 consent, before a single byte leaves the device — and before the FETCH, not just
-  // the extraction. A third-party app cannot cause a document or a page to be read without
-  // the user seeing this, and neither can a mis-tap inside beanies.
-  const grant = await requestConsent();
-  if (!grant) {
-    logEvent({
-      level: 'info',
-      surface: env.surface,
-      message: 'consent declined',
-      context: { action: 'consent_declined' },
-    });
-    return;
-  }
-
+  // ADR-030 consent is already minted by the caller — REQUIRED here, never optional, so an
+  // unthreaded call site is a compile error rather than a silent ungated read. Both entry
+  // points now mint at the same point in their own flow (the in-app door at the commit, before
+  // its picker; the share path as soon as `prepare` yields a usable source), which is what
+  // makes them one rule rather than two orderings that can drift.
   const outcome = await read(source, grant, env);
   if (!outcome) return; // already logged and toasted
 
@@ -1089,7 +1139,39 @@ async function runIngest(source: ShareSource, env: IngestEnv): Promise<void> {
     return;
   }
 
-  dispatchSharePayload(outcome.payload);
+  // Hold the resolved tile long enough to be seen. Only on a DISPATCHED outcome — never on
+  // `none`, never on a refusal, where there is nothing to resolve to.
+  const current = ingestState.value;
+  if (current.phase !== 'idle') {
+    ingestState.value = {
+      phase: 'resolved',
+      presentation: current.presentation,
+      kind: outcome.kind,
+    };
+    if (!prefersReducedMotion()) {
+      await new Promise((resolve) => setTimeout(resolve, RESOLVE_HOLD_MS));
+    }
+  }
+
+  // A door that can consume this kind itself gets first refusal. A THROW here falls through to
+  // the dispatch and is reported: this is the one path meaning "we charged a bean and lost the
+  // answer", so it must never end in silence.
+  let claimed = false;
+  if (destination) {
+    try {
+      claimed = destination.claim(outcome.payload);
+    } catch (err) {
+      reportError({
+        surface: env.surface,
+        message: 'a local destination threw on an extracted capture',
+        severity: 'error',
+        error: err,
+        context: { action: 'threw', kind: outcome.kind },
+      });
+    }
+  }
+
+  if (!claimed) dispatchSharePayload(outcome.payload);
   logEvent({
     level: 'info',
     surface: env.surface,
@@ -1103,11 +1185,33 @@ async function runIngest(source: ShareSource, env: IngestEnv): Promise<void> {
 
 // ─── The IN-APP entry point (#84) ────────────────────────────────────────────────────────
 
-const IN_APP_ENV: IngestEnv = { surface: 'magic-beans-capture', origin: 'in-app' };
+/** Exported so a door can name this funnel when it refuses early (`refuseIfBusy`). */
+export const IN_APP_ENV: IngestEnv = { surface: 'magic-beans-capture', origin: 'in-app' };
 
 /** What the magic-beans sheet can hand over. A camera shot and a picked file are the same
  *  thing once a `File` exists, so there are two arms rather than three. */
 export type InAppInput = { kind: 'file'; file: File } | { kind: 'paste'; text: string };
+
+/**
+ * A door that fills ITSELF in rather than dispatching by kind.
+ *
+ * Exactly one exists: `RecipeFormModal`. It runs from five mount points (the meal editor, the
+ * recipe rail, the favourite picker, the recipe detail page, the cookbook) and delivers into
+ * its own fields — dispatching by kind would `router.push('/pod/cookbook')` and UNMOUNT the
+ * form the user is filling in at four of those five.
+ *
+ * An OBJECT rather than a bare callback so a second concern becomes a field here rather than a
+ * fourth parameter on `ingestInAppSource`, and `IngestEnv` stays the label its header insists
+ * it is.
+ */
+export interface InAppDestination {
+  /**
+   * Offered the payload FIRST. `true` keeps it here; `false` or absent falls through to
+   * `dispatchSharePayload`, so a school invite pasted into the recipe form still becomes an
+   * activity on the Activities page.
+   */
+  claim(payload: SharePayload): boolean;
+}
 
 /**
  * Record that someone opened the magic-beans sheet (#84).
@@ -1147,7 +1251,11 @@ export function logCaptureOpened(): void {
  * module pair — NOT "one composable per entry point". Two entry points is the maximum this
  * shape supports; a third means the split above.
  */
-export async function ingestInAppSource(input: InAppInput): Promise<void> {
+export async function ingestInAppSource(
+  input: InAppInput,
+  grant: ConsentGrant,
+  destination?: InAppDestination
+): Promise<void> {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -1166,7 +1274,7 @@ export async function ingestInAppSource(input: InAppInput): Promise<void> {
     const source = await inAppSource(input, showToast, t);
     if (!source) return; // already logged and toasted
 
-    await runIngest(source, IN_APP_ENV);
+    await runIngest(source, IN_APP_ENV, grant, destination);
   });
 }
 

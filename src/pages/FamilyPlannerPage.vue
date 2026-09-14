@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { ref, computed, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
@@ -55,8 +54,6 @@ import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
-import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
-import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
 import type { FieldConfidence } from '@/services/ai/types';
@@ -239,8 +236,6 @@ const activitySourcePhoto = ref<File | undefined>(undefined);
 // this page only asks; it hosts no consent UI. The grant is held between the gate and the
 // picker's file event because consent runs BEFORE the picker opens (privacy-correct order)
 // while the extraction call that needs the token happens after a file is chosen.
-const { requestConsent: requestPhotoConsent } = useDocumentConsent();
-let photoGrant: ConsentGrant | null = null;
 
 type PhotoActivityReady = {
   prefill: Partial<CreateFamilyActivityInput>;
@@ -310,50 +305,27 @@ async function onPhotoActivityReady(ready: PhotoActivityReady): Promise<void> {
   return update ? applyUpdateExisting(match, ready) : applyAddNew(ready);
 }
 
-const {
-  isProcessing: isReadingPhoto,
-  processFile: processPhoto,
-  deliverEvent,
-} = useDocumentToActivity({
+// DELIVERY only. The capture half — the picker, consent, the busy guard, the extract call —
+// moved to `MagicBeansDoor` and the shared spine, so every door validates, locks, counts and
+// logs identically instead of five near-copies drifting apart.
+const { deliverEvent } = useDocumentToActivity({
   onActivityReady: onPhotoActivityReady,
 });
-
-// The AI document picker (a camera-or-file chooser on touch devices, a direct
-// file dialog on desktop) is opened via its exposed pick() after consent; it
-// emits the chosen file. See AiDocumentPicker.vue.
-const aiPhotoPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
-
-/**
- * 📸 entry point. The consent gate runs BEFORE the file picker — nothing leaves the device
- * until the user agrees, and a decline is a deliberate silent no-op (no picker, no network,
- * no toast). Honours skipDocumentConsentPrompt (requestPhotoConsent resolves true at once).
- * Offline is detected later in processPhoto (after a file is picked), so an offline user may
- * pass consent + the picker before the "offline" toast — acceptable; consent-first is the
- * privacy-correct order.
- */
-async function handleAddFromPhoto(): Promise<void> {
-  const granted = await requestPhotoConsent();
-  if (!granted) return;
-  photoGrant = granted;
-  aiPhotoPicker.value?.pick();
-}
 
 // Photo-reader cross-surface dispatch: the global FAB card sets `pendingMagic`
 // and navigates here; pick it up (watch + onMounted) and run the same handler.
 // A capture arrives already extracted (#64, #84) and is DELIVERED rather than re-read; no
 // payload means an affordance asked to open the picker instead.
 //
-// ⚠️ The payload-less `else` is UNREACHABLE for 'photo' since #84 deleted `openPhotoReader`
-// with the three magic chips — nothing calls `openReader('photo')` any more. Kept anyway,
-// deliberately: `useMagicReaderConsumer`'s handler signature is shared with 'document', which
-// still uses that branch (`VacationStep1.vue`), so removing it here would make one of three
-// consumers a different shape for no gain. Delete it only if the opener-without-payload
-// concept goes away entirely.
+// ⚠️ The payload-less `else` is UNREACHABLE for 'photo'. It was already unreachable once the
+// three magic chips went; now the door owns opening entirely, so there is nothing left that
+// could call `openReader('photo')` without a payload. The branch is kept because
+// `useMagicReaderConsumer`'s handler signature is shared with 'document', which still uses it
+// (`VacationStep1`) — making one of three consumers a different shape would gain nothing.
 useMagicReaderConsumer(
   'photo',
   (payload) => {
     if (payload) deliverEvent(payload.data, payload.env);
-    else void handleAddFromPhoto();
   },
   canReadPhoto
 );
@@ -772,7 +744,6 @@ function handleActivitySwapped(newId: string) {
       :label="label"
       :active-view="activeView"
       :can-add="canEditActivities"
-      :can-add-from-photo="canReadPhoto"
       :is-all-active="isAllActive"
       :is-member-active="isMemberActive"
       :active-member-names="activeMemberNames"
@@ -781,7 +752,6 @@ function handleActivitySwapped(newId: string) {
       @today="handleToday"
       @update:active-view="setView"
       @add="openAddModal()"
-      @add-from-photo="handleAddFromPhoto"
       @open-agenda="handleOpenAgenda"
       @select-all="onSelectAll"
       @select-member="onSelectMember"
@@ -954,16 +924,7 @@ function handleActivitySwapped(newId: string) {
       @save="handleSave"
       @delete="handleDelete"
       @start-vacation-wizard="handleStartVacationWizard"
-      @start-photo-reader="handleAddFromPhoto"
     />
-
-    <!-- Add from a photo (#133): hidden picker input and processing overlay. The consent
-         modal is mounted globally in App.vue (#64). -->
-    <AiDocumentPicker
-      ref="aiPhotoPicker"
-      @file="(f) => photoGrant && void processPhoto(f, photoGrant)"
-    />
-    <AiProcessingOverlay :open="isReadingPhoto" />
 
     <!-- Vacation wizard -->
     <VacationWizard

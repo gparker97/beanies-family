@@ -29,15 +29,9 @@ vi.mock('@/stores/familyStore', () => ({
 
 // The service now owns document preparation (PDF rasterization + compression); the composable
 // just hands it the original File and attaches that original as the trip source.
-vi.mock('@/services/ai/documentExtractionService', () => ({
-  extractTravelFromDocument: vi.fn(),
-}));
 
 import { useDocumentToTravel } from '../useDocumentToTravel';
-import { extractTravelFromDocument } from '@/services/ai/documentExtractionService';
 import type { TravelExtractionResult } from '@/services/ai/types';
-
-const mockExtract = vi.mocked(extractTravelFromDocument);
 
 const TRAVEL: TravelExtractionResult = {
   isTravel: true,
@@ -85,19 +79,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('useDocumentToTravel', () => {
-  it('offline: info toast, no extraction', async () => {
-    isOnline.value = false;
-    const { processFile } = setup();
-    await processFile(imageFile(), __testConsentGrant);
-    expect(showToast).toHaveBeenCalledWith('info', 'ai.offline.title', 'ai.offline.message');
-    expect(mockExtract).not.toHaveBeenCalled();
-  });
-
+/**
+ * DELIVERY ONLY since the magic-beans doors were unified.
+ *
+ * The offline guard, the busy guard, the extract call and the error toasts moved to
+ * `useSharedDocumentIngest` and are covered there. What `deliverTravel` still owns — and what a
+ * shared capture cannot do for it — is turning a travel extraction into buckets, resolving
+ * which trip it attaches to, and refusing to emit something that is not travel at all.
+ */
+describe('useDocumentToTravel — delivery', () => {
   it('success (no overlapping trip): emits buckets + a create target', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: TRAVEL });
-    const { processFile, onTravelReady } = setup();
-    await processFile(imageFile(), __testConsentGrant);
+    const { deliverTravel, onTravelReady } = setup();
+    deliverTravel(TRAVEL, { sourceFile: imageFile() });
 
     const arg = onTravelReady.mock.calls[0][0] as {
       buckets: { travelSegments: unknown[] };
@@ -114,24 +107,21 @@ describe('useDocumentToTravel', () => {
     expect(showToast).not.toHaveBeenCalled();
   });
 
-  it('PDF: hands the ORIGINAL pdf to the service and attaches it as the trip source', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: TRAVEL });
-    const { processFile, onTravelReady } = setup();
+  it('PDF: attaches the ORIGINAL pdf as the trip source', async () => {
+    const { deliverTravel, onTravelReady } = setup();
 
-    await processFile(pdfFile(), __testConsentGrant);
+    deliverTravel(TRAVEL, { sourceFile: pdfFile() });
 
-    // The service (mocked) receives the original PDF — rasterization is its concern now.
-    expect((mockExtract.mock.calls[0][0] as File).type).toBe('application/pdf');
-    // And the source attached to the trip is that same original PDF.
+    // The ORIGINAL pdf is what gets attached to the trip — rasterization was the service's
+    // concern and the full document must survive it.
     const arg = onTravelReady.mock.calls[0][0] as { sourceFile: File };
     expect(arg.sourceFile.type).toBe('application/pdf');
   });
 
   it('truncated PDF: info toast that only the first pages were read, still emits the trip', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: TRAVEL, truncated: true });
-    const { processFile, onTravelReady } = setup();
+    const { deliverTravel, onTravelReady } = setup();
 
-    await processFile(pdfFile(), __testConsentGrant);
+    deliverTravel(TRAVEL, { sourceFile: pdfFile(), truncated: true });
 
     expect(showToast).toHaveBeenCalledWith(
       'info',
@@ -142,23 +132,14 @@ describe('useDocumentToTravel', () => {
   });
 
   it('not a travel document → friendly info toast, nothing emitted', async () => {
-    mockExtract.mockResolvedValue({
-      success: true,
-      data: { isTravel: false, tripName: '', tripTypeHint: '', segments: [] },
-    });
-    const { processFile, onTravelReady } = setup();
-    await processFile(imageFile(), __testConsentGrant);
+    const { deliverTravel, onTravelReady } = setup();
+
+    deliverTravel(
+      { isTravel: false, tripName: '', tripTypeHint: '', segments: [] },
+      { sourceFile: imageFile() }
+    );
     expect(showToast).toHaveBeenCalledWith('info', 'ai.notTravel.title', 'ai.notTravel.message');
     expect(onTravelReady).not.toHaveBeenCalled();
-  });
-
-  it('provider error → error toast via shared mapping', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'provider_error' });
-    const { processFile } = setup();
-    await processFile(imageFile(), __testConsentGrant);
-    expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.generic', {
-      surface: 'ai-extract',
-    });
   });
 
   it('attaches to the single overlapping trip', async () => {
@@ -178,9 +159,8 @@ describe('useDocumentToTravel', () => {
         transportation: [],
       },
     ];
-    mockExtract.mockResolvedValue({ success: true, data: TRAVEL });
-    const { processFile, onTravelReady } = setup();
-    await processFile(imageFile(), __testConsentGrant);
+    const { deliverTravel, onTravelReady } = setup();
+    deliverTravel(TRAVEL, { sourceFile: imageFile() });
     const arg = onTravelReady.mock.calls[0][0] as { target: { kind: string; vacationId?: string } };
     expect(arg.target).toEqual({ kind: 'attach', vacationId: 'trip-1' });
   });

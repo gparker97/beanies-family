@@ -21,7 +21,18 @@ vi.mock('@/stores/syncStore', () => ({
 }));
 
 // Stub the composed children so we don't need their stores / overlays.
+/**
+ * The door renders its trigger through a slot and self-gates on permission, so an unstubbed
+ * one renders nothing and takes the trigger with it. This stands in for it.
+ */
+const MagicBeansDoorStub = {
+  name: 'MagicBeansDoor',
+  props: ['claim'],
+  template: '<div><slot name="trigger" :open="() => {}" /></div>',
+};
+
 const stubs = {
+  MagicBeansDoor: MagicBeansDoorStub,
   HamburgerButton: {
     name: 'HamburgerButton',
     emits: ['click'],

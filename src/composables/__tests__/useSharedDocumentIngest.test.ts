@@ -67,6 +67,15 @@ vi.mock('@/stores/familyStore', () => ({
 // Pinia is always up by the time a share is triaged (`awaitReadiness` has already confirmed
 // `currentMember`), so a try/catch there would only hide a real regression — the family
 // limit silently ceasing to apply.
+/**
+ * The resolve beat is a deliberate ~700ms pause before routing, so the resolved tile can be
+ * seen. Under test that is 700ms of real time on EVERY ingest, which pushes the slower cases
+ * past vitest's 5s timeout and slows the rest for no coverage. A test environment has no motion
+ * preference, so taking the reduced-motion path here is both realistic and fast; the hold
+ * itself is asserted in its own case below.
+ */
+vi.mock('@/utils/prefersReducedMotion', () => ({ prefersReducedMotion: () => true }));
+
 let activeFamilyId: string | null = 'fam-1';
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({
@@ -77,6 +86,16 @@ vi.mock('@/stores/familyContextStore', () => ({
 }));
 
 const requestConsent = vi.fn();
+
+/**
+ * The grant an in-app DOOR would have minted before opening its picker.
+ *
+ * `ingestInAppSource` no longer calls `requestConsent` itself — the door does, at the commit,
+ * so a decline costs the user nothing instead of discarding a photo already taken. These tests
+ * stand in for the door. The share path still mints internally and is still driven by the
+ * `requestConsent` mock above.
+ */
+const doorGrant = {} as never;
 // `vi.hoisted` because the mock factory is lifted above ordinary top-level consts, and the
 // module under test reads `consentOpen` at import time.
 const { consentOpen } = vi.hoisted(() => ({ consentOpen: { value: false } }));
@@ -1034,8 +1053,8 @@ describe('ingestInAppSource (#84)', () => {
   /** Long enough to clear MIN_SHARE_TEXT_CHARS, with no URL in it. */
   const REAL = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
 
-  const paste = (text: string) => ingestInAppSource({ kind: 'paste', text });
-  const pick = (file: File) => ingestInAppSource({ kind: 'file', file });
+  const paste = (text: string) => ingestInAppSource({ kind: 'paste', text }, doorGrant);
+  const pick = (file: File) => ingestInAppSource({ kind: 'file', file }, doorGrant);
 
   describe('a picked file', () => {
     it('reads it through the same documents path a share uses', async () => {
@@ -1145,16 +1164,14 @@ describe('ingestInAppSource (#84)', () => {
       expect(showToast).toHaveBeenCalledWith('info', 'ai.unavailable.title', expect.anything());
     });
 
-    it('prompts for consent exactly ONCE per capture', async () => {
-      await paste(REAL);
-      expect(requestConsent).toHaveBeenCalledTimes(1);
-    });
-
-    it('saves nothing when consent is declined', async () => {
-      requestConsent.mockResolvedValue(null);
-      await paste(REAL);
-      expect(extractShareFromText).not.toHaveBeenCalled();
-      expect(dispatchSharePayload).not.toHaveBeenCalled();
+    it('does NOT prompt for consent — the door already did, at the commit', () => {
+      // The guarantee did not go away, it MOVED. A door mints the grant when the user commits
+      // a source, before its picker opens, so a decline costs them nothing; asking here would
+      // mean asking after a photo was already taken. The spine now REQUIRES a grant, so an
+      // ungated in-app read is a compile error rather than something a test has to catch.
+      // `MagicBeansDoor`'s own suite covers the prompting, the decline and the stranded-grant
+      // TTL that a cancelled picker would otherwise leave behind.
+      expect(requestConsent).not.toHaveBeenCalled();
     });
 
     it('reports being offline instead of calling the model', async () => {
@@ -1270,22 +1287,25 @@ describe('the in-app surface invariant holds on EVERY path, not just the happy o
 
   it('a picked FILE files every event in-app', async () => {
     // Mutation this catches: `logReceivedKind(SHARE_ENV, 'file', 1)` in `inAppSource`.
-    await ingestInAppSource({ kind: 'file', file: img() });
+    await ingestInAppSource({ kind: 'file', file: img() }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
   it('an over-size file refusal files in-app', async () => {
     const big = img();
     Object.defineProperty(big, 'size', { value: 30 * 1024 * 1024 });
-    await ingestInAppSource({ kind: 'file', file: big });
+    await ingestInAppSource({ kind: 'file', file: big }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
   it('an unreadable-type refusal files in-app', async () => {
-    await ingestInAppSource({
-      kind: 'file',
-      file: new File(['x'], 'sheet.xlsx', { type: 'application/vnd.ms-excel' }),
-    });
+    await ingestInAppSource(
+      {
+        kind: 'file',
+        file: new File(['x'], 'sheet.xlsx', { type: 'application/vnd.ms-excel' }),
+      },
+      doorGrant
+    );
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
@@ -1293,19 +1313,20 @@ describe('the in-app surface invariant holds on EVERY path, not just the happy o
     // Mutation this catches: `notReady(SHARE_ENV, …)` in `ingestInAppSource`. The BYOK test
     // asserts only the toast, so the surface was free to be wrong.
     aiConfigured = false;
-    await ingestInAppSource({ kind: 'paste', text: REAL });
+    await ingestInAppSource({ kind: 'paste', text: REAL }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
   it('a text-band refusal files in-app', async () => {
-    await ingestInAppSource({ kind: 'paste', text: 'Soccer 4pm' });
+    await ingestInAppSource({ kind: 'paste', text: 'Soccer 4pm' }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
   it('a budget refusal files in-app', async () => {
-    for (let i = 0; i < 20; i += 1) await ingestInAppSource({ kind: 'paste', text: REAL });
+    for (let i = 0; i < 20; i += 1)
+      await ingestInAppSource({ kind: 'paste', text: REAL }, doorGrant);
     logEvent.mockClear();
-    await ingestInAppSource({ kind: 'paste', text: REAL });
+    await ingestInAppSource({ kind: 'paste', text: REAL }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
   });
 
@@ -1320,7 +1341,7 @@ describe('the in-app surface invariant holds on EVERY path, not just the happy o
     await Promise.resolve();
     logEvent.mockClear();
 
-    await ingestInAppSource({ kind: 'paste', text: REAL });
+    await ingestInAppSource({ kind: 'paste', text: REAL }, doorGrant);
     expect([...surfaces()]).toEqual(['magic-beans-capture']);
 
     release(EVENT_RESULT);
@@ -1329,7 +1350,7 @@ describe('the in-app surface invariant holds on EVERY path, not just the happy o
 
   it('a throw files in-app, on reportError as well as logEvent', async () => {
     extractShareFromText.mockRejectedValueOnce(new Error('boom'));
-    await ingestInAppSource({ kind: 'paste', text: REAL });
+    await ingestInAppSource({ kind: 'paste', text: REAL }, doorGrant);
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'magic-beans-capture' })
     );

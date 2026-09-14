@@ -17,6 +17,7 @@ import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.vue';
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
@@ -242,16 +243,20 @@ onBeforeUnmount(() => {
             @vacation-click="emit('vacation-click', $event)"
           />
 
-          <!-- "✨ Perform magic" — reads an invitation photo into a prefilled
-               activity (#133). The shared responsive AI pill: compact ✨ circle
-               on mobile, full "✨ Perform magic" label on sm:+ — identical to the
-               Travel headers so the AI door is consistent everywhere. Gated by
-               canAddFromPhoto (falls back to canAdd when unset). -->
-          <MagicReaderPill
-            v-if="canAddFromPhoto ?? canAdd"
-            :label="t('ai.magic.perform')"
-            @click="emit('add-from-photo')"
-          />
+          <!-- "✨ Magic beans". The shared responsive AI pill: compact ✨ circle on mobile,
+               full label on sm:+ — identical to Travel and the cookbook so the door is the
+               same everywhere.
+
+               The pill sits INSIDE MagicBeansDoor's trigger slot, so the door owns the sheet,
+               the picker, consent and the busy guard, and its `canReadAny` gate removes the
+               affordance and its tap together. The old per-kind gate is gone: every door can
+               now produce every kind, so gating this one on the photo reader would hide a
+               button that still works. -->
+          <MagicBeansDoor>
+            <template #trigger="{ open }">
+              <MagicReaderPill :label="t('ai.magic.perform')" @click="open" />
+            </template>
+          </MagicBeansDoor>
 
           <AddEntityButton
             v-if="canAdd"

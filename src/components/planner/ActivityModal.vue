@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -89,12 +90,11 @@ const emit = defineEmits<{
   delete: [];
   'start-vacation-wizard': [defaults: { assigneeIds: string[]; date: string }];
   /** "Perform magic" — page closes this modal, runs the photo reader, reopens pre-filled. */
-  'start-photo-reader': [];
 }>();
 
 const { t } = useTranslation();
 // Gates the "Perform magic" half of the Quick-start row (photo reader, #133).
-const { canReadPhoto } = useMagicReader();
+const { canReadAny } = useMagicReader();
 
 /** "Plan a trip" — hand off to the vacation wizard and close this modal. */
 function startTripWizard(): void {
@@ -874,25 +874,33 @@ function handleSave() {
            shortcut shows full-width exactly as before. -->
       <template v-if="!isEditing">
         <!-- Magic available → kicker + two-up row -->
-        <div v-if="canReadPhoto">
+        <div v-if="canReadAny">
           <div
             class="font-outfit mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide text-[var(--color-text-muted)] uppercase opacity-60"
           >
             <span aria-hidden="true">✨</span>{{ t('ai.magic.quickStart') }}
           </div>
           <div class="grid grid-cols-2 gap-3">
-            <!-- Perform magic (photo reader) -->
-            <button
-              type="button"
-              class="magic-shimmer from-primary-500 to-terracotta-400 flex cursor-pointer flex-col gap-1 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.6)]"
-              @click="emit('start-photo-reader')"
-            >
-              <span aria-hidden="true" class="text-lg leading-none">✨</span>
-              <span class="font-outfit text-sm font-extrabold">{{ t('ai.magic.perform') }}</span>
-              <span class="relative z-[1] text-xs leading-snug opacity-90">
-                {{ t('ai.magic.performHint') }}
-              </span>
-            </button>
+            <!-- Magic beans, in its own door. The modal no longer emits upward for this: the
+                 page used to own the picker and consent, and now every door owns its own. The
+                 sheet opens at `layer="top"` so it sits above this modal rather than behind it. -->
+            <MagicBeansDoor>
+              <template #trigger="{ open }">
+                <button
+                  type="button"
+                  class="magic-shimmer from-primary-500 to-terracotta-400 flex w-full cursor-pointer flex-col gap-1 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.6)]"
+                  @click="open"
+                >
+                  <span aria-hidden="true" class="text-lg leading-none">✨</span>
+                  <span class="font-outfit text-sm font-extrabold">{{
+                    t('ai.magic.perform')
+                  }}</span>
+                  <span class="relative z-[1] text-xs leading-snug opacity-90">
+                    {{ t('ai.magic.performHint') }}
+                  </span>
+                </button>
+              </template>
+            </MagicBeansDoor>
             <!-- Plan a trip (existing shortcut), compact for the two-up grid -->
             <TripShortcutCard compact @start="startTripWizard" />
           </div>

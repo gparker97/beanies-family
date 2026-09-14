@@ -1,38 +1,35 @@
-import { __testConsentGrant } from '@/test/consentGrant';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ref } from 'vue';
-
-// --- mocks ---
-const tier = ref<'managed' | 'byok' | 'on-device'>('managed');
-const byokConfig = ref<{ provider: string; apiKey: string } | null>(null);
-vi.mock('../useAiCapability', () => ({
-  useAiCapability: () => ({ tier, byokConfig, isConfigured: ref(true) }),
-}));
-
-const isOnline = ref(true);
-vi.mock('../useOnline', () => ({ useOnline: () => ({ isOnline }) }));
-
-const showToast = vi.fn();
-vi.mock('../useToast', () => ({ useToast: () => ({ showToast }) }));
-
-// t() echoes the key so assertions can match on keys.
-vi.mock('../useTranslation', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-
-// The service now owns document preparation (PDF rasterization + compression), so the
-// composable just hands it the original File. We mock the service and assert what's passed.
-vi.mock('@/services/ai/documentExtractionService', () => ({
-  extractEventFromDocument: vi.fn(),
-}));
+/**
+ * `useDocumentToActivity` is now DELIVERY ONLY.
+ *
+ * Its capture half — offline guard, busy guard, the extract call, the error toasts — moved to
+ * `useSharedDocumentIngest` when the magic-beans doors were unified, and is covered there. The
+ * tests that drove `processFile` went with it; what remains are the guarantees `deliverEvent`
+ * still owns, which are exactly the ones a shared capture cannot make for it:
+ *
+ *   · the extraction result becomes an activity prefill, with its confidence carried through
+ *   · a compressed blob comes back as a File the form can attach
+ *   · a non-event still OPENS the form rather than being silently dropped
+ *   · a truncated PDF says so
+ *   · a throw inside delivery is reported and toasted, never swallowed
+ *
+ * The `deliverX` split exists so a SHARED document can be delivered without a second AI call,
+ * so testing it directly is also testing the share path's last mile.
+ */
+import { createPinia, setActivePinia } from 'pinia';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDocumentToActivity } from '../useDocumentToActivity';
-import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { ExtractionResult } from '@/services/ai/types';
+import type { ResultEnvelope } from '@/types/magicPayload';
 
-const mockExtract = vi.mocked(extractEventFromDocument);
+const showToast = vi.fn();
+vi.mock('@/composables/useToast', () => ({ useToast: () => ({ showToast }) }));
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
+}));
 
-function pdf(): File {
-  return new File(['%PDF-1.4'], 'invite.pdf', { type: 'application/pdf' });
-}
+const reportError = vi.fn();
+vi.mock('@/utils/errorReporter', () => ({ reportError: (...a: unknown[]) => reportError(...a) }));
 
 const SAMPLE: ExtractionResult = {
   isEvent: true,
@@ -46,41 +43,27 @@ const SAMPLE: ExtractionResult = {
   confidence: { title: 0.9, date: 0.9, startTime: 0.6, endTime: 0, location: 0.8 },
 };
 
-function file(): File {
-  return new File(['x'], 'invite.jpg', { type: 'image/jpeg' });
-}
+const env = (over: Partial<ResultEnvelope> = {}): ResultEnvelope => ({
+  sourceFile: null,
+  ...over,
+});
 
-// Consent is gated by the page (FamilyPlannerPage.handleAddFromPhoto) BEFORE the picker, so
-// this composable no longer takes a requestConsent option — processFile runs post-consent.
 function setup() {
   const onActivityReady = vi.fn();
-  const wedge = useDocumentToActivity({ onActivityReady });
-  return { ...wedge, onActivityReady };
+  const { deliverEvent } = useDocumentToActivity({ onActivityReady });
+  return { deliverEvent, onActivityReady };
 }
 
 beforeEach(() => {
+  setActivePinia(createPinia());
   vi.resetAllMocks();
-  tier.value = 'managed';
-  byokConfig.value = null;
-  isOnline.value = true;
 });
 
-describe('useDocumentToActivity', () => {
-  it('offline: info toast, no extraction', async () => {
-    isOnline.value = false;
-    const { processFile } = setup();
+describe('useDocumentToActivity — delivery', () => {
+  it('turns an extraction into a prefill, carrying confidence through', () => {
+    const { deliverEvent, onActivityReady } = setup();
 
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith('info', 'ai.offline.title', 'ai.offline.message');
-    expect(mockExtract).not.toHaveBeenCalled();
-  });
-
-  it('success (event): opens the activity with prefill + confidence, no toast', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile, onActivityReady } = setup();
-
-    await processFile(file(), __testConsentGrant);
+    deliverEvent(SAMPLE, env());
 
     expect(onActivityReady).toHaveBeenCalledWith({
       // 'Birthday' title → inferred category rides along in the prefill.
@@ -92,141 +75,63 @@ describe('useDocumentToActivity', () => {
         category: 'birthday',
       },
       confidence: SAMPLE.confidence,
-      sourcePhoto: undefined, // no compressed blob on this result
+      sourcePhoto: undefined,
     });
     expect(showToast).not.toHaveBeenCalled();
   });
 
-  it('success with a compressed blob: hands back the source photo as a File to attach', async () => {
-    const blob = new Blob(['imgbytes'], { type: 'image/jpeg' });
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE, compressedBlob: blob });
-    const { processFile, onActivityReady } = setup();
+  it('hands a compressed blob back as a File the form can attach', () => {
+    const { deliverEvent, onActivityReady } = setup();
+    const blob = new Blob(['jpeg'], { type: 'image/jpeg' });
 
-    await processFile(file(), __testConsentGrant);
-
-    const arg = onActivityReady.mock.calls[0][0] as { sourcePhoto?: File };
-    expect(arg.sourcePhoto).toBeInstanceOf(File);
-    expect(arg.sourcePhoto?.type).toBe('image/jpeg');
-    expect(arg.sourcePhoto?.name).toMatch(/\.jpg$/);
-  });
-
-  it('passes the selected tier + byok config to the service', async () => {
-    tier.value = 'byok';
-    byokConfig.value = { provider: 'openai', apiKey: 'sk-test' };
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile } = setup();
-
-    await processFile(file(), __testConsentGrant);
-
-    expect(mockExtract).toHaveBeenCalledWith(
-      expect.any(File),
-      expect.objectContaining({ tier: 'byok', byok: { provider: 'openai', apiKey: 'sk-test' } })
+    deliverEvent(
+      SAMPLE,
+      env({
+        sourceFile: new File(['x'], 'invite.jpg', { type: 'image/jpeg' }),
+        compressedBlob: blob,
+      })
     );
+
+    const photo = onActivityReady.mock.calls[0][0].sourcePhoto as File;
+    expect(photo).toBeInstanceOf(File);
+    expect(photo.type).toBe('image/jpeg');
   });
 
-  it('non-event: still opens the form AND shows an info toast (never silently dropped)', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: { ...SAMPLE, isEvent: false } });
-    const { processFile, onActivityReady } = setup();
+  it('OPENS the form for a non-event too, with an info toast — never a silent drop', () => {
+    const { deliverEvent, onActivityReady } = setup();
 
-    await processFile(file(), __testConsentGrant);
+    deliverEvent({ ...SAMPLE, isEvent: false }, env());
 
+    // The user handed something over; dropping it with no form and no explanation is the one
+    // outcome that reads as "beanies lost it".
+    expect(onActivityReady).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith('info', 'ai.notEvent.title', 'ai.notEvent.message');
-    expect(onActivityReady).toHaveBeenCalled();
   });
 
-  it('provider_error: error toast with report surface, no activity opened', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'provider_error' });
-    const { processFile, onActivityReady } = setup();
+  it('says so when only the first pages of a PDF were read', () => {
+    const { deliverEvent, onActivityReady } = setup();
 
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.generic', {
-      surface: 'ai-extract',
-    });
-    expect(onActivityReady).not.toHaveBeenCalled();
-  });
-
-  it('compression failure: warning toast reusing the photo-type wording', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'compression' });
-    const { processFile } = setup();
-
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith('warning', 'ai.error.title', 'photos.invalidType');
-  });
-
-  it('not_available: info toast (not an error)', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'not_available' });
-    const { processFile } = setup();
-
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith(
-      'info',
-      'ai.unavailable.title',
-      'ai.unavailable.message'
-    );
-  });
-
-  it('upstream_busy: friendly retry toast, NO report surface (transient provider outage)', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'upstream_busy' });
-    const { processFile } = setup();
-
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith(
-      'warning',
-      'ai.error.busy.title',
-      'ai.error.busy.message'
-    );
-    // No 4th argument → no surface → no reportError/Slack alert for a transient 5xx.
-    expect(showToast.mock.calls[0].length).toBe(3);
-  });
-
-  it('malformed_output: error toast with the "clearer photo" hint', async () => {
-    mockExtract.mockResolvedValue({ success: false, errorCode: 'malformed_output' });
-    const { processFile } = setup();
-
-    await processFile(file(), __testConsentGrant);
-
-    expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.unreadable', {
-      surface: 'ai-extract',
-    });
-  });
-
-  it('PDF input: hands the ORIGINAL pdf to the service (service owns rasterization now)', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile, onActivityReady } = setup();
-
-    await processFile(pdf(), __testConsentGrant);
-
-    const passed = mockExtract.mock.calls[0][0] as File;
-    expect(passed.type).toBe('application/pdf'); // not a client-rasterized image
-    expect(onActivityReady).toHaveBeenCalled();
-  });
-
-  it('truncated PDF: info toast that only the first pages were read, still opens the activity', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE, truncated: true });
-    const { processFile, onActivityReady } = setup();
-
-    await processFile(pdf(), __testConsentGrant);
+    deliverEvent(SAMPLE, env({ truncated: true }));
 
     expect(showToast).toHaveBeenCalledWith(
       'info',
       'ai.pdfTruncated.title',
       'ai.pdfTruncated.message'
     );
-    expect(onActivityReady).toHaveBeenCalled();
+    expect(onActivityReady).toHaveBeenCalledTimes(1);
   });
 
-  it('toggles isProcessing around the extraction', async () => {
-    mockExtract.mockResolvedValue({ success: true, data: SAMPLE });
-    const { processFile, isProcessing } = setup();
+  it('reports and toasts if delivery throws, rather than swallowing it', () => {
+    const onActivityReady = vi.fn(() => {
+      throw new Error('boom');
+    });
+    const { deliverEvent } = useDocumentToActivity({ onActivityReady });
 
-    expect(isProcessing.value).toBe(false);
-    const p = processFile(file(), __testConsentGrant);
-    // isProcessing flips true once extraction starts and back to false when it resolves.
-    await p;
-    expect(isProcessing.value).toBe(false);
+    expect(() => deliverEvent(SAMPLE, env())).not.toThrow();
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'ai-activity-capture', severity: 'error' })
+    );
+    expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.generic');
   });
 });
