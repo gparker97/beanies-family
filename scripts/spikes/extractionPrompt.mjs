@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-07.1';
+export const PROMPT_VERSION = '2026-09-14.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -263,6 +263,26 @@ export const RECIPE_JSON_SHAPE = {
 export const RECIPE_REQUIRED_KEYS = ['isRecipe', 'name', 'ingredients', 'steps', 'confidence'];
 
 /**
+ * The recipe-extraction policies that BOTH the `recipe` task and the `share` task's
+ * kind="recipe" branch must carry.
+ *
+ * Declared once because they were not both carrying them. The share task had only the
+ * inferredTimes exception, so a recipe captured through the share path came back with no
+ * per-ingredient `inferred` flags at all — and the form's "we guessed this" highlighting
+ * silently stopped being accurate. Unifying the magic-beans doors routes every recipe link
+ * through `share`, which would have made that the normal case rather than the edge one.
+ *
+ * `isRecipe=false` is deliberately NOT here: the share task expresses "not a recipe" as
+ * kind="none", so the two tasks genuinely differ on that one, and only that one.
+ */
+export const RECIPE_POLICY_LINES = [
+  'ONE EXCEPTION, for "prepTime", "cookTime" and "servings" ONLY: if the source does not state one, you MAY supply a reasonable value from general culinary knowledge — but you MUST then list that field name in "inferredTimes". This exception NEVER applies to ingredient quantities or step timings.',
+  'Set inferred=true on any ingredient or step whose quantity or timing was NOT stated in the source and which you filled in from general culinary knowledge. Do not smooth over ambiguity: "a shake of salt" is {"text":"salt, to taste","inferred":false}, never {"text":"1 tsp salt","inferred":false}.',
+  "Write the recipe in your own words as a clean structured list. Do not reproduce the source's narration or prose verbatim.",
+  'For "notes", write each distinct fact on its own line (one per line), never a single run-on paragraph.',
+];
+
+/**
  * Build the system+user message array for a recipe extraction.
  *
  * The system prompt is a FIXED constant with no interpolation of source content — that is
@@ -277,11 +297,8 @@ export function buildRecipeExtractionMessages(source, _todayIso) {
     'You extract ONE structured recipe from the provided source — images of a cookbook page, a screenshot, a photographed recipe card, or the text of a web page or video transcript.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     'Never output a quantity, temperature or time that is not actually supported by the source. An empty field is ALWAYS better than a guessed one.',
-    'ONE EXCEPTION, for "prepTime", "cookTime" and "servings" ONLY: if the source does not state one, you MAY supply a reasonable value from general culinary knowledge — but you MUST then list that field name in "inferredTimes". This exception NEVER applies to ingredient quantities or step timings.',
-    'Set inferred=true on any ingredient or step whose quantity or timing was NOT stated in the source and which you filled in from general culinary knowledge. Do not smooth over ambiguity: "a shake of salt" is {"text":"salt, to taste","inferred":false}, never {"text":"1 tsp salt","inferred":false}.',
-    "Write the recipe in your own words as a clean structured list. Do not reproduce the source's narration or prose verbatim.",
+    ...RECIPE_POLICY_LINES,
     'Set isRecipe=false if the source is not a recipe. Do not invent one.',
-    'For "notes", write each distinct fact on its own line (one per line), never a single run-on paragraph.',
     'The JSON object must have exactly these keys: ' +
       Object.keys(RECIPE_JSON_SHAPE).join(', ') +
       '.',
@@ -356,7 +373,9 @@ export function buildShareExtractionMessages(source, todayIso) {
       '. Field meanings: ' +
       JSON.stringify(RECIPE_JSON_SHAPE) +
       '.',
-    'When kind="recipe", ONE EXCEPTION to the rule above, for "prepTime", "cookTime" and "servings" ONLY: if the source does not state one, you MAY supply a reasonable value from general culinary knowledge — but you MUST then list that field name in "inferredTimes". This exception NEVER applies to ingredient quantities or step timings.',
+    // The share task carried ONLY the inferredTimes exception, so a recipe extracted here
+    // came back with no per-ingredient `inferred` flags. Same policies, one declaration.
+    ...RECIPE_POLICY_LINES.map((line) => `When kind="recipe": ${line}`),
   ].join('\n');
 
   return [
