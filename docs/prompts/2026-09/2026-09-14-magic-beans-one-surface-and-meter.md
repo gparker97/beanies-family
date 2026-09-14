@@ -161,3 +161,104 @@ every non-200 exit, and a 409 refusal in place of the downgrade.
 
 The terraform apply that flips `CORRECTION_GRANTS` on and ships the Lambda was blocked by the
 sandbox and is greg's to run.
+
+---
+
+# Session part 2 — the surface, the wall, and the arrows
+
+Same day, after the meter and the correction shipped. greg ran the app locally and sent
+findings; each one below is his, verbatim where it shaped the work.
+
+### 11 — six changes to the magic-beans surface
+
+> - let's update the text back to the original proposal, from 'did beanies get this wrong? this
+>   one's on us..' -> 'not right? tell us what this is' <- link
+> - let's move the 'not right?' nessage to the bottom of the resutls modal rather than the top as
+>   i think that is a more natural place a user would look to correct an issue - after scanning
+>   the details
+> - on the 'what is this' modal - rather than opening a new modal, can we just expand / expose a
+>   section with icons for activity/trip/recipe/etc (as required in the future) for hte user to
+>   select? [...] this keeps the whole experience living within a single modal [...] ensure that
+>   clear docs are written so that anytime an AI functionality is added, this surface is also
+>   updated
+> - also, the icons in the modal are greyscale rather than color, which feels a bit like they are
+>   disabled
+> - in the mockup there was an shimering type of animation that ran across the three magic bean
+>   type boxes while the message said "working out what this is..."
+> - in addition, in the mockup, magic beans and 'give us something to read and we'll...' is all on
+>   the same line, within a gradient orange shimmering box
+
+Answer: all six were real. The greyscale icons were `BeanieIcon` at 50% opacity inside a
+`ChoiceModal` — genuinely the disabled treatment — and expanding in place removed the modal, the
+second vocabulary and a stacking hazard together. The mockup's "shimmer" on the tiles is actually
+a staggered opacity `tick`; the 105° sheen runs on the header band. `magicDestinations.ts` became
+the add-a-new-AI-kind checklist, and every item on it fails the build.
+
+### 12 — the empty header bar
+
+> for the 'meagic beans' header in the sidebar, it seems strange that it's placed below the
+> horizontal rule at the top of the sidebar, with the title space above the horizontal rule empty
+> [...] should we place the full orange gradient box above the horizontal line?
+
+Answer: greg caught a flaw in the fix mid-flight — removing the drawer title to get the band on
+one line left an empty header bar. His proposal was right and needed `customHeader` to work on
+drawers, a `BeanieFormModal` prop that until then was forwarded and silently did nothing there.
+
+### 13 — the member filter
+
+> at the moment i believe this is a single family filter, and hopefully it is a shared component
+> so it is not repeated across the views. can we make this a multi-select filter
+
+Answer: it WAS shared and already multi-select everywhere except the beanie wall, whose footer
+was deliberately single-select for an unattended screen. Made multi-select with the reasons
+answered rather than deleted. It also surfaced a live bug: the filter was never reconciled when
+the roster changed under a mounted wall — and the review later found the SHARED store's
+`syncWithMembers` had no caller at all, so the same defect was live on every finance page.
+
+### 14 — night mode
+
+> does the 'night mode' function on the beanie wall activate automatically [...] or does it
+> always wait for the user to manually activate it?
+
+> let's keep night mode as is for now, but to make it easier to reach, can we perhaps add a night
+> mode button to the wall face? perhaps near (or within) the view selector?
+
+Answer: manual only, nothing schedules it. That mattered, because the filter change had been
+written up as "waking clears it overnight" — which is false. The comment was corrected rather
+than the claim kept.
+
+### 15 — the arrows
+
+> often several steps at once [...] due to the length of the month name, or some other variable,
+> the arrows change position, and when tapping in one spot all of a sudden the arrow position
+> changes [...] the forward and backward arrow position should not change
+
+> unless i'm wrong, it looks like the issue is already resolved on the mobile/app surface? i
+> think the month name belongs as the first thing you see on the top left [...] can you review
+> some conventional calendar designs and propose a design that is functional and conventional
+> across the industry
+
+Answer: greg was right that mobile was already correct, which reframed the whole thing. A
+reserved label width was tried and REJECTED BY MEASUREMENT — no single number serves "April 2026"
+and "Wednesday, 25 February 2026". Mockup + industry survey in
+`docs/mockups/calendar-nav-stability-2026-09-14.html`; greg picked Option A.
+
+Three separate things held the arrows to the label, each found by measuring rather than
+reasoning: the cluster followed the title in the DOM; `sm:flex-none` is `flex-shrink: 0` so a
+long title overflowed the row; and the left group had no `min-w-0`, whose default
+`min-width: auto` is the content's min-content — the whole string, for a `truncate` title.
+
+Prev-arrow x across six presses:
+
+| view  | before                  | after   |
+| ----- | ----------------------- | ------- |
+| month | 473 438 438 438 438 438 | 615 × 6 |
+| day   | 525 596 566 599 623 587 | 615 × 6 |
+| week  | —                       | 615 × 4 |
+
+## Outcome (part 2)
+
+Shipped as `538b9ff6`, `6b0e2073`, `5ef2d395`, `c489a62d`, `8fa17fcb`. Two `/code-review max`
+rounds; the second found thirteen, including a `length === 1` left in `WallLanesView` that made
+multi-select lie to screen readers, a chip row that could clip a lit chip inside an
+`overflow-hidden` root, `aria-hidden` set on a focused element, and the dead `syncWithMembers`.
