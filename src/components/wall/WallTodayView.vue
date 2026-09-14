@@ -49,7 +49,7 @@ const props = defineProps<{
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own content too. */
-  visibleMemberIds: string[] | null;
+  visibleMemberIds: readonly string[] | null;
 }>();
 // `openDay` is deliberately NOT declared: in THIS view tapping a day moves the
 // panel to that day rather than opening a sheet over it.

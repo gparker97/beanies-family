@@ -59,7 +59,7 @@ const props = defineProps<{
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own content too. */
-  visibleMemberIds: string[] | null;
+  visibleMemberIds: readonly string[] | null;
   /** Whether each arrow can still move — the range boundary, from the page. */
   canStepBack: boolean;
   canStepForward: boolean;

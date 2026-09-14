@@ -33,7 +33,7 @@ export interface WallOccurrence {
  */
 export function matchesWallFilter(
   activity: FamilyActivity,
-  visibleMemberIds: string[] | null
+  visibleMemberIds: readonly string[] | null
 ): boolean {
   if (!visibleMemberIds) return true;
   const allowed = new Set(visibleMemberIds);
@@ -64,7 +64,7 @@ export function sortByTime(entries: readonly WallOccurrence[]): WallOccurrence[]
 /** Filter + sort in the one order every screen wants. */
 export function wallEvents(
   entries: readonly WallOccurrence[],
-  visibleMemberIds: string[] | null
+  visibleMemberIds: readonly string[] | null
 ): WallOccurrence[] {
   return sortByTime(entries.filter((e) => matchesWallFilter(e.activity, visibleMemberIds)));
 }

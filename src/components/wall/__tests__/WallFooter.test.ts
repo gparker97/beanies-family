@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-function mountFooter(focused: string[]) {
+function mountFooter(focused: readonly string[]) {
   return mount(WallFooter, {
     props: { focused },
     global: { stubs: { BeanieAvatar: true } },
