@@ -587,14 +587,6 @@ const LIST_TEXTAREA_CLASS =
     @save="handleSave"
     @delete="handleDelete"
   >
-    <!-- "not right?" — above the form body, and outside the reading overlay's anchor. -->
-    <MagicMiscategorisedBanner
-      v-if="correctionEnv"
-      :env="correctionEnv"
-      from="recipe"
-      @close="emit('close')"
-    />
-
     <!-- `relative` so the reading overlay below anchors to the FORM BODY. The drawer and
          modal containers differ in whether they establish a positioning context, and an
          overlay that silently anchors to the viewport in one of them is the kind of bug
@@ -776,6 +768,16 @@ const LIST_TEXTAREA_CLASS =
           </template>
         </FormFieldGroup>
       </FormSection>
+
+      <!-- "not right?" — at the FOOT, where someone ends up after scanning the ingredients and
+           finding this was never a recipe. Inside the `relative` wrapper, so the scoped reading
+           overlay covers it too: a correction must not be startable while one is in flight. -->
+      <MagicMiscategorisedBanner
+        v-if="correctionEnv"
+        :env="correctionEnv"
+        from="recipe"
+        @close="emit('close')"
+      />
     </div>
   </BeanieFormModal>
 </template>

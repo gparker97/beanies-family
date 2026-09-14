@@ -907,15 +907,6 @@ function handleSave() {
     @save="readOnly ? emit('close') : handleSave()"
     @delete="emit('delete')"
   >
-    <!-- "not right?" — OUTSIDE the read-only wrapper below, which disables pointer events on
-         everything inside it. A correction is not an edit of this activity. -->
-    <MagicMiscategorisedBanner
-      v-if="prefillEnv"
-      :env="prefillEnv"
-      from="event"
-      @close="emit('close')"
-    />
-
     <div class="space-y-5" :class="readOnly ? 'pointer-events-none opacity-60' : ''">
       <!-- Occurrence date banner for recurring activity edits -->
       <div
@@ -1375,5 +1366,15 @@ function handleSave() {
         </div>
       </div>
     </div>
+
+    <!-- "not right?" — at the FOOT, which is where someone ends up after scanning the details
+         and finding them wrong. OUTSIDE the read-only wrapper above, which disables pointer
+         events on everything inside it: a correction is not an edit of this activity. -->
+    <MagicMiscategorisedBanner
+      v-if="prefillEnv"
+      :env="prefillEnv"
+      from="event"
+      @close="emit('close')"
+    />
   </BeanieFormModal>
 </template>

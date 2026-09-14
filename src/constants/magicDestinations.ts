@@ -7,25 +7,37 @@ import type { ShareKind } from '@/types/magicPayload';
  * product noun, so a fourth reader is a **compile error** here rather than a tile that silently
  * never lights. `MAGIC_READERS` stays the registry of record; this is only how a kind is drawn.
  *
- * TWO renderings of one vocabulary, because two components need different art:
- *   · `emoji` for the destination tiles in the sheet and the reading overlay
- *   · `icon`  (a BeanieIcon name) for `ChoiceModal`, which renders `<BeanieIcon>` and cannot
- *     show an emoji at all
+ * ⭐ ADDING A NEW AI KIND — THIS MODULE IS THE CHECKLIST, and every item is a compile error
+ * rather than a review question. A fourth kind needs, in total:
+ *
+ *   1. a `ShareKind` member                       (`types/magicPayload.ts`)
+ *   2. a `SharePayload` arm                       (same file — the union is discriminated)
+ *   3. a `MAGIC_READERS` entry                    (`composables/useMagicReader.ts` — where it routes)
+ *   4. an entry HERE                              (this `Record<ShareKind, …>` will not compile without one)
+ *   5. an `ai.capture.dest.<kind>` string         (`uiStrings.ts` — its accessible name)
+ *
+ * 1-4 fail the build; 5 fails it too, via the template-literal key below. Nothing else needs
+ * touching: the magic-beans sheet, the reading overlay AND the "not right?" correction surface
+ * all ITERATE this module rather than listing kinds, so all three pick the new kind up at once.
+ * Nothing server-side changes either — the meter and the grant are kind-agnostic.
+ *
+ * ONE rendering, used three times. `emoji` is what every surface draws: faint tiles at rest in
+ * the sheet, ticking then resolving in the overlay, and the choices in the correction surface.
+ * ⚠️ There was a second, `icon` (a BeanieIcon name), for when the correction opened a
+ * `ChoiceModal`. It is gone with that modal, and deliberately: BeanieIcon is a monochrome
+ * stroke glyph and the tiles read as DISABLED next to the coloured ones everywhere else. If a
+ * surface ever needs a line icon, give it its own map — do not re-widen this one and leave two
+ * vocabularies for one idea.
  *
  * The accessible name is derived, never stored here: `t(\`ai.capture.dest.${kind}\`)`. That
  * template-literal type only resolves while `kind` is narrowed to `ShareKind`, so iterate with
  * `KINDS` below and never a bare `Object.keys`, which widens to `string[]` and quietly takes
  * the compile-time guarantee with it.
  */
-export const MAGIC_DESTINATIONS: Record<ShareKind, { emoji: string; icon: string }> = {
-  event: { emoji: '📅', icon: 'calendar' },
-  // ⚠️ NOT `airplane` / `utensils`, which read like the obvious choices and are both WRONG:
-  // the registry holds heroicons' cube path under `airplane` and its currency-dollar path
-  // under `utensils`. `BeanieIcon` renders an unknown name as three grey dots and a MISLABELLED
-  // one as the wrong picture, silently in both cases — so verify a name by looking at it, and
-  // keep `magicDestinations.test.ts`'s registry check in place.
-  travel: { emoji: '✈️', icon: 'briefcase' },
-  recipe: { emoji: '🍳', icon: 'book' },
+export const MAGIC_DESTINATIONS: Record<ShareKind, { emoji: string }> = {
+  event: { emoji: '📅' },
+  travel: { emoji: '✈️' },
+  recipe: { emoji: '🍳' },
 };
 
 /** Iteration order for the tiles. Typed, so the `t()` key stays a compile-checked literal. */

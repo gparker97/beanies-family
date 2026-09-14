@@ -46,7 +46,13 @@ const resolvedKind = () =>
            reading; on resolve two fall back and one lifts. Visually unlabelled by design — the
            strings are their accessible names. -->
       <ul class="flex list-none gap-2.5 p-0">
-        <li v-for="kind in MAGIC_DESTINATION_KINDS" :key="kind">
+        <!-- `magic-tick` on the LI, not the tile: its stagger is `:nth-child`, so it has to sit
+             on the element that is actually the nth child of this list. -->
+        <li
+          v-for="kind in MAGIC_DESTINATION_KINDS"
+          :key="kind"
+          :class="resolvedKind() ? '' : 'magic-tick'"
+        >
           <div
             class="flex h-16 w-16 flex-col items-center justify-center rounded-[14px] transition-all duration-300"
             :class="

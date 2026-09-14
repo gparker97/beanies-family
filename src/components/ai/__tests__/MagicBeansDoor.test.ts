@@ -229,9 +229,6 @@ describe('MagicBeansDoor', () => {
       expect(MAGIC_DESTINATION_KINDS).toEqual(['event', 'travel', 'recipe']);
       for (const kind of MAGIC_DESTINATION_KINDS) {
         expect(MAGIC_DESTINATIONS[kind].emoji).toBeTruthy();
-        // ChoiceModal renders <BeanieIcon>, which cannot show an emoji — two renderings of one
-        // vocabulary, both required.
-        expect(MAGIC_DESTINATIONS[kind].icon).toBeTruthy();
       }
     });
   });
