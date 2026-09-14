@@ -43,6 +43,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          # See the same step in mobile-android-release.yml: the action's default
+          # `packages` includes the legacy `tools` package, which no longer
+          # exists in the SDK repository. AGP resolves what it needs itself.
+          packages: ''
 
       - name: Install dependencies
         run: npm ci
