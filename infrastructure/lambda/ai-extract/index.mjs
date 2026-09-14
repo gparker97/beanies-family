@@ -19,6 +19,7 @@
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
+import { countUsage } from './countUsage.mjs';
 import { checkLimits } from './rateLimit.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
@@ -308,6 +309,16 @@ export async function handler(event) {
         event
       );
     }
+
+    // Count the bean. AWAITED, not fire-and-forget: Lambda freezes the execution environment
+    // the moment the handler returns, so a `void` call frequently never reaches DynamoDB AND
+    // never logs its own failure — a silent, unalertable undercount. It never throws and never
+    // fails the request; a lost count is a logged, alertable gap (see countUsage.mjs).
+    //
+    // Here and nowhere else: this is the only `response(200, …)` in the handler, so "a bean is
+    // spent exactly when beanies answered you" falls out of the existing control flow with no
+    // special-casing. A `kind: 'none'` share is a 200 and counts, deliberately.
+    await countUsage({ familyId: typeof familyId === 'string' ? familyId : undefined });
 
     // Retain nothing: no document bytes, no model content — only a structured success line.
     console.log(`[ai-extract] ok task=${task} enclave=${enclave || 'unknown'}`);
