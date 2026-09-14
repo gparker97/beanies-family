@@ -16,6 +16,7 @@
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberFilterMobileMenu from '@/components/planner/MemberFilterMobileMenu.vue';
+import CalendarPeriodNav from '@/components/planner/CalendarPeriodNav.vue';
 import CalendarTripRibbon from '@/components/planner/CalendarTripRibbon.vue';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
@@ -110,7 +111,17 @@ onBeforeUnmount(() => {
   >
     <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls -->
     <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-      <div class="flex items-center gap-2 sm:justify-start">
+      <!-- ⚠️ `min-w-0 flex-1` on the GROUP is what pins the nav cluster. Both halves matter and
+           each was found by measuring:
+             · `flex-1` — the group ALWAYS takes the free space, so the controls beside it sit
+               at the container's right edge rather than wherever the title happens to end.
+             · `min-w-0` — a flex item's default `min-width: auto` is its content's min-content,
+               and a `truncate` title is `white-space: nowrap`, so its min-content is the WHOLE
+               string. Without this the group refuses to shrink below the full title however
+               shrinkable its children are, the row overflows, and everything after it moves.
+           Result, measured: the prev arrow sits at 615px in month, week AND day view, and at
+           every step within each. See `CalendarPeriodNav` for what it was before. -->
+      <div class="flex min-w-0 flex-1 items-center gap-2 sm:justify-start">
         <!-- Mobile only: the planner reclaims the top bar, so the hamburger that
              opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
         <HamburgerButton v-if="headerReclaimed" :alert="saveNeedsAttention" @click="toggleMenu" />
@@ -122,8 +133,16 @@ onBeforeUnmount(() => {
              flexible child, so without a stable wrapper the whole sticky header
              collapsed on every boundary and the nav cluster slid left and
              snapped back. The wrapper keeps the flex slot; only its contents
-             fade. -->
-        <div class="min-w-0 flex-1 sm:flex-none">
+             fade.
+
+             ⚠️ `flex-1` at EVERY width — never `sm:flex-none`, which is `flex-shrink: 0` and so
+             REFUSES to shrink. A long day title ("Wednesday, 25 February 2026") then overflowed
+             the row and shoved everything after it sideways, including the nav cluster that had
+             just been moved out of its way. Measured: the prev arrow tracked the label exactly,
+             633 → 704 → 674 → 707 → 731 → 695 px across six presses. Shrinkable, `truncate`
+             finally has a constrained width to bite on, the row never overflows, and the
+             right-hand controls stay where `sm:ml-auto` puts them. -->
+        <div class="min-w-0 flex-1">
           <Transition name="cal-label" mode="out-in">
             <h1
               :key="label"
@@ -134,48 +153,15 @@ onBeforeUnmount(() => {
           </Transition>
         </div>
 
-        <!-- Nav cluster (absorbed from CalendarNavBar) -->
-        <div class="flex flex-shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
-            :aria-label="t('planner.prevPeriod')"
-            @click="emit('prev')"
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            class="font-outfit text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
-            @click="emit('today')"
-          >
-            {{ t('planner.today') }}
-          </button>
-          <button
-            type="button"
-            class="text-secondary-500/50 dark:text-ink-soft dark:hover:bg-surface-hover flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100"
-            :aria-label="t('planner.nextPeriod')"
-            @click="emit('next')"
-          >
-            <svg
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+        <!-- PHONE ONLY. This row has always been stable here — the title above is `flex-1`,
+             so it absorbs the slack and the cluster is already pinned. At `sm:` and up the
+             cluster moves to the view controls instead; see the component's header for why. -->
+        <CalendarPeriodNav
+          class="sm:hidden"
+          @prev="emit('prev')"
+          @today="emit('today')"
+          @next="emit('next')"
+        />
 
         <!-- Mobile only: notification bell + search (re-homed from the hidden
              AppHeader, which is suppressed on the mobile planner). The member
@@ -212,6 +198,18 @@ onBeforeUnmount(() => {
             </svg>
             <span class="hidden sm:inline">{{ t('planner.agenda') }}</span>
           </button>
+
+          <!-- sm AND UP. Placed here, and specifically BEFORE the view toggle, so everything
+               to its right has a fixed width: the toggle, the mobile filter (absent here), the
+               trip chip (absent here), the magic pill and Add. Its x is therefore a constant —
+               in every locale, at every text size, whatever the period label says, and the same
+               across a view switch. That is the whole fix. -->
+          <CalendarPeriodNav
+            class="hidden sm:flex"
+            @prev="emit('prev')"
+            @today="emit('today')"
+            @next="emit('next')"
+          />
 
           <ViewToggle
             :active-view="activeView"
