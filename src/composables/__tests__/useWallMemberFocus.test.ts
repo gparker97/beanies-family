@@ -28,11 +28,13 @@ describe('what the views are handed', () => {
     f.stop();
   });
 
-  it('hands a copy, so a view cannot mutate the focus by sorting its own prop', () => {
-    const f = withFocus(['m1']);
+  it('hands the same array to every view, which is why the type is readonly', () => {
+    // A computed CACHES, so the spread inside it runs once per change — "a defensive copy" was
+    // never true, and the old version of this test pushed to the copy and then asserted the
+    // SOURCE, which the spread protects unconditionally. It passed without testing its claim.
+    const f = withFocus(['m1', 'm2']);
     f.toggle('m1');
-    f.visibleMemberIds.value!.push('m2');
-    expect(f.focusedMemberIds.value).toEqual(['m1']);
+    expect(f.visibleMemberIds.value).toBe(f.visibleMemberIds.value);
     f.stop();
   });
 });
@@ -92,14 +94,15 @@ describe('when the roster changes underneath a mounted wall', () => {
     f.stop();
   });
 
-  it('leaves an unfiltered wall alone, and does not churn on an unchanged roster', async () => {
+  it('does not churn when the roster grows but the focus is unaffected', async () => {
     const f = withFocus(['m1', 'm2']);
     f.toggle('m1');
     const before = f.focusedMemberIds.value;
 
-    // Same ids, new array — the roster is recomputed on every store touch, so reassigning here
-    // would re-render every wall view with identical ids.
-    f.roster.value = ['m1', 'm2'];
+    // A roster that GROWS while the focus is unaffected. ⚠️ Deliberately not an identical-content
+    // reassign: the watch source is a joined string, so identical content never fires the
+    // callback at all and the old version of this test passed with the guard deleted.
+    f.roster.value = ['m1', 'm2', 'm3'];
     await nextTick();
 
     expect(f.focusedMemberIds.value).toBe(before);

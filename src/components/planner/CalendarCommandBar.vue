@@ -142,7 +142,12 @@ onBeforeUnmount(() => {
              633 → 704 → 674 → 707 → 731 → 695 px across six presses. Shrinkable, `truncate`
              finally has a constrained width to bite on, the row never overflows, and the
              right-hand controls stay where `sm:ml-auto` puts them. -->
-        <div class="min-w-0 flex-1">
+        <!-- ⚠️ A FLOOR as well as `flex-1`. Both the group and this wrapper have
+             `flex-basis: 0`, which gives them a shrink weight of 0 — so the controls sibling
+             absorbs all negative free space and this can be squeezed to literally nothing,
+             losing the month entirely. The floor is on the TITLE, not on the arrows: it cannot
+             move them, because the group beside it still takes the slack. -->
+        <div class="min-w-[6rem] flex-1">
           <Transition name="cal-label" mode="out-in">
             <h1
               :key="label"
@@ -153,11 +158,16 @@ onBeforeUnmount(() => {
           </Transition>
         </div>
 
-        <!-- PHONE ONLY. This row has always been stable here — the title above is `flex-1`,
-             so it absorbs the slack and the cluster is already pinned. At `sm:` and up the
-             cluster moves to the view controls instead; see the component's header for why. -->
+        <!-- RECLAIMED-HEADER WIDTHS ONLY. This row has always been stable here — the title
+             above is `flex-1`, so it absorbs the slack and the cluster is already pinned.
+
+             ⚠️ `md:`, not `sm:`. `headerReclaimed` follows `useBreakpoint`'s 767px, while
+             Tailwind's `sm:` is 640px — so an `sm:` split left a 128px band where the desktop
+             nav rendered AND the mobile member filter and trip chip rendered to its right,
+             both of which change width when a member is selected. `useMobileMenu`'s header
+             warns about exactly this collision. -->
         <CalendarPeriodNav
-          class="sm:hidden"
+          class="md:hidden"
           @prev="emit('prev')"
           @today="emit('today')"
           @next="emit('next')"
@@ -199,13 +209,14 @@ onBeforeUnmount(() => {
             <span class="hidden sm:inline">{{ t('planner.agenda') }}</span>
           </button>
 
-          <!-- sm AND UP. Placed here, and specifically BEFORE the view toggle, so everything
-               to its right has a fixed width: the toggle, the mobile filter (absent here), the
-               trip chip (absent here), the magic pill and Add. Its x is therefore a constant —
+          <!-- md AND UP — the same 767px boundary `headerReclaimed` uses, so the mobile-only
+               filter and trip chip are genuinely absent rather than merely usually absent.
+               Placed BEFORE the view toggle, so everything to its right has a fixed width: the
+               toggle, the magic pill and Add. Its x is therefore a constant —
                in every locale, at every text size, whatever the period label says, and the same
                across a view switch. That is the whole fix. -->
           <CalendarPeriodNav
-            class="hidden sm:flex"
+            class="hidden md:flex"
             @prev="emit('prev')"
             @today="emit('today')"
             @next="emit('next')"

@@ -12,8 +12,10 @@
  *   · every focused bean is a LIT chip — the state is always legible from across the room,
  *     which is not true of a checkbox set behind a menu;
  *   · dropping the last one falls back to everyone, so there is no "matches nobody" state;
- *   · waking the wall from its night screen clears the filter, so a wall left focused
- *     overnight is showing the whole family by morning.
+ *   · waking the wall from its night screen clears the filter — though night mode is only ever
+ *     entered BY HAND from the lock menu or the face button, so this helps a wall someone put to
+ *     bed and does nothing for one simply left running. Stated honestly because the first draft
+ *     of this comment claimed a nightly reset that does not exist.
  *
  * Deliberately NOT wired to `memberFilterStore`: that filter is the account holder's,
  * persisted and shared with the planner, and a child poking the wall must not silently
@@ -26,7 +28,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 
 /** `focused` is EMPTY for everyone — never a list that matches nobody. */
-const props = defineProps<{ focused: string[] }>();
+const props = defineProps<{ focused: readonly string[] }>();
 const emit = defineEmits<{
   /** Toggle one bean in or out of the focus. The page owns the semantics. */
   select: [string];
@@ -45,7 +47,12 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
-  <div class="flex shrink-0 items-center gap-2 px-7 pt-3 pb-4">
+  <!-- ⚠️ `flex-wrap`. The row cannot scroll — `.wall-root` is `overflow-hidden` — so without
+       this a sixth chip is CLIPPED, and a clipped chip can be a LIT one. That would defeat the
+       only mitigation this control actually relies on: the wall's own floor is 600px, which
+       leaves ~544px after the padding, and "everyone" plus five avatar chips plus the brand
+       lockup does not fit. Wrapping costs a second row on a big family and never hides state. -->
+  <div class="flex shrink-0 flex-wrap items-center gap-2 px-7 pt-3 pb-4">
     <button
       type="button"
       class="font-outfit wall-chip-person rounded-full px-3.5 py-1.5 font-semibold shadow-[var(--card-shadow)]"

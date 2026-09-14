@@ -535,6 +535,25 @@ function onGoBack() {
 }
 
 /**
+ * Into night mode, from either door.
+ *
+ * ONE function for both because the two call sites were the same assignment written twice, and
+ * because `source` is the only thing that answers the question this change was made to ask: the
+ * face button exists because the lock menu hid night mode two taps deep, and "did anyone find
+ * it" is unanswerable without it. Emitted on the SUCCESS path, so the rate is measurable rather
+ * than just the absence of complaints.
+ */
+function enterNight(source: 'face' | 'lock-menu') {
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'wall_night_enter',
+    context: { action: 'night', detail: source },
+  });
+  nightNow.value = true;
+}
+
+/**
  * Waking from the night screen returns the wall to everyone.
  *
  * ⚠️ Night mode is MANUAL — it is only ever entered from the lock menu's "night now", and
@@ -737,8 +756,14 @@ watch(activeView, () => (sheet.value = null));
       night-mode and unlock controls were unreachable while a sheet was open.
     -->
     <header class="relative z-40 flex shrink-0 items-center gap-4 px-7 pt-5 pb-3">
-      <div class="min-w-0">
-        <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink font-extrabold">
+      <!-- ⚠️ `flex-1` as well as `min-w-0`, matching `CalendarCommandBar`. `ml-auto` on the
+           cluster beside it only anchors the arrows while free space is POSITIVE; once the
+           header overflows, `margin-left: auto` resolves to 0 and negative space is shared out
+           in proportion to base sizes — which include the nav label — so the arrows become
+           label-dependent again. Growing to take the slack keeps free space positive, and
+           `truncate` on the date is what lets this actually shrink. -->
+      <div class="min-w-0 flex-1">
+        <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink truncate font-extrabold">
           {{
             new Date(`${today}T00:00:00`).toLocaleDateString(undefined, {
               weekday: 'long',
@@ -798,16 +823,24 @@ watch(activeView, () => (sheet.value = null));
             Offered only when it would do something — but it KEEPS ITS SPACE when
             it would not. `v-if` moved both arrows every time the wall arrived at
             or left today, which is the same defect as a label between them and
-            would have undone the reorder above. Hidden rather than removed, and
-            taken out of the tab order and the a11y tree with it so nothing
-            invisible is still reachable.
+            would have undone the reorder above.
+
+            ⚠️ `disabled` + `opacity-0`, NOT `invisible` + `aria-hidden`. Its
+            sibling `WallNavArrow` already solves the identical "this control
+            would do nothing" case this way, and says why: a control that
+            vanishes under your finger is worse than one that plainly will not
+            move. `aria-hidden` was also actively wrong here — press Today and
+            the condition flips on the element that currently HOLDS FOCUS, which
+            WAI-ARIA forbids and which drops the keyboard user back to
+            `<body>`. `disabled` alone takes it out of hit-testing and the tab
+            order, so the three extra bindings that restated the same boolean
+            are gone with it.
           -->
           <button
             type="button"
-            class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold"
-            :class="isAnchoredToToday ? 'pointer-events-none invisible' : ''"
-            :aria-hidden="isAnchoredToToday || undefined"
-            :tabindex="isAnchoredToToday ? -1 : undefined"
+            class="font-outfit text-primary-500 dark:text-accent-lift wall-nav-today rounded-xl bg-[var(--tint-orange-8)] px-2.5 py-1.5 font-bold transition-opacity"
+            :class="isAnchoredToToday ? 'opacity-0' : ''"
+            :disabled="isAnchoredToToday"
             @click="onGoToToday"
           >
             {{ t('date.today') }}
@@ -822,8 +855,14 @@ watch(activeView, () => (sheet.value = null));
         <WallViewSwitcher :active="activeView" @select="selectView" />
         <!-- Beside the switcher, not inside it: night is an action, the switcher is a radio
              group. One tap, on the face, where the lock menu hid it two taps deep. -->
-        <WallNightButton @night-now="nightNow = true" />
-        <div class="text-right">
+        <WallNightButton @night-now="enterNight('face')" />
+        <!-- ⚠️ A RESERVED, tabular column. Both children change width on a timer with no user
+             action: the clock is proportional (9:59 → 10:00) and `WallStatusStamp` rebuilds its
+             label every 30s ("Saved just now" → "Saved 24 minutes ago" → "Can't reach your
+             family file"). This group is `ml-auto`, so every wobble moved the nav arrows to its
+             left — measured at up to 81px, on an unattended display, twice a minute. Reserving
+             the column is what makes the arrow reservation two siblings over mean anything. -->
+        <div class="wall-clock-col min-w-[9.5rem] text-right tabular-nums">
           <p class="font-outfit wall-clock leading-none font-extrabold">
             {{ clockNow.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) }}
           </p>
@@ -840,7 +879,7 @@ watch(activeView, () => (sheet.value = null));
           @relock="lock.lock('manual')"
           @verified="lock.onVerified"
           @cancelled="lock.onCancelled"
-          @night-now="nightNow = true"
+          @night-now="enterNight('lock-menu')"
           @leave="leaveWall"
         />
       </div>

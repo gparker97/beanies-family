@@ -158,6 +158,28 @@ const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
+
+/**
+ * Keep the shared member filter in step with the roster.
+ *
+ * ⚠️ `syncWithMembers` had NO caller. `initialize()` runs on app load and family open only, so
+ * a member removed on another device mid-session left a ghost id in the selection: narrowed to
+ * that member, Transactions rendered EMPTY with no chip lit to say why; on "all", every chip lit
+ * at once and the All chip went dark. The store has held the rule since it was written and
+ * simply never ran it.
+ *
+ * Here rather than per page: this is the ONE place that already owns the filter's lifecycle, and
+ * six pages consume it. Keyed on the joined ids so an unrelated member edit (a rename, a colour)
+ * does not churn the selection, and skipped entirely before `initialize()` has run so it cannot
+ * manufacture a selection out of the pre-load empty state.
+ */
+watch(
+  () => familyStore.humans.map((m) => m.id).join('\u0000'),
+  () => {
+    if (memberFilterStore.isInitialized) memberFilterStore.syncWithMembers();
+  }
+);
+
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();
 const { t } = useTranslation();

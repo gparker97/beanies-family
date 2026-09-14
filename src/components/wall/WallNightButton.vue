@@ -16,6 +16,12 @@
  * ⚠️ Sized by the same `.wall-switch-btn` rule the switcher's buttons use, for the reason that
  * rule's own comment gives — a control a child reaches for on a wall-mounted tablet needs the
  * full target, and a missed tap on a wall looks identical to nothing having happened.
+ *
+ * ⚠️ FULL OPACITY, deliberately. It first carried the switcher's inactive class string verbatim,
+ * `opacity-50 hover:opacity-100` — which on a touch-only wall never un-fades, and which beside
+ * that switcher is the encoding for "not the active view". It read as a disabled fifth tab: the
+ * exact misreading being a peer was meant to avoid. The feedback is a background on press, not a
+ * permanent dimming.
  */
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -29,7 +35,7 @@ const { t } = useTranslation();
   >
     <button
       type="button"
-      class="wall-switch-btn text-secondary-500 dark:text-ink grid place-items-center rounded-[14px] bg-transparent opacity-50 transition-opacity hover:opacity-100"
+      class="wall-switch-btn dark:hover:bg-surface-hover grid place-items-center rounded-[14px] bg-transparent transition-colors hover:bg-[var(--tint-slate-5)]"
       :title="t('wall.lock.nightNow')"
       :aria-label="t('wall.lock.nightNow')"
       @click="$emit('nightNow')"

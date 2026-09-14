@@ -50,7 +50,7 @@ const props = defineProps<{
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own lanes too. */
-  visibleMemberIds: string[] | null;
+  visibleMemberIds: readonly string[] | null;
 }>();
 const emit = defineEmits<{
   /** Forwarded from the grid's band — the page opens the read-only drawer. */
@@ -196,12 +196,17 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
 /**
  * Is the wall currently filtered to just this bean?
  *
- * Read from `visibleMemberIds` rather than from a new prop: the page already
- * derives it from `focusedMemberId` and every view already receives it, so a
- * second channel for the same fact could disagree with the one that filters.
+ * Read from `visibleMemberIds` rather than from a new prop: the page already derives it and
+ * every view already receives it, so a second channel for the same fact could disagree with the
+ * one that filters.
+ *
+ * ⚠️ MEMBERSHIP, not `length === 1`. It tested for a single focused bean, which was true while
+ * the footer was single-select and silently wrong the moment it was not: with two focused, both
+ * lane headers went dark and reported `aria-pressed="false"` while the wall was filtered to
+ * exactly those two — and tapping one then DROPPED it from a header that looked unselected.
  */
 function isFocused(memberId: string) {
-  return props.visibleMemberIds?.length === 1 && props.visibleMemberIds[0] === memberId;
+  return props.visibleMemberIds?.includes(memberId) ?? false;
 }
 
 function tomorrowCount(memberId: string) {

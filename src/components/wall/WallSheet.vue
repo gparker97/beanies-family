@@ -41,7 +41,7 @@ const props = defineProps<{
   target: WallSheetTarget;
   isPending: (job: WallJob) => boolean;
   /** The wall's person filter — the sheet must agree with the view behind it. */
-  visibleMemberIds: string[] | null;
+  visibleMemberIds: readonly string[] | null;
   /** To-dos due today, by bean — the drawer half of the board/drawer split. */
   todosFor: (memberId: string) => WallJob[];
   /** EVERY to-do, bucketed — the drawer shows more than the lane does. */

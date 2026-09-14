@@ -49,8 +49,19 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
   }
 
   /**
-   * Re-initialize when members change (e.g., new member added).
-   * Keeps existing selections and adds new members.
+   * Reconcile the selection with the roster: drop members who have gone, select members who
+   * have arrived.
+   *
+   * ⚠️ CALL THIS whenever the roster can change under a live session. It existed for years with
+   * NO caller — `initialize()` runs only on app load and family open — so a member removed on
+   * another device mid-session left a ghost id here. Narrowed to that member, the Transactions
+   * page then resolved an empty account set and rendered EMPTY with no chip lit to explain it;
+   * on "all", `isAllSelected` flipped false (N ids against N-1 humans) so every chip lit at once
+   * and the All chip went dark, which `useMemberFilterChips` documents as reading like
+   * "everything is filtered" rather than "no filter".
+   *
+   * The beanie wall hit the same bug and fixed it wall-locally in `useWallMemberFocus`; this is
+   * the shared half, and it is the one with the bigger blast radius.
    */
   function syncWithMembers() {
     const familyStore = useFamilyStore();
