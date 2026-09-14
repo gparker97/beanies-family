@@ -8,6 +8,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-14
+
+### Added
+
+- **Got the wrong thing? Tell beanies what it is, and the second read is free.** When beanies decides your recipe is a trip, or your class invite is a recipe, the review screen now offers "Tell beanies what it is". Pick the right one and beanies reads the same thing again, properly — without spending another magic bean, because the mistake was ours. One free correction per thing you hand over; the photo or file you sent still attaches to whatever it creates.
+
+- **Every AI read is now counted, per family.** A magic bean is spent exactly when beanies answers you — once per thing you hand over, including when it cannot work out what it is. Refusals, timeouts and unreadable answers cost nothing, and a free correction is recorded separately so it can never be billed.
+
+### Fixed
+
+- **The end time from an invitation is the one it actually says.** An invite reading "2pm to 4:30pm" filled the form in as 2pm to 3pm — the end time was being overwritten with the usual one-hour default a moment after it was read.
+
+- **A failed read now says what went wrong.** "Something went wrong reading that" has become the actual reason where there is one, along with which AI setting you are on, so an invalid key or an exhausted quota is recognisable instead of a mystery.
+
+---
+
 ## 2026-09-13
 
 ### Added

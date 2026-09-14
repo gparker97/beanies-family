@@ -44,9 +44,14 @@ const titleColorClass: Record<ToastType, string> = {
 </script>
 
 <template>
+  <!-- ⚠️ z-[270], ABOVE every modal layer including the consent gate (z-[260]).
+       A toast is how a surface tells the user why their tap did nothing — the busy refusal
+       fires from inside the magic-beans sheet (z-[250]), and at z-[200] it was painted under
+       that sheet's own backdrop: the tap did nothing, nothing was said, and the sheet stayed
+       open. A message nobody can see is the silent failure the guard exists to prevent. -->
   <TransitionGroup
     tag="div"
-    class="fixed right-4 bottom-20 z-[200] flex flex-col items-end gap-2 md:right-6 md:bottom-6"
+    class="fixed right-4 bottom-20 z-[270] flex flex-col items-end gap-2 md:right-6 md:bottom-6"
     enter-active-class="transition-all duration-300 ease-out"
     leave-active-class="transition-all duration-200 ease-in"
     enter-from-class="translate-y-4 opacity-0"

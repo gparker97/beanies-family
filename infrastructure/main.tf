@@ -166,5 +166,9 @@ module "ai_extract" {
   # Reuses content-fetch's SNS topic rather than creating a second one (#83) — one email
   # confirmation, one Slack forwarder. This is what makes ai_extract depend on content_fetch.
   alerts_topic_arn = module.content_fetch.alerts_topic_arn
+  # The free correction ("not right?"). ON, now that the client half that spends the grants
+  # ships with it. A production problem here is this line, not a rollback: unset, the Lambda
+  # neither issues nor consumes grants and corrections simply cost a bean.
+  correction_grants_enabled = true
 }
 

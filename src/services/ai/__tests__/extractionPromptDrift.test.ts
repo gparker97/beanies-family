@@ -43,7 +43,7 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
     requiredKeys: readonly string[];
     jsonShape: Record<string, string>;
     sources: readonly string[];
-    buildMessages: (source: unknown, todayIso: string) => unknown;
+    buildMessages: (source: unknown, todayIso: string, kindHint?: string) => unknown;
   };
   const tasks = (registry: Record<string, unknown>, task: string) => registry[task] as TaskEntry;
 
@@ -80,4 +80,50 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
       });
     }
   }
+
+  // The correction branch. Without a hinted fixture it would be the one piece of prompt text
+  // with NO cross-copy coverage at all — which is precisely the gap the comment above records
+  // as how a fence bypass once reached three copies unnoticed. `share` is the only task that
+  // reads the hint; the others take the third argument and ignore it, which is what keeps the
+  // registry to ONE signature.
+  for (const kind of Object.keys(SOURCE_FIXTURES)) {
+    it(`task "share" / source "${kind}" / kindHint: built messages match across all three`, () => {
+      const fixture = SOURCE_FIXTURES[kind];
+      const expected = tasks(spike.EXTRACTION_TASKS, 'share').buildMessages(
+        fixture,
+        todayIso,
+        'recipe'
+      );
+      expect(
+        tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe')
+      ).toEqual(expected);
+      expect(
+        tasks(server.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe')
+      ).toEqual(expected);
+    });
+  }
+
+  it('a hint actually CHANGES the prompt, so the fixture above is not vacuous', () => {
+    const fixture = SOURCE_FIXTURES[Object.keys(SOURCE_FIXTURES)[0]!];
+    const plain = JSON.stringify(
+      tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso)
+    );
+    const hinted = JSON.stringify(
+      tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe')
+    );
+    expect(hinted).not.toEqual(plain);
+    expect(hinted).toContain('This IS a recipe');
+  });
+
+  it('a task that ignores the hint is UNCHANGED by it — one registry signature, not two', () => {
+    const fixture = SOURCE_FIXTURES[Object.keys(SOURCE_FIXTURES)[0]!];
+    const withHint = tasks(client.EXTRACTION_TASKS, 'recipe').buildMessages(
+      fixture,
+      todayIso,
+      'event'
+    );
+    expect(withHint).toEqual(
+      tasks(client.EXTRACTION_TASKS, 'recipe').buildMessages(fixture, todayIso)
+    );
+  });
 });

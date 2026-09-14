@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-14.1';
+export const PROMPT_VERSION = '2026-09-14.2';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -343,7 +343,16 @@ export const SHARE_REQUIRED_KEYS = ['kind'];
  * The per-kind field meanings are the three exported shapes verbatim, so this prompt cannot
  * describe an event differently from the event task does.
  */
-export function buildShareExtractionMessages(source, todayIso) {
+/**
+ * `kindHint` is a correction: the user has SEEN a wrong answer and said what the thing actually
+ * is, and the server has already spent a grant to allow it. It is honoured only in that case.
+ *
+ * ⚠️ This is NOT the per-surface hint the one-surface work exists to remove. That would bias
+ * every extraction by where the user happened to be standing, before the model had looked. A
+ * user-stated kind AFTER seeing a wrong answer is a categorically different thing, and the
+ * server enforces the difference: `openRead` passes a hint only when a grant was consumed.
+ */
+export function buildShareExtractionMessages(source, todayIso, kindHint) {
   const system = [
     'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, or a recipe.',
     'First decide which ONE of these the document is, then extract it.',
@@ -381,7 +390,9 @@ export function buildShareExtractionMessages(source, todayIso) {
   return [
     { role: 'system', content: system },
     buildUserMessage(
-      'Work out what this shared document is, then extract it as the specified JSON object.',
+      kindHint
+        ? `This IS a ${kindHint}. The earlier reading of it was wrong; extract it as a ${kindHint} and set kind="${kindHint}".`
+        : 'Work out what this shared document is, then extract it as the specified JSON object.',
       source
     ),
   ];

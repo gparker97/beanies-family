@@ -43,6 +43,9 @@
  * A rendered button whose `open()` optional-chains into nothing is a dead tap with no trace.
  */
 import { onBeforeUnmount, ref } from 'vue';
+import { useToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
+import { logEvent } from '@/services/telemetry/logEvent';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
@@ -56,6 +59,15 @@ import {
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import type { InAppDestination } from '@/composables/useSharedDocumentIngest';
 
+const emit = defineEmits<{
+  /**
+   * The door is finished with: the sheet closed without starting a capture, or the user
+   * declined consent. A page holding state SET AT THE TAP (the travel page's trip target) must
+   * drop it here, or the next capture from any other door inherits it.
+   */
+  (e: 'closed'): void;
+}>();
+
 const props = defineProps<{
   /**
    * For the ONE door that fills itself in rather than dispatching by kind (the recipe form).
@@ -66,6 +78,8 @@ const props = defineProps<{
 }>();
 
 const { canReadAny } = useMagicReader();
+const { showToast } = useToast();
+const { t } = useTranslation();
 
 /** Built per capture so a `claim` swapped at runtime cannot be captured stale. */
 const destination = (): InAppDestination | undefined =>
@@ -114,6 +128,7 @@ function open(): void {
 function closeSheet(): void {
   sheetOpen.value = false;
   clearGrant();
+  emit('closed');
 }
 
 /**
@@ -123,8 +138,17 @@ function closeSheet(): void {
  * a busy toast, or a silent decline. Either way the caller simply returns.
  */
 async function commit(): Promise<ConsentGrant | null> {
-  if (refuseIfBusy(IN_APP_ENV)) return null;
+  if (refuseIfBusy(IN_APP_ENV)) {
+    // A refusal ends this capture as surely as a decline does — the comment below applies to
+    // both, so the emit has to be on both paths.
+    emit('closed');
+    return null;
+  }
   const granted = await requestConsent();
+  // A refusal or a decline ends this capture. The sheet stays open (the user may try again),
+  // but any tap-time state a page is holding for it must be released now — otherwise a target
+  // chosen here silently attaches the NEXT capture, from any door, to the wrong thing.
+  if (!granted) emit('closed');
   return granted ?? null;
 }
 
@@ -159,9 +183,26 @@ async function handleFile(): Promise<void> {
 function handlePickedFile(file: File): void {
   const grant = pendingGrant;
   clearGrant();
-  // No grant means it expired or was cleared — the picker returning late is the case the TTL
-  // exists for. Silent is correct here: the user cancelled minutes ago and has moved on.
-  if (!grant) return;
+  // No grant means it expired or was cleared while the picker was open.
+  //
+  // ⚠️ NOT silent. The TTL exists because `AiDocumentPicker` has no cancel signal, so the only
+  // way to stop a grant outliving an abandoned pick is to time it out — but a photo the user
+  // spent three minutes composing (or took while the app was backgrounded on Android, where
+  // the timer keeps running) then arrives and is dropped with nothing said. That is data loss
+  // on a path that used to always work, and this door is the shared one for six surfaces.
+  //
+  // Telling them costs one toast, and the event is what makes the TTL's real rate measurable
+  // before anyone argues about its length.
+  if (!grant) {
+    logEvent({
+      level: 'warn',
+      surface: IN_APP_ENV.surface,
+      message: 'a picked file arrived after its consent grant expired',
+      context: { action: 'rejected_type', detail: 'grant_expired' },
+    });
+    showToast('info', t('ai.picker.expired.title'), t('ai.picker.expired.message'));
+    return;
+  }
   void ingestInAppSource({ kind: 'file', file }, grant, destination());
 }
 

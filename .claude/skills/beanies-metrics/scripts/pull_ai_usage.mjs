@@ -78,10 +78,18 @@ async function main() {
   let charged = 0;
   let corrected = 0;
   let unattributed = 0;
+  // ⚠️ The DENOMINATOR must be window-filtered too. `unattributed` is counted only for rows
+  // inside the window, so dividing by `counters.length` — every row the scan returned, up to
+  // the ~400-day TTL horizon — dilutes the ratio by roughly the ratio of the two spans. At a
+  // 30-day default that is ~13x: 100% of in-window rows failing to join could report 0.075
+  // against a 0.05 threshold, and a typical 30% drift would never fire at all. This is the one
+  // alarm that exists to catch hash drift; a diluted one is worse than none.
+  let inWindow = 0;
 
   for (const row of counters) {
     const day = row.sk.slice(2);
     if (day < since) continue;
+    inWindow += 1;
     const n = Number(row[USAGE_ATTRS.charged] ?? 0);
     const c = Number(row[USAGE_ATTRS.corrected] ?? 0);
     charged += n;
@@ -116,10 +124,11 @@ async function main() {
     process.exit(1);
   }
 
-  if (byHash.size && unattributed / Math.max(counters.length, 1) > UNATTRIBUTED_WARN_RATIO) {
+  if (byHash.size && unattributed / Math.max(inWindow, 1) > UNATTRIBUTED_WARN_RATIO) {
     console.error(
-      `[pull_ai_usage] ${unattributed}/${counters.length} usage rows do not join to a registry ` +
-        'family. First suspect is hash drift between ddb.mjs and whatever wrote these rows.'
+      `[pull_ai_usage] ${unattributed}/${inWindow} usage rows in the window do not join to a ` +
+        'registry family. First suspect is hash drift between ddb.mjs and whatever wrote these ' +
+        'rows.'
     );
   }
 

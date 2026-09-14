@@ -8,6 +8,7 @@
 // `deliverEvent`. Every consumer narrows on it and closes with `assertNever`, so adding a
 // fourth reader is a build error at every page rather than a silent no-op at one of them.
 
+import type { ExtractionSource } from '@/services/ai/types';
 import type {
   ExtractionResult,
   RecipeExtractionResult,
@@ -140,6 +141,33 @@ export type RecipeShareSource =
  * three dialects of the same idea.
  */
 export interface ResultEnvelope {
+  /**
+   * A free re-read of THIS document as a different kind, when beanies got the kind wrong.
+   *
+   * Carries the prepared source the model was given, and — on the managed tier — the grant the
+   * proxy issued with the answer. The proxy fingerprints the bytes it received and refuses
+   * anything else, so a correction must re-send exactly what the first read sent; re-preparing
+   * the original file would produce different canvas-JPEG output and be refused on a document
+   * nobody changed.
+   *
+   * Absent when the model was never invoked — a `jsonld` or `titleOnly` link resolution answers
+   * from the page itself, is never counted and never granted, and correctly shows no banner.
+   * That is not a missing feature to "fix".
+   */
+  correction?: {
+    /**
+     * The exact prepared payload the model was given — compressed image data URLs, or the
+     * already-fetched text. NOT the original `File`: the proxy fingerprints the bytes it
+     * received, and a second compression pass would not reproduce them.
+     */
+    source: ExtractionSource;
+    /**
+     * The managed-tier grant that makes the re-read free. Absent on BYOK and on-device (their
+     * reads cost us nothing), and absent on a managed read whose grant failed to issue — where
+     * the banner is simply not offered rather than offering a free read we cannot honour.
+     */
+    token?: string;
+  };
   /**
    * The source document, or `null` for a link (a link has no file).
    *

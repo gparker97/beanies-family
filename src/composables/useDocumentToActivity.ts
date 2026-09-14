@@ -30,6 +30,12 @@ export interface UseDocumentToActivityOptions {
     confidence: FieldConfidence;
     /** The client-compressed source document (#133), to attach to the created activity. */
     sourcePhoto?: File;
+    /**
+     * The envelope this result arrived in, carried whole so the review modal can offer the
+     * free correction. Passed rather than flattened: `sourcePhoto` above is already a derived
+     * copy of one envelope field, and a second derived copy is a second thing to keep in step.
+     */
+    env: ResultEnvelope;
   }) => void;
 }
 
@@ -106,6 +112,7 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
       prefill,
       confidence: data.confidence,
       sourcePhoto,
+      env,
     });
   }
 

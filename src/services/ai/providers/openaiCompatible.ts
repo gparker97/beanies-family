@@ -119,7 +119,14 @@ export function callOpenAiCompatibleTask<T extends ExtractionTask>(
   task: T,
   request: ExtractionRequest
 ): Promise<ExtractionResultByTask[T]> {
-  const messages = EXTRACTION_TASKS[task].buildMessages(request.source, request.todayIso);
+  // The correction hint rides the same channel here as it does on the managed tier, so a BYOK
+  // family's "not right?" produces the same targeted re-read rather than a second blind guess.
+  // There is no grant to spend — a BYOK read costs us nothing, so there is nothing to exempt.
+  const messages = EXTRACTION_TASKS[task].buildMessages(
+    request.source,
+    request.todayIso,
+    request.correction?.to
+  );
   const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
   return callOpenAiCompatible(config, request, messages, parse);
 }

@@ -25,7 +25,12 @@ import type { FamilyMember } from '@/types/models';
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
-vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+// Both shapes: the page imports `showToast` directly, and the shared ingest spine — reached
+// through the page's `refuseIfBusy` fence — calls `useToast()`.
+vi.mock('@/composables/useToast', () => {
+  const showToast = vi.fn();
+  return { showToast, useToast: () => ({ showToast }) };
+});
 vi.mock('@/composables/useQuickAddIntent', () => ({ useQuickAddIntent: vi.fn() }));
 vi.mock('@/composables/useMagicReader', () => ({
   useMagicReader: () => ({ canReadRecipe: { value: false } }),
@@ -82,7 +87,6 @@ function mountPage() {
         RecipeFormModal: FormModalStub,
         AiProcessingOverlay: true,
         AiDocumentPicker: true,
-        RecipeLinkModal: true,
         MagicReaderPill: true,
         CookbookControls: true,
         AddEntityButton: true,
@@ -173,7 +177,6 @@ describe('the form the receiver actually sees', () => {
         stubs: {
           AiProcessingOverlay: true,
           AiDocumentPicker: true,
-          RecipeLinkModal: true,
           MagicReaderPill: true,
           CookbookControls: true,
           AddEntityButton: true,

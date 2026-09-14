@@ -30,7 +30,21 @@ export type AiProviderId = 'tinfoil' | 'openai' | 'claude' | 'gemini' | 'on-devi
 export interface AttestedResult {
   /** Managed tier only (see {@link AttestationInfo}); omitted by BYOK/on-device. */
   attestation?: AttestationInfo;
+  /**
+   * A one-use grant to re-read THIS document as a different kind, free of charge, when beanies
+   * got the kind wrong.
+   *
+   * Managed tier only, and the SECOND documented exception to this file's "no transport
+   * concerns" rule (attestation is the first). It is here for the same reason attestation is:
+   * it rides on any task's result, so declaring it once lets the generic `run` fold it in with
+   * no cast and no per-task branch. BYOK and on-device omit it — their reads cost us nothing,
+   * so they need no exemption to be free.
+   */
+  correction?: { token: string };
 }
+
+/** The kinds a correction may assert. Kept in step with `ShareKind` by the meter's own tests. */
+export type ShareKindHint = 'event' | 'travel' | 'recipe';
 
 /**
  * What the model is given. Discriminated so a text-only task can never be handed images
@@ -56,6 +70,23 @@ export type ExtractionSource =
  */
 export interface ExtractionRequest {
   source: ExtractionSource;
+  /**
+   * "This is actually a `to` — read it again." Sent only when the user corrected a
+   * miscategorised result, carrying the grant the proxy issued with that result.
+   *
+   * The proxy validates `to` against a closed set before it reaches the model: the value is
+   * interpolated into the classification INSTRUCTION, outside the fence that bounds the
+   * untrusted document, so an unchecked one would be an injection channel.
+   */
+  correction?: {
+    /**
+     * The grant the proxy issued with the result being corrected. MANAGED TIER ONLY, and
+     * optional because BYOK and on-device reads never reach the proxy and have nothing to
+     * exempt — `to` alone is what makes their re-read a targeted one.
+     */
+    token?: string;
+    to: ShareKindHint;
+  };
   /** Current date `YYYY-MM-DD`, so the model can resolve relative/partial dates. */
   todayIso: string;
   /** Optional cancel signal so the UI can abort a slow extraction. */
@@ -280,6 +311,9 @@ export type ExtractionErrorCode =
   | 'source_unreachable' // the SITE refused us or the page is gone (404/410/403/429).
   // Deliberately separate from provider_error: nothing is wrong on our side, and telling the
   // user "something went wrong" would send them to us instead of to their link.
+  | 'correction_refused' // the free re-read's grant was missing, spent, or for another
+  // document. The proxy REFUSES rather than quietly running a charged, unhinted re-read that
+  // would return the same wrong answer — so nothing was read and nothing was charged.
   | 'rate_limited'; // OUR proxy refused: too many extractions from this family or IP in the
 // window (#83). An expected, intentional refusal — the system working as designed — so it
 // must NEVER reach an error surface. `useExtractionErrorToast` gives it an info toast, the
@@ -292,6 +326,15 @@ export type ExtractionErrorCode =
  * introduce one.
  */
 export interface DocumentExtractionResult<T = ExtractionResult> {
+  /**
+   * The WIRE payload that was actually sent — the compressed data URLs, or the text.
+   *
+   * Retained so a correction can re-send exactly these bytes. The proxy fingerprints what it
+   * received and refuses a grant against anything else, so re-preparing the original file
+   * would fail the guard on a document the user never changed. It is also cheaper to hold than
+   * the originals: bounded by the proxy's 5 MB body cap rather than the picker's 25 MB.
+   */
+  preparedSource?: ExtractionSource;
   success: boolean;
   data?: T;
   errorCode?: ExtractionErrorCode;

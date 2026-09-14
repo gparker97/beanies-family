@@ -181,6 +181,12 @@ function openReader(reader: MagicReader, payload?: SharePayload): void {
   });
 }
 
+/**
+ * ⚠️ NO CALLER since every door moved to `MagicBeansDoor` (#84), and it is kept only because
+ * `useMagicReaderConsumer`'s handler signature is shared with the payload path that IS live.
+ * Calling it now sets a payload-less `pendingMagic` that every consumer's `else` branch
+ * ignores — a dead tap with no trace. A new door opens the sheet; it does not come here.
+ */
 export function openDocumentReader(): void {
   openReader('document');
 }

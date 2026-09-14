@@ -14,16 +14,18 @@ import { logEvent } from '@/services/telemetry';
 import type {
   ExtractionResult,
   ExtractionSource,
+  ExtractionTask,
   FieldConfidence,
   RecipeExtractionResult,
   RecipeFieldConfidence,
   RecipeLine,
   ShareExtractionResult,
+  ShareKindHint,
   TravelExtractionResult,
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-09-14.1';
+export const PROMPT_VERSION = '2026-09-14.2';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -668,9 +670,19 @@ export const SHARE_REQUIRED_KEYS = ['kind'] as const;
  * The per-kind field meanings are the three exported shapes verbatim, so this prompt cannot
  * describe an event differently from the event task does.
  */
+/**
+ * `kindHint` is a correction: the user has SEEN a wrong answer and said what the thing actually
+ * is, and the server has already spent a grant to allow it. It is honoured only in that case.
+ *
+ * ⚠️ This is NOT the per-surface hint the one-surface work exists to remove. That would bias
+ * every extraction by where the user happened to be standing, before the model had looked. A
+ * user-stated kind AFTER seeing a wrong answer is a categorically different thing, and the
+ * server enforces the difference: `openRead` passes a hint only when a grant was consumed.
+ */
 export function buildShareExtractionMessages(
   source: ExtractionSource,
-  todayIso: string
+  todayIso: string,
+  kindHint?: ShareKindHint
 ): ChatMessage[] {
   const system = [
     'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, or a recipe.',
@@ -709,7 +721,9 @@ export function buildShareExtractionMessages(
   return [
     { role: 'system', content: system },
     buildUserMessage(
-      'Work out what this shared document is, then extract it as the specified JSON object.',
+      kindHint
+        ? `This IS a ${kindHint}. The earlier reading of it was wrong; extract it as a ${kindHint} and set kind="${kindHint}".`
+        : 'Work out what this shared document is, then extract it as the specified JSON object.',
       source
     ),
   ];
@@ -759,7 +773,27 @@ function requireNested(obj: Record<string, unknown>, key: string): unknown {
   return nested;
 }
 
-export const EXTRACTION_TASKS = {
+/**
+ * ONE signature for every task's builder.
+ *
+ * `kindHint` reaches only `share`; the other three take the third argument and ignore it.
+ * That is what keeps `EXTRACTION_TASKS[task].buildMessages(source, todayIso, hint)` callable
+ * GENERICALLY — with a per-task builder type the call is a union of signatures, a three-arg
+ * call stops compiling, and the fix reached for is a cast or a `task === 'share'` branch at
+ * the call site. One signature is cheaper than either.
+ */
+export interface ExtractionTaskEntry {
+  buildMessages: (
+    source: ExtractionSource,
+    todayIso: string,
+    kindHint?: ShareKindHint
+  ) => ChatMessage[];
+  requiredKeys: readonly string[];
+  jsonShape: Record<string, string>;
+  sources: readonly ('images' | 'text')[];
+}
+
+export const EXTRACTION_TASKS: Record<ExtractionTask, ExtractionTaskEntry> = {
   event: {
     buildMessages: buildExtractionMessages,
     requiredKeys: REQUIRED_KEYS,
@@ -801,7 +835,7 @@ export const EXTRACTION_TASKS = {
     // and resisted an injection payload spliced into the page text.
     sources: ['images', 'text'],
   },
-} as const;
+};
 
 /**
  * Task → parser. CLIENT-ONLY, and deliberately NOT mirrored into the spike/server copies:

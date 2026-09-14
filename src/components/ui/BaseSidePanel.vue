@@ -18,7 +18,9 @@ interface Props {
   // other surface. Accepted here so BeanieFormModal can forward one layer union to both of
   // its containers — a drawer that silently DOWNGRADED 'top' to 'overlay' would be the worse
   // failure, because the caller asking for 'top' has a reason.
-  layer?: 'base' | 'overlay' | 'top';
+  // 'gate' is accepted so BeanieFormModal forwards ONE union to both containers. No drawer uses
+  // it today (the consent gate is a modal), and it is given real z-values anyway — see below.
+  layer?: 'base' | 'overlay' | 'top' | 'gate';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -37,11 +39,28 @@ const sizeClasses: Record<string, string> = {
 
 // Backdrop sits just under the panel; 'overlay' clears a base drawer (z-40)
 // and a base modal (z-50) beneath it.
+// ⚠️ 'gate' is in the union because `BeanieFormModal` forwards ONE union to both containers.
+// It MUST have a branch here: without one it falls through to `z-40`, below a plain base
+// modal — so a gate moved to a drawer would render 220 levels below what it asked for, which
+// is the invisible-permission-prompt bug that layer exists to prevent.
+const gateOrTop = (l: string) => l === 'gate' || l === 'top';
 const backdropZ = computed(() =>
-  props.layer === 'top' ? 'z-[245]' : props.layer === 'overlay' ? 'z-[55]' : 'z-40'
+  props.layer === 'gate'
+    ? 'z-[255]'
+    : gateOrTop(props.layer)
+      ? 'z-[245]'
+      : props.layer === 'overlay'
+        ? 'z-[55]'
+        : 'z-40'
 );
 const panelZ = computed(() =>
-  props.layer === 'top' ? 'z-[250]' : props.layer === 'overlay' ? 'z-[60]' : 'z-40'
+  props.layer === 'gate'
+    ? 'z-[260]'
+    : gateOrTop(props.layer)
+      ? 'z-[250]'
+      : props.layer === 'overlay'
+        ? 'z-[60]'
+        : 'z-40'
 );
 
 const emit = defineEmits<{

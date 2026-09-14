@@ -94,3 +94,13 @@ variable "alerts_topic_arn" {
   type        = string
   default     = ""
 }
+
+# Free corrections (the "not right?" affordance). Kept OFF by default so the Lambda half can
+# ship and be observed ahead of the client that uses it - Change 1 deploys the code writing no
+# grant rows at all, keeping its own observation window clean. Flipping this is what turns the
+# feature on, which is also what makes turning it off a variable rather than a rollback.
+variable "correction_grants_enabled" {
+  description = "Issue and consume free-correction grants for miscategorised AI reads."
+  type        = bool
+  default     = false
+}

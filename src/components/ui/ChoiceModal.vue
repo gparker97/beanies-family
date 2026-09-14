@@ -17,11 +17,21 @@ export interface ChoiceOption {
   description?: string;
 }
 
-defineProps<{
-  open: boolean;
-  title: string;
-  options: ChoiceOption[];
-}>();
+withDefaults(
+  defineProps<{
+    open: boolean;
+    title: string;
+    options: ChoiceOption[];
+    /**
+     * Which stacking layer to open on. `'overlay'` (z-[60]) is right above a page, and is the
+     * default so every existing call site is unchanged. A caller opening this from INSIDE a
+     * modal must pass `'top'` — `RecipeFormModal` sits at z-[60] itself at its meal-editor
+     * mount, and at equal specificity source order alone would decide which one you can see.
+     */
+    layer?: 'base' | 'overlay' | 'top';
+  }>(),
+  { layer: 'overlay' }
+);
 
 const emit = defineEmits<{
   (e: 'select', id: string): void;
@@ -30,7 +40,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <BaseModal :open="open" :title="title" size="sm" layer="overlay" @close="emit('close')">
+  <BaseModal :open="open" :title="title" size="sm" :layer="layer" @close="emit('close')">
     <div class="flex flex-col gap-2">
       <button
         v-for="opt in options"

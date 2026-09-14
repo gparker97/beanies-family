@@ -57,6 +57,7 @@ import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
 import type { FieldConfidence } from '@/services/ai/types';
+import type { ResultEnvelope } from '@/types/magicPayload';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -231,6 +232,8 @@ const activityPrefill = ref<Partial<CreateFamilyActivityInput> | undefined>(unde
 const activityPrefillConfidence = ref<FieldConfidence | undefined>(undefined);
 // The compressed source document, attached to the activity ActivityModal creates (#133).
 const activitySourcePhoto = ref<File | undefined>(undefined);
+// The envelope the extraction arrived in — what lets ActivityModal offer the free correction.
+const activityPrefillEnv = ref<ResultEnvelope | undefined>(undefined);
 
 // Shared per-document consent gate. The modal itself is mounted ONCE in App.vue (#64), so
 // this page only asks; it hosts no consent UI. The grant is held between the gate and the
@@ -241,6 +244,8 @@ type PhotoActivityReady = {
   prefill: Partial<CreateFamilyActivityInput>;
   confidence: FieldConfidence;
   sourcePhoto?: File;
+  /** Carried through to `ActivityModal` so it can offer the free "not right?" correction. */
+  env: ResultEnvelope;
 };
 
 /**
@@ -267,6 +272,7 @@ function applyAddNew(ready: PhotoActivityReady): void {
   activityPrefill.value = ready.prefill;
   activityPrefillConfidence.value = ready.confidence;
   activitySourcePhoto.value = ready.sourcePhoto;
+  activityPrefillEnv.value = ready.env;
   openExtractionModalReset();
 }
 
@@ -277,6 +283,9 @@ function applyUpdateExisting(match: FamilyActivity, ready: PhotoActivityReady): 
   activityPrefill.value = undefined;
   activityPrefillConfidence.value = undefined;
   activitySourcePhoto.value = ready.sourcePhoto;
+  // Kept even on the EDIT path: "this was never an activity" is a correction the user can only
+  // make here, and it is just as true of a merge into an existing one.
+  activityPrefillEnv.value = ready.env;
   openExtractionModalReset();
 }
 
@@ -395,12 +404,33 @@ watch(editingSegmentValue, (next, prev) => {
   }
 });
 
-function openAddModal(date?: string, time?: string, memberId?: string) {
-  // A manual add is never a photo prefill — clear any leftover so it can't leak in
-  // (incl. the source photo, or it would attach to the next manually-added activity).
+/**
+ * Everything the activity modal leaves behind, dropped in ONE place.
+ *
+ * ⚠️ Called from `handleSave` too, not only from `@close`. `handleSave` sets `showModal = false`
+ * directly, so the inline clears this replaced never ran on the save path — `activitySourcePhoto`
+ * survived an AI-created activity and was then staged onto the NEXT activity opened for edit,
+ * uploading the previous document and linking it with no prompt. Six refs cleared in four places
+ * is the shape that half-updates; this is the one place.
+ */
+function clearActivityModalState(): void {
+  defaultStartTime.value = undefined;
+  defaultAssigneeId.value = undefined;
   activityPrefill.value = undefined;
   activityPrefillConfidence.value = undefined;
   activitySourcePhoto.value = undefined;
+  activityPrefillEnv.value = undefined;
+}
+
+function closeActivityModal(): void {
+  showModal.value = false;
+  clearActivityModalState();
+}
+
+function openAddModal(date?: string, time?: string, memberId?: string) {
+  // A manual add is never a photo prefill — clear any leftover so it can't leak in
+  // (incl. the source photo, or it would attach to the next manually-added activity).
+  clearActivityModalState();
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
@@ -514,6 +544,9 @@ async function handleViewOpenEdit(activity: FamilyActivity) {
   // docs/E2E_HEALTH.md for the cross-entity history.
   const { activity: target, occurrenceDate } = scopedViewOpenEdit(activity);
   await nextTick();
+  // Opening an EXISTING activity is never a correction of a document, and it must not inherit
+  // the previous capture's source photo either — see `clearActivityModalState`.
+  clearActivityModalState();
   editingActivity.value = target;
   editingOccurrenceDate.value = occurrenceDate;
   showModal.value = true;
@@ -598,6 +631,7 @@ async function handleSave(
     // docs/E2E_HEALTH.md 2026-05-03 entry). nextTick lets Vue flush the
     // v-if removal of the first dialog before we mount the second.
     showModal.value = false;
+    clearActivityModalState();
     if (created) {
       await nextTick();
       showActivityCreatedConfirmation(data as CreateFamilyActivityInput);
@@ -628,6 +662,7 @@ async function handleSave(
   }
 
   showModal.value = false;
+  clearActivityModalState();
 
   // Show success confirmation when a new linked payment was created
   if (isAddingPayment) {
@@ -707,6 +742,7 @@ async function handleDelete() {
   if (!editingActivity.value) return;
   const activityToDelete = editingActivity.value;
   showModal.value = false;
+  clearActivityModalState();
   const confirmed = await confirm({
     title: 'planner.deleteActivity',
     message: 'planner.deleteConfirm',
@@ -910,17 +946,11 @@ function handleActivitySwapped(newId: string) {
       :default-assignee-ids="defaultAssigneeId ? [defaultAssigneeId] : undefined"
       :prefill="activityPrefill"
       :prefill-confidence="activityPrefillConfidence"
+      :prefill-env="activityPrefillEnv"
       :source-photo="activitySourcePhoto"
       :read-only="!canEditActivities"
       :occurrence-date="editingOccurrenceDate"
-      @close="
-        showModal = false;
-        defaultStartTime = undefined;
-        defaultAssigneeId = undefined;
-        activityPrefill = undefined;
-        activityPrefillConfidence = undefined;
-        activitySourcePhoto = undefined;
-      "
+      @close="closeActivityModal"
       @save="handleSave"
       @delete="handleDelete"
       @start-vacation-wizard="handleStartVacationWizard"

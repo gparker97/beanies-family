@@ -635,8 +635,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     excerpt:
       'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
     icon: '\u{1FAD8}',
-    readTime: 4,
-    updatedDate: '2026-06-07',
+    readTime: 5,
+    updatedDate: '2026-09-14',
     sections: [
       {
         type: 'heading',
@@ -654,6 +654,29 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content:
           "Picked a PDF? beanies reads its first few pages — not just the first — so a return flight on page two or a second day's plan gets picked up too. Very long PDFs read the first several pages, and either way the full original document stays attached to whatever it creates, so nothing is lost. A photo is read as a single image.",
         title: 'Multi-page PDFs',
+      },
+      {
+        type: 'heading',
+        content: 'One bean per thing you hand over',
+        level: 2,
+        id: 'one-bean',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every time beanies reads something for you, that counts as <strong>one magic bean</strong> — one photo, one document, one link, one piece of pasted text. Several photos of the same invitation are one thing, so they are one bean. It counts even when beanies cannot work out what it is: we still read it for you, and counting it is what keeps "paste it again and again until something sticks" from being free for everyone else.',
+      },
+      {
+        type: 'callout',
+        content:
+          'If beanies decides your recipe is a trip, or your invitation is a recipe, tap <strong>Tell beanies what it is</strong> on the review screen and pick the right one. beanies reads it again, properly this time — and that second read is <strong>free</strong>, because the mistake was ours, not yours. One free correction per thing you hand over. (A read where beanies simply could not tell has no free retry — nothing was got wrong, so there is nothing to correct.)',
+        title: 'Got it wrong? Putting it right is free',
+        icon: '\u{2728}',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you bring your own AI provider (BYOK) or run a model on your own device, your reads go to your provider and are paid for by you, so they are not counted against a beanies allowance at all.',
       },
       {
         type: 'heading',

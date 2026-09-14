@@ -47,6 +47,8 @@ function buildSignal(signal?: AbortSignal): AbortSignal {
 }
 
 interface ProxyBody {
+  /** A one-use grant to re-read this document as a different kind, free. Managed tier only. */
+  correction?: { token: string };
   result?: unknown;
   attestation?: AttestationInfo;
 }
@@ -88,6 +90,16 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
         // Omitted entirely when absent, so an old bundle's body is byte-identical to what it
         // sends today and the Lambda's absent-id fallback is what handles it.
         ...(request.familyId ? { familyId: request.familyId } : {}),
+        // Same rule as `familyId`: ADDED beside `todayIso`, never a rename, and omitted
+        // entirely when absent so a normal read's body is byte-identical to what it always was.
+        //
+        // Gated on the TOKEN, not on the correction: the proxy 400s a correction whose token is
+        // not a UUID, so sending a tokenless one would turn "the grant never issued" into "the
+        // correction fails outright". Without it the read is simply charged — which is the
+        // direction every other fence in the meter fails in.
+        ...(request.correction?.token
+          ? { correction: { token: request.correction.token, to: request.correction.to } }
+          : {}),
       }),
       signal: buildSignal(request.signal),
     });
@@ -140,6 +152,17 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
       throw new ExtractionProviderError(
         'rate_limited',
         `Managed proxy rate-limited this request (HTTP ${res.status})`
+      );
+    }
+    if (code === 'correction_refused' || res.status === 409) {
+      // The grant was missing, already spent, expired, or issued against a different document.
+      // The proxy refuses instead of downgrading to a charged, unhinted re-read — so nothing
+      // reached the model and nothing was counted. Its own code, not `provider_error`: this is
+      // an expected refusal with a specific message, and folding it into the generic error
+      // would tell the user something went wrong when nothing did.
+      throw new ExtractionProviderError(
+        'correction_refused',
+        `Managed proxy refused this correction (HTTP ${res.status})`
       );
     }
     if (code === 'unknown_task') {
@@ -197,6 +220,9 @@ export const managedProvider: ExtractionProvider = {
     // depends on TS's generic-spread intersection behaviour and is where an implementer
     // reaches for `as`. Assigning onto `T extends AttestedResult` is unambiguously typed.
     if (body.attestation) result.attestation = body.attestation;
+    // Rides the same channel as attestation, for the same reason: it belongs to ANY task's
+    // result, so folding it in here needs no cast and no per-task branch.
+    if (body.correction) result.correction = body.correction;
     return result;
   },
 };

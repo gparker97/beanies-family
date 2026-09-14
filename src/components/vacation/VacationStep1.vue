@@ -36,6 +36,10 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 // "beanies can do magic" — read a travel booking into a built trip (#30).
+import { useMagicReader } from '@/composables/useMagicReader';
+
+const { canReadAny } = useMagicReader();
+
 // The door self-gates on `canReadAny` and owns opening. `openDocumentReader` is gone: it was
 // the last payload-less `openReader` caller, which navigated to /travel and asked the page to
 // open a picker the page no longer has.
@@ -55,7 +59,11 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
        trip only. The door self-gates on `canReadAny`, so the banner and its tap are removed
        together rather than leaving a button whose handler does nothing. Followed by an
        "or add it yourself" divider before the manual fields. -->
-  <div v-if="isNewTrip" class="mb-5">
+  <!-- ⚠️ The gate is `isNewTrip && canReadAny`, not `isNewTrip` alone. The door self-gates and
+       renders nothing without a reader, but the divider below is its SIBLING — so gating only
+       the door leaves "OR ADD IT YOURSELF" sitting above the manual fields with nothing above
+       it to add instead. -->
+  <div v-if="isNewTrip && canReadAny" class="mb-5">
     <MagicBeansDoor>
       <template #trigger="{ open }">
         <button

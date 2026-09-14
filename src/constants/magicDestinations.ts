@@ -19,8 +19,13 @@ import type { ShareKind } from '@/types/magicPayload';
  */
 export const MAGIC_DESTINATIONS: Record<ShareKind, { emoji: string; icon: string }> = {
   event: { emoji: '📅', icon: 'calendar' },
-  travel: { emoji: '✈️', icon: 'plane' },
-  recipe: { emoji: '🍳', icon: 'recipe' },
+  // ⚠️ NOT `airplane` / `utensils`, which read like the obvious choices and are both WRONG:
+  // the registry holds heroicons' cube path under `airplane` and its currency-dollar path
+  // under `utensils`. `BeanieIcon` renders an unknown name as three grey dots and a MISLABELLED
+  // one as the wrong picture, silently in both cases — so verify a name by looking at it, and
+  // keep `magicDestinations.test.ts`'s registry check in place.
+  travel: { emoji: '✈️', icon: 'briefcase' },
+  recipe: { emoji: '🍳', icon: 'book' },
 };
 
 /** Iteration order for the tiles. Typed, so the `t()` key stays a compile-checked literal. */

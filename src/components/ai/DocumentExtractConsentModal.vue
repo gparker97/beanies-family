@@ -2,13 +2,19 @@
 /**
  * Per-action consent for the photo → activity wedge (#133, ADR-030).
  *
- * ⚠️ `layer="top"` is load-bearing, not cosmetic. This is a GATE: it asks permission before
- * anything leaves the device, so a version of it the user cannot see is a security-UX
- * failure, not a z-index nit. It previously defaulted to `layer="base"` (z-50) — the same
- * layer as `QuickAddSheet` — and since App.vue mounts the quick-add sheet LATER in the body,
- * equal z-index meant the sheet painted over this dialog. Every in-app magic-beans capture
- * (#84) requests consent while that sheet is open, so the prompt was invisible and the flow
- * appeared to hang on its own await. Do not lower this.
+ * ⚠️ `layer="gate"` is load-bearing, not cosmetic, and it is the ONLY user of that layer.
+ * This is a GATE: it asks permission before anything leaves the device, so a version of it
+ * the user cannot see is a security-UX failure, not a z-index nit.
+ *
+ * It has been bitten TWICE by the same mechanic — equal z-index is decided by DOM order, and
+ * App.vue mounts this modal before the router-view, so it loses every tie. First at `base`
+ * (z-50) against `QuickAddSheet`; then at `top` (z-[250]) against `MagicBeansSheet`, once
+ * that moved to `top` to clear the recipe form. Both times the prompt was invisible, the flow
+ * appeared to hang on its own await, and every in-app capture was dead for any family that
+ * had not ticked "don't ask again" — which is the default.
+ *
+ * `gate` (z-[260]) ends the pattern by putting this above `top` rather than level with it.
+ * Do not lower it, and do not give a second surface that layer.
  *
  * Built on BeanieFormModal (the mandated modal hierarchy — never raw BaseModal). The
  * itemised "what / where / after" list is why this is a dedicated modal rather than a
@@ -80,7 +86,7 @@ function onConfirm(): void {
 <template>
   <BeanieFormModal
     variant="modal"
-    layer="top"
+    layer="gate"
     size="narrow"
     :open="consentOpen"
     :title="t('ai.consent.title')"

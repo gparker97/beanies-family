@@ -197,6 +197,10 @@ resource "aws_lambda_function" "ai_extract" {
       # Same supported-no-op posture as RATE_TABLE: unset ⇒ `countUsage` returns immediately and
       # logs nothing, which is what keeps the handler suite off a real DynamoDB call per test.
       USAGE_TABLE = aws_dynamodb_table.usage.name
+      # The free-correction kill switch. UNSET means grants are neither issued nor consumed,
+      # silently - so the Lambda half ships dormant ahead of the client that uses it, and a
+      # production problem is a terraform variable rather than a rollback.
+      CORRECTION_GRANTS = var.correction_grants_enabled ? "1" : ""
     }
   }
 
@@ -363,6 +367,49 @@ resource "aws_cloudwatch_metric_alarm" "usage_count_skipped" {
 
   tags = {
     Name        = "${var.app_name}-ai-extract-usage-count-skipped"
+    Environment = var.environment
+  }
+}
+
+# The one correction refusal that means the FEATURE is broken rather than someone probing it.
+# `missing`, `spent` and `same_kind` are all expected in normal operation; `different_source`
+# means the banner is offering a correction the server will refuse - the client and the server
+# disagree about what document was read, so every correction is charged while the UI promises
+# it is free.
+
+resource "aws_cloudwatch_log_metric_filter" "correction_source_mismatch" {
+  name           = "${var.app_name}-ai-extract-correction-mismatch-${var.environment}"
+  log_group_name = aws_cloudwatch_log_group.ai_extract.name
+  pattern        = "\"[ai-extract] correction refused reason=different_source\""
+
+  metric_transformation {
+    name          = "CorrectionSourceMismatch"
+    namespace     = "${var.app_name}/ai-extract"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "correction_source_mismatch" {
+  count = var.alerts_topic_arn == "" ? 0 : 1
+
+  alarm_name        = "${var.app_name}-ai-extract-correction-mismatch-${var.environment}"
+  alarm_description = "Free corrections are being refused because the client re-sent a different document than the grant was issued for. Families are being charged for corrections the UI promises are free."
+
+  namespace           = aws_cloudwatch_log_metric_filter.correction_source_mismatch.metric_transformation[0].namespace
+  metric_name         = aws_cloudwatch_log_metric_filter.correction_source_mismatch.metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 5
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [var.alerts_topic_arn]
+  ok_actions    = [var.alerts_topic_arn]
+
+  tags = {
+    Name        = "${var.app_name}-ai-extract-correction-mismatch"
     Environment = var.environment
   }
 }

@@ -105,9 +105,12 @@ vi.mock('../useDocumentConsent', () => ({
 }));
 
 const extractShareFromDocuments = vi.fn();
+const extractShareFromPreparedSource = vi.fn();
 vi.mock('@/services/ai/documentExtractionService', () => ({
   extractShareFromDocuments: (f: unknown, o: unknown) => extractShareFromDocuments(f, o),
   extractShareFromText: (t: unknown, o: unknown) => extractShareFromText(t, o),
+  extractShareFromPreparedSource: (src: unknown, o: unknown) =>
+    extractShareFromPreparedSource(src, o),
 }));
 
 // The real `routeUrl`, wrapped so its calls can be COUNTED. The suite depends on its actual
@@ -651,7 +654,11 @@ describe('share ingest — refusals and failures', () => {
     extractShareFromDocuments.mockResolvedValue({ success: false, errorCode: 'timeout' });
     await ingestSharedContent({ files: [img()] }, meta);
 
-    expect(reportExtractionFailure).toHaveBeenCalledWith('timeout');
+    // Two arguments now: the code, and the provider's own message when it has one. Asserted
+    // positionally rather than with `expect.anything()` — the second argument is the detail a
+    // bare "something went wrong" once cost a family an afternoon over, and a test that shrugs
+    // at it would not notice the day it stopped being passed.
+    expect(reportExtractionFailure).toHaveBeenCalledWith('timeout', undefined);
     expect(logEvent.mock.calls.at(-1)?.[0].context).toMatchObject({
       action: 'failed',
       error_code: 'timeout',
@@ -1646,5 +1653,106 @@ describe('link-vs-text precedence (#85)', () => {
     // would pass with the `.catch` deleted. The guard is still correct and cheap (offline or a
     // stale deploy reads the message instead of erroring), and its `link_router_unavailable`
     // event is the signal that says whether it ever fires in production.
+  });
+});
+
+// ─── The free correction: "not right?" ───────────────────────────────────────
+//
+// A correction is a THIRD ARM of `InAppInput`, not a third entry point — everything below
+// `withIngestLock` is the existing tail. These tests pin the three things that are specific to
+// the arm, each of which fails silently and expensively if it breaks.
+
+describe('a correction (the third InAppInput arm)', () => {
+  const PREPARED = { kind: 'images' as const, imageDataUrls: ['data:image/jpeg;base64,AAA'] };
+  const SOURCE_FILE = new File(['x'], 'dish.jpg', { type: 'image/jpeg' });
+  const COMPRESSED = new Blob(['c'], { type: 'image/jpeg' });
+
+  /** The envelope a first read handed to the review modal the user is correcting from. */
+  const envelope = () => ({
+    sourceFile: SOURCE_FILE,
+    compressedBlob: COMPRESSED,
+    origin: 'in-app' as const,
+    correction: { source: PREPARED, token: 'tok-1' },
+  });
+
+  const correct = (to: 'event' | 'travel' | 'recipe' = 'recipe') =>
+    ingestInAppSource({ kind: 'correction', env: envelope(), from: 'travel', to }, doorGrant);
+
+  beforeEach(() => {
+    extractShareFromPreparedSource.mockResolvedValue({
+      success: true,
+      data: { kind: 'recipe', recipe: { isRecipe: true, name: 'Pasta' } },
+      preparedSource: PREPARED,
+    });
+  });
+
+  it('re-sends the PREPARED source verbatim, never a re-prepared one', async () => {
+    await correct();
+
+    // Re-preparing would produce different canvas-JPEG bytes, and the proxy fingerprints the
+    // bytes it received — so the grant would be refused on a document nobody changed.
+    expect(extractShareFromPreparedSource).toHaveBeenCalledTimes(1);
+    expect(extractShareFromPreparedSource.mock.calls[0][0]).toBe(PREPARED);
+    expect(extractShareFromPreparedSource.mock.calls[0][1].correction).toEqual({
+      token: 'tok-1',
+      to: 'recipe',
+    });
+    expect(extractShareFromDocuments).not.toHaveBeenCalled();
+  });
+
+  it('carries the ORIGINAL envelope forward, so a dish photo still attaches on save', async () => {
+    await correct();
+
+    // The silent data-loss path this exists to close: a photo misread as travel and corrected
+    // to recipe arriving at the recipe form with no photo to attach.
+    const payload = dispatchSharePayload.mock.calls[0][0];
+    expect(payload.kind).toBe('recipe');
+    expect(payload.env.sourceFile).toBe(SOURCE_FILE);
+    expect(payload.env.compressedBlob).toBe(COMPRESSED);
+  });
+
+  it('drops the spent grant, so the banner cannot offer a client-side free chain', async () => {
+    await correct();
+
+    // Carrying it forward would re-render the banner with a token the server refuses — the
+    // chain the no-chain invariant forbids, produced on the client instead of the server.
+    expect(dispatchSharePayload.mock.calls[0][0].env.correction).toBeUndefined();
+  });
+
+  it('does not spend the client text budget, which is what "free" has to mean', async () => {
+    // Exhaust it first: a correction refused by a quota toast while the server grant sits
+    // unspent and expires is precisely the failure at the moment someone is correcting a lot.
+    extractShareFromText.mockResolvedValue({ success: true, data: { kind: 'none' } });
+    const prose = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+    for (let i = 0; i < 40; i += 1) {
+      await ingestInAppSource({ kind: 'paste', text: `${prose} ${i}` }, doorGrant);
+    }
+    dispatchSharePayload.mockClear();
+
+    await correct();
+
+    expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits the miscategorised signal with both kinds, so prompt quality is measurable', async () => {
+    await correct();
+
+    const corrected = logEvent.mock.calls
+      .map((c) => c[0])
+      .find((e) => e.context?.action === 'corrected');
+    expect(corrected?.context).toMatchObject({ kind: 'recipe', detail: 'travel' });
+  });
+
+  it('refuses out loud when the envelope carries no prepared source', async () => {
+    // A should-not-happen — the banner gates on it — which is exactly why it must not fall
+    // through to a re-prepare the server would refuse and charge for.
+    await ingestInAppSource(
+      { kind: 'correction', env: { sourceFile: null }, from: 'event', to: 'recipe' },
+      doorGrant
+    );
+
+    expect(extractShareFromPreparedSource).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalled();
+    expect(actions()).toContain('not_ready');
   });
 });
