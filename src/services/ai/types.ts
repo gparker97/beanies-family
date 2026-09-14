@@ -311,6 +311,9 @@ export type ExtractionErrorCode =
   | 'source_unreachable' // the SITE refused us or the page is gone (404/410/403/429).
   // Deliberately separate from provider_error: nothing is wrong on our side, and telling the
   // user "something went wrong" would send them to us instead of to their link.
+  | 'correction_disagreed' // the free re-read ran, and beanies still does not think the
+  // document is the kind the user asserted. NOT a failure of the read: nothing is wrong with
+  // the document, so "try a clearer photo" would be false and would invite a paid retry.
   | 'correction_refused' // the free re-read's grant was missing, spent, or for another
   // document. The proxy REFUSES rather than quietly running a charged, unhinted re-read that
   // would return the same wrong answer — so nothing was read and nothing was charged.

@@ -154,6 +154,14 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
         `Managed proxy rate-limited this request (HTTP ${res.status})`
       );
     }
+    if (code === 'correction_disagreed' || res.status === 422) {
+      // The model read it again and still does not agree. Its own code rather than the generic
+      // malformed-output one: nothing went wrong, so the toast must not say it did.
+      throw new ExtractionProviderError(
+        'correction_disagreed',
+        `Managed proxy: the document does not support that correction (HTTP ${res.status})`
+      );
+    }
     if (code === 'correction_refused' || res.status === 409) {
       // The grant was missing, already spent, expired, or issued against a different document.
       // The proxy refuses instead of downgrading to a charged, unhinted re-read — so nothing

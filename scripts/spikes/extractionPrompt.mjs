@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-14.2';
+export const PROMPT_VERSION = '2026-09-14.3';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -355,10 +355,23 @@ export const SHARE_REQUIRED_KEYS = ['kind'];
 export function buildShareExtractionMessages(source, todayIso, kindHint) {
   const system = [
     'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, or a recipe.',
-    'First decide which ONE of these the document is, then extract it.',
+    kindHint
+      ? // ⚠️ The CLASSIFICATION rules are replaced, not appended to, when the user has told us
+        // what the thing is. The default system message says «"none" is always better than a
+        // wrong guess», which argues directly against the hint sitting in the user message —
+        // and the system message wins. Tested live against gemma4-31b: a correction the model
+        // disagreed with came back as the original kind, the wrong-kind guard 502'd it, and the
+        // family lost both the grant and the answer. The user has already SEEN a wrong result
+        // and said what the thing is; the model's job here is extraction, not adjudication.
+        `The person who shared this has told us what it is: a ${kindHint}. An earlier reading got that wrong. Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields. Only if the document contains nothing at all that could fill them, set kind="none".`
+      : 'First decide which ONE of these the document is, then extract it.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
-    'Set kind="none" if the document is none of the three. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+    ...(kindHint
+      ? []
+      : [
+          'Set kind="none" if the document is none of the three. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+        ]),
     'Include ONLY the nested object matching your chosen kind. Omit the other two entirely.',
     'Never output any value that is not actually supported by the source. An empty field is ALWAYS better than an invented one.',
     'The JSON object must have exactly these keys: ' +
@@ -391,7 +404,7 @@ export function buildShareExtractionMessages(source, todayIso, kindHint) {
     { role: 'system', content: system },
     buildUserMessage(
       kindHint
-        ? `This IS a ${kindHint}. The earlier reading of it was wrong; extract it as a ${kindHint} and set kind="${kindHint}".`
+        ? `Extract this as a ${kindHint}, as the system instructions describe.`
         : 'Work out what this shared document is, then extract it as the specified JSON object.',
       source
     ),

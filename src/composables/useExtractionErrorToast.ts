@@ -129,6 +129,13 @@ export function useExtractionErrorToast() {
           t('recipeExtract.unreachable.message')
         );
         return;
+      case 'correction_disagreed':
+        // beanies read it again and still disagrees. Nothing is broken and nothing was charged,
+        // so this is info with no error surface — and deliberately NOT the generic
+        // "couldn't make sense of that one", which would send the user off to re-photograph a
+        // document that is perfectly legible.
+        showToast('info', t('ai.correct.disagreed.title'), t('ai.correct.disagreed.message'));
+        return;
       case 'correction_refused':
         // Expected, and nothing is broken: the grant had already been spent, had aged out, or
         // belonged to a different document. Nothing was read and nothing was charged, so this

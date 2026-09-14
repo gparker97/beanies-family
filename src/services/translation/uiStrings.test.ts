@@ -109,6 +109,7 @@ describe('uiStrings', () => {
       // every beanie value there sat outside the floor until this was added.
       'ai.error.',
       'ai.correct.refused.',
+      'ai.correct.disagreed.',
       'ai.picker.expired.',
       'app.initError.',
       'auth.',
