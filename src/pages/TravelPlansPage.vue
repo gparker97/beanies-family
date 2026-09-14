@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
+import { ref, computed, nextTick, watch } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
@@ -29,6 +29,7 @@ import { showToast } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
+import { isReadingSharedDocument } from '@/composables/useSharedDocumentIngest';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
@@ -104,6 +105,26 @@ const { deliverTravel } = useDocumentToTravel({
 function targetTrip(tripId?: string): void {
   pendingTripTarget.value = tripId ?? null;
 }
+
+/**
+ * Drop a target that never reached a travel review.
+ *
+ * Set at the tap, `pendingTripTarget` used to be cleared on exactly two paths: a successful
+ * travel delivery, and a declined consent inside the page's own capture. The capture moved to
+ * `MagicBeansDoor` and the decline clear went with it, so a capture from trip X that ended in
+ * `none`, a refusal, or a dispatch to Activities left X behind — and the NEXT travel capture,
+ * from ANY door including the global FAB or a share, silently attached to the wrong trip.
+ *
+ * Two clears now, covering the two ways a capture ends without a travel review:
+ *   · `@closed` on the door — the sheet was dismissed, or consent was declined
+ *   · this watcher — an ingest ran and resolved to something that is not a trip
+ *
+ * `onTravelReady` sets `reviewReady` synchronously inside `runIngest`, before the state
+ * returns to idle, so a genuine travel delivery is never cleared by this.
+ */
+watch(isReadingSharedDocument, (reading, wasReading) => {
+  if (wasReading && !reading && reviewReady.value === null) pendingTripTarget.value = null;
+});
 
 // Document-reader cross-surface dispatch: the FAB card / new-trip-wizard banner
 // set `pendingMagic` and route here; pick it up (watch + onMounted) and run it.
@@ -817,7 +838,7 @@ async function addQuickIdea() {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <PageWelcomeSubtitle :text="t('travel.subtitle')" />
         <div class="flex flex-wrap items-center gap-2">
-          <MagicBeansDoor>
+          <MagicBeansDoor @closed="targetTrip()">
             <template #trigger="{ open }">
               <MagicReaderPill
                 :label="t('ai.magic.perform')"
@@ -964,7 +985,7 @@ async function addQuickIdea() {
             <!-- ✨ Beanies AI — read a booking into THIS trip. Same responsive pill as
                  everywhere else; defaults the review modal to the open trip (user can
                  still switch to New / another trip). -->
-            <MagicBeansDoor>
+            <MagicBeansDoor @closed="targetTrip()">
               <template #trigger="{ open }">
                 <MagicReaderPill
                   :label="t('ai.magic.perform')"

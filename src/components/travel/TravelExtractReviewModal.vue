@@ -18,6 +18,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
 import { matchTravellerIds, learnableAliases } from '@/utils/segmentTravellers';
+import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
 import type { TravelReady } from '@/composables/useDocumentToTravel';
 import type {
   VacationAccommodation,
@@ -235,6 +236,14 @@ function onSave(): void {
     @save="onSave"
   >
     <div class="space-y-4">
+      <!-- "not right?" — renders itself only when a correction is actually available. -->
+      <MagicMiscategorisedBanner
+        v-if="ready"
+        :env="ready.env"
+        from="travel"
+        @close="emit('close')"
+      />
+
       <p class="font-inter text-xs text-gray-400">
         {{ t('travelExtract.reviewSubtitle') }}
       </p>

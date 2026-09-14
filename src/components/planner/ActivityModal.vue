@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
+import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -55,6 +56,7 @@ import type {
 } from '@/types/models';
 import type { RecurrenceRule } from '@/types/recurrence';
 import type { FieldConfidence } from '@/services/ai/types';
+import type { ResultEnvelope } from '@/types/magicPayload';
 import {
   ACTIVITY_LEAD_OPTIONS,
   ACTIVITY_LEAD_CHIP_KEYS,
@@ -74,6 +76,14 @@ const props = defineProps<{
   prefill?: Partial<CreateFamilyActivityInput>;
   /** Per-field confidence accompanying `prefill`; low-confidence fields are flagged for review. */
   prefillConfidence?: FieldConfidence;
+  /**
+   * The envelope the extraction arrived in, when this form was opened from magic beans.
+   *
+   * Present ONLY on that path — every other open path clears it — so its presence is what
+   * decides whether "not right?" is offered. `MagicMiscategorisedBanner` then decides for
+   * itself whether a correction is actually available.
+   */
+  prefillEnv?: ResultEnvelope;
   /**
    * The source document image (#133) to attach to the activity once the eager-create gate is
    * satisfiable. Attached via the existing PhotoAttachments / photo-upload path; the user can
@@ -186,6 +196,21 @@ function setSourcePhotoPreview(file: File | null): void {
 }
 
 /** Apply an optional extraction prefill over the just-set onNew defaults (additive). */
+/**
+ * Guards BOTH time watchers below while a block of fields is being seeded at once — the
+ * convenience "end = start + 1h" sync AND the `end < start` clamp. 'pre' watchers are QUEUED,
+ * so without it the queue flushes after the block and clobbers values that were deliberately
+ * set. Both the edit path and the AI-prefill path need it, for the same reason.
+ *
+ * ⚠️ The CLAMP matters as much as the sync, and guarding only the sync looked like a fix.
+ * `onNew` seeds 09:00/10:00, which queues the clamp; the prefill then sets a later start, the
+ * suppressed sync stands down, and the unsuppressed clamp fires with the STALE 10:00 and
+ * forces the end back to the start — a zero-length activity. It also destroys a legitimate
+ * overnight extraction (19:00 → 00:30 became 19:00 → 19:00), which the document plainly said
+ * and nothing told the user had been changed.
+ */
+let suppressTimeWatchers = false;
+
 function applyPrefill(): void {
   wasPrefilled.value = false;
   const p = props.prefill;
@@ -218,8 +243,39 @@ function applyPrefill(): void {
     showMoreDetails.value = true;
   }
   if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;
+
+  // ⚠️ SUPPRESS THE END-TIME SYNC ACROSS BOTH ASSIGNMENTS.
+  //
+  // 'pre' watchers are queued, not synchronous. Without this, assigning `startTime` queues the
+  // convenience watcher below; `endTime` is then set from the extraction; and the queue flushes
+  // AFTERWARDS and overwrites it with start + 1h. The result was that an extracted end time was
+  // discarded every single time — a document that clearly said "2pm to 4:30pm" produced a 3pm
+  // end, silently, and the user had to notice.
+  //
+  // The edit path already guarded this (see the `props.open` watcher); the prefill path did not.
+  suppressTimeWatchers = true;
   if (p.startTime) startTime.value = p.startTime;
+  // An extraction that found a start but no end gets the same convenience default a manual
+  // entry does — applied HERE rather than left to the suppressed watcher, which by definition
+  // is not going to run. Left out, the field keeps `onNew`'s 10:00 against a 14:00 start.
   if (p.endTime) endTime.value = p.endTime;
+  else if (p.startTime) endTime.value = addHourToTime(p.startTime);
+  // ⚠️ The clamp is SUPPRESSED above but applied here, deliberately, on the extraction's own
+  // pair rather than on whatever stale value the queue happened to hold.
+  //
+  // Suppressing it outright looked like the better fix — a flyer reading "7pm to 12:30am" then
+  // keeps its real end. But nothing else in the app handles an end before a start: the sibling
+  // edit modal re-clamps it on the first touch, `useScheduledReminders` resolves 00:30 on the
+  // START day and silently drops every reminder for the activity, and the week/day grid draws
+  // a negative-height sliver. Preserving it would have shipped data three other subsystems
+  // mishandle. Overnight support is a real gap and a follow-up; until then this stays
+  // CONSISTENT with every other way an activity is created.
+  if (endTime.value && startTime.value && endTime.value < startTime.value) {
+    endTime.value = startTime.value;
+  }
+  void nextTick(() => {
+    suppressTimeWatchers = false;
+  });
   // Inferred category (when matched) — the category watch derives the icon + colour.
   if (p.category) category.value = p.category;
 }
@@ -405,9 +461,6 @@ watch(category, (newCategory) => {
 // (`seriesAnchor`), not the occurrence-seeded `date`, so populating an edit
 // cannot re-anchor anything.
 
-// Sync endTime when startTime changes (skip during edit population)
-let suppressEndTimeSync = false;
-
 /**
  * Baseline snapshot of the form payload, taken once per open in edit mode.
  *
@@ -439,9 +492,9 @@ watch(
       // queue those callbacks, and this watcher — registered later on the same
       // `props.open` source — sets the flag before the queue flushes.
       // (#70: the daysOfWeek flag is gone with the watcher it guarded.)
-      suppressEndTimeSync = true;
+      suppressTimeWatchers = true;
       nextTick(() => {
-        suppressEndTimeSync = false;
+        suppressTimeWatchers = false;
         // Only NOW may the series-anchor watcher act on `date` changes: both
         // refs are seeded, so any further change is a real user edit rather
         // than the previous open's value flushing through.
@@ -464,12 +517,13 @@ watch(
   }
 );
 watch(startTime, (newStart) => {
-  if (suppressEndTimeSync || !newStart) return;
+  if (suppressTimeWatchers || !newStart) return;
   endTime.value = addHourToTime(newStart);
 });
-// Clamp endTime to not be before startTime
+// Clamp endTime to not be before startTime — a USER edit only. See the flag's header for why
+// it must stand down while a block of fields is seeded.
 watch(endTime, (newEnd) => {
-  if (!newEnd || !startTime.value) return;
+  if (suppressTimeWatchers || !newEnd || !startTime.value) return;
   if (newEnd < startTime.value) {
     endTime.value = startTime.value;
   }
@@ -853,6 +907,15 @@ function handleSave() {
     @save="readOnly ? emit('close') : handleSave()"
     @delete="emit('delete')"
   >
+    <!-- "not right?" — OUTSIDE the read-only wrapper below, which disables pointer events on
+         everything inside it. A correction is not an edit of this activity. -->
+    <MagicMiscategorisedBanner
+      v-if="prefillEnv"
+      :env="prefillEnv"
+      from="event"
+      @close="emit('close')"
+    />
+
     <div class="space-y-5" :class="readOnly ? 'pointer-events-none opacity-60' : ''">
       <!-- Occurrence date banner for recurring activity edits -->
       <div

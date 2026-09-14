@@ -19,6 +19,7 @@ import {
   type CompressOptions,
 } from '@/services/photos/photoCompression';
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
+import type { ShareKindHint } from './types';
 import { assertNever } from '@/utils/assertNever';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { MAX_EXTRACT_PAGES, isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
@@ -31,13 +32,11 @@ import {
   type DocumentExtractionResult,
   type ExtractionProvider,
   type ExtractionRequest,
-  type ExtractionResult,
   type ExtractionResultByTask,
   type ExtractionSource,
   type ExtractionTask,
   type RecipeExtractionResult,
   type ShareExtractionResult,
-  type TravelExtractionResult,
 } from './types';
 
 /**
@@ -85,6 +84,12 @@ export interface ExtractOptions {
    * would put app state into the one AI module that has none.
    */
   familyId: string;
+  /**
+   * Set only on a correction re-read. `to` is what makes the re-read targeted; `token` is the
+   * managed-tier grant that makes it free, and is absent on BYOK and on-device, whose reads
+   * cost us nothing and so need no exemption.
+   */
+  correction?: { token?: string; to: ShareKindHint };
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {
@@ -258,10 +263,15 @@ async function runWithSource<T extends ExtractionTask>(
     todayIso: opts.todayIso,
     signal: opts.signal,
     familyId: opts.familyId,
+    ...(opts.correction ? { correction: opts.correction } : {}),
   };
   try {
     const data = await provider.run(task, request);
-    return { success: true, data, compressedBlob, truncated };
+    // `preparedSource` is the WIRE payload — the compressed data URLs or the text actually
+    // sent. A correction must re-send exactly these bytes: the server fingerprints what it
+    // received, so re-preparing the original file would produce different canvas-JPEG output
+    // and the grant would be refused on a document the user never changed.
+    return { success: true, data, compressedBlob, truncated, preparedSource: source };
   } catch (err) {
     if (err instanceof ExtractionProviderError) {
       return { success: false, errorCode: err.code, error: err.message };
@@ -275,29 +285,17 @@ async function runWithSource<T extends ExtractionTask>(
 }
 
 /**
- * Extract event details from a document and return a typed result (#133).
+ * Re-run the `share` task over a source that has ALREADY been prepared and paid for.
  *
- * Accepts SEVERAL documents (#64), which are read as the pages of one item — sharing three
- * photos of one invite produces one event, not three. Passing a single `File` is unchanged.
- * Always resolves (never rejects) with a classified outcome.
+ * Skips `prepareImageDataUrls` deliberately: the proxy fingerprints the exact bytes it
+ * received, and a second compression pass would not reproduce them. The ONLY caller is the
+ * spine's correction arm — every other entry point takes a `File` or a string and prepares it.
  */
-export function extractEventFromDocument(
-  file: File | File[],
+export function extractShareFromPreparedSource(
+  source: ExtractionSource,
   opts: ExtractOptions
-): Promise<DocumentExtractionResult<ExtractionResult>> {
-  return runExtraction(file, opts, 'event');
-}
-
-/**
- * Extract a recipe from a document (photo, screenshot or PDF) and return a typed result
- * (#72). Accepts several documents, read as the pages of one recipe (#64).
- * Always resolves (never rejects) with a classified outcome.
- */
-export function extractRecipeFromDocument(
-  file: File | File[],
-  opts: ExtractOptions
-): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
-  return runExtraction(file, opts, 'recipe');
+): Promise<DocumentExtractionResult<ShareExtractionResult>> {
+  return runWithSource(source, opts, 'share', undefined, false);
 }
 
 /**
@@ -356,16 +354,4 @@ export function extractShareFromText(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<ShareExtractionResult>> {
   return runExtraction(text, opts, 'share');
-}
-
-/**
- * Extract travel booking(s) from a document and return a typed result (#30). Accepts several
- * documents, read as the pages of one itinerary (#64).
- * Always resolves (never rejects) with a classified outcome.
- */
-export function extractTravelFromDocument(
-  file: File | File[],
-  opts: ExtractOptions
-): Promise<DocumentExtractionResult<TravelExtractionResult>> {
-  return runExtraction(file, opts, 'travel');
 }

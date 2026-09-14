@@ -3,6 +3,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { __setRateLimitClientForTests } from '../rateLimit.mjs';
+import { USAGE_ATTRS, __setDdbClientForTests } from '../ddb.mjs';
 
 const API_KEY = 'test-key';
 const originalLog = console.log;
@@ -513,6 +514,189 @@ describe('ai-extract Lambda handler', () => {
         assert.ok(ipKeys[0].includes(sha('203.0.113.7')), 'must key on sourceIp');
         assert.ok(!ipKeys[0].includes(sha('9.9.9.9')), 'must NOT key on x-forwarded-for');
       });
+    });
+  });
+
+  // ── The meter, where it meets the handler ────────────────────────────────────────────────
+  //
+  // `meter.test.mjs` covers the two verbs in isolation. What can only be checked HERE is that
+  // they are wired to the right points in the handler's control flow: a bean is spent exactly
+  // when beanies answered you, and never on a request that returned nothing.
+  describe('counting, at the 200 and nowhere else', () => {
+    const SHARE = JSON.stringify({ kind: 'event', event: VALID_EXTRACTION });
+
+    /** Records every UpdateItem the meter sends, so the counted attribute can be asserted. */
+    function recordingDdb() {
+      const sent = [];
+      return {
+        sent,
+        ddb: {
+          send: async (cmd) => {
+            sent.push(cmd.input);
+            return {};
+          },
+          commands: {
+            UpdateItemCommand: class {
+              constructor(input) {
+                this.input = input;
+              }
+            },
+          },
+        },
+      };
+    }
+
+    let recorder;
+
+    beforeEach(() => {
+      process.env.USAGE_TABLE = 'beanies-ai-usage-test';
+      recorder = recordingDdb();
+      __setDdbClientForTests(recorder.ddb);
+    });
+
+    afterEach(() => {
+      delete process.env.USAGE_TABLE;
+      delete process.env.CORRECTION_GRANTS;
+      __setDdbClientForTests(null);
+    });
+
+    /** Which usage attributes were incremented, in order. */
+    const counted = () =>
+      recorder.sent
+        .filter((i) => i.TableName === 'beanies-ai-usage-test')
+        .map((i) => i.ExpressionAttributeNames?.['#n']);
+
+    it('counts exactly one read on a 200', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: SHARE });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { ...goodBody, task: 'share', familyId: 'fam-handler-01' },
+        })
+      );
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+    });
+
+    it('counts NOTHING on a refusal before the model', async () => {
+      // No api key — 401, returned long before anything reaches the model.
+      const res = await handler(makeEvent({ body: { ...goodBody, familyId: 'fam-handler-01' } }));
+      assert.equal(res.statusCode, 401);
+      assert.deepEqual(counted(), [], 'a read that never happened is not a bean');
+    });
+
+    it('counts NOTHING when the model returns wrong-shape output', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify({ nope: true }) });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { ...goodBody, task: 'share', familyId: 'fam-handler-01' },
+        })
+      );
+      assert.equal(res.statusCode, 502);
+      assert.deepEqual(counted(), [], 'we pay for this one, the family does not');
+    });
+
+    it('counts NOTHING when a CORRECTION comes back as the wrong kind', async () => {
+      // ⚠️ The regression this pins: the kind check once sat AFTER `closeRead`, so a correction
+      // the model answered wrongly was recorded as a free correction on a 502 that returned the
+      // user nothing. Every other 502 here counts in neither column; this must match.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      globalThis.fetch = async () => fakeUpstream({ content: SHARE }); // kind: 'event'
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'share',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'recipe' },
+          },
+        })
+      );
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 502);
+      assert.deepEqual(counted(), []);
+    });
+
+    it('REFUSES a correction whose grant was not spent, rather than charging for it', async () => {
+      // Without the refusal it falls through as an ordinary read: the hint is dropped, so at
+      // temperature 0 on the same bytes the model returns the same wrong kind, `n` is charged,
+      // and the client has already discarded the token — the user tapped a button labelled
+      // free, paid for it, got the same answer, and lost the affordance.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      recorder.ddb.send = async () => {
+        const err = new Error('condition failed');
+        err.name = 'ConditionalCheckFailedException';
+        throw err;
+      };
+      let upstreamCalls = 0;
+      globalThis.fetch = async () => {
+        upstreamCalls += 1;
+        return fakeUpstream({ content: SHARE });
+      };
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'share',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'recipe' },
+          },
+        })
+      );
+
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 409);
+      assert.equal(JSON.parse(res.body).code, 'correction_refused');
+      assert.equal(upstreamCalls, 0, 'a refused correction must not reach the model at all');
+    });
+
+    it('does NOT read at all when a correction arrives on a non-share task', async () => {
+      // A grant is bound to the family, the document and the kind — but not to a TASK. Without
+      // this fence a grant earned on `share` is spendable on `recipe`: the builder ignores the
+      // hint, the model is CALLED AND BILLED, the result carries no `kind`, and the wrong-kind
+      // guard 502s a request that could never have succeeded. Deterministic, and on a path no
+      // UI produces.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      let upstreamCalls = 0;
+      globalThis.fetch = async () => {
+        upstreamCalls += 1;
+        return fakeUpstream({ content: SHARE });
+      };
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'recipe',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'travel' },
+          },
+        })
+      );
+
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 400);
+      assert.equal(upstreamCalls, 0, 'nothing may reach the model, and nothing may be billed');
+      assert.equal(recorder.sent.length, 0, 'and the grant must not be touched');
+    });
+
+    it('issues no grant when the feature is switched off', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: SHARE });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { ...goodBody, task: 'share', familyId: 'fam-handler-01' },
+        })
+      );
+      assert.equal(JSON.parse(res.body).correction, undefined);
     });
   });
 

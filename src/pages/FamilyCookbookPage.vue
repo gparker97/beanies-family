@@ -8,7 +8,7 @@
  * `PolaroidImage` placeholder illustration when no photo is set,
  * matching the mockup's kraft-paper style.
  */
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
@@ -37,6 +37,8 @@ import type { Recipe } from '@/types/models';
 import { consumeKeptRecipe } from '@/utils/recipeKeepStash';
 import { sharedRecipeToPrefill } from '@/utils/recipeShareLink';
 import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
+import type { ResultEnvelope } from '@/types/magicPayload';
+import { IN_APP_ENV, refuseIfBusy } from '@/composables/useSharedDocumentIngest';
 
 const router = useRouter();
 const { t } = useTranslation();
@@ -56,6 +58,7 @@ const { canReadRecipe } = useMagicReader();
 // The consent modal is mounted ONCE in App.vue (#64); this page only asks. The grant is
 // held between the gate and the picker's file event — consent runs before the picker opens.
 const prefill = ref<RecipePrefill | null>(null);
+const prefillEnv = ref<ResultEnvelope | undefined>(undefined);
 const { isPending } = useRecipePhotoPending();
 
 /**
@@ -65,14 +68,26 @@ const { isPending } = useRecipePhotoPending();
  * and `useFormModal` runs `onNew` on the open TRANSITION only, so a caller that sets the
  * prefill in the wrong order gets a blank form and no error. Both paths go through here.
  */
-function openWithPrefill(p: RecipePrefill): void {
+function openWithPrefill(p: RecipePrefill, env?: ResultEnvelope): void {
+  // ⚠️ `useFormModal` runs `onNew` on the OPEN TRANSITION only, so setting `modalOpen = true`
+  // while it is already true delivers nothing: the prefill is silently dropped and the held
+  // source attaches to whatever the user had typed. Close first and reopen on the next tick so
+  // there is always a transition to seed from.
+  if (modalOpen.value) {
+    modalOpen.value = false;
+    void nextTick(() => openWithPrefill(p, env));
+    return;
+  }
   prefill.value = p;
+  // Carried down so the form can offer the free "not right?" correction. `undefined` on the
+  // refetch path, which is not a magic-beans door and has no kind to have got wrong.
+  prefillEnv.value = env;
   editing.value = null;
   modalOpen.value = true;
 }
 
 const capture = useRecipeCapture({
-  onRecipeReady: (ready) => openWithPrefill(ready.prefill),
+  onRecipeReady: (ready) => openWithPrefill(ready.prefill, ready.env),
 });
 
 /**
@@ -206,19 +221,22 @@ function thumbFor(recipe: Recipe): string | null {
 }
 
 function openAdd(): void {
-  // The overlay blocks the button, but the `add-recipe` quick-add intent can fire
-  // programmatically. Opening the blank form here would strand the in-flight extraction:
-  // useFormModal runs onNew on the open TRANSITION only, so the prefill would never apply
-  // and the held source would attach to whatever the user typed instead.
-  if (capture.isProcessing.value) return;
-  // `isProcessing` is only true once a file is actually being read — it is FALSE for the
-  // whole window between tapping 🍳 and choosing a file. Opening the blank form in that
-  // window and then letting the extraction finish would leave the prefill undelivered
-  // (useFormModal's watch does not fire on true→true) AND attach the extracted document to
-  // whatever the user typed instead. Dropping the held source is what makes that safe.
+  // The `add-recipe` quick-add intent can fire programmatically, and opening the blank form
+  // here would strand an in-flight extraction: `useFormModal` runs `onNew` on the open
+  // TRANSITION only, so a prefill arriving afterwards would never apply and the held source
+  // would attach to whatever the user typed instead.
+  //
+  // ⚠️ Asked of the SPINE, not of `capture.isProcessing`. That flag is set only by
+  // `processUrl`, which this page no longer calls — every capture here now runs through
+  // `MagicBeansDoor`, so a guard written against it is dead code that reads as live.
+  // `refuseIfBusy` also says so out loud, where the old guard returned in silence.
+  if (refuseIfBusy(IN_APP_ENV)) return;
+  // Still dropped: the window between tapping ✨ and choosing a file is not "reading" yet,
+  // and a source held from an abandoned capture must never attach to a hand-typed recipe.
   capture.discardPendingSource();
   editing.value = null;
   prefill.value = null;
+  prefillEnv.value = undefined;
   modalOpen.value = true;
 }
 
@@ -248,12 +266,17 @@ function closeModal(): void {
   editing.value = null;
   // Abandoning the form drops the held source, so it can never attach to a later recipe.
   prefill.value = null;
+  // And the envelope with it. Left behind, the next BLANK Add-Recipe form would offer to
+  // correct the PREVIOUS capture — spending its one-use grant on a document the user is no
+  // longer looking at, and routing away from the form they are filling in.
+  prefillEnv.value = undefined;
   capture.discardPendingSource();
 }
 
 /** Save completed — hand the id back so the source document can be attached. */
 async function handleSaved(id: string): Promise<void> {
   prefill.value = null;
+  prefillEnv.value = undefined;
   await capture.attachAfterSave(id);
 }
 </script>
@@ -480,6 +503,7 @@ async function handleSaved(id: string): Promise<void> {
       :open="modalOpen"
       :recipe="editing"
       :prefill="prefill"
+      :prefill-env="prefillEnv"
       @close="closeModal"
       @saved="handleSaved"
     />

@@ -105,6 +105,11 @@ describe('uiStrings', () => {
       'sync.',
       'docWorker.',
       'error.',
+      // The AI failure surface. `error.` does not cover it — the keys are `ai.error.*` — so
+      // every beanie value there sat outside the floor until this was added.
+      'ai.error.',
+      'ai.correct.refused.',
+      'ai.picker.expired.',
       'app.initError.',
       'auth.',
       'reauth.',

@@ -40,6 +40,15 @@ export interface TravelReady {
   suggestedTripName: string;
   /** The ORIGINAL uploaded file (image or PDF), attached to the created segment(s). */
   sourceFile: File | null;
+  /**
+   * The envelope this result arrived in, carried whole so the review modal can offer the free
+   * correction (`MagicMiscategorisedBanner` needs the prepared source and the grant).
+   *
+   * Deliberately NOT flattened into more fields beside `sourceFile`: that is how this shape
+   * came to carry a copy of one envelope field and nothing else, and a second copied field is
+   * a second thing to keep in step by hand.
+   */
+  env: ResultEnvelope;
 }
 
 export interface UseDocumentToTravelOptions {
@@ -133,6 +142,7 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
       target: resolveTripTarget(matches),
       suggestedTripName: data.tripName,
       sourceFile: env.sourceFile, // attach the ORIGINAL (PDF stays a PDF)
+      env,
     });
   }
 

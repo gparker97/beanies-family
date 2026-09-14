@@ -16,7 +16,7 @@
  * in-flight guard and the form modal's cannot interfere.
  */
 import { ref } from 'vue';
-import { useRecipeCapture } from './useRecipeCapture';
+import { CAPTURE_ENV, useRecipeCapture } from './useRecipeCapture';
 import { useDocumentConsent } from './useDocumentConsent';
 import { useTranslation } from './useTranslation';
 import { useOnline } from './useOnline';
@@ -24,6 +24,8 @@ import { showToast } from './useToast';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { peekAttempt, consumeAttempt, type BudgetPolicy } from '@/utils/attemptBudget';
+import { refuseIfBusy } from './useSharedDocumentIngest';
+import { resolveBillableFamilyId } from './useMagicBeanScope';
 import { diffRecipe, type RecipeDiff } from '@/utils/recipeDiff';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
@@ -146,6 +148,19 @@ export function useRecipeRefetch() {
       return;
     }
 
+    // Mutual exclusion with the magic-beans spine, in the direction that matters: a refetch
+    // will not start on top of a capture. `isProcessing` inside `useRecipeCapture` still
+    // guards refetch against itself.
+    //
+    // ⚠️ HERE, not inside `processUrl`. Both of these refuse, and a refusal on the far side of
+    // the consume below burns the recipe's single 10-minute slot on a read that never happened
+    // — the rule this whole function is written around, and the shape of both bugs it has had.
+    if (refuseIfBusy(CAPTURE_ENV)) return;
+
+    // The family a managed read is billed to. Refetch bypasses the spine entirely, so its own
+    // family fence is explicit — and, like the busy check, above the consume.
+    if (!resolveBillableFamilyId(CAPTURE_ENV)) return;
+
     const key = refetchBudgetKey(recipe.id);
     const peeked = peekAttempt(key, REFETCH_BUDGET);
     if (!peeked.ok) {
@@ -158,6 +173,13 @@ export function useRecipeRefetch() {
     // inheriting a capture WITHOUT its gate has happened before (RecipeFormModal.vue:286).
     const grant = await requestConsent();
     if (!grant) return;
+
+    // Busy AGAIN, after the prompt. `requestConsent` waits on the user — up to 60s behind a
+    // queued prompt — and a capture can start in that window. The check above the consume is
+    // what stops a refusal burning the slot; this one is what actually delivers the mutual
+    // exclusion, and it still sits before the consume so a refusal here costs nothing either.
+    // `processUrl` deliberately has no check of its own, so both of these have to be here.
+    if (refuseIfBusy(CAPTURE_ENV)) return;
 
     const allowed = consumeAttempt(key, REFETCH_BUDGET);
     if (!allowed.ok) {

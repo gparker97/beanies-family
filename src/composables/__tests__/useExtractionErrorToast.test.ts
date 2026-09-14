@@ -9,6 +9,7 @@
  * has been paging that channel whenever two families extracted at once.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
 import type { ExtractionErrorCode } from '@/services/ai/types';
 
 const showToast = vi.fn();
@@ -17,7 +18,12 @@ vi.mock('../useTranslation', () => ({ useTranslation: () => ({ t: (k: string) =>
 
 import { useExtractionErrorToast } from '../useExtractionErrorToast';
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  // The generic arm names the TIER now, which it reads from app state — a family on their own
+  // key and a family on beanies AI fail for different reasons, and only one is ours to fix.
+  setActivePinia(createPinia());
+  vi.clearAllMocks();
+});
 
 /** The 4th argument is the toast options; an error surface is what fires the reporter. */
 const optionsOf = () => showToast.mock.calls[0]?.[3];
@@ -63,5 +69,33 @@ describe('useExtractionErrorToast', () => {
         expect(optionsOf()).toBeUndefined();
       }
     );
+  });
+
+  describe('the generic failure names the tier and the cause (#greg)', () => {
+    it('names which AI setup failed, so the family knows whose problem it is', () => {
+      // A family whose provider had been switched to BYOK with a bad key saw only "something
+      // went wrong". Diagnosing it took a CloudWatch query and API Gateway metrics. The toast
+      // knew the tier the whole time.
+      useExtractionErrorToast().reportExtractionFailure('provider_error');
+      const body = String(showToast.mock.calls[0]?.[2]);
+      expect(body).toContain('ai.error.genericWithTier');
+    });
+
+    it("appends the provider's own message when there is one", () => {
+      useExtractionErrorToast().reportExtractionFailure('provider_error', 'invalid api key');
+      expect(String(showToast.mock.calls[0]?.[2])).toContain('invalid api key');
+    });
+
+    it('still reads cleanly with no detail, rather than trailing an empty string', () => {
+      useExtractionErrorToast().reportExtractionFailure('provider_error');
+      expect(String(showToast.mock.calls[0]?.[2]).trimEnd()).toBe(
+        String(showToast.mock.calls[0]?.[2])
+      );
+    });
+
+    it('keeps the error surface, so a real provider failure still pages', () => {
+      useExtractionErrorToast().reportExtractionFailure('provider_error', 'boom');
+      expect(optionsOf()).toBeDefined();
+    });
   });
 });
