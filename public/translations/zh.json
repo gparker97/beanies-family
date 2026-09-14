@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-13",
+    "lastUpdated": "2026-09-14",
     "translationCount": 4757
   },
   "translations": {
@@ -16666,11 +16666,6 @@
       "hash": "fdyp24",
       "lastUpdated": "2026-06-15"
     },
-    "segmentRow.arrivesNextDay": {
-      "translation": "到达（+1天）",
-      "hash": "r13t7j",
-      "lastUpdated": "2026-06-15"
-    },
     "segmentRow.cruiseLine": {
       "translation": "邮轮公司",
       "hash": "uthm81",
@@ -23790,6 +23785,11 @@
       "translation": "+2",
       "hash": "12f",
       "lastUpdated": "2026-09-13"
+    },
+    "segmentRow.arrivesPlusDays": {
+      "translation": "入住日期（ + {n} ）",
+      "hash": "kr4lsq",
+      "lastUpdated": "2026-09-14"
     }
   }
 }
