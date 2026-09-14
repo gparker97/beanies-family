@@ -62,8 +62,9 @@ beforeEach(() => {
 describe('useDocumentToActivity — delivery', () => {
   it('turns an extraction into a prefill, carrying confidence through', () => {
     const { deliverEvent, onActivityReady } = setup();
+    const envelope = env();
 
-    deliverEvent(SAMPLE, env());
+    deliverEvent(SAMPLE, envelope);
 
     expect(onActivityReady).toHaveBeenCalledWith({
       // 'Birthday' title → inferred category rides along in the prefill.
@@ -76,6 +77,10 @@ describe('useDocumentToActivity — delivery', () => {
       },
       confidence: SAMPLE.confidence,
       sourcePhoto: undefined,
+      // The WHOLE envelope, carried through rather than flattened — it is what lets the review
+      // modal offer the free correction, and `sourcePhoto` above is already a derived copy of
+      // one of its fields.
+      env: envelope,
     });
     expect(showToast).not.toHaveBeenCalled();
   });

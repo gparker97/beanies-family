@@ -26,7 +26,6 @@ import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import ReauthGateModal from '@/components/auth/ReauthGateModal.vue';
 import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
-import { isReadingSharedDocument } from '@/composables/useSharedDocumentIngest';
 import { useShareTargets } from '@/composables/useShareTargets';
 import DoseLogConfirmModal from '@/components/pod/DoseLogConfirmModal.vue';
 import QuickAddFab from '@/components/common/QuickAddFab.vue';
@@ -1966,7 +1965,10 @@ watch(
     <ConfirmModal />
     <ReauthGateModal />
     <DocumentExtractConsentModal />
-    <AiProcessingOverlay :open="isReadingSharedDocument" />
+    <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly
+         one mount after unification. A binding here would fall through as a stray attribute and
+         read as if this file still controlled its visibility. -->
+    <AiProcessingOverlay />
     <DoseLogConfirmModal />
     <RecurringEditScopeModal />
 

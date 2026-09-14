@@ -34,8 +34,6 @@ defineProps<{
   label: string;
   activeView: PlannerView;
   canAdd: boolean;
-  /** Gates the 📸 add-from-photo button. Falls back to `canAdd` when omitted. */
-  canAddFromPhoto?: boolean;
   isAllActive: boolean;
   isMemberActive: (id: string) => boolean;
   activeMemberNames: string[];
@@ -47,7 +45,6 @@ const emit = defineEmits<{
   today: [];
   'update:activeView': [view: string];
   add: [];
-  'add-from-photo': [];
   'open-agenda': [];
   'select-all': [];
   'select-member': [id: string];

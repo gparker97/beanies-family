@@ -9,6 +9,10 @@
 
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
+import { useAiCapability } from './useAiCapability';
+import { storeToRefs } from 'pinia';
+import { useTranslationStore } from '@/stores/translationStore';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { ExtractionErrorCode } from '@/services/ai/types';
 
 const ERROR_SURFACE = 'ai-extract';
@@ -23,8 +27,60 @@ const ERROR_SURFACE = 'ai-extract';
 export function useExtractionErrorToast() {
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { tier } = useAiCapability();
+  const { isEnglish } = storeToRefs(useTranslationStore());
 
-  function reportExtractionFailure(code: ExtractionErrorCode | undefined): void {
+  /**
+   * The generic "something went wrong" message, with the two facts that make it diagnosable.
+   *
+   * WHY THIS EXISTS. A family reported that nothing would read at all, and the toast said only
+   * "Something went wrong reading that. Please try again." It took a CloudWatch query and a
+   * trip through API Gateway metrics to establish the cause: their AI provider had been
+   * switched to BYOK and their key was not working. The toast knew the tier and knew the
+   * provider's own message, and told them neither.
+   *
+   * Two additions, both deliberate:
+   *  · the TIER, because "managed" and "your own key" fail for completely different reasons and
+   *    only one of them is ours to fix. A BYOK family needs to check their key; a managed
+   *    family needs to tell us.
+   *  · the provider's DETAIL when there is one, because "invalid api key" ends the
+   *    investigation on the spot.
+   *
+   * ⚠️ The detail comes from our own provider layer's error message, never from raw response
+   * text: an upstream body could carry anything, and putting that in front of a user is how a
+   * provider's internals end up in a screenshot.
+   */
+  function genericFailure(detail?: string): void {
+    const tierLabel = tier.value === 'managed' ? t('ai.tier.managed') : t('ai.tier.byok');
+    const base = fillTemplate(t('ai.error.genericWithTier'), { tier: tierLabel });
+    // ⚠️ The TOAST is English-only. The detail is our provider layer's own message — "invalid
+    // api key", "managed proxy rate-limited this request" — a hardcoded English literal no
+    // translation pass can reach, and appending it to a Chinese toast reads worse than the
+    // generic line it was meant to improve.
+    //
+    // But it must not vanish either: for a non-English family this string is the whole answer
+    // to "why can't beanies read anything", and they are the users least able to self-diagnose.
+    // The provider layer does NOT log it (`openaiCompatible` has no console call at all), so
+    // the console line is here, unconditionally, and it is the one channel that always carries
+    // it. Deliberately not telemetry: the firehose context is an allowlist and a provider
+    // message is free-form text that could carry anything.
+    if (detail) {
+      console.error(
+        `[ai-extract] extraction failed on the ${tier.value} tier: ${detail}\n` +
+          'On "byok" check the key in Settings → AI & Privacy; on "managed" this is ours to fix.'
+      );
+    }
+    const useDetail = detail && isEnglish.value ? detail : undefined;
+    showToast('error', t('ai.error.title'), useDetail ? `${base} ${useDetail}` : base, {
+      surface: ERROR_SURFACE,
+    });
+  }
+
+  function reportExtractionFailure(
+    code: ExtractionErrorCode | undefined,
+    /** The provider's own message, when it carried one worth showing. */
+    detail?: string
+  ): void {
     switch (code) {
       case 'offline':
         showToast('info', t('ai.offline.title'), t('ai.offline.message'));
@@ -73,6 +129,13 @@ export function useExtractionErrorToast() {
           t('recipeExtract.unreachable.message')
         );
         return;
+      case 'correction_refused':
+        // Expected, and nothing is broken: the grant had already been spent, had aged out, or
+        // belonged to a different document. Nothing was read and nothing was charged, so this
+        // is info with deliberately NO error surface — the same treatment `rate_limited` gets
+        // for the same reason.
+        showToast('info', t('ai.correct.refused.title'), t('ai.correct.refused.message'));
+        return;
       case 'rate_limited':
         // We refused on purpose — too many extractions from this family or IP in the window
         // (#83). NOT the per-device client budget: that refuses before any provider call and
@@ -88,7 +151,7 @@ export function useExtractionErrorToast() {
         return;
       case 'provider_error':
       default:
-        showToast('error', t('ai.error.title'), t('ai.error.generic'), { surface: ERROR_SURFACE });
+        genericFailure(detail);
         return;
     }
   }

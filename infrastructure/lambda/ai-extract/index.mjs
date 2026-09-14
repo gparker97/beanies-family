@@ -19,7 +19,7 @@
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
-import { countUsage } from './countUsage.mjs';
+import { closeRead, openRead, validateCorrection } from './meter.mjs';
 import { checkLimits } from './rateLimit.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
@@ -109,7 +109,15 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
-  const { imageDataUrls, imageDataUrl, text, todayIso, task: rawTask, familyId } = parsed || {};
+  const {
+    imageDataUrls,
+    imageDataUrl,
+    text,
+    todayIso,
+    task: rawTask,
+    familyId,
+    correction,
+  } = parsed || {};
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
   const task = rawTask === undefined ? 'event' : rawTask;
@@ -200,6 +208,24 @@ export async function handler(event) {
   //
   // ⚠️ `checkLimits` never throws and fails open internally, which is why this is one `if`
   // and not a nested try/catch. Keeping this validation section flat is why it stays readable.
+  // Shape-check the correction BEFORE the grant is consumed, so a malformed one costs nothing
+  // and leaves the grant spendable. `to` reaches the model's INSTRUCTION rather than its fenced
+  // source, so a closed set is a security fence here, not a formality.
+  const correctionFault = validateCorrection(correction);
+  if (correctionFault) {
+    return response(400, { error: 'Bad correction', code: 'bad_correction' }, event);
+  }
+
+  // ⚠️ A correction is only meaningful on `share`, and refusing it elsewhere is a FENCE, not
+  // tidiness. A grant is bound to the family, the document and the kind — but not to a task,
+  // so without this a grant earned on a `share` read can be spent on a `recipe` one: the
+  // builder ignores the hint, the model is called and billed, the result carries no `kind`, and
+  // the wrong-kind guard below 502s a request that was never going to succeed. The grant is
+  // gone and the call is paid for, deterministically, on a path no UI can produce.
+  if (correction && task !== 'share') {
+    return response(400, { error: 'Bad correction', code: 'bad_correction' }, event);
+  }
+
   if (hasText) {
     const verdict = await checkLimits({
       familyId: typeof familyId === 'string' ? familyId : undefined,
@@ -223,6 +249,35 @@ export async function handler(event) {
     }
   }
 
+  // Everything the meter needs to know, decided once and here: after the refusals (so a
+  // rate-limited correction does not spend its grant) and before the model (so two concurrent
+  // replays cannot both get a free read).
+  const read = await openRead({
+    familyId: typeof familyId === 'string' ? familyId : undefined,
+    source,
+    correction,
+  });
+
+  // ⚠️ A correction the grant store REFUSED is refused here too, not silently downgraded.
+  //
+  // Downgrading runs the request as an ordinary read: the hint is dropped (it is honoured only
+  // against a spent grant), so at temperature 0 on the same bytes the model returns the same
+  // wrong kind; the kind guard below cannot fire because there is no hint; and `countUsage`
+  // charges `n`. The user tapped a button labelled free, was charged, got the same wrong
+  // answer, and — because the client discards the token when it sends it — lost the affordance.
+  //
+  // ⚠️ Gated on `reason === 'refused'`, NOT on `!read.free`. The other two outcomes must still
+  // fall through to a charged read:
+  //   · `disabled`       — the CORRECTION_GRANTS kill switch. `variables.tf` promises that
+  //                        turning it off makes corrections "simply cost a bean"; 409ing every
+  //                        in-flight token during the exact incident the switch exists for
+  //                        would make that documentation false.
+  //   · `store_unavailable` — a DynamoDB blip. `checkLimits` next door deliberately fails OPEN
+  //                        on the identical failure, because a blip must not lock a family out.
+  if (correction && read.reason === 'refused') {
+    return response(409, { error: 'Correction refused', code: 'correction_refused' }, event);
+  }
+
   try {
     let upstream;
     try {
@@ -234,7 +289,7 @@ export async function handler(event) {
         },
         body: JSON.stringify({
           model: TINFOIL_MODEL,
-          messages: taskConfig.buildMessages(source, todayDate),
+          messages: taskConfig.buildMessages(source, todayDate, read.kindHint),
           temperature: 0,
         }),
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
@@ -310,6 +365,22 @@ export async function handler(event) {
       );
     }
 
+    // A correction ASSERTED what this is, so a result of a different kind is a wrong-shape
+    // answer rather than a re-classification. Only reachable when a grant was actually spent.
+    //
+    // ⚠️ BEFORE `closeRead`, with the other shape checks. After it, a wrong-kind answer would
+    // be RECORDED as a free correction on a request that returned the user nothing — and every
+    // other 502 here already follows the opposite rule: a read that produced nothing usable is
+    // counted in neither column.
+    if (read.kindHint && result?.kind !== read.kindHint) {
+      console.error(`[ai-extract] correction returned kind=${result?.kind} want=${read.kindHint}`);
+      return response(
+        502,
+        { error: 'Model returned wrong-shape output', code: 'model_shape' },
+        event
+      );
+    }
+
     // Count the bean. AWAITED, not fire-and-forget: Lambda freezes the execution environment
     // the moment the handler returns, so a `void` call frequently never reaches DynamoDB AND
     // never logs its own failure — a silent, unalertable undercount. It never throws and never
@@ -318,11 +389,19 @@ export async function handler(event) {
     // Here and nowhere else: this is the only `response(200, …)` in the handler, so "a bean is
     // spent exactly when beanies answered you" falls out of the existing control flow with no
     // special-casing. A `kind: 'none'` share is a 200 and counts, deliberately.
-    await countUsage({ familyId: typeof familyId === 'string' ? familyId : undefined });
+    const grant = await closeRead(read, {
+      familyId: typeof familyId === 'string' ? familyId : undefined,
+      task,
+      result,
+    });
 
     // Retain nothing: no document bytes, no model content — only a structured success line.
     console.log(`[ai-extract] ok task=${task} enclave=${enclave || 'unknown'}`);
-    return response(200, { result, attestation: enclave ? { enclave } : undefined }, event);
+    return response(
+      200,
+      { result, attestation: enclave ? { enclave } : undefined, correction: grant },
+      event
+    );
   } catch (err) {
     console.error('[ai-extract] error:', err);
     return response(500, { error: 'Internal server error' }, event);

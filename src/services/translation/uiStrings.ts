@@ -9841,46 +9841,27 @@ const STRING_DEFS = {
     beanie:
       "that video's recipe is only spoken aloud, so beanies couldn't read the ingredients or steps. the name and the video link are saved — type in the rest while you watch.",
   },
+  // ⚠️ The strip opens the MAGIC-BEANS SHEET now, not the link-only modal it used to, so none
+  // of this says "link" any more. It did until every door was unified — and a user holding a
+  // photographed recipe card read that as "photos are not supported" and typed it out by hand.
+  // The whole point of the unified surface is that the user never has to have the right KIND of
+  // thing in hand.
   'recipeExtract.strip.title': {
-    en: 'Start From a Link',
-    beanie: 'start from a link',
+    en: 'Start From Something You Have',
+    beanie: 'start from something you have',
   },
   'recipeExtract.strip.subtitle': {
-    en: 'Paste a recipe page or a YouTube link and beanies fills this in for you.',
-    beanie: 'paste a recipe page or a youtube link and beanies fills this in for you.',
+    en: 'A photo, a file, a link, or text you pasted — beanies works out what it is and fills this in for you.',
+    beanie:
+      'a photo, a file, a link, or text you pasted — beanies works out what it is and fills this in for you.',
   },
   'recipeExtract.strip.action': { en: 'Fill It In', beanie: 'fill it in' },
-  'recipeExtract.strip.document': {
-    en: 'or read a photo or PDF instead',
-    beanie: 'or read a photo or pdf instead',
-  },
-  'recipeExtract.link.title': { en: 'Paste a Recipe Link', beanie: 'paste a recipe link' },
-  'recipeExtract.link.label': { en: 'Recipe Link', beanie: 'recipe link' },
-  'recipeExtract.link.placeholder': {
-    en: 'https://... or a YouTube video',
-    beanie: 'https://... or a youtube video',
-  },
-  'recipeExtract.link.invalid': {
-    en: 'That needs to be a secure (https) web address.',
-    beanie: 'that needs to be a secure (https) web address.',
-  },
-  'recipeExtract.link.action': { en: 'Read It', beanie: 'read it' },
-  'recipeExtract.link.hint': {
-    en: 'Most recipe sites work. We read the ingredients and steps exactly as written.',
-    beanie: 'most recipe sites work. we read the ingredients and steps exactly as written.',
-  },
-  'recipeExtract.link.videoHint': {
-    en: "That's a video — beanies reads its description and follows the recipe link most cooks put there.",
-    beanie:
-      "that's a video — beanies reads its description and follows the recipe link most cooks put there.",
-  },
-  'recipeExtract.reader.label': { en: 'Read a Recipe', beanie: 'read a recipe' },
   'recipeExtract.reader.aria': {
-    // The control now opens a LINK field it programmatically focuses. Describing it as
-    // "from a photo or PDF" told a screen-reader user the wrong thing about where focus was
-    // about to land (WCAG 2.5.3 / 4.1.2).
-    en: 'Read a recipe from a link, photo or PDF',
-    beanie: 'read a recipe from a link, photo or pdf',
+    // Read verbatim by screen readers, so it must describe where focus actually lands. It said
+    // "a link field it programmatically focuses" while the control was a link modal; it now
+    // opens the magic-beans sheet, whose first control is a free-text box.
+    en: 'Read a recipe from a photo, a file, a link or pasted text',
+    beanie: 'read a recipe from a photo, a file, a link or pasted text',
   },
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
@@ -9978,6 +9959,16 @@ const STRING_DEFS = {
     en: "We couldn't make sense of that one. Try a clearer photo or a sharper scan.",
     beanie: "we couldn't make sense of that one. try a clearer photo or a sharper scan.",
   },
+  // Names the TIER, because managed and bring-your-own-key fail for different reasons and only
+  // one of them is ours to fix — and a family switched to BYOK with a bad key otherwise sees a
+  // message that gives them nothing to act on. The provider's own detail is appended after this
+  // when there is one worth showing.
+  'ai.error.genericWithTier': {
+    en: 'Something went wrong reading that on your {tier} setup.',
+    beanie: 'something went wrong reading that on your {tier} setup.',
+  },
+  'ai.tier.managed': { en: 'beanies AI', beanie: 'beanies ai' },
+  'ai.tier.byok': { en: 'own API key', beanie: 'own api key' },
   'ai.error.generic': {
     en: 'Something went wrong reading that. Please try again.',
     beanie: 'something went wrong reading that. please try again.',
@@ -9992,8 +9983,8 @@ const STRING_DEFS = {
     en: 'How do you want to add it?',
     beanie: 'how do you want to add it?',
   },
-  // Shared by RecipeLinkModal and the magic-beans sheet via `AiSourceButtons` (#84). Replaces
-  // `recipeExtract.link.orFrom`, which was recipe-specific for no reason.
+  // Shared by the magic-beans sheet via `AiSourceButtons` (#84). Replaces
+  // a recipe-specific key, which was recipe-flavoured for no reason.
   'ai.picker.orFrom': { en: 'or read from', beanie: 'or read from' },
   'ai.picker.takePhoto': { en: 'Take a photo', beanie: 'take a photo' },
   'ai.picker.chooseFile': { en: 'Choose a file', beanie: 'choose a file' },
@@ -10036,6 +10027,42 @@ const STRING_DEFS = {
     en: "That looks like a link, but it isn't one beanies can open. Paste it again, or send a photo instead.",
     beanie:
       "that looks like a link, but it isn't one beanies can open. paste it again, or send a photo instead.",
+  },
+  // ── "not right?" — the free correction ────────────────────────────────────────────────
+  // Per the beanie-mode floor these keep the real nouns. A correction is about DATA being
+  // wrong, and a reader who does not know the joke must still be able to act on it.
+  'ai.correct.prompt': {
+    en: 'Did beanies get this wrong?',
+    beanie: 'did beanies get this wrong?',
+  },
+  'ai.correct.action': {
+    en: 'Tell beanies what it is',
+    beanie: 'tell beanies what it is',
+  },
+  /** Shown beside the affordance only when the re-read is actually free (managed tier, grant
+   *  in hand). Never promised when we cannot honour it. */
+  'ai.correct.free': { en: "This one's on us.", beanie: "this one's on us." },
+  'ai.correct.title': { en: 'What is this?', beanie: 'what is this?' },
+  // The free re-read was refused. Real nouns, per the beanie floor: the user needs to know
+  // their work is unaffected and what to do next.
+  'ai.correct.refused.title': { en: "Couldn't Read It Again", beanie: "couldn't read it again" },
+  'ai.correct.refused.message': {
+    en: 'That free re-read has already been used, or it was for a different document. Nothing was charged. Hand the document over again to have another go.',
+    beanie:
+      'that free re-read has already been used, or it was for a different document. nothing was charged. hand the document over again to have another go.',
+  },
+  /** `{kind}` is filled from `ai.capture.dest.*` via `fillTemplate`. */
+  'ai.correct.picked': {
+    en: 'Reading it again as a {kind}…',
+    beanie: 'reading it again as a {kind}…',
+  },
+  // The consent grant timed out while the picker was open. Real nouns — the user is being
+  // told their photo was not read and what to do about it.
+  'ai.picker.expired.title': { en: 'That Took a While', beanie: 'that took a while' },
+  'ai.picker.expired.message': {
+    en: "beanies stopped waiting for that one, so it hasn't been read and nothing left your device. Tap magic beans again to send it.",
+    beanie:
+      "beanies stopped waiting for that one, so it hasn't been read and nothing left your device. tap magic beans again to send it.",
   },
   'ai.picker.openErrorTitle': {
     en: "Couldn't Open the Picker",

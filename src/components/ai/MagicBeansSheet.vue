@@ -164,7 +164,7 @@ function handleSave(): void {
             MAGIC_DESTINATIONS[kind].emoji
           }}</span>
           <span
-            class="font-outfit text-secondary-500/55 dark:text-ink-faint mt-1.5 block text-xs font-semibold"
+            class="font-outfit text-secondary-400 dark:text-ink-faint mt-1.5 block text-xs font-semibold"
           >
             {{ t(`ai.capture.dest.${kind}`) }}
           </span>

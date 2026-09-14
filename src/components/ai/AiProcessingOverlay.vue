@@ -52,9 +52,14 @@ const resolvedKind = () =>
             :class="
               resolvedKind() === kind
                 ? 'from-primary-500 to-terracotta-400 magic-shimmer magic-shimmer-once scale-110 bg-gradient-to-br shadow-[0_12px_26px_-10px_rgba(241,93,34,0.65)]'
-                : resolvedKind()
+                : // ⚠️ Opacity ONLY on the two tiles that are on their way out. The CIG forbids an
+                  // opacity modifier on text a person reads, and the RESTING state is read —
+                  // these labels are the tiles' accessible names. So at rest the faintness
+                  // comes from the tint background and a fainter ink, not from compositing the
+                  // label down; the 30% is a 300ms exit on something already answered.
+                  resolvedKind()
                   ? 'dark:bg-surface-overlay bg-[var(--tint-slate-5)] opacity-30'
-                  : 'dark:bg-surface-overlay bg-[var(--tint-slate-5)] opacity-70'
+                  : 'dark:bg-surface-overlay bg-[var(--tint-slate-5)]'
             "
           >
             <span aria-hidden="true" class="relative z-[1] text-xl leading-none">{{
@@ -63,7 +68,7 @@ const resolvedKind = () =>
             <span
               class="font-outfit relative z-[1] mt-1 block text-xs font-semibold"
               :class="
-                resolvedKind() === kind ? 'text-white' : 'text-secondary-500/55 dark:text-ink-faint'
+                resolvedKind() === kind ? 'text-white' : 'text-secondary-400 dark:text-ink-faint'
               "
             >
               {{ t(`ai.capture.dest.${kind}`) }}

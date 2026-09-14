@@ -19,15 +19,12 @@ import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
 import { resolveBillableFamilyId } from './useMagicBeanScope';
-import { refuseIfBusy, type IngestEnv } from './useSharedDocumentIngest';
+import type { IngestEnv } from './useSharedDocumentIngest';
 import { usePhotos } from './usePhotos';
 import { useRecipePhotoPending } from './useRecipePhotoPending';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import {
-  extractRecipeFromDocument,
-  extractRecipeFromText,
-} from '@/services/ai/documentExtractionService';
+import { extractRecipeFromText } from '@/services/ai/documentExtractionService';
 import { resolveRecipeSource, type ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import { routeUrl } from '@/utils/recipeSourceUrl';
 import { assertNever } from '@/utils/assertNever';
@@ -59,7 +56,8 @@ const SURFACE = 'recipe-extract';
  * family already saved — so it gets its own surface rather than borrowing one of the two ingest
  * funnels, which would make a CloudWatch filter for either of them wrong.
  */
-const CAPTURE_ENV: IngestEnv = { surface: SURFACE, origin: 'in-app' };
+/** Exported so `useRecipeRefetch` runs its pre-flight refusals against the SAME label. */
+export const CAPTURE_ENV: IngestEnv = { surface: SURFACE, origin: 'in-app' };
 
 /** Fixed buckets for how many of the three times were inferred — never a raw digit in
  *  `detail`, which is a closed vocabulary across this surface. */
@@ -91,6 +89,13 @@ export interface RecipeReady {
    * capture — there is no document; provenance is the stored `sourceUrl` instead.
    */
   sourceFile: File | null;
+  /**
+   * The envelope this result arrived in, when it came through the shared spine.
+   *
+   * Absent on the REFETCH path (`processUrl`), which is not a magic-beans door: it re-reads a
+   * recipe the user already has, so there is no kind to have got wrong and nothing to correct.
+   */
+  env?: ResultEnvelope;
 }
 
 export interface UseRecipeCaptureOptions {
@@ -287,72 +292,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
 
     pendingSource.value = env.sourceFile;
     pendingCompressed.value = env.compressedBlob ?? null;
-    handOver(prefill, kind, path, env.sourceFile);
-  }
-
-  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
-    if (isProcessing.value) return; // ignore a second pick while one is in flight
-
-    if (!isOnline.value) {
-      showToast('info', t('ai.offline.title'), t('ai.offline.message'));
-      return;
-    }
-
-    // Same reasoning as processUrl: drop anything held from a previous capture first.
-    discardPendingSource();
-
-    // Before the model, so an unattributable read costs nothing. See useMagicBeanScope.
-    const familyId = resolveBillableFamilyId(CAPTURE_ENV);
-    if (!familyId) return;
-
-    isProcessing.value = true;
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'capture started',
-      context: { action: 'start', kind: 'document' },
-    });
-    try {
-      const result = await extractRecipeFromDocument(file, {
-        tier: tier.value,
-        todayIso: toDateInputValue(new Date()),
-        byok: byokConfig.value ?? undefined,
-        grant,
-        familyId,
-      });
-
-      if (!result.success || !result.data) {
-        logEvent({
-          level: 'error',
-          surface: SURFACE,
-          message: 'extraction failed',
-          context: { action: 'failed', kind: 'document', error_code: result.errorCode },
-        });
-        reportExtractionFailure(result.errorCode);
-        return;
-      }
-
-      deliverRecipe(
-        { via: 'extraction', data: result.data },
-        { sourceFile: file, compressedBlob: result.compressedBlob, truncated: result.truncated }
-      );
-    } catch (err) {
-      // NO SILENT FAILURES (docs/lessons.md). Every call site does `void capture.processX()`,
-      // so without this a throw is an unhandled rejection: the spinner vanishes, the form is
-      // blank, the user is told nothing and CloudWatch records nothing. Every other outcome
-      // in this function is logged; the throw path was the one gap, and it is the one that
-      // fires when the Lambda's response shape drifts (the client casts that JSON unchecked).
-      reportError({
-        surface: SURFACE,
-        message: 'recipe capture threw',
-        severity: 'error',
-        error: err,
-        context: { action: 'threw' },
-      });
-      showToast('error', t('ai.error.title'), t('ai.error.generic'));
-    } finally {
-      isProcessing.value = false;
-    }
+    handOver(prefill, kind, path, env.sourceFile, env);
   }
 
   /**
@@ -363,7 +303,8 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     prefill: RecipePrefill,
     kind: 'document' | 'page' | 'youtube',
     path: ExtractionPath,
-    sourceFile: File | null
+    sourceFile: File | null,
+    env?: ResultEnvelope
   ): void {
     const gotCourse = Boolean(prefill.fields.course);
     const gotMeals = (prefill.fields.mealSlots?.length ?? 0) > 0;
@@ -441,7 +382,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
       });
     }
 
-    options.onRecipeReady({ prefill, sourceFile });
+    options.onRecipeReady({ prefill, sourceFile, env });
   }
 
   /**
@@ -453,13 +394,14 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   async function processUrl(rawUrl: string, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return;
 
-    // This path never enters the spine, so it needs BOTH fences explicitly. A guard, not
-    // `withIngestLock`: the lock would refuse AFTER consent and after a refetch budget slot
-    // had been spent, and it needs an `IngestEnv` that refetch — not a magic-beans door — has
-    // no honest value for. Mutual exclusion in the direction that matters (a refetch will not
-    // start on top of a capture); `isProcessing` still guards refetch against itself.
-    if (refuseIfBusy(CAPTURE_ENV)) return;
-
+    // This path never enters the spine, so its family fence is explicit. A read nobody can
+    // attribute cannot be counted.
+    //
+    // ⚠️ The BUSY check is NOT here — it lives in `useRecipeRefetch.start`, above the budget
+    // consume, because a refusal on this side of the consume burns the recipe's single
+    // 10-minute slot on a read that never happened. `start` also resolves the family id there
+    // for the same reason; this call is the one that produces the VALUE, and by the time it
+    // runs a null is a should-not-happen rather than a real path.
     const familyId = resolveBillableFamilyId(CAPTURE_ENV);
     if (!familyId) return;
 
@@ -821,7 +763,6 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
 
   return {
     isProcessing,
-    processFile,
     processUrl,
     deliverRecipe,
     attachAfterSave,

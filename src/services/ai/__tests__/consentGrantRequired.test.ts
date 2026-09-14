@@ -10,7 +10,7 @@
  * These assertions are compile-time. The runtime body only exists so the file is a test.
  */
 import { describe, it, expect } from 'vitest';
-import { extractEventFromDocument } from '../documentExtractionService';
+import { extractShareFromDocuments } from '../documentExtractionService';
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import { __testConsentGrant } from '@/test/consentGrant';
 
@@ -20,21 +20,21 @@ const base = { tier: 'managed' as const, todayIso: '2026-01-01', familyId: 'fam-
 describe('ConsentGrant is required to reach the extraction funnel (#64)', () => {
   it('does not compile without a grant', () => {
     // @ts-expect-error — `grant` is required; omitting it must be a build error.
-    void (() => extractEventFromDocument(file(), base));
+    void (() => extractShareFromDocuments([file()], base));
     expect(true).toBe(true);
   });
 
   it('does not accept a forged grant from application code', () => {
     // @ts-expect-error — the brand is a unique symbol, so a bare object cannot satisfy it.
-    void (() => extractEventFromDocument(file(), { ...base, grant: {} }));
+    void (() => extractShareFromDocuments([file()], { ...base, grant: {} }));
     // @ts-expect-error — nor can a string, a cast-free literal, or anything else nameable.
-    void (() => extractEventFromDocument(file(), { ...base, grant: 'granted' }));
+    void (() => extractShareFromDocuments([file()], { ...base, grant: 'granted' }));
     expect(true).toBe(true);
   });
 
   it('compiles with a real grant', () => {
     const grant: ConsentGrant = __testConsentGrant;
-    void (() => extractEventFromDocument(file(), { ...base, grant }));
+    void (() => extractShareFromDocuments([file()], { ...base, grant }));
     expect(true).toBe(true);
   });
 });

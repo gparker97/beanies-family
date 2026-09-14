@@ -20,7 +20,12 @@ import type { RecipePrefill } from '@/utils/recipeExtractionToRecipe';
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
-vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+// Both shapes: this composable imports `showToast` directly, and the shared ingest spine —
+// reached through the `refuseIfBusy` fence above the budget consume — calls `useToast()`.
+vi.mock('@/composables/useToast', () => {
+  const showToast = vi.fn();
+  return { showToast, useToast: () => ({ showToast }) };
+});
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 const requestConsent = vi.fn();
@@ -47,12 +52,25 @@ let onReady: ((r: { prefill: RecipePrefill }) => void) | null = null;
 vi.mock('@/composables/useRecipeCapture', async () => {
   const { ref } = await import('vue');
   return {
+    // Refetch runs its pre-flight refusals against the capture surface's own label, above the
+    // budget consume — so the mock has to carry it too.
+    CAPTURE_ENV: { surface: 'recipe-extract', origin: 'in-app' },
     useRecipeCapture: (opts: { onRecipeReady: (r: { prefill: RecipePrefill }) => void }) => {
       onReady = opts.onRecipeReady;
       return { processUrl, attachAfterSave, isProcessing: ref(false) };
     },
   };
 });
+
+/**
+ * The family a managed read is billed to. Resolved in `start` ABOVE the budget consume, for
+ * the same reason every other pre-flight refusal is: a read nobody can attribute is refused,
+ * and refusing on the far side of the consume burns the recipe's one slot for nothing.
+ */
+let billableFamily: string | null = 'fam-1';
+vi.mock('@/composables/useMagicBeanScope', () => ({
+  resolveBillableFamilyId: () => billableFamily,
+}));
 
 const updateRecipe = vi.fn();
 vi.mock('@/stores/recipesStore', () => ({ useRecipesStore: () => ({ updateRecipe }) }));
@@ -97,6 +115,7 @@ beforeEach(() => {
   onReady = null;
   requestConsent.mockResolvedValue(GRANT);
   online = true;
+  billableFamily = 'fam-1';
   updateRecipe.mockResolvedValue({ id: 'r-1' });
 });
 
@@ -142,6 +161,17 @@ describe('the three gates, in order', () => {
     online = true;
     await r.start(recipe());
     expect(processUrl).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT burn the cooldown when there is no family to bill', async () => {
+    // Same rule as offline: the read is refused before it starts, so it must not cost the
+    // recipe its one slot for the next ten minutes.
+    billableFamily = null;
+    const r = useRecipeRefetch();
+    await r.start(recipe());
+    expect(processUrl).not.toHaveBeenCalled();
+    expect(requestConsent).not.toHaveBeenCalled();
+    expect(peekAttempt('recipe-refetch:r-1', { max: 1, windowMs: 600_000 }).ok).toBe(true);
   });
 
   it('does nothing at all for a recipe with no source', async () => {

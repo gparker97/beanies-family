@@ -17,7 +17,10 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import FormSection from '@/components/ui/FormSection.vue';
 import RecipeSourceStrip from './RecipeSourceStrip.vue';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
-import type { SharePayload } from '@/types/magicPayload';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
+import { isReadingLocally } from '@/composables/useSharedDocumentIngest';
+import type { ResultEnvelope, SharePayload } from '@/types/magicPayload';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import type { DishImagePrefill } from '@/types/magicPayload';
@@ -61,6 +64,12 @@ const props = withDefaults(
      * the review step.
      */
     prefill?: RecipePrefill | null;
+    /**
+     * The envelope `prefill` arrived in, for the mount that captures through its OWN
+     * `useRecipeCapture` instance and passes the result down (the cookbook). Present only on
+     * that path; the in-form capture sets the same state directly from its callback.
+     */
+    prefillEnv?: ResultEnvelope;
   }>(),
   { recipe: null, layer: 'base', prefill: null }
 );
@@ -240,12 +249,20 @@ const { isEditing, isSubmitting } = useFormModal(
       course.value = r.course ?? '';
       mealSlots.value = sortSlots(r.mealSlots ?? []);
       tags.value = Array.isArray(r.tags) ? [...r.tags] : [];
+      // Editing an existing recipe is never a correction of a document.
+      correctionEnv.value = undefined;
     },
     // ONE reset path. A separate `watch(() => props.prefill)` would RACE this callback
     // (useFormModal fires it when `open` flips), and the resulting "sometimes the form
     // opens blank" bug is order-dependent and miserable to reproduce. applyPrefill(null)
     // IS the blank reset.
-    onNew: () => applyPrefill(props.prefill),
+    onNew: () => {
+      // The cookbook captures through ITS OWN instance and hands the prefill down as a prop,
+      // so the envelope has to arrive the same way. Set here rather than watched, for exactly
+      // the reason the comment above gives about racing this callback.
+      correctionEnv.value = props.prefillEnv;
+      applyPrefill(props.prefill);
+    },
   }
 );
 
@@ -303,8 +320,19 @@ const showSourceStrip = computed(
  * orchestration still lives in the composable — the form is a view USING an orchestrator,
  * which is the MVO shape; it is only the delegation that was wrong.
  */
+/**
+ * The envelope the current prefill came in on — what lets this form offer "not right?".
+ *
+ * Cleared whenever the form is opened for anything else, so the banner can never offer to
+ * re-read a document the fields on screen have nothing to do with.
+ */
+const correctionEnv = ref<ResultEnvelope | undefined>(undefined);
+
 const capture = useRecipeCapture({
-  onRecipeReady: ({ prefill }) => applyPrefill(prefill),
+  onRecipeReady: ({ prefill, env }) => {
+    correctionEnv.value = env;
+    applyPrefill(prefill);
+  },
 });
 
 /**
@@ -323,6 +351,19 @@ const capture = useRecipeCapture({
  * The ADR-030 consent gate came with the capture and has gone with it: `MagicBeansDoor` mints
  * the grant at the commit, before its picker, for every door including this one.
  */
+/**
+ * Refuse to close while a read is in flight.
+ *
+ * Save is already locked against it; the X, the backdrop and Escape were not, so closing here
+ * orphaned the picked file into `pendingSource` for the NEXT recipe to attach — and the
+ * extraction resolved into a form that had unmounted. Same refusal the Save guard gives, and
+ * the scoped overlay is already telling the user something is happening.
+ */
+function handleClose(): void {
+  if (isReadingLocally.value) return;
+  emit('close');
+}
+
 function claimRecipe(payload: SharePayload): boolean {
   if (payload.kind !== 'recipe') return false;
   capture.deliverRecipe(payload.source, payload.env);
@@ -441,6 +482,9 @@ watch(
       // FamilyCookbookPage carries exactly this guard for its own instance, with a comment
       // saying why. This instance was given the hazard without the fix.
       capture.discardPendingSource();
+      // Same reason, one line up: the envelope is what the "not right?" banner re-reads, and a
+      // stale one would offer to correct a document the next open has nothing to do with.
+      correctionEnv.value = undefined;
       // Cleared HERE, in the one place things are already cleared. No `props.recipe` watcher
       // branch is needed: `onNew` reseeds via `applyPrefill` on every open-for-new, and this
       // close path nulls it, so opening the form to EDIT finds it null by construction.
@@ -462,7 +506,7 @@ async function handleSave(): Promise<void> {
   // while a capture was in flight. Committing then closing means the extraction resolves
   // into a closed form, applyPrefill writes into nothing, and the next open wipes it —
   // ingredients, steps and times gone with no toast and nothing logged.
-  if (capture.isProcessing.value) return;
+  if (isReadingLocally.value) return;
   isSubmitting.value = true;
   try {
     const result = await eager.commit();
@@ -536,13 +580,21 @@ const LIST_TEXTAREA_CLASS =
     icon="🍝"
     icon-bg="var(--tint-orange-8)"
     size="default"
-    :save-disabled="!canSave || capture.isProcessing.value"
+    :save-disabled="!canSave || isReadingLocally"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
-    @close="emit('close')"
+    @close="handleClose"
     @save="handleSave"
     @delete="handleDelete"
   >
+    <!-- "not right?" — above the form body, and outside the reading overlay's anchor. -->
+    <MagicMiscategorisedBanner
+      v-if="correctionEnv"
+      :env="correctionEnv"
+      from="recipe"
+      @close="emit('close')"
+    />
+
     <!-- `relative` so the reading overlay below anchors to the FORM BODY. The drawer and
          modal containers differ in whether they establish a positioning context, and an
          overlay that silently anchors to the viewport in one of them is the kind of bug
@@ -553,6 +605,25 @@ const LIST_TEXTAREA_CLASS =
           <RecipeSourceStrip @start="open" />
         </template>
       </MagicBeansDoor>
+
+      <!-- Reading blocks the form: every field is about to be overwritten, so letting the
+           user type meanwhile would only throw their work away.
+
+           SCOPED to the fields, deliberately — a full-screen overlay would hide the very
+           thing the feedback is about. That scoping is why this door sets
+           `presentation: 'local'`, which suppresses the app-shell overlay; delete this block
+           and a recipe-form capture has NO feedback at all. -->
+      <div
+        v-if="isReadingLocally"
+        class="dark:bg-surface-ground/85 absolute inset-0 z-10 grid place-items-center rounded-[var(--sq)] bg-white/85 backdrop-blur-sm"
+      >
+        <div class="flex flex-col items-center gap-3">
+          <BeanieSpinner size="lg" :halo="true" />
+          <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
+            {{ t('ai.processing') }}
+          </p>
+        </div>
+      </div>
 
       <!-- The consent modal is mounted globally in App.vue (#64) and stacks above this
            modal, so this form asks for consent without hosting the UI. -->

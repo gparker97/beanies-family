@@ -41,6 +41,7 @@ import { extractUrls } from '@/utils/url';
 import { withSniffedType } from '@/utils/sniffFileType';
 import {
   extractShareFromDocuments,
+  extractShareFromPreparedSource,
   extractShareFromText,
 } from '@/services/ai/documentExtractionService';
 import { useAuthStore } from '@/stores/authStore';
@@ -51,7 +52,12 @@ import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
 import { assertNever } from '@/utils/assertNever';
 import type { ResultEnvelope, SharePayload, ShareKind } from '@/types/magicPayload';
-import type { ExtractionErrorCode, ShareExtractionResult } from '@/services/ai/types';
+import type {
+  DocumentExtractionResult,
+  ExtractionErrorCode,
+  ExtractionSource,
+  ShareExtractionResult,
+} from '@/services/ai/types';
 import type { ConsentGrant } from './useDocumentConsent';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -146,12 +152,30 @@ const RESOLVE_HOLD_MS = 700;
  * False while the consent prompt is up: that modal IS the feedback at that moment, and the
  * overlay sits above it.
  */
-export const isReadingSharedDocument = computed(() => {
+export const isReadingSharedDocument = computed(() => isReadingOn('global'));
+
+/**
+ * The same question for a door that fills ITSELF in (`InAppDestination`).
+ *
+ * ⚠️ `presentation: 'local'` SUPPRESSES the app-shell overlay, so this is not an extra: it is
+ * the only feedback such a door has, and without a consumer a recipe-form capture is four to
+ * eight seconds of an inert, editable, blank form that then silently repopulates. The two
+ * values of `presentation` must each have exactly one renderer; that is the whole point of
+ * deriving the flag from the claim rather than configuring it separately.
+ *
+ * It is also the in-flight fact every OTHER local guard should read. `useRecipeCapture`'s
+ * `isProcessing` is composable-local and is set only by `processUrl`, which the doors no
+ * longer call — so a guard written against it is dead code that looks live.
+ */
+export const isReadingLocally = computed(() => isReadingOn('local'));
+
+/** One predicate, two presentations — so the two computeds cannot drift in their guards. */
+function isReadingOn(presentation: 'global' | 'local'): boolean {
   // Read ONCE into a local: re-reading `ingestState.value` in each operand does not narrow the
   // union, and an `as` at this call site would defeat the point of discriminating it.
   const state = ingestState.value;
-  return state.phase !== 'idle' && !consentOpen.value && state.presentation === 'global';
-});
+  return state.phase !== 'idle' && !consentOpen.value && state.presentation === presentation;
+}
 
 /**
  * Is an ingest already running?
@@ -369,7 +393,23 @@ function refuseForQuota(env: IngestEnv, resetsAt: number): void {
 type ShareSource =
   | { kind: 'documents'; files: File[] }
   | { kind: 'link'; url: string }
-  | { kind: 'text'; text: string; truncated: boolean };
+  | { kind: 'text'; text: string; truncated: boolean }
+  /**
+   * A re-read of a document this spine has ALREADY resolved and (on the managed tier) paid
+   * for, as the kind the user says it actually is.
+   *
+   * A `ShareSource` arm rather than a fourth entry point: everything below `withIngestLock` —
+   * offline, classify, the reader gate, the resolve hold, dispatch — is identical, and only
+   * the two lines that produce the source differ. `prepared` is the payload the model was
+   * given verbatim, because the proxy fingerprints those exact bytes.
+   */
+  | {
+      kind: 'correction';
+      prepared: ExtractionSource;
+      to: ShareKind;
+      env: ResultEnvelope;
+      token?: string;
+    };
 
 /**
  * Which funnel an event belongs to, derived from the source rather than threaded alongside
@@ -385,6 +425,11 @@ function sourceDetail(source: ShareSource): 'file' | 'link' | 'text' {
       return 'link';
     case 'text':
       return 'text';
+    case 'correction':
+      // The funnel a correction belongs to is the one its ORIGINAL read belonged to — a
+      // corrected photo is still the file funnel. Derived from the prepared payload rather
+      // than threaded, for the same reason the rest of this function is.
+      return source.prepared.kind === 'text' ? 'text' : 'file';
     default:
       return assertNever(source, 'shareSourceDetail');
   }
@@ -787,15 +832,39 @@ async function read(
   };
 
   /** Report an extraction failure once, tagged with which funnel it came from. */
-  function failed(errorCode: ExtractionErrorCode | undefined): null {
+  /**
+   * `providerDetail` is our own provider layer's message ("invalid api key", "quota exceeded"),
+   * not raw upstream response text. It reaches the user because a bare "something went wrong"
+   * cost a real family an afternoon: their tier had been switched to BYOK and the key was bad,
+   * and the toast named neither fact.
+   *
+   * It is deliberately NOT logged — the telemetry context is an allowlist, and a provider
+   * message is free-form text that could carry anything. `error_code` is the queryable field.
+   */
+  function failed(errorCode: ExtractionErrorCode | undefined, providerDetail?: string): null {
     logEvent({
       level: 'info',
       surface: env.surface,
       message: 'share extraction failed',
       context: { action: 'failed', error_code: errorCode, detail },
     });
-    reportExtractionFailure(errorCode);
+    reportExtractionFailure(errorCode, providerDetail);
     return null;
+  }
+
+  /**
+   * What the review modal needs to offer a "not right?" — the prepared payload the model was
+   * actually given, plus the grant if the proxy issued one.
+   *
+   * Both halves come off the SAME result, so they cannot describe different reads. A missing
+   * `preparedSource` means the model was never invoked (a JSON-LD or title-only link), and
+   * then there is nothing to re-read and correctly no banner.
+   */
+  function correctableFrom(
+    result: DocumentExtractionResult<ShareExtractionResult>
+  ): ResultEnvelope['correction'] {
+    if (!result.preparedSource) return undefined;
+    return { source: result.preparedSource, token: result.data?.correction?.token };
   }
 
   /**
@@ -808,20 +877,41 @@ async function read(
   // ResultEnvelope is exactly the kind of confusion that produces a wrong-funnel event.
   async function readText(text: string, envelope: ResultEnvelope): Promise<ReadOutcome | null> {
     const result = await extractShareFromText(text, opts);
-    if (!result.success || !result.data) return failed(result.errorCode);
-    return classify(result.data, envelope);
+    if (!result.success || !result.data) return failed(result.errorCode, result.error);
+    return classify(result.data, { ...envelope, correction: correctableFrom(result) });
+  }
+
+  if (source.kind === 'correction') {
+    // The prepared payload is re-sent verbatim — never re-prepared. The proxy fingerprints the
+    // bytes it received, and a second canvas pass would not reproduce them, so re-preparing
+    // would have the grant refused on a document nobody changed.
+    //
+    // The client text budget is deliberately NOT consumed: a correction that is free of the
+    // server count but not of the client cap is not free, and it would fail loudest at exactly
+    // the moment someone is correcting a lot — refused by a quota toast while the server grant
+    // sits unspent and expires.
+    const result = await extractShareFromPreparedSource(source.prepared, {
+      ...opts,
+      correction: { token: source.token, to: source.to },
+    });
+    if (!result.success || !result.data) return failed(result.errorCode, result.error);
+    // ⚠️ `correction: undefined` is load-bearing, not tidiness. Carrying the spent grant
+    // forward would re-render the banner with a token the server will refuse — the free chain
+    // the proxy's no-chain invariant forbids, produced on the client instead.
+    return classify(result.data, { ...source.env, correction: undefined });
   }
 
   if (source.kind === 'documents') {
     // ONE call that classifies AND extracts. The page cap lives in the funnel; this
     // orchestrator never counts pages or files.
     const result = await extractShareFromDocuments(source.files, opts);
-    if (!result.success || !result.data) return failed(result.errorCode);
+    if (!result.success || !result.data) return failed(result.errorCode, result.error);
     return classify(result.data, {
       sourceFile: source.files[0],
       compressedBlob: result.compressedBlob,
       truncated: result.truncated,
       origin: env.origin,
+      correction: correctableFrom(result),
     });
   }
 
@@ -1039,7 +1129,11 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
  * `isReadingSharedDocument`, so the in-app path inherits the globally-mounted
  * `AiProcessingOverlay` with no new code at all.
  */
-async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise<void> {
+async function withIngestLock(
+  env: IngestEnv,
+  run: () => Promise<void>,
+  presentation: 'global' | 'local' = 'global'
+): Promise<void> {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -1053,7 +1147,12 @@ async function withIngestLock(env: IngestEnv, run: () => Promise<void>): Promise
     showToast('info', t('shareTarget.busy.title'), t('shareTarget.busy.message'));
     return;
   }
-  ingestState.value = { phase: 'reading', presentation: 'global' };
+  // `presentation` is decided HERE, not after triage. `runIngest` used to downgrade to
+  // 'local' several awaits later — `withSniffedType` reads the file — so an in-form capture
+  // painted the full-screen overlay over the very fields the scoped one exists to keep
+  // visible, then swapped. A triage refusal never reached `runIngest` at all, so the user saw
+  // only the wrong overlay for the whole thing.
+  ingestState.value = { phase: 'reading', presentation };
 
   try {
     await run();
@@ -1090,15 +1189,15 @@ async function runIngest(
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  // `local` when a door will consume the payload itself (the recipe form, which keeps an
-  // overlay scoped to its own fields). Derived from the claim rather than configured
-  // separately: a door that keeps the payload IS the door the user is looking at, so the
-  // global overlay cannot double up by construction rather than by a check to remember.
-  if (destination) ingestState.value = { phase: 'reading', presentation: 'local' };
-
-  // Offline sits between triage and consent — every `ShareSource` is produced without a
-  // network call, so the file path's original ordering (triage → offline → consent → extract)
-  // is preserved.
+  // ⚠️ Offline is checked AFTER consent now, at both entry points, and that is a deliberate
+  // trade rather than an oversight. Consent moved out to the callers (the door mints at the
+  // commit, before its picker; the share path as soon as `prepare` yields a usable source), so
+  // the order is consent → offline everywhere instead of two orderings that could drift.
+  //
+  // The cost is that an offline user answers a privacy prompt and is then told they are
+  // offline. `FamilyPlannerPage` accepted exactly this trade in writing — "consent-first is the
+  // privacy-correct order" — and nothing leaves the device either way. The previous comment
+  // here claimed the old triage → offline → consent order was preserved; it is not.
   const { reportExtractionFailure } = useExtractionErrorToast();
   if (!useOnline().isOnline.value) {
     reportExtractionFailure('offline');
@@ -1148,7 +1247,10 @@ async function runIngest(
       presentation: current.presentation,
       kind: outcome.kind,
     };
-    if (!prefersReducedMotion()) {
+    // Only where there is something to SEE resolve. The hold exists so the app-shell overlay's
+    // three tiles can fade to one; a `local` door renders no tiles, so there it is 700ms of a
+    // frozen spinner with Save dead, for a beat nobody watches.
+    if (current.presentation === 'global' && !prefersReducedMotion()) {
       await new Promise((resolve) => setTimeout(resolve, RESOLVE_HOLD_MS));
     }
   }
@@ -1190,7 +1292,21 @@ export const IN_APP_ENV: IngestEnv = { surface: 'magic-beans-capture', origin: '
 
 /** What the magic-beans sheet can hand over. A camera shot and a picked file are the same
  *  thing once a `File` exists, so there are two arms rather than three. */
-export type InAppInput = { kind: 'file'; file: File } | { kind: 'paste'; text: string };
+export type InAppInput =
+  | { kind: 'file'; file: File }
+  | { kind: 'paste'; text: string }
+  /**
+   * A re-read of a document the spine has ALREADY resolved, as the kind the user says it
+   * actually is. Raised by `MagicMiscategorisedBanner` from inside a review modal.
+   *
+   * It carries the WHOLE envelope, not a `source` + `token` pair, and that is what makes
+   * `sourceFile`, `compressedBlob`, `truncated`, `link` and `origin` survive BY CONSTRUCTION
+   * rather than by four hand-copied fields. Without it a dish photo misread as travel and
+   * corrected to recipe would open the recipe form with no photo to attach — silently.
+   *
+   * Skips triage (it already ran, on these exact bytes) and the text budget (it is free).
+   */
+  | { kind: 'correction'; env: ResultEnvelope; from: ShareKind; to: ShareKind };
 
 /**
  * A door that fills ITSELF in rather than dispatching by kind.
@@ -1259,23 +1375,42 @@ export async function ingestInAppSource(
   const { showToast } = useToast();
   const { t } = useTranslation();
 
-  await withIngestLock(IN_APP_ENV, async () => {
-    // ⚠️ `awaitReadiness` is deliberately NOT called: auth and family are settled inside a
-    // running app, and its polling loop would be dead time. But ONE of its four preconditions
-    // still applies here — `isConfigured` is false for BYOK-without-a-key and for on-device,
-    // and without this check the user pays a consent prompt for a call that is guaranteed to
-    // fail at extraction. Same `notReady` site the share path uses, so there is one toast and
-    // one log for "not set up yet" rather than two phrasings of it.
-    if (!useAiCapability().isConfigured.value) {
-      notReady(IN_APP_ENV, 'ai_unconfigured', 'ai.unavailable.title', 'ai.unavailable.message');
-      return;
-    }
+  await withIngestLock(
+    IN_APP_ENV,
+    async () => {
+      // ⚠️ `awaitReadiness` is deliberately NOT called: auth and family are settled inside a
+      // running app, and its polling loop would be dead time. But ONE of its four preconditions
+      // still applies here — `isConfigured` is false for BYOK-without-a-key and for on-device,
+      // and without this check the user pays a consent prompt for a call that is guaranteed to
+      // fail at extraction. Same `notReady` site the share path uses, so there is one toast and
+      // one log for "not set up yet" rather than two phrasings of it.
+      if (!useAiCapability().isConfigured.value) {
+        notReady(IN_APP_ENV, 'ai_unconfigured', 'ai.unavailable.title', 'ai.unavailable.message');
+        return;
+      }
 
-    const source = await inAppSource(input, showToast, t);
-    if (!source) return; // already logged and toasted
+      // The model-quality signal, emitted HERE rather than in the banner: the `from`/`to` pair
+      // is the first thing to look at before touching the prompt, and a signal a caller has to
+      // remember to emit is one a second caller will not.
+      if (input.kind === 'correction') {
+        logEvent({
+          level: 'info',
+          surface: IN_APP_ENV.surface,
+          message: 'beanies read this as the wrong kind',
+          context: { action: 'corrected', kind: input.to, detail: input.from },
+        });
+      }
 
-    await runIngest(source, IN_APP_ENV, grant, destination);
-  });
+      const source = await inAppSource(input, showToast, t);
+      if (!source) return; // already logged and toasted
+
+      await runIngest(source, IN_APP_ENV, grant, destination);
+    },
+    // A door that will CLAIM the payload is by definition the door the user is looking at, so
+    // it scopes its own overlay and the app-shell one must stand down — from the first frame,
+    // not from several awaits later.
+    destination ? 'local' : 'global'
+  );
 }
 
 /**
@@ -1293,6 +1428,24 @@ async function inAppSource(
 ): Promise<ShareSource | null> {
   if (input.kind === 'paste') {
     return sourceFromText(input.text, IN_APP_ENV);
+  }
+
+  if (input.kind === 'correction') {
+    // The banner only renders when `env.correction` exists, so this is a should-not-happen —
+    // which is exactly why it refuses out loud rather than falling through to a re-prepare
+    // that would be refused server-side and charged.
+    const carried = input.env.correction;
+    if (!carried) {
+      notReady(IN_APP_ENV, 'no_prepared_source', 'ai.error.title', 'ai.error.generic');
+      return null;
+    }
+    return {
+      kind: 'correction',
+      prepared: carried.source,
+      token: carried.token,
+      to: input.to,
+      env: input.env,
+    };
   }
 
   // Re-stamp with the type the BYTES say it is, exactly as `prepare` does — a PDF declared

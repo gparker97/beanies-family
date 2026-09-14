@@ -28,28 +28,41 @@ vi.mock('@/utils/pdfExtractionImages', () => ({
   pdfToExtractionImages: (f: File, maxPages?: number) => mockPdfToExtractionImages(f, maxPages),
 }));
 
-import { extractEventFromDocument } from '../documentExtractionService';
+import { extractShareFromDocuments } from '../documentExtractionService';
 import { compress, CompressionError } from '@/services/photos/photoCompression';
 import { managedProvider } from '../providers/managedProvider';
 import { createByokProvider } from '../providers/byokProvider';
 import { onDeviceProvider } from '../providers/onDeviceProvider';
-import { ExtractionProviderError, type ExtractionResult } from '../types';
+import { ExtractionProviderError, type ShareExtractionResult } from '../types';
 
 const mockCompress = vi.mocked(compress);
 const mockManagedExtract = vi.mocked(managedProvider.run);
 const mockCreateByok = vi.mocked(createByokProvider);
 const mockOnDeviceExtract = vi.mocked(onDeviceProvider.run);
 
-const SAMPLE: ExtractionResult = {
-  isEvent: true,
-  title: "Mia's 6th Birthday",
-  date: '2026-07-12',
-  startTime: '14:00',
-  endTime: '16:00',
-  isAllDay: false,
-  location: 'Sunshine Hall',
-  description: 'Bring a gift',
-  confidence: { title: 0.95, date: 0.9, startTime: 0.8, endTime: 0.7, location: 0.85 },
+/**
+ * A SHARE result, not a bare event one.
+ *
+ * These cases are about tier dispatch, compression and PDF page handling — none of which
+ * varies by task — and `share` is the only document task with a caller. The per-kind entry
+ * points this file used to exercise were three typed ways to reach the model that BYPASSED
+ * the spine, and so bypassed the family fence and the meter with it; they were deleted rather
+ * than left as unreachable exports, and the meter's premise is that the client has exactly one
+ * path to the model.
+ */
+const SAMPLE: ShareExtractionResult = {
+  kind: 'event',
+  event: {
+    isEvent: true,
+    title: "Mia's 6th Birthday",
+    date: '2026-07-12',
+    startTime: '14:00',
+    endTime: '16:00',
+    isAllDay: false,
+    location: 'Sunshine Hall',
+    description: 'Bring a gift',
+    confidence: { title: 0.95, date: 0.9, startTime: 0.8, endTime: 0.7, location: 0.85 },
+  },
 };
 
 function file(): File {
@@ -80,11 +93,11 @@ beforeEach(() => {
   mockCompress.mockResolvedValue(compressedOk());
 });
 
-describe('extractEventFromDocument — tier dispatch', () => {
+describe('extractShareFromDocuments — tier dispatch', () => {
   it('managed tier: returns the provider result on success', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -102,7 +115,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('sends ONLY the single compressed document (data-minimization)', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    await extractEventFromDocument(file(), {
+    await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -110,7 +123,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
-    expect(task).toBe('event');
+    expect(task).toBe('share');
     // A photo is the single-element case of the images array.
     expect(request.source.kind).toBe('images');
     const urls = request.source.kind === 'images' ? request.source.imageDataUrls : [];
@@ -139,7 +152,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('threads familyId through to the provider when supplied (#83)', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    await extractEventFromDocument(file(), {
+    await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -158,7 +171,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     // tier, so switching tiers cannot silently drop it.
     const byokRun = vi.fn().mockResolvedValue(SAMPLE);
     mockCreateByok.mockReturnValue({ id: 'openai', run: byokRun });
-    await extractEventFromDocument(file(), {
+    await extractShareFromDocuments([file()], {
       tier: 'byok',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -177,7 +190,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     });
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    const res = await extractEventFromDocument(pdfFile(), {
+    const res = await extractShareFromDocuments([pdfFile()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -185,7 +198,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
     });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
-    expect(task).toBe('event');
+    expect(task).toBe('share');
     // Images now ride the discriminated source rather than a bare field on the request.
     expect(request.source.kind).toBe('images');
     const urls = request.source.kind === 'images' ? request.source.imageDataUrls : [];
@@ -200,7 +213,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('a PDF that produces no readable pages → compression error, provider never called', async () => {
     mockPdfToExtractionImages.mockResolvedValue({ files: [], truncated: false });
 
-    const res = await extractEventFromDocument(pdfFile(), {
+    const res = await extractShareFromDocuments([pdfFile()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -214,7 +227,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   it('PDF rasterization failure → compression error (never leaks a raw throw)', async () => {
     mockPdfToExtractionImages.mockRejectedValue(new Error('corrupt or password-protected'));
 
-    const res = await extractEventFromDocument(pdfFile(), {
+    const res = await extractShareFromDocuments([pdfFile()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -232,7 +245,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       run: vi.fn().mockResolvedValue(SAMPLE),
     });
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'byok',
       todayIso: '2026-06-03',
       byok: { provider: 'openai', apiKey: 'sk-test' },
@@ -245,7 +258,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
   });
 
   it('byok tier without a key config → not_available, never builds a provider', async () => {
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'byok',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -268,7 +281,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       )
     );
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'on-device',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -280,8 +293,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
   });
 
   it('unknown tier → assertNever path is caught, returns not_available (no throw)', async () => {
-    // @ts-expect-error deliberately passing an invalid tier to exercise the dispatch default.
-    const res = await extractEventFromDocument(file(), { tier: 'bogus', todayIso: '2026-06-03' });
+    const res = await extractShareFromDocuments([file()], {
+      // @ts-expect-error deliberately passing an invalid tier to exercise the dispatch default.
+      tier: 'bogus',
+      todayIso: '2026-06-03',
+    });
 
     expect(res.success).toBe(false);
     expect(res.errorCode).toBe('not_available');
@@ -289,11 +305,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
   });
 });
 
-describe('extractEventFromDocument — failure classification', () => {
+describe('extractShareFromDocuments — failure classification', () => {
   it('compression failure → compression code, provider never called', async () => {
     mockCompress.mockRejectedValue(new CompressionError('HEIC only decodes in Safari'));
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -313,7 +329,7 @@ describe('extractEventFromDocument — failure classification', () => {
       new ExtractionProviderError('malformed_output', 'Model returned unparseable JSON')
     );
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -327,7 +343,7 @@ describe('extractEventFromDocument — failure classification', () => {
   it('provider timeout is preserved', async () => {
     mockManagedExtract.mockRejectedValue(new ExtractionProviderError('timeout', 'timed out'));
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -340,7 +356,7 @@ describe('extractEventFromDocument — failure classification', () => {
   it('a non-typed provider throw is classified as provider_error (never leaks)', async () => {
     mockManagedExtract.mockRejectedValue(new Error('boom'));
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -355,7 +371,7 @@ describe('extractEventFromDocument — failure classification', () => {
     mockManagedExtract.mockRejectedValue(new ExtractionProviderError('provider_error', 'HTTP 500'));
 
     await expect(
-      extractEventFromDocument(file(), {
+      extractShareFromDocuments([file()], {
         tier: 'managed',
         todayIso: '2026-06-03',
         grant: __testConsentGrant,
@@ -377,7 +393,7 @@ describe('multi-document extraction (#64)', () => {
   it('reads several images as the pages of one request, in order', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    const res = await extractEventFromDocument([imgFile('a'), imgFile('b'), imgFile('c')], {
+    const res = await extractShareFromDocuments([imgFile('a'), imgFile('b'), imgFile('c')], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -402,7 +418,7 @@ describe('multi-document extraction (#64)', () => {
       truncated: false,
     });
 
-    const res = await extractEventFromDocument([pdfFile(), imgFile('after')], {
+    const res = await extractShareFromDocuments([pdfFile(), imgFile('after')], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -417,7 +433,7 @@ describe('multi-document extraction (#64)', () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
     const seven = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(imgFile);
 
-    const res = await extractEventFromDocument(seven, {
+    const res = await extractShareFromDocuments(seven, {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -437,7 +453,7 @@ describe('multi-document extraction (#64)', () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
     mockPdfToExtractionImages.mockResolvedValue({ files: [imgFile('p1')], truncated: true });
 
-    await extractEventFromDocument([imgFile('a'), imgFile('b'), imgFile('c'), pdfFile()], {
+    await extractShareFromDocuments([imgFile('a'), imgFile('b'), imgFile('c'), pdfFile()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -455,7 +471,7 @@ describe('multi-document extraction (#64)', () => {
       truncated: true,
     });
 
-    const res = await extractEventFromDocument([pdfFile()], {
+    const res = await extractShareFromDocuments([pdfFile()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -472,7 +488,7 @@ describe('multi-document extraction (#64)', () => {
       .mockResolvedValueOnce({ blob: first, width: 1, height: 1, mime: 'image/jpeg' })
       .mockResolvedValue(compressedOk());
 
-    const res = await extractEventFromDocument([imgFile('a'), imgFile('b')], {
+    const res = await extractShareFromDocuments([imgFile('a'), imgFile('b')], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -485,7 +501,7 @@ describe('multi-document extraction (#64)', () => {
   it('a single File still behaves exactly as before', async () => {
     mockManagedExtract.mockResolvedValue(SAMPLE);
 
-    const res = await extractEventFromDocument(file(), {
+    const res = await extractShareFromDocuments([file()], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
@@ -498,7 +514,7 @@ describe('multi-document extraction (#64)', () => {
   });
 
   it('classifies an empty document list as a compression failure rather than sending nothing', async () => {
-    const res = await extractEventFromDocument([], {
+    const res = await extractShareFromDocuments([], {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
