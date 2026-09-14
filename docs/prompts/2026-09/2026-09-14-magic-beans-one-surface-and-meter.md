@@ -262,3 +262,35 @@ Shipped as `538b9ff6`, `6b0e2073`, `5ef2d395`, `c489a62d`, `8fa17fcb`. Two `/cod
 rounds; the second found thirteen, including a `length === 1` left in `WallLanesView` that made
 multi-select lie to screen readers, a chip row that could clip a lit chip inside an
 `overflow-hidden` root, `aria-hidden` set on a focused element, and the dead `syncWithMembers`.
+
+---
+
+## 2026-09-15 — the wait, and the meter check
+
+**Prompt** (via `/frontend-design:frontend-design`):
+
+> make one small change to the copy used on the 'counting beans' spinner used for magic beanes - for
+> this one only (as an exception) rather counting beans, change the copy to 'counting magic beans' and
+> add some kind of effect on the text to make it look special (i.e. a glimmering, shimmer, etc). i
+> think it might look nice to also add ai emoji star flashes in the background, etc - making it look
+> special. let me know your thoughts
+>
+> also - note that this morning i've used ai on my local dev family account exactly 2 times, on 2
+> separate browsers. go ahead to confirm if it is working as planned. i can't test on native with the
+> new code until we deploy. also confirmed the wall looks good on my local.
+
+**Outcome.** `ai.processing` became `Counting magic beans…` / `counting magic beans…`. The key already
+had exactly three call sites, all of them magic beans (the global reading overlay, the recipe form's
+scoped overlay, the share target), so the exception is precisely scoped by construction — the app-wide
+loaders are separate keys (`action.loading`, `common.saving`, `auth.loadingFile`) and are untouched.
+
+The shimmer travels through the letterforms (`background-clip: text`) rather than across a box. The
+box sheen is `.magic-shimmer`, and `MagicBeansSheet`'s header already records why it must never sit on
+text: a sweep over type is the skeleton-loader convention and reads as "disabled".
+
+The ✨ emoji idea became four drawn `clip-path` sparkles in Heritage Orange / Terracotta. An emoji is a
+different picture on every platform, cannot take a brand colour, and scattered reads as clip-art.
+
+**Meter verification.** Confirmed counting end to end, with two things worth knowing: the day key is
+**UTC**, so greg's 06:00 SGT reads land on the previous UTC day's row; and CloudWatch shows **three**
+successful reads in his morning window, not the two he recalls.

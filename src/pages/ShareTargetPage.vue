@@ -72,7 +72,7 @@ onMounted(async () => {
     </template>
     <template v-else>
       <BeanieSpinner size="lg" :halo="true" />
-      <p class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+      <p class="font-outfit magic-text-shimmer text-sm font-semibold">
         {{ t('ai.processing') }}
       </p>
     </template>
