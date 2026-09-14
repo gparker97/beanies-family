@@ -10086,7 +10086,11 @@ const STRING_DEFS = {
   'ai.addFromPhoto': { en: 'Add from a Photo', beanie: 'add from a photo' },
   // Source-neutral: this is shown for a link and for pasted text as well as a photo, at three
   // call sites. "Reading your photo…" was wrong at two of them.
-  'ai.processing': { en: 'Counting beans…', beanie: 'counting beans…' },
+  // ⚠️ "magic beans", not the app-wide "counting beans…" loader — a deliberate exception, and
+  // the ONLY one. This key is read by exactly the three magic-beans surfaces (the reading
+  // overlay, the recipe form's scoped overlay, the share target); the generic loaders live on
+  // `action.loading` / `common.saving` / `auth.loadingFile` and stay as they are.
+  'ai.processing': { en: 'Counting magic beans…', beanie: 'counting magic beans…' },
   'ai.sourcePhotoPreview': {
     en: 'Attaches when you save',
     beanie: 'attaches when you save',

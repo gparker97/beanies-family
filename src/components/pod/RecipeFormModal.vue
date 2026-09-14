@@ -611,7 +611,10 @@ const LIST_TEXTAREA_CLASS =
       >
         <div class="flex flex-col items-center gap-3">
           <BeanieSpinner size="lg" :halo="true" />
-          <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
+          <!-- The same shimmer the global reader uses. No sparkles here: this overlay is
+               scoped to the fields it is about to overwrite, and decoration inside a form panel
+               competes with the thing the user is watching. -->
+          <p class="font-outfit magic-text-shimmer text-sm font-semibold">
             {{ t('ai.processing') }}
           </p>
         </div>

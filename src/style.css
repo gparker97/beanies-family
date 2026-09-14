@@ -449,8 +449,15 @@
   .attention-pulse,
   .bell-ring,
   .magic-tick,
+  .magic-text-shimmer,
   .magic-shimmer::after {
     animation: none !important;
+  }
+
+  /* Stopped mid-twinkle a sparkle would freeze at whatever opacity it had, so these go entirely
+     rather than merely stopping. */
+  .magic-sparkle {
+    display: none !important;
   }
 
   .beanie-lift:hover {
@@ -783,6 +790,112 @@
 .magic-shimmer-once::after {
   animation-fill-mode: forwards;
   animation-iteration-count: 1;
+}
+
+/**
+ * The magic-beans wait, made to feel like something is happening TO the words.
+ *
+ * A light travels through the letterforms themselves — `background-clip: text` — rather than a
+ * sheen passing over a box. That distinction is the whole point: `.magic-shimmer` is the box
+ * idiom and `MagicBeansSheet`'s header already records why it must never sit on text, because a
+ * sweep over type is the skeleton-loader convention and reads as "disabled" or "still loading
+ * the words" instead of "something magic is happening".
+ *
+ * ⚠️ The gradient is INK → accent → INK, never accent → transparent. `background-clip: text`
+ * paints the whole string, so every stop has to be a colour someone can read; a transparent or
+ * faded stop would put the CIG's "no opacity on text a person reads" rule inside an animation,
+ * where it is harder to notice and impossible to lint. The sweep only ever ADDS brightness.
+ *
+ * ⚠️ And `color: transparent` is fatal if the gradient does not paint, so it lives behind
+ * `@supports` with a solid ink fallback outside it. A wait message nobody can read is worse
+ * than a wait message with no effect on it.
+ */
+.magic-text-shimmer {
+  /* Deep Slate and Heritage Orange. Literals rather than theme tokens because both halves of a
+     `background-clip: text` gradient must be readable ink — see the warning above. */
+  --magic-text-ink: #2c3e50;
+  --magic-text-spark: #f15d22;
+
+  /* The fallback, OUTSIDE the @supports below: what renders if the gradient does not paint. It
+     is the gradient's OWN ink, so the two can never disagree.
+     ⚠️ The dark partner below switches the token and must NOT also declare `color`. A
+     `html.dark .magic-text-shimmer { color: … }` is specificity (0,1,1) and silently outranks the
+     `color: transparent` inside `@supports` at (0,1,0) — the text then paints solid ink over a
+     gradient nobody can see, which looks correct in a screenshot and has no shimmer at all. That
+     is exactly what shipped in the first draft of this rule; the computed style caught it. */
+  color: var(--magic-text-ink);
+}
+
+html.dark .magic-text-shimmer {
+  --magic-text-ink: #e8eef3;
+
+  /* Accents get LIGHTER on dark, never darker (CIG slides 8-9). */
+  --magic-text-spark: #ff8b5e;
+}
+
+/* `-webkit-background-clip` in the CONDITION, never as a declaration: autoprefixer emits the
+   prefixed property itself (stylelint's `property-no-vendor-prefix` forbids hand-writing it), but
+   it does not widen a feature query, and Safari needs the prefixed spelling to match. */
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .magic-text-shimmer {
+    /* 300% so the bright band is a narrow travelling highlight rather than a wash. */
+    animation: magic-text-sweep 2.8s ease-in-out infinite;
+    background: linear-gradient(
+      100deg,
+      var(--magic-text-ink) 0%,
+      var(--magic-text-ink) 38%,
+      var(--magic-text-spark) 50%,
+      var(--magic-text-ink) 62%,
+      var(--magic-text-ink) 100%
+    );
+    background-clip: text;
+    background-size: 300% 100%;
+    color: transparent;
+  }
+}
+
+@keyframes magic-text-sweep {
+  0% {
+    background-position: 130% 0;
+  }
+
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+/**
+ * Four drawn sparkles behind the reading card.
+ *
+ * ⚠️ DRAWN, not the ✨ emoji, and that was a deliberate swap. An emoji renders as a different
+ * picture on every platform, cannot take a brand colour, and scattered across a surface reads as
+ * clip-art rather than as the feature's own language. A clip-path star is identical everywhere
+ * and takes Heritage Orange.
+ *
+ * FOUR of them, small and slow, BEHIND the card. The card already carries a spinner and three
+ * ticking tiles; this is atmosphere, and the moment it competes with the tiles the resolve stops
+ * landing. Staggered rather than synchronous — in unison they read as a pulse, in sequence as
+ * something alive.
+ */
+.magic-sparkle {
+  animation: magic-sparkle-twinkle 2.6s ease-in-out infinite;
+  background: currentcolor;
+  clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%);
+  opacity: 0;
+  position: absolute;
+}
+
+@keyframes magic-sparkle-twinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6) rotate(0deg);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(1) rotate(45deg);
+  }
 }
 
 /**
