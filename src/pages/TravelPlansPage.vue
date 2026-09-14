@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { ref, computed, nextTick } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -28,10 +27,9 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { showToast } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
-import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
-import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
@@ -65,8 +63,6 @@ const photoStore = usePhotoStore();
 const { canReadDocument } = useMagicReader();
 // The consent modal is mounted ONCE in App.vue (#64); this page only asks. The grant is
 // held between the gate and the picker's file event — consent runs before the picker opens.
-const { requestConsent } = useDocumentConsent();
-let docGrant: ConsentGrant | null = null;
 
 // The extracted payload handed to the review modal (null when closed).
 const reviewReady = ref<TravelReady | null>(null);
@@ -79,11 +75,8 @@ const reviewSubmitting = ref(false);
 // when launched from the list header (target auto-resolves by date).
 const pendingTripTarget = ref<string | null>(null);
 
-const {
-  isProcessing: isReadingDoc,
-  processFile: processTravelDoc,
-  deliverTravel,
-} = useDocumentToTravel({
+// DELIVERY only — the capture half moved to `MagicBeansDoor` and the shared spine.
+const { deliverTravel } = useDocumentToTravel({
   onTravelReady: (ready) => {
     // If launched from a trip's detail page, default to that trip (modal still allows New/other).
     const target = overrideTripTarget(
@@ -99,22 +92,17 @@ const {
 // The AI document picker (a camera-or-file chooser on touch devices, a direct
 // file dialog on desktop) is opened via its exposed pick() after consent; it
 // emits the chosen file. See AiDocumentPicker.vue.
-const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 
 /**
- * 📄 entry point. Consent gate runs BEFORE the picker; a decline is a silent no-op. When called
- * with a `tripId` (from a trip's detail page), the review modal defaults to attaching to that
- * trip; the list-header call passes nothing → the target auto-resolves by date.
+ * Which trip a capture should attach to, decided at the TAP.
+ *
+ * EVERY door on this page sets this explicitly — the list header to `null`, a trip's detail
+ * page to that trip. That is what stops a capture from trip X that ends in `none` or a refusal
+ * leaving its target behind for the NEXT travel capture to silently attach to. `onTravelReady`
+ * consumes and clears it on the success path.
  */
-async function handleAddFromDocument(tripId?: string): Promise<void> {
+function targetTrip(tripId?: string): void {
   pendingTripTarget.value = tripId ?? null;
-  const granted = await requestConsent();
-  if (!granted) {
-    pendingTripTarget.value = null;
-    return;
-  }
-  docGrant = granted;
-  aiDocPicker.value?.pick();
 }
 
 // Document-reader cross-surface dispatch: the FAB card / new-trip-wizard banner
@@ -126,7 +114,6 @@ useMagicReaderConsumer(
   'document',
   (payload) => {
     if (payload) deliverTravel(payload.data, payload.env);
-    else void handleAddFromDocument();
   },
   canReadDocument
 );
@@ -830,11 +817,19 @@ async function addQuickIdea() {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <PageWelcomeSubtitle :text="t('travel.subtitle')" />
         <div class="flex flex-wrap items-center gap-2">
-          <MagicReaderPill
-            v-if="canReadDocument"
-            :label="t('ai.magic.perform')"
-            @click="handleAddFromDocument"
-          />
+          <MagicBeansDoor>
+            <template #trigger="{ open }">
+              <MagicReaderPill
+                :label="t('ai.magic.perform')"
+                @click="
+                  () => {
+                    targetTrip();
+                    open();
+                  }
+                "
+              />
+            </template>
+          </MagicBeansDoor>
           <button
             v-if="canEditActivities"
             type="button"
@@ -969,11 +964,19 @@ async function addQuickIdea() {
             <!-- ✨ Beanies AI — read a booking into THIS trip. Same responsive pill as
                  everywhere else; defaults the review modal to the open trip (user can
                  still switch to New / another trip). -->
-            <MagicReaderPill
-              v-if="canReadDocument"
-              :label="t('ai.magic.perform')"
-              @click="handleAddFromDocument(selectedVacation.id)"
-            />
+            <MagicBeansDoor>
+              <template #trigger="{ open }">
+                <MagicReaderPill
+                  :label="t('ai.magic.perform')"
+                  @click="
+                    () => {
+                      targetTrip(selectedVacation?.id);
+                      open();
+                    }
+                  "
+                />
+              </template>
+            </MagicBeansDoor>
             <div class="flex gap-1.5">
               <button
                 type="button"
@@ -1456,12 +1459,6 @@ async function addQuickIdea() {
     <!-- Linked Beanie List drawer — opened from the embed, overlays the page (#33) -->
     <ListDetailModal :list-id="linkedListId" @close="linkedListId = null" />
 
-    <!-- Add travel plans from a document (#30): picker, review modal, overlay. The consent
-         modal is mounted globally in App.vue (#64). -->
-    <AiDocumentPicker
-      ref="aiDocPicker"
-      @file="(f) => docGrant && void processTravelDoc(f, docGrant)"
-    />
     <TravelExtractReviewModal
       :open="reviewReady !== null"
       :ready="reviewReady"
@@ -1469,7 +1466,6 @@ async function addQuickIdea() {
       @close="reviewReady = null"
       @submit="onReviewSubmit"
     />
-    <AiProcessingOverlay :open="isReadingDoc" />
 
     <!-- Copied toast -->
     <Transition

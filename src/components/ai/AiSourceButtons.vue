@@ -3,7 +3,7 @@
  * The quieter "or from…" pair beneath an AI reader's primary field: take a photo, or choose
  * a file.
  *
- * Extracted from `RecipeLinkModal` (#84) at the moment a SECOND caller appeared — the
+ * Extracted from the old link modal (#84) when a SECOND caller appeared — the
  * magic-beans sheet — rather than after the copy shipped. `docs/lessons.md` §11 applied one
  * step earlier than usual, which is the only time it is cheap.
  *

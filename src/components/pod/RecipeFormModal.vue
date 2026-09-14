@@ -16,15 +16,14 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import FormSection from '@/components/ui/FormSection.vue';
 import RecipeSourceStrip from './RecipeSourceStrip.vue';
-import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
-import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
+import type { SharePayload } from '@/types/magicPayload';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import type { DishImagePrefill } from '@/types/magicPayload';
 import { diffPayload } from '@/utils/diffPayload';
 import { recipeComparable } from '@/utils/recipeComparable';
 import type { RecipeTimeField } from '@/constants/recipeTimeFields';
-import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -291,8 +290,6 @@ const showSourceStrip = computed(
   () => !isEditing.value && !props.prefill && name.value.trim().length === 0
 );
 
-const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
-
 /**
  * The form runs its OWN capture, and fills ITSELF in.
  *
@@ -311,32 +308,25 @@ const capture = useRecipeCapture({
 });
 
 /**
- * ADR-030 CONSENT GATE — the same one every other reader entry point runs.
+ * This form is the ONE door that keeps its payload instead of dispatching by kind.
  *
- * `useDocumentConsent`'s own header is explicit that this must run BEFORE a single document
- * leaves the device, and FamilyCookbookPage, TravelPlansPage and FamilyPlannerPage all await
- * it first. When this form took ownership of its own capture it inherited five mount points
- * (the cookbook, the recipe page, the meal-planner rail, the meal editor and the favourite
- * picker) and none of them gate anything — so a family that had actively DECLINED could pick
- * a scan of a recipe card from the rail and have it sent to the managed model with the modal
- * never shown. Owning the capture means owning the gate that goes with it.
+ * Routing by kind would `router.push('/pod/cookbook')` and UNMOUNT the form the user is
+ * filling in — at four of its five mount points (the meal editor, the recipe rail, the
+ * favourite picker, the recipe detail page) that is a hard regression, not a caveat. So the
+ * door offers the payload here first.
+ *
+ * Returning FALSE for anything else is the point: paste a school invite into the recipe form
+ * and it still becomes an activity on the Activities page. Requirement 1.3 holds — the kind
+ * decides the destination — with exactly one exception, which is the surface that can consume
+ * that kind itself.
+ *
+ * The ADR-030 consent gate came with the capture and has gone with it: `MagicBeansDoor` mints
+ * the grant at the commit, before its picker, for every door including this one.
  */
-const { requestConsent } = useDocumentConsent();
-// Held between the gate and the picker's file event: consent runs before the picker opens,
-// but the extraction call that needs the token happens once a file is chosen.
-let docGrant: ConsentGrant | null = null;
-
-async function startLinkCapture(url: string): Promise<void> {
-  const granted = await requestConsent();
-  if (!granted) return;
-  await capture.processUrl(url, granted);
-}
-
-async function startDocumentCapture(): Promise<void> {
-  const granted = await requestConsent();
-  if (!granted) return;
-  docGrant = granted;
-  aiDocPicker.value?.pick();
+function claimRecipe(payload: SharePayload): boolean {
+  if (payload.kind !== 'recipe') return false;
+  capture.deliverRecipe(payload.source, payload.env);
+  return true;
 }
 
 const modalTitle = computed(() =>
@@ -558,32 +548,14 @@ const LIST_TEXTAREA_CLASS =
          overlay that silently anchors to the viewport in one of them is the kind of bug
          that only shows up on one variant. -->
     <div class="relative">
-      <RecipeSourceStrip
-        v-if="showSourceStrip"
-        @submit="(url) => void startLinkCapture(url)"
-        @document="void startDocumentCapture()"
-      />
-
-      <!-- Reading blocks the form: every field is about to be overwritten, so letting the
-           user type meanwhile would only throw their work away. -->
-      <div
-        v-if="capture.isProcessing.value"
-        class="dark:bg-surface-ground/85 absolute inset-0 z-10 grid place-items-center rounded-[var(--sq)] bg-white/85 backdrop-blur-sm"
-      >
-        <div class="flex flex-col items-center gap-3">
-          <BeanieSpinner size="lg" :halo="true" />
-          <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-semibold">
-            {{ t('ai.processing') }}
-          </p>
-        </div>
-      </div>
+      <MagicBeansDoor v-if="showSourceStrip" :claim="claimRecipe">
+        <template #trigger="{ open }">
+          <RecipeSourceStrip @start="open" />
+        </template>
+      </MagicBeansDoor>
 
       <!-- The consent modal is mounted globally in App.vue (#64) and stacks above this
            modal, so this form asks for consent without hosting the UI. -->
-      <AiDocumentPicker
-        ref="aiDocPicker"
-        @file="(f) => docGrant && void capture.processFile(f, docGrant)"
-      />
 
       <FormSection label-key="recipes.section.dish" emoji="🍽️" first>
         <FormFieldGroup :label="t('recipes.field.name')" required>
