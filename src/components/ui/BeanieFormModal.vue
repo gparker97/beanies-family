@@ -25,7 +25,13 @@ interface Props {
    * `isolation: isolate` has to sit on the same box as the layer it contains.
    */
   bodyClass?: string;
-  /** When true, uses the #custom-header slot edge-to-edge (no padding/border). Modal only. */
+  /**
+   * Render the `#custom-header` slot edge-to-edge, with no padding and no rule beneath it.
+   *
+   * ⚠️ Works for BOTH variants. It was modal-only, and silently did nothing on a drawer — a
+   * caller could pass it, see no effect, and have no way to tell that from a styling mistake.
+   * `BaseSidePanel` now honours it on the same terms `BaseModal` does.
+   */
   customHeader?: boolean;
   /** Render as a centered modal or a right-side drawer. */
   variant?: 'modal' | 'drawer';
@@ -89,6 +95,7 @@ const containerProps = computed(() => {
       open: props.open,
       size: drawerSizeMap[props.size] ?? ('medium' as DrawerSize),
       closable: !props.isSubmitting,
+      customHeader: props.customHeader,
       layer: props.layer,
     };
   }
@@ -106,7 +113,7 @@ const containerProps = computed(() => {
 <template>
   <component :is="containerComponent" v-bind="containerProps" @close="emit('close')">
     <template #header>
-      <slot v-if="customHeader && variant === 'modal'" name="custom-header" />
+      <slot v-if="customHeader" name="custom-header" />
       <div v-else class="flex w-full items-center gap-3">
         <!-- Icon box. The `icon` slot lets a caller supply artwork instead of an
              emoji (e.g. the beanie-bell on Settings → Reminders); `iconColor`

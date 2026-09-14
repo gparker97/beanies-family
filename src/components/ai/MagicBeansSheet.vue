@@ -103,29 +103,40 @@ function handleSave(): void {
     layer="top"
     :open="open"
     :title="t('ai.capture.title')"
-    icon="✨"
-    icon-bg="var(--tint-orange-8)"
+    custom-header
     size="default"
     :save-disabled="!text.trim()"
     :save-label="t('ai.capture.action')"
     @close="emit('close')"
     @save="handleSave"
   >
-    <!-- The tagline band. Caveat + Heritage Orange on a soft gradient tint, and the thing the
-         sheen travels across — deliberately NOT the textarea: a shimmer over an input is the
-         skeleton-loader idiom, so it reads as loading or disabled and it fights the caret.
+    <!-- THE HEADER ITSELF, not a block under it: the feature's name and its tagline in one
+         tinted gradient, occupying the whole header area with no rule beneath. That is what the
+         approved mockup draws, and it is what makes magic beans read as a feature rather than
+         another form.
 
-         The band lives in the BODY rather than the header because `customHeader` is modal-only
-         and this is a drawer; the standard header (icon box + title) is the house pattern and
-         stays. --magic-sheen-color is set here because the shared sheen is white, which is
-         invisible on a light tint. -->
-    <div class="magic-shimmer magic-shimmer-slow magic-tagline-band mb-4 rounded-2xl px-3.5 py-3">
-      <p
-        class="text-primary-500 dark:text-accent-lift relative z-[1] m-0 font-[Caveat,Outfit,cursive] text-base leading-snug font-bold"
-      >
-        {{ t('ai.capture.tagline') }}
-      </p>
-    </div>
+         ⚠️ Deliberately DIFFERENT from every other drawer, which puts only a title there. Two
+         earlier attempts were both worse: the band in the BODY under a standard header did not
+         match the mockup, and removing the title to fix that left an EMPTY bar above the rule.
+
+         This is also what the sheen travels across, and deliberately not the textarea: a
+         shimmer over an input is the skeleton-loader idiom, so it reads as loading or disabled
+         and it fights the caret. `--magic-sheen-color` is set by `.magic-tagline-band` because
+         the shared sheen is white, which is invisible on a light tint. -->
+    <template #custom-header>
+      <div class="magic-shimmer magic-shimmer-slow magic-tagline-band px-6 py-4">
+        <p
+          class="font-outfit dark:text-ink relative z-[1] m-0 flex items-center gap-2 text-lg leading-tight font-bold text-[var(--color-text)]"
+        >
+          <span aria-hidden="true">✨</span>{{ t('ai.capture.title') }}
+        </p>
+        <p
+          class="text-primary-500 dark:text-accent-lift relative z-[1] mt-0.5 mb-0 font-[Caveat,Outfit,cursive] text-base leading-snug font-bold"
+        >
+          {{ t('ai.capture.tagline') }}
+        </p>
+      </div>
+    </template>
 
     <FormFieldGroup :label="t('ai.capture.label')">
       <div ref="fieldWrap">

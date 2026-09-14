@@ -51,18 +51,19 @@ function makeEnv(correction?: { source: typeof PREPARED; token?: string }) {
 function mountBanner(env: ReturnType<typeof makeEnv>, from: ShareKind = 'travel') {
   return mount(MagicMiscategorisedBanner, {
     props: { env, from },
-    global: {
-      stubs: {
-        ChoiceModal: {
-          name: 'ChoiceModal',
-          props: ['open', 'title', 'options', 'layer'],
-          emits: ['select', 'close'],
-          template: '<div />',
-        },
-      },
-    },
+    // `SmoothHeight` is a real component here, not a stub: the choices live inside its default
+    // slot, so stubbing it would hide the very thing these cases assert is reachable.
+    global: { stubs: { SmoothHeight: { template: '<div><slot /></div>' } } },
   });
 }
+
+/** The affordance that expands the chooser. */
+const toggle = (w: ReturnType<typeof mountBanner>) =>
+  w.findAll('button').find((b) => b.text().includes('ai.correct.action'))!;
+
+/** The kind buttons, once expanded. Empty while collapsed — which is itself an assertion. */
+const choices = (w: ReturnType<typeof mountBanner>) =>
+  w.findAll('button').filter((b) => b.text().includes('ai.capture.dest.'));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -108,12 +109,37 @@ describe('when the correction is offered at all', () => {
     expect(mountBanner(makeEnv({ source: PREPARED, token: 'tok' })).text()).toBe('');
   });
 
-  it('never offers the kind beanies already chose', () => {
+  it('never offers the kind beanies already chose', async () => {
     const w = mountBanner(makeEnv({ source: PREPARED, token: 'tok' }), 'recipe');
-    const options = w.findComponent({ name: 'ChoiceModal' }).props('options') as Array<{
-      id: string;
-    }>;
-    expect(options.map((o) => o.id)).toEqual(['event', 'travel']);
+    await toggle(w).trigger('click');
+
+    expect(choices(w).map((b) => b.text())).toEqual([
+      expect.stringContaining('ai.capture.dest.event'),
+      expect.stringContaining('ai.capture.dest.travel'),
+    ]);
+  });
+
+  it('shows the choices IN PLACE, not in a second modal over the one being corrected', async () => {
+    // A modal on top of a modal, for one tap, made the user leave the evidence to answer a
+    // question about it — and rendered the kinds as monochrome glyphs that read as disabled.
+    const w = mountBanner(makeEnv({ source: PREPARED, token: 'tok' }));
+    expect(choices(w)).toHaveLength(0);
+
+    await toggle(w).trigger('click');
+
+    expect(choices(w).length).toBeGreaterThan(0);
+    // The SAME emoji vocabulary the sheet offers and the overlay resolves.
+    expect(w.text()).toContain('🍳');
+  });
+
+  it('promises free only where the promise is load-bearing — inside the expanded chooser', async () => {
+    const w = mountBanner(makeEnv({ source: PREPARED, token: 'tok' }));
+    expect(w.text()).not.toContain('ai.correct.free');
+
+    await toggle(w).trigger('click');
+
+    // The moment the user is deciding whether this costs them something.
+    expect(w.text()).toContain('ai.correct.free');
   });
 });
 
@@ -124,17 +150,17 @@ describe('the handler order', () => {
     refuseIfBusy.mockReturnValue(true);
     const w = open();
 
-    await w.find('button').trigger('click');
+    await toggle(w).trigger('click');
 
-    expect(w.findComponent({ name: 'ChoiceModal' }).props('open')).toBe(false);
+    expect(choices(w)).toHaveLength(0);
     expect(requestConsent).not.toHaveBeenCalled();
   });
 
   it('closes the host BEFORE starting the correction', async () => {
     const w = open();
-    await w.find('button').trigger('click');
+    await toggle(w).trigger('click');
 
-    await w.findComponent({ name: 'ChoiceModal' }).vm.$emit('select', 'recipe');
+    await choices(w)[1]!.trigger('click'); // 'recipe' — 'travel' is the `from`
     await flushPromises();
 
     // Leaving the host mounted stacks two review modals and routes underneath an open one —
@@ -150,8 +176,8 @@ describe('the handler order', () => {
 
   it('mints a FRESH consent grant rather than replaying one', async () => {
     const w = open();
-    await w.find('button').trigger('click');
-    await w.findComponent({ name: 'ChoiceModal' }).vm.$emit('select', 'recipe');
+    await toggle(w).trigger('click');
+    await choices(w)[1]!.trigger('click');
     await flushPromises();
 
     // Same document, but a new user action on a different surface: one prompt answers for
@@ -162,8 +188,8 @@ describe('the handler order', () => {
   it('does nothing at all when consent is declined, and stays offered', async () => {
     requestConsent.mockResolvedValue(null);
     const w = open();
-    await w.find('button').trigger('click');
-    await w.findComponent({ name: 'ChoiceModal' }).vm.$emit('select', 'recipe');
+    await toggle(w).trigger('click');
+    await choices(w)[1]!.trigger('click');
     await flushPromises();
 
     expect(ingestInAppSource).not.toHaveBeenCalled();
@@ -172,9 +198,10 @@ describe('the handler order', () => {
     expect(w.text()).toContain('ai.correct.action');
   });
 
-  it('opens its picker ABOVE a modal, not level with one', async () => {
-    // `RecipeFormModal` is itself z-[60] at its meal-editor mount; at equal specificity source
-    // order alone would decide whether the picker is visible.
-    expect(open().findComponent({ name: 'ChoiceModal' }).props('layer')).toBe('top');
+  it('needs no stacking layer at all, because it opens nothing', () => {
+    // The old picker was a `ChoiceModal` that had to clear its host — `RecipeFormModal` is
+    // itself z-[60] at its meal-editor mount, so source order decided whether it was visible.
+    // Expanding in place removes the question rather than answering it.
+    expect(open().findComponent({ name: 'ChoiceModal' }).exists()).toBe(false);
   });
 });

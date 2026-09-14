@@ -448,6 +448,7 @@
   .animate-beanie-shimmer,
   .attention-pulse,
   .bell-ring,
+  .magic-tick,
   .magic-shimmer::after {
     animation: none !important;
   }
@@ -782,6 +783,48 @@
 .magic-shimmer-once::after {
   animation-fill-mode: forwards;
   animation-iteration-count: 1;
+}
+
+/**
+ * The reading beat: the three destination tiles pulse in sequence while beanies works out what
+ * the document is.
+ *
+ * ⚠️ A PULSE, not a sheen — the mockup's tiles `tick`, and the 105° sheen runs on the header
+ * band instead. They are different idioms doing different jobs: the sheen says "this surface is
+ * magic", the tick says "something is happening right now, in this order". The overlay had the
+ * resolve (one sheen pass on the winning tile) but not the wait, so the tiles sat inert for the
+ * several seconds that actually need a heartbeat.
+ *
+ * Staggered rather than synchronous: three tiles breathing in unison reads as a loading
+ * skeleton, and in sequence as a decision being made.
+ *
+ * Opacity here is deliberate and does NOT break the CIG's "no opacity on text a person reads"
+ * rule: nothing is being read during the beat — the answer is not known yet, and the labels are
+ * accessible names rather than content. The RESTING state carries no opacity, which is the one
+ * that is read. Killed outright under `prefers-reduced-motion` by the sweep at the top of this
+ * file, which targets animations on these classes.
+ */
+@keyframes magic-tick {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+
+  50% {
+    opacity: 0.92;
+  }
+}
+
+.magic-tick {
+  animation: magic-tick 1.05s ease-in-out infinite;
+}
+
+.magic-tick:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.magic-tick:nth-child(3) {
+  animation-delay: 0.32s;
 }
 
 /* ───── Magic tagline band ───────────────────────────────────────────────────

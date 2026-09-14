@@ -10031,18 +10031,14 @@ const STRING_DEFS = {
   // ── "not right?" — the free correction ────────────────────────────────────────────────
   // Per the beanie-mode floor these keep the real nouns. A correction is about DATA being
   // wrong, and a reader who does not know the joke must still be able to act on it.
-  'ai.correct.prompt': {
-    en: 'Did beanies get this wrong?',
-    beanie: 'did beanies get this wrong?',
-  },
-  'ai.correct.action': {
-    en: 'Tell beanies what it is',
-    beanie: 'tell beanies what it is',
-  },
-  /** Shown beside the affordance only when the re-read is actually free (managed tier, grant
-   *  in hand). Never promised when we cannot honour it. */
+  // Short on purpose. It sits at the FOOT of a review modal, after the user has scanned the
+  // details — so it has to be recognisable at a glance, not read.
+  'ai.correct.prompt': { en: 'Not right?', beanie: 'not right?' },
+  'ai.correct.action': { en: 'Tell us what this is', beanie: 'tell us what this is' },
+  /** Shown inside the EXPANDED chooser, only when the re-read is actually free (managed tier,
+   *  grant in hand) — the one moment the promise is load-bearing, because it is the moment the
+   *  user is deciding whether this costs them something. Never promised when we cannot honour it. */
   'ai.correct.free': { en: "This one's on us.", beanie: "this one's on us." },
-  'ai.correct.title': { en: 'What is this?', beanie: 'what is this?' },
   // beanies looked again and still disagrees. Real nouns, per the beanie floor: the user needs
   // to know the document is fine, nothing was charged, and re-photographing it will not help.
   'ai.correct.disagreed.title': {
