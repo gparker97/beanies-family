@@ -8,7 +8,6 @@
  * `PolaroidImage` placeholder illustration when no photo is set,
  * matching the mockup's kraft-paper style.
  */
-import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AddTile from '@/components/pod/shared/AddTile.vue';
@@ -23,10 +22,8 @@ import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
-import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
-import RecipeLinkModal from '@/components/pod/RecipeLinkModal.vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
-import { useDocumentConsent, type ConsentGrant } from '@/composables/useDocumentConsent';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import { useTranslation } from '@/composables/useTranslation';
@@ -58,11 +55,7 @@ const editing = ref<Recipe | null>(null);
 const { canReadRecipe } = useMagicReader();
 // The consent modal is mounted ONCE in App.vue (#64); this page only asks. The grant is
 // held between the gate and the picker's file event — consent runs before the picker opens.
-const { requestConsent } = useDocumentConsent();
-let docGrant: ConsentGrant | null = null;
-const aiDocPicker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
 const prefill = ref<RecipePrefill | null>(null);
-const linkModalOpen = ref(false);
 const { isPending } = useRecipePhotoPending();
 
 /**
@@ -150,34 +143,6 @@ function consumeKeptRecipeIfAllowed(): void {
   openWithPrefill(sharedRecipeToPrefill(kept));
 }
 
-function handlePastedLink(url: string): void {
-  linkModalOpen.value = false;
-  if (docGrant) void capture.processUrl(url, docGrant);
-}
-
-/** Secondary sources, chosen from inside the link modal rather than a separate chooser. */
-function handleUseCamera(): void {
-  linkModalOpen.value = false;
-  aiDocPicker.value?.pickCamera();
-}
-function handleUseFile(): void {
-  linkModalOpen.value = false;
-  aiDocPicker.value?.pickFile();
-}
-
-/**
- * 🍳 entry point. Consent runs BEFORE anything opens; a decline is a silent no-op.
- *
- * Opens the LINK modal directly. A link is the everyday source, so it gets the field
- * focused and ready to paste; camera and file live inside that modal, one tap away.
- */
-async function handleAddFromDocument(): Promise<void> {
-  const granted = await requestConsent();
-  if (!granted) return;
-  docGrant = granted;
-  linkModalOpen.value = true;
-}
-
 // Cross-surface dispatch: the global FAB card sets `pendingMagic` and routes here;
 // without this the chip would navigate to the cookbook and then silently do nothing.
 // A share arrives already extracted (#64) and is DELIVERED rather than re-read.
@@ -193,7 +158,6 @@ useMagicReaderConsumer(
   'recipe',
   (payload) => {
     if (payload) capture.deliverRecipe(payload.source, payload.env);
-    else void handleAddFromDocument();
   },
   canReadRecipe
 );
@@ -362,12 +326,18 @@ async function handleSaved(id: string): Promise<void> {
         </div>
 
         <div class="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center">
-          <MagicReaderPill
-            v-if="canReadRecipe"
-            :label="t('recipeExtract.reader.label')"
-            :aria-label="t('recipeExtract.reader.aria')"
-            @click="handleAddFromDocument"
-          />
+          <!-- The cookbook's door now opens the SAME sheet as every other, so a recipe link,
+               a photo, a PDF or pasted text all arrive here — and something that turns out not
+               to be a recipe routes to the page that owns it instead of failing. -->
+          <MagicBeansDoor>
+            <template #trigger="{ open }">
+              <MagicReaderPill
+                :label="t('ai.magic.perform')"
+                :aria-label="t('recipeExtract.reader.aria')"
+                @click="open"
+              />
+            </template>
+          </MagicBeansDoor>
           <AddEntityButton
             v-if="canEditActivities"
             :label="t('cookbook.addRecipe')"
@@ -512,20 +482,6 @@ async function handleSaved(id: string): Promise<void> {
       :prefill="prefill"
       @close="closeModal"
       @saved="handleSaved"
-    />
-
-    <AiProcessingOverlay :open="capture.isProcessing.value" />
-
-    <AiDocumentPicker
-      ref="aiDocPicker"
-      @file="(f) => docGrant && void capture.processFile(f, docGrant)"
-    />
-    <RecipeLinkModal
-      :open="linkModalOpen"
-      @close="linkModalOpen = false"
-      @submit="handlePastedLink"
-      @camera="handleUseCamera"
-      @file="handleUseFile"
     />
   </div>
 </template>

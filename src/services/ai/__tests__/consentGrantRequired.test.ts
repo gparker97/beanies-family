@@ -15,7 +15,7 @@ import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import { __testConsentGrant } from '@/test/consentGrant';
 
 const file = () => new File(['x'], 'a.jpg', { type: 'image/jpeg' });
-const base = { tier: 'managed' as const, todayIso: '2026-01-01' };
+const base = { tier: 'managed' as const, todayIso: '2026-01-01', familyId: 'fam-test' };
 
 describe('ConsentGrant is required to reach the extraction funnel (#64)', () => {
   it('does not compile without a grant', () => {

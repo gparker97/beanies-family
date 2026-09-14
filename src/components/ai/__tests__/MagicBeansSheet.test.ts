@@ -145,11 +145,19 @@ describe('MagicBeansSheet', () => {
     expect(w.emitted('file')).toHaveLength(1);
   });
 
-  it('opens ABOVE the quick-add sheet, as an overlay-layer drawer', () => {
-    // z-index is not decorative here: the quick-add BaseModal is z-50, so a same-layer panel
-    // would render underneath it and be invisible.
+  it('opens ABOVE every host it can be opened from, at the TOP layer', () => {
+    // z-index is not decorative here. It was `overlay` while the only host was the quick-add
+    // BaseModal at z-50. Since the doors were unified this sheet also opens from INSIDE other
+    // modals — the activity modal's quick-start tile, the recipe form's source strip — and at
+    // `overlay` its backdrop (z-[55]) sits UNDER a host panel at z-[60], leaving that host
+    // bright and clickable behind it.
+    //
+    // `top` is safe at every host by construction rather than by inspection: the sheet's own
+    // invariant is that it closes before any ingest starts, so it is never co-resident with
+    // AiProcessingOverlay or the consent prompt. Fixing it here rather than per-door is what
+    // stops every future door making a stacking decision it can get wrong.
     const modal = mountSheet().findComponent({ name: 'BeanieFormModal' });
     expect(modal.props('variant')).toBe('drawer');
-    expect(modal.props('layer')).toBe('overlay');
+    expect(modal.props('layer')).toBe('top');
   });
 });

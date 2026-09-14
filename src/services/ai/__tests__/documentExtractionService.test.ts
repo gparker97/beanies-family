@@ -88,6 +88,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(true);
@@ -105,6 +106,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
@@ -127,8 +129,11 @@ describe('extractEventFromDocument — tier dispatch', () => {
     // `task` is deliberately NOT on the request: it is run()'s first argument, and carrying
     // it in both places would be two sources of truth that can disagree.
     expect(Object.keys(request).sort()).toEqual(['familyId', 'signal', 'source', 'todayIso']);
-    // Not supplied by this caller, so it is carried as undefined and JSON.stringify drops it.
-    expect(request.familyId).toBeUndefined();
+    // `familyId` is now REQUIRED rather than optional — an unattributable read cannot be
+    // counted, and an uncounted read is the loophole the meter exists to close. So it is
+    // always present, and this assertion is about what is NOT here: the key list above is the
+    // whole request, and family DATA (members, activities, balances) is absent from it.
+    expect(request.familyId).toBe('fam-test');
   });
 
   it('threads familyId through to the provider when supplied (#83)', async () => {
@@ -176,6 +181,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     const [task, request] = mockManagedExtract.mock.calls[0];
@@ -198,6 +204,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.errorCode).toBe('compression');
@@ -211,6 +218,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(false);
@@ -228,6 +236,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'byok',
       todayIso: '2026-06-03',
       byok: { provider: 'openai', apiKey: 'sk-test' },
+      familyId: 'fam-test',
       grant: __testConsentGrant,
     });
 
@@ -240,6 +249,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'byok',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res).toEqual({
@@ -262,6 +272,7 @@ describe('extractEventFromDocument — tier dispatch', () => {
       tier: 'on-device',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(false);
@@ -286,6 +297,7 @@ describe('extractEventFromDocument — failure classification', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res).toEqual({
@@ -305,6 +317,7 @@ describe('extractEventFromDocument — failure classification', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(false);
@@ -318,6 +331,7 @@ describe('extractEventFromDocument — failure classification', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.errorCode).toBe('timeout');
@@ -330,6 +344,7 @@ describe('extractEventFromDocument — failure classification', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(false);
@@ -344,6 +359,7 @@ describe('extractEventFromDocument — failure classification', () => {
         tier: 'managed',
         todayIso: '2026-06-03',
         grant: __testConsentGrant,
+        familyId: 'fam-test',
       })
     ).resolves.toMatchObject({ success: false });
   });
@@ -365,6 +381,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(true);
@@ -389,6 +406,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(true);
@@ -403,6 +421,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(true);
@@ -422,6 +441,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     // Three images already collected, so at most two pages remain worth rendering.
@@ -439,6 +459,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.truncated).toBe(true);
@@ -455,6 +476,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.compressedBlob).toBe(first);
@@ -467,6 +489,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(true);
@@ -479,6 +502,7 @@ describe('multi-document extraction (#64)', () => {
       tier: 'managed',
       todayIso: '2026-06-03',
       grant: __testConsentGrant,
+      familyId: 'fam-test',
     });
 
     expect(res.success).toBe(false);

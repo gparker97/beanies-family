@@ -72,6 +72,16 @@ async function save(wrapper: Awaited<ReturnType<typeof mountModal>>['wrapper']) 
   await nextTick();
 }
 
+/**
+ * The door renders its trigger through a slot and self-gates on permission, so an unstubbed
+ * one renders nothing and takes the trigger with it. This stands in for it.
+ */
+const MagicBeansDoorStub = {
+  name: 'MagicBeansDoor',
+  props: ['claim'],
+  template: '<div><slot name="trigger" :open="() => {}" /></div>',
+};
+
 describe('RecipeFormModal — sectioned layout', () => {
   it('groups the eleven fields into four labelled sections', async () => {
     const { wrapper } = await mountModal();
@@ -124,9 +134,11 @@ describe('RecipeFormModal — sectioned layout', () => {
           PhotoAttachments: true,
           AiDocumentPicker: true,
           DocumentExtractConsentModal: true,
-          // Stubbed so the ONLY url input this can find is the standalone "Link" field —
-          // the strip has one of its own, which is exactly the collision being guarded.
+          // Stubbed so the ONLY url input this can find is the standalone "Link" field.
+          // The strip itself no longer HAS one — every door opens the same sheet now — but the
+          // guarantee still matters: on a blank new recipe there is exactly one place to paste.
           RecipeSourceStrip: true,
+          MagicBeansDoor: MagicBeansDoorStub,
         },
       },
     });

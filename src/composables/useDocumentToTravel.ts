@@ -10,14 +10,9 @@
 
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
-import { ref } from 'vue';
-import { useAiCapability } from './useAiCapability';
-import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
-import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useVacationStore } from '@/stores/vacationStore';
-import { extractTravelFromDocument } from '@/services/ai/documentExtractionService';
 import {
   inferTripType,
   travelExtractionToSegments,
@@ -25,7 +20,6 @@ import {
 } from '@/utils/travelExtractionToSegments';
 import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
-import type { ConsentGrant } from './useDocumentConsent';
 import type { ResultEnvelope } from '@/types/magicPayload';
 import type { TravelExtractionResult } from '@/services/ai/types';
 import { toDateInputValue } from '@/utils/date';
@@ -60,14 +54,9 @@ export interface UseDocumentToTravelOptions {
 const SURFACE = 'travel-extract';
 
 export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
-  const { tier, byokConfig } = useAiCapability();
-  const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const { reportExtractionFailure } = useExtractionErrorToast();
   const vacationStore = useVacationStore();
-
-  const isProcessing = ref(false);
 
   /** Run intake → (rasterize) → extract → map → resolve for one document (consent granted). */
   /**
@@ -147,72 +136,5 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
     });
   }
 
-  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
-    if (isProcessing.value) return; // ignore a second pick while one is in flight
-
-    if (!isOnline.value) {
-      showToast('info', t('ai.offline.title'), t('ai.offline.message'));
-      return;
-    }
-
-    isProcessing.value = true;
-    logEvent({
-      level: 'info',
-      surface: SURFACE,
-      message: 'travel capture started',
-      // The SUCCESS path is instrumented too, so a failure RATE is computable. An event that
-      // only fires on failure has no denominator.
-      context: { action: 'start' },
-    });
-    try {
-      // The service owns document preparation: a PDF is rasterized to its first pages (up
-      // to MAX_EXTRACT_PAGES) and a photo is used as-is, then each page is compressed. The
-      // ORIGINAL file is still attached below, so the full PDF is never lost. Preparation
-      // failures come back classified as `compression`, never silent.
-      const result = await extractTravelFromDocument(file, {
-        tier: tier.value,
-        // Local YYYY-MM-DD so the model resolves relative dates against the user's calendar
-        // date and the proxy's date validation passes.
-        todayIso: toDateInputValue(new Date()),
-        byok: byokConfig.value ?? undefined,
-        grant,
-      });
-
-      if (result.success && result.data) {
-        deliverTravel(result.data, {
-          sourceFile: file,
-          compressedBlob: result.compressedBlob,
-          truncated: result.truncated,
-        });
-        return;
-      }
-
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'travel extraction failed',
-        context: { action: 'failed', error_code: result.errorCode },
-      });
-      reportExtractionFailure(result.errorCode);
-    } catch (err) {
-      // NO SILENT FAILURES (docs/lessons.md, CLAUDE.md § Observability). This was try/finally
-      // with NO catch, and the only caller does `void processTravelDoc(f)` — so any throw in
-      // travelExtractionToSegments, inferTripType or resolveTripTarget became an unhandled
-      // rejection: the spinner cleared, the review modal never opened, the user was told
-      // nothing, and CloudWatch recorded nothing. The whole travel surface emitted ZERO
-      // diagnostic events, against a rule the project calls mandatory.
-      reportError({
-        surface: SURFACE,
-        message: 'travel document processing threw',
-        severity: 'error',
-        error: err,
-        context: { action: 'threw' },
-      });
-      showToast('error', t('ai.error.title'), t('ai.error.generic'));
-    } finally {
-      isProcessing.value = false;
-    }
-  }
-
-  return { isProcessing, processFile, deliverTravel };
+  return { deliverTravel };
 }

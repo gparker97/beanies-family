@@ -10015,9 +10015,27 @@ const STRING_DEFS = {
     en: 'Paste a message, an email, or a link…',
     beanie: 'paste a message, an email, or a link…',
   },
-  'ai.capture.hint': {
-    en: 'An invite, a booking, a recipe — beanies works out which it is.',
-    beanie: 'an invite, a booking, a recipe — beanies works out which it is.',
+  // The Caveat tagline under the title. A TAGLINE, not help text — by the time this sheet is
+  // open the family has already tapped Magic beans, so it is the feature's voice rather than an
+  // instruction. Lowercase in BOTH registers, matching the CIG's other Caveat lines ("shhh…",
+  // "what are we tackling together? 🌱"), so the dual casing standard holds.
+  'ai.capture.tagline': {
+    en: "give us something to read and we'll work out the rest",
+    beanie: "give us something to read and we'll work out the rest",
+  },
+  // The three destination tiles' ACCESSIBLE names — the tiles are visually unlabelled, but an
+  // icon-only tile with no name is unusable with a screen reader. Keyed by ShareKind so the
+  // label is `t(\`ai.capture.dest.${kind}\`)`, derived rather than looked up in a parallel map.
+  'ai.capture.dest.event': { en: 'Activity', beanie: 'activity' },
+  'ai.capture.dest.travel': { en: 'Trip', beanie: 'trip' },
+  'ai.capture.dest.recipe': { en: 'Recipe', beanie: 'recipe' },
+  // Shown under the field when a single pasted token looks like a link but will not route.
+  // NON-BLOCKING: the sheet refuses only emptiness, because deciding what the content is IS
+  // the feature.
+  'ai.capture.badLinkHint': {
+    en: "That looks like a link, but it isn't one beanies can open. Paste it again, or send a photo instead.",
+    beanie:
+      "that looks like a link, but it isn't one beanies can open. paste it again, or send a photo instead.",
   },
   'ai.picker.openErrorTitle': {
     en: "Couldn't Open the Picker",
@@ -10032,7 +10050,9 @@ const STRING_DEFS = {
     beanie: "we weren't sure about this one. worth a quick check.",
   },
   'ai.addFromPhoto': { en: 'Add from a Photo', beanie: 'add from a photo' },
-  'ai.processing': { en: 'Reading your photo…', beanie: 'counting beans…' },
+  // Source-neutral: this is shown for a link and for pasted text as well as a photo, at three
+  // call sites. "Reading your photo…" was wrong at two of them.
+  'ai.processing': { en: 'Counting beans…', beanie: 'counting beans…' },
   'ai.sourcePhotoPreview': {
     en: 'Attaches when you save',
     beanie: 'attaches when you save',

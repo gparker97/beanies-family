@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
-import { useMagicReader } from '@/composables/useMagicReader';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import type { VacationTripType, VacationTripPurpose } from '@/types/models';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -36,7 +36,9 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 // "beanies can do magic" — read a travel booking into a built trip (#30).
-const { canReadDocument, openDocumentReader } = useMagicReader();
+// The door self-gates on `canReadAny` and owns opening. `openDocumentReader` is gone: it was
+// the last payload-less `openReader` caller, which navigated to /travel and asked the page to
+// open a picker the page no longer has.
 
 const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
   { value: 'fly_and_stay', emoji: '✈️', key: 'fly_and_stay' },
@@ -50,27 +52,32 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
 
 <template>
   <!-- "beanies can do magic" — read a travel booking into a built trip. New
-       trip only, and only when the flag + permission allow. Followed by an
+       trip only. The door self-gates on `canReadAny`, so the banner and its tap are removed
+       together rather than leaving a button whose handler does nothing. Followed by an
        "or add it yourself" divider before the manual fields. -->
-  <div v-if="isNewTrip && canReadDocument" class="mb-5">
-    <button
-      type="button"
-      class="magic-shimmer from-primary-500 to-terracotta-400 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.55)]"
-      @click="openDocumentReader"
-    >
-      <span
-        aria-hidden="true"
-        class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg"
-        >✨</span
-      >
-      <span class="relative z-[1] min-w-0 flex-1">
-        <span class="font-outfit block text-sm font-extrabold">{{ t('ai.magic.title') }}</span>
-        <span class="block text-xs leading-snug opacity-90">{{
-          t('ai.magic.travelSubtitle')
-        }}</span>
-      </span>
-      <span aria-hidden="true" class="font-outfit relative z-[1] font-extrabold">→</span>
-    </button>
+  <div v-if="isNewTrip" class="mb-5">
+    <MagicBeansDoor>
+      <template #trigger="{ open }">
+        <button
+          type="button"
+          class="magic-shimmer from-primary-500 to-terracotta-400 flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.55)]"
+          @click="open"
+        >
+          <span
+            aria-hidden="true"
+            class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg"
+            >✨</span
+          >
+          <span class="relative z-[1] min-w-0 flex-1">
+            <span class="font-outfit block text-sm font-extrabold">{{ t('ai.magic.title') }}</span>
+            <span class="block text-xs leading-snug opacity-90">{{
+              t('ai.magic.travelSubtitle')
+            }}</span>
+          </span>
+          <span aria-hidden="true" class="font-outfit relative z-[1] font-extrabold">→</span>
+        </button>
+      </template>
+    </MagicBeansDoor>
     <div
       class="font-outfit mt-4 flex items-center gap-3 text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase opacity-60"
     >

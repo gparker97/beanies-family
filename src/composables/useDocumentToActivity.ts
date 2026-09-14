@@ -9,21 +9,14 @@
 // Every outcome is explicit and non-silent (see docs/lessons.md): offline is guarded before
 // any work; every failure code maps to an informative toast at the right severity.
 
-import { ref } from 'vue';
-import { useAiCapability } from './useAiCapability';
-import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
-import { useExtractionErrorToast } from './useExtractionErrorToast';
-import type { ConsentGrant } from './useDocumentConsent';
-import { extractEventFromDocument } from '@/services/ai/documentExtractionService';
 import type { FieldConfidence } from '@/services/ai/types';
 import { reportError } from '@/utils/errorReporter';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import type { ResultEnvelope } from '@/types/magicPayload';
 import type { ExtractionResult } from '@/services/ai/types';
 import { sanitiseAttachmentBase } from '@/utils/sanitiseFilename';
-import { toDateInputValue } from '@/utils/date';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
 export interface UseDocumentToActivityOptions {
@@ -41,13 +34,8 @@ export interface UseDocumentToActivityOptions {
 }
 
 export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
-  const { tier, byokConfig } = useAiCapability();
-  const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const { reportExtractionFailure } = useExtractionErrorToast();
-
-  const isProcessing = ref(false);
 
   /**
    * The post-extraction half: notices, mapping, and the hand-off to the review modal.
@@ -121,43 +109,5 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     });
   }
 
-  /** Run the full intake → extract → prefill flow for one document. */
-  async function processFile(file: File, grant: ConsentGrant): Promise<void> {
-    if (isProcessing.value) return; // ignore a second pick while one is in flight
-
-    if (!isOnline.value) {
-      showToast('info', t('ai.offline.title'), t('ai.offline.message'));
-      return;
-    }
-
-    isProcessing.value = true;
-    try {
-      // The service owns document preparation: a PDF is rasterized to its first pages
-      // (up to MAX_EXTRACT_PAGES) and a photo is used as-is, then each page is compressed.
-      // Preparation failures come back classified as `compression`, never silent.
-      const result = await extractEventFromDocument(file, {
-        // Local YYYY-MM-DD (not a full ISO timestamp) so the model resolves relative dates
-        // against the user's calendar date, and the proxy's date validation passes.
-        tier: tier.value,
-        todayIso: toDateInputValue(new Date()),
-        byok: byokConfig.value ?? undefined,
-        grant,
-      });
-
-      if (result.success && result.data) {
-        deliverEvent(result.data, {
-          sourceFile: file,
-          compressedBlob: result.compressedBlob,
-          truncated: result.truncated,
-        });
-        return;
-      }
-
-      reportExtractionFailure(result.errorCode);
-    } finally {
-      isProcessing.value = false;
-    }
-  }
-
-  return { isProcessing, processFile, deliverEvent };
+  return { deliverEvent };
 }

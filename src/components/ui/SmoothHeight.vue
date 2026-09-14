@@ -16,17 +16,15 @@ import { nextTick, ref, watch } from 'vue';
  */
 const props = defineProps<{ revision: unknown }>();
 
-const el = ref<HTMLElement>();
+import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 
-const REDUCED_MOTION =
-  typeof window !== 'undefined' &&
-  !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const el = ref<HTMLElement>();
 
 watch(
   () => props.revision,
   async () => {
     const node = el.value;
-    if (!node || REDUCED_MOTION) return;
+    if (!node || prefersReducedMotion()) return;
 
     // `watch` (flush: 'pre') runs before the DOM update — capture the old height.
     const from = node.offsetHeight;

@@ -66,16 +66,25 @@ export interface ExtractOptions {
    */
   grant: ConsentGrant;
   /**
-   * Which family this extraction is for, so the managed proxy can rate-limit per family
-   * (#83). Optional: BYOK and on-device ignore it, and an absent id degrades to the proxy's
-   * IP limit rather than failing.
+   * Which family this read is billed to.
    *
-   * Passed as an OPTION rather than read from a store on purpose. This module is deliberately
-   * store-free — `grep -rn "from '@/stores/" src/services/ai/` returns nothing — and calling
-   * `useFamilyStore()` here would put app state into the one AI module that has none and make
-   * every existing test in this service require a Pinia instance.
+   * REQUIRED since the meter. It used to be optional in both directions, and the reason it
+   * gave — an absent id degrades to the proxy's IP limit — stopped being acceptable once every
+   * read had to be counted: with no id the Lambda has no partition key to write under, so the
+   * read happens, costs us money, and leaves no row. That is the loophole the meter exists to
+   * close, so an unattributable read is now REFUSED before the model
+   * (`resolveBillableFamilyId`), and omitting this is a compile error rather than a silent
+   * fallback.
+   *
+   * The Lambda still ACCEPTS a request without one and must continue to — every cached old
+   * bundle sends none, and 400ing them would break working installs. That asymmetry is
+   * deliberate; the skipped count is logged and alarmed so its real rate is visible.
+   *
+   * Still an OPTION rather than a store read: this module is deliberately store-free
+   * (`grep -rn "from '@/stores/" src/services/ai/` returns nothing), and calling a store here
+   * would put app state into the one AI module that has none.
    */
-  familyId?: string;
+  familyId: string;
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {
