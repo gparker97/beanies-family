@@ -688,6 +688,57 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(recorder.sent.length, 0, 'and the grant must not be touched');
     });
 
+    it('says DISAGREED, not malformed, when the model declines an asserted kind', async () => {
+      // Observed live: correcting a parents-evening notice to `travel` comes back `none`, which
+      // is the one way out the hinted prompt leaves. `model_shape` renders as "couldn't make
+      // sense of that one, try a clearer photo" — false about a perfectly legible document, and
+      // it invites a retry that costs a bean.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify({ kind: 'none' }) });
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'share',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'recipe' },
+          },
+        })
+      );
+
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 422);
+      assert.equal(JSON.parse(res.body).code, 'correction_disagreed');
+      assert.deepEqual(counted(), [], 'a disagreement is still not a read anyone pays for');
+    });
+
+    it('still says model_shape when the model returns a DIFFERENT kind', async () => {
+      // The model was told not to re-decide the category. Coming back with a third kind is a
+      // genuine shape failure, and must not be softened into a disagreement.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      globalThis.fetch = async () => fakeUpstream({ content: SHARE }); // kind: 'event'
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'share',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'recipe' },
+          },
+        })
+      );
+
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 502);
+      assert.equal(JSON.parse(res.body).code, 'model_shape');
+    });
+
     it('issues no grant when the feature is switched off', async () => {
       globalThis.fetch = async () => fakeUpstream({ content: SHARE });
       const res = await handler(
