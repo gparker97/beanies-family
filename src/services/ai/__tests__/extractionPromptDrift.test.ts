@@ -112,7 +112,15 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
       tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe')
     );
     expect(hinted).not.toEqual(plain);
-    expect(hinted).toContain('This IS a recipe');
+    expect(hinted).toContain('told us what it is: a recipe');
+    // ⚠️ The load-bearing half: the hinted SYSTEM message must DROP the default classification
+    // rule. «"none" is always better than a wrong guess» argues directly against the hint, and
+    // the system message wins — tested live against gemma4-31b, where a correction the model
+    // disagreed with came back as the original kind, tripped the wrong-kind guard, and cost the
+    // family both the grant and the answer. The plain prompt must still carry it.
+    // (Quote-free substring: these are JSON-stringified, so the prompt's own quotes are escaped.)
+    expect(plain).toContain('is always better than a wrong guess');
+    expect(hinted).not.toContain('is always better than a wrong guess');
   });
 
   it('a task that ignores the hint is UNCHANGED by it — one registry signature, not two', () => {

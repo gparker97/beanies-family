@@ -374,9 +374,20 @@ export async function handler(event) {
     // counted in neither column.
     if (read.kindHint && result?.kind !== read.kindHint) {
       console.error(`[ai-extract] correction returned kind=${result?.kind} want=${read.kindHint}`);
+      // `none` is a DISAGREEMENT, not a malformed answer: the hinted prompt asks the model to
+      // extract the asserted kind and leaves it exactly one way out — "only if the document
+      // contains nothing at all that could fill those fields". Observed live, correcting a
+      // parents-evening notice to `travel`. Folding it into `model_shape` tells the user
+      // "couldn't make sense of that one, try a clearer photo", which is false and invites a
+      // retry that costs a bean. Its own code, so the toast can say what actually happened.
+      //
+      // A different concrete kind IS a shape failure — the model was told not to re-decide.
+      const disagreed = result?.kind === 'none';
       return response(
-        502,
-        { error: 'Model returned wrong-shape output', code: 'model_shape' },
+        disagreed ? 422 : 502,
+        disagreed
+          ? { error: 'Correction not supported by the document', code: 'correction_disagreed' }
+          : { error: 'Model returned wrong-shape output', code: 'model_shape' },
         event
       );
     }

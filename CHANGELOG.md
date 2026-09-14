@@ -20,6 +20,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **The end time from an invitation is the one it actually says.** An invite reading "2pm to 4:30pm" filled the form in as 2pm to 3pm — the end time was being overwritten with the usual one-hour default a moment after it was read.
 
+- **Beanies says when it disagrees, instead of blaming the photo.** Asking it to read something as a kind it cannot see in the document said "couldn't make sense of that one, try a clearer photo" — untrue of a perfectly legible page, and it invited a retry that cost a bean. It now says plainly that it looked again and still can't see it, and that nothing was charged.
+
 - **A failed read now says what went wrong.** "Something went wrong reading that" has become the actual reason where there is one, along with which AI setting you are on, so an invalid key or an exhausted quota is recognisable instead of a mystery.
 
 ---

@@ -10043,6 +10043,17 @@ const STRING_DEFS = {
    *  in hand). Never promised when we cannot honour it. */
   'ai.correct.free': { en: "This one's on us.", beanie: "this one's on us." },
   'ai.correct.title': { en: 'What is this?', beanie: 'what is this?' },
+  // beanies looked again and still disagrees. Real nouns, per the beanie floor: the user needs
+  // to know the document is fine, nothing was charged, and re-photographing it will not help.
+  'ai.correct.disagreed.title': {
+    en: "Beanies Still Isn't Sure",
+    beanie: "beanies still isn't sure",
+  },
+  'ai.correct.disagreed.message': {
+    en: "beanies read it again and still can't see that in this one. Nothing was charged. You can fill it in yourself instead.",
+    beanie:
+      "beanies read it again and still can't see that in this one. nothing was charged. you can fill it in yourself instead.",
+  },
   // The free re-read was refused. Real nouns, per the beanie floor: the user needs to know
   // their work is unaffected and what to do next.
   'ai.correct.refused.title': { en: "Couldn't Read It Again", beanie: "couldn't read it again" },
