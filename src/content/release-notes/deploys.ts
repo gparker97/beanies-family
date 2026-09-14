@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.15',
+    date: '2026-09-15',
+    month: '15 september 2026',
+    summary: {
+      en: 'Magic beans reads what you hand it, wherever you are - and a wrong read is free to fix.',
+      beanie:
+        'magic beans reads what you hand it, wherever you are - and a wrong read is free to fix.',
+    },
+  },
+  {
     version: '2026.09.13',
     date: '2026-09-13',
     month: '13 september 2026',
