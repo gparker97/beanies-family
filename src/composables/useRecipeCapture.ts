@@ -18,6 +18,8 @@ import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
+import { resolveBillableFamilyId } from './useMagicBeanScope';
+import { refuseIfBusy, type IngestEnv } from './useSharedDocumentIngest';
 import { usePhotos } from './usePhotos';
 import { useRecipePhotoPending } from './useRecipePhotoPending';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -36,7 +38,6 @@ import {
 } from '@/utils/recipeExtractionToRecipe';
 import { RECIPE_TIME_FIELDS } from '@/constants/recipeTimeFields';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { recipeFetchService } from '@/services/ai/recipeFetchService';
 import { reportError } from '@/utils/errorReporter';
 import type { ConsentGrant } from './useDocumentConsent';
@@ -52,6 +53,13 @@ import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
 const SURFACE = 'recipe-extract';
+
+/**
+ * This composable's `IngestEnv`. Refetch is NOT a magic-beans door — it re-reads a recipe the
+ * family already saved — so it gets its own surface rather than borrowing one of the two ingest
+ * funnels, which would make a CloudWatch filter for either of them wrong.
+ */
+const CAPTURE_ENV: IngestEnv = { surface: SURFACE, origin: 'in-app' };
 
 /** Fixed buckets for how many of the three times were inferred — never a raw digit in
  *  `detail`, which is a closed vocabulary across this surface. */
@@ -95,9 +103,6 @@ export interface UseRecipeCaptureOptions {
 
 export function useRecipeCapture(options: UseRecipeCaptureOptions) {
   const { tier, byokConfig } = useAiCapability();
-  // Family id for the proxy's per-family rate limit (#83). Read here rather than in the AI
-  // service, which is deliberately store-free.
-  const familyContextStore = useFamilyContextStore();
   const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -296,6 +301,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
     // Same reasoning as processUrl: drop anything held from a previous capture first.
     discardPendingSource();
 
+    // Before the model, so an unattributable read costs nothing. See useMagicBeanScope.
+    const familyId = resolveBillableFamilyId(CAPTURE_ENV);
+    if (!familyId) return;
+
     isProcessing.value = true;
     logEvent({
       level: 'info',
@@ -309,7 +318,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         todayIso: toDateInputValue(new Date()),
         byok: byokConfig.value ?? undefined,
         grant,
-        familyId: familyContextStore.activeFamilyId ?? undefined,
+        familyId,
       });
 
       if (!result.success || !result.data) {
@@ -443,6 +452,17 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
    */
   async function processUrl(rawUrl: string, grant: ConsentGrant): Promise<void> {
     if (isProcessing.value) return;
+
+    // This path never enters the spine, so it needs BOTH fences explicitly. A guard, not
+    // `withIngestLock`: the lock would refuse AFTER consent and after a refetch budget slot
+    // had been spent, and it needs an `IngestEnv` that refetch — not a magic-beans door — has
+    // no honest value for. Mutual exclusion in the direction that matters (a refetch will not
+    // start on top of a capture); `isProcessing` still guards refetch against itself.
+    if (refuseIfBusy(CAPTURE_ENV)) return;
+
+    const familyId = resolveBillableFamilyId(CAPTURE_ENV);
+    if (!familyId) return;
+
     if (!isOnline.value) {
       showToast('info', t('ai.offline.title'), t('ai.offline.message'));
       return;
@@ -484,7 +504,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
             todayIso: toDateInputValue(new Date()),
             byok: byokConfig.value ?? undefined,
             grant,
-            familyId: familyContextStore.activeFamilyId ?? undefined,
+            familyId,
           });
           if (!result.success || !result.data) {
             logEvent({

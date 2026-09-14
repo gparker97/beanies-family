@@ -9,6 +9,7 @@
 import { __testConsentGrant } from '@/test/consentGrant';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { ref } from 'vue';
 
 const photosAdd = vi.fn().mockResolvedValue([{ id: 'p1' }]);
@@ -39,9 +40,25 @@ import { useRecipePhotoPending } from '../useRecipePhotoPending';
 
 const JPEG = 'data:image/jpeg;base64,/9j/4AAQ';
 
+/**
+ * Give the capture a family to bill the read to.
+ *
+ * `resolveBillableFamilyId` refuses a read it cannot attribute — an unattributable read cannot
+ * be counted, and an uncounted read is the loophole the meter exists to close. Production always
+ * has one here (a capture is only reachable from a signed-in member), so this is the test
+ * supplying a real precondition rather than working around a guard.
+ */
+function withActiveFamily(): void {
+  useFamilyContextStore().activeFamily = {
+    id: 'fam-test',
+    name: 'Test Family',
+  } as never;
+}
+
 describe('attachAfterSave', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    withActiveFamily();
     vi.clearAllMocks();
     photosAdd.mockResolvedValue([{ id: 'p1' }]);
     fetchImage.mockResolvedValue({ success: true, data: { mime: 'image/jpeg', dataUrl: JPEG } });
@@ -159,6 +176,7 @@ describe('attachAfterSave', () => {
 describe('processUrl — the title-only fallback', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    withActiveFamily();
     vi.clearAllMocks();
   });
 
@@ -208,6 +226,7 @@ describe('processUrl — the title-only fallback', () => {
 describe('deliverRecipe compensates the start event for BOTH orchestrated doors', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    withActiveFamily();
     vi.clearAllMocks();
   });
 

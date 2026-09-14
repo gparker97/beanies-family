@@ -33,6 +33,7 @@ import {
 } from '@/services/share/types';
 import { boundText } from '@/utils/boundText';
 import { consumeAttempt, peekAttempt } from '@/utils/attemptBudget';
+import { resolveBillableFamilyId } from '@/composables/useMagicBeanScope';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatTime12, toTimeInputValue } from '@/utils/date';
@@ -119,6 +120,36 @@ const isIngesting = ref(false);
 export const isReadingSharedDocument = computed(() => isIngesting.value && !consentOpen.value);
 
 /**
+ * Is an ingest already running?
+ *
+ * Exported so a DOOR can refuse at the moment the user commits a source — before the consent
+ * prompt and before the picker opens — rather than after. `withIngestLock` below is still the
+ * authority and still refuses correctly if this check is ever lost; the difference is where
+ * the user finds out.
+ *
+ * Without it the sequence is: tap camera on door 2 while door 1's capture is in flight →
+ * answer a consent prompt → take a photo → `ingestInAppSource` runs → the lock refuses → the
+ * photo is discarded. That is the exact "declining throws away work already done" failure the
+ * consent reorder exists to remove, reintroduced one layer down.
+ *
+ * The window between this check and the lock is a single user gesture on a single-threaded UI.
+ */
+export function refuseIfBusy(env: IngestEnv): boolean {
+  if (!isIngesting.value) return false;
+
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+  logEvent({
+    level: 'info',
+    surface: env.surface,
+    message: 'ingest arrived while busy',
+    context: { action: 'busy' },
+  });
+  showToast('info', t('shareTarget.busy.title'), t('shareTarget.busy.message'));
+  return true;
+}
+
+/**
  * Wait for the app to be genuinely usable on a cold launch, bounded.
  *
  * Waiting on `isInitialized` ALONE is not enough, and getting that wrong broke essentially
@@ -146,8 +177,14 @@ async function waitUntilReady(): Promise<void> {
   }
 }
 
-/** Tell the user why nothing happened, and record it. Never a silent return. */
-function notReady(
+/**
+ * Tell the user why nothing happened, and record it. Never a silent return.
+ *
+ * EXPORTED for `useMagicBeanScope`, which refuses a read with no family id. It needs the same
+ * log+toast pair, and a second implementation of "explain why nothing happened" is how the two
+ * drift into two dialects of the same message.
+ */
+export function notReady(
   env: IngestEnv,
   detail: string,
   titleKey: UIStringKey,
@@ -693,6 +730,12 @@ async function read(
   const { showToast } = useToast();
   const { t } = useTranslation();
   const { reportExtractionFailure } = useExtractionErrorToast();
+  // The family fence, BEFORE the model. A read nobody can attribute cannot be counted, and an
+  // uncounted read is the loophole the meter exists to close — so this refuses rather than
+  // degrading to the proxy's IP limit. `resolveBillableFamilyId` has already logged and toasted.
+  const familyId = resolveBillableFamilyId(env);
+  if (!familyId) return null;
+
   const { tier, byokConfig } = useAiCapability();
   const detail = sourceDetail(source);
   const opts = {
@@ -700,10 +743,10 @@ async function read(
     todayIso: toDateInputValue(new Date()),
     byok: byokConfig.value ?? undefined,
     grant,
-    // Lets the proxy rate-limit per family (#83). Absent is a supported state, not an error:
-    // the Lambda falls back to its IP limit. Read from the context store rather than the AI
-    // layer, which is deliberately store-free.
-    familyId: useFamilyContextStore().activeFamilyId ?? undefined,
+    // REQUIRED, not optional. Absent used to degrade to the proxy's IP limit; under the meter
+    // it would be an UNCOUNTED read — the Lambda has no partition key to write under — which is
+    // the loophole the meter exists to close. Resolved (and refused) above, before the model.
+    familyId,
   };
 
   /** Report an extraction failure once, tagged with which funnel it came from. */
