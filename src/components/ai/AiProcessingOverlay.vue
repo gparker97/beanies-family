@@ -48,28 +48,43 @@ const resolvedKind = () =>
          across a full-screen backdrop they would read as page decoration instead of something
          happening to this one thing. -->
     <div class="relative">
-      <!-- Four of them, drawn rather than the ✨ emoji: an emoji is a different picture on every
-           platform and cannot take Heritage Orange. Behind the card (no z-index; they precede it
-           in source order and the card paints its own background), never in the way, and gone
-           entirely under `prefers-reduced-motion`. -->
+      <!-- Drawn, not the ✨ emoji: an emoji is a different picture on every platform and cannot
+           take Heritage Orange. Behind the card — no z-index needed, they precede it in source
+           order and the card paints its own background — and `pointer-events-none` so they can
+           never eat a tap meant for something underneath.
+
+           ⚠️ The offsets are what make them SPARKS AROUND THE CARD rather than specks on its
+           edge, and the first pass got that wrong: four at 10-14px hugging the corners were
+           invisible on the blurred scrim. Keep them outside the card and keep the sizes here in
+           step with the glow in `.magic-sparkle`. Staggered delays, never a shared one. -->
       <span
         aria-hidden="true"
-        class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-4 -left-5 h-3.5 w-3.5"
+        class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-7 -left-8 h-5 w-5"
       />
       <span
         aria-hidden="true"
-        class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -top-2 -right-6 h-2.5 w-2.5"
-        style="animation-delay: 0.65s"
+        class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -top-9 right-10 h-3.5 w-3.5"
+        style="animation-delay: 0.5s"
       />
       <span
         aria-hidden="true"
-        class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-5 -left-3 h-2.5 w-2.5"
-        style="animation-delay: 1.3s"
+        class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-4 -right-9 h-6 w-6"
+        style="animation-delay: 1.05s"
       />
       <span
         aria-hidden="true"
-        class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -right-4 -bottom-3 h-3 w-3"
-        style="animation-delay: 1.95s"
+        class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-8 -left-6 h-4 w-4"
+        style="animation-delay: 1.6s"
+      />
+      <span
+        aria-hidden="true"
+        class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -right-7 -bottom-9 h-5 w-5"
+        style="animation-delay: 2.15s"
+      />
+      <span
+        aria-hidden="true"
+        class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-6 left-1/3 h-3.5 w-3.5"
+        style="animation-delay: 2.7s"
       />
 
       <div

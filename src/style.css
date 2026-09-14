@@ -872,15 +872,30 @@ html.dark .magic-text-shimmer {
  * clip-art rather than as the feature's own language. A clip-path star is identical everywhere
  * and takes Heritage Orange.
  *
- * FOUR of them, small and slow, BEHIND the card. The card already carries a spinner and three
- * ticking tiles; this is atmosphere, and the moment it competes with the tiles the resolve stops
- * landing. Staggered rather than synchronous — in unison they read as a pulse, in sequence as
- * something alive.
+ * SIX of them, around the card rather than hugging it. The first pass used four at 10-14px with a
+ * peak opacity of 0.85 and no glow, and greg could not see them at all: a 12px flat shape on a
+ * blurred dark scrim, at full brightness for one instant of a 2.6s cycle, is below the threshold
+ * where anyone notices. Three things fixed it, and all three are load-bearing —
+ *
+ *   SIZE. 14-24px rather than 10-14px, and pushed further out so they read as sparks around the
+ *   card instead of dirt on its edge.
+ *   DWELL. The flash rises fast and HOLDS near peak from 18% to 38% of the cycle before falling.
+ *   A single bright instant is a flicker; a held one is a twinkle.
+ *   GLOW. `drop-shadow` in the sparkle's own colour. The filter applies to the clipped result, so
+ *   the halo is star-shaped, and it is what lifts Heritage Orange off a dark blurred backdrop.
+ *
+ * Still atmosphere, not an effect: staggered so they never flash in unison (in unison they read as
+ * one pulse, in sequence as something alive), and the card's spinner and three ticking tiles stay
+ * the thing you actually watch.
  */
 .magic-sparkle {
-  animation: magic-sparkle-twinkle 2.6s ease-in-out infinite;
+  animation: magic-sparkle-twinkle 3.2s ease-in-out infinite;
   background: currentcolor;
   clip-path: polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%);
+
+  /* `currentcolor`, so the halo is always the sparkle's own hue in whichever theme is live — and
+     star-shaped, because a filter applies to the CLIPPED result rather than the box. */
+  filter: drop-shadow(0 0 5px currentcolor);
   opacity: 0;
   position: absolute;
 }
@@ -889,12 +904,24 @@ html.dark .magic-text-shimmer {
   0%,
   100% {
     opacity: 0;
-    transform: scale(0.6) rotate(0deg);
+    transform: scale(0.35) rotate(0deg);
   }
 
-  50% {
-    opacity: 0.85;
-    transform: scale(1) rotate(45deg);
+  18% {
+    opacity: 1;
+    transform: scale(1.08) rotate(35deg);
+  }
+
+  /* The dwell. Without these two frames the star is at full brightness for a single instant and
+     nobody catches it. */
+  38% {
+    opacity: 0.92;
+    transform: scale(0.94) rotate(70deg);
+  }
+
+  62% {
+    opacity: 0;
+    transform: scale(0.45) rotate(105deg);
   }
 }
 

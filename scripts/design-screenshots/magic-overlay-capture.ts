@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import { test } from '../../e2e/fixtures/test';
 import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
 import { gotoRoot } from '../../e2e/helpers/navigation';
@@ -13,10 +15,12 @@ import { gotoRoot } from '../../e2e/helpers/navigation';
 const OVERLAY = `
 <div id="shotwrap" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
   <div class="relative">
-    <span aria-hidden="true" class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-4 -left-5 h-3.5 w-3.5"></span>
-    <span aria-hidden="true" class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -top-2 -right-6 h-2.5 w-2.5" style="animation-delay: 0.65s"></span>
-    <span aria-hidden="true" class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-5 -left-3 h-2.5 w-2.5" style="animation-delay: 1.3s"></span>
-    <span aria-hidden="true" class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -right-4 -bottom-3 h-3 w-3" style="animation-delay: 1.95s"></span>
+    <span aria-hidden="true" class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-7 -left-8 h-5 w-5"></span>
+    <span aria-hidden="true" class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -top-9 right-10 h-3.5 w-3.5" style="animation-delay: 0.5s"></span>
+    <span aria-hidden="true" class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -top-4 -right-9 h-6 w-6" style="animation-delay: 1.05s"></span>
+    <span aria-hidden="true" class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-8 -left-6 h-4 w-4" style="animation-delay: 1.6s"></span>
+    <span aria-hidden="true" class="magic-sparkle text-primary-500 dark:text-accent-lift pointer-events-none -right-7 -bottom-9 h-5 w-5" style="animation-delay: 2.15s"></span>
+    <span aria-hidden="true" class="magic-sparkle text-terracotta-400 dark:text-terracotta-lift pointer-events-none -bottom-6 left-1/3 h-3.5 w-3.5" style="animation-delay: 2.7s"></span>
     <div class="dark:bg-surface-raised relative flex flex-col items-center gap-4 rounded-3xl bg-white px-8 py-6 shadow-[var(--soft-shadow)]">
       <ul class="flex list-none gap-2.5 p-0">
         <li class="magic-tick"><div class="dark:bg-surface-overlay flex h-16 w-16 flex-col items-center justify-center rounded-[14px] bg-[var(--tint-slate-5)]"><span class="relative z-[1] text-xl leading-none">📅</span><span class="font-outfit text-secondary-400 dark:text-ink-faint relative z-[1] mt-1 block text-xs font-semibold">activity</span></div></li>
@@ -67,6 +71,20 @@ for (const theme of ['light', 'dark'] as const)
         };
       });
       console.log(theme, w.name, 'reduced motion:', JSON.stringify(still));
+
+      // The markup below is a COPY of the component's. A sparkle added there and not here would
+      // make this harness quietly stop covering it, so the counts are compared rather than
+      // trusted.
+      const inHarness = await page.locator('#shotwrap .magic-sparkle').count();
+      const inComponent = (
+        readFileSync(
+          new URL('../../src/components/ai/AiProcessingOverlay.vue', import.meta.url),
+          'utf-8'
+          // `class="magic-sparkle` and not a bare `magic-sparkle`: the component's own comment
+          // names the class, and counting that mention made this check fail on a correct file.
+        ).match(/class="magic-sparkle/g) ?? []
+      ).length;
+      expect(inHarness, 'harness markup has drifted from the component').toBe(inComponent);
       await page.screenshot({
         path: `scratch-shots/magic-overlay-${theme}-${w.name}-reduced.png`,
       });
@@ -114,6 +132,29 @@ for (const theme of ['light', 'dark'] as const)
       );
       console.log(theme, w.name, 'horizontal overflow:', overflows);
 
+      // ⚠️ Sample the sparkles ACROSS the cycle, not at one instant. Each is dark for most of its
+      // 3.2s period, so a single screenshot can show an empty frame and prove nothing — which is
+      // exactly how the first, far too faint, version got past this harness.
+      // Past the warm-up: at t=0 every sparkle is at opacity 0 by definition, and the first one
+      // takes ~0.6s to reach peak. Asserting from the very first frame would fail on correct
+      // behaviour, so the window starts after the first star has risen.
+      await page.waitForTimeout(700);
+      const peaks: number[] = [];
+      for (let i = 0; i < 12; i++) {
+        peaks.push(
+          await page.evaluate(() =>
+            Math.max(
+              ...[...document.querySelectorAll('#shotwrap .magic-sparkle')].map((el) =>
+                Number(getComputedStyle(el).opacity)
+              )
+            )
+          )
+        );
+        await page.waitForTimeout(260);
+      }
+      console.log(theme, w.name, 'brightest sparkle:', peaks.map((n) => n.toFixed(2)).join(' '));
+      expect(Math.min(...peaks), 'a frame with no visible sparkle at all').toBeGreaterThan(0.25);
+
       // Mid-sweep, so the gradient band is actually inside the text rather than off its edge.
       await page.waitForTimeout(1400);
       await page.screenshot({ path: `scratch-shots/magic-overlay-${theme}-${w.name}.png` });
@@ -123,7 +164,7 @@ for (const theme of ['light', 'dark'] as const)
       const box = (await page.locator('#shotwrap .relative').first().boundingBox())!;
       await page.screenshot({
         path: `scratch-shots/magic-overlay-${theme}-${w.name}-card.png`,
-        clip: { x: box.x - 40, y: box.y - 40, width: box.width + 80, height: box.height + 80 },
+        clip: { x: box.x - 60, y: box.y - 60, width: box.width + 120, height: box.height + 120 },
       });
     });
   }
