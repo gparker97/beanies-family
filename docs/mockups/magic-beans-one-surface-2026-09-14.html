@@ -1,0 +1,1253 @@
+<title>Magic Beans, One Surface</title>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Magic beans: one surface, every door (2026-09-14)
+
+     Successor to magic-beans-one-button-2026-09-03.html, whose direction B was
+     approved and shipped as MagicBeansSheet.vue — but only on the quick-add FAB.
+     This proposes (a) rolling that one surface out to the remaining four doors
+     and (b) a resolve moment that makes full inference safe to rely on.
+
+     CIG-clamped. Every token below comes from .claude/skills/beanies-theme/SKILL.md
+     or packages/brand/theme.css. Nothing invented:
+       Heritage Orange #F15D22 · Terracotta #E67E22 · Deep Slate #2C3E50
+       Sky Silk #AED6F1 · Cloud White #F8F9FA · growth green #27AE60
+       dark: surface-raised #1E2A36 · surface-overlay #26343F · ink #F2F5F7
+             ink-soft #C3CED6 · ink-faint #9AA9B4 · line #4A5B69
+             accent-lift #FF8B5E · terracotta-lift #F0A05A · success-lift #5FD08A
+     Outfit (headings) · Inter (body) · Caveat (the tagline only, one per screen).
+     Squircle radii, diffused shadows only, no Alert Red anywhere.
+
+     Authored body-only so it both opens via file:// and publishes as an Artifact.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@700&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  /* ── page chrome only (NOT the design). Theme-aware per artifact rules. ───── */
+  :root {
+    --page-bg: #eef1f4;
+    --page-card: #ffffff;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 10%);
+    --page-shadow: 0 4px 20px rgb(44 62 80 / 6%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --page-bg: #101820;
+      --page-card: #1a242e;
+      --page-ink: #f2f5f7;
+      --page-ink-soft: #9aa9b4;
+      --page-line: rgb(255 255 255 / 10%);
+      --page-shadow: 0 4px 20px rgb(0 0 0 / 30%);
+    }
+  }
+  :root[data-theme='dark'] {
+    --page-bg: #101820;
+    --page-card: #1a242e;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #9aa9b4;
+    --page-line: rgb(255 255 255 / 10%);
+    --page-shadow: 0 4px 20px rgb(0 0 0 / 30%);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-block: 28px 72px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  h1 em {
+    font-style: normal;
+    color: #f15d22;
+  }
+  .lede {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+    max-width: 72ch;
+    margin: 0 0 4px;
+  }
+  h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 40px 0 4px;
+  }
+  h2 .n {
+    color: #f15d22;
+    margin-right: 8px;
+  }
+  .sub {
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+    max-width: 74ch;
+    margin: 0 0 18px;
+  }
+
+  /* ── the door table ───────────────────────────────────────────────────────── */
+  .doors {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--page-card);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--page-shadow);
+    font-size: 0.8125rem;
+  }
+  .doors th,
+  .doors td {
+    text-align: left;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--page-line);
+    vertical-align: top;
+  }
+  .doors th {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--page-ink-soft);
+  }
+  .doors tr:last-child td {
+    border-bottom: 0;
+  }
+  .doors code {
+    font-size: 0.75rem;
+    color: var(--page-ink-soft);
+  }
+  .tag {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 99px;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  .tag.ok {
+    background: rgb(39 174 96 / 12%);
+    color: #1e7e46;
+  }
+  .tag.no {
+    background: rgb(241 93 34 / 12%);
+    color: #c04a18;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .tag.ok {
+      background: rgb(95 208 138 / 18%);
+      color: #5fd08a;
+    }
+    :root:not([data-theme='light']) .tag.no {
+      background: rgb(255 139 94 / 18%);
+      color: #ff8b5e;
+    }
+  }
+  :root[data-theme='dark'] .tag.ok {
+    background: rgb(95 208 138 / 18%);
+    color: #5fd08a;
+  }
+  :root[data-theme='dark'] .tag.no {
+    background: rgb(255 139 94 / 18%);
+    color: #ff8b5e;
+  }
+  .tbl-scroll {
+    overflow-x: auto;
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     THE DESIGN. Everything below this line is app-accurate and CIG-clamped.
+     .light / .dark carry the two palettes explicitly, because this page depicts
+     both modes at once and must not follow the viewer's theme.
+     ══════════════════════════════════════════════════════════════════════════ */
+  .sheet {
+    --s-panel: #ffffff;
+    --s-tile: rgb(44 62 80 / 5%);
+    --s-tile-ink: rgb(44 62 80 / 55%);
+    --s-field-bg: #f8f9fa;
+    --s-field-edge: #aed6f1;
+    --s-title: #2c3e50;
+    --s-body: #4d5d6c;
+    --s-hint: #6b7a88;
+    --s-label: rgb(44 62 80 / 45%);
+    --s-accent: #f15d22;
+    --s-btn-edge: rgb(44 62 80 / 10%);
+    --s-grab: rgb(44 62 80 / 14%);
+    --s-sheen: rgb(241 93 34 / 13%);
+    --s-head-a: rgb(241 93 34 / 10%);
+    --s-head-b: rgb(230 126 34 / 6%);
+  }
+  .sheet.dark {
+    --s-panel: #1e2a36;
+    --s-tile: #26343f;
+    --s-tile-ink: #9aa9b4;
+    --s-field-bg: #26343f;
+    --s-field-edge: rgb(143 199 232 / 45%);
+    --s-title: #f2f5f7;
+    --s-body: #c3ced6;
+    --s-hint: #9aa9b4;
+    --s-label: #9aa9b4;
+    --s-accent: #ff8b5e;
+    --s-btn-edge: #4a5b69;
+    --s-grab: rgb(255 255 255 / 18%);
+    --s-sheen: rgb(255 139 94 / 16%);
+    --s-head-a: rgb(255 139 94 / 16%);
+    --s-head-b: rgb(240 160 90 / 9%);
+  }
+
+  /* phone shell (chrome, not design) */
+  .phone {
+    background: #1f2d3a;
+    border-radius: 30px;
+    padding: 9px;
+    width: 288px;
+    flex: 0 0 auto;
+  }
+  .screen {
+    border-radius: 22px;
+    overflow: hidden;
+    height: 486px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .screen.light {
+    background: #f8f9fa;
+  }
+  .screen.dark {
+    background: #151e27;
+  }
+  /* a hint of the page underneath, so the drawer reads as a drawer */
+  .behind {
+    padding: 16px 14px 0;
+    flex: 1;
+  }
+  .behind .bar {
+    height: 10px;
+    border-radius: 99px;
+    background: rgb(44 62 80 / 8%);
+    margin-bottom: 9px;
+  }
+  .behind .bar.w1 {
+    width: 54%;
+  }
+  .behind .bar.w2 {
+    width: 78%;
+  }
+  .behind .bar.w3 {
+    width: 40%;
+  }
+  .screen.dark .behind .bar {
+    background: rgb(255 255 255 / 7%);
+  }
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(44 62 80 / 28%);
+  }
+  .screen.dark .scrim {
+    background: rgb(0 0 0 / 45%);
+  }
+
+  /* ── the drawer itself ────────────────────────────────────────────────────── */
+  .panel {
+    position: relative;
+    margin-top: auto;
+    background: var(--s-panel);
+    border-radius: 24px 24px 22px 22px;
+    padding: 12px 14px 16px;
+    box-shadow: 0 -8px 40px rgb(44 62 80 / 14%);
+  }
+  .grab {
+    width: 38px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--s-grab);
+    margin: 0 auto 12px;
+  }
+
+  /* ── the header zone ──────────────────────────────────────────────────────────
+     Title + tagline share a soft gradient-tinted block, and this is what the sheen
+     now travels across. Moving it off the textarea matters: a shimmer over an input
+     is the skeleton-loader idiom, so it reads as loading or disabled rather than as
+     magic, and it competes with the caret.
+     The tint is a gradient rather than a flat fill so the drawer gets a little depth
+     at the top — but it stops at the header. Painting the whole panel in
+     orange→terracotta would collide with the resolved tile, which spends that exact
+     gradient as its payoff; keeping the panel quiet is what lets the resolve land. */
+  .p-head {
+    position: relative;
+    overflow: hidden;
+    border-radius: 16px;
+    padding: 11px 13px 12px;
+    margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--s-head-a), var(--s-head-b) 62%, transparent);
+  }
+
+  /* Section Title level. The feature keeps its name and its ✨ — this is the same
+     "Magic beans" a family already knows from the card and the pills. */
+  .p-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--s-title);
+    margin: 0;
+    line-height: 1.25;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  /* Caveat, Heritage Orange, one per screen. By the time this sheet is open the
+     family has already tapped Magic beans, so the line is an informal tagline
+     rather than instruction — which is an allowed Caveat use. It stays lowercase
+     in `en` as well as `beanie`, matching the CIG's own Caveat examples
+     ("shhh…", "what are we tackling together? 🌱"), so the casing standard holds.
+     16px, inside the CIG's 14–24px band. */
+  .p-sub {
+    font-family: 'Caveat', 'Outfit', cursive;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--s-accent);
+    margin: 3px 0 0;
+    line-height: 1.3;
+    max-width: 30ch;
+  }
+
+  /* ── the magic-beans sheen ────────────────────────────────────────────────────
+     One idiom, three speeds. This is the SAME 105° gradient the shipped
+     MagicReaderCard already paints on its gradient card, reused rather than
+     reinvented so the shimmer reads as the feature's existing visual language:
+       at rest  — slow, barely there, so the surface feels alive before you touch it
+       reading  — quick, so the wait has a heartbeat
+       resolved — one pass over the won tile, then still
+     All three are off under prefers-reduced-motion. */
+  .sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .sheen::after,
+  .dest::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 40%, var(--s-sheen) 50%, transparent 60%);
+    transform: translateX(-130%);
+  }
+  @keyframes sweep {
+    to {
+      transform: translateX(130%);
+    }
+  }
+  .sheen.idle::after {
+    animation: sweep 7s ease-in-out 1.2s infinite;
+  }
+  .sheen.busy::after {
+    animation: sweep 1.3s ease-in-out infinite;
+  }
+  .dest.won::after {
+    /* white on the gradient tile, exactly as the shipped card does it */
+    background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 26%) 50%, transparent 62%);
+    animation: sweep 1.15s ease-out 1 forwards;
+  }
+
+  /* the hero: the hand-over field */
+  .field {
+    background: var(--s-field-bg);
+    border: 2px dashed var(--s-field-edge);
+    border-radius: 12px;
+    padding: 15px 13px;
+    min-height: 106px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .field .ph {
+    font-size: 0.875rem;
+    color: var(--s-hint);
+    line-height: 1.5;
+  }
+  .field .caret {
+    display: inline-block;
+    width: 1.5px;
+    height: 1em;
+    background: var(--s-accent);
+    vertical-align: -0.16em;
+    margin-left: 1px;
+    animation: blink 1.1s steps(1, end) infinite;
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+  .field .drop {
+    font-size: 0.75rem;
+    color: var(--s-hint);
+    opacity: 0.72;
+    margin-top: auto;
+  }
+  .field.filled {
+    border-style: solid;
+    border-color: var(--s-btn-edge);
+  }
+  .field .said {
+    font-size: 0.875rem;
+    color: var(--s-body);
+    line-height: 1.5;
+  }
+
+  .or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 13px 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--s-label);
+  }
+  .or::before,
+  .or::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--s-btn-edge);
+  }
+
+  .sources {
+    display: flex;
+    gap: 9px;
+  }
+  .src {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 1px solid var(--s-btn-edge);
+    border-radius: 16px;
+    padding: 11px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--s-title);
+    cursor: pointer;
+  }
+  .src .g {
+    font-size: 1rem;
+  }
+
+  /* the destination row — unlabelled on purpose. Each tile names itself, and the
+     resolve does the explaining that a "beanies can make" header used to. */
+  .dests {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .dest {
+    flex: 1;
+    min-width: 0;
+    background: var(--s-tile);
+    border-radius: 14px;
+    padding: 11px 6px 9px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform 320ms cubic-bezier(0.2, 0.9, 0.25, 1),
+      opacity 320ms ease,
+      box-shadow 320ms ease;
+  }
+  .dest .g {
+    font-size: 1.25rem;
+    line-height: 1;
+    display: block;
+  }
+  .dest .n {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--s-tile-ink);
+    margin-top: 5px;
+    display: block;
+  }
+  /* resolved: the ONE orchestrated moment */
+  .dest.won {
+    background: linear-gradient(135deg, #f15d22, #e67e22);
+    transform: scale(1.09) translateY(-3px);
+    box-shadow: 0 12px 26px -10px rgb(241 93 34 / 65%);
+  }
+  .dest.won .n {
+    color: #fff;
+  }
+  .dest.lost {
+    opacity: 0.28;
+  }
+  .dest.thinking {
+    animation: tick 1.05s ease-in-out infinite;
+  }
+  .dest.thinking:nth-child(2) {
+    animation-delay: 0.16s;
+  }
+  .dest.thinking:nth-child(3) {
+    animation-delay: 0.32s;
+  }
+  @keyframes tick {
+    0%,
+    100% {
+      opacity: 0.34;
+    }
+    50% {
+      opacity: 0.92;
+    }
+  }
+
+  .verdict {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-top: 13px;
+    flex-wrap: wrap;
+  }
+  .verdict .v {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--s-title);
+  }
+  .verdict .fix {
+    font-size: 0.8125rem;
+    color: var(--s-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+  }
+  .reading {
+    font-size: 0.875rem;
+    color: var(--s-body);
+    margin-top: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .spin {
+    width: 14px;
+    height: 14px;
+    border-radius: 99px;
+    border: 2px solid var(--s-field-edge);
+    border-top-color: var(--s-accent);
+    animation: spin 0.85s linear infinite;
+    flex: 0 0 auto;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dest,
+    .dest.thinking,
+    .spin,
+    .field .caret,
+    .sheen::after,
+    .dest::after,
+    .sheen.idle::after,
+    .sheen.busy::after,
+    .dest.won::after {
+      animation: none !important;
+      transition: none !important;
+    }
+    /* the won tile keeps its gradient and lift; it just does not sweep */
+    .dest.won::after {
+      opacity: 0;
+    }
+  }
+
+  /* ── layout for the demo + state grid ─────────────────────────────────────── */
+  .demo {
+    display: flex;
+    gap: 26px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    background: var(--page-card);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: var(--page-shadow);
+  }
+  .demo-copy {
+    flex: 1 1 300px;
+    min-width: 0;
+  }
+  .demo-copy h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 7px;
+  }
+  .demo-copy p {
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--page-ink-soft);
+    margin: 0 0 10px;
+  }
+  .play {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #fff;
+    background: #f15d22;
+    border: 0;
+    border-radius: 16px;
+    padding: 11px 20px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -8px rgb(241 93 34 / 70%);
+  }
+  .play:hover {
+    background: #d14d1a;
+  }
+  .play:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--page-card),
+      0 0 0 4px #aed6f1;
+  }
+  .grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .cell {
+    flex: 0 0 auto;
+  }
+  .cap {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--page-ink-soft);
+    text-align: center;
+    margin: 9px 0 0;
+  }
+
+  /* desktop rendering of the same sheet */
+  .deskframe {
+    background: #1f2d3a;
+    border-radius: 16px;
+    padding: 9px;
+    max-width: 760px;
+  }
+  .deskscreen {
+    border-radius: 10px;
+    height: 430px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .deskscreen.light {
+    background: #f8f9fa;
+  }
+  .deskmodal {
+    position: relative;
+    width: 424px;
+    max-width: 92%;
+    border-radius: 24px;
+    padding: 18px 20px 20px;
+    background: var(--s-panel);
+    box-shadow: 0 20px 60px rgb(44 62 80 / 22%);
+  }
+  .deskmodal .grab {
+    display: none;
+  }
+  .notes {
+    background: var(--page-card);
+    border-radius: 20px;
+    padding: 16px 18px;
+    box-shadow: var(--page-shadow);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--page-ink-soft);
+  }
+  .notes b {
+    color: var(--page-ink);
+    font-family: 'Outfit', sans-serif;
+  }
+  .notes ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+  }
+  .notes li {
+    margin-bottom: 7px;
+  }
+  .notes li:last-child {
+    margin-bottom: 0;
+  }
+</style>
+
+<div class="wrap">
+  <h1>Magic beans: <em>one surface, every door</em></h1>
+  <p class="lede">
+    Direction B of the 3 September mockup was approved and shipped as
+    <code>MagicBeansSheet.vue</code> — but only behind the quick-add FAB. Four other doors still
+    open a bare file picker wired to a pinned extractor. This proposes rolling the one surface out
+    to all of them, and adds the one thing that makes full inference safe to lean on: the type
+    question moves from before the read to after it.
+  </p>
+
+  <h2><span class="n">1</span>Where the six doors stand today</h2>
+  <p class="sub">
+    Two doors already infer and route anywhere. Four pin the answer before beanies has looked at
+    anything. Activities and travel accept no text and no link at all, so a forwarded WhatsApp
+    invite or an emailed itinerary has no way in on the page that owns it. The recipe doors do take
+    a link, but only a link, and only a valid one.
+  </p>
+  <div class="tbl-scroll">
+    <table class="doors">
+      <thead>
+        <tr>
+          <th>Door</th>
+          <th>Opens</th>
+          <th>Accepts</th>
+          <th>Decides what it is</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Share into beanies</b><br /><code>dispatchSharePayload</code></td>
+          <td>nothing — arrives read</td>
+          <td>text, link, image, PDF</td>
+          <td><span class="tag ok">infers, routes anywhere</span></td>
+        </tr>
+        <tr>
+          <td><b>Quick-add FAB</b><br /><code>MagicReaderCard</code></td>
+          <td><code>MagicBeansSheet</code></td>
+          <td>paste, camera, file</td>
+          <td><span class="tag ok">infers, routes anywhere</span></td>
+        </tr>
+        <tr>
+          <td><b>Activities</b><br /><code>FamilyPlannerPage</code></td>
+          <td><code>AiDocumentPicker</code></td>
+          <td>image / PDF only</td>
+          <td><span class="tag no">pinned to event</span></td>
+        </tr>
+        <tr>
+          <td><b>Travel</b><br /><code>TravelPlansPage</code></td>
+          <td><code>AiDocumentPicker</code></td>
+          <td>image / PDF only</td>
+          <td><span class="tag no">pinned to travel</span></td>
+        </tr>
+        <tr>
+          <td><b>Cookbook</b><br /><code>FamilyCookbookPage</code></td>
+          <td><code>RecipeLinkModal</code></td>
+          <td>link (validated), camera, file</td>
+          <td><span class="tag no">pinned to recipe</span></td>
+        </tr>
+        <tr>
+          <td><b>Add-recipe form</b><br /><code>RecipeSourceStrip</code></td>
+          <td>inline, own capture instance</td>
+          <td>link, file</td>
+          <td><span class="tag no">pinned to recipe</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">2</span>Why this is not just tidiness</h2>
+  <p class="sub">
+    The two spines are not cosmetically different, they are behaviourally different.
+    <code>useSharedDocumentIngest</code> validates, budgets, locks and logs; the three per-page
+    wedges re-implement a thinner version of each. Collapsing onto the one surface closes these as
+    a side effect rather than as six separate tickets.
+  </p>
+  <div class="notes">
+    <ul>
+      <li>
+        <b>Two capture locks that do not see each other.</b> <code>isIngesting</code> is
+        module-global but the page wedges never consult it, so a page capture can run concurrently
+        with a share or FAB ingest and bill two extractions at once.
+      </li>
+      <li>
+        <b>Size and type checks exist on two doors of six.</b> The 25 MB cap and the byte-sniff live
+        in the ingest only. On the page wedges an oversized or mislabelled file goes straight into
+        canvas compression and surfaces as <code>photos.invalidType</code>, which names the wrong
+        problem.
+      </li>
+      <li>
+        <b>Activities and travel never reach the per-family rate limit.</b> Neither wedge passes
+        <code>familyId</code>, so those two doors are held back only by the IP limit.
+      </li>
+      <li>
+        <b>A refused reader is billed first.</b> With <code>aiTravelExtract</code> off, a travel
+        paste is read and charged, then refused with <code>shareTarget.readerOff</code>.
+      </li>
+      <li>
+        <b><code>useDocumentToActivity</code> emits no <code>logEvent</code> at all</b> — only
+        <code>reportError</code>. The busiest reader is the one that cannot be triaged from
+        CloudWatch, against the observability rule in CLAUDE.md.
+      </li>
+      <li>
+        <b>Consent order is inverted between doors.</b> Pages ask before the picker; the FAB asks
+        after, so declining there discards a photo already taken.
+      </li>
+      <li>
+        <b>"Not recognised" behaves four ways.</b> Activities open the form anyway, travel aborts,
+        recipes abort with different copy, share shows a fourth message. And recipe-flavoured
+        strings reach non-recipe captures, so a shared school newsletter can be told it has no
+        transcript.
+      </li>
+    </ul>
+  </div>
+
+  <h2><span class="n">3</span>The surface, and the moment it turns on</h2>
+  <p class="sub">
+    The field is the hero and is focused on open, so pasting costs nothing. Camera and file sit
+    underneath, quieter. The row at the bottom is the new part: it shows what beanies can make
+    without ever asking you to pick, then resolves to what it actually made.
+  </p>
+
+  <div class="demo">
+    <div class="demo-copy">
+      <h3>Play the resolve</h3>
+      <p>
+        Three faint tiles at rest are a capability statement, not a question — and they carry no
+        header, because the layout and the resolve already say what they are. They tick while
+        beanies reads, then two fade and one lifts into the brand gradient with a single sheen
+        pass.
+      </p>
+      <p>
+        The shimmer is one idiom at three speeds: slow and barely there on the field at rest, quick
+        while reading, one pass on the tile that wins. It is the same 105° gradient the shipped
+        <code>MagicReaderCard</code> already paints, so the magic reads as this feature's own
+        language rather than a new effect. All of it stops under
+        <code>prefers-reduced-motion</code>.
+      </p>
+      <p>
+        And it earns its keep: when inference lands wrong, <b>not right?</b> re-routes the same
+        extraction to another kind. That is a question a parent can now answer correctly, because
+        they can see what beanies made of it — and it costs no second read.
+      </p>
+      <button class="play" id="play">Hand beanies something</button>
+    </div>
+
+    <div class="cell">
+      <div class="phone">
+        <div class="screen light">
+          <div class="behind">
+            <div class="bar w2"></div>
+            <div class="bar w1"></div>
+            <div class="bar w3"></div>
+            <div class="bar w2"></div>
+          </div>
+          <div class="scrim"></div>
+          <div class="sheet">
+            <div class="panel">
+              <div class="grab"></div>
+              <div class="p-head sheen idle" id="head">
+                <p class="p-title"><span aria-hidden="true">✨</span>Magic beans</p>
+                <p class="p-sub">give us something to read and we'll work out the rest</p>
+              </div>
+
+              <div class="field" id="f">
+                <div class="ph" id="ph">
+                  paste a message, a link, anything<span class="caret"></span>
+                </div>
+                <div class="drop" id="drop">or drop a photo or file here</div>
+              </div>
+
+              <div class="or" id="or">or</div>
+              <div class="sources" id="srcs">
+                <button class="src"><span class="g">📷</span>Take a photo</button>
+                <button class="src"><span class="g">📄</span>Choose a file</button>
+              </div>
+
+              <div class="dests" id="dests">
+                <div class="dest" data-k="event"><span class="g">📅</span><span class="n">activity</span></div>
+                <div class="dest" data-k="travel"><span class="g">✈️</span><span class="n">trip</span></div>
+                <div class="dest" data-k="recipe"><span class="g">🍳</span><span class="n">recipe</span></div>
+              </div>
+              <div id="foot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="cap">interactive</p>
+    </div>
+  </div>
+
+  <h2><span class="n">4</span>Every state, both modes</h2>
+  <p class="sub">
+    Authored for light and dark in the same pass. Dark uses the semantic scale — ink on
+    surface-raised, tiles on surface-overlay, Heritage Orange lifted to
+    <code>accent-lift #FF8B5E</code> for the tagline, the re-route link and the sheen — accents get
+    lighter on dark, never darker. The resolved tile keeps the brand gradient with white ink, which
+    clears AA in both modes. No opacity modifier sits on any readable string; the faded tiles carry
+    no text a person needs to read at that moment.
+  </p>
+
+  <div class="grid" id="states"></div>
+
+  <h2><span class="n">5</span>On desktop</h2>
+  <p class="sub">
+    The same component, centred rather than drawn up from the bottom — which is what
+    <code>BeanieFormModal variant="drawer"</code> already does. Nothing about the layout changes,
+    so there is one surface to maintain, not two.
+  </p>
+  <div class="deskframe">
+    <div class="deskscreen light">
+      <div class="sheet">
+        <div class="deskmodal">
+          <div class="p-head sheen idle">
+            <p class="p-title"><span aria-hidden="true">✨</span>Magic beans</p>
+            <p class="p-sub">give us something to read and we'll work out the rest</p>
+          </div>
+          <div class="field">
+            <div class="ph">paste a message, a link, anything<span class="caret"></span></div>
+            <div class="drop">or drop a photo or file here</div>
+          </div>
+          <div class="or">or</div>
+          <div class="sources">
+            <button class="src"><span class="g">📷</span>Take a photo</button>
+            <button class="src"><span class="g">📄</span>Choose a file</button>
+          </div>
+          <div class="dests">
+            <div class="dest"><span class="g">📅</span><span class="n">activity</span></div>
+            <div class="dest"><span class="g">✈️</span><span class="n">trip</span></div>
+            <div class="dest"><span class="g">🍳</span><span class="n">recipe</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="n">6</span>Counting every magic bean, per family</h2>
+  <p class="sub">
+    One surface is what makes a trustworthy meter possible, but it is not the meter. Today there is
+    no count that could carry entitlement: the only per-family number is a
+    <code>localStorage</code> budget of 20 text reads an hour, which is per <em>device</em> and
+    clearable, covers the bare-text arm only, and is invisible to the server. Three devices is
+    three budgets.
+  </p>
+  <div class="notes">
+    <b>The one rule that matters</b>
+    <p style="margin: 7px 0 0">
+      The count of record is written server-side by the <code>ai-extract</code> Lambda, because that
+      is the single chokepoint every read must pass through. A client-side count can never carry
+      entitlement — it is per device, it is editable, and a modified client simply does not send it.
+      The client keeps a count only to <em>show</em> a family where they stand.
+    </p>
+    <ul style="margin-top: 12px">
+      <li>
+        <b>Make <code>familyId</code> required, not optional.</b> It is
+        <code>familyId?</code> in <code>ExtractOptions</code> today, and
+        <code>useDocumentToActivity</code> and <code>useDocumentToTravel</code> both omit it — so
+        those two doors are already uncounted and reach only the IP limit. Required at the type
+        level means a future door that forgets it fails the build instead of quietly leaking free
+        reads.
+      </li>
+      <li>
+        <b>Separate counting from limiting.</b> The existing limiter is fail-open, which is right
+        for a limiter — a DynamoDB blip should not lock a family out. It is wrong for a meter: a
+        fail-open count silently loses reads, and usage built on it cannot be defended to a
+        customer. A count that cannot be written gets recorded as a known gap and alerted on, never
+        dropped.
+      </li>
+      <li>
+        <b>One atomic increment per read, keyed by family and day.</b>
+        <code>pk=family#&lt;id&gt;</code>, <code>sk=usage#&lt;YYYY-MM-DD&gt;</code>, DynamoDB
+        <code>ADD</code>. Day is the finest grain the pricing page sells, and week and month are
+        then a range query rather than a second counter to keep in step.
+      </li>
+      <li>
+        <b>Carry an attempt id so the write is idempotent.</b> A retried invocation or a client
+        retry over a dropped response must not double-count. This is cheap to add now and
+        impossible to backfill later.
+      </li>
+      <li>
+        <b>Read the usage back from day one.</b> A write-only meter cannot be verified. Surfacing
+        reads-per-family in <code>/beanies-metrics</code> makes it both a cost number and a proof
+        that the meter works, well before entitlement depends on it.
+      </li>
+      <li>
+        <b>Retire the localStorage budget once the meter lands.</b> Two sources of truth that
+        disagree is worse than one that is occasionally strict. It becomes a display of the server's
+        number, or it goes.
+      </li>
+    </ul>
+  </div>
+
+  <p class="sub" style="margin-top: 22px">
+    <b>This part needs your call, because the pricing page sells a number.</b> "One magic bean" has
+    to mean something a family can predict and we can defend. My proposal:
+  </p>
+  <div class="tbl-scroll">
+    <table class="doors">
+      <thead>
+        <tr>
+          <th>Case</th>
+          <th>Counts?</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A read the model answered</td>
+          <td><span class="tag no">1 bean</span></td>
+          <td>The billable unit. One model call, one bean.</td>
+        </tr>
+        <tr>
+          <td>A 12-page PDF</td>
+          <td><span class="tag no">1 bean</span></td>
+          <td>One call today. Page count is our cost problem, not the family's mental model.</td>
+        </tr>
+        <tr>
+          <td>Came back <code>none</code> — not recognised</td>
+          <td><span class="tag no">1 bean</span></td>
+          <td>
+            The model ran and we paid for it. Counting it also stops "keep pasting until something
+            sticks" being free.
+          </td>
+        </tr>
+        <tr>
+          <td><b>not right?</b> re-route</td>
+          <td><span class="tag ok">free</span></td>
+          <td>No second model call — the same extraction is handed to another reader.</td>
+        </tr>
+        <tr>
+          <td>Refused before the model: offline, consent declined, file too large, wrong type,
+            reader off</td>
+          <td><span class="tag ok">free</span></td>
+          <td>Nothing was read. Note this means fixing the "billed then refused" defect above.</td>
+        </tr>
+        <tr>
+          <td>Our failure: 5xx, timeout, malformed response</td>
+          <td><span class="tag ok">free</span></td>
+          <td>Never bill a family for our outage. Counted separately as an error rate.</td>
+        </tr>
+        <tr>
+          <td>The recipe link ladder (video → transcript → extract)</td>
+          <td><span class="tag no">needs a decision</span></td>
+          <td>
+            It can make more than one upstream call for one user action. I would call it 1 bean and
+            eat the variance, but it is a real cost asymmetry worth naming.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">7</span>What this changes, and what it deliberately does not</h2>
+  <div class="notes">
+    <b>Changes</b>
+    <ul>
+      <li>
+        The three pinned doors open <code>MagicBeansSheet</code> instead of
+        <code>AiDocumentPicker</code>. They keep their buttons — discoverability is the reason to
+        have a magic-beans affordance on a page at all — but every button opens the same surface.
+      </li>
+      <li>
+        Text becomes an input everywhere, not just at the FAB. A pasted class-group message is the
+        case with no other home today.
+      </li>
+      <li>
+        The detected kind decides where the result goes, so pasting a party invite while standing
+        on Travel makes an activity. Landing somewhere you did not expect is why the resolve moment
+        and <b>not right?</b> exist.
+      </li>
+    </ul>
+    <br />
+    <b>Deliberately not</b>
+    <ul>
+      <li>
+        <b>No per-surface hint passed to the extractor.</b> Biasing inference by the page you
+        happened to be on makes the same input produce different results depending on where you
+        stood — unreproducible in support, and it quietly reintroduces the "what IS this?" guess
+        that shipping direction B removed. One input, one answer, everywhere.
+      </li>
+      <li>
+        <b>No new camera plumbing.</b> <code>AiDocumentPicker</code> stays exactly as it is and
+        stays mounted, because the mixed image+PDF accept routes to the documents picker with no
+        camera entry on native. It stops being a <em>surface</em> and goes back to being the file
+        mechanism the sheet calls.
+      </li>
+      <li>
+        <b>No fourth reader.</b> This is a rollout of the existing three, not a new kind.
+        <code>MAGIC_READERS</code> and the totality test are untouched.
+      </li>
+    </ul>
+  </div>
+</div>
+
+<script>
+  // ── the four states, rendered twice (light, dark) ────────────────────────────
+  const FIELD_REST = `<div class="ph">paste a message, a link, anything<span class="caret"></span></div>
+       <div class="drop">or drop a photo or file here</div>`;
+  const FIELD_SAID = `<div class="said">"Ollie's 6th! Sat 27 Sep, 2pm, 14 Jalan Kayu. RSVP by Thu 🎈"</div>`;
+
+  const STATES = [
+    {
+      cap: 'at rest',
+      field: FIELD_REST,
+      fieldMod: '', headMod: 'idle',
+      chrome: true,
+      dests: ['', '', ''],
+      foot: '',
+    },
+    {
+      cap: 'reading',
+      field: FIELD_SAID,
+      fieldMod: 'filled', headMod: 'busy',
+      chrome: false,
+      dests: ['thinking', 'thinking', 'thinking'],
+      foot: `<div class="reading"><span class="spin"></span>working out what this is…</div>`,
+    },
+    {
+      cap: 'resolved',
+      field: FIELD_SAID,
+      fieldMod: 'filled', headMod: '',
+      chrome: false,
+      dests: ['won', 'lost', 'lost'],
+      foot: `<div class="verdict"><span class="v">An activity, on Sat 27 Sep.</span><button class="fix">not right?</button></div>`,
+    },
+    {
+      cap: 're-routing',
+      field: FIELD_SAID,
+      fieldMod: 'filled', headMod: '',
+      chrome: false,
+      dests: ['lost', 'won', 'lost'],
+      foot: `<div class="verdict"><span class="v">A trip instead. Same reading.</span><button class="fix">not right?</button></div>`,
+    },
+  ];
+
+  const DESTS = [
+    ['📅', 'activity'],
+    ['✈️', 'trip'],
+    ['🍳', 'recipe'],
+  ];
+
+  function screen(state, mode) {
+    const tiles = DESTS.map(
+      ([g, n], i) =>
+        `<div class="dest ${state.dests[i]}"><span class="g">${g}</span><span class="n">${n}</span></div>`
+    ).join('');
+    const chrome = state.chrome
+      ? `<div class="or">or</div>
+         <div class="sources">
+           <button class="src"><span class="g">📷</span>Take a photo</button>
+           <button class="src"><span class="g">📄</span>Choose a file</button>
+         </div>`
+      : '';
+    return `
+      <div class="cell">
+        <div class="phone">
+          <div class="screen ${mode}">
+            <div class="behind"><div class="bar w2"></div><div class="bar w1"></div><div class="bar w3"></div><div class="bar w2"></div></div>
+            <div class="scrim"></div>
+            <div class="sheet ${mode === 'dark' ? 'dark' : ''}">
+              <div class="panel">
+                <div class="grab"></div>
+                <div class="p-head sheen ${state.headMod}">
+                  <p class="p-title"><span aria-hidden="true">✨</span>Magic beans</p>
+                  <p class="p-sub">give us something to read and we'll work out the rest</p>
+                </div>
+                <div class="field ${state.fieldMod}">${state.field}</div>
+                ${chrome}
+                <div class="dests">${tiles}</div>
+                ${state.foot}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="cap">${state.cap} · ${mode}</p>
+      </div>`;
+  }
+
+  document.getElementById('states').innerHTML = ['light', 'dark']
+    .flatMap((mode) => STATES.map((s) => screen(s, mode)))
+    .join('');
+
+  // ── the interactive phone ───────────────────────────────────────────────────
+  const ph = document.getElementById('ph');
+  const drop = document.getElementById('drop');
+  const f = document.getElementById('f');
+  const head = document.getElementById('head');
+  const or = document.getElementById('or');
+  const srcs = document.getElementById('srcs');
+  const dests = [...document.querySelectorAll('#dests .dest')];
+  const foot = document.getElementById('foot');
+  const play = document.getElementById('play');
+  let t = [];
+
+  function reset() {
+    t.forEach(clearTimeout);
+    t = [];
+    f.className = 'field';
+    head.className = 'p-head sheen idle';
+    f.innerHTML = FIELD_REST;
+    or.style.display = '';
+    srcs.style.display = '';
+    dests.forEach((d) => (d.className = 'dest'));
+    foot.innerHTML = '';
+    play.textContent = 'Hand beanies something';
+  }
+
+  function at(ms, fn) {
+    t.push(setTimeout(fn, ms));
+  }
+
+  play.addEventListener('click', () => {
+    reset();
+    play.textContent = 'Replay';
+    at(60, () => {
+      f.className = 'field filled';
+      head.className = 'p-head sheen busy';
+      f.innerHTML = FIELD_SAID;
+      or.style.display = 'none';
+      srcs.style.display = 'none';
+      dests.forEach((d) => (d.className = 'dest thinking'));
+      foot.innerHTML = `<div class="reading"><span class="spin"></span>working out what this is…</div>`;
+    });
+    at(2150, () => {
+      head.className = 'p-head sheen';
+      dests.forEach((d) => (d.className = d.dataset.k === 'event' ? 'dest won' : 'dest lost'));
+      foot.innerHTML = `<div class="verdict"><span class="v">An activity, on Sat 27 Sep.</span><button class="fix">not right?</button></div>`;
+    });
+    at(3550, () => {
+      foot.innerHTML = `<div class="verdict"><span class="v">Opening it for you to check…</span></div>`;
+    });
+  });
+</script>

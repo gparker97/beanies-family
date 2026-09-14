@@ -25,8 +25,17 @@ The goal is a row so well-formed that running `/beanies-pre-plan #<ID>` on it la
   /beanies-pre-plan #<ID>   ← validates every field, resolves TBCs, optional mockup, → In Progress
         │
         ▼
-  /beanies-plan   ← 4-pass design → saved docs/plans/… → optional GitHub issue → implementation
+  /beanies-plan   ← 4-pass design → saved docs/plans/… → optional GitHub issue
+        │
+        ▼
+  /beanies-build-auto   ← implement → validate → terraform (if needed) → browser verify
+                          → /code-review max → fix → re-review call → summary + manual tests
 ```
+
+The last hop is optional and separately invoked: `/beanies-plan` still stops at an approved, saved plan, so
+"save the plan, don't implement" stays a first-class outcome. `/beanies-build-auto` picks a plan up — either
+by running `beanies-plan` itself, or from a `docs/plans/` path — and carries it to reviewed, verified code.
+It stops short of deploying; that remains `/deploy-prod-auto`.
 
 This skill only owns the first hop. It **never** auto-runs `beanies-pre-plan`; it offers it once the row exists (see step 9).
 
