@@ -21,6 +21,7 @@ import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallStatusStamp from '@/components/wall/WallStatusStamp.vue';
+import WallNightButton from '@/components/wall/WallNightButton.vue';
 import WallViewSwitcher from '@/components/wall/WallViewSwitcher.vue';
 import {
   DEFAULT_WALL_VIEW,
@@ -777,12 +778,17 @@ watch(activeView, () => (sheet.value = null));
             fallback is what always renders — about 2.5:1 on the dark ground.
             The dark partner is the thing doing the work here.
             `truncate` (nowrap + overflow-hidden + ellipsis) stops the label
-            reflowing and shoving the arrows sideways between presses — and,
-            unlike a bare `whitespace-nowrap` beside `min-w-0`, stops it spilling
-            over them in a long locale or in Large reading mode.
+            spilling OVER the arrows in a long locale or in Large reading mode.
+            `period-label-stable` is what stops it MOVING them: this cluster is
+            `ml-auto`, so without a reserved width "Today" → "Wednesday, 10
+            September" drags both arrows left between presses, out from under a
+            finger already coming down. 28ch clears `formatDayLong` ("Wednesday, 10
+            September"), the longest of the three labels. Deliberately generous: over-reserving
+            costs invisible space inside a right-anchored cluster, under-reserving costs the
+            whole fix, and unlike the planner this one cannot be measured in the harness. See `.period-label-stable` in style.css.
           -->
           <p
-            class="font-inter wall-nav-label dark:text-ink-soft min-w-0 truncate text-center text-[var(--muted-text,#4d5d6c)]"
+            class="period-label-stable font-inter wall-nav-label dark:text-ink-soft min-w-0 truncate text-center text-[var(--muted-text,#4d5d6c)] [--period-label-w:28ch]"
           >
             {{ anchorLabel }}
           </p>
@@ -803,6 +809,9 @@ watch(activeView, () => (sheet.value = null));
           </button>
         </div>
         <WallViewSwitcher :active="activeView" @select="selectView" />
+        <!-- Beside the switcher, not inside it: night is an action, the switcher is a radio
+             group. One tap, on the face, where the lock menu hid it two taps deep. -->
+        <WallNightButton @night-now="nightNow = true" />
         <div class="text-right">
           <p class="font-outfit wall-clock leading-none font-extrabold">
             {{ clockNow.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) }}
