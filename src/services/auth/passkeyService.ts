@@ -209,6 +209,19 @@ export async function reclaimFamilyKeystore(familyId: string): Promise<void> {
   await nativeBiometric.nativeReclaimFamilyKeystore(familyId);
 }
 
+/**
+ * Reclaim EVERY keystore blob on this device, for every family — the explicit
+ * clear-all-data path, and the only route that reaches material for a family this
+ * device no longer has a registry entry for (the #82 orphan case).
+ *
+ * `familyIds` is the fallback list for a build where the sweep primitive is missing;
+ * see `nativeReclaimAllKeystores`. Pass the families the registry knows about.
+ */
+export async function reclaimAllKeystores(familyIds: string[]): Promise<void> {
+  if (!isNative()) return;
+  await nativeBiometric.nativeReclaimAllKeystores(familyIds);
+}
+
 export async function removePasskey(credentialId: string): Promise<void> {
   const record = await passkeyRepo.getPasskeyByCredentialId(credentialId);
   if (record?.mechanism === 'native-keystore') {

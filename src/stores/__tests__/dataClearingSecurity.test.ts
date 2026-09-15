@@ -139,7 +139,14 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 // Sync service — uses shared auto-mock from __mocks__/syncService.ts
 vi.mock('@/services/sync/syncService');
 
-vi.mock('@/services/sync/capabilities', () => ({
+// Spread the original rather than enumerating: `capabilities.ts` exports 14 functions,
+// and this graph reaches more of them than it used to. `reclaimAllPasskeys` now calls the
+// keystore sweep OUTSIDE the families loop, so `passkeyService.isNative` and
+// `nativeBiometric.getPlatform` are actually evaluated — with an enumerated mock they were
+// `undefined`, the step threw, `runSignOutSteps` caught and reported it, and the suite
+// stayed green while the most security-critical clear step silently did nothing.
+vi.mock('@/services/sync/capabilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/sync/capabilities')>()),
   getSyncCapabilities: () => ({ hasFileSystemAccess: true }),
   canAutoSync: () => true,
 }));
@@ -169,6 +176,25 @@ vi.mock('@/services/indexeddb/registryDatabase', () => ({
     put: vi.fn(async () => {}),
     add: vi.fn(async () => {}),
   })),
+}));
+
+// The device-level passkey registry, stateful so the clear-all step can be given
+// records to reach. Seeded per test via `registryPasskeys`.
+const { registryPasskeys } = vi.hoisted(() => ({
+  registryPasskeys: { rows: [] as { credentialId: string; familyId: string }[] },
+}));
+vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
+  getAllPasskeys: vi.fn(async () => registryPasskeys.rows),
+  getPasskeysByFamily: vi.fn(async (familyId: string) =>
+    registryPasskeys.rows.filter((r) => r.familyId === familyId)
+  ),
+  getPasskeysByMember: vi.fn(async () => []),
+  getPasskeyByCredentialId: vi.fn(async () => null),
+  savePasskeyRegistration: vi.fn(async () => {}),
+  updatePasskey: vi.fn(async () => {}),
+  removePasskeyRegistration: vi.fn(async (credentialId: string) => {
+    registryPasskeys.rows = registryPasskeys.rows.filter((r) => r.credentialId !== credentialId);
+  }),
 }));
 
 vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
@@ -464,6 +490,7 @@ describe('Sensitive Data Clearing Security', () => {
     vi.clearAllMocks();
     savedGlobalSettings = { ...mockGlobalSettings };
     autoOpenState.map.clear();
+    registryPasskeys.rows = [];
   });
 
   // =========================================================================
@@ -503,6 +530,23 @@ describe('Sensitive Data Clearing Security', () => {
 
       expect(auth.currentUser).toBeNull();
       expect(auth.isAuthenticated).toBe(false);
+    });
+
+    it('reclaims EVERY passkey record, including families the registry does not list', async () => {
+      // The #82 half this closes: reclaimAllPasskeys used to loop `getAllFamilies()`,
+      // so after a delete-and-reinstall it iterated an empty family registry, reclaimed
+      // nothing, and reported success. It now works from the passkey registry itself,
+      // which is what reaches a record whose family this device no longer lists.
+      registryPasskeys.rows = [
+        { credentialId: 'native:family-123:member-1', familyId: 'family-123' },
+        // A family with NO entry in the family registry — unreachable by the old loop.
+        { credentialId: 'native:family-999:member-9', familyId: 'family-999' },
+      ];
+      const { auth } = populateAllStores();
+
+      await auth.signOutAndClearData();
+
+      expect(registryPasskeys.rows).toHaveLength(0);
     });
 
     it('calls deleteFamilyDatabase with the family ID', async () => {
