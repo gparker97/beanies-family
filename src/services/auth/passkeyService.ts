@@ -24,9 +24,11 @@ import * as nativeBiometric from './nativeBiometric';
 import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { isNative } from '@/services/sync/capabilities';
-// The registry, not a store: `authStore.ts` statically imports `resolveDeviceKeys` from
-// this module, so any store import here would be a real cycle. Same import
-// `rosterCache.ts` uses to resolve the active family without a store dependency.
+// The authority on which family is active, and the same import `rosterCache.ts` uses for
+// it. Note it is not a store, but it DOES reach stores transitively through the error
+// reporter, so do not rely on this file being store-free: the direct edge is what matters
+// (`authStore.ts` statically imports `resolveDeviceKeys` from here, so a direct store
+// import would close a real cycle).
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { logEvent } from '@/services/telemetry/logEvent';
 import {
@@ -242,9 +244,15 @@ export interface RosterMemberRef {
  *
  * A roster-driven delete against a half-painted roster would destroy live keys, so the
  * bar is: there are members, we know who is signed in, and that person is in the list.
- * The last clause is also the coherence check that makes the family scoping safe — if
- * the active family switched between the watcher firing and this running, the signed-in
- * member and the list come from different families and the pass is dropped.
+ * Deliberately NOT the family-coherence check. An earlier version of this comment claimed
+ * the membership clause served that purpose; it cannot. `currentMember` is
+ * `members.find(...)`, so a non-null `signedInMemberId` is a member of `roster` BY
+ * CONSTRUCTION and that clause can never be false for the real caller. Both values come
+ * from the same store snapshot, so they are mutually coherent whatever family is active.
+ * The family check is the explicit `rosterFamilyId` comparison in the caller below.
+ *
+ * The clause is kept because it is not worthless: it rules out a roster published without
+ * a resolved session member, which is the partial-paint shape.
  */
 function rosterLooksComplete(roster: RosterMemberRef[], signedInMemberId: string | null): boolean {
   if (roster.length === 0) return false;
@@ -257,28 +265,44 @@ function rosterLooksComplete(roster: RosterMemberRef[], signedInMemberId: string
  * requirement 4): a member removed while the app was uninstalled has no surviving blob,
  * and a member who is still here gets their real name back on the picker.
  *
+ * `rosterFamilyId` is WHICH FAMILY THE ROSTER DESCRIBES, and it is the load-bearing
+ * guard: it must equal the currently active family before anything is deleted. The two
+ * genuinely diverge, because `activateFamily` flips the active family and then awaits an
+ * IndexedDB write, so a family-A roster mutation flushed in that window arrives while the
+ * registry already says B. Judging A's roster against B's adopted keys would delete B's
+ * live enrolments: the same cross-family deletion this design exists to prevent, arriving
+ * by a different route. `rosterCache.ts` documents this exact store-vs-registry
+ * divergence as a hazard it has already shipped once.
+ *
  * `signedInMemberId` is passed IN rather than looked up: this module must not import a
- * store (`authStore.ts:13` imports `resolveDeviceKeys` from here, so the reverse edge is
- * a genuine cycle), and the `familyStore` watcher already holds `currentMember`.
+ * store (`authStore.ts` imports `resolveDeviceKeys` from here, so the reverse edge is a
+ * genuine cycle). The narrower true claim, worth stating so nobody over-relies on it:
+ * `@/services/indexeddb/database` is not a store, but it does reach stores transitively
+ * via the error reporter. The reason to use it here is that it is the authority on the
+ * active family, not module purity.
  *
  * NEVER THROWS. The caller is a `void`-ed Vue watcher with no `.catch`, where an
  * unhandled rejection would have no owner. Modelled on `rosterCache.refreshRosterCache`,
  * its sibling in that same watcher, rather than inventing a second shape.
  */
 export async function reconcileDeviceKeysWithRoster(
+  rosterFamilyId: string | null,
   roster: RosterMemberRef[],
   signedInMemberId: string | null
 ): Promise<void> {
-  if (!isNative()) return;
   try {
-    // Resolved before the first `await`, so this still runs in the same tick in which
-    // the watcher captured the roster and the signed-in member. A late family-A mutation
-    // landing after a switch to B must never have A's roster judged against B's id.
-    // Inside the try, because "never throws" has to cover this line too.
-    const familyId = getActiveFamilyId();
-    if (!familyId) return;
+    // Everything is inside the try, `isNative()` included: a broken test double makes it
+    // `undefined`, and a TypeError here is an unhandled rejection in a `void`-ed watcher.
+    // Not hypothetical in this repo, an enumerated `capabilities` mock is exactly how the
+    // clear-all step once threw while the suite stayed green.
+    if (!isNative()) return;
+    if (!rosterFamilyId) return;
+    // Read in the same tick the watcher captured the roster in, and compared against the
+    // family the roster was actually read for. A mismatch means this roster belongs to a
+    // superseded family: drop it rather than delete against it.
+    if (rosterFamilyId !== getActiveFamilyId()) return;
     if (!rosterLooksComplete(roster, signedInMemberId)) return;
-    await nativeBiometric.nativeReconcileRoster(familyId, roster);
+    await nativeBiometric.nativeReconcileRoster(rosterFamilyId, roster);
   } catch (err) {
     logEvent({
       level: 'warn',

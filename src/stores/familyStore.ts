@@ -9,6 +9,7 @@ import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { refreshRosterCache } from '@/services/auth/rosterCache';
 import { reconcileDeviceKeysWithRoster } from '@/services/auth/passkeyService';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { computeInitials } from '@/utils/memberInitials';
 import { isBlankMemberColor } from '@/constants/memberColors';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -26,6 +27,16 @@ export const useFamilyStore = defineStore('family', () => {
   const currentMemberId = ref<string | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+  /**
+   * WHICH family the current `members` list was read for.
+   *
+   * Captured at the read, not derived later, because the two can diverge: `activateFamily`
+   * flips the active family and then awaits an IndexedDB write, so for that window the
+   * registry says B while this roster still holds A. Anything that DELETES on the strength
+   * of this roster has to know which family it actually describes — see
+   * `reconcileDeviceKeysWithRoster`, where a mismatch drops the pass.
+   */
+  const rosterFamilyId = ref<string | null>(null);
 
   // Getters
   const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
@@ -125,6 +136,7 @@ export const useFamilyStore = defineStore('family', () => {
     // can only ever PROTECT a blob from deletion. Native-only and a no-op elsewhere;
     // never throws, like its sibling above.
     void reconcileDeviceKeysWithRoster(
+      rosterFamilyId.value,
       list.map((m) => ({ id: m.id, name: m.name })),
       currentMember.value?.id ?? null
     );
@@ -348,6 +360,8 @@ export const useFamilyStore = defineStore('family', () => {
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
+      // Captured BEFORE the read, so it names the family whose doc was actually read.
+      const readForFamilyId = getActiveFamilyId();
       const loaded = await familyRepo.getAllFamilyMembers();
       const roster = await normalizeRoles(loaded);
       // Resolve the session member BEFORE publishing the roster. Assigning members.value
@@ -357,6 +371,7 @@ export const useFamilyStore = defineStore('family', () => {
       // vanished and the canViewFinances true->false diagnostic fired on every boot.
       const resolvedForRoster = currentMemberId.value ? null : await resolveSessionMember(roster);
       members.value = roster;
+      rosterFamilyId.value = readForFamilyId;
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
@@ -824,6 +839,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   function resetState() {
     members.value = [];
+    rosterFamilyId.value = null;
     currentMemberId.value = null;
     isLoading.value = false;
     error.value = null;
@@ -832,6 +848,7 @@ export const useFamilyStore = defineStore('family', () => {
   return {
     // State
     members,
+    rosterFamilyId,
     currentMemberId,
     isLoading,
     error,
