@@ -265,7 +265,11 @@ vi.mock('@/services/registry/registryService', () => ({
 }));
 
 // Passkey
-vi.mock('@/services/auth/passkeyService', () => ({}));
+vi.mock('@/services/auth/passkeyService', () => ({
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
+}));
 
 // Family stores — minimal stubs for the auto-sync watcher sources
 vi.mock('@/stores/familyStore', () => ({

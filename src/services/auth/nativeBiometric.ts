@@ -934,6 +934,59 @@ export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<vo
   }
 }
 
+/**
+ * Requirement 4 of #82, deliberately narrow: a member absent from the live roster has no
+ * surviving blob — for THIS family, and never for any other family on the device.
+ *
+ * Only this session's ADOPTED targets for `familyId` are deletable here. A blob that was
+ * legitimately registered before this session can never be deleted by this path, and
+ * neither can another family's, because `takeAdoptedTargets` drains per family and
+ * `AdoptedTarget` carries the family it belongs to. That scoping is not decoration: with
+ * a bare account string and a wholesale drain, a device holding families A and B would
+ * lose B's grandparent's enrolment the moment A's roster arrived, reported as a
+ * successful reconcile.
+ *
+ * This is also the only case requirement 4 actually needs.
+ * `familyStore.invalidateDeviceCredentials` → `removeAllPasskeysForMember` already
+ * retires a member's credentials at removal time, so the sole gap is a member removed
+ * WHILE THE APP WAS UNINSTALLED.
+ *
+ * Same pass, non-destructive half: an adopted record whose member IS on the roster gets
+ * its `memberName` backfilled, so the id-tail label adoption had to invent is seen at
+ * most once per reinstall. Adoption never writes a name, so for these targets the field
+ * is absent by construction; the one case where it is not is a re-enrol in this same
+ * session, which wrote this very roster's name anyway.
+ */
+export async function nativeReconcileRoster(
+  familyId: string,
+  roster: { id: string; name: string }[]
+): Promise<void> {
+  const targets = takeAdoptedTargets(familyId);
+  if (targets.length === 0) return;
+
+  const names = new Map(roster.map((m) => [m.id, m.name]));
+  const gone = targets.filter((t) => !names.has(t.memberId));
+  // purgeTargets owns the summary event; an empty set must not emit one.
+  if (gone.length > 0) await purgeTargets(gone, 'roster_reconcile');
+
+  for (const t of targets) {
+    const name = names.get(t.memberId);
+    if (name === undefined) continue;
+    try {
+      await passkeyRepo.updatePasskey(t.credentialId, { memberName: name });
+    } catch (err) {
+      // Cosmetic, so it must not abort the pass — but not silent either: without it the
+      // picker keeps showing a device label where a name belongs.
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'roster_backfill_failed',
+        context: { os: getPlatform(), action: 'roster_backfill_failed', detail: detailOf(err) },
+      });
+    }
+  }
+}
+
 // --- Internal helpers ---
 
 /**

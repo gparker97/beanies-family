@@ -17,6 +17,9 @@ vi.mock('@/services/sync/capabilities', () => ({ isNative: mocks.isNative }));
 vi.mock('@/services/auth/passkeyService', () => ({
   resolveDeviceKeys: mocks.resolveDeviceKeys,
   canOfferBiometric: mocks.canOfferBiometric,
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: mocks.reportError }));
 

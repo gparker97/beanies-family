@@ -8,6 +8,7 @@ import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { refreshRosterCache } from '@/services/auth/rosterCache';
+import { reconcileDeviceKeysWithRoster } from '@/services/auth/passkeyService';
 import { computeInitials } from '@/utils/memberInitials';
 import { isBlankMemberColor } from '@/constants/memberColors';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -116,6 +117,17 @@ export const useFamilyStore = defineStore('family', () => {
   // missing active family (join/create flows before registration).
   watch(sortedMembers, (list) => {
     void refreshRosterCache(list);
+    // Reconcile the device's ADOPTED keystore material against the live roster (#82):
+    // a member removed while the app was uninstalled loses their surviving blob, and a
+    // member who is still here gets their real name back on the pre-decrypt picker.
+    // The signed-in member is passed IN because `passkeyService` must not import a
+    // store. Pets are included deliberately — the id list is a superset, and a superset
+    // can only ever PROTECT a blob from deletion. Native-only and a no-op elsewhere;
+    // never throws, like its sibling above.
+    void reconcileDeviceKeysWithRoster(
+      list.map((m) => ({ id: m.id, name: m.name })),
+      currentMember.value?.id ?? null
+    );
   });
 
   // Diagnostic: track permission changes on currentMember

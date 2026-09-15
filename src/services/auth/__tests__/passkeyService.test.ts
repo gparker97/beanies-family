@@ -38,11 +38,21 @@ const { nativeMocks } = vi.hoisted(() => ({
     nativeCanOffer: vi.fn(async () => true),
     nativeResolveDeviceKeys: vi.fn(async (): Promise<unknown[]> => []),
     nativeReclaimFamilyKeystore: vi.fn(async () => {}),
+    nativeReclaimAllKeystores: vi.fn(async () => {}),
+    nativeReconcileRoster: vi.fn(async () => {}),
     nativeDisable: vi.fn(async () => {}),
   },
 }));
 vi.mock('../nativeBiometric', () => nativeMocks);
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+// The active family is resolved from the REGISTRY, not a store: authStore imports
+// resolveDeviceKeys from this module, so a store import here would be a real cycle.
+const { getActiveFamilyIdMock } = vi.hoisted(() => ({
+  getActiveFamilyIdMock: vi.fn((): string | null => 'family-1'),
+}));
+vi.mock('@/services/indexeddb/database', () => ({
+  getActiveFamilyId: getActiveFamilyIdMock,
+}));
 // Translation store: return the KEY so `tr()` uses its English fallback (the
 // fallback is what a user sees when no translation is loaded — what we assert on).
 vi.mock('@/stores/translationStore', () => ({
@@ -63,6 +73,7 @@ import {
   canOfferBiometric,
   canEnrollBiometric,
   removePasskey,
+  reconcileDeviceKeysWithRoster,
   MEMBER_MISMATCH,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
@@ -354,5 +365,63 @@ describe('guessAuthenticatorLabel', () => {
     );
     expect(label).toContain('Touch ID');
     expect(label).toContain('macOS');
+  });
+});
+
+describe('reconcileDeviceKeysWithRoster — the guards, not the deletion (#82)', () => {
+  const roster = [
+    { id: 'member-1', name: 'Ada' },
+    { id: 'member-2', name: 'Bo' },
+  ];
+
+  beforeEach(() => {
+    isNativeMock.mockReturnValue(true);
+    getActiveFamilyIdMock.mockReturnValue('family-1');
+    nativeMocks.nativeReconcileRoster.mockClear();
+    nativeMocks.nativeReconcileRoster.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    isNativeMock.mockReturnValue(false);
+  });
+
+  it('runs when the roster looks like a real decrypted roster', async () => {
+    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).toHaveBeenCalledWith('family-1', roster);
+  });
+
+  it('is a no-op on web', async () => {
+    isNativeMock.mockReturnValue(false);
+    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('drops the pass on an EMPTY roster — a partial paint must never drive a delete', async () => {
+    await reconcileDeviceKeysWithRoster([], 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('drops the pass when nobody is signed in yet', async () => {
+    await reconcileDeviceKeysWithRoster(roster, null);
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('drops the pass when the signed-in member is NOT in the list', async () => {
+    // The coherence check that makes the family scoping safe: if the active family
+    // switched between the watcher firing and this running, the signed-in member and
+    // the list come from different families, and A's roster must not judge B's keys.
+    await reconcileDeviceKeysWithRoster(roster, 'someone-from-another-family');
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('drops the pass when there is no active family (join/create before registration)', async () => {
+    getActiveFamilyIdMock.mockReturnValue(null);
+    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('NEVER rejects — the caller is a void-ed watcher with no owner for a rejection', async () => {
+    nativeMocks.nativeReconcileRoster.mockRejectedValueOnce(new Error('boom'));
+    await expect(reconcileDeviceKeysWithRoster(roster, 'member-1')).resolves.toBeUndefined();
   });
 });

@@ -92,6 +92,7 @@ import {
   nativeReclaimFamilyKeystore,
   nativeReclaimAllKeystores,
   nativeDisable,
+  nativeReconcileRoster,
   takeAdoptedTargets,
   __resetKeystoreSessionForTests,
 } from '../nativeBiometric';
@@ -938,5 +939,118 @@ describe('keystore enumeration + adoption (#82)', () => {
       // B is still waiting for whenever (if ever) it becomes the active family.
       expect(takeAdoptedTargets('family-2').map((t) => t.memberId)).toEqual(['member-2']);
     });
+  });
+});
+
+describe('roster reconcile — requirement 4, and the cross-family defect it must not have', () => {
+  /** Adopt blobs for the given accounts, as a post-reinstall session would. */
+  async function adopt(accounts: string[]) {
+    plugin.listAccounts.mockResolvedValue({ accounts });
+    await nativeResolveDeviceKeys(accounts[0]!.split(':')[0]!);
+    plugin.deleteKey.mockClear();
+  }
+
+  it('a member removed while the app was uninstalled loses their blob', async () => {
+    await adopt(['family-1:member-1', 'family-1:ghost']);
+
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:ghost' });
+    expect(plugin.deleteKey).not.toHaveBeenCalledWith({ account: 'family-1:member-1' });
+    expect(store.map((r) => r.memberId)).toEqual(['member-1']);
+  });
+
+  it("family A's roster deletes NOTHING belonging to family B", async () => {
+    // THE defect this design exists to prevent. Adoption is all-families, so a wholesale
+    // drain judged against A's roster would delete B's live enrolment — at info, as a
+    // successful reconcile — and the member would lose biometric unlock on a family that
+    // was never involved.
+    await adopt(['family-1:member-1', 'family-2:grandparent']);
+
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(store.map((r) => r.familyId).sort()).toEqual(['family-1', 'family-2']);
+    // And B's own reconcile, when B becomes active, still works on B's own targets.
+    await nativeReconcileRoster('family-2', [{ id: 'someone-else', name: 'Bo' }]);
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-2:grandparent' });
+  });
+
+  it('backfills the real member name over the adopted id-tail label', async () => {
+    await adopt(['family-1:member-1']);
+    expect(store[0]!.memberName).toBeUndefined();
+
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+
+    expect(store[0]!.memberName).toBe('Ada');
+  });
+
+  it('a member PRESENT in the roster survives repeated roster mutations', async () => {
+    await adopt(['family-1:member-1']);
+    const roster = [{ id: 'member-1', name: 'Ada' }];
+
+    await nativeReconcileRoster('family-1', roster);
+    await nativeReconcileRoster('family-1', roster);
+    await nativeReconcileRoster('family-1', roster);
+
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(store).toHaveLength(1);
+  });
+
+  it('is a one-shot per family: the drain IS the already-reconciled flag', async () => {
+    await adopt(['family-1:member-1']);
+    // First pass keeps the member (they are on the roster).
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+    // A later pass with an EMPTY-ish roster cannot delete them: the targets are drained,
+    // so there is nothing this path is permitted to touch.
+    await nativeReconcileRoster('family-1', [{ id: 'someone-else', name: 'Bo' }]);
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(store).toHaveLength(1);
+  });
+
+  it('a record registered BEFORE this session is never deletable by this path', async () => {
+    // Only adopted targets are in scope. A legitimately-enrolled member who happens not
+    // to be on a partially-loaded roster must not lose their key here.
+    store.push({
+      keystoreScheme: 'per-member',
+      credentialId: 'native:family-1:long-standing',
+      memberId: 'long-standing',
+      familyId: 'family-1',
+      publicKey: '',
+      prfSupported: false,
+      mechanism: 'native-keystore',
+      label: 'this device',
+      createdAt: '2026-01-02',
+    });
+    plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:long-standing'] });
+    await nativeResolveDeviceKeys('family-1');
+
+    await nativeReconcileRoster('family-1', [{ id: 'someone-else', name: 'Bo' }]);
+
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(store).toHaveLength(1);
+  });
+
+  it('an enumeration failure means no adopted set, so the pass does nothing', async () => {
+    plugin.listAccounts.mockImplementation(rejectWith('unknown'));
+    await nativeResolveDeviceKeys('family-1');
+
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+  });
+
+  it('a failing name backfill is reported and does not abort the pass', async () => {
+    await adopt(['family-1:member-1', 'family-1:member-2']);
+    vi.mocked(repo.updatePasskey).mockRejectedValueOnce(new Error('idb gone'));
+
+    await nativeReconcileRoster('family-1', [
+      { id: 'member-1', name: 'Ada' },
+      { id: 'member-2', name: 'Bo' },
+    ]);
+
+    expect(eventContext('roster_backfill_failed')).toBeDefined();
+    // The second member still got their name.
+    expect(store.find((r) => r.memberId === 'member-2')!.memberName).toBe('Bo');
   });
 });
