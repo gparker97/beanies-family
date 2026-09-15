@@ -17,6 +17,9 @@ vi.mock('../useToast', () => ({ useToast: () => ({ showToast }) }));
 
 vi.mock('../useTranslation', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
 
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (...a: unknown[]) => logEvent(...a) }));
+
 const vacations = ref<unknown[]>([]);
 vi.mock('@/stores/vacationStore', () => ({
   useVacationStore: () => ({ vacations: vacations.value }),
@@ -163,5 +166,159 @@ describe('useDocumentToTravel — delivery', () => {
     deliverTravel(TRAVEL, { sourceFile: imageFile() });
     const arg = onTravelReady.mock.calls[0][0] as { target: { kind: string; vacationId?: string } };
     expect(arg.target).toEqual({ kind: 'attach', vacationId: 'trip-1' });
+  });
+});
+
+/**
+ * The `ready` event. Until 2026-09-15 it sent `segment_count` and `target_kind`, NEITHER of which
+ * was in ALLOWED_CONTEXT_KEYS — so `redactContext` dropped both and this event shipped with an
+ * empty payload from #30 onwards.
+ *
+ * The allowlist assertion below is the guard that actually catches that class: mocking `logEvent`
+ * means redaction never runs, so asserting the object we PASS proves nothing about what survives.
+ * Same pattern as `calendarImportStore.test.ts`.
+ */
+describe('useDocumentToTravel — the ready event', () => {
+  const NAMED: TravelExtractionResult = {
+    ...TRAVEL,
+    segments: [
+      {
+        ...TRAVEL.segments[0]!,
+        fields: {
+          departureAirport: 'Singapore Changi Airport',
+          arrivalAirport: 'HND',
+          departureDate: '2026-08-12',
+        },
+      },
+    ],
+  };
+
+  it('sends only context keys that are in the shipped allowlist', async () => {
+    const { ALLOWED_CONTEXT_KEYS } = await import('@/utils/diagnosticContext');
+    const { deliverTravel } = setup();
+    deliverTravel(TRAVEL, { sourceFile: imageFile() });
+
+    expect(logEvent).toHaveBeenCalled(); // else this whole assertion passes vacuously
+    for (const [payload] of logEvent.mock.calls) {
+      const context = (payload as { context?: Record<string, unknown> }).context ?? {};
+      expect(Object.keys(context).length).toBeGreaterThan(0);
+      for (const key of Object.keys(context)) {
+        expect(
+          ALLOWED_CONTEXT_KEYS.has(key),
+          `context key "${key}" is not in ALLOWED_CONTEXT_KEYS`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('carries the segment count, the trip target and the code-shape trace', () => {
+    const { deliverTravel } = setup();
+    deliverTravel(TRAVEL, { sourceFile: imageFile() });
+    const call = logEvent.mock.calls.at(-1)![0] as {
+      level: string;
+      context: Record<string, unknown>;
+    };
+    expect(call.context.action).toBe('ready');
+    expect(call.context.kind).toBe('create');
+    expect(call.context.count).toBe(1);
+    // TRAVEL's fixture is SIN/HND — both already codes.
+    expect(call.context.inferred_count).toBe(0);
+    expect(call.level).toBe('info');
+  });
+
+  it('does not score a forbidden placeholder as a translated code', () => {
+    // 'TBA' satisfies /^[A-Z]{3}$/, so a naive shape test reported a perfect health score while
+    // the flight was titled "TBA → SIN". The prompt forbids these; the counter must agree.
+    const { deliverTravel } = setup();
+    deliverTravel(
+      {
+        ...TRAVEL,
+        segments: [
+          {
+            ...TRAVEL.segments[0]!,
+            fields: { departureAirport: 'TBA', arrivalAirport: 'SIN', departureDate: '2026-08-12' },
+          },
+        ],
+      },
+      { sourceFile: imageFile() }
+    );
+    const call = logEvent.mock.calls.at(-1)![0] as {
+      level: string;
+      context: Record<string, unknown>;
+    };
+    expect(call.context.inferred_count).toBe(1);
+    expect(call.level).toBe('warn');
+  });
+
+  it('stays at info when only the AIRLINE came back as a name', () => {
+    // The airline list is the known-incomplete one, so an airline name is expected background
+    // and must not contaminate the airport signal.
+    const { deliverTravel } = setup();
+    deliverTravel(
+      {
+        ...TRAVEL,
+        segments: [
+          {
+            ...TRAVEL.segments[0]!,
+            fields: {
+              departureAirport: 'SIN',
+              arrivalAirport: 'HND',
+              airline: 'Juneyao Airlines',
+              departureDate: '2026-08-12',
+            },
+          },
+        ],
+      },
+      { sourceFile: imageFile() }
+    );
+    const call = logEvent.mock.calls.at(-1)![0] as {
+      level: string;
+      context: Record<string, unknown>;
+    };
+    // The counter meters AIRPORTS only, so it agrees with the level it drives — an
+    // `inferred_count` that mixed both could not reproduce the severity it was emitted with.
+    expect(call.context.inferred_count).toBe(0);
+    expect(call.level).toBe('info');
+  });
+
+  it('does not flag the picker shape as a translation failure', () => {
+    // 'Sydney (SYD) Terminal 1' carries its code and the title builder reads it — an anchored
+    // probe here would have logged working input as a failure and escalated the event.
+    const { deliverTravel } = setup();
+    deliverTravel(
+      {
+        ...TRAVEL,
+        segments: [
+          {
+            ...TRAVEL.segments[0]!,
+            fields: {
+              departureAirport: 'Sydney (SYD) Terminal 1',
+              arrivalAirport: 'Tokyo (HND)',
+              departureDate: '2026-08-12',
+            },
+          },
+        ],
+      },
+      { sourceFile: imageFile() }
+    );
+    const call = logEvent.mock.calls.at(-1)![0] as {
+      level: string;
+      context: Record<string, unknown>;
+    };
+    expect(call.context.inferred_count).toBe(0);
+    expect(call.level).toBe('info');
+  });
+
+  it('escalates to warn when the model returned a NAME instead of a code', () => {
+    // Allowed by the prompt as its not-confident fallback, but it should be rare — the
+    // info→warn ratio is what makes that rate queryable.
+    const { deliverTravel } = setup();
+    deliverTravel(NAMED, { sourceFile: imageFile() });
+    const call = logEvent.mock.calls.at(-1)![0] as {
+      level: string;
+      context: Record<string, unknown>;
+    };
+    expect(call.context.inferred_count).toBe(1);
+    expect(call.level).toBe('warn');
   });
 });

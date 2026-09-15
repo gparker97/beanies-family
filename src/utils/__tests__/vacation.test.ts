@@ -10,6 +10,12 @@ import {
   tripBadge,
   segmentDateRange,
   tripsOverlappingRange,
+  buildTravelSegmentTitle,
+  flightCodeLabel,
+  airportLabel,
+  airlineLabel,
+  buildAirportOptions,
+  buildAirlineOptions,
   resolveTripTarget,
   overrideTripTarget,
   type SupportedTravelType,
@@ -511,5 +517,193 @@ describe('tripBadge', () => {
     // Junk sorts after an ISO date, so tripPhase says 'upcoming' and daysBetween
     // returns NaN. NaN <= 0 is false, so only the finite check stops a "NaN" chip.
     expect(tripBadge(trip('garbage', undefined), TODAY)).toBeNull();
+  });
+});
+
+// The two title/label fixes (2026-09-15). Translating a name to a code is the MODEL's job now
+// (see TRAVEL_JSON_SHAPE); these only cover what the app does with whatever it was given.
+// docs/plans/2026-09-15-airport-airline-code-normalization.md
+describe('buildTravelSegmentTitle — flights', () => {
+  const flight = (departureAirport?: string, arrivalAirport?: string) =>
+    buildTravelSegmentTitle({ type: 'flight_outbound', departureAirport, arrivalAirport });
+
+  it('titles from the codes the model now returns', () => {
+    expect(flight('SIN', 'JFK')).toBe('SIN → JFK');
+  });
+
+  it('titles from the picker shape', () => {
+    expect(flight('Singapore (SIN)', 'Tokyo (HND)')).toBe('SIN → HND');
+  });
+
+  it('still reads a PARENTHESIZED code with trailing text after it', () => {
+    // A terminal used to be appended into the airport field, and pre-prompt segments still hold
+    // that shape.
+    expect(flight('Sydney (SYD) Terminal 1', 'Tokyo (HND) Japan')).toBe('SYD → HND');
+  });
+
+  it('renders a bare code with trailing text verbatim — the accepted trade-off', () => {
+    // A leading-bare-code rung would shorten this to "SIN → JFK", and that rung is precisely
+    // what turned "LOS ANGELES (LAX)" into Lagos. Verbose but true beats short and possibly
+    // false, so this stays long rather than earning back a rung with a wrong-airport failure
+    // mode. The full value is shown in the detail row either way.
+    expect(flight('SIN Terminal 3', 'JFK International Airport')).toBe(
+      'SIN Terminal 3 → JFK International Airport'
+    );
+  });
+
+  it('reads the code out of an ALL-CAPS name, not the first word', () => {
+    // GDS/e-ticket text is overwhelmingly all-caps, and a leading-bare-code rung placed before
+    // the parenthesized one turned these into LOS (Lagos), SAN (San Diego) and ABU (Atambua).
+    expect(flight('LOS ANGELES (LAX)', 'SIN')).toBe('LAX → SIN');
+    expect(flight('SAN FRANCISCO (SFO)', 'SIN')).toBe('SFO → SIN');
+    expect(flight('ABU DHABI (AUH)', 'SIN')).toBe('AUH → SIN');
+    expect(flight('NEW YORK (JFK)', 'SIN')).toBe('JFK → SIN');
+  });
+
+  it('renders an all-caps name with no code verbatim rather than guessing', () => {
+    expect(flight('LOS ANGELES', 'SIN')).toBe('LOS ANGELES → SIN');
+  });
+
+  it('never turns a forbidden placeholder into an airport', () => {
+    // UNK is Unalakleet and NAN is Nadi, so a placeholder reaching a lookup would name a real
+    // airport in the wrong hemisphere. Both shapes must be refused.
+    expect(flight('TBA', 'SIN')).toBe('TBA → SIN');
+    expect(flight('Somewhere (TBA)', 'SIN')).toBe('Somewhere (TBA) → SIN');
+    expect(flight('UNK', 'SIN')).toBe('UNK → SIN');
+  });
+
+  it('renders a NAME in full rather than its first word — the defect', () => {
+    // Was 'Singapore → John'. A name only reaches here when the model could not identify the
+    // airport, or the segment predates the prompt asking for a code.
+    expect(flight('Singapore Changi Airport', 'John F. Kennedy International Airport')).toBe(
+      'Singapore Changi Airport → John F. Kennedy International Airport'
+    );
+  });
+
+  it('falls back to a generic title with no airports', () => {
+    expect(flight(undefined, undefined)).toBe('outbound flight');
+  });
+});
+
+describe('flightCodeLabel', () => {
+  it('prints the carrier beside a plain flight number', () => {
+    expect(flightCodeLabel('China Eastern (MU)', '5678')).toBe('MU 5678');
+    expect(flightCodeLabel('MU', '5678')).toBe('MU 5678');
+  });
+
+  it('never prints the carrier twice', () => {
+    expect(flightCodeLabel('Singapore Airlines (SQ)', 'SQ25')).toBe('SQ25');
+    expect(flightCodeLabel('SQ', 'SQ25')).toBe('SQ25');
+    expect(flightCodeLabel('Emirates (EK)', 'EK')).toBe('EK');
+    expect(flightCodeLabel('Singapore Airlines (SQ)', 'SQ-25')).toBe('SQ-25');
+    expect(flightCodeLabel('Singapore Airlines (SQ)', 'SQ 25')).toBe('SQ 25');
+    expect(flightCodeLabel('Delta (DL)', 'DL 00123')).toBe('DL 00123');
+  });
+
+  it('keeps the airline when the flight-number field holds something else', () => {
+    // Equipment codes must not swallow the carrier. The second case is the one a bare prefix
+    // test got wrong: "AT" is a real carrier code and "ATR72" starts with it.
+    expect(flightCodeLabel('Singapore Airlines (SQ)', 'E190')).toBe('SQ E190');
+    expect(flightCodeLabel('Royal Air Maroc (AT)', 'ATR72')).toBe('AT ATR72');
+    expect(flightCodeLabel('British Airways (BA)', 'BAW117')).toBe('BA BAW117');
+    // …and identically for the BARE code, which is the mainline shape after the prompt change.
+    // Guarding only the parenthesized branch left these three dropping the carrier.
+    expect(flightCodeLabel('SQ', 'E190')).toBe('SQ E190');
+    expect(flightCodeLabel('LH', 'A380')).toBe('LH A380');
+    expect(flightCodeLabel('AT', 'ATR72')).toBe('AT ATR72');
+  });
+
+  it('collapses a bare code the flight number already names', () => {
+    // "EK" + "EK" printed "EK EK" — the exact defect this function exists to prevent — because
+    // the bare path could not reach the collapse rule.
+    expect(flightCodeLabel('EK', 'EK')).toBe('EK');
+    expect(flightCodeLabel('SQ', 'SQ25')).toBe('SQ25');
+  });
+
+  it('reads the code out of the LAST paren group', () => {
+    expect(flightCodeLabel('ANA (All Nippon Airways) (NH)', 'NH820')).toBe('NH820');
+    expect(flightCodeLabel('ANA (All Nippon Airways) (NH)', '820')).toBe('NH 820');
+  });
+
+  it('prefers a self-describing flight number over a paren-less airline NAME', () => {
+    // The prompt's not-confident fallback returns a name. Printing it in full beside a number
+    // that already names the carrier is just long — this was "Singapore Airlines SQ25".
+    expect(flightCodeLabel('Singapore Airlines', 'SQ25')).toBe('SQ25');
+    expect(flightCodeLabel('Beanstalk Air', 'BN220')).toBe('BN220');
+    // …but a number with no designator still needs the name beside it.
+    expect(flightCodeLabel('China Eastern', '5678')).toBe('China Eastern 5678');
+  });
+
+  it('collapses an undecidable carrier-vs-equipment collision, by documented choice', () => {
+    // "A3" + digits is exactly the shape of a real Aegean flight number, so the flightNumber
+    // field is read as one. travelDetailRows still shows the airline in full.
+    expect(flightCodeLabel('Aegean Airlines (A3)', 'A320')).toBe('A320');
+  });
+
+  it('renders a flight number with no airline, which used to vanish', () => {
+    expect(flightCodeLabel(undefined, 'SQ25')).toBe('SQ25');
+    expect(flightCodeLabel(undefined, '5678')).toBe('5678');
+  });
+
+  it('renders the carrier alone with no flight number', () => {
+    expect(flightCodeLabel('Singapore Airlines (SQ)', undefined)).toBe('SQ');
+  });
+
+  it('is empty when it has nothing to say', () => {
+    expect(flightCodeLabel(undefined, undefined)).toBe('');
+  });
+});
+
+// code -> readable label. The SAFE direction: code→entry is 1:1 and exact, unlike the name→code
+// resolver that was built for this feature, measured, and deleted.
+describe('airportLabel / airlineLabel', () => {
+  it('expands a bare code to the shape the dropdown shows', () => {
+    expect(airportLabel('SIN')).toBe('Singapore (SIN)');
+    expect(airportLabel('JFK')).toBe('New York (JFK)');
+    expect(airlineLabel('SQ')).toBe('Singapore Airlines (SQ)');
+  });
+
+  it('matches buildAirportOptions byte-for-byte, so the two cannot drift', () => {
+    const option = buildAirportOptions().find((o) => o.value.endsWith('(SIN)'));
+    expect(option).toBeDefined();
+    expect(airportLabel('SIN')).toBe(option!.value);
+    const airline = buildAirlineOptions().find((o) => o.value.endsWith('(SQ)'));
+    expect(airlineLabel('SQ')).toBe(airline!.value);
+  });
+
+  it('leaves a value that already carries text exactly as stored', () => {
+    // Expanding these would discard what the document said.
+    expect(airportLabel('Singapore (SIN)')).toBe('Singapore (SIN)');
+    expect(airportLabel('Sydney (SYD) Terminal 1')).toBe('Sydney (SYD) Terminal 1');
+    expect(airportLabel('John F. Kennedy International Airport')).toBe(
+      'John F. Kennedy International Airport'
+    );
+    expect(airlineLabel('Juneyao Airlines')).toBe('Juneyao Airlines');
+  });
+
+  it('never expands a forbidden placeholder into a real place', () => {
+    // UNK is Unalakleet, Alaska — a real row, and the single most likely "unknown" placeholder a
+    // model would emit. Blocked, at the cost of one tiny airport being unreachable by its code.
+    expect(airportLabel('UNK')).toBe('UNK');
+    expect(airportLabel('TBA')).toBe('TBA');
+    expect(airportLabel('TBD')).toBe('TBD');
+  });
+
+  it('does NOT block a real destination that merely looks like garbage', () => {
+    // NAN is Nadi, Fiji. It resembles JavaScript's NaN, but it is a genuine family destination
+    // and an unlikely model placeholder, so the denylist deliberately stops short of it. The
+    // line is drawn at tokens that read as "I do not know", not at anything code-shaped.
+    expect(airportLabel('NAN')).toBe('Nadi (NAN)');
+  });
+
+  it('keeps an unlisted code as-is', () => {
+    expect(airlineLabel('HO')).toBe('HO'); // Juneyao is not in the 135-entry list
+    expect(airportLabel('ZZQ')).toBe('ZZQ');
+  });
+
+  it('is empty-safe and idempotent', () => {
+    expect(airportLabel(undefined)).toBe('');
+    expect(airportLabel('  ')).toBe('');
+    expect(airportLabel(airportLabel('SIN'))).toBe('Singapore (SIN)');
   });
 });

@@ -14,8 +14,8 @@ import {
   daysBetween,
   addDaysYmd,
 } from '@/utils/date';
-import { AIRLINES } from '@/constants/airlines';
-import { AIRPORTS } from '@/constants/airports';
+import { AIRLINES, type AirlineInfo } from '@/constants/airlines';
+import { AIRPORTS, type AirportInfo } from '@/constants/airports';
 import { CRUISE_LINES } from '@/constants/cruiseLines';
 import { CRUISE_SHIPS } from '@/constants/cruiseShips';
 import { CRUISE_PORTS } from '@/constants/cruisePorts';
@@ -858,11 +858,134 @@ export function overrideTripTarget(
 
 // ── Auto-generated segment titles ────────────────────────────────────────────
 
-/** Extract 3-letter airport code from strings like "Singapore (SIN)" */
+/**
+ * A code-SHAPED token that is not a code. The prompt forbids the model inventing these, but
+ * `UNK` is Unalakleet and `NAN` is Nadi, so one reaching a lookup would name a real airport in
+ * the wrong hemisphere. Treated as "no code carried", which renders the field verbatim instead.
+ */
+const PLACEHOLDER_CODES = new Set(['TBA', 'TBD', 'TBC', 'UNK', 'XXX', 'ZZZ', 'NIL', 'NA', 'XX']);
+// The line is drawn at tokens that read as "I do not know", and it stops there on purpose. `UNK`
+// costs Unalakleet, which is worth it. `NAN` is NOT listed: it is Nadi, Fiji — a genuine family
+// destination and an unlikely placeholder — so a wider net would cost more than it saves.
+
+/**
+ * The IATA code a field EXPLICITLY carries, or `undefined` when it carries a name.
+ *
+ * ONE definition, three consumers (`airportCode`, `flightCodeLabel`, and the extraction
+ * telemetry's shape probe), because two of those disagreeing is its own defect class: an
+ * anchored probe beside an unanchored extractor logged working input as a translation failure.
+ *
+ * Two shapes only, and deliberately no cleverer rung. Three rounds of review each broke a new
+ * input class as rungs were added — most sharply a leading-bare-code rung placed before the
+ * parenthesized one, which turned "LOS ANGELES (LAX)" into LOS (Lagos, Nigeria). The rule that
+ * holds is **verbose but true beats short and possibly false**: when the field does not plainly
+ * carry a code, the caller renders the whole string rather than guessing which token is one.
+ */
+export function carriedCode(value: string | undefined, width: 2 | 3): string | undefined {
+  const v = value?.trim();
+  if (!v) return undefined;
+  const exact = width === 3 ? /^[A-Z]{3}$/ : /^[A-Z0-9]{2}$/;
+  // Unanchored for width 3: the picker's "Sydney (SYD) Terminal 1" is a real stored shape, and
+  // matching parens FIRST is what keeps an all-caps city name from winning over the real code.
+  const parens = width === 3 ? /\(([A-Z]{3})\)/ : /\(([A-Z0-9]{2,3})\)$/;
+  const code = exact.test(v) ? v : (parens.exec(v)?.[1] ?? undefined);
+  return code && !PLACEHOLDER_CODES.has(code) ? code : undefined;
+}
+
+// ── code → readable label ───────────────────────────────────────────────────
+//
+// The SAFE direction, and the only lookup in this file. code→entry is 1:1 and exact (zero
+// duplicate codes in either list), unlike name→code, which is why a local name→code resolver was
+// built for this feature, measured, and deleted: see the plan's superseded section. Asking the
+// model to translate a name is reliable; asking a CSV to is not. Expanding a code it already gave
+// us is neither — it is a dictionary lookup.
+
+/** The stored shape, defined ONCE and shared with the combobox option builders below. */
+const airportValue = (a: AirportInfo): string => `${a.city} (${a.code})`;
+const airlineValue = (a: AirlineInfo): string => `${a.name} (${a.code})`;
+
+let airportsByCode: Map<string, AirportInfo> | null = null;
+let airlinesByCode: Map<string, AirlineInfo> | null = null;
+
+/**
+ * Expand a BARE code to the same readable shape the dropdown shows, so a family confirming an
+ * AI-read booking sees "Singapore (SIN)" rather than "SIN".
+ *
+ * Bare only, deliberately. A value that already carries text — the picker's
+ * "Sydney (SYD) Terminal 1", or a name the model returned because it was not sure — is returned
+ * exactly as stored, because expanding it would discard what the document actually said.
+ */
+export function airportLabel(value?: string): string {
+  const v = value?.trim() ?? '';
+  if (!/^[A-Z]{3}$/.test(v) || PLACEHOLDER_CODES.has(v)) return v;
+  airportsByCode ??= new Map(AIRPORTS.map((a) => [a.code, a]));
+  const entry = airportsByCode.get(v);
+  return entry ? airportValue(entry) : v;
+}
+
+/** As `airportLabel`, for a 2-character carrier code. The list is hand-maintained and short, so
+ *  an unlisted carrier simply keeps its code. */
+export function airlineLabel(value?: string): string {
+  const v = value?.trim() ?? '';
+  if (!/^[A-Z0-9]{2}$/.test(v) || PLACEHOLDER_CODES.has(v)) return v;
+  airlinesByCode ??= new Map(AIRLINES.map((a) => [a.code, a]));
+  const entry = airlinesByCode.get(v);
+  return entry ? airlineValue(entry) : v;
+}
+
+/**
+ * The airport code for a title, from whatever shape the field holds: a bare "SIN" (what the
+ * extraction prompt now asks the model for), the picker's "Singapore (SIN)", or a name.
+ *
+ * The first-word fallback this replaced is the bug: "John F. Kennedy International Airport"
+ * titled a flight "John". Falling back to the WHOLE string is longer but never wrong, and a
+ * name only reaches here when the model could not identify the airport (or the segment predates
+ * the prompt asking). Resolving a name to a code is the model's job, not ours — see
+ * `TRAVEL_JSON_SHAPE` in `extractionPrompt.ts`.
+ */
 function airportCode(airport?: string): string {
-  if (!airport) return '';
-  const m = airport.match(/\(([A-Z]{3})\)/);
-  return m ? m[1]! : (airport.split(' ')[0] ?? '');
+  return carriedCode(airport, 3) ?? airport?.trim() ?? '';
+}
+
+/**
+ * The carrier token for a collapsed flight row, printed ONCE.
+ *
+ * Two defects in one line, both live before this: the carrier was printed beside a flight number
+ * that already named it ("SQ SQ25"), and the whole token sat inside `if (seg.airline)`, so a
+ * flight number with no airline vanished from the row entirely.
+ *
+ * A prefix test, not a shape test: "EK" + "EK" and "SQ" + "SQ-25" both need collapsing, and an
+ * equipment code in the flight-number field ("E190", "ATR72") must NOT swallow the airline.
+ *
+ * One case is genuinely undecidable and left as-is: "Aegean Airlines (A3)" + "A320" collapses to
+ * "A320", because "A3" followed by digits is exactly the shape of a real Aegean flight number.
+ * The field is `flightNumber`, so reading it as one is the right default, and `travelDetailRows`
+ * still shows the airline in full — only the one-line summary loses it.
+ */
+/** Two alphanumerics (at least one a letter) then 1-4 digits: "SQ25", "HO1602", "6E123". */
+const FLIGHT_DESIGNATOR = /^(?=[a-z0-9]{2}\d)(?=[a-z0-9]*[a-z])[a-z0-9]{2}\d{1,4}$/i;
+export function flightCodeLabel(airline?: string, flightNumber?: string): string {
+  const raw = airline?.trim() ?? '';
+  // Both shapes through ONE derivation. Branching on "parenthesized" vs "bare" is what left the
+  // bare path unguarded: "EK" + "EK" printed "EK EK", and "SQ" + "E190" dropped the carrier.
+  const code = carriedCode(raw, 2);
+  const carrier = code ?? raw;
+  const fn = flightNumber?.trim() ?? '';
+  if (!fn) return carrier;
+
+  if (code && fn.toUpperCase().startsWith(code.toUpperCase())) {
+    // Collapse only when what FOLLOWS the code reads as a flight number. A bare prefix match
+    // erased the carrier on an aircraft type: "AT" + "ATR72" became "ATR72". The remainder must
+    // be nothing ("EK" + "EK") or digits with an optional separator ("SQ-25", "DL 00123").
+    const rest = fn.slice(code.length);
+    if (rest === '' || /^[-/ ]?\d+$/.test(rest)) return fn;
+  } else if (!code && FLIGHT_DESIGNATOR.test(fn)) {
+    // The airline is a plain name — the prompt's not-confident fallback. A flight number
+    // carrying its own designator is the more precise of the two, and printing the full name
+    // beside it is merely long ("Singapore Airlines SQ25").
+    return fn;
+  }
+  return `${carrier} ${fn}`.trim();
 }
 
 /** Build a display title for a travel segment based on its type and fields */
@@ -1334,14 +1457,17 @@ export interface ComboOption {
 
 export function buildAirlineOptions(): ComboOption[] {
   return AIRLINES.map((a) => ({
-    value: `${a.name} (${a.code})`,
+    // `value` is the STORED shape — shared with `airlineLabel` so the dropdown and the
+    // expanded-code label are the same string by construction.
+    value: airlineValue(a),
     label: `${a.name} (${a.code})`,
   }));
 }
 
 export function buildAirportOptions(): ComboOption[] {
   return AIRPORTS.map((a) => ({
-    value: `${a.city} (${a.code})`,
+    // Shared with `airportLabel` — see `buildAirlineOptions`.
+    value: airportValue(a),
     // `label` stays full-form so search by city, airport name, or code all match.
     label: `${a.city} - ${a.name} (${a.code})`,
     // Rich layout: city primary, airport name secondary, IATA code as a

@@ -25,7 +25,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-09-14.3';
+export const PROMPT_VERSION = '2026-09-15.3';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -396,7 +396,7 @@ export const TRAVEL_JSON_SHAPE = {
   travellers:
     'array of strings — the names of the people on THIS segment. Return each name in a clean "Given Surname" form: Title Case, drop honorifics/titles (Mr, Mrs, Ms, Mstr, Master, Miss, Dr), remove slashes and booking-code artefacts, reorder surname-first names to given-name-first, and omit middle names/initials (e.g. "SMITH/JONATHAN MR" → "Jonathan Smith"). [] if no names are shown. A booking shared by several people is ONE segment with multiple names here — NEVER output a separate segment per person.',
   travelFields:
-    'kind=travel flights: airline, flightNumber, departureAirport, arrivalAirport, departureDate (YYYY-MM-DD), departureTime (24h HH:mm), arrivalDate, arrivalTime, terminal (departure terminal, e.g. "Terminal 1"), arrivesNextDay (boolean). cruise: cruiseLine, shipName, departurePort, terminal (cruise terminal, e.g. "Cruise Terminal A"), cabinNumber, embarkationDate, embarkationTime, disembarkationDate. train/ferry: operator, route, departureStation, arrivalStation, departureDate, departureTime, arrivalDate, arrivalTime.',
+    'kind=travel flights: airline (the 2-character IATA airline code, e.g. "SQ", "HO", "A3"), flightNumber, departureAirport (the 3-letter IATA airport code, e.g. "SIN"), arrivalAirport (also the 3-letter IATA airport code, e.g. "JFK"), departureDate (YYYY-MM-DD), departureTime (24h HH:mm), arrivalDate, arrivalTime, terminal (departure terminal, e.g. "Terminal 1"), arrivesNextDay (boolean). Those three fields, and ONLY those three (airline, departureAirport, arrivalAirport): an itinerary prints names, so translate them, working out which specific airport and carrier the document means and returning their codes. Where you are not sure, two rules. If you cannot confidently identify the airport or carrier, including a city with several airports the document does not choose between, return the name exactly as the document prints it. And never invent a placeholder such as "TBA", "TBD", "UNK" or "N/A"; an unchanged name is always better than a made-up code. Every other field below, including departurePort, departureStation, arrivalStation and operator, is returned exactly as the document prints it: those have no code and must not be abbreviated. cruise: cruiseLine, shipName, departurePort, terminal (cruise terminal, e.g. "Cruise Terminal A"), cabinNumber, embarkationDate, embarkationTime, disembarkationDate. train/ferry: operator, route, departureStation, arrivalStation, departureDate, departureTime, arrivalDate, arrivalTime.',
   accommodationFields:
     'kind=accommodation: name, address, checkInDate (YYYY-MM-DD), checkOutDate, confirmationNumber, roomType, contactPhone, breakfastIncluded (boolean), link.',
   transportationFields:

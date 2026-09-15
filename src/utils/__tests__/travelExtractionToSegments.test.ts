@@ -352,3 +352,65 @@ describe('parseTravelExtractionResult → travelExtractionToSegments (nested *Fi
     expect(buckets.accommodations[0].breakfastIncluded).toBe(true);
   });
 });
+
+// Round-tripping through the pickers (2026-09-15). The model returns bare codes, but the combobox
+// option `value` is "City (CODE)" — so a bare "SIN" matched nothing and the field arrived in the
+// wizard as a CUSTOM value instead of a selected airport. greg caught this on a real itinerary.
+describe('storing the value the picker uses', () => {
+  const codes = (fields: Record<string, string>) =>
+    travelExtractionToSegments(result([draft({ fields })])).buckets.travelSegments[0]!;
+
+  it('expands a bare listed code to the picker shape', () => {
+    const seg = codes({ departureAirport: 'SIN', arrivalAirport: 'LAX', airline: 'BR' });
+    expect(seg.departureAirport).toBe('Singapore (SIN)');
+    expect(seg.arrivalAirport).toBe('Los Angeles (LAX)');
+    expect(seg.airline).toBe('EVA Air (BR)');
+  });
+
+  it('matches the dropdown option value exactly, so the field is not custom', async () => {
+    const { buildAirportOptions, buildAirlineOptions } = await import('@/utils/vacation');
+    const seg = codes({ departureAirport: 'TPE', airline: 'BR' });
+    expect(buildAirportOptions().some((o) => o.value === seg.departureAirport)).toBe(true);
+    expect(buildAirlineOptions().some((o) => o.value === seg.airline)).toBe(true);
+  });
+
+  it('still derives the compact title from the expanded value', () => {
+    expect(codes({ departureAirport: 'SIN', arrivalAirport: 'LAX' }).title).toBe('SIN → LAX');
+  });
+
+  it('leaves anything that is not a bare listed code exactly as the document said', () => {
+    const seg = codes({
+      departureAirport: 'Singapore Changi Airport', // a name — the model was not sure
+      arrivalAirport: 'Sydney (SYD) Terminal 1', // already carries text
+      airline: 'HO', // a real code, not in our 135-entry list
+    });
+    expect(seg.departureAirport).toBe('Singapore Changi Airport');
+    expect(seg.arrivalAirport).toBe('Sydney (SYD) Terminal 1');
+    expect(seg.airline).toBe('HO');
+  });
+
+  it('never expands a placeholder into a real airport', () => {
+    expect(codes({ departureAirport: 'UNK', arrivalAirport: 'TBA' }).departureAirport).toBe('UNK');
+    expect(codes({ departureAirport: 'UNK', arrivalAirport: 'TBA' }).arrivalAirport).toBe('TBA');
+  });
+
+  it('is idempotent — a picker-entered value is untouched', () => {
+    const seg = codes({ departureAirport: 'Singapore (SIN)', airline: 'EVA Air (BR)' });
+    expect(seg.departureAirport).toBe('Singapore (SIN)');
+    expect(seg.airline).toBe('EVA Air (BR)');
+  });
+
+  it('does not touch cruise ports or train stations', () => {
+    const seg = travelExtractionToSegments(
+      result([draft({ type: 'train', fields: { departureStation: 'SIN', arrivalStation: 'TPE' } })])
+    ).buckets.travelSegments[0]!;
+    expect(seg.departureStation).toBe('SIN');
+    expect(seg.arrivalStation).toBe('TPE');
+  });
+
+  it('does not mutate the draft it was given', () => {
+    const d = draft({ fields: { departureAirport: 'SIN' } });
+    travelExtractionToSegments(result([d]));
+    expect(d.fields.departureAirport).toBe('SIN');
+  });
+});

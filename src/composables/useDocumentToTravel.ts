@@ -18,7 +18,12 @@ import {
   travelExtractionToSegments,
   type SegmentBuckets,
 } from '@/utils/travelExtractionToSegments';
-import { resolveTripTarget, segmentDateRange, tripsOverlappingRange } from '@/utils/vacation';
+import {
+  carriedCode,
+  resolveTripTarget,
+  segmentDateRange,
+  tripsOverlappingRange,
+} from '@/utils/vacation';
 import type { TripTarget } from '@/utils/vacation';
 import type { ResultEnvelope } from '@/types/magicPayload';
 import type { TravelExtractionResult } from '@/services/ai/types';
@@ -61,6 +66,32 @@ export interface UseDocumentToTravelOptions {
 
 /** kebab-case and greppable: one CloudWatch filter isolates this feature. */
 const SURFACE = 'travel-extract';
+
+/**
+ * Did the model translate the airport/airline names into codes, as `TRAVEL_JSON_SHAPE` asks?
+ *
+ * A shape test, NOT a lookup: translating a name to a code is the model's job, and this only
+ * counts whether it did. `named` rising is the prompt-health signal — a prompt regression, a
+ * model change, or a document class that defeats the instruction all show up here first, and the
+ * prompt's own fallback ("return the name exactly as printed") is supposed to be rare.
+ */
+function countCodeShapes(data: TravelExtractionResult): { airportNamed: number } {
+  let airportNamed = 0;
+  for (const seg of data.segments) {
+    if (seg.kind !== 'travel') continue;
+    // Airports only. The airline list is the known-incomplete one and the prompt's own `HO`
+    // example is absent from it, so airline misses are expected background — metering them here
+    // would leave the airport signal permanently contaminated and the level unreproducible.
+    for (const key of ['departureAirport', 'arrivalAirport'] as const) {
+      const v = seg.fields[key];
+      if (!v?.trim()) continue;
+      // `carriedCode` is the SAME derivation the title builder uses, so this can never classify
+      // input the renderer handles as a translation failure.
+      if (!carriedCode(v, 3)) airportNamed += 1;
+    }
+  }
+  return { airportNamed };
+}
 
 export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
   const { showToast } = useToast();
@@ -121,17 +152,31 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
       ? tripsOverlappingRange(vacationStore.vacations, range, toDateInputValue(new Date()))
       : [];
 
+    const target = resolveTripTarget(matches);
+    const { airportNamed } = countCodeShapes(data);
     logEvent({
-      level: 'info',
+      // Escalate on an AIRPORT name only. An airline name is expected background — the
+      // hand-maintained list is short and the prompt's own `HO` example is not in it — so folding
+      // it in would leave the airport signal permanently contaminated.
+      level: airportNamed > 0 ? 'warn' : 'info',
       surface: SURFACE,
       message: 'travel document ready for review',
       context: {
         action: 'ready',
-        segment_count:
+        // `kind` and `count`, NOT `target_kind` and `segment_count`: neither of those two was ever
+        // in ALLOWED_CONTEXT_KEYS, so `redactContext` dropped both and this event has carried only
+        // its `action` plus the enriched fields since #30. These are allowlisted, and reusing the
+        // generic keys rather than adding feature-scoped ones is the convention in that file.
+        kind: target.kind,
+        // segments (not fields)
+        count:
           buckets.travelSegments.length +
           buckets.accommodations.length +
           buckets.transportation.length,
-        target_kind: resolveTripTarget(matches).kind,
+        // AIRPORT fields the model returned as a name rather than a code — the same number the
+        // `level` above keys on, so the metric and the severity can never tell different stories.
+        // A real integer, not a packed string, so Insights can sum it and an alarm threshold it.
+        inferred_count: airportNamed,
       },
     });
     options.onTravelReady({
@@ -139,7 +184,7 @@ export function useDocumentToTravel(options: UseDocumentToTravelOptions) {
       travellerNamesBySegmentId,
       distinctTravellerNames,
       tripType: inferTripType(data),
-      target: resolveTripTarget(matches),
+      target,
       suggestedTripName: data.tripName,
       sourceFile: env.sourceFile, // attach the ORIGINAL (PDF stays a PDF)
       env,
