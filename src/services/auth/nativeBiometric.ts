@@ -111,6 +111,94 @@ function detailOf(err: unknown): string {
   return describeAuthError(err).slice(0, 200);
 }
 
+// --- Removing key material: one target type, one delete, one purge ---
+
+/** One thing to remove: the OS blob, and the registry record when there is one. */
+interface KeystoreTarget {
+  account: string;
+  credentialId?: string;
+}
+
+/**
+ * Delete ONE blob. Returns whether it is provably gone. NEVER silent.
+ *
+ * This replaces the two bare `catch {}` swallows that used to sit around `deleteKey`.
+ * Both plugins resolve `deleteKey` for an account that has no item, so a `false` here
+ * means the OS refused — not that there was nothing to do. Key material that will not
+ * delete is now always visible in the firehose (#82).
+ */
+async function deleteBlob(account: string, action: string): Promise<boolean> {
+  try {
+    await BiometricKeystore.deleteKey({ account });
+    return true;
+  } catch (err) {
+    logEvent({
+      level: 'warn',
+      surface: SURFACE,
+      message: 'blob_delete_failed',
+      context: { os: getPlatform(), action, error_code: errorCode(err), detail: detailOf(err) },
+    });
+    return false;
+  }
+}
+
+/**
+ * The pinned shape of a purge's `detail` field. One function, one test, one place to
+ * change deliberately: a hand-written template literal at the emit site is a structure
+ * encoded inside a free-text field, and reordering it silently empties every saved
+ * CloudWatch query built on it.
+ */
+function formatPurgeDetail(targets: number, failed: number): string {
+  return `targets=${targets},failed=${failed}`;
+}
+
+/**
+ * Remove a set of targets: the blob always, the registry record when the target carries
+ * a `credentialId`. THE one implementation of "make this key material go away" — disable,
+ * the unlock self-heal and family reclaim all funnel through here, so none of them can
+ * drift in ordering, level or wording.
+ *
+ * Emits exactly ONE summary event per call (warn if anything survived), which is why no
+ * caller writes a log line for a purge. Returns how many blobs are provably gone.
+ *
+ * Per target the record is removed BEFORE the blob — the order `clearNativeRecord` has
+ * always used — and a failure on one target is counted without aborting the rest. Because
+ * the work is per target there is no "which half ran first" question to get wrong.
+ */
+async function purgeTargets(targets: KeystoreTarget[], action: string): Promise<number> {
+  let deleted = 0;
+  for (const t of targets) {
+    if (t.credentialId) {
+      try {
+        await passkeyRepo.removePasskeyRegistration(t.credentialId);
+      } catch (err) {
+        // A record that will not delete means a self-heal that did not heal: the user
+        // keeps being offered an enrolment that cannot work.
+        logEvent({
+          level: 'warn',
+          surface: SURFACE,
+          message: 'clear_record_failed',
+          context: { os: getPlatform(), action: 'remove_registration', detail: detailOf(err) },
+        });
+      }
+    }
+    if (await deleteBlob(t.account, action)) deleted += 1;
+  }
+  const failed = targets.length - deleted;
+  logEvent({
+    level: failed > 0 ? 'warn' : 'info',
+    surface: SURFACE,
+    message: 'purge_result',
+    context: {
+      os: getPlatform(),
+      action,
+      count: deleted,
+      detail: formatPurgeDetail(targets.length, failed),
+    },
+  });
+  return deleted;
+}
+
 // --- Availability / gating ---
 
 /**
@@ -281,13 +369,18 @@ export async function nativeEnable(params: RegisterPasskeyParams): Promise<Regis
  * selector on a security primitive is an invitation to a null-member unlock.
  *
  * Resolution order:
- *  1. This member's own per-member item — the normal path.
- *  2. The legacy family-keyed item, when this member owns the family's only native
- *     record: prompt once against it, then silently re-home the key at the per-member
- *     address and drop the legacy blob. `setKey` needs no authentication, so the repair
- *     costs ZERO extra prompts. A failed repair never fails a good unlock — the user has
- *     already authenticated and holds the key; the next launch retries.
- *  3. Neither → the existing `absent_self_heal` path.
+ *  1. This member's record says which address its key lives at (`recordAccount`) — the
+ *     per-member item since #76, the legacy family-keyed one for a pre-#76 record. That
+ *     address is read AS-IS; nothing is inferred and nothing is moved.
+ *  2. No record for this member → `MEMBER_MISMATCH`, no prompt.
+ *  3. A record whose blob the OS has wiped → the `absent_self_heal` path.
+ *
+ * A legacy blob is NEVER re-homed at the per-member address. An earlier version of this
+ * comment described exactly that ("prompt once, then silently re-home"); the body never
+ * did it, and it must not — `recordAccount` below records why at length (on Android
+ * `setKey` fires a SECOND BiometricPrompt, and a dismissal leaves the old blob behind, so
+ * the double prompt returns on every sign-in). A legacy record moves to the new scheme
+ * when that member re-enrols, and not before.
  *
  * A member with no record on this device gets `MEMBER_MISMATCH` with NO prompt, and
  * deliberately not the re-enrol copy, which would wrongly tell a healthy user their
@@ -320,7 +413,7 @@ export async function nativeUnlock(
   try {
     const { present } = await BiometricKeystore.hasKey({ account: readFrom });
     if (!present) {
-      await clearNativeRecord(familyId, memberId);
+      await clearNativeRecord(familyId, memberId, 'absent_self_heal');
       logEvent({
         level: 'info',
         surface: SURFACE,
@@ -398,7 +491,7 @@ export async function nativeUnlock(
  * put the id format in two places.
  */
 export async function nativeDisable(familyId: string, memberId: string): Promise<void> {
-  await clearNativeRecord(familyId, memberId);
+  await clearNativeRecord(familyId, memberId, 'disable');
 }
 
 /**
@@ -408,14 +501,18 @@ export async function nativeDisable(familyId: string, memberId: string): Promise
  * Used by `deleteLocalFamily` and by the device-wide OS-invalidation path.
  */
 export async function nativeReclaimFamilyKeystore(familyId: string): Promise<void> {
+  const byAccount = new Map<string, KeystoreTarget>();
   for (const r of await listNativeRecords(familyId)) {
-    await clearNativeRecord(familyId, r.memberId);
+    const account = recordAccount(familyId, r);
+    byAccount.set(account, { account, credentialId: nativeCredentialId(familyId, r.memberId) });
   }
-  try {
-    await BiometricKeystore.deleteKey({ account: legacyKeystoreAccount(familyId) });
-  } catch {
-    /* best-effort — a missing legacy key is the normal case */
-  }
+  // The legacy blob is always a target, whether or not a record points at it. Added only
+  // when absent: a legacy-SCHEME record already occupies this account key and carries the
+  // credentialId, and overwriting it with a bare target would leave that record behind.
+  const legacy = legacyKeystoreAccount(familyId);
+  if (!byAccount.has(legacy)) byAccount.set(legacy, { account: legacy });
+
+  await purgeTargets([...byAccount.values()], 'reclaim');
 }
 
 // --- Internal helpers ---
@@ -471,27 +568,19 @@ async function loadNativeRecord(
  * Deletes whichever address the record actually used — a legacy-scheme member's key is at
  * the family-wide address, and deleting only the per-member one would leave a live,
  * biometric-gated copy of the family key behind after the user explicitly removed it.
+ *
+ * The removal itself is `purgeTargets`, so disable and the unlock self-heal share one
+ * implementation (and now emit a purge summary, which neither did before). `action` names
+ * the calling path in that summary.
  */
-async function clearNativeRecord(familyId: string, memberId: string): Promise<void> {
+async function clearNativeRecord(
+  familyId: string,
+  memberId: string,
+  action: string
+): Promise<void> {
   const record = await loadNativeRecord(familyId, memberId);
   const account = record ? recordAccount(familyId, record) : keystoreAccount(familyId, memberId);
-  try {
-    await passkeyRepo.removePasskeyRegistration(nativeCredentialId(familyId, memberId));
-  } catch (err) {
-    // A record that will not delete means a self-heal that did not heal: the user keeps
-    // being offered an enrolment that cannot work.
-    logEvent({
-      level: 'warn',
-      surface: SURFACE,
-      message: 'clear_record_failed',
-      context: { os: getPlatform(), action: 'remove_registration', detail: detailOf(err) },
-    });
-  }
-  try {
-    await BiometricKeystore.deleteKey({ account });
-  } catch {
-    /* best-effort — a missing key is not an error */
-  }
+  await purgeTargets([{ account, credentialId: nativeCredentialId(familyId, memberId) }], action);
 }
 
 // --- Friendly copy (via t() with English fallbacks) ---

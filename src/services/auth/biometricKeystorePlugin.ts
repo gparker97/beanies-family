@@ -36,9 +36,22 @@ export interface BiometricKeystorePlugin {
   }>;
   /** UNLOCK: prompt biometric, unwrap, and return the raw family key (standard base64). */
   getKey(options: { account: string }): Promise<{ keyB64: string; keyBacking?: string }>;
-  /** Presence check — is there a biometric blob for `account`? No prompt. */
+  /**
+   * Presence check — is there a biometric blob for `account`? No prompt.
+   *
+   * `present: false` means the OS genuinely has no blob. Anything else REJECTS: a
+   * missing/empty account, and (Android) a thrown KeyStore read. Both used to report
+   * absence, and `nativeUnlock` self-heals on absence by deleting the record — so a
+   * caller bug or a transient KeyStore hiccup destroyed a live enrolment.
+   */
   hasKey(options: { account: string }): Promise<{ present: boolean }>;
-  /** DISABLE: delete the Keystore alias / Keychain item for `account`. Idempotent. */
+  /**
+   * DISABLE: delete the Keystore alias / Keychain item for `account`.
+   *
+   * Idempotent — an already-absent item RESOLVES. But it resolves only when the delete
+   * is provably done: a missing/empty account rejects, and on iOS a failing OS delete
+   * rejects with its mapped code. It never reports success having touched nothing (#82).
+   */
   deleteKey(options: { account: string }): Promise<void>;
 }
 

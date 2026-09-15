@@ -69,7 +69,10 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
-        // Idempotent re-enable: remove any prior item first.
+        // Idempotent re-enable: remove any prior item first. This status is deliberately
+        // DISCARDED and that is correct — the delete is advisory, and the SecItemAdd below
+        // is the operation whose outcome is reported. Do NOT "fix" it into a failure to
+        // match deleteKey: a first-time enable has nothing to delete and would then reject.
         SecItemDelete(baseQuery(account) as CFDictionary)
 
         let addQuery: [String: Any] = [
@@ -121,7 +124,12 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func hasKey(_ call: CAPPluginCall) {
         guard let account = call.getString("account"), !account.isEmpty else {
-            call.resolve(["present": false])
+            // A missing account is a CALLER bug, not an absent key. Resolving
+            // {present: false} here reported the same false-absent as the 0.13R2 bug
+            // described below, only arriving from the JS side, and `nativeUnlock` then
+            // deleted a live record to "self-heal". A reject is handled there as
+            // "fall through to the real unlock", logged and harmless.
+            call.reject("account is required", "unknown")
             return
         }
         var query = baseQuery(account)
@@ -141,10 +149,22 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func deleteKey(_ call: CAPPluginCall) {
-        if let account = call.getString("account"), !account.isEmpty {
-            SecItemDelete(baseQuery(account) as CFDictionary)
+        guard let account = call.getString("account"), !account.isEmpty else {
+            // Never resolve here. A caller asking for key material to be removed and
+            // being told it succeeded, while nothing was touched, is the exact shape of
+            // the #82 defect this plugin is being audited for.
+            call.reject("account is required", "unknown")
+            return
         }
-        call.resolve()
+        let status = SecItemDelete(baseQuery(account) as CFDictionary)
+        // errSecItemNotFound is a SUCCESS for an idempotent delete, and must be
+        // short-circuited BEFORE mapOSStatus, which maps it to "invalidated" (see below)
+        // and would turn every repeat delete into a spurious re-enrol prompt.
+        if status == errSecSuccess || status == errSecItemNotFound {
+            call.resolve()
+        } else {
+            call.reject("keychain delete failed", mapOSStatus(status))
+        }
     }
 
     // MARK: - Helpers

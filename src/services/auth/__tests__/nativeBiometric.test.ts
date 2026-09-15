@@ -41,7 +41,32 @@ vi.mock('@/services/sync/capabilities', () => ({
 }));
 const { reportErrorMock } = vi.hoisted(() => ({ reportErrorMock: vi.fn() }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
-vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+// Hoisted (not a bare vi.fn) so the purge/adoption summary events can be asserted: the
+// counts in them ARE the observability deliverable, so an untestable emit is not enough.
+const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
+
+/**
+ * The context of the emitted event whose `action` matches — preferring the purge summary
+ * when several share the action (see `eventsFor`).
+ */
+function eventContext(action: string): Record<string, unknown> | undefined {
+  const matching = logEventMock.mock.calls
+    .map((c) => c[0] as { message: string; context?: Record<string, unknown> })
+    .filter((e) => (e.context as { action?: string } | undefined)?.action === action);
+  const summary = matching.find((e) => e.message === 'purge_result');
+  return (summary ?? matching[0])?.context;
+}
+
+/**
+ * Every purge SUMMARY emitted with this `action`. Keyed on the message as well, because
+ * `deleteBlob`'s own failure event deliberately carries the caller's `action` too.
+ */
+function eventsFor(action: string) {
+  return logEventMock.mock.calls
+    .map((c) => c[0] as { level: string; message: string; context?: { action?: string } })
+    .filter((e) => e.message === 'purge_result' && e.context?.action === action);
+}
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (k: string) => k }),
 }));
@@ -85,6 +110,9 @@ beforeEach(() => {
   plugin.setKey.mockResolvedValue({ keyBacking: 'strongbox' });
   plugin.getKey.mockResolvedValue({ keyB64: 'AAAA', keyBacking: 'strongbox' });
   plugin.hasKey.mockResolvedValue({ present: true });
+  // deleteKey needs resetting too: `vi.clearAllMocks()` clears CALLS, not implementations,
+  // so a case that makes the delete reject would otherwise leak into every case after it.
+  plugin.deleteKey.mockResolvedValue(undefined);
 });
 
 describe('nativeEnable', () => {
@@ -390,5 +418,102 @@ describe('gating + device keys', () => {
     expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-2' });
     expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1' });
     expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(0);
+  });
+
+  it('a LEGACY-scheme record: reclaim removes the legacy blob AND that record', async () => {
+    // The target set is keyed by ACCOUNT, and a legacy-scheme record's account IS the
+    // bare familyId — the same key the always-added legacy target uses. Adding the bare
+    // legacy target unconditionally would overwrite the record-derived entry, drop its
+    // credentialId, and leave a registry record pointing at a blob that is now gone.
+    store.push({
+      credentialId: 'native:family-1:member-1', // no keystoreScheme => legacy address
+      memberId: 'member-1',
+      familyId: 'family-1',
+      publicKey: '',
+      prfSupported: false,
+      mechanism: 'native-keystore',
+      label: 'this device',
+      createdAt: '2026-01-02',
+    });
+    await nativeReclaimFamilyKeystore('family-1');
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1' });
+    expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(0);
+    // One target, not two: the record and the legacy sweep address are the same blob.
+    expect(eventContext('reclaim')?.detail).toBe('targets=1,failed=0');
+  });
+});
+
+describe('no delete reports success it did not achieve (#82)', () => {
+  function seedPerMember(memberId = 'member-1') {
+    store.push({
+      keystoreScheme: 'per-member',
+      credentialId: `native:family-1:${memberId}`,
+      memberId,
+      familyId: 'family-1',
+      publicKey: '',
+      prfSupported: false,
+      mechanism: 'native-keystore',
+      label: 'this device',
+      createdAt: '2026-01-02',
+    });
+  }
+
+  it('a REJECTING deleteKey during disable is reported, never swallowed', async () => {
+    // This is the defect in miniature: the two bare `catch {}` blocks around deleteKey
+    // meant key material that would not delete left no trace anywhere.
+    seedPerMember();
+    plugin.deleteKey.mockImplementation(rejectWith('unknown'));
+
+    await nativeDisable('family-1', 'member-1');
+
+    expect(eventContext('disable')).toMatchObject({
+      action: 'disable',
+      count: 0,
+      detail: 'targets=1,failed=1',
+    });
+    expect(eventsFor('disable')[0]!.level).toBe('warn');
+    const failure = logEventMock.mock.calls.find(
+      (c) => (c[0] as { message: string }).message === 'blob_delete_failed'
+    );
+    expect(failure).toBeDefined();
+  });
+
+  it('a successful purge emits ONE info summary with the provably-gone count', async () => {
+    seedPerMember();
+    await nativeDisable('family-1', 'member-1');
+    const events = eventsFor('disable');
+    expect(events).toHaveLength(1);
+    expect(events[0]!.level).toBe('info');
+    expect(eventContext('disable')).toMatchObject({ count: 1, detail: 'targets=1,failed=0' });
+  });
+
+  it('a REJECTING hasKey does not delete the record — it falls through to the unlock', async () => {
+    // Both plugins now reject hasKey on a missing account rather than reporting absence.
+    // That must stay a logged non-event: absence is what drives the self-heal, and a
+    // reject treated as absence is how a live enrolment gets deleted.
+    seedPerMember();
+    plugin.hasKey.mockImplementation(rejectWith('unknown'));
+
+    const result = await nativeUnlock('family-1', 'member-1');
+
+    expect(result.success).toBe(true);
+    expect(plugin.getKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(1);
+    expect(eventContext('haskey_failed')).toBeDefined();
+  });
+
+  it('a registry record that will not delete still reports clear_record_failed', async () => {
+    seedPerMember();
+    vi.mocked(repo.removePasskeyRegistration).mockRejectedValueOnce(new Error('idb gone'));
+
+    await nativeDisable('family-1', 'member-1');
+
+    const failure = logEventMock.mock.calls.find(
+      (c) => (c[0] as { message: string }).message === 'clear_record_failed'
+    );
+    expect(failure).toBeDefined();
+    // The blob delete still happened — one target's record failure must not skip it.
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
   });
 });
