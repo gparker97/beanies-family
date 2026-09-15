@@ -102,6 +102,11 @@ export interface PasskeyRegistration {
    * display hint and is deliberately NOT reconciled — rename a bean and the chooser shows
    * the old name until they re-enrol, which costs one confusing tap at most and saves a
    * background reconciliation job for a two-keys-on-one-device edge case.
+   *
+   * One clarification since #82: a record ADOPTED back from the keychain after a
+   * reinstall has no name at all (nothing on the device knows it), and that ABSENT name
+   * is backfilled once the roster is known. Filling in a missing name is not the same as
+   * reconciling a stale one — a PRESENT name is still never overwritten.
    */
   memberName?: string;
   /**
