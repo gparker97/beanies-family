@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-16
 
+### Fixed
+
+- **A flight you already saved keeps naming its airport, even after the airport's code changes hands.** Airport codes occasionally move: in September, West Palm Beach's PBI was handed to a new code. beanies used to drop the old code entirely, and a trip saved against it stopped showing the place and showed the bare letters instead. Retired codes are now kept and still read properly, while never being offered as a new choice.
+
 ### Changed
 
 - **Routine dependency maintenance.** Build and test tooling updated; no change to how beanies behaves.
