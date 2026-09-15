@@ -205,7 +205,11 @@ vi.mock('@/services/registry/registryService', () => ({
   removeFamily: vi.fn(async () => {}),
 }));
 
-vi.mock('@/services/auth/passkeyService', () => ({}));
+vi.mock('@/services/auth/passkeyService', () => ({
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
+}));
 
 vi.mock('@/utils/errorReporter', () => ({
   reportError: (...a: unknown[]) => mockReportError(...a),
