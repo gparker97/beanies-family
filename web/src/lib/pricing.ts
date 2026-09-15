@@ -137,7 +137,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'when-is-v1',
     q: 'when is v1 coming?',
-    a: "as of now, i'd say roughly around october (2026), depending on how long it takes to plod through our issues list. i'll post updates here as we get closer.",
+    a: "v1 will be released once i've muscled my way through our outstanding bugs and issues list. we're getting closer to an acceptable (in my view) level of production stability every day. as of this writing (which is Sep 2026), i'd say we're a month or 2 away. i'll post updates here as we get closer.",
   },
   {
     id: 'data-if-i-leave',
