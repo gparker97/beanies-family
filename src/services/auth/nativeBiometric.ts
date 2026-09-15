@@ -24,10 +24,25 @@
  * "someone this device trusts"; the "not you?" escape on the prove screen is the
  * mitigation, not this module.
  *
- * THIS MODULE IS THE ONLY PLACE THAT BUILDS A KEYSTORE ACCOUNT STRING. Nothing else
- * may construct `${familyId}:${memberId}` or reference the legacy bare-familyId
- * address — that is what keeps a future migration from silently orphaning blobs.
- * Other modules reclaim storage through `nativeReclaimFamilyKeystore`.
+ * THIS MODULE IS THE ONLY PLACE THAT BUILDS OR PARSES A KEYSTORE ACCOUNT STRING.
+ * Nothing else may construct `${familyId}:${memberId}` or reference the legacy
+ * bare-familyId address — that is what keeps a future migration from silently orphaning
+ * blobs. Other modules reclaim storage through `nativeReclaimFamilyKeystore` (one
+ * family) or `nativeReclaimAllKeystores` (the explicit clear-all).
+ *
+ * THE KEYCHAIN, NOT INDEXEDDB, IS THE DURABLE INDEX OF KEY MATERIAL (#82). On iOS the
+ * items outlive an app uninstall while the IndexedDB registry dies with the app, so the
+ * registry alone could not see a reinstall's own blobs and nothing could delete them.
+ * Since the account encodes both ids, `listAccounts` recovers every pair, and the fix is
+ * ADOPTION rather than deletion: orphans are written back into the registry, after which
+ * every deletion path the product advertises reaches them. Reclaim therefore works from
+ * the UNION of registry records and enumerated blobs, so an unavailable enumeration
+ * degrades to today's behaviour instead of orphaning or over-deleting.
+ *
+ * Adoption runs at exactly TWO named seams, both bounded by one per-session time budget:
+ * `nativeResolveDeviceKeys` (the login surface) and `nativeUnlock`. Nothing else may
+ * trigger it — a hidden enumeration inside `readNativeRecords` would fire from unlock,
+ * from disable, and from inside a reclaim about to delete the records being adopted.
  */
 
 import { BiometricKeystore, type BiometricKeystoreErrorCode } from './biometricKeystorePlugin';
@@ -41,6 +56,7 @@ import type { AuthenticatePasskeyResult } from './passkeyService';
 import { exportFamilyKey, importFamilyKey } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { toISODateString } from '@/utils/date';
+import { raceTimeout } from '@/utils/timing';
 import { getPlatform } from '@/services/sync/capabilities';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -199,6 +215,328 @@ async function purgeTargets(targets: KeystoreTarget[], action: string): Promise<
   return deleted;
 }
 
+// --- Enumerating what the device actually holds ---
+
+/**
+ * A keychain item this device holds. `memberId: null` means the legacy family-wide
+ * address. `malformed` means the account does not parse into the scheme this module
+ * writes, so it must never be ADOPTED (we cannot know whose key it is) while still
+ * being reclaimable under the family its prefix names.
+ */
+interface KeystoreBlob {
+  account: string;
+  familyId: string;
+  memberId: string | null;
+  malformed: boolean;
+}
+
+/**
+ * A blob this session adopted into the registry. Deletable by the roster pass — and ONLY
+ * ever against the roster of its OWN `familyId`, which is why the family is part of the
+ * type rather than a caller's assumption. Adoption spans every family on the device, so
+ * a bare account string here would let one family's roster delete another family's live
+ * enrolment; with `familyId` on the type, that version cannot be written.
+ */
+interface AdoptedTarget extends KeystoreTarget {
+  familyId: string;
+  memberId: string;
+  credentialId: string;
+}
+
+/**
+ * Split an account back into its ids. The inverse of `keystoreAccount` /
+ * `legacyKeystoreAccount`, and it lives here because this module is the only place that
+ * knows the address format (see the module header).
+ *
+ * Splits on the FIRST colon: family and member ids are UUIDs and contain none, so a
+ * second colon means something wrote an address this module did not. Such an account is
+ * read as "belongs to the family before the first colon" — the only claim the string
+ * actually supports, and the reading that keeps family-scoped reclaim able to remove it.
+ */
+function parseKeystoreAccount(account: string): KeystoreBlob {
+  const i = account.indexOf(':');
+  if (i < 0) {
+    // The legacy family-wide form. An empty account is not a family id, so it is flagged
+    // rather than treated as a legacy blob for a family called "".
+    return { account, familyId: account, memberId: null, malformed: account === '' };
+  }
+  const familyId = account.slice(0, i);
+  const memberId = account.slice(i + 1);
+  return {
+    account,
+    familyId,
+    memberId,
+    malformed: familyId === '' || memberId === '' || memberId.includes(':'),
+  };
+}
+
+/**
+ * Every account under our service, or `null` when the QUERY FAILED or is unavailable.
+ *
+ * The `null` is the point: it keeps "there are no items" distinct from "we could not
+ * ask", and every caller treats the latter as contributing nothing rather than as
+ * evidence of absence. An empty list that meant both would be the 0.13R2 bug again.
+ */
+async function listKeystoreBlobs(): Promise<KeystoreBlob[] | null> {
+  try {
+    const { accounts } = await BiometricKeystore.listAccounts();
+    return accounts.map(parseKeystoreAccount);
+  } catch (err) {
+    if (isPluginMissing(err)) {
+      // Android (no enumeration needed there — see the plugin interface) or a Swift
+      // method absent from `pluginMethods`. Deliberately NOT the `plugin-missing`/`error`
+      // pair `nativeCanEnroll` uses, so this cannot pollute the #74 signal.
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'keystore_enumerate_unsupported',
+        context: { os: getPlatform(), action: 'enumerate_unsupported', error_code: errorCode(err) },
+      });
+      return null;
+    }
+    reportError({
+      surface: SURFACE,
+      message: 'keystore enumerate failed — reclaim degrades to registry-only',
+      error: err,
+      severity: 'warning',
+      context: {
+        os: getPlatform(),
+        action: 'enumerate_failed',
+        error_code: errorCode(err),
+        detail: detailOf(err),
+      },
+    });
+    return null;
+  }
+}
+
+// --- Adoption: making orphaned material visible again ---
+
+/** The ONE shape of a device-local native-keystore record. */
+function nativeRecord(p: {
+  familyId: string;
+  memberId: string;
+  memberName?: string;
+  label: string;
+}): PasskeyRegistration {
+  return {
+    credentialId: nativeCredentialId(p.familyId, p.memberId),
+    memberId: p.memberId,
+    familyId: p.familyId,
+    publicKey: '',
+    prfSupported: false,
+    mechanism: 'native-keystore',
+    label: p.label,
+    memberName: p.memberName,
+    keystoreScheme: 'per-member',
+    createdAt: toISODateString(new Date()),
+  };
+}
+
+interface AdoptionSummary {
+  /** Blobs the keychain returned. */
+  enumerated: number;
+  /** Blobs that had no registry record and now have one. */
+  adopted: number;
+  /**
+   * Native records ALREADY in the registry before this pass. Reported in the same event
+   * as `enumerated` on purpose: `enumerated=0` with `registered>0` is a self-proving
+   * contradiction — records exist, therefore blobs must exist, therefore the query is
+   * excluding them. That is the 0.13R2 failure visible in one log line, per device,
+   * rather than a fleet-wide count somebody has to eyeball.
+   */
+  registered: number;
+  /** Legacy family-wide blobs: enumerable and reclaimable, never adoptable. */
+  legacy: number;
+  malformed: number;
+  adoptedTargets: AdoptedTarget[];
+}
+
+function emptyAdoption(): AdoptionSummary {
+  return { enumerated: 0, adopted: 0, registered: 0, legacy: 0, malformed: 0, adoptedTargets: [] };
+}
+
+/** Pinned `detail` shape — same reasoning as `formatPurgeDetail`. */
+function formatAdoptionDetail(s: AdoptionSummary): string {
+  return `adopted=${s.adopted},registered=${s.registered},legacy=${s.legacy},malformed=${s.malformed}`;
+}
+
+/**
+ * Spent ONCE per session in total, not once per caller. `FamilyPickerView.loadFamilies()`
+ * awaits `resolveDeviceKeys` per family in a SEQUENTIAL loop, and on native that mount is
+ * app launch — so a per-caller timer would cost budget × familyCount before first paint.
+ * Keychain IPC is single-digit ms in practice; this is the ceiling on a pathological
+ * device, and `awaitAdoptionGate` memoizes the raced promise so it is a session total.
+ */
+const ADOPTION_BUDGET_MS = 1500;
+
+let adoption: Promise<AdoptionSummary> | null = null;
+let adoptionGate: Promise<void> | null = null;
+let adoptedTargets: AdoptedTarget[] = [];
+
+/**
+ * Adopt every orphaned blob on this device into the registry.
+ *
+ * This is the fix for #82, and it is ADOPTION rather than deletion on purpose. Once a
+ * blob is back in the registry, every deletion path the product already advertises
+ * reaches it — so "beyond any code path" is cured without deleting anything, and a
+ * legitimate reinstaller keeps their biometric unlock instead of being silently broken.
+ * Adoption only makes material VISIBLE; it grants no access the device's owner did not
+ * already have, since the blob is still biometry-gated.
+ *
+ * Runs for every family at once, which is what makes it one enumeration per session
+ * instead of one per family per picker render. The all-families scope is safe precisely
+ * because nothing here deletes — but it is why the roster pass must re-narrow to one
+ * family (see `takeAdoptedTargets`).
+ *
+ * NEVER REJECTS. That single contract is what makes the un-awaited tail of
+ * `awaitAdoptionGate` safe (no unhandled rejection with no owner) and is pinned by a test.
+ */
+function ensureKeystoreAdopted(): Promise<AdoptionSummary> {
+  return (adoption ??= runAdoptionPass()
+    .then((summary) => {
+      adoptedTargets = summary.adoptedTargets;
+      return summary;
+    })
+    .catch((err) => {
+      // Defence in depth: every step inside the pass already handles its own failure, so
+      // reaching here means a bug rather than an expected condition. Report it and hand
+      // back an empty summary; callers behave exactly as they do today.
+      reportError({
+        surface: SURFACE,
+        message: 'keystore adoption pass threw',
+        error: err,
+        severity: 'warning',
+        context: { os: getPlatform(), action: 'adopt_failed', detail: detailOf(err) },
+      });
+      return emptyAdoption();
+    }));
+}
+
+/**
+ * Wait for adoption — but never for more than `ADOPTION_BUDGET_MS` in TOTAL per session.
+ * The RACED promise is memoized, so N callers share one budget instead of arming N
+ * timers. On timeout the pass keeps running and later callers see its results.
+ */
+function awaitAdoptionGate(): Promise<void> {
+  return (adoptionGate ??= raceTimeout(ensureKeystoreAdopted(), ADOPTION_BUDGET_MS).then(
+    () => undefined
+  ));
+}
+
+async function runAdoptionPass(): Promise<AdoptionSummary> {
+  const blobs = await listKeystoreBlobs();
+  // null = failed or unavailable, and already reported. Nothing to adopt, and crucially
+  // no deletion anywhere in this module is driven by an absent enumeration.
+  if (!blobs) return emptyAdoption();
+
+  let existing: PasskeyRegistration[];
+  try {
+    existing = await passkeyRepo.getAllPasskeys();
+  } catch (err) {
+    // Abort adoption and leave today's behaviour exactly as it is: without knowing what
+    // is already registered we would write duplicates.
+    logEvent({
+      level: 'warn',
+      surface: SURFACE,
+      message: 'adopt_registry_read_failed',
+      context: { os: getPlatform(), action: 'adopt_registry_read_failed', detail: detailOf(err) },
+    });
+    return emptyAdoption();
+  }
+
+  const known = new Set(existing.map((r) => r.credentialId));
+  const summary: AdoptionSummary = {
+    ...emptyAdoption(),
+    enumerated: blobs.length,
+    registered: existing.filter((r) => r.mechanism === 'native-keystore').length,
+  };
+
+  for (const b of blobs) {
+    if (b.malformed) {
+      summary.malformed += 1;
+      continue;
+    }
+    if (b.memberId === null) {
+      // A legacy account encodes no member, and `PasskeyRegistration.memberId` is
+      // required, so there is no record to construct — any of N members could own it.
+      // Counted, left to the reclaim and sweep paths, never guessed at.
+      summary.legacy += 1;
+      continue;
+    }
+    const credentialId = nativeCredentialId(b.familyId, b.memberId);
+    if (known.has(credentialId)) continue;
+    try {
+      await passkeyRepo.savePasskeyRegistration(
+        nativeRecord({
+          familyId: b.familyId,
+          memberId: b.memberId,
+          // Nothing on the device knows the member's name yet (the roster died with the
+          // app). `idTail` keeps two adopted cards distinguishable and honest until the
+          // pod opens and the roster pass backfills the real name.
+          label: `${guessAuthenticatorLabel()} · ${idTail(b.memberId)}`,
+        })
+      );
+      summary.adopted += 1;
+      summary.adoptedTargets.push({
+        account: b.account,
+        credentialId,
+        familyId: b.familyId,
+        memberId: b.memberId,
+      });
+    } catch (err) {
+      // One bad write must not abandon the rest of the device's material.
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'adopt_write_failed',
+        context: { os: getPlatform(), action: 'adopt_write_failed', detail: detailOf(err) },
+      });
+    }
+  }
+
+  // ONE event, level computed. Two emissions for one fact would double-count the
+  // interesting passes in any CloudWatch count of them.
+  logEvent({
+    level: summary.adopted > 0 ? 'warn' : 'info',
+    surface: SURFACE,
+    message: 'keystore_adopted',
+    context: {
+      os: getPlatform(),
+      action: 'adopt',
+      count: summary.enumerated,
+      detail: formatAdoptionDetail(summary),
+    },
+  });
+  return summary;
+}
+
+/**
+ * Drain this session's adopted targets FOR ONE FAMILY, removing them from the set.
+ *
+ * Per family, not wholesale: adoption spans every family on the device, so draining
+ * everything and testing it against one family's roster would delete every other
+ * family's adopted enrolment — their member ids are of course not in this family's
+ * roster. An empty result means both "nothing was adopted for this family" and "this
+ * family was already reconciled", which is why no second flag is needed.
+ */
+export function takeAdoptedTargets(familyId: string): AdoptedTarget[] {
+  const mine = adoptedTargets.filter((t) => t.familyId === familyId);
+  adoptedTargets = adoptedTargets.filter((t) => t.familyId !== familyId);
+  return mine;
+}
+
+/**
+ * Reset the module's session state. Test-only, following the house convention
+ * (`__resetPinAttemptsForTests` and friends) — the single-flight, the gate and the
+ * adopted set are module-level and do not reset between cases in one test file.
+ */
+export function __resetKeystoreSessionForTests(): void {
+  adoption = null;
+  adoptionGate = null;
+  adoptedTargets = [];
+}
+
 // --- Availability / gating ---
 
 /**
@@ -252,6 +590,21 @@ export async function nativeCanOffer(): Promise<boolean> {
  * record neither drives an unlock nor suppresses the fresh Keystore enrollment offer.
  */
 export async function nativeResolveDeviceKeys(familyId: string): Promise<PasskeyRegistration[]> {
+  // Adopted records must be IN the registry before the read below, or a reinstaller's
+  // own material stays invisible for one more session. Bounded, because the family
+  // picker mounts at launch on native and a keychain IPC must never hold first paint —
+  // and bounded ONCE per session, not once per caller (see ADOPTION_BUDGET_MS).
+  await awaitAdoptionGate();
+  return readNativeRecords(familyId);
+}
+
+/**
+ * The registry read plus the stale-record cleanup, and nothing else. Split out of
+ * `nativeResolveDeviceKeys` so adoption fires at two NAMED seams instead of implicitly
+ * from unlock, from disable, and from inside a reclaim that is about to delete the very
+ * records being adopted — this function is reached by all of those.
+ */
+async function readNativeRecords(familyId: string): Promise<PasskeyRegistration[]> {
   let records: PasskeyRegistration[];
   try {
     records = await passkeyRepo.getPasskeysByFamily(familyId);
@@ -311,19 +664,11 @@ export async function nativeEnable(params: RegisterPasskeyParams): Promise<Regis
       keyB64,
     });
 
-    const registration: PasskeyRegistration = {
-      credentialId: nativeCredentialId(familyId, memberId),
-      memberId,
-      familyId,
-      publicKey: '',
-      prfSupported: false,
-      mechanism: 'native-keystore',
-      label: label || guessAuthenticatorLabel(),
-      memberName,
-      keystoreScheme: 'per-member',
-      createdAt: toISODateString(new Date()),
-    };
-    await passkeyRepo.savePasskeyRegistration(registration);
+    // One factory, shared with adoption: a required field added to one record literal
+    // and not the other is a silent half-record.
+    await passkeyRepo.savePasskeyRegistration(
+      nativeRecord({ familyId, memberId, memberName, label: label || guessAuthenticatorLabel() })
+    );
     clearBiometricSuppression();
 
     logEvent({
@@ -391,6 +736,14 @@ export async function nativeUnlock(
   memberId: string
 ): Promise<AuthenticatePasskeyResult> {
   const os = getPlatform();
+  // The other place a missing adopted record produces a WRONG ANSWER (a spurious
+  // MEMBER_MISMATCH) rather than merely a stale list. Bounded via the shared gate, not
+  // the raw single-flight: a hung enumeration awaited unbounded here would wedge the
+  // unlock button, which is exactly the 0.9.5R3 "verifying" freeze `raceTimeout` exists
+  // to prevent. In the normal flow `resolveDeviceKeys` has already run, so the gate is
+  // settled and this is free; in the pathological case the degrade is MEMBER_MISMATCH →
+  // password, which is today's outcome for an un-adopted blob anyway.
+  await awaitAdoptionGate();
   const record = await loadNativeRecord(familyId, memberId);
   if (!record) {
     logEvent({
@@ -501,8 +854,27 @@ export async function nativeDisable(familyId: string, memberId: string): Promise
  * Used by `deleteLocalFamily` and by the device-wide OS-invalidation path.
  */
 export async function nativeReclaimFamilyKeystore(familyId: string): Promise<void> {
+  // THE UNION IS THE WHOLE TRICK, and it is why there is no "if the enumeration failed,
+  // fall back to registry-only" branch: a failed or empty enumeration contributes zero
+  // members, which IS the fallback — expressed as data, one code path, nothing to
+  // forget, and monotonically >= today's behaviour on every platform. It also keeps the
+  // converse hole closed: a purely keychain-driven reclaim would stop removing registry
+  // records whose blob the OS already wiped, leaving dead records that render as dead
+  // buttons on the chooser.
+  //
+  // Enumerating per call is deliberate and is NOT a violation of "one enumeration per
+  // session" (that budget is adoption's): a session-old list could miss a blob written
+  // since, and this is a rare, user-initiated or invalidation-driven path.
+  const blobs = await listKeystoreBlobs();
   const byAccount = new Map<string, KeystoreTarget>();
-  for (const r of await listNativeRecords(familyId)) {
+  for (const b of blobs ?? []) {
+    // Filtered by family: this function never touches another family's material, which
+    // is what lets `deleteLocalFamily` keep its name honest.
+    if (b.familyId === familyId) byAccount.set(b.account, { account: b.account });
+  }
+  // Records SECOND so a record-derived entry wins on a shared account key and its
+  // credentialId is not lost — a blob the registry also knows about is one target.
+  for (const r of await readNativeRecords(familyId)) {
     const account = recordAccount(familyId, r);
     byAccount.set(account, { account, credentialId: nativeCredentialId(familyId, r.memberId) });
   }
@@ -587,17 +959,16 @@ function recordScheme(record: PasskeyRegistration): string {
   return record.keystoreScheme === 'per-member' ? 'per_member' : 'legacy';
 }
 
-/** Last 8 chars of an id — the allowlisted, non-identifying form used in telemetry. */
+/**
+ * Last 8 chars of an id — the allowlisted, non-identifying form used in telemetry.
+ *
+ * ALSO a UI disambiguator since #82: an adopted record has no `memberName` (nothing on
+ * the device knows it yet), so its label carries this tail to keep two adopted cards on
+ * the post-reinstall picker distinguishable. Shortening it for telemetry reasons would
+ * silently change a rendered string.
+ */
 function idTail(id: string): string {
   return id.slice(-8);
-}
-
-/**
- * Every native record for a family on this device. The single implementation of
- * "get the family's records and keep the native ones" — it had grown three copies.
- */
-async function listNativeRecords(familyId: string): Promise<PasskeyRegistration[]> {
-  return nativeResolveDeviceKeys(familyId);
 }
 
 /** One member's record, or null meaning exactly "that member has no key here". */
@@ -605,7 +976,7 @@ async function loadNativeRecord(
   familyId: string,
   memberId: string
 ): Promise<PasskeyRegistration | null> {
-  const records = await listNativeRecords(familyId);
+  const records = await readNativeRecords(familyId);
   return records.find((r) => r.memberId === memberId) ?? null;
 }
 

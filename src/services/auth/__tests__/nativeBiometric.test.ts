@@ -10,6 +10,11 @@ const { plugin } = vi.hoisted(() => ({
     hasKey: vi.fn(async () => ({ present: true })),
     deleteKey: vi.fn(async () => {}),
     deleteAllKeys: vi.fn(async () => ({ deleted: true })),
+    // Required, not cosmetic: adoption now runs from a seam every existing case reaches,
+    // and a missing method on a plain-object double is a TypeError — which
+    // `isPluginMissing()` deliberately does NOT match — so every case would otherwise
+    // emit an `enumerate_failed` reportError and break the cases asserting none.
+    listAccounts: vi.fn(async () => ({ accounts: [] as string[] })),
   },
 }));
 vi.mock('../biometricKeystorePlugin', () => ({ BiometricKeystore: plugin }));
@@ -26,6 +31,12 @@ vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
   }),
   removePasskeyRegistration: vi.fn(async (credentialId: string) => {
     store = store.filter((x) => x.credentialId !== credentialId);
+  }),
+  // Adoption reads the whole device registry and backfills names through updatePasskey.
+  getAllPasskeys: vi.fn(async () => store),
+  updatePasskey: vi.fn(async (credentialId: string, updates: Partial<PasskeyRegistration>) => {
+    const i = store.findIndex((x) => x.credentialId === credentialId);
+    if (i >= 0) store[i] = { ...store[i]!, ...updates, credentialId };
   }),
 }));
 
@@ -81,6 +92,8 @@ import {
   nativeReclaimFamilyKeystore,
   nativeReclaimAllKeystores,
   nativeDisable,
+  takeAdoptedTargets,
+  __resetKeystoreSessionForTests,
 } from '../nativeBiometric';
 import * as repo from '@/services/indexeddb/repositories/passkeyRepository';
 
@@ -116,6 +129,10 @@ beforeEach(() => {
   // so a case that makes the delete reject would otherwise leak into every case after it.
   plugin.deleteKey.mockResolvedValue(undefined);
   plugin.deleteAllKeys.mockResolvedValue({ deleted: true });
+  plugin.listAccounts.mockResolvedValue({ accounts: [] });
+  // The adoption single-flight, its shared time budget and the adopted-target set are
+  // module-level, so without this one case's pass leaks into every case after it.
+  __resetKeystoreSessionForTests();
 });
 
 describe('nativeEnable', () => {
@@ -607,5 +624,319 @@ describe('nativeReclaimAllKeystores — the explicit clear-all sweep', () => {
     });
     plugin.deleteKey.mockImplementation(rejectWith('unknown'));
     await expect(nativeReclaimAllKeystores(['family-1'])).resolves.toBeUndefined();
+  });
+});
+
+describe('keystore enumeration + adoption (#82)', () => {
+  function seeded(
+    familyId: string,
+    memberId: string,
+    scheme: 'per-member' | 'legacy' = 'per-member'
+  ) {
+    return {
+      ...(scheme === 'per-member' ? { keystoreScheme: 'per-member' as const } : {}),
+      credentialId: `native:${familyId}:${memberId}`,
+      memberId,
+      familyId,
+      publicKey: '',
+      prfSupported: false,
+      mechanism: 'native-keystore' as const,
+      label: 'this device',
+      createdAt: '2026-01-02',
+    };
+  }
+
+  describe('the account parser', () => {
+    it('adopts a per-member account, never a legacy or malformed one', async () => {
+      plugin.listAccounts.mockResolvedValue({
+        accounts: [
+          'family-1:member-1', // per-member, unknown => adopted
+          'family-1', // legacy: encodes no member, so no record is constructible
+          'family-1:member-2:extra', // malformed: a second colon is not our scheme
+          'family-1:', // malformed: empty member
+          '', // malformed: not a family id
+        ],
+      });
+
+      const keys = await nativeResolveDeviceKeys('family-1');
+
+      expect(keys.map((k) => k.memberId)).toEqual(['member-1']);
+      expect(eventContext('adopt')).toMatchObject({
+        count: 5,
+        detail: 'adopted=1,registered=0,legacy=1,malformed=3',
+      });
+    });
+
+    it('a malformed account is still RECLAIMABLE under the family before its first colon', async () => {
+      // The conservative reading: it is the only claim the string supports, and it keeps
+      // family-scoped reclaim able to remove material we cannot otherwise attribute.
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-2:extra'] });
+      await nativeReclaimFamilyKeystore('family-1');
+      expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-2:extra' });
+    });
+  });
+
+  describe('the adoption pass', () => {
+    it('writes a record for an orphaned blob, so biometric unlock survives a reinstall', async () => {
+      // The reinstall case: the keychain item is still there, the registry is empty.
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-1'] });
+
+      const keys = await nativeResolveDeviceKeys('family-1');
+
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).toMatchObject({
+        memberId: 'member-1',
+        familyId: 'family-1',
+        mechanism: 'native-keystore',
+        keystoreScheme: 'per-member',
+      });
+      // No memberName — nothing on the device knows it. The label carries the id tail so
+      // two adopted cards stay distinguishable on the picker.
+      expect(keys[0]!.memberName).toBeUndefined();
+      expect(keys[0]!.label).toContain('member-1'.slice(-8));
+      // Adoption NEVER deletes.
+      expect(plugin.deleteKey).not.toHaveBeenCalled();
+    });
+
+    it('does not re-adopt a blob that already has a record', async () => {
+      store.push(seeded('family-1', 'member-1'));
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-1'] });
+
+      await nativeResolveDeviceKeys('family-1');
+
+      expect(store).toHaveLength(1);
+      expect(eventContext('adopt')).toMatchObject({
+        detail: 'adopted=0,registered=1,legacy=0,malformed=0',
+      });
+    });
+
+    it('a member with an existing LEGACY-scheme record is not adopted at the new address', async () => {
+      // nativeCredentialId does not encode the scheme, so the legacy record suppresses
+      // adoption. Correct and harmless: the union still reaches the per-member blob.
+      store.push(seeded('family-1', 'member-1', 'legacy'));
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-1'] });
+
+      await nativeResolveDeviceKeys('family-1');
+      expect(store).toHaveLength(1);
+      expect(store[0]!.keystoreScheme).toBeUndefined();
+
+      await nativeReclaimFamilyKeystore('family-1');
+      expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
+    });
+
+    it('enumerated=0 with registered>0 is emitted as ONE self-proving contradiction', async () => {
+      // Records exist, therefore blobs must exist, therefore the query is excluding
+      // them — the 0.13R2 failure visible in a single log line rather than a fleet count.
+      store.push(seeded('family-1', 'member-1'));
+      plugin.listAccounts.mockResolvedValue({ accounts: [] });
+
+      await nativeResolveDeviceKeys('family-1');
+
+      expect(eventContext('adopt')).toMatchObject({
+        count: 0,
+        detail: 'adopted=0,registered=1,legacy=0,malformed=0',
+      });
+    });
+
+    it('a REJECTING enumeration reports enumerate_failed and adopts nothing', async () => {
+      plugin.listAccounts.mockImplementation(rejectWith('unknown'));
+
+      const keys = await nativeResolveDeviceKeys('family-1');
+
+      expect(keys).toEqual([]);
+      expect(reportErrorMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'warning',
+          context: expect.objectContaining({ action: 'enumerate_failed' }),
+        })
+      );
+    });
+
+    it('a MISSING method takes enumerate_unsupported, not the #74 plugin-missing signal', async () => {
+      plugin.listAccounts.mockImplementation(async () => {
+        throw new Error('not implemented on android');
+      });
+
+      await nativeResolveDeviceKeys('family-1');
+
+      expect(eventContext('enumerate_unsupported')).toBeDefined();
+      expect(eventContext('plugin-missing')).toBeUndefined();
+      expect(reportErrorMock).not.toHaveBeenCalled();
+    });
+
+    it('a failing getAllPasskeys aborts adoption without changing the existing degrade', async () => {
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-1'] });
+      vi.mocked(repo.getAllPasskeys).mockRejectedValueOnce(new Error('idb gone'));
+
+      const keys = await nativeResolveDeviceKeys('family-1');
+
+      expect(keys).toEqual([]);
+      expect(store).toHaveLength(0);
+      expect(eventContext('adopt_registry_read_failed')).toBeDefined();
+    });
+
+    it('one failing write is counted and does not abandon the rest of the device', async () => {
+      plugin.listAccounts.mockResolvedValue({
+        accounts: ['family-1:member-1', 'family-1:member-2'],
+      });
+      vi.mocked(repo.savePasskeyRegistration).mockRejectedValueOnce(new Error('quota'));
+
+      await nativeResolveDeviceKeys('family-1');
+
+      expect(store).toHaveLength(1);
+      expect(eventContext('adopt_write_failed')).toBeDefined();
+      expect(eventContext('adopt')).toMatchObject({
+        detail: 'adopted=1,registered=0,legacy=0,malformed=0',
+      });
+    });
+
+    it('adopts for EVERY family in one pass, not just the one being resolved', async () => {
+      plugin.listAccounts.mockResolvedValue({
+        accounts: ['family-1:member-1', 'family-2:member-2'],
+      });
+
+      await nativeResolveDeviceKeys('family-1');
+
+      // Family 2's blob is now visible to family 2's own reclaim path too, which is the
+      // point: it was previously reachable by nothing at all.
+      expect(store.map((r) => r.familyId).sort()).toEqual(['family-1', 'family-2']);
+    });
+  });
+
+  describe('the session budget is shared, not per caller', () => {
+    it('AT MOST one adoption enumeration across many resolves and an unlock', async () => {
+      store.push(seeded('family-1', 'member-1'));
+      plugin.listAccounts.mockResolvedValue({ accounts: [] });
+
+      await nativeResolveDeviceKeys('family-1');
+      await nativeResolveDeviceKeys('family-2');
+      await nativeResolveDeviceKeys('family-3');
+      await nativeUnlock('family-1', 'member-1');
+
+      // Only the adoption pass is memoized; this asserts the memoization, not reclaim's.
+      expect(plugin.listAccounts).toHaveBeenCalledTimes(1);
+    });
+
+    it('nativeDisable triggers NO enumeration at all', async () => {
+      store.push(seeded('family-1', 'member-1'));
+      await nativeDisable('family-1', 'member-1');
+      expect(plugin.listAccounts).not.toHaveBeenCalled();
+    });
+
+    it('nativeReclaimFamilyKeystore enumerates once PER CALL, by design', async () => {
+      // A session-old list could miss a blob written since, and reclaim is rare and
+      // user-initiated. This is intended behaviour, not a violation of the budget.
+      await nativeReclaimFamilyKeystore('family-1');
+      await nativeReclaimFamilyKeystore('family-2');
+      expect(plugin.listAccounts).toHaveBeenCalledTimes(2);
+    });
+
+    it('a NEVER-RESOLVING enumeration costs ONE budget across three families', async () => {
+      vi.useFakeTimers();
+      try {
+        plugin.listAccounts.mockImplementation(() => new Promise(() => {}));
+
+        const done = (async () => {
+          await nativeResolveDeviceKeys('family-1');
+          await nativeResolveDeviceKeys('family-2');
+          await nativeResolveDeviceKeys('family-3');
+          return 'settled';
+        })();
+
+        // One budget, not three: a per-caller timer would need 3 × 1500ms here, which is
+        // 4.5s before the family picker's first paint on a three-family device.
+        await vi.advanceTimersByTimeAsync(1500);
+        await expect(done).resolves.toBe('settled');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a hung enumeration still lets nativeUnlock return', async () => {
+      vi.useFakeTimers();
+      try {
+        store.push(seeded('family-1', 'member-1'));
+        plugin.listAccounts.mockImplementation(() => new Promise(() => {}));
+
+        const unlock = nativeUnlock('family-1', 'member-1');
+        await vi.advanceTimersByTimeAsync(1500);
+
+        await expect(unlock).resolves.toMatchObject({ success: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('never rejects, even with a throwing plugin AND a throwing repo', async () => {
+      plugin.listAccounts.mockImplementation(async () => {
+        throw new Error('boom');
+      });
+      vi.mocked(repo.getPasskeysByFamily).mockRejectedValueOnce(new Error('idb gone'));
+      await expect(nativeResolveDeviceKeys('family-1')).resolves.toEqual([]);
+    });
+  });
+
+  describe('the union reclaim', () => {
+    it('deletes a blob that has NO registry record', async () => {
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:ghost'] });
+      await nativeReclaimFamilyKeystore('family-1');
+      expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:ghost' });
+    });
+
+    it('still removes a registry record whose blob is already gone', async () => {
+      // The converse hole a purely keychain-driven reclaim would open: dead records
+      // render as dead buttons on the chooser.
+      store.push(seeded('family-1', 'member-1'));
+      plugin.listAccounts.mockResolvedValue({ accounts: [] });
+      await nativeReclaimFamilyKeystore('family-1');
+      expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(0);
+    });
+
+    it("NEVER touches another family's account", async () => {
+      plugin.listAccounts.mockResolvedValue({
+        accounts: ['family-1:member-1', 'family-2:member-2'],
+      });
+      await nativeReclaimFamilyKeystore('family-1');
+      expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
+      expect(plugin.deleteKey).not.toHaveBeenCalledWith({ account: 'family-2:member-2' });
+    });
+
+    it('a record and its enumerated blob are ONE target, keeping the credentialId', async () => {
+      store.push(seeded('family-1', 'member-1'));
+      plugin.listAccounts.mockResolvedValue({ accounts: ['family-1:member-1'] });
+
+      await nativeReclaimFamilyKeystore('family-1');
+
+      // Two targets: the member's account (deduped) and the legacy sweep address.
+      expect(eventContext('reclaim')).toMatchObject({ detail: 'targets=2,failed=0' });
+      expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(0);
+    });
+
+    it('an EMPTY or failed enumeration never causes a deletion of its own', async () => {
+      plugin.listAccounts.mockImplementation(rejectWith('unknown'));
+      await nativeReclaimFamilyKeystore('family-1');
+      // Only the legacy sweep address, which is unconditional and always has been.
+      expect(plugin.deleteKey).toHaveBeenCalledTimes(1);
+      expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1' });
+    });
+  });
+
+  describe('adopted targets drain PER FAMILY', () => {
+    it("taking family A's targets leaves family B's untouched", async () => {
+      // The cross-family defect this type exists to prevent: adoption spans every family,
+      // so a wholesale drain tested against A's roster would delete B's live enrolments.
+      plugin.listAccounts.mockResolvedValue({
+        accounts: ['family-1:member-1', 'family-2:member-2'],
+      });
+      await nativeResolveDeviceKeys('family-1');
+
+      const a = takeAdoptedTargets('family-1');
+      expect(a.map((t) => t.memberId)).toEqual(['member-1']);
+      // Drained: an empty second take means "nothing adopted" AND "already reconciled",
+      // which is why no separate done-flag is needed.
+      expect(takeAdoptedTargets('family-1')).toEqual([]);
+      // B is still waiting for whenever (if ever) it becomes the active family.
+      expect(takeAdoptedTargets('family-2').map((t) => t.memberId)).toEqual(['member-2']);
+    });
   });
 });

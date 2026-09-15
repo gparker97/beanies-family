@@ -31,7 +31,8 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
         // A new @objc func that is NOT listed here is invisible to Capacitor and rejects
         // as not-implemented. That is exactly how #74 happened, twice. Anything added
         // below must be added here in the same edit.
-        CAPPluginMethod(name: "deleteAllKeys", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "deleteAllKeys", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "listAccounts", returnType: CAPPluginReturnPromise)
     ]
 
     private let service = "family.beanies.app.biometric"
@@ -168,6 +169,68 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         } else {
             call.reject("keychain delete failed", mapOSStatus(status))
+        }
+    }
+
+    // MARK: - listAccounts (enumerate)
+
+    /// Every account this device holds under our service — the app's DURABLE index.
+    ///
+    /// Keychain items survive an app uninstall by design; the IndexedDB registry that
+    /// used to be the only way to enumerate them does not. Because the account encodes
+    /// `${familyId}:${memberId}`, a query by SERVICE ALONE recovers every pair, which is
+    /// what lets a reinstall adopt its own material back instead of orphaning it beyond
+    /// every deletion path (#82). The keychain was always the index; the plugin just
+    /// never exposed it, because every other method pins `kSecAttrAccount`.
+    ///
+    /// ⚠️ This query asks for `kSecReturnAttributes` ONLY, and that is the entire basis
+    /// of the method. Do NOT "simplify" it toward `hasKey`'s shape below. `hasKey`
+    /// passes NO return-type key, so for a generic-password item the keychain returns
+    /// the item's DATA — which is why it evaluates the access control, and why its
+    /// comment reports `errSecInteractionNotAllowed` as the healthy status for a gated
+    /// item. Attributes are metadata: the encrypted data is never touched, so the ACL
+    /// should not be evaluated and no prompt should appear. Reading hasKey's behaviour
+    /// as a prediction of this one is exactly how someone "fixes" this into a Face ID
+    /// prompt on the login screen.
+    ///
+    /// NEVER use `kSecUseAuthenticationUISkip` (see hasKey's 0.13R2 note — Skip makes
+    /// gated items silently vanish from results, and the JS self-heal then deleted live
+    /// enrolments). The `LAContext` with `interactionNotAllowed` is carried from the
+    /// outset so that IF the OS ever does decide authentication is needed, this rejects
+    /// deterministically instead of surprising the user with a prompt.
+    @objc func listAccounts(_ call: CAPPluginCall) {
+        let ctx = LAContext()
+        ctx.interactionNotAllowed = true
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnAttributes as String: true,
+            kSecUseAuthenticationContext as String: ctx
+        ]
+        // A keychain IPC round-trip on a rendering login screen — off the main thread,
+        // same treatment as getKey.
+        DispatchQueue.global(qos: .userInitiated).async {
+            var items: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &items)
+            DispatchQueue.main.async {
+                if status == errSecItemNotFound {
+                    // A legitimately empty device. Not a failure.
+                    call.resolve(["accounts": [String]()])
+                    return
+                }
+                guard status == errSecSuccess else {
+                    // Including errSecInteractionNotAllowed. A caller MUST be able to
+                    // tell "no items" from "the query failed": an empty list on failure
+                    // is precisely how a broken probe becomes "nothing is enrolled".
+                    call.reject("keychain enumerate failed", self.mapOSStatus(status))
+                    return
+                }
+                let attrs = items as? [[String: Any]] ?? []
+                call.resolve([
+                    "accounts": attrs.compactMap { $0[kSecAttrAccount as String] as? String }
+                ])
+            }
         }
     }
 
