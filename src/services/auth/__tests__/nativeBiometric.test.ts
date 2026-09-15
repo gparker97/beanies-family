@@ -1174,11 +1174,56 @@ describe('the gaps the review found (#82)', () => {
     await nativeResolveDeviceKeys('family-1');
 
     await nativeReclaimFamilyKeystore('family-1');
+    // The blob really is gone now, so the keychain stops returning it. Reclaim also
+    // clears the adoption memo, so the next pass sees post-delete reality rather than
+    // reusing the stale one.
+    plugin.listAccounts.mockResolvedValue({ accounts: [] });
     plugin.deleteKey.mockClear();
     logEventMock.mockClear();
 
     await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
     expect(eventsFor('roster_reconcile')).toEqual([]);
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+  });
+
+  it('an adoption pass still IN FLIGHT cannot undo a reclaim that overtook it', async () => {
+    // The defect the first fix round left behind. The adopted-target assignment is a
+    // wholesale replace, and the pass reads the registry BEFORE it writes, so a reclaim
+    // landing mid-pass used to get its targets restored AND its deleted records
+    // re-created, pointing at blobs that were gone.
+    // Only the ADOPTION pass's enumeration hangs. Reclaim does its own enumeration, and
+    // it has to be able to complete — that is the whole point of the race.
+    let releaseEnumeration: (v: { accounts: string[] }) => void = () => {};
+    let call = 0;
+    plugin.listAccounts.mockImplementation(() => {
+      call += 1;
+      if (call === 1) {
+        return new Promise<{ accounts: string[] }>((resolve) => {
+          releaseEnumeration = resolve;
+        });
+      }
+      return Promise.resolve({ accounts: [] });
+    });
+
+    // Start a pass and leave it hanging (the bounded gate gives up, the pass does not).
+    const pending = nativeResolveDeviceKeys('family-1');
+
+    // A reclaim overtakes it and deletes everything for the family.
+    await nativeReclaimFamilyKeystore('family-1');
+
+    // Now the enumeration finally answers, still describing the pre-delete world.
+    releaseEnumeration({ accounts: ['family-1:member-1'] });
+    await pending;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // No record was resurrected, and no target survived for a roster pass to purge.
+    expect(store.filter((r) => r.mechanism === 'native-keystore')).toEqual([]);
+    plugin.deleteKey.mockClear();
+    logEventMock.mockClear();
+    plugin.listAccounts.mockResolvedValue({ accounts: [] });
+    await nativeReconcileRoster('family-1', [{ id: 'member-1', name: 'Ada' }]);
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
   });
 
   it('the roster pass WAITS for adoption instead of assuming it already ran', async () => {

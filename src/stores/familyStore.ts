@@ -126,7 +126,15 @@ export const useFamilyStore = defineStore('family', () => {
   // sorted projection covers load + add + update + remove with one seam. The service
   // no-ops on an empty list (so the sign-out reset can't erase a good roster) and on a
   // missing active family (join/create flows before registration).
-  watch(sortedMembers, (list) => {
+  // Sources include `currentMemberId` deliberately. `loadMembers` publishes the roster and
+  // only THEN resolves the session member (behind an await), so a watcher on the roster
+  // alone always runs with `currentMember` still undefined on a fresh open — and the
+  // keystore reconcile requires a resolved session member as its proof that this is a real
+  // decrypted roster rather than a partial paint. Watching the roster alone made that pass
+  // deterministically skipped on the first publish, recovering only if some later mutation
+  // happened to re-fire it. Extra firings are cheap: the roster-cache write is idempotent
+  // and TOCTOU-guarded, and the reconcile's drain is one-shot per family.
+  watch([sortedMembers, currentMemberId], ([list]) => {
     void refreshRosterCache(list);
     // Reconcile the device's ADOPTED keystore material against the live roster (#82):
     // a member removed while the app was uninstalled loses their surviving blob, and a
