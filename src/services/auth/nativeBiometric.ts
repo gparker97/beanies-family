@@ -392,7 +392,10 @@ const ADOPTION_BUDGET_MS = 1500;
 let adoption: Promise<AdoptionSummary> | null = null;
 let adoptionGate: Promise<void> | null = null;
 let adoptedTargets: AdoptedTarget[] = [];
-/** Bumped by the test reset so an in-flight pass cannot write into the next session. */
+/**
+ * Bumped whenever this session's adoption results stop being true, so an IN-FLIGHT pass
+ * cannot write into a world that has moved on. See `invalidateAdoptionState`.
+ */
 let sessionGeneration = 0;
 
 /**
@@ -421,11 +424,13 @@ let sessionGeneration = 0;
  */
 function ensureKeystoreAdopted(): Promise<AdoptionSummary> {
   const generation = sessionGeneration;
-  return (adoption ??= runAdoptionPass()
+  return (adoption ??= runAdoptionPass(generation)
     .then((summary) => {
-      // Generation-checked: `__resetKeystoreSessionForTests` can null the refs while a
-      // pass is still in flight, and that pass still holds this closure. Without the
-      // check, test N's slow-but-resolving pass assigns targets during test N+1.
+      // Generation-checked, and this is LOAD-BEARING in production, not just in tests.
+      // The assignment is a wholesale replace, so without the check a pass still in
+      // flight when a reclaim or the clear-all sweep ran would RESTORE every target
+      // those paths had just dropped, and a later roster pass would then purge blobs
+      // that were already gone and report it as real key removal.
       if (generation === sessionGeneration) adoptedTargets = summary.adoptedTargets;
       return summary;
     })
@@ -455,7 +460,7 @@ function awaitAdoptionGate(): Promise<void> {
   ));
 }
 
-async function runAdoptionPass(): Promise<AdoptionSummary> {
+async function runAdoptionPass(generation: number): Promise<AdoptionSummary> {
   const blobs = await listKeystoreBlobs();
   // null = failed or unavailable, and already reported. Nothing to adopt, and crucially
   // no deletion anywhere in this module is driven by an absent enumeration.
@@ -494,6 +499,18 @@ async function runAdoptionPass(): Promise<AdoptionSummary> {
       // Counted, left to the reclaim and sweep paths, never guessed at.
       summary.legacy += 1;
       continue;
+    }
+    // A reclaim or the clear-all sweep landing mid-pass makes every remaining write
+    // wrong: `existing` was read before it ran, so adopting now RE-CREATES records that
+    // were just deleted, pointing at blobs that were just deleted. Stop, and say so.
+    if (generation !== sessionGeneration) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'adopt_superseded',
+        context: { os: getPlatform(), action: 'adopt_superseded', count: summary.adopted },
+      });
+      return summary;
     }
     const credentialId = nativeCredentialId(b.familyId, b.memberId);
     if (known.has(credentialId)) continue;
@@ -563,11 +580,26 @@ function takeAdoptedTargets(familyId: string): AdoptedTarget[] {
  * (`__resetPinAttemptsForTests` and friends) — the single-flight, the gate and the
  * adopted set are module-level and do not reset between cases in one test file.
  */
-export function __resetKeystoreSessionForTests(): void {
+/**
+ * This session's adoption results are no longer true, because the material they describe
+ * has just been deleted. Bumps the generation so an in-flight pass cannot write back,
+ * and clears the memo so the NEXT caller runs a fresh pass against post-delete reality
+ * rather than reusing a stale one.
+ *
+ * Deliberately device-wide rather than per family: a racing pass holds one summary for
+ * every family, and there is no way to partially retract it. The cost is that another
+ * family's adoption may be redone, which is cheap; the alternative is restoring records
+ * for material that is gone.
+ */
+function invalidateAdoptionState(): void {
   sessionGeneration += 1;
   adoption = null;
   adoptionGate = null;
   adoptedTargets = [];
+}
+
+export function __resetKeystoreSessionForTests(): void {
+  invalidateAdoptionState();
 }
 
 // --- Availability / gating ---
@@ -923,11 +955,10 @@ export async function nativeReclaimFamilyKeystore(familyId: string): Promise<voi
   const legacy = legacyKeystoreAccount(familyId);
   if (!byAccount.has(legacy)) byAccount.set(legacy, { account: legacy });
 
-  // Drop this family's adopted targets: their blobs and records are about to be gone, and
-  // a later roster pass draining them would emit a `roster_reconcile` purge that reads as
-  // real key removal when nothing was there. Discard the result — these are targets, not
-  // survivors.
-  takeAdoptedTargets(familyId);
+  // Their blobs and records are about to be gone, so a later roster pass draining them
+  // would emit a `roster_reconcile` purge reading as real key removal when nothing was
+  // there. A plain drop is not enough: a pass still in flight would restore them.
+  invalidateAdoptionState();
 
   await purgeTargets([...byAccount.values()], 'reclaim');
 }
@@ -950,8 +981,9 @@ export async function nativeReclaimFamilyKeystore(familyId: string): Promise<voi
  * level up and reported as a step failure with no statement of what survived.
  */
 export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<void> {
-  // Everything on the device is going, so no adopted target can still be a real target.
-  adoptedTargets = [];
+  // Everything on the device is going, so no adopted target can still be a real target,
+  // and no in-flight pass may write one back.
+  invalidateAdoptionState();
   try {
     const { deleted } = await BiometricKeystore.deleteAllKeys();
     logEvent({
@@ -976,22 +1008,26 @@ export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<vo
       },
     });
   }
-  // The fallback list comes from the registry, and in the very scenario this whole change
-  // exists for the registry can be EMPTY (a reinstall where adoption never ran, or a
-  // failed registry read). Looping zero families would then report a clean device while
-  // every blob survived, which is the same lie one layer down. So derive the families
-  // from the keychain itself when the caller's list is empty.
-  let targets = familyIds;
-  if (targets.length === 0) {
-    const blobs = await listKeystoreBlobs();
-    targets = [...new Set((blobs ?? []).map((b) => b.familyId))];
-    logEvent({
-      level: targets.length > 0 ? 'warn' : 'info',
-      surface: SURFACE,
-      message: 'sweep_fallback_enumerated',
-      context: { os: getPlatform(), action: 'sweep_fallback', count: targets.length },
-    });
-  }
+  // THE UNION AGAIN, for the same reason it is used in reclaim: the caller's list comes
+  // from the registry, and the registry can be empty (a reinstall where adoption never
+  // ran) or merely INCOMPLETE (a family whose row was removed earlier). Gating the
+  // enumeration on "the list is empty" would leave that second case reporting a clean
+  // device while another family's biometric-gated key survived. So always enumerate and
+  // union: a failed enumeration contributes nothing, which is the fallback's fallback.
+  const blobs = await listKeystoreBlobs();
+  const enumerated = [...new Set((blobs ?? []).map((b) => b.familyId))];
+  const targets = [...new Set([...familyIds, ...enumerated])];
+  logEvent({
+    level: targets.length > familyIds.length ? 'warn' : 'info',
+    surface: SURFACE,
+    message: 'sweep_fallback',
+    context: {
+      os: getPlatform(),
+      action: 'sweep_fallback',
+      count: targets.length,
+      detail: `registry=${familyIds.length},enumerated=${enumerated.length}`,
+    },
+  });
   for (const id of targets) {
     await nativeReclaimFamilyKeystore(id);
   }
@@ -1128,12 +1164,25 @@ async function clearNativeRecord(
   memberId: string,
   action: string
 ): Promise<void> {
-  const record = await loadNativeRecord(familyId, memberId);
+  const records = await readNativeRecords(familyId);
+  const record = records.find((r) => r.memberId === memberId) ?? null;
   const account = record ? recordAccount(familyId, record) : keystoreAccount(familyId, memberId);
-  await purgeTargets(
-    [{ account, credentialIds: [nativeCredentialId(familyId, memberId)] }],
-    action
-  );
+
+  // EVERY record that lives at this account, not just the caller's. Two legacy-scheme
+  // records for one family both address the bare familyId, so deleting that one blob
+  // already revokes both members; removing only the caller's record would leave the
+  // sibling listed and offered, pointing at a blob that is gone. That is the dead-button
+  // state the union reclaim exists to prevent, and it was still reachable here.
+  const credentialIds = records
+    .filter((r) => recordAccount(familyId, r) === account)
+    .map((r) => nativeCredentialId(familyId, r.memberId));
+  if (!credentialIds.includes(nativeCredentialId(familyId, memberId))) {
+    // No record for this member (the not-enrolled / already-cleared case): still remove
+    // the id the caller asked about, which is what makes this idempotent.
+    credentialIds.push(nativeCredentialId(familyId, memberId));
+  }
+
+  await purgeTargets([{ account, credentialIds }], action);
 }
 
 // --- Friendly copy (via t() with English fallbacks) ---

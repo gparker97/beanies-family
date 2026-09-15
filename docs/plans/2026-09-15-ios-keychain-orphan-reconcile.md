@@ -477,21 +477,23 @@ That is strictly fewer lines than the current loop, strictly more complete, and 
 
 **Surface: the existing `native-biometric`** (`SURFACE`, `nativeBiometric.ts:57`) — _not_ a new `keystore-reconcile` surface. Pass-2 change: the module already owns one surface constant, `src/utils/diagnosticContext.ts` (the `key_backing` block, `:195-200`) documents the convention for this exact surface ("Outcome rides the existing `action` key; the rest reuse os/error_code/detail"), and a second surface would split one stream in two for CloudWatch queries and require a new runbook/declaration row. Outcomes ride `action`.
 
-| Level                                         | When                                                                                                    | Context                                                                                                                                                       |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `info`, or `warn` when `adopted > 0`          | the one-per-session adoption pass completes — **one event, level computed**                             | `action: 'adopt'`, `count` = blobs enumerated, `detail` = `formatAdoptionDetail(summary)`                                                                     |
-| `info`                                        | `enumerate` is unavailable (missing method / Android)                                                   | `action: 'enumerate_unsupported'`, `error_code` — deliberately NOT the `plugin-missing`/`error` pair used by `nativeCanEnroll`, so the #74 signal stays clean |
-| `error` via `reportError`, severity `warning` | the enumeration query rejects                                                                           | `action: 'enumerate_failed'`, `error_code`, `detail` — names the degraded (union) behaviour                                                                   |
-| `info`, or `warn` when any target survived    | **every** purge completes — emitted by `purgeTargets`, so no caller writes this                         | `action: 'reclaim' \| 'roster_reconcile' \| 'disable' \| 'absent_self_heal'`, `count` = blobs provably gone, `detail` = `formatPurgeDetail(targets, deleted)` |
-| `warn`                                        | a blob delete failed (`deleteBlob`)                                                                     | `action` = the caller's, `error_code` — key material that would not delete                                                                                    |
-| `warn`                                        | a registry record would not delete (preserved from `clearNativeRecord`)                                 | message `clear_record_failed`, `action: 'remove_registration'`, `detail`                                                                                      |
-| `info`                                        | the whole-service sweep succeeded                                                                       | `action: 'sweep'`                                                                                                                                             |
-| `error` via `reportError`, severity `warning` | **Pass 4:** the whole-service sweep rejected (missing/failing `deleteAllKeys`) — the fallback then runs | `action: 'sweep_failed'`, `error_code`, `detail`                                                                                                              |
-| `warn`                                        | the adoption pass's own registry read failed, so adoption is skipped this session                       | `action: 'adopt_registry_read_failed'`, `detail`                                                                                                              |
-| `warn`                                        | one adoption write failed — counted, and the rest of the device still processed                         | `action: 'adopt_write_failed'`, `detail`                                                                                                                      |
-| `error` via `reportError`, severity `warning` | the adoption pass threw despite its internal handling (a bug, not an expected condition)                | `action: 'adopt_failed'`, `detail`                                                                                                                            |
-| `warn`                                        | a `memberName` backfill failed — cosmetic, so the pass continues                                        | `action: 'roster_backfill_failed'`, `detail`                                                                                                                  |
-| `warn`                                        | the roster reconcile threw — the never-throws backstop for the `void`-ed watcher                        | `action: 'roster_reconcile_failed'`, `detail`                                                                                                                 |
+| Level                                                                         | When                                                                                                    | Context                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `info`, or `warn` when `adopted > 0`                                          | the one-per-session adoption pass completes — **one event, level computed**                             | `action: 'adopt'`, `count` = blobs enumerated, `detail` = `formatAdoptionDetail(summary)`                                                                     |
+| `info`                                                                        | `enumerate` is unavailable (missing method / Android)                                                   | `action: 'enumerate_unsupported'`, `error_code` — deliberately NOT the `plugin-missing`/`error` pair used by `nativeCanEnroll`, so the #74 signal stays clean |
+| `error` via `reportError`, severity `warning`                                 | the enumeration query rejects                                                                           | `action: 'enumerate_failed'`, `error_code`, `detail` — names the degraded (union) behaviour                                                                   |
+| `info`, or `warn` when any target survived                                    | **every** purge completes — emitted by `purgeTargets`, so no caller writes this                         | `action: 'reclaim' \| 'roster_reconcile' \| 'disable' \| 'absent_self_heal'`, `count` = blobs provably gone, `detail` = `formatPurgeDetail(targets, failed)`  |
+| `warn`                                                                        | a blob delete failed (`deleteBlob`)                                                                     | `action` = the caller's, `error_code` — key material that would not delete                                                                                    |
+| `warn`                                                                        | a registry record would not delete (preserved from `clearNativeRecord`)                                 | message `clear_record_failed`, `action: 'remove_registration'`, `detail`                                                                                      |
+| `info`                                                                        | the whole-service sweep succeeded                                                                       | `action: 'sweep'`                                                                                                                                             |
+| `error` via `reportError`, severity `warning`                                 | **Pass 4:** the whole-service sweep rejected (missing/failing `deleteAllKeys`) — the fallback then runs | `action: 'sweep_failed'`, `error_code`, `detail`                                                                                                              |
+| `warn`                                                                        | the adoption pass's own registry read failed, so adoption is skipped this session                       | `action: 'adopt_registry_read_failed'`, `detail`                                                                                                              |
+| `warn`                                                                        | one adoption write failed — counted, and the rest of the device still processed                         | `action: 'adopt_write_failed'`, `detail`                                                                                                                      |
+| `error` via `reportError`, severity `warning`                                 | the adoption pass threw despite its internal handling (a bug, not an expected condition)                | `action: 'adopt_failed'`, `detail`                                                                                                                            |
+| `warn`                                                                        | a `memberName` backfill failed — cosmetic, so the pass continues                                        | `action: 'roster_backfill_failed'`, `detail`                                                                                                                  |
+| `warn`                                                                        | the roster reconcile threw — the never-throws backstop for the `void`-ed watcher                        | `action: 'roster_reconcile_failed'`, `detail`                                                                                                                 |
+| `info`, or `warn` when the keychain held more families than the registry knew | the clear-all sweep's fallback ran (only after `deleteAllKeys` rejected)                                | `action: 'sweep_fallback'`, `count` = families reclaimed, `detail` = `registry=N,enumerated=M`                                                                |
+| `info`                                                                        | an adoption pass was superseded mid-flight by a reclaim or the clear-all sweep                          | `action: 'adopt_superseded'`, `count` = adopted before it stopped                                                                                             |
 
 **Pass 3 — one `adopt` event, not two.** The Pass-2 table listed an `info` row and a `warn` row for the same pass, which reads as two emissions for one fact: a CloudWatch count of adoption passes would then double-count the interesting ones. Emit once with `level: summary.adopted > 0 ? 'warn' : 'info'`.
 
@@ -513,6 +515,46 @@ That is strictly fewer lines than the current loop, strictly more complete, and 
 **Critical vs telemetry** — nothing here is `severity: 'critical'`. No user action fails and no data is at risk; the worst outcome is degrading to today's behaviour. Firehose only, no Slack page.
 
 **Privacy / store gate** — **no new context keys.** `action`, `error_code`, `detail` and `count` are already in `ALLOWED_CONTEXT_KEYS` (`src/utils/diagnosticContext.ts:68,69,188,321`) _and_ already in the Lambda's mirrored allowlist, with `telemetryAllowlistDrift.test.ts` asserting set equality between the two — so no Lambda code change and no pinned-test change. Family and member ids never ship; the counts in `detail` are integers under fixed labels, capped well under `MAX_STRING_LEN`. ⚠️ `docs/STATUS.md` (the 2026-07-14 session-3/session-4 blocks, ~`:533-536`) records that the **deployed** telemetry Lambda may predate the `native-biometric`/`key_backing` keys — confirm (and terraform-apply if needed) **before** trusting the field signal, or the whole reconcile stream is stripped after leaving the device, silently.
+
+> **REVIEWED TWICE AFTER IMPLEMENTATION (2026-09-15).** The first review round found two
+> HIGH defects, and reviewing THOSE FIXES found a third, which is the failure mode this
+> repo's own lessons file warns about:
+>
+> 1. **The roster reconcile's cross-family guard was a tautology.** `rosterLooksComplete`'s
+>    "the signed-in member is in the list" clause can never be false for the real caller,
+>    because `currentMember` is `members.find(...)`. Nothing verified that the roster
+>    belonged to the family whose adopted keys were being judged, so a family-A roster
+>    mutation arriving during `activateFamily`'s await would have deleted family B's live
+>    enrolments. The roster now carries the family it was read for, and a mismatch drops
+>    the pass.
+> 2. **The reconcile never waited for adoption**, so on the primary reinstall path it could
+>    not run at all: the roster arrives before any login surface resolves keys, the drain
+>    found nothing, and no later session could recover because adoption skips
+>    already-registered blobs. It now awaits the single-flight unbounded, making
+>    `nativeReconcileRoster` a THIRD adoption seam.
+> 3. **The fix for (2) made a new race reachable, and the first round's "drop stale adopted
+>    targets" fix did not survive it.** The adopted-target assignment is a wholesale
+>    replace and the pass reads the registry before it writes, so a reclaim or clear-all
+>    landing mid-pass had its targets restored and its deleted records re-created. The
+>    destructive paths now bump a generation that the pass checks before every write and
+>    before the assignment, and they clear the memo so the next pass sees post-delete
+>    reality.
+>
+> Also: the sweep fallback now UNIONS the registry list with an enumeration rather than
+> only enumerating when the list is empty (an incomplete list reported a clean device while
+> another family's key survived); `clearNativeRecord` removes every record living at the
+> account it deletes, not just the caller's, which was the same one-blob-many-records
+> defect one function away from where it was fixed; and `currentMemberId` joined the roster
+> watcher's sources, without which the reconcile was deterministically skipped on the first
+> publish after a pod opens.
+>
+> **Caveat whose reachability changed:** `rosterLooksComplete` cannot tell a complete
+> roster from a complete but STALE one. Because the reconcile now runs on the first
+> post-adoption roster, and this project loads cache-first, that roster is the most likely
+> to be stale. A member who had enrolled on this device but is absent from the opened
+> `.beanpod` loses their adopted blob and must re-enrol. Graceful (no data loss, the family
+> key is still reachable by password or PIN) and inherent to requirement 4, which is why
+> commit D is the one the plan says to cut if scope must shrink.
 
 > **CORRECTED DURING IMPLEMENTATION (2026-09-15).** Two defects in this plan were found while
 > building it and fixed in the code rather than shipped:
