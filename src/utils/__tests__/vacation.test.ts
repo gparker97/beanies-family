@@ -20,6 +20,7 @@ import {
   overrideTripTarget,
   type SupportedTravelType,
 } from '../vacation';
+import { AIRPORTS } from '@/constants/airports';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 function flightSeg(overrides: Partial<VacationTravelSegment> = {}): VacationTravelSegment {
@@ -679,6 +680,26 @@ describe('airportLabel / airlineLabel', () => {
       'John F. Kennedy International Airport'
     );
     expect(airlineLabel('Juneyao Airlines')).toBe('Juneyao Airlines');
+  });
+
+  it('still resolves a RETIRED code, so a trip saved before the code moved keeps reading right', () => {
+    // PBI left the upstream dataset in Sept 2026 when West Palm Beach was reassigned to DJT.
+    // A family with a PBI flight already saved must not watch it decay into bare 'PBI'.
+    const retired = AIRPORTS.filter((a) => a.retired);
+    expect(retired.length).toBeGreaterThan(0);
+    for (const a of retired.slice(0, 5)) {
+      expect(airportLabel(a.code)).toBe(`${a.city} (${a.code})`);
+    }
+  });
+
+  it('never OFFERS a retired code in the picker, because it is gone or now means somewhere else', () => {
+    const offered = new Set(buildAirportOptions().map((o) => o.value));
+    for (const a of AIRPORTS.filter((x) => x.retired)) {
+      expect(offered.has(`${a.city} (${a.code})`)).toBe(false);
+    }
+    // ...and the live ones are all still there, so the filter cannot quietly empty the list.
+    const live = AIRPORTS.filter((a) => !a.retired);
+    expect(buildAirportOptions()).toHaveLength(live.length);
   });
 
   it('never expands a forbidden placeholder into a real place', () => {
