@@ -17,6 +17,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
+import { airportLabel } from '@/utils/vacation';
 import { matchTravellerIds, learnableAliases } from '@/utils/segmentTravellers';
 import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
 import type { TravelReady } from '@/composables/useDocumentToTravel';
@@ -149,14 +150,23 @@ interface ReviewRow {
 
 function travelRow(s: VacationTravelSegment): ReviewRow {
   const date = s.departureDate || s.embarkationDate || s.sortDate || '';
-  const route = [s.departureAirport || s.departureStation, s.arrivalAirport || s.arrivalStation]
+  // Expanded for reading: a bare "SIN" becomes "Singapore (SIN)". This is the one screen where
+  // the family checks what the model read before it reaches the pod, so a code the model returned
+  // must not be the only thing they are shown. Stations are left alone — they have no code.
+  const route = [
+    airportLabel(s.departureAirport) || s.departureStation,
+    airportLabel(s.arrivalAirport) || s.arrivalStation,
+  ]
     .filter(Boolean)
     .join(' → ');
   return {
     id: s.id,
     emoji: TRAVEL_EMOJI[s.type] ?? '✈️',
     title: s.title || route || t('travelExtract.kind.travel'),
-    detail: [date, route && route !== s.title ? route : ''].filter(Boolean).join(' · '),
+    // The route is shown whenever there IS one. It used to be suppressed when it equalled the
+    // title, which assumed the title was a SHORTENED form of it — no longer true once a title
+    // can be the full route verbatim, and the row then lost the route entirely.
+    detail: [date, route].filter(Boolean).join(' · '),
     typeLabel: t('travelExtract.kind.travel'),
   };
 }

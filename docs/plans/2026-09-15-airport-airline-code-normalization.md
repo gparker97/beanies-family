@@ -436,6 +436,14 @@ One event per extraction, one surface, no second event and no second surface. Th
 
 **Privacy / store gate** — **no new context keys.** `action`, `kind`, `count` and `detail` are all already allowlisted in `src/utils/diagnosticContext.ts` (verified at `:68`, `:75`, `:188`, `:321`), already mirrored in `infrastructure/lambda/telemetry/index.mjs`, and already declared to Apple and Google inside the existing Diagnostics → Other Diagnostic Data category. Per `docs/runbooks/native-store-submission.md:589-591`, §1's data-collection table is therefore unchanged and must not be edited. No value in `detail` is derived from the model's string — it is ten integers under fixed labels. The raw airport/airline string never leaves the device.
 
+> ⚠️ **The `## Observability Coverage`, `## Acceptance Criteria` and `## Testing Plan` sections
+> below describe the DELETED resolver design.** They are kept verbatim as the record of what was
+> approved. Read the "SUPERSEDED IN IMPLEMENTATION" section at the end of this file for what
+> actually shipped — in particular, the `detail` format named above is not emitted (an
+> `inferred_count` integer replaced it), and the criteria referring to `code-unlisted`,
+> `travelCodes.ts`, `makeCodeResolver` and the per-entry property test describe code that no
+> longer exists.
+
 ## Acceptance Criteria
 
 - [ ] `resolveAirport` / `resolveAirline` return the canonical form for a listed bare code (`sin`), a trailing parenthesized code, an exact folded name and an unambiguous city
@@ -515,3 +523,212 @@ One event per extraction, one surface, no second event and no second surface. Th
 - `/home/greg/projects/beanies-family/src/utils/vacation.ts`
 - `/home/greg/projects/beanies-family/src/composables/useDocumentToTravel.ts`
 - `/home/greg/projects/beanies-family/src/services/ai/extractionPrompt.ts` (plus the two mirrored copies)
+
+---
+
+## ⚠️ SUPERSEDED IN IMPLEMENTATION — the altitude was wrong
+
+> Added 2026-09-15, after implementation and a `/code-review max`. Everything above is the plan as
+> approved through four passes. **It was built, reviewed, and then largely deleted.** This section
+> is the record of why, because the plan's central claim turned out to be the defect.
+
+### What the plan got wrong
+
+The plan's answer to "the AI returns an airport name" was a **local resolver**: a 4,159-row
+index over `AIRPORTS`/`AIRLINES` that mapped names and cities back to codes, applied at the
+extraction boundary and behind the display fallbacks. It was built exactly as specified, and the
+review found the design unsafe. Reproduced against the real lists:
+
+| Input                           | Stored                                                  | Outcome     | Signal            |
+| ------------------------------- | ------------------------------------------------------- | ----------- | ----------------- |
+| `Goa`                           | `Genova (GOA)` — India to Italy                         | `code`      | none              |
+| `Tokyo`                         | `Tokyo (HND)` — a Narita itinerary becomes Haneda       | `rescued`   | none              |
+| `Washington`                    | `Washington (DCA)` — Dulles unreachable by its own city | `rescued`   | none              |
+| `UNK`                           | `Unalakleet (UNK)` — Alaska                             | `code`      | none              |
+| `Dubai International Airport`   | unchanged                                               | `ambiguous` | warns + escalates |
+| `London` / `Paris` / `New York` | unchanged                                               | `ambiguous` | warns + escalates |
+
+The wrong answers landed at the **highest-confidence** outcomes, silently, in the family's CRDT;
+the alarm fired on exactly what the prompt instructed the model to return. Three root causes:
+
+1. **The OurAirports `city` column is inconsistent across co-located airports** — NRT's city is
+   `Narita`, IAD's is `Dulles`. So "this city matches exactly one row" is not evidence of
+   unambiguity, and the ambiguity guard protected ~1% of city inputs rather than the ~139 the
+   plan assumed.
+2. **29 airports have a 3-letter city or name**, so the bare-code rung ate them (`Goa` → GOA).
+3. **A guard clause added in §5 fed the weak engine its hardest inputs.** "If the document names
+   only a city that has several airports, return the city name" deliberately routed bare city
+   names into the one rung that guesses. Self-inflicted, and the worst single decision in the plan.
+
+Four review passes missed all of it because **none of them executed the resolver against the real
+list**. The ladder reasons beautifully; only measurement shows the data does not support it.
+
+### The measurement that settled it
+
+| Path                                                  | Result                                                           |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| Model returns a **code** (what the prompt asks)       | **4,159/4,159 airports, 135/135 airlines correct**               |
+| Model returns a **name** (the resolver's rescue rung) | 4,065 rescued, 87 ambiguous, **4 landed on a different airport** |
+
+greg's call, and it is the right one: _"we should be asking the model to translate city or airport
+names to codes … not be writing logic to do it ourselves in our code — this is what we should be
+using AI for and it should be much more accurate and simpler. In the case the AI returns an answer
+with low confidence, we can fallback to the information in the original document."_
+
+A model that knows the world's airports is a far better name→code resolver than a string matcher
+over an open-data CSV. The local engine was a liability wrapped around a fix the prompt delivers.
+
+### What actually shipped
+
+**The prompt is the mechanism; there is no local translation.** `PROMPT_VERSION` `2026-09-15.2`,
+byte-identical in all three copies: return the IATA airport and airline codes, translating from
+the names the itinerary prints; if you cannot confidently identify one (including a multi-airport
+city the document does not disambiguate), **return the name exactly as printed**; never invent a
+placeholder. The not-confident fallback is the document's own words, not a guess of ours.
+
+Three code changes, all table-free:
+
+1. **`vacation.ts::airportCode`** — the original defect. Kept the unanchored paren match (so
+   `Sydney (SYD) Terminal 1` still reads `SYD`) and replaced the `split(' ')[0]` fallback, which
+   titled a JFK flight **"John"**, with the whole trimmed string. Longer, never wrong.
+2. **`vacation.ts::flightCodeLabel`** (new, ~8 lines) — prints the carrier once. A **prefix test**,
+   not a shape test: the plan's `FLIGHT_DESIGNATOR` regex still produced `EK EK` and `SQ SQ-25`,
+   and silently erased the airline when the flight-number field held an equipment code (`E190`).
+   Also drops the `if (seg.airline)` gate, so a flight number with no airline stops vanishing.
+3. **`useDocumentToTravel.ts`** — the separate live defect: `segment_count` and `target_kind` were
+   never in `ALLOWED_CONTEXT_KEYS`, so every travel-extraction event since #30 shipped an empty
+   payload. Remapped to the allowlisted `kind`/`count`, plus `detail: coded=N,named=N` from a
+   shape regex (not a lookup) and `warn` when `named > 0` — the model declining to translate is
+   the prompt-health signal, and it is supposed to be rare.
+
+**Deleted, never shipped:** `src/utils/travelCodes.ts` and its tests — the resolver, the fold, the
+factory, the canonical formatters, the outcome tally, the write-time field rewriting. **No
+extracted value is rewritten at all now**, so the stored field stays what the document said and
+the #30 regression test keeps its original assertion.
+
+### Findings from the review that the smaller design makes moot
+
+The resolver carried a measured 42-88ms synchronous index build on the first flight-title render
+(below `TELEMETRY_FLOOR_MS`, so unmeasurable in production); `fold()` deleted non-decomposable
+letters, so `Bodo` failed while `Bodø` resolved; `TRAILING_GENERIC` collapsed 55 uniquely-resolvable
+hub names into `ambiguous`; the per-entry "constants integrity" test short-circuited at the paren
+rung and never touched the name index it claimed to guard; and write-time rewriting would have
+silently reverted a family's manual correction on the next upload of the same PDF. None of it
+exists any more.
+
+### Still open, deliberately
+
+- **`extractSegmentOccurrences` emits the stored `seg.title`**, so a pre-change segment keeps its
+  legacy title on every calendar chip, month cell and scheduled reminder while `/travel` shows the
+  derived one. Pre-existing (titles have always been stored), not made worse here, out of scope.
+- **A long name in a title row truncates.** `VacationSegmentCard`'s title is a single `truncate`
+  line, so `John F. Kennedy International Airport → SIN` ellipsizes. Correct-and-clipped beats
+  short-and-wrong, the full value is in the detail row, and it only occurs when the model declined.
+- **`VacationStep2.vue` passes `other-value`** on the airport/airline comboboxes, so the wizard can
+  still write a free-text name. Harmless now that nothing rewrites values and the title renders a
+  name in full — but it refutes the plan's "one write site" claim, which is recorded here because
+  the claim was load-bearing for the deleted design.
+- **The live prompt check is the load-bearing test and is greg's to run.** The prompt is now the
+  whole mechanism, and only a real document through the deployed Lambda proves it translates.
+
+### Round-three addendum: two more review rounds, and the rule that ended them
+
+A second `/code-review max` on the small design found real line-level defects, and **the fixes for
+them introduced a worse one**: adding a leading bare-code rung _before_ the parenthesized rung
+turned `LOS ANGELES (LAX)` into `LOS` — Lagos, Nigeria. Also `SAN FRANCISCO (SFO)` → `SAN` (San
+Diego) and `ABU DHABI (AUH)` → `ABU` (Atambua). GDS and e-ticket text is overwhelmingly all-caps,
+and the prompt's own not-confident fallback returns the printed name, so that is the mainline path
+for the exact shape it broke. All 95 tests were green.
+
+That was the third round of fixes-introducing-regressions in the same two functions, which is the
+repo's own signal to stop patching and move the decision (`docs/lessons.md`). The structural answer:
+
+- **One `carriedCode(value, width)` in `vacation.ts`**, exported, consumed by `airportCode`,
+  `flightCodeLabel` and the extraction telemetry's shape probe. Three consumers deriving the code
+  three ways was its own defect class — an anchored probe beside an unanchored extractor logged
+  working input as a translation failure and escalated the event.
+- **Two shapes, and deliberately no cleverer rung**: the whole trimmed value when it _is_ a code,
+  or a parenthesized code. Parens are matched **first**, which is what stops an all-caps city word
+  winning over the real code.
+- **The governing rule, written into the docstring so the next rung has to argue with it:**
+  _verbose but true beats short and possibly false._ When a field does not plainly carry a code the
+  caller renders the whole string. `SIN Terminal 3` therefore titles long rather than earning back
+  a rung whose failure mode is a different real airport. A test pins that as intended, not a bug.
+- **Placeholders are refused in both shapes** (`TBA`, `Somewhere (TBA)`), since `UNK` is Unalakleet
+  and `NAN` is Nadi.
+- **`flightCodeLabel` derives the carrier once** for bare and parenthesized shapes. Branching on
+  shape had left the bare path unguarded: `EK` + `EK` printed `EK EK`, and `SQ` + `E190` dropped
+  the carrier — the two defects the function exists to prevent, on the shape the prompt now makes
+  mainline.
+- **`inferred_count` meters airports only**, the same number `level` keys on, so the metric can
+  always reproduce the severity it shipped with.
+
+`PROMPT_VERSION` `2026-09-15.3` also scopes the translate directive to the three flight fields and
+attaches the code note to `departureAirport` as well as `arrivalAirport`. The unscoped wording sat
+immediately above the cruise and train field lists; a model returning `operator: 'EST'` for
+Eurostar would have missed `segmentIdentityKey` (type + operator + departureDate) and appended a
+duplicate train segment on every re-upload.
+
+### Carried forward, not fixed here
+
+Each is real, verified, and out of scope for a title fix. Named so they are decisions rather than
+oversights:
+
+- **The Lambda ships only via `terraform apply`; no workflow runs terraform.** `managed` is the
+  default tier, so a client-only deploy would ship the longer titles with none of the benefit.
+  Applied by hand three times in this session and verified live, but nothing detects a
+  prompt-version skew the way `managedProvider` already detects an unknown task.
+- **A title is unbounded and persisted.** Travel fields are capped at `MODEL_TEXT_MAX = 4000`, not
+  200, so two pathological OCR-bleed fields could persist an ~8KB derived title to every device.
+  `.trim()` also does not collapse internal newlines.
+- **`segmentMerge` downgrades picker values.** `departureAirport`/`arrivalAirport`/`airline` are not
+  in `SPECIAL_KEYS`, so re-uploading a PDF over a hand-picked segment replaces `Singapore (SIN)`
+  with `SIN`. Line 159 then re-derives `title`, overwriting a user-authored one despite `title`
+  being excluded. Both pre-date this change; the prompt makes the first visible.
+- ~~**The review modal hides the route when it equals the title**~~ — **FIXED.** The suppression
+  assumed the title was a _shortened_ form of the route, which stopped being true once a title can
+  be the full route verbatim. The route now always shows when there is one, and it is expanded to
+  readable names.
+- ~~**Combobox round-trip.**~~ **FIXED** — greg hit it on a real EVA Air itinerary: the codes came
+  back correct (`LAX`, `TPE`, `BR`) but the FROM dropdown showed a custom "SIN" rather than the
+  matching airport, because the option `value` is `"Singapore (SIN)"` and `VacationStep2` passes
+  `other-value`, so `checkBackwardCompat()` flipped the field into "other" mode.
+
+  The mapper now stores the value the PICKER writes, via the same `airportLabel`/`airlineLabel`
+  pair the display sites use: `expandCodesToPickerValues` in `travelExtractionToSegments.ts`.
+
+  **This is not a reversal of the "no write-time rewriting" decision.** What that decision
+  forbade was persisting an _inference_ — name→code, which the measurements showed unreliable.
+  Expanding a bare LISTED code to its own canonical label is an identity map over a 1:1 exact
+  index, and everything that is not one (a name, an unlisted code, a placeholder, a value with
+  trailing text) passes through untouched, so the document's own words are still never overwritten
+  by a guess. The functions are idempotent, so a picker-entered value is a no-op.
+
+  Verified end to end through the real mapper: `SIN`/`TPE`/`BR` store as `Singapore (SIN)` /
+  `Taoyuan (TPE)` / `EVA Air (BR)`, each matching a dropdown option exactly (pinned by a test), so
+  the drawer now shows the selected option — `Singapore - Singapore Changi (SIN)` — instead of raw
+  text. The title still derives as the compact `SIN → TPE`.
+
+- ~~**Detail rows now read `SIN` / `SQ` rather than a name**~~ — **FIXED**, on greg's call:
+  _"a code to airport name lookup is fine and this should already exist in the airport
+  drop-down."_ It did: `buildAirportOptions` already carried the data, so `airportLabel` /
+  `airlineLabel` share one `Map` and one definition of the stored shape with it, and a test pins
+  them byte-identical so the dropdown and the label cannot drift.
+
+  **code→entry is the safe direction and the only lookup in the file** — 1:1, exact, zero
+  duplicate codes in either list. That is the whole difference from the deleted resolver: asking
+  a CSV to translate a _name_ is unreliable, expanding a _code the model already gave us_ is a
+  dictionary lookup.
+
+  **Bare codes only.** A value that already carries text (`Sydney (SYD) Terminal 1`, or a name)
+  is returned exactly as stored — expanding it would discard what the document said. Titles keep
+  the compact code (`SIN → JFK`); only the detail rows and the review modal's route expand.
+  Placeholders are refused, with the denylist stopping deliberately short of `NAN`, which is Nadi,
+  Fiji rather than a garbage token.
+
+  Verified in a browser: `FROM Singapore (SIN) / TO New York (JFK) / AIRLINE Singapore Airlines
+(SQ)` from a segment storing `SIN`/`JFK`/`SQ`.
+
+- **`WallPeripheralCards.vue:60` documents an invariant this change breaks** for pre-existing pods:
+  its comment says `item.title` "already renders a flight as SIN → HND", which is no longer true
+  for a segment whose stored airports are names.

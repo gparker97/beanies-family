@@ -13,6 +13,7 @@ import {
   buildTransportationTitle,
   buildTravelSegmentTitle,
 } from './vacation';
+import { airlineLabel, airportLabel } from './vacation';
 import { normalizePersonName } from '@/utils/segmentTravellers';
 import type { TravelExtractionResult, TravelSegmentDraft } from '@/services/ai/types';
 import type {
@@ -178,9 +179,31 @@ function buildNotes(draft: TravelSegmentDraft, mappedKeys: readonly string[]): s
   return parts.length ? parts.join('\n') : undefined;
 }
 
+/**
+ * Store the airport/airline exactly as the PICKER would, so an AI-read segment round-trips
+ * through the dropdowns instead of arriving as a custom value.
+ *
+ * `airportLabel`/`airlineLabel` expand a bare LISTED code to its canonical `"City (CODE)"` —
+ * which is `buildAirportOptions().value` by construction, shared definition and pinned by a test.
+ * That is an identity expansion of a code the model already gave us, NOT the name→code inference
+ * a previous attempt persisted and this plan deleted: anything that is not a bare listed code
+ * (a name, an unlisted code, a placeholder, a value with trailing text) passes through untouched,
+ * so the document's own words are never overwritten by a guess.
+ *
+ * Without this, `BaseCombobox.checkBackwardCompat()` matches `modelValue` against the option
+ * `value` — "Singapore (SIN)" — finds nothing for "SIN", and flips the field into "other" mode.
+ */
+function expandCodesToPickerValues(fields: Record<string, string>): Record<string, string> {
+  const out = { ...fields };
+  if (out.departureAirport) out.departureAirport = airportLabel(out.departureAirport);
+  if (out.arrivalAirport) out.arrivalAirport = airportLabel(out.arrivalAirport);
+  if (out.airline) out.airline = airlineLabel(out.airline);
+  return out;
+}
+
 function toTravelSegment(draft: TravelSegmentDraft): VacationTravelSegment {
   const type = coerceType(draft.type, TRAVEL_TYPES, 'activity');
-  const mapped = pickFields(draft.fields, TRAVEL_FIELDS);
+  const mapped = expandCodesToPickerValues(pickFields(draft.fields, TRAVEL_FIELDS));
   const primaryDate =
     mapped.departureDate || mapped.embarkationDate || mapped.arrivalDate || undefined;
   const seg: VacationTravelSegment = {

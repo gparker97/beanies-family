@@ -136,3 +136,32 @@ describe('the arrival row says how many days later the flight lands', () => {
     expect(arrivalLabel({ arrivesNextDay: false })).toBe('segmentRow.arrives');
   });
 });
+
+// The collapsed summary's carrier token (2026-09-15). It was `${code} ${flightNumber}`
+// unconditionally, inside an `if (seg.airline)` gate — so "Singapore Airlines (SQ)" + "SQ25"
+// read "SQ SQ25", and a flight number with no airline vanished.
+describe('buildTravelKeyValue — the carrier token', () => {
+  it('keeps the carrier + plain number form', () => {
+    expect(buildTravelKeyValue(flight())).toContain('MU 5678');
+  });
+
+  it('does not repeat a carrier the flight number already names', () => {
+    const row = buildTravelKeyValue(
+      flight({ airline: 'Singapore Airlines (SQ)', flightNumber: 'SQ25' })
+    );
+    expect(row).toContain('SQ25');
+    expect(row).not.toContain('SQ SQ25');
+  });
+
+  it('handles the bare code the model now returns', () => {
+    const row = buildTravelKeyValue(flight({ airline: 'HO', flightNumber: 'HO1602' }));
+    expect(row).toContain('HO1602');
+    expect(row).not.toContain('HO HO1602');
+  });
+
+  it('renders a flight number that has no airline, which used to disappear', () => {
+    expect(buildTravelKeyValue(flight({ airline: undefined, flightNumber: 'SQ25' }))).toContain(
+      'SQ25'
+    );
+  });
+});
