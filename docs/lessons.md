@@ -1618,3 +1618,38 @@ broken again in the very next pass, twice, so two of them get sharper:
     that blocks every future delete on that name, which is a worse and more
     permanent failure than the hang. A review pass caught it. **Whenever you race
     a promise you cannot cancel, decide what happens to the loser.**
+
+---
+
+## A test that depends on a capability being ABSENT from the environment is a time-bomb
+
+**Date:** 2026-09-16
+**Context:** Dependabot bumped happy-dom 20.11.2 -> 20.14.5 and 12 of the 35 tests in
+`useWheelMonthPaging.test.ts` failed. `useWheelMonthPaging` picks between a synchronous swap and a
+two-phase async slide with `typeof el.animate === 'function'`. Neither jsdom nor happy-dom used to
+ship `Element.animate`, so every test in the file got the synchronous path for free. The file even
+said so in a comment: _"jsdom ships no Web Animations API, so the default path above degrades to the
+instant swap."_ That comment was documenting an accident as if it were a guarantee. happy-dom
+20.14.x added `Element.animate`, the default path flipped to async, and the assertions started
+looking for `onNext` before it had been called.
+
+Two things went wrong, and the second is the one worth keeping.
+
+**I misdiagnosed it first.** I reported to greg that it was fake-timer interleaving around the 260ms
+idle reset, reasoning from the composable having no time source and from which tests failed. It was
+a plausible story that fit the evidence I had bothered to gather, and it was wrong: accumulation was
+working the entire time. Only a direct probe of what actually changed between successive wheel
+dispatches showed the truth. A hypothesis that explains the symptoms is not a diagnosis; the cheap
+probe was available the whole time and I should have run it before saying anything.
+
+**The structural point:** the suite was passing for a reason nobody had chosen. Environments gain
+capabilities over time, so "this test works because the platform lacks X" silently becomes "this
+test asserts something else entirely" on some future bump, and it can flip without failing if the
+new path happens to satisfy the assertion. The same gate existed in `useCalendarSlide`, whose tests
+stub `Element.prototype.animate` themselves and so were never exposed.
+
+**Rule:** when a test's behaviour depends on a branch chosen by an environment capability check,
+**pin the capability in the harness** rather than inheriting whatever the environment implements.
+State the default you want, and make the other branch opt in. And when a dependency bump breaks
+tests, probe what actually changed before reporting a cause -- a story that fits the symptoms is not
+evidence, and a confident wrong diagnosis costs more than saying "not yet diagnosed".
