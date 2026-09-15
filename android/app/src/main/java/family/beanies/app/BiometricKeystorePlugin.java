@@ -190,15 +190,26 @@ public class BiometricKeystorePlugin extends Plugin {
     @PluginMethod
     public void hasKey(PluginCall call) {
         String account = call.getString("account");
-        JSObject ret = new JSObject();
-        boolean present = false;
-        if (account != null && !account.isEmpty()) {
-            try {
-                present = prefs().contains(account) && loadKey(account) != null;
-            } catch (Exception e) {
-                present = false;
-            }
+        if (account == null || account.isEmpty()) {
+            // A missing account is a caller bug, not an absent key. Reporting absence
+            // here made nativeUnlock delete a live record to "self-heal".
+            call.reject("account is required", "unknown");
+            return;
         }
+        boolean present;
+        try {
+            present = prefs().contains(account) && loadKey(account) != null;
+        } catch (Exception e) {
+            // A THROW from loadKey is a KeyStore malfunction, NOT absence. A genuine OS
+            // invalidation either removes the alias (containsAlias false -> getKey null
+            // -> present: false below) or surfaces later at Cipher.init as
+            // KeyPermanentlyInvalidatedException. So reporting absence here is exactly
+            // the hazard nativeBiometric.ts warns about in prose while this code caused
+            // it: a transient KeyStore exception deleting a live enrolment.
+            call.reject("keystore read failed", "unknown", e);
+            return;
+        }
+        JSObject ret = new JSObject();
         ret.put("present", present);
         call.resolve(ret);
     }
@@ -206,10 +217,17 @@ public class BiometricKeystorePlugin extends Plugin {
     @PluginMethod
     public void deleteKey(PluginCall call) {
         String account = call.getString("account");
-        if (account != null && !account.isEmpty()) {
-            prefs().edit().remove(account).apply();
-            deleteAlias(account);
+        if (account == null || account.isEmpty()) {
+            // Never resolve on a missing account: a caller asking for key material to be
+            // removed must not be told it succeeded while nothing was touched.
+            call.reject("account is required", "unknown");
+            return;
         }
+        // The blob is the thing that makes the key usable, so removing it is the delete
+        // that matters; deleteAlias stays best-effort (see its comment) because one dead
+        // alias must not turn an otherwise-complete delete into a reported failure.
+        prefs().edit().remove(account).apply();
+        deleteAlias(account);
         call.resolve();
     }
 
