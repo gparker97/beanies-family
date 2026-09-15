@@ -231,6 +231,34 @@ public class BiometricKeystorePlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Remove EVERY blob and alias this app holds on this device — the explicit
+     * clear-all primitive. Only nativeReclaimAllKeystores may call this.
+     *
+     * This exists on Android as well as iOS deliberately. The clear-all step replaced a
+     * per-family reclaim loop with one deleteAllKeys() call; an iOS-only method would
+     * reject here as not-implemented while the registry records were still deleted,
+     * leaving live KeyStore aliases with nothing left that knows their addresses — this
+     * change's own bug class, newly introduced on the platform that never had it.
+     *
+     * Every key in this prefs file is an account (setKey is its sole writer), so the
+     * key set IS the account list. Copied first: deleteAlias touches the KeyStore rather
+     * than prefs, but iterating a live SharedPreferences map while editing it is not
+     * worth risking. deleteAlias stays best-effort per alias so one dead alias cannot
+     * abort the sweep.
+     */
+    @PluginMethod
+    public void deleteAllKeys(PluginCall call) {
+        boolean deleted = !prefs().getAll().isEmpty();
+        for (String account : new java.util.HashSet<>(prefs().getAll().keySet())) {
+            deleteAlias(account);
+        }
+        prefs().edit().clear().apply();
+        JSObject ret = new JSObject();
+        ret.put("deleted", deleted);
+        call.resolve(ret);
+    }
+
     // --- BiometricPrompt bridge ---
 
     private interface CipherConsumer {

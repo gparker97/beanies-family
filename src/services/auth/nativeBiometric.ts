@@ -515,6 +515,53 @@ export async function nativeReclaimFamilyKeystore(familyId: string): Promise<voi
   await purgeTargets([...byAccount.values()], 'reclaim');
 }
 
+/**
+ * The explicit clear-all primitive: remove EVERY blob for our service on this device,
+ * including families this device will never open again. Sole permitted caller of
+ * `BiometricKeystore.deleteAllKeys()`.
+ *
+ * `familyIds` is a defence-in-depth FALLBACK list, not the mechanism. The sweep itself
+ * needs no registry and no enumeration. But a `@objc func` that exists and was never
+ * added to `pluginMethods` rejects as not-implemented — that is #74, which this repo has
+ * lived through twice — and in such a build the caller would delete the registry records,
+ * tell the user their data was cleared, and leave every blob on the device with nothing
+ * left that knows its address. Strictly worse than the per-family loop this replaced. So
+ * on ANY rejection we report it and fall back to the union reclaim per family, which uses
+ * only the long-shipped `deleteKey`. That makes the outcome >= today's on every build.
+ *
+ * Never throws: the caller is a sign-out step, and a thrown sweep would be caught one
+ * level up and reported as a step failure with no statement of what survived.
+ */
+export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<void> {
+  try {
+    const { deleted } = await BiometricKeystore.deleteAllKeys();
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'keystore_swept',
+      context: { os: getPlatform(), action: 'sweep', detail: `deleted=${String(deleted)}` },
+    });
+    return;
+  } catch (err) {
+    reportError({
+      surface: SURFACE,
+      message: 'keystore sweep unavailable — falling back to per-family reclaim',
+      error: err,
+      severity: 'warning',
+      context: {
+        os: getPlatform(),
+        action: 'sweep_failed',
+        error_code: errorCode(err),
+        count: familyIds.length,
+        detail: detailOf(err),
+      },
+    });
+  }
+  for (const id of familyIds) {
+    await nativeReclaimFamilyKeystore(id);
+  }
+}
+
 // --- Internal helpers ---
 
 /**

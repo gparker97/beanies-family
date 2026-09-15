@@ -9,6 +9,7 @@ const { plugin } = vi.hoisted(() => ({
     getKey: vi.fn(async () => ({ keyB64: 'AAAA', keyBacking: 'strongbox' })),
     hasKey: vi.fn(async () => ({ present: true })),
     deleteKey: vi.fn(async () => {}),
+    deleteAllKeys: vi.fn(async () => ({ deleted: true })),
   },
 }));
 vi.mock('../biometricKeystorePlugin', () => ({ BiometricKeystore: plugin }));
@@ -78,6 +79,7 @@ import {
   nativeCanOffer,
   nativeResolveDeviceKeys,
   nativeReclaimFamilyKeystore,
+  nativeReclaimAllKeystores,
   nativeDisable,
 } from '../nativeBiometric';
 import * as repo from '@/services/indexeddb/repositories/passkeyRepository';
@@ -113,6 +115,7 @@ beforeEach(() => {
   // deleteKey needs resetting too: `vi.clearAllMocks()` clears CALLS, not implementations,
   // so a case that makes the delete reject would otherwise leak into every case after it.
   plugin.deleteKey.mockResolvedValue(undefined);
+  plugin.deleteAllKeys.mockResolvedValue({ deleted: true });
 });
 
 describe('nativeEnable', () => {
@@ -515,5 +518,94 @@ describe('no delete reports success it did not achieve (#82)', () => {
     expect(failure).toBeDefined();
     // The blob delete still happened — one target's record failure must not skip it.
     expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
+  });
+});
+
+describe('nativeReclaimAllKeystores — the explicit clear-all sweep', () => {
+  function seed(familyId: string, memberId: string) {
+    store.push({
+      keystoreScheme: 'per-member',
+      credentialId: `native:${familyId}:${memberId}`,
+      memberId,
+      familyId,
+      publicKey: '',
+      prfSupported: false,
+      mechanism: 'native-keystore',
+      label: 'this device',
+      createdAt: '2026-01-02',
+    });
+  }
+
+  it('one service-wide delete, with no enumeration and no per-family loop', async () => {
+    seed('family-1', 'member-1');
+    seed('family-2', 'member-2');
+
+    await nativeReclaimAllKeystores(['family-1', 'family-2']);
+
+    expect(plugin.deleteAllKeys).toHaveBeenCalledTimes(1);
+    // The whole point: the sweep needs no account, so it cannot miss a gated item.
+    expect(plugin.deleteKey).not.toHaveBeenCalled();
+    expect(eventContext('sweep')).toMatchObject({ action: 'sweep', detail: 'deleted=true' });
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('an empty device still resolves cleanly — nothing there is not a failure', async () => {
+    plugin.deleteAllKeys.mockResolvedValue({ deleted: false });
+    await nativeReclaimAllKeystores([]);
+    expect(eventContext('sweep')).toMatchObject({ detail: 'deleted=false' });
+    expect(reportErrorMock).not.toHaveBeenCalled();
+  });
+
+  it('a REJECTING deleteAllKeys reports sweep_failed and falls back to per-family reclaim', async () => {
+    // Simulates the #74 class: a Swift @objc func that exists but was never added to
+    // pluginMethods. Without the fallback the caller deletes the registry records, the
+    // user is told their data is cleared, and every blob survives with nothing left
+    // that knows its address — strictly worse than the loop this replaced.
+    seed('family-1', 'member-1');
+    seed('family-2', 'member-2');
+    plugin.deleteAllKeys.mockImplementation(async () => {
+      throw new Error('not implemented on ios');
+    });
+
+    await nativeReclaimAllKeystores(['family-1', 'family-2']);
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'native-biometric',
+        severity: 'warning',
+        context: expect.objectContaining({ action: 'sweep_failed' }),
+      })
+    );
+    // Every blob the registry knows about is still deleted, via long-shipped deleteKey.
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1:member-1' });
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-2:member-2' });
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-1' });
+    expect(plugin.deleteKey).toHaveBeenCalledWith({ account: 'family-2' });
+    expect(store.filter((r) => r.mechanism === 'native-keystore')).toHaveLength(0);
+  });
+
+  it('never reports a clean device having deleted nothing', async () => {
+    seed('family-1', 'member-1');
+    plugin.deleteAllKeys.mockImplementation(async () => {
+      throw new Error('not implemented on ios');
+    });
+    plugin.deleteKey.mockImplementation(rejectWith('unknown'));
+
+    await nativeReclaimAllKeystores(['family-1']);
+
+    // Both layers speak: the sweep failed, AND the fallback's purge says what survived.
+    expect(eventContext('sweep_failed') ?? reportErrorMock.mock.calls[0]?.[0]).toBeDefined();
+    expect(eventContext('reclaim')).toMatchObject({ count: 0 });
+    expect(eventsFor('reclaim')[0]!.level).toBe('warn');
+  });
+
+  it('does not throw when the sweep AND the fallback both fail', async () => {
+    // It is a sign-out step: a throw here becomes a caught step failure with no
+    // statement of what survived, which is the outcome this whole change removes.
+    plugin.deleteAllKeys.mockImplementation(async () => {
+      throw new Error('boom');
+    });
+    plugin.deleteKey.mockImplementation(rejectWith('unknown'));
+    await expect(nativeReclaimAllKeystores(['family-1'])).resolves.toBeUndefined();
   });
 });

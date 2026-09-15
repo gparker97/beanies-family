@@ -53,6 +53,18 @@ export interface BiometricKeystorePlugin {
    * rejects with its mapped code. It never reports success having touched nothing (#82).
    */
   deleteKey(options: { account: string }): Promise<void>;
+  /**
+   * CLEAR ALL: remove every blob this app holds on this device, in one shot.
+   *
+   * No account, no enumeration, no authentication — so it cannot miss a biometry-gated
+   * item. `deleted` reports whether anything was actually there. An empty device
+   * resolves (`deleted: false`); an OS failure REJECTS, because "your data is cleared"
+   * must never be said over a device where every blob survived.
+   *
+   * `nativeReclaimAllKeystores` is the only permitted caller. Everything else reclaims
+   * per family, so no other path can reach a family the user did not ask about.
+   */
+  deleteAllKeys(): Promise<{ deleted: boolean }>;
 }
 
 /**
