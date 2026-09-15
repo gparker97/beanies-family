@@ -1465,20 +1465,28 @@ export function buildAirlineOptions(): ComboOption[] {
 }
 
 export function buildAirportOptions(): ComboOption[] {
-  return AIRPORTS.map((a) => ({
-    // Shared with `airportLabel` — see `buildAirlineOptions`.
-    value: airportValue(a),
-    // `label` stays full-form so search by city, airport name, or code all match.
-    label: `${a.city} - ${a.name} (${a.code})`,
-    // Rich layout: city primary, airport name secondary, IATA code as a
-    // right-aligned monospace badge — visually distinctive when scanning a
-    // multi-airport city like "London" or "New York".
-    rich: {
-      primary: a.city,
-      secondary: a.name,
-      badge: a.code,
-    },
-  }));
+  return (
+    AIRPORTS
+      // Retired codes stay resolvable by `airportLabel` so a trip a family already
+      // saved keeps reading the way they saved it, but they are never offered as a
+      // NEW choice — the code is either gone or now belongs to a different airport
+      // (PBI -> DJT, West Palm Beach). See scripts/updateAirports.mjs.
+      .filter((a) => !a.retired)
+      .map((a) => ({
+        // Shared with `airportLabel` — see `buildAirlineOptions`.
+        value: airportValue(a),
+        // `label` stays full-form so search by city, airport name, or code all match.
+        label: `${a.city} - ${a.name} (${a.code})`,
+        // Rich layout: city primary, airport name secondary, IATA code as a
+        // right-aligned monospace badge — visually distinctive when scanning a
+        // multi-airport city like "London" or "New York".
+        rich: {
+          primary: a.city,
+          secondary: a.name,
+          badge: a.code,
+        },
+      }))
+  );
 }
 
 export function buildCruiseLineOptions(): ComboOption[] {
