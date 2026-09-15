@@ -2,12 +2,12 @@
   "meta": {
     "country": "SM",
     "name": "San Marino",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "it",
     "types": [
       "public"
@@ -60,7 +60,7 @@
       "date": "2025-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2025-06-19",
@@ -78,7 +78,7 @@
       "date": "2025-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2025-09-03",
@@ -113,7 +113,7 @@
       "date": "2025-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2025-12-26",
@@ -167,7 +167,7 @@
       "date": "2026-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2026-06-04",
@@ -185,7 +185,7 @@
       "date": "2026-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2026-09-03",
@@ -220,7 +220,7 @@
       "date": "2026-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2026-12-26",
@@ -274,7 +274,7 @@
       "date": "2027-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2027-05-27",
@@ -292,7 +292,7 @@
       "date": "2027-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2027-09-03",
@@ -327,7 +327,7 @@
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2027-12-26",
@@ -381,7 +381,7 @@
       "date": "2028-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2028-06-15",
@@ -399,7 +399,7 @@
       "date": "2028-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2028-09-03",
@@ -434,7 +434,7 @@
       "date": "2028-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2028-12-26",
@@ -488,7 +488,7 @@
       "date": "2029-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2029-05-31",
@@ -506,7 +506,7 @@
       "date": "2029-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2029-09-03",
@@ -541,7 +541,7 @@
       "date": "2029-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2029-12-26",

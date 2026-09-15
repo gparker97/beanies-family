@@ -2,12 +2,12 @@
   "meta": {
     "country": "PA",
     "name": "Panama",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "es",
     "types": [
       "public"
@@ -51,6 +51,12 @@
       "name_local": "Día de la Separación (de Colombia)"
     },
     {
+      "date": "2025-11-05",
+      "name": "Colón Day",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
       "date": "2025-11-10",
       "name": "Primer Grito de Independencia",
       "type": "public"
@@ -66,6 +72,12 @@
       "name": "Mother's Day",
       "type": "public",
       "name_local": "Día de la Madre"
+    },
+    {
+      "date": "2025-12-20",
+      "name": "National Mourning Day",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
     },
     {
       "date": "2025-12-25",
@@ -110,6 +122,12 @@
       "name_local": "Día de la Separación (de Colombia)"
     },
     {
+      "date": "2026-11-05",
+      "name": "Colón Day",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
       "date": "2026-11-10",
       "name": "Primer Grito de Independencia",
       "type": "public"
@@ -125,6 +143,18 @@
       "name": "Mother's Day",
       "type": "public",
       "name_local": "Día de la Madre"
+    },
+    {
+      "date": "2026-12-20",
+      "name": "National Mourning Day",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
+    },
+    {
+      "date": "2026-12-21",
+      "name": "National Mourning Day (substitute day)",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
     },
     {
       "date": "2026-12-25",
@@ -169,6 +199,12 @@
       "name_local": "Día de la Separación (de Colombia)"
     },
     {
+      "date": "2027-11-05",
+      "name": "Colón Day",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
       "date": "2027-11-10",
       "name": "Primer Grito de Independencia",
       "type": "public"
@@ -190,6 +226,12 @@
       "name": "Mother's Day",
       "type": "public",
       "name_local": "Día de la Madre"
+    },
+    {
+      "date": "2027-12-20",
+      "name": "National Mourning Day",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
     },
     {
       "date": "2027-12-25",
@@ -240,6 +282,18 @@
       "name_local": "Día de la Separación (de Colombia)"
     },
     {
+      "date": "2028-11-05",
+      "name": "Colón Day",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
+      "date": "2028-11-06",
+      "name": "Colón Day (substitute day)",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
       "date": "2028-11-10",
       "name": "Primer Grito de Independencia",
       "type": "public"
@@ -255,6 +309,12 @@
       "name": "Mother's Day",
       "type": "public",
       "name_local": "Día de la Madre"
+    },
+    {
+      "date": "2028-12-20",
+      "name": "National Mourning Day",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
     },
     {
       "date": "2028-12-25",
@@ -304,6 +364,12 @@
       "name_local": "Día de la Separación (de Colombia)"
     },
     {
+      "date": "2029-11-05",
+      "name": "Colón Day",
+      "type": "public",
+      "name_local": "Día de Colón"
+    },
+    {
       "date": "2029-11-10",
       "name": "Primer Grito de Independencia",
       "type": "public"
@@ -319,6 +385,12 @@
       "name": "Mother's Day",
       "type": "public",
       "name_local": "Día de la Madre"
+    },
+    {
+      "date": "2029-12-20",
+      "name": "National Mourning Day",
+      "type": "public",
+      "name_local": "Día de Duelo Nacional"
     },
     {
       "date": "2029-12-25",

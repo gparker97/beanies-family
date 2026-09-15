@@ -2,12 +2,12 @@
   "meta": {
     "country": "FI",
     "name": "Finland",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fi",
     "types": [
       "public"
@@ -18,391 +18,391 @@
       "date": "2025-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Uudenvuodenpäivä"
+      "name_local": "uudenvuodenpäivä"
     },
     {
       "date": "2025-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Loppiainen"
+      "name_local": "loppiainen"
     },
     {
       "date": "2025-04-18",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Pitkäperjantai"
+      "name_local": "pitkäperjantai"
     },
     {
       "date": "2025-04-20",
       "name": "Easter Sunday",
       "type": "public",
-      "name_local": "Pääsiäispäivä"
+      "name_local": "pääsiäispäivä"
     },
     {
       "date": "2025-04-21",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "2. pääsiäispäivä"
+      "name_local": "toinen pääsiäispäivä"
     },
     {
       "date": "2025-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Vappu"
+      "name_local": "vappu"
     },
     {
       "date": "2025-05-29",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Helatorstai"
+      "name_local": "helatorstai"
     },
     {
       "date": "2025-06-08",
       "name": "Pentecost",
       "type": "public",
-      "name_local": "Helluntaipäivä"
+      "name_local": "helluntaipäivä"
     },
     {
       "date": "2025-06-21",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Juhannuspäivä"
+      "name_local": "juhannuspäivä"
     },
     {
       "date": "2025-11-01",
       "name": "All Saints' Day",
       "type": "public",
-      "name_local": "Pyhäinpäivä"
+      "name_local": "pyhäinpäivä"
     },
     {
       "date": "2025-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Itsenäisyyspäivä"
+      "name_local": "itsenäisyyspäivä"
     },
     {
       "date": "2025-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Joulupäivä"
+      "name_local": "joulupäivä"
     },
     {
       "date": "2025-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "2. joulupäivä"
+      "name_local": "tapaninpäivä"
     },
     {
       "date": "2026-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Uudenvuodenpäivä"
+      "name_local": "uudenvuodenpäivä"
     },
     {
       "date": "2026-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Loppiainen"
+      "name_local": "loppiainen"
     },
     {
       "date": "2026-04-03",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Pitkäperjantai"
+      "name_local": "pitkäperjantai"
     },
     {
       "date": "2026-04-05",
       "name": "Easter Sunday",
       "type": "public",
-      "name_local": "Pääsiäispäivä"
+      "name_local": "pääsiäispäivä"
     },
     {
       "date": "2026-04-06",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "2. pääsiäispäivä"
+      "name_local": "toinen pääsiäispäivä"
     },
     {
       "date": "2026-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Vappu"
+      "name_local": "vappu"
     },
     {
       "date": "2026-05-14",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Helatorstai"
+      "name_local": "helatorstai"
     },
     {
       "date": "2026-05-24",
       "name": "Pentecost",
       "type": "public",
-      "name_local": "Helluntaipäivä"
+      "name_local": "helluntaipäivä"
     },
     {
       "date": "2026-06-20",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Juhannuspäivä"
+      "name_local": "juhannuspäivä"
     },
     {
       "date": "2026-10-31",
       "name": "All Saints' Day",
       "type": "public",
-      "name_local": "Pyhäinpäivä"
+      "name_local": "pyhäinpäivä"
     },
     {
       "date": "2026-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Itsenäisyyspäivä"
+      "name_local": "itsenäisyyspäivä"
     },
     {
       "date": "2026-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Joulupäivä"
+      "name_local": "joulupäivä"
     },
     {
       "date": "2026-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "2. joulupäivä"
+      "name_local": "tapaninpäivä"
     },
     {
       "date": "2027-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Uudenvuodenpäivä"
+      "name_local": "uudenvuodenpäivä"
     },
     {
       "date": "2027-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Loppiainen"
+      "name_local": "loppiainen"
     },
     {
       "date": "2027-03-26",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Pitkäperjantai"
+      "name_local": "pitkäperjantai"
     },
     {
       "date": "2027-03-28",
       "name": "Easter Sunday",
       "type": "public",
-      "name_local": "Pääsiäispäivä"
+      "name_local": "pääsiäispäivä"
     },
     {
       "date": "2027-03-29",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "2. pääsiäispäivä"
+      "name_local": "toinen pääsiäispäivä"
     },
     {
       "date": "2027-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Vappu"
+      "name_local": "vappu"
     },
     {
       "date": "2027-05-06",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Helatorstai"
+      "name_local": "helatorstai"
     },
     {
       "date": "2027-05-16",
       "name": "Pentecost",
       "type": "public",
-      "name_local": "Helluntaipäivä"
+      "name_local": "helluntaipäivä"
     },
     {
       "date": "2027-06-26",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Juhannuspäivä"
+      "name_local": "juhannuspäivä"
     },
     {
       "date": "2027-11-06",
       "name": "All Saints' Day",
       "type": "public",
-      "name_local": "Pyhäinpäivä"
+      "name_local": "pyhäinpäivä"
     },
     {
       "date": "2027-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Itsenäisyyspäivä"
+      "name_local": "itsenäisyyspäivä"
     },
     {
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Joulupäivä"
+      "name_local": "joulupäivä"
     },
     {
       "date": "2027-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "2. joulupäivä"
+      "name_local": "tapaninpäivä"
     },
     {
       "date": "2028-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Uudenvuodenpäivä"
+      "name_local": "uudenvuodenpäivä"
     },
     {
       "date": "2028-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Loppiainen"
+      "name_local": "loppiainen"
     },
     {
       "date": "2028-04-14",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Pitkäperjantai"
+      "name_local": "pitkäperjantai"
     },
     {
       "date": "2028-04-16",
       "name": "Easter Sunday",
       "type": "public",
-      "name_local": "Pääsiäispäivä"
+      "name_local": "pääsiäispäivä"
     },
     {
       "date": "2028-04-17",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "2. pääsiäispäivä"
+      "name_local": "toinen pääsiäispäivä"
     },
     {
       "date": "2028-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Vappu"
+      "name_local": "vappu"
     },
     {
       "date": "2028-05-25",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Helatorstai"
+      "name_local": "helatorstai"
     },
     {
       "date": "2028-06-04",
       "name": "Pentecost",
       "type": "public",
-      "name_local": "Helluntaipäivä"
+      "name_local": "helluntaipäivä"
     },
     {
       "date": "2028-06-24",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Juhannuspäivä"
+      "name_local": "juhannuspäivä"
     },
     {
       "date": "2028-11-04",
       "name": "All Saints' Day",
       "type": "public",
-      "name_local": "Pyhäinpäivä"
+      "name_local": "pyhäinpäivä"
     },
     {
       "date": "2028-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Itsenäisyyspäivä"
+      "name_local": "itsenäisyyspäivä"
     },
     {
       "date": "2028-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Joulupäivä"
+      "name_local": "joulupäivä"
     },
     {
       "date": "2028-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "2. joulupäivä"
+      "name_local": "tapaninpäivä"
     },
     {
       "date": "2029-01-01",
       "name": "New Year's Day",
       "type": "public",
-      "name_local": "Uudenvuodenpäivä"
+      "name_local": "uudenvuodenpäivä"
     },
     {
       "date": "2029-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Loppiainen"
+      "name_local": "loppiainen"
     },
     {
       "date": "2029-03-30",
       "name": "Good Friday",
       "type": "public",
-      "name_local": "Pitkäperjantai"
+      "name_local": "pitkäperjantai"
     },
     {
       "date": "2029-04-01",
       "name": "Easter Sunday",
       "type": "public",
-      "name_local": "Pääsiäispäivä"
+      "name_local": "pääsiäispäivä"
     },
     {
       "date": "2029-04-02",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "2. pääsiäispäivä"
+      "name_local": "toinen pääsiäispäivä"
     },
     {
       "date": "2029-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Vappu"
+      "name_local": "vappu"
     },
     {
       "date": "2029-05-10",
       "name": "Ascension Day",
       "type": "public",
-      "name_local": "Helatorstai"
+      "name_local": "helatorstai"
     },
     {
       "date": "2029-05-20",
       "name": "Pentecost",
       "type": "public",
-      "name_local": "Helluntaipäivä"
+      "name_local": "helluntaipäivä"
     },
     {
       "date": "2029-06-23",
       "name": "Midsummer Day",
       "type": "public",
-      "name_local": "Juhannuspäivä"
+      "name_local": "juhannuspäivä"
     },
     {
       "date": "2029-11-03",
       "name": "All Saints' Day",
       "type": "public",
-      "name_local": "Pyhäinpäivä"
+      "name_local": "pyhäinpäivä"
     },
     {
       "date": "2029-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Itsenäisyyspäivä"
+      "name_local": "itsenäisyyspäivä"
     },
     {
       "date": "2029-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Joulupäivä"
+      "name_local": "joulupäivä"
     },
     {
       "date": "2029-12-26",
       "name": "Boxing Day",
       "type": "public",
-      "name_local": "2. joulupäivä"
+      "name_local": "tapaninpäivä"
     }
   ]
 }

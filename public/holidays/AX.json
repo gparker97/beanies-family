@@ -2,12 +2,12 @@
   "meta": {
     "country": "AX",
     "name": "Aland Islands",
-    "generatedAt": "2026-08-01",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "sv",
     "types": [
       "public"
@@ -72,7 +72,7 @@
       "date": "2025-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Självständighetsdagen"
+      "name_local": "självständighetsdagen"
     },
     {
       "date": "2025-12-25",
@@ -144,7 +144,7 @@
       "date": "2026-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Självständighetsdagen"
+      "name_local": "självständighetsdagen"
     },
     {
       "date": "2026-12-25",
@@ -216,7 +216,7 @@
       "date": "2027-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Självständighetsdagen"
+      "name_local": "självständighetsdagen"
     },
     {
       "date": "2027-12-25",
@@ -288,7 +288,7 @@
       "date": "2028-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Självständighetsdagen"
+      "name_local": "självständighetsdagen"
     },
     {
       "date": "2028-12-25",
@@ -360,7 +360,7 @@
       "date": "2029-12-06",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Självständighetsdagen"
+      "name_local": "självständighetsdagen"
     },
     {
       "date": "2029-12-25",

@@ -2,12 +2,12 @@
   "meta": {
     "country": "HT",
     "name": "Haiti",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fr",
     "types": [
       "public"
@@ -18,7 +18,7 @@
       "date": "2025-01-01",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2025-01-02",
@@ -112,7 +112,7 @@
       "date": "2026-01-01",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2026-01-02",
@@ -206,7 +206,7 @@
       "date": "2027-01-01",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2027-01-02",
@@ -300,7 +300,7 @@
       "date": "2028-01-01",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2028-01-02",
@@ -394,7 +394,7 @@
       "date": "2029-01-01",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2029-01-02",
