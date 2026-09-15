@@ -65,6 +65,21 @@ export interface BiometricKeystorePlugin {
    * per family, so no other path can reach a family the user did not ask about.
    */
   deleteAllKeys(): Promise<{ deleted: boolean }>;
+  /**
+   * ENUMERATE: every account this device holds under our service.
+   *
+   * iOS ONLY, deliberately. Keychain items outlive an app uninstall while the IndexedDB
+   * registry that enumerated them does not, so on iOS the keychain is the durable index
+   * and this is how a reinstall finds its own material again (#82). Android's blobs live
+   * in SharedPreferences and die WITH the registry, so the two can never diverge and
+   * there is nothing to enumerate back — the call rejects there as not-implemented, and
+   * `nativeBiometric.ts` treats that as "contributes nothing", never as an error.
+   *
+   * Resolves `{ accounts: [] }` for an empty device. REJECTS on a failed query — a
+   * caller must be able to tell "no items" from "the query broke", because an empty
+   * list on failure reads as "nothing is enrolled".
+   */
+  listAccounts(): Promise<{ accounts: string[] }>;
 }
 
 /**

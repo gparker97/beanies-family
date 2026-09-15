@@ -153,10 +153,13 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   // 2a. Native (installed app): reclaim the device-local hardware-Keystore blobs for this
   // family — every member's, plus the legacy family-keyed one.
   //
-  // ORDER IS LOAD-BEARING: this MUST run before the registry records are deleted below.
-  // The reclaim enumerates the family's `native-keystore` records to know which per-member
-  // OS items exist, so running it after the loop would find an empty registry, silently
-  // reclaim nothing, and orphan every per-member blob — while a mocked test still passed.
+  // ORDER STILL MATTERS, but it is no longer catastrophic (#82). The reclaim works from
+  // the UNION of the family's `native-keystore` records and the accounts it enumerates
+  // from the keychain itself, so the per-member addresses are covered independently of
+  // the registry: running this after the loop below would now DEGRADE (it would stop
+  // removing records whose blob is already gone) rather than orphan every blob while a
+  // mocked test still passed. Keep it here anyway — the records are one half of the
+  // union, and on Android there is no enumeration to fall back on.
   //
   // Routed through `passkeyService` so the `isNative()` guard lives in one place and no
   // module outside `nativeBiometric` has to know how a keystore account is addressed.
