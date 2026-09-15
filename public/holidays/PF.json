@@ -2,12 +2,12 @@
   "meta": {
     "country": "PF",
     "name": "French Polynesia",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fr",
     "types": [
       "public"
@@ -24,7 +24,7 @@
       "date": "2025-03-05",
       "name": "Missionary Day",
       "type": "public",
-      "name_local": "Arrivée de l'Évangile"
+      "name_local": "Arrivée de l’Évangile"
     },
     {
       "date": "2025-04-18",
@@ -66,7 +66,7 @@
       "date": "2025-06-29",
       "name": "Internal Autonomy Day",
       "type": "public",
-      "name_local": "Fête de l'Autonomie"
+      "name_local": "Fête de l’Autonomie"
     },
     {
       "date": "2025-07-14",
@@ -108,7 +108,7 @@
       "date": "2026-03-05",
       "name": "Missionary Day",
       "type": "public",
-      "name_local": "Arrivée de l'Évangile"
+      "name_local": "Arrivée de l’Évangile"
     },
     {
       "date": "2026-04-03",
@@ -174,7 +174,7 @@
       "date": "2026-11-20",
       "name": "Maori New Year",
       "type": "public",
-      "name_local": "Matari'i"
+      "name_local": "Matari’i"
     },
     {
       "date": "2026-12-25",
@@ -192,7 +192,7 @@
       "date": "2027-03-05",
       "name": "Missionary Day",
       "type": "public",
-      "name_local": "Arrivée de l'Évangile"
+      "name_local": "Arrivée de l’Évangile"
     },
     {
       "date": "2027-03-26",
@@ -258,7 +258,7 @@
       "date": "2027-11-20",
       "name": "Maori New Year",
       "type": "public",
-      "name_local": "Matari'i"
+      "name_local": "Matari’i"
     },
     {
       "date": "2027-12-25",
@@ -276,7 +276,7 @@
       "date": "2028-03-05",
       "name": "Missionary Day",
       "type": "public",
-      "name_local": "Arrivée de l'Évangile"
+      "name_local": "Arrivée de l’Évangile"
     },
     {
       "date": "2028-04-14",
@@ -342,7 +342,7 @@
       "date": "2028-11-20",
       "name": "Maori New Year",
       "type": "public",
-      "name_local": "Matari'i"
+      "name_local": "Matari’i"
     },
     {
       "date": "2028-12-25",
@@ -360,7 +360,7 @@
       "date": "2029-03-05",
       "name": "Missionary Day",
       "type": "public",
-      "name_local": "Arrivée de l'Évangile"
+      "name_local": "Arrivée de l’Évangile"
     },
     {
       "date": "2029-03-30",
@@ -426,7 +426,7 @@
       "date": "2029-11-20",
       "name": "Maori New Year",
       "type": "public",
-      "name_local": "Matari'i"
+      "name_local": "Matari’i"
     },
     {
       "date": "2029-12-25",

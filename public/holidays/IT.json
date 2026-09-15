@@ -2,12 +2,12 @@
   "meta": {
     "country": "IT",
     "name": "Italy",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "it",
     "types": [
       "public"
@@ -24,7 +24,7 @@
       "date": "2025-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Befana"
+      "name_local": "Epifania"
     },
     {
       "date": "2025-04-20",
@@ -40,15 +40,15 @@
     },
     {
       "date": "2025-04-25",
-      "name": "Liberation Day",
+      "name": "Liberation from Nazi-Fascism (1945)",
       "type": "public",
-      "name_local": "Anniversario della Liberazione"
+      "name_local": "Liberazione dal nazifascismo (1945)"
     },
     {
       "date": "2025-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2025-06-02",
@@ -60,7 +60,7 @@
       "date": "2025-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2025-11-01",
@@ -78,7 +78,7 @@
       "date": "2025-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2025-12-26",
@@ -96,7 +96,7 @@
       "date": "2026-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Befana"
+      "name_local": "Epifania"
     },
     {
       "date": "2026-04-05",
@@ -112,15 +112,15 @@
     },
     {
       "date": "2026-04-25",
-      "name": "Liberation Day",
+      "name": "Liberation from Nazi-Fascism (1945)",
       "type": "public",
-      "name_local": "Anniversario della Liberazione"
+      "name_local": "Liberazione dal nazifascismo (1945)"
     },
     {
       "date": "2026-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2026-06-02",
@@ -132,13 +132,13 @@
       "date": "2026-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2026-10-04",
-      "name": "Francis of Assisi",
+      "name": "National Day of Saint Francis of Assisi",
       "type": "public",
-      "name_local": "San Francesco d'Assisi"
+      "name_local": "Festa nazionale di San Francesco d'Assisi"
     },
     {
       "date": "2026-11-01",
@@ -156,7 +156,7 @@
       "date": "2026-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2026-12-26",
@@ -174,7 +174,7 @@
       "date": "2027-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Befana"
+      "name_local": "Epifania"
     },
     {
       "date": "2027-03-28",
@@ -190,15 +190,15 @@
     },
     {
       "date": "2027-04-25",
-      "name": "Liberation Day",
+      "name": "Liberation from Nazi-Fascism (1945)",
       "type": "public",
-      "name_local": "Anniversario della Liberazione"
+      "name_local": "Liberazione dal nazifascismo (1945)"
     },
     {
       "date": "2027-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2027-06-02",
@@ -210,13 +210,13 @@
       "date": "2027-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2027-10-04",
-      "name": "Francis of Assisi",
+      "name": "National Day of Saint Francis of Assisi",
       "type": "public",
-      "name_local": "San Francesco d'Assisi"
+      "name_local": "Festa nazionale di San Francesco d'Assisi"
     },
     {
       "date": "2027-11-01",
@@ -234,7 +234,7 @@
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2027-12-26",
@@ -252,7 +252,7 @@
       "date": "2028-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Befana"
+      "name_local": "Epifania"
     },
     {
       "date": "2028-04-16",
@@ -268,15 +268,15 @@
     },
     {
       "date": "2028-04-25",
-      "name": "Liberation Day",
+      "name": "Liberation from Nazi-Fascism (1945)",
       "type": "public",
-      "name_local": "Anniversario della Liberazione"
+      "name_local": "Liberazione dal nazifascismo (1945)"
     },
     {
       "date": "2028-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2028-06-02",
@@ -288,13 +288,13 @@
       "date": "2028-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2028-10-04",
-      "name": "Francis of Assisi",
+      "name": "National Day of Saint Francis of Assisi",
       "type": "public",
-      "name_local": "San Francesco d'Assisi"
+      "name_local": "Festa nazionale di San Francesco d'Assisi"
     },
     {
       "date": "2028-11-01",
@@ -312,7 +312,7 @@
       "date": "2028-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2028-12-26",
@@ -330,7 +330,7 @@
       "date": "2029-01-06",
       "name": "Epiphany",
       "type": "public",
-      "name_local": "Befana"
+      "name_local": "Epifania"
     },
     {
       "date": "2029-04-01",
@@ -346,15 +346,15 @@
     },
     {
       "date": "2029-04-25",
-      "name": "Liberation Day",
+      "name": "Liberation from Nazi-Fascism (1945)",
       "type": "public",
-      "name_local": "Anniversario della Liberazione"
+      "name_local": "Liberazione dal nazifascismo (1945)"
     },
     {
       "date": "2029-05-01",
       "name": "Labour Day",
       "type": "public",
-      "name_local": "Festa del Lavoro"
+      "name_local": "Festa del lavoro"
     },
     {
       "date": "2029-06-02",
@@ -366,13 +366,13 @@
       "date": "2029-08-15",
       "name": "Assumption",
       "type": "public",
-      "name_local": "Ferragosto"
+      "name_local": "Assunzione di Maria"
     },
     {
       "date": "2029-10-04",
-      "name": "Francis of Assisi",
+      "name": "National Day of Saint Francis of Assisi",
       "type": "public",
-      "name_local": "San Francesco d'Assisi"
+      "name_local": "Festa nazionale di San Francesco d'Assisi"
     },
     {
       "date": "2029-11-01",
@@ -390,7 +390,7 @@
       "date": "2029-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Natale"
+      "name_local": "Natale di Gesù"
     },
     {
       "date": "2029-12-26",
