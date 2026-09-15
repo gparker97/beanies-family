@@ -13,7 +13,10 @@ import {
   buildTravelSegmentTitle,
   buildAccommodationTitle,
   buildTransportationTitle,
+  airlineLabel,
+  airportLabel,
   buildWhenBand,
+  flightCodeLabel,
   segmentSpan,
   classifySegmentPhase,
   type WhenBand,
@@ -196,10 +199,9 @@ export function buildTravelKeyValue(seg: {
     }
   };
   if (isF) {
-    if (seg.airline) {
-      const code = seg.airline.match(/\(([A-Z0-9]{2})\)/)?.[1] ?? seg.airline.split(' ')[0];
-      p.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
-    }
+    // NOT gated on `seg.airline`: a flight number with no airline used to vanish from the row.
+    const carrierLabel = flightCodeLabel(seg.airline, seg.flightNumber);
+    if (carrierLabel) p.push(carrierLabel);
     pushDeparture();
     if (seg.terminal) p.push(seg.terminal);
   } else if (seg.type === 'cruise') {
@@ -264,10 +266,14 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
     // where → which order (date/time now lead in the hero band, so route + carrier
     // come first in the row list). Date/time rows are still pushed below but the
     // band-consumed filter drops them — the band is their single display home.
+    // Expanded for READING only — a bare "SIN" becomes "Singapore (SIN)", the same shape the
+    // dropdown shows. Anything that already carries text stays exactly as stored.
     if (seg.departureAirport)
-      rows.push({ label: t('segmentRow.from'), value: seg.departureAirport });
-    if (seg.arrivalAirport) rows.push({ label: t('segmentRow.to'), value: seg.arrivalAirport });
-    if (seg.airline) rows.push({ label: t('segmentRow.airline'), value: seg.airline });
+      rows.push({ label: t('segmentRow.from'), value: airportLabel(seg.departureAirport) });
+    if (seg.arrivalAirport)
+      rows.push({ label: t('segmentRow.to'), value: airportLabel(seg.arrivalAirport) });
+    if (seg.airline)
+      rows.push({ label: t('segmentRow.airline'), value: airlineLabel(seg.airline) });
     if (seg.flightNumber)
       rows.push({
         label: t('segmentRow.flightNumber'),

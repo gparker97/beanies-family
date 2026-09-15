@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-15
 
+### Fixed
+
+- **A flight read from a booking is named by its airport codes, not by a stray first word.** beanies used to title a New York flight "John", after the first word of "John F. Kennedy International Airport". It now asks the AI to give the airport and airline codes the way an itinerary spells them out, and shows the full name unchanged whenever the AI is not sure rather than guessing.
+- **An airport read from a booking is now the airport, not a typed-in note.** After beanies read a flight, the From and To boxes held a bare code like "SIN" that did not match anything in the list, so they showed as a custom entry rather than the airport itself. They now arrive already matched, the same as if you had picked them.
+- **A flight number is shown once, and never disappears.** A flight that already names its airline in its number read "SQ SQ25", and a flight number with no airline recorded vanished from the trip summary altogether.
+
 ### Changed
 
 - **The magic-beans wait now says "counting magic beans…", and looks like it means it.** Every other loader in beanies still says "counting beans…"; this one screen is the exception, because the waiting is the feature. A light travels through the words while beanies reads, and sparkles flash around the card. All of it stops for anyone who has asked their device for less motion, and the message stays perfectly readable either way.
