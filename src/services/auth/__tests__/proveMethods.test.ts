@@ -6,6 +6,9 @@ const resolveDeviceKeys = vi.fn<() => Promise<PasskeyRegistration[]>>();
 vi.mock('@/services/auth/passkeyService', () => ({
   resolveDeviceKeys: (...args: unknown[]) =>
     (resolveDeviceKeys as unknown as (...a: unknown[]) => Promise<PasskeyRegistration[]>)(...args),
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
 }));
 const isNative = vi.fn(() => false);
 vi.mock('@/services/sync/capabilities', () => ({

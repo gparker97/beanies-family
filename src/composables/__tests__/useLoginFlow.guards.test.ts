@@ -124,7 +124,12 @@ vi.mock('@/composables/useGoogleReconnect', () => ({
   reconnectSucceeded: vi.fn(),
 }));
 vi.mock('@/composables/useMemberInfo', () => ({ getMemberAvatarUrl: () => undefined }));
-vi.mock('@/services/auth/passkeyService', () => ({ resolveDeviceKeys: vi.fn(async () => []) }));
+vi.mock('@/services/auth/passkeyService', () => ({
+  resolveDeviceKeys: vi.fn(async () => []),
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
+}));
 vi.mock('@/services/auth/deviceUnlock', async (orig) => ({
   ...(await orig<typeof import('@/services/auth/deviceUnlock')>()),
   unlockWithPin: vi.fn(),

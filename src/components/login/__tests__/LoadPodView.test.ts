@@ -121,6 +121,9 @@ vi.mock('@/services/google/googleAuth', () => ({
 }));
 
 vi.mock('@/services/auth/passkeyService', () => ({
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
   isPlatformAuthenticatorAvailable: vi.fn(async () => false),
   hasRegisteredPasskeys: vi.fn(async () => false),
   registerPasskeyForMember: vi.fn(),

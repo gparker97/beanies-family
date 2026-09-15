@@ -216,6 +216,9 @@ vi.mock('@/services/auth/passwordService', () => ({
   verifyPassword: vi.fn(async () => true),
 }));
 vi.mock('@/services/auth/passkeyService', () => ({
+  // familyStore's roster watcher calls this; an absent export on the double is a
+  // TypeError inside a void-ed watcher, i.e. an unhandled rejection.
+  reconcileDeviceKeysWithRoster: vi.fn(async () => {}),
   registerPasskeyForMember: vi.fn(),
   authenticateWithPasskey: vi.fn(),
   hasRegisteredPasskeys: vi.fn(() => false),

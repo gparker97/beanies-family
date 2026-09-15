@@ -24,6 +24,10 @@ import * as nativeBiometric from './nativeBiometric';
 import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { isNative } from '@/services/sync/capabilities';
+// The registry, not a store: `authStore.ts` statically imports `resolveDeviceKeys` from
+// this module, so any store import here would be a real cycle. Same import
+// `rosterCache.ts` uses to resolve the active family without a store dependency.
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { logEvent } from '@/services/telemetry/logEvent';
 import {
   describeAuthError,
@@ -220,6 +224,72 @@ export async function reclaimFamilyKeystore(familyId: string): Promise<void> {
 export async function reclaimAllKeystores(familyIds: string[]): Promise<void> {
   if (!isNative()) return;
   await nativeBiometric.nativeReclaimAllKeystores(familyIds);
+}
+
+/** One member as the roster knows them. */
+export interface RosterMemberRef {
+  id: string;
+  /**
+   * Used ONLY to backfill an absent `memberName` on a record adopted back from the
+   * keychain. Never logged, never sent to telemetry — same privacy class as
+   * `PasskeyRegistration.memberName`.
+   */
+  name: string;
+}
+
+/**
+ * Cheap proof this is a real decrypted roster and not a partial paint.
+ *
+ * A roster-driven delete against a half-painted roster would destroy live keys, so the
+ * bar is: there are members, we know who is signed in, and that person is in the list.
+ * The last clause is also the coherence check that makes the family scoping safe — if
+ * the active family switched between the watcher firing and this running, the signed-in
+ * member and the list come from different families and the pass is dropped.
+ */
+function rosterLooksComplete(roster: RosterMemberRef[], signedInMemberId: string | null): boolean {
+  if (roster.length === 0) return false;
+  if (!signedInMemberId) return false;
+  return roster.some((m) => m.id === signedInMemberId);
+}
+
+/**
+ * Reconcile this device's ADOPTED keystore material against the live roster (#82,
+ * requirement 4): a member removed while the app was uninstalled has no surviving blob,
+ * and a member who is still here gets their real name back on the picker.
+ *
+ * `signedInMemberId` is passed IN rather than looked up: this module must not import a
+ * store (`authStore.ts:13` imports `resolveDeviceKeys` from here, so the reverse edge is
+ * a genuine cycle), and the `familyStore` watcher already holds `currentMember`.
+ *
+ * NEVER THROWS. The caller is a `void`-ed Vue watcher with no `.catch`, where an
+ * unhandled rejection would have no owner. Modelled on `rosterCache.refreshRosterCache`,
+ * its sibling in that same watcher, rather than inventing a second shape.
+ */
+export async function reconcileDeviceKeysWithRoster(
+  roster: RosterMemberRef[],
+  signedInMemberId: string | null
+): Promise<void> {
+  if (!isNative()) return;
+  try {
+    // Resolved before the first `await`, so this still runs in the same tick in which
+    // the watcher captured the roster and the signed-in member. A late family-A mutation
+    // landing after a switch to B must never have A's roster judged against B's id.
+    // Inside the try, because "never throws" has to cover this line too.
+    const familyId = getActiveFamilyId();
+    if (!familyId) return;
+    if (!rosterLooksComplete(roster, signedInMemberId)) return;
+    await nativeBiometric.nativeReconcileRoster(familyId, roster);
+  } catch (err) {
+    logEvent({
+      level: 'warn',
+      surface: 'native-biometric',
+      message: 'roster_reconcile_failed',
+      context: {
+        action: 'roster_reconcile_failed',
+        detail: describeAuthError(err).slice(0, 200),
+      },
+    });
+  }
 }
 
 export async function removePasskey(credentialId: string): Promise<void> {
