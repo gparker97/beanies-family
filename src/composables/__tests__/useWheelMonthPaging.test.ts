@@ -111,6 +111,25 @@ function makeHarness(
   const wrapper = mount(Comp, { attachTo: document.body });
   const el = wrapper.element as HTMLElement;
   el.getBoundingClientRect = () => ({ top: rect.top, bottom: rect.bottom }) as DOMRect;
+
+  // PIN THE NO-WAAPI PATH, rather than inheriting whatever the DOM environment
+  // of the day happens to implement.
+  //
+  // `canAnimate` is `typeof el.animate === 'function' && !prefersReducedMotion`,
+  // so whether a commit is a synchronous swap or a two-phase async slide is
+  // decided by the test environment. That used to be a safe accident: neither
+  // jsdom nor happy-dom shipped `Element.animate`, so every test below got the
+  // instant swap for free. happy-dom 20.14.x ADDED it, and 12 assertions in this
+  // file silently started testing the animated path instead — `onNext` had not
+  // been called yet at the point they looked, because it now fires between two
+  // awaited animation phases.
+  //
+  // So the default is stated here instead of assumed. Tests about the state
+  // machine (accumulation, cooldown, deltaMode, guards) get the synchronous
+  // path deterministically, and the WAAPI describe-block below opts in by
+  // assigning its own `animate` stub after `makeHarness` returns.
+  Object.defineProperty(el, 'animate', { value: undefined, writable: true, configurable: true });
+
   return { wrapper, el, onNext, onPrev, rect, scroller, isPaging };
 }
 
@@ -309,9 +328,10 @@ describe('useWheelMonthPaging — cooldown', () => {
 
 describe('useWheelMonthPaging — commit slide (WAAPI present)', () => {
   /**
-   * jsdom ships no Web Animations API, so the default path above degrades to
-   * the instant swap. This stubs `animate` to assert the two-phase sequence:
-   * out in the direction of travel → content swap → snap opposite → in.
+   * `makeHarness` pins `el.animate` to undefined, so the default path above is
+   * the instant swap. This opts back in by stubbing `animate` after the
+   * harness is built, to assert the two-phase sequence: out in the direction
+   * of travel → content swap → snap opposite → in.
    */
   it('runs a two-phase vertical slide and swaps the month between phases', async () => {
     const h1 = makeHarness();
