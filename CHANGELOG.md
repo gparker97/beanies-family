@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-16
+
+### Changed
+
+- **Devices still on an older beanies are now asked to update.** Anything below 0.21.1 gets the update prompt, because an older device cannot read a tidied-up family file but writes over it anyway, and the changes made on it in between cannot be brought back.
+
 ## 2026-09-15
 
 ### Security
