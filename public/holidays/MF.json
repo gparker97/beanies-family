@@ -2,12 +2,12 @@
   "meta": {
     "country": "MF",
     "name": "Saint Martin",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fr",
     "types": [
       "public"
@@ -40,9 +40,9 @@
     },
     {
       "date": "2025-05-27",
-      "name": "abolition of slavery",
+      "name": "Abolition of Slavery",
       "type": "public",
-      "name_local": "Abolition de l'esclavage"
+      "name_local": "Abolition de l’esclavage"
     },
     {
       "date": "2025-05-29",
@@ -124,9 +124,9 @@
     },
     {
       "date": "2026-05-27",
-      "name": "abolition of slavery",
+      "name": "Abolition of Slavery",
       "type": "public",
-      "name_local": "Abolition de l'esclavage"
+      "name_local": "Abolition de l’esclavage"
     },
     {
       "date": "2026-07-14",
@@ -196,9 +196,9 @@
     },
     {
       "date": "2027-05-27",
-      "name": "abolition of slavery",
+      "name": "Abolition of Slavery",
       "type": "public",
-      "name_local": "Abolition de l'esclavage"
+      "name_local": "Abolition de l’esclavage"
     },
     {
       "date": "2027-07-14",
@@ -262,9 +262,9 @@
     },
     {
       "date": "2028-05-27",
-      "name": "abolition of slavery",
+      "name": "Abolition of Slavery",
       "type": "public",
-      "name_local": "Abolition de l'esclavage"
+      "name_local": "Abolition de l’esclavage"
     },
     {
       "date": "2028-06-05",
@@ -340,9 +340,9 @@
     },
     {
       "date": "2029-05-27",
-      "name": "abolition of slavery",
+      "name": "Abolition of Slavery",
       "type": "public",
-      "name_local": "Abolition de l'esclavage"
+      "name_local": "Abolition de l’esclavage"
     },
     {
       "date": "2029-07-14",

@@ -2,12 +2,12 @@
   "meta": {
     "country": "NO",
     "name": "Norway",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "no",
     "types": [
       "public"
@@ -78,7 +78,7 @@
       "date": "2025-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Første Juledag"
+      "name_local": "Første juledag"
     },
     {
       "date": "2025-12-26",
@@ -150,7 +150,7 @@
       "date": "2026-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Første Juledag"
+      "name_local": "Første juledag"
     },
     {
       "date": "2026-12-26",
@@ -222,7 +222,7 @@
       "date": "2027-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Første Juledag"
+      "name_local": "Første juledag"
     },
     {
       "date": "2027-12-26",
@@ -294,7 +294,7 @@
       "date": "2028-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Første Juledag"
+      "name_local": "Første juledag"
     },
     {
       "date": "2028-12-26",
@@ -366,7 +366,7 @@
       "date": "2029-12-25",
       "name": "Christmas Day",
       "type": "public",
-      "name_local": "Første Juledag"
+      "name_local": "Første juledag"
     },
     {
       "date": "2029-12-26",

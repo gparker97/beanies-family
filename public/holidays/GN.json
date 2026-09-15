@@ -2,12 +2,12 @@
   "meta": {
     "country": "GN",
     "name": "Guinea",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-09-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.34.0",
+    "source": "date-holidays@3.35.0",
     "primaryLanguage": "fr",
     "types": [
       "public"
@@ -77,7 +77,7 @@
       "date": "2025-10-02",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2025-12-25",
@@ -148,7 +148,7 @@
       "date": "2026-10-02",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2026-12-25",
@@ -219,7 +219,7 @@
       "date": "2027-10-02",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2027-12-25",
@@ -290,7 +290,7 @@
       "date": "2028-10-02",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2028-12-25",
@@ -361,7 +361,7 @@
       "date": "2029-10-02",
       "name": "Independence Day",
       "type": "public",
-      "name_local": "Jour de l'Indépendance"
+      "name_local": "Jour de l’Indépendance"
     },
     {
       "date": "2029-12-25",
