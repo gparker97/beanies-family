@@ -385,43 +385,70 @@ describe('reconcileDeviceKeysWithRoster — the guards, not the deletion (#82)',
     isNativeMock.mockReturnValue(false);
   });
 
-  it('runs when the roster looks like a real decrypted roster', async () => {
-    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+  it('runs when the roster is complete and belongs to the active family', async () => {
+    await reconcileDeviceKeysWithRoster('family-1', roster, 'member-1');
     expect(nativeMocks.nativeReconcileRoster).toHaveBeenCalledWith('family-1', roster);
+  });
+
+  it('DROPS the pass when the roster belongs to a DIFFERENT family than the active one', async () => {
+    // The guard that actually prevents cross-family deletion. `activateFamily` flips the
+    // active family and then awaits an IndexedDB write, so a family-A roster mutation
+    // flushed in that window arrives while the registry already says B. Without this,
+    // A's roster would be judged against B's adopted keys and delete B's live enrolments.
+    await reconcileDeviceKeysWithRoster('family-A', roster, 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
+  });
+
+  it('reconciles the family the ROSTER names, never whatever is active', async () => {
+    getActiveFamilyIdMock.mockReturnValue('family-2');
+    await reconcileDeviceKeysWithRoster('family-2', roster, 'member-1');
+    expect(nativeMocks.nativeReconcileRoster).toHaveBeenCalledWith('family-2', roster);
   });
 
   it('is a no-op on web', async () => {
     isNativeMock.mockReturnValue(false);
-    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+    await reconcileDeviceKeysWithRoster('family-1', roster, 'member-1');
     expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
   });
 
   it('drops the pass on an EMPTY roster — a partial paint must never drive a delete', async () => {
-    await reconcileDeviceKeysWithRoster([], 'member-1');
+    await reconcileDeviceKeysWithRoster('family-1', [], 'member-1');
     expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
   });
 
   it('drops the pass when nobody is signed in yet', async () => {
-    await reconcileDeviceKeysWithRoster(roster, null);
+    // The partial-paint shape: a roster published before the session member resolved.
+    await reconcileDeviceKeysWithRoster('family-1', roster, null);
     expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
   });
 
-  it('drops the pass when the signed-in member is NOT in the list', async () => {
-    // The coherence check that makes the family scoping safe: if the active family
-    // switched between the watcher firing and this running, the signed-in member and
-    // the list come from different families, and A's roster must not judge B's keys.
-    await reconcileDeviceKeysWithRoster(roster, 'someone-from-another-family');
+  it('drops the pass when the roster names no family at all (pre-load / after reset)', async () => {
+    await reconcileDeviceKeysWithRoster(null, roster, 'member-1');
     expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
   });
 
   it('drops the pass when there is no active family (join/create before registration)', async () => {
     getActiveFamilyIdMock.mockReturnValue(null);
-    await reconcileDeviceKeysWithRoster(roster, 'member-1');
+    await reconcileDeviceKeysWithRoster('family-1', roster, 'member-1');
     expect(nativeMocks.nativeReconcileRoster).not.toHaveBeenCalled();
   });
 
   it('NEVER rejects — the caller is a void-ed watcher with no owner for a rejection', async () => {
     nativeMocks.nativeReconcileRoster.mockRejectedValueOnce(new Error('boom'));
-    await expect(reconcileDeviceKeysWithRoster(roster, 'member-1')).resolves.toBeUndefined();
+    await expect(
+      reconcileDeviceKeysWithRoster('family-1', roster, 'member-1')
+    ).resolves.toBeUndefined();
+  });
+
+  it('NEVER rejects even when isNative itself is broken (an enumerated test double)', async () => {
+    // This is why the guard sits inside the try: an undefined `isNative` is a live
+    // failure class in this repo, and a TypeError here is an unhandled rejection.
+    isNativeMock.mockImplementation(() => {
+      throw new TypeError('isNative is not a function');
+    });
+    await expect(
+      reconcileDeviceKeysWithRoster('family-1', roster, 'member-1')
+    ).resolves.toBeUndefined();
+    isNativeMock.mockReturnValue(false);
   });
 });

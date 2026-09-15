@@ -178,6 +178,19 @@ vi.mock('@/services/indexeddb/registryDatabase', () => ({
   })),
 }));
 
+// Spy on ONE function of the real passkeyService: the clear-all step's keystore sweep.
+// Spread the original so every other export stays real — the point of this file is the
+// store's wiring, and a fully faked service would pin nothing. Without a spy the sweep is
+// unobservable here (jsdom is not native, so it returns at its own `isNative` guard) and
+// deleting the call from authStore would leave this suite green.
+const { reclaimAllKeystoresSpy } = vi.hoisted(() => ({
+  reclaimAllKeystoresSpy: vi.fn(async () => {}),
+}));
+vi.mock('@/services/auth/passkeyService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/auth/passkeyService')>()),
+  reclaimAllKeystores: reclaimAllKeystoresSpy,
+}));
+
 // The device-level passkey registry, stateful so the clear-all step can be given
 // records to reach. Seeded per test via `registryPasskeys`.
 const { registryPasskeys } = vi.hoisted(() => ({
@@ -491,6 +504,7 @@ describe('Sensitive Data Clearing Security', () => {
     savedGlobalSettings = { ...mockGlobalSettings };
     autoOpenState.map.clear();
     registryPasskeys.rows = [];
+    reclaimAllKeystoresSpy.mockClear();
   });
 
   // =========================================================================
@@ -530,6 +544,24 @@ describe('Sensitive Data Clearing Security', () => {
 
       expect(auth.currentUser).toBeNull();
       expect(auth.isAuthenticated).toBe(false);
+    });
+
+    it('sweeps the keystore ONCE, with the family ids derived from the passkey registry', async () => {
+      // Pins the wiring the sweep depends on: one call, outside any loop, carrying the
+      // deduped family ids that are the fallback's only source if `deleteAllKeys` is
+      // missing from the build (#74). Two records for one family must dedupe to one id.
+      registryPasskeys.rows = [
+        { credentialId: 'native:family-123:member-1', familyId: 'family-123' },
+        { credentialId: 'native:family-123:member-2', familyId: 'family-123' },
+        { credentialId: 'native:family-999:member-9', familyId: 'family-999' },
+      ];
+      const { auth } = populateAllStores();
+
+      await auth.signOutAndClearData();
+
+      expect(reclaimAllKeystoresSpy).toHaveBeenCalledTimes(1);
+      const passed = vi.mocked(reclaimAllKeystoresSpy).mock.calls[0] as unknown as [string[]];
+      expect([...passed[0]].sort()).toEqual(['family-123', 'family-999']);
     });
 
     it('reclaims EVERY passkey record, including families the registry does not list', async () => {

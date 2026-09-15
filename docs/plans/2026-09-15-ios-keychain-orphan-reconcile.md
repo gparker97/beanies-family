@@ -487,6 +487,11 @@ That is strictly fewer lines than the current loop, strictly more complete, and 
 | `warn`                                        | a registry record would not delete (preserved from `clearNativeRecord`)                                 | message `clear_record_failed`, `action: 'remove_registration'`, `detail`                                                                                      |
 | `info`                                        | the whole-service sweep succeeded                                                                       | `action: 'sweep'`                                                                                                                                             |
 | `error` via `reportError`, severity `warning` | **Pass 4:** the whole-service sweep rejected (missing/failing `deleteAllKeys`) — the fallback then runs | `action: 'sweep_failed'`, `error_code`, `detail`                                                                                                              |
+| `warn`                                        | the adoption pass's own registry read failed, so adoption is skipped this session                       | `action: 'adopt_registry_read_failed'`, `detail`                                                                                                              |
+| `warn`                                        | one adoption write failed — counted, and the rest of the device still processed                         | `action: 'adopt_write_failed'`, `detail`                                                                                                                      |
+| `error` via `reportError`, severity `warning` | the adoption pass threw despite its internal handling (a bug, not an expected condition)                | `action: 'adopt_failed'`, `detail`                                                                                                                            |
+| `warn`                                        | a `memberName` backfill failed — cosmetic, so the pass continues                                        | `action: 'roster_backfill_failed'`, `detail`                                                                                                                  |
+| `warn`                                        | the roster reconcile threw — the never-throws backstop for the `void`-ed watcher                        | `action: 'roster_reconcile_failed'`, `detail`                                                                                                                 |
 
 **Pass 3 — one `adopt` event, not two.** The Pass-2 table listed an `info` row and a `warn` row for the same pass, which reads as two emissions for one fact: a CloudWatch count of adoption passes would then double-count the interesting ones. Emit once with `level: summary.adopted > 0 ? 'warn' : 'info'`.
 
@@ -508,6 +513,24 @@ That is strictly fewer lines than the current loop, strictly more complete, and 
 **Critical vs telemetry** — nothing here is `severity: 'critical'`. No user action fails and no data is at risk; the worst outcome is degrading to today's behaviour. Firehose only, no Slack page.
 
 **Privacy / store gate** — **no new context keys.** `action`, `error_code`, `detail` and `count` are already in `ALLOWED_CONTEXT_KEYS` (`src/utils/diagnosticContext.ts:68,69,188,321`) _and_ already in the Lambda's mirrored allowlist, with `telemetryAllowlistDrift.test.ts` asserting set equality between the two — so no Lambda code change and no pinned-test change. Family and member ids never ship; the counts in `detail` are integers under fixed labels, capped well under `MAX_STRING_LEN`. ⚠️ `docs/STATUS.md` (the 2026-07-14 session-3/session-4 blocks, ~`:533-536`) records that the **deployed** telemetry Lambda may predate the `native-biometric`/`key_backing` keys — confirm (and terraform-apply if needed) **before** trusting the field signal, or the whole reconcile stream is stripped after leaving the device, silently.
+
+> **CORRECTED DURING IMPLEMENTATION (2026-09-15).** Two defects in this plan were found while
+> building it and fixed in the code rather than shipped:
+>
+> 1. **§5's reclaim snippet would have orphaned a legacy-scheme record.** It set the bare legacy
+>    target into the account-keyed Map unconditionally, AFTER the record loop. A legacy-SCHEME
+>    record's own account IS the bare familyId, so that overwrote the record-derived entry, dropped
+>    its `credentialId`, and left a registry record pointing at a blob that had just been deleted —
+>    a dead button on the chooser. The legacy target is now added only when the account is absent.
+> 2. **§6's `reconcileDeviceKeysWithRoster(memberIds, …)` signature could not do §4's `memberName`
+>    backfill**, which needs names. It takes `RosterMemberRef { id, name }[]`. Consequence, not
+>    stated in the plan: member names now cross from the store into the auth service layer. They are
+>    only ever written to `PasskeyRegistration.memberName` (the same privacy class, never synced,
+>    never logged) and never reach telemetry.
+>
+> Also: the ADR and runbook amendments landed in commit C rather than B, and `takeAdoptedTargets` is
+> module-private (the per-family drain is asserted through `nativeReconcileRoster`, which is the only
+> path permitted to call it).
 
 ## Acceptance Criteria
 

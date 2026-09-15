@@ -10,7 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-15
 
+### Security
+
+- **Biometric unlock keys can no longer outlive the app on an iPhone or iPad.** Deleting the app left the device's biometric keys in place while the list beanies used to find them was deleted with the app, so nothing in beanies could see or remove them. beanies now finds them again on the way back in, which both restores biometric unlock after a reinstall and puts them back within reach of every delete the app offers. "Clear all data" now removes every biometric key on the device rather than only the ones it had a record of, on iPhone, iPad and Android.
+
 ### Fixed
+
+- **A delete that does not happen is no longer reported as done.** Removing a biometric key could quietly do nothing and report success, and a device hiccup while checking whether a key was still there could remove a working one.
 
 - **A flight read from a booking is named by its airport codes, not by a stray first word.** beanies used to title a New York flight "John", after the first word of "John F. Kennedy International Airport". It now asks the AI to give the airport and airline codes the way an itinerary spells them out, and shows the full name unchanged whenever the AI is not sure rather than guessing.
 - **An airport read from a booking is now the airport, not a typed-in note.** After beanies read a flight, the From and To boxes held a bare code like "SIN" that did not match anything in the list, so they showed as a custom entry rather than the airport itself. They now arrive already matched, the same as if you had picked them.
