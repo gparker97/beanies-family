@@ -39,10 +39,15 @@
  * the UNION of registry records and enumerated blobs, so an unavailable enumeration
  * degrades to today's behaviour instead of orphaning or over-deleting.
  *
- * Adoption runs at exactly TWO named seams, both bounded by one per-session time budget:
- * `nativeResolveDeviceKeys` (the login surface) and `nativeUnlock`. Nothing else may
- * trigger it — a hidden enumeration inside `readNativeRecords` would fire from unlock,
- * from disable, and from inside a reclaim about to delete the records being adopted.
+ * Adoption runs at exactly THREE named seams and nowhere else. Two are login surfaces —
+ * `nativeResolveDeviceKeys` and `nativeUnlock` — and share ONE per-session time budget,
+ * because on native the family picker mounts at launch. The third is
+ * `nativeReconcileRoster`, which awaits adoption UNBOUNDED: it runs after the pod is
+ * open with nothing waiting on it, and on a fresh reinstall the roster arrives before
+ * any login surface has resolved keys, so a bounded wait there could lose the very
+ * targets it exists to reconcile. Nothing else may trigger adoption — a hidden
+ * enumeration inside `readNativeRecords` would fire from unlock, from disable, and from
+ * inside a reclaim about to delete the records being adopted.
  */
 
 import { BiometricKeystore, type BiometricKeystoreErrorCode } from './biometricKeystorePlugin';
@@ -129,10 +134,18 @@ function detailOf(err: unknown): string {
 
 // --- Removing key material: one target type, one delete, one purge ---
 
-/** One thing to remove: the OS blob, and the registry record when there is one. */
+/**
+ * One thing to remove: the OS blob, and every registry record that points at it.
+ *
+ * `credentialIds` is a LIST, not one id, because more than one record can resolve to the
+ * same account: two legacy-scheme records for a family both address the bare familyId.
+ * Targets are keyed by account, so a single-id field silently dropped the second record's
+ * id and left that record behind pointing at a blob that had just been deleted. The
+ * pre-#82 code could not hit that, because it looped records and removed each one.
+ */
 interface KeystoreTarget {
   account: string;
-  credentialId?: string;
+  credentialIds?: string[];
 }
 
 /**
@@ -168,6 +181,11 @@ function formatPurgeDetail(targets: number, failed: number): string {
   return `targets=${targets},failed=${failed}`;
 }
 
+/** Ditto for the whole-service sweep. Every `detail` in this module is built by one of these. */
+function formatSweepDetail(deleted: boolean): string {
+  return `deleted=${String(deleted)}`;
+}
+
 /**
  * Remove a set of targets: the blob always, the registry record when the target carries
  * a `credentialId`. THE one implementation of "make this key material go away" — disable,
@@ -184,9 +202,9 @@ function formatPurgeDetail(targets: number, failed: number): string {
 async function purgeTargets(targets: KeystoreTarget[], action: string): Promise<number> {
   let deleted = 0;
   for (const t of targets) {
-    if (t.credentialId) {
+    for (const credentialId of t.credentialIds ?? []) {
       try {
-        await passkeyRepo.removePasskeyRegistration(t.credentialId);
+        await passkeyRepo.removePasskeyRegistration(credentialId);
       } catch (err) {
         // A record that will not delete means a self-heal that did not heal: the user
         // keeps being offered an enrolment that cannot work.
@@ -240,6 +258,7 @@ interface KeystoreBlob {
 interface AdoptedTarget extends KeystoreTarget {
   familyId: string;
   memberId: string;
+  /** Exactly the one record adoption wrote, kept separately for the name backfill. */
   credentialId: string;
 }
 
@@ -373,6 +392,8 @@ const ADOPTION_BUDGET_MS = 1500;
 let adoption: Promise<AdoptionSummary> | null = null;
 let adoptionGate: Promise<void> | null = null;
 let adoptedTargets: AdoptedTarget[] = [];
+/** Bumped by the test reset so an in-flight pass cannot write into the next session. */
+let sessionGeneration = 0;
 
 /**
  * Adopt every orphaned blob on this device into the registry.
@@ -390,12 +411,22 @@ let adoptedTargets: AdoptedTarget[] = [];
  * family (see `takeAdoptedTargets`).
  *
  * NEVER REJECTS. That single contract is what makes the un-awaited tail of
- * `awaitAdoptionGate` safe (no unhandled rejection with no owner) and is pinned by a test.
+ * `awaitAdoptionGate` safe (no unhandled rejection with no owner), makes it safe to await
+ * unbounded from the roster pass, and is pinned by a test.
+ *
+ * Note for future edits: `runAdoptionPass()` runs its synchronous prefix BEFORE `adoption`
+ * is assigned, so anything added to that prefix which reaches back into
+ * `ensureKeystoreAdopted` / `awaitAdoptionGate` would recurse rather than dedupe. Nothing
+ * does today; keep it that way.
  */
 function ensureKeystoreAdopted(): Promise<AdoptionSummary> {
+  const generation = sessionGeneration;
   return (adoption ??= runAdoptionPass()
     .then((summary) => {
-      adoptedTargets = summary.adoptedTargets;
+      // Generation-checked: `__resetKeystoreSessionForTests` can null the refs while a
+      // pass is still in flight, and that pass still holds this closure. Without the
+      // check, test N's slow-but-resolving pass assigns targets during test N+1.
+      if (generation === sessionGeneration) adoptedTargets = summary.adoptedTargets;
       return summary;
     })
     .catch((err) => {
@@ -481,6 +512,7 @@ async function runAdoptionPass(): Promise<AdoptionSummary> {
       summary.adoptedTargets.push({
         account: b.account,
         credentialId,
+        credentialIds: [credentialId],
         familyId: b.familyId,
         memberId: b.memberId,
       });
@@ -520,7 +552,7 @@ async function runAdoptionPass(): Promise<AdoptionSummary> {
  * roster. An empty result means both "nothing was adopted for this family" and "this
  * family was already reconciled", which is why no second flag is needed.
  */
-export function takeAdoptedTargets(familyId: string): AdoptedTarget[] {
+function takeAdoptedTargets(familyId: string): AdoptedTarget[] {
   const mine = adoptedTargets.filter((t) => t.familyId === familyId);
   adoptedTargets = adoptedTargets.filter((t) => t.familyId !== familyId);
   return mine;
@@ -532,6 +564,7 @@ export function takeAdoptedTargets(familyId: string): AdoptedTarget[] {
  * adopted set are module-level and do not reset between cases in one test file.
  */
 export function __resetKeystoreSessionForTests(): void {
+  sessionGeneration += 1;
   adoption = null;
   adoptionGate = null;
   adoptedTargets = [];
@@ -872,17 +905,29 @@ export async function nativeReclaimFamilyKeystore(familyId: string): Promise<voi
     // is what lets `deleteLocalFamily` keep its name honest.
     if (b.familyId === familyId) byAccount.set(b.account, { account: b.account });
   }
-  // Records SECOND so a record-derived entry wins on a shared account key and its
-  // credentialId is not lost — a blob the registry also knows about is one target.
+  // Records SECOND, and ACCUMULATING their credentialIds rather than replacing: a blob
+  // the registry also knows about is one target, and two legacy-scheme records share one
+  // account, so both ids have to survive onto it.
   for (const r of await readNativeRecords(familyId)) {
     const account = recordAccount(familyId, r);
-    byAccount.set(account, { account, credentialId: nativeCredentialId(familyId, r.memberId) });
+    const existing = byAccount.get(account);
+    const credentialIds = [
+      ...(existing?.credentialIds ?? []),
+      nativeCredentialId(familyId, r.memberId),
+    ];
+    byAccount.set(account, { account, credentialIds });
   }
   // The legacy blob is always a target, whether or not a record points at it. Added only
   // when absent: a legacy-SCHEME record already occupies this account key and carries the
   // credentialId, and overwriting it with a bare target would leave that record behind.
   const legacy = legacyKeystoreAccount(familyId);
   if (!byAccount.has(legacy)) byAccount.set(legacy, { account: legacy });
+
+  // Drop this family's adopted targets: their blobs and records are about to be gone, and
+  // a later roster pass draining them would emit a `roster_reconcile` purge that reads as
+  // real key removal when nothing was there. Discard the result — these are targets, not
+  // survivors.
+  takeAdoptedTargets(familyId);
 
   await purgeTargets([...byAccount.values()], 'reclaim');
 }
@@ -905,13 +950,15 @@ export async function nativeReclaimFamilyKeystore(familyId: string): Promise<voi
  * level up and reported as a step failure with no statement of what survived.
  */
 export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<void> {
+  // Everything on the device is going, so no adopted target can still be a real target.
+  adoptedTargets = [];
   try {
     const { deleted } = await BiometricKeystore.deleteAllKeys();
     logEvent({
       level: 'info',
       surface: SURFACE,
       message: 'keystore_swept',
-      context: { os: getPlatform(), action: 'sweep', detail: `deleted=${String(deleted)}` },
+      context: { os: getPlatform(), action: 'sweep', detail: formatSweepDetail(deleted) },
     });
     return;
   } catch (err) {
@@ -929,7 +976,23 @@ export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<vo
       },
     });
   }
-  for (const id of familyIds) {
+  // The fallback list comes from the registry, and in the very scenario this whole change
+  // exists for the registry can be EMPTY (a reinstall where adoption never ran, or a
+  // failed registry read). Looping zero families would then report a clean device while
+  // every blob survived, which is the same lie one layer down. So derive the families
+  // from the keychain itself when the caller's list is empty.
+  let targets = familyIds;
+  if (targets.length === 0) {
+    const blobs = await listKeystoreBlobs();
+    targets = [...new Set((blobs ?? []).map((b) => b.familyId))];
+    logEvent({
+      level: targets.length > 0 ? 'warn' : 'info',
+      surface: SURFACE,
+      message: 'sweep_fallback_enumerated',
+      context: { os: getPlatform(), action: 'sweep_fallback', count: targets.length },
+    });
+  }
+  for (const id of targets) {
     await nativeReclaimFamilyKeystore(id);
   }
 }
@@ -961,6 +1024,22 @@ export async function nativeReconcileRoster(
   familyId: string,
   roster: { id: string; name: string }[]
 ): Promise<void> {
+  // THIS AWAIT IS LOAD-BEARING, and it is the UNBOUNDED single-flight rather than the
+  // time-bounded gate. Adoption is lazy, and on the primary #82 path it has NOT run when
+  // this fires: after a reinstall the family registry is gone too, so the family picker
+  // loops zero families and `resolveDeviceKeys` is never called before decrypt. The
+  // roster then arrives first, and a reconcile that assumed adoption had finished would
+  // drain an empty set and return — and nothing would ever retry, because a later session
+  // finds those blobs already registered, adopts nothing, and produces no targets. So
+  // requirement 4 and the name backfill would silently never run for the exact scenario
+  // this plan was written for.
+  //
+  // Unbounded is correct here where it would be wrong at the login seams: this runs
+  // fire-and-forget from a roster watcher AFTER the pod is open, so nothing is waiting on
+  // it, and the bounded gate could resolve early and lose the targets the same way.
+  // `ensureKeystoreAdopted` never rejects, which is what makes awaiting it safe.
+  await ensureKeystoreAdopted();
+
   const targets = takeAdoptedTargets(familyId);
   if (targets.length === 0) return;
 
@@ -1051,7 +1130,10 @@ async function clearNativeRecord(
 ): Promise<void> {
   const record = await loadNativeRecord(familyId, memberId);
   const account = record ? recordAccount(familyId, record) : keystoreAccount(familyId, memberId);
-  await purgeTargets([{ account, credentialId: nativeCredentialId(familyId, memberId) }], action);
+  await purgeTargets(
+    [{ account, credentialIds: [nativeCredentialId(familyId, memberId)] }],
+    action
+  );
 }
 
 // --- Friendly copy (via t() with English fallbacks) ---
