@@ -27,7 +27,11 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setKey", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getKey", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "hasKey", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "deleteKey", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "deleteKey", returnType: CAPPluginReturnPromise),
+        // A new @objc func that is NOT listed here is invisible to Capacitor and rejects
+        // as not-implemented. That is exactly how #74 happened, twice. Anything added
+        // below must be added here in the same edit.
+        CAPPluginMethod(name: "deleteAllKeys", returnType: CAPPluginReturnPromise)
     ]
 
     private let service = "family.beanies.app.biometric"
@@ -164,6 +168,33 @@ public class BiometricKeystorePlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         } else {
             call.reject("keychain delete failed", mapOSStatus(status))
+        }
+    }
+
+    // MARK: - deleteAllKeys (explicit clear-all)
+
+    /// Remove EVERY item this app holds for our service on this device.
+    ///
+    /// One `SecItemDelete` over class + service with NO account: it needs no
+    /// authentication and returns no attributes, so unlike an enumerate-then-delete it
+    /// cannot miss a biometry-gated item. That is deliberate — it makes the product's
+    /// strongest promise ("clear all data really clears it") independent of any
+    /// assumption about how the keychain treats access-controlled items in a query.
+    ///
+    /// `nativeReclaimAllKeystores` in `nativeBiometric.ts` is the ONLY permitted caller.
+    /// Everything else reclaims per family, so a bug there cannot reach another family.
+    @objc func deleteAllKeys(_ call: CAPPluginCall) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        // Nothing to delete is a clean device, not a failure. `deleted` says whether an
+        // item was actually removed, which is the only part a caller could not infer.
+        if status == errSecSuccess || status == errSecItemNotFound {
+            call.resolve(["deleted": status == errSecSuccess])
+        } else {
+            call.reject("keychain sweep failed", mapOSStatus(status))
         }
     }
 

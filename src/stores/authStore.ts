@@ -2499,21 +2499,30 @@ export const useAuthStore = defineStore('auth', () => {
         await clearAllRosterCache();
       },
       reclaimAllPasskeys: async () => {
-        // Native keystore blobs first (enumerated FROM the registry records), then the
-        // records + the platform Signal (greg's local-test find: leftovers rendered a
-        // ghost "Windows Hello · Chrome" person card after clear-data).
-        const { getAllFamilies } = await import('@/services/familyContext');
-        const { reclaimFamilyKeystore, signalCredentialsRemoved } =
+        // Native keystore blobs first, then the records + the platform Signal (greg's
+        // local-test find: leftovers rendered a ghost "Windows Hello · Chrome" person
+        // card after clear-data).
+        //
+        // This used to loop `getAllFamilies()` and reclaim per family, which after a
+        // delete-and-reinstall iterated an EMPTY family registry and reclaimed nothing
+        // while reporting success — one half of #82. The sweep is one service-wide
+        // delete instead, so it reaches blobs for families this device has no registry
+        // entry for at all.
+        //
+        // ORDER: the registry READ must precede the record deletion, because that read
+        // is the sweep fallback's only source of family ids. The sweep itself needs no
+        // registry, so the orphaning class `familyContext.deleteLocalFamily` warns about
+        // cannot arise here on the happy path. Nothing else about the order is
+        // load-bearing.
+        const { reclaimAllKeystores, signalCredentialsRemoved } =
           await import('@/services/auth/passkeyService');
-        const { getPasskeysByFamily, removePasskeyRegistration } =
+        const { getAllPasskeys, removePasskeyRegistration } =
           await import('@/services/indexeddb/repositories/passkeyRepository');
-        for (const family of await getAllFamilies()) {
-          await reclaimFamilyKeystore(family.id);
-          const passkeys = await getPasskeysByFamily(family.id);
-          for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
-          if (passkeys.length > 0) {
-            await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
-          }
+        const passkeys = await getAllPasskeys();
+        await reclaimAllKeystores([...new Set(passkeys.map((pk) => pk.familyId))]);
+        for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
+        if (passkeys.length > 0) {
+          await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
         }
       },
       untrustDevice: () => settingsStore.setTrustedDevice(false),
