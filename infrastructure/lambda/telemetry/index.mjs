@@ -76,6 +76,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // 'activity-celebration' and 'activity-owner-resolve' surfaces. Small integers only.
   'count',
   'error_code',
+  // Beanie wall sizing (#96, surface 'beanie-wall'). Coarse integers only.
+  // MIRROR of src/utils/diagnosticContext.ts — see the note at the top.
+  'viewport_w',
+  'viewport_h',
+  'screen_w',
+  'screen_h',
   // Meal planner (#27, surface 'meal-planner'). PII-free fixed enums/bools:
   // `kind` (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|
   // dinner|snack), `quick_add`, `share_scope` (day|week), `overwrote`.

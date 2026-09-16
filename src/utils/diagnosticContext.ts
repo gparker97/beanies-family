@@ -67,6 +67,17 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'from_path',
   'action',
   'error_code',
+  // Beanie wall sizing (#96, surface 'beanie-wall'). Four coarse integers, no
+  // identifier value beyond what a user-agent string already exposes, and no
+  // user-typed content can reach them. They exist because `wall_room_gate_closed`
+  // could previously say only THAT the wall was refused, never which floor
+  // rejected the device or by how much — which is why an 8" tablet being turned
+  // away needed a research pass instead of a CloudWatch filter.
+  // DECLARED to Apple & Google as collected Diagnostics; see the runbook.
+  'viewport_w',
+  'viewport_h',
+  'screen_w',
+  'screen_h',
   // Meal Planner (#27, surface 'meal-planner'). All PII-free fixed enums/bools —
   // no recipe names, notes, guest names, or member names ever ship: `kind`
   // (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|dinner|snack),

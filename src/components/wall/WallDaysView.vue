@@ -21,7 +21,6 @@ import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
-import { ARROW_GUTTER_PX } from '@/components/wall/wallLayout';
 import { useActivityStore } from '@/stores/activityStore';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
@@ -211,9 +210,18 @@ function colourFor(activity: FamilyActivity) {
         stable, so the plot's ResizeObserver cannot be fed a width that depends
         on what it measured.
       -->
+      <!--
+        ⚠️ The gutter is the CUSTOM PROPERTY, not the `ARROW_GUTTER_PX` constant.
+        That constant is the FULL tier's value, so painting it here while
+        `daysLayoutFor` subtracted the tier's own (38px at compact) made the
+        column arithmetic disagree with the rendered gutter by 18px — the exact
+        drift the shared `wallChrome` exists to make impossible. `BeanieWallPage`
+        writes this property from the same `wallChromeFor()` call it hands to the
+        arithmetic, so there is one number.
+      -->
       <div
         class="relative flex min-h-0 flex-1 flex-col gap-2.5"
-        :style="{ paddingRight: `${ARROW_GUTTER_PX}px` }"
+        :style="{ paddingRight: 'var(--wall-arrow-gutter, 56px)' }"
       >
         <WallNavArrow
           class="absolute top-0 left-0 z-10"
@@ -224,14 +232,19 @@ function colourFor(activity: FamilyActivity) {
         />
         <WallNavArrow
           class="absolute top-0 right-0 z-10"
-          :style="{ width: `${ARROW_GUTTER_PX}px` }"
+          :style="{ width: 'var(--wall-arrow-gutter, 56px)' }"
           :direction="1"
           :enabled="canStepForward"
           @step="emit('step', $event)"
         />
 
         <!-- day headers, on the same column track as the plot below -->
+        <!-- `data-wall-dayheads` is a VERIFICATION hook, not styling: the header
+             row and the plot must share left and right edges, and without a hook
+             that invariant can only be eyeballed. See
+             scripts/design-screenshots/wall-small-tablet-capture.ts -->
         <div
+          data-wall-dayheads
           class="grid shrink-0 gap-0"
           :style="{
             paddingLeft: `${AXIS_WIDTH_PX}px`,
