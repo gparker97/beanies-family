@@ -112,3 +112,55 @@ switching them changes the create-a-pod and Settings-restore flows, which is out
 
 **Owed by greg** (cannot be done programmatically): a real two-account join on an iPhone, the kit
 PDF in his own Firefox, and clearing the stuck member with the new unclaim button.
+
+### 2026-09-16/17 — the Picker diagnosis (a live back-and-forth, paraphrased)
+
+> also note - i've added the lines VITE_GOOGLE_API_KEY and VITE_GOOGLE_PROJECT_NUMBER to
+> .env.local but i'm still getting the invalid developer API key error.
+
+> the string "localhost:*" is already under the websites list, do i also need to add
+> localhost:5173? i'm pretty sure this used to work from my local
+
+> i've made the change and restarted the dev server but still getting the same error ... note
+> that i'm running edge in private mode, not sure if that matters
+
+> i've tested with a new account. i cannot see the file OR the folder in the file picker, even
+> if i clear the search filter, however when i look on google drive on the web, I now CAN see
+> the shared beanpod file in the shared with me section
+
+> [after signing out of all accounts] that was the issue - after signing out from all accounts
+> and then trying the joining link again, the beanpod file was listed in the file picker and i
+> could set a pin.
+
+> ratehr than forcing a user to sign out of their existing accounts, which is extremely annoying
+> and troublesome, isn't there any way we can force the picker to open the drive of the google
+> account that JUST granted consent?
+
+### 2026-09-17 — the review rounds
+
+> once done run another /code-review max against all changes and commits made in this session
+> and fix any issues found to ensure that everyting implemented today is robust, once done
+> commit and push all changes and run /end-session - capture all context and anything pending to
+> start in the next session ina fresh context.
+
+> Commit all the picker work and everything just implemented and old ensure that is all included
+> in the code review
+
+> Go ahead and work autonomously as I'll be stepping away now. Ensure all issues are fixed and
+> you are satisfied with that implementation or go ahead to run another review and end session
+> when done
+
+## Outcome addendum
+
+The Picker diagnosis took five wrong hypotheses before the right one, and greg's clean-account
+test is what settled it. Recorded in `docs/STATUS.md` (2026-09-17) and in the session memory,
+because the same symptom has now produced three `fix(picker)` commits in this repo's history.
+
+Wrong hypotheses, in order: a missing env value (it was already in `.env`); an invalid API key
+(valid); a blocked HTTP referrer (real, and fixed, but not the cause of the empty list); Edge
+InPrivate blocking third-party cookies (plausible, not it); `setQuery('*.beanpod')` being an
+unsupported glob (it works, and I nearly "fixed" a working line). The cause was the Picker iframe
+listing the browser's default Google session.
+
+Five commits: `ee47d778`, `0a064b2a`, `46320057`, `255e831a`, `9b6f6158`. Two `/code-review max`
+rounds, 30 findings, all triaged; three left open as greg's decisions and recorded in STATUS.

@@ -708,3 +708,26 @@ Settings-restore flows.
 2. The recovery kit as a PDF in Firefox: expect a saved file, in fallback fonts if need be.
 3. The stuck member: Pod → their bean → "Let them join again", then confirm a new invite link can
    be minted for them.
+
+---
+
+## Outcome addendum (2026-09-17) — the Picker, and two review rounds
+
+The plan's Picker scope was decided on an incomplete model twice, and both corrections came from
+greg testing on real accounts rather than from analysis.
+
+**First correction (in the plan above):** "retire the Picker everywhere" is impossible, because
+under `drive.file` the Picker selection IS the access grant and `files.list` is blind exactly
+where the three candidate sites sit.
+
+**Second correction (this addendum):** the Picker was not merely necessary, it was BROKEN for
+anyone signed into more than one Google account. The `docs.google.com` iframe enumerates using
+the browser's own session cookies, not the token passed to `setOAuthToken`, so it defaults to
+account index 0 — and when that is the pod owner, "Shared with me" is legitimately empty.
+`PickerBuilder.setAuthUser` fixes it and is a real exported method absent from our hand-written
+typedef. Found by pulling Google's live picker module and reading its export table.
+
+Two `/code-review max` rounds followed, 30 findings, and in BOTH rounds the most serious findings
+were defects introduced by the previous round's fixes. Details in `docs/STATUS.md` under the
+2026-09-17 entry, including the three items deliberately left for greg: the envelope-revocation
+tombstone gap, the grant-replay window, and the iOS 15.0-15.3 deployment floor.

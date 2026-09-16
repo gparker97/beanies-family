@@ -4,6 +4,34 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Fixing a bound by moving it can leave the bug and lose the guard
+
+**Date:** 2026-09-17
+**Context:** `relayEhbpHeaders` had a `break` that bounded a walk over caller-supplied keys. A
+rewrite removed it and replaced it with `dropped.length < MAX && ++seen <= MAX * 4`, which bounds
+nothing — `dropped` fills first, the `&&` short-circuits, and `seen` freezes. Review round 1
+caught that. My fix restored the `break`, which immediately failed a test named _"does not let
+junk keys starve the real ehbp header"_ — the exact bug the `break` had been removed for. So I
+moved the bound onto the INPUT (a key-count ceiling) and wrote a comment saying no amount of junk
+under the ceiling could hide the real header. Review round 2 proved that false by execution:
+`kept < MAX_EHBP_HEADERS` was still inside the loop, so sixteen keys that MATCH the prefix fill
+the budget and the seventeenth is dropped.
+
+Three rounds, three wrong bounds, and the fix that finally worked was different in kind: admit
+the one header that must survive BEFORE anything can spend the budget.
+
+**Rule:** when a bound and a correctness requirement conflict, the answer is usually neither
+"bound harder" nor "bound elsewhere" — it is to make the thing that must survive not compete for
+the budget. And when you move a guard, re-derive what it now protects from scratch. A moved bound
+is a new bound; the old comment describes the old one.
+
+**The compounding lesson:** the regression test for the starvation built its junk as
+`not-ehbp-${i}`, which fails the prefix test and never reaches the counter that does the
+starving. It passed through all three wrong versions. A test named for a failure mode is not the
+same as a test that can observe it — check which side of the branch your fixture lands on.
+
+---
+
 ## A boolean whose name is the opposite of its meaning
 
 **Date:** 2026-09-16
