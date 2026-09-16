@@ -57,7 +57,13 @@ describe('orientation policy', () => {
       ['a large phone', 430, 932, false],
       ['iPad mini', 744, 1133, true],
       ['iPad Pro', 1024, 1366, true],
-      ['a 600dp Android tablet, exactly on the threshold', 600, 960, true],
+      ['a 600dp Android tablet', 600, 960, true],
+      // The devices the 600px floor used to turn away. A mounted wall tablet
+      // has to be able to be landscape, so these MUST rotate.
+      ['an 8" tablet at hdpi (Lenovo Tab M8, Galaxy Tab A9)', 533, 853, true],
+      ['an 8" tablet at tvdpi (Fire HD 8)', 601, 961, true],
+      ['exactly on the threshold', 500, 960, true],
+      ['one pixel under the threshold', 499, 960, false],
     ])('%s (%s x %s) rotatable: %s', (_name, w, h, expected) => {
       setScreen(w, h);
       expect(isRotatableFormFactor()).toBe(expected);

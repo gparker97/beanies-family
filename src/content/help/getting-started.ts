@@ -776,7 +776,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-09-11',
+    updatedDate: '2026-09-16',
     sections: [
       {
         type: 'paragraph',
@@ -939,7 +939,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The wall is built for a landscape tablet, and that works today in a browser tab on any tablet, and in the beanies app on iPad. If you installed beanies to your Android home screen, or you are using the Android app, the wall stays portrait for now; landscape there is coming in a later release. It still works, it is just taller than it is wide. iPhones are portrait by design, and a phone screen is too narrow for the wall in any case, so beanies will tell you it needs a wider screen rather than showing you something unreadable.',
+          'The wall is built for a landscape tablet, and that works today in a browser tab on any tablet, and in the beanies app on iPad. If you installed beanies to your Android home screen, or you are using the Android app, the wall stays portrait for now; landscape there is coming in a later release. It still works, it is just taller than it is wide. Any tablet will do, including the small 8-inch ones, and the wall makes itself a little more compact on those so it still reads from across the kitchen. A phone is genuinely too small, so beanies says so rather than showing you something unreadable.',
       },
       {
         type: 'paragraph',

@@ -47,6 +47,11 @@ export type DeviceProfile = {
 export const PROFILES: DeviceProfile[] = [
   { name: 'phone', viewport: { width: 360, height: 640 }, deviceScaleFactor: 3, isMobile: true },
   { name: 'tablet7', viewport: { width: 720, height: 1280 }, deviceScaleFactor: 2, isMobile: true },
+  // The budget 8" Android class (Lenovo Tab M8, Galaxy Tab A9 8.7", Fire HD 8 at
+  // the other density). 533 CSS px is the smallest screen the beanie wall now
+  // draws on, and until #96 nothing in any visual suite covered it — the closest
+  // was `tablet7` above, which is 187px wider and a different tier.
+  { name: 'tablet8', viewport: { width: 533, height: 853 }, deviceScaleFactor: 2, isMobile: true },
   {
     name: 'tablet10',
     viewport: { width: 1152, height: 2048 },

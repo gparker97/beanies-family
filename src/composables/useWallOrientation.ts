@@ -20,6 +20,7 @@
  */
 import { onScopeDispose, ref } from 'vue';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { deviceCanRotate } from '@/components/wall/wallRoom';
 
 type OrientationLike = {
   /** Returns a promise that rejects routinely — always attach a handler. */
@@ -33,25 +34,28 @@ function screenOrientation(): OrientationLike | null {
 }
 
 /**
- * Android's own tablet threshold, and the one iPadOS effectively agrees with.
- * Measured on the SMALLEST screen dimension so a phone held sideways — which
- * can easily exceed 768px of width — is still a phone.
- */
-const TABLET_MIN_SIDE_PX = 600;
-
-/**
  * True on a device big enough that landscape is a reasonable way to hold the
  * whole app, not just the wall.
  *
- * `screen.width/height` are the DEVICE dimensions, not the viewport, so this
- * does not change when a browser window is resized — which is what we want: a
- * narrow window on a desktop is not a phone.
+ * ⚠️ The threshold and the `screen` read now live in `wallRoom.ts`, shared with
+ * the wall's admission gate. They were two separate literals both called 600,
+ * and on a 601px device they contradicted each other: this said "tablet, rotate
+ * freely" while the wall's viewport test said "too small to be a wall".
+ *
+ * ⚠️ Lowering that shared floor to 500 means devices between 500 and 600 on
+ * their smaller side — small tablets, and an unfolded foldable's inner screen —
+ * now rotate freely EVERYWHERE in the app, not just on the wall, because
+ * `applyOrientationPolicy()` runs at boot from `main.ts`. That is intended (they
+ * are tablets, and a mounted wall tablet must be able to be landscape), but it
+ * is an app-wide consequence of a wall change and is pinned by tests.
+ *
+ * `deviceCanRotate()` returns FALSE when `screen` cannot be read, which is the
+ * opposite of the wall gate's default and correct here: do not unlock what you
+ * cannot measure. The 2026-06-12 regression was phones rotating against a
+ * locked OS setting.
  */
 export function isRotatableFormFactor(): boolean {
-  if (typeof screen === 'undefined') return false;
-  const { width, height } = screen;
-  if (!width || !height) return false;
-  return Math.min(width, height) >= TABLET_MIN_SIDE_PX;
+  return deviceCanRotate();
 }
 
 /**

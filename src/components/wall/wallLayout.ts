@@ -1,4 +1,5 @@
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
+import { wallChromeFor, type WallChrome } from '@/components/wall/wallRoom';
 
 /**
  * Page-layout facts about the wall's chrome.
@@ -16,7 +17,20 @@ export const RAIL_WIDTH_PX = 296;
 
 /** Everything the rail costs a view's columns, in px. */
 const RAIL_GAP_PX = 16;
-const PAGE_PADDING_PX = 56; // px-7, both sides
+
+/**
+ * ⚠️ The page padding and the arrow gutter are NO LONGER constants here.
+ *
+ * They step with the wall's density tier, and a copy of them in this module
+ * would be a second number that CSS could drift away from — which shows up as
+ * `daysLayoutFor` computing a column count against a width the wall does not
+ * actually have. They live in `wallRoom.ts`, are written onto `.wall-root` as
+ * custom properties, and arrive here as a resolved `WallChrome`.
+ *
+ * This module stays what it was: pure arithmetic about widths. It does not know
+ * what a tier is, and should not learn.
+ */
+const DEFAULT_CHROME: WallChrome = wallChromeFor('full');
 
 /*
  * ─── Three column widths, three different questions ──────────────────────────
@@ -65,7 +79,7 @@ const TARGET_COLUMN_PX = BLOCK_FULL_PX + 1;
  * (113px each at 1280, below MIN_READABLE_COLUMN_PX) for one commit of real
  * crowding sitting in the bisect window.
  */
-export const ARROW_GUTTER_PX = 56;
+export const ARROW_GUTTER_PX = DEFAULT_CHROME.arrowGutter;
 
 /** Below three, the week view stops being distinguishable from the day view. */
 export const MIN_DAY_COLUMNS = 3;
@@ -77,9 +91,9 @@ export const MAX_DAY_COLUMNS = 7;
  * The ONE place the chrome list lives. Both views' width rules read it and then
  * diverge, and that divergence is the point of the two functions below.
  */
-function chromeFreeWidth(viewportPx: number, withRail: boolean): number {
+function chromeFreeWidth(viewportPx: number, withRail: boolean, chrome: WallChrome): number {
   const rail = withRail ? RAIL_WIDTH_PX + RAIL_GAP_PX : 0;
-  return viewportPx - PAGE_PADDING_PX - AXIS_WIDTH_PX - rail;
+  return viewportPx - chrome.padding - AXIS_WIDTH_PX - rail;
 }
 
 /**
@@ -94,8 +108,8 @@ function chromeFreeWidth(viewportPx: number, withRail: boolean): number {
  * `Number.isFinite` guard has to be here rather than at the clamp, because
  * `Math.max(3, NaN)` is NaN.
  */
-function dayColumnsThatFit(viewportPx: number, withRail: boolean): number {
-  const content = chromeFreeWidth(viewportPx, withRail) - ARROW_GUTTER_PX;
+function dayColumnsThatFit(viewportPx: number, withRail: boolean, chrome: WallChrome): number {
+  const content = chromeFreeWidth(viewportPx, withRail, chrome) - chrome.arrowGutter;
   if (!Number.isFinite(content)) return 0;
   return Math.max(0, Math.floor(content / TARGET_COLUMN_PX));
 }
@@ -117,8 +131,12 @@ function dayColumnsThatFit(viewportPx: number, withRail: boolean): number {
  * enabling the rail shrinks the plot below the threshold, which disables the
  * rail, which widens it again. No last-good fallback fixes an oscillating input.
  */
-export function railFits(viewportPx: number, columns: number): boolean {
-  return chromeFreeWidth(viewportPx, true) >= columns * MIN_READABLE_COLUMN_PX;
+export function railFits(
+  viewportPx: number,
+  columns: number,
+  chrome: WallChrome = DEFAULT_CHROME
+): boolean {
+  return chromeFreeWidth(viewportPx, true, chrome) >= columns * MIN_READABLE_COLUMN_PX;
 }
 
 /**
@@ -140,10 +158,11 @@ export function railFits(viewportPx: number, columns: number): boolean {
  */
 export function daysLayoutFor(
   viewportPx: number,
-  portrait: boolean
+  portrait: boolean,
+  chrome: WallChrome = DEFAULT_CHROME
 ): { rail: boolean; columns: number } {
-  const rail = !portrait && dayColumnsThatFit(viewportPx, true) >= MIN_DAY_COLUMNS;
-  const fit = dayColumnsThatFit(viewportPx, rail);
+  const rail = !portrait && dayColumnsThatFit(viewportPx, true, chrome) >= MIN_DAY_COLUMNS;
+  const fit = dayColumnsThatFit(viewportPx, rail, chrome);
   return { rail, columns: Math.min(MAX_DAY_COLUMNS, Math.max(MIN_DAY_COLUMNS, fit)) };
 }
 

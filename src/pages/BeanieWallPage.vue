@@ -34,6 +34,7 @@ import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useWallRoomGate } from '@/composables/useWallRoomGate';
+import { wallChromeFor, wallTierFor } from '@/components/wall/wallRoom';
 import { useToday } from '@/composables/useToday';
 import { useWakeLock } from '@/composables/useWakeLock';
 import { useWallAnchor } from '@/composables/useWallAnchor';
@@ -233,12 +234,37 @@ if (typeof window !== 'undefined') window.addEventListener('resize', onViewportR
  * fixed threshold: with seven columns pinned, the rail had to be traded against
  * them, and that trade is what produced the squeezed-both-ways layout.
  */
-const daysLayout = computed(() => daysLayoutFor(viewportWidth.value, isPortrait.value));
+/**
+ * How dense the wall draws itself, keyed on the SMALLER side of the box.
+ *
+ * Size, not orientation: an iPad in portrait is 810px wide and needs no
+ * step-down, while an 8" tablet in landscape is 533px tall and needs one badly.
+ * `.wall-portrait` still exists for the genuinely orientation-specific rules
+ * (the band's two-column grid); everything size-driven is this.
+ */
+const wallTier = computed(() => wallTierFor(Math.min(viewportWidth.value, viewportHeight.value)));
+
+/**
+ * ⭐ The ONE place these numbers exist.
+ *
+ * They are bound onto `.wall-root` as custom properties below AND handed to
+ * `daysLayoutFor`/`railFits`, so the padding the wall paints and the padding the
+ * column arithmetic subtracts are provably the same value. A CSS copy and a JS
+ * copy would drift, and the only symptom would be a column count computed
+ * against a width the wall does not have. `wallRoom.test.ts` pins the table;
+ * `BeanieWallPage` is what makes CSS read it.
+ */
+const wallChrome = computed(() => wallChromeFor(wallTier.value));
+
+const daysLayout = computed(() =>
+  daysLayoutFor(viewportWidth.value, isPortrait.value, wallChrome.value)
+);
 /** Whether a stacked band still leaves the grid a real day — see `bandFitsHeight`. */
 const roomForBand = computed(() => bandFitsHeight(viewportHeight.value));
 const lanesRail = computed(
   () =>
-    !isPortrait.value && railFits(viewportWidth.value, Math.max(1, familyStore.sortedHumans.length))
+    !isPortrait.value &&
+    railFits(viewportWidth.value, Math.max(1, familyStore.sortedHumans.length), wallChrome.value)
 );
 
 /**
@@ -278,6 +304,50 @@ watch(
     }, RAIL_SETTLE_MS);
   }
 );
+
+/**
+ * ⭐ The SUCCESS-path counter, and the reason #96 went unnoticed.
+ *
+ * Refusals were countable; the population they came from was not. Without a row
+ * per wall that DID render, "how many families are on a small tablet" had no
+ * answer, so a whole device class could be turned away and nothing in CloudWatch
+ * would look wrong. It is also how we confirm after deploy that the fix reached
+ * the tablets it was for, rather than inferring it from the absence of
+ * complaints.
+ *
+ * Debounced on the same settle as `wall_rail_mode`, for the same reason: a
+ * window drag crosses tier boundaries every frame and would eat the surface's
+ * rate bucket.
+ */
+let tierEmitTimer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  wallTier,
+  (tier) => {
+    if (tierEmitTimer) clearTimeout(tierEmitTimer);
+    tierEmitTimer = setTimeout(() => {
+      tierEmitTimer = undefined;
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'wall_tier_rendered',
+        context: {
+          action: 'layout',
+          kind: tier,
+          viewport_w: viewportWidth.value,
+          viewport_h: viewportHeight.value,
+          ...(typeof screen !== 'undefined' && screen?.width
+            ? { screen_w: screen.width, screen_h: screen.height }
+            : {}),
+        },
+      });
+    }, RAIL_SETTLE_MS);
+  },
+  { immediate: true }
+);
+
+onScopeDispose(() => {
+  if (tierEmitTimer) clearTimeout(tierEmitTimer);
+});
 
 /** How long the layout must hold still before it is worth a row in CloudWatch. */
 const RAIL_SETTLE_MS = 300;
@@ -750,6 +820,11 @@ watch(activeView, () => (sheet.value = null));
     v-else
     class="wall-root dark:bg-surface-ground relative flex h-[100dvh] flex-col overflow-hidden bg-[var(--cloud-white,#F8F9FA)]"
     :class="{ 'wall-portrait': isPortrait }"
+    :data-tier="wallTier"
+    :style="{
+      '--wall-pad': `${wallChrome.padding / 2}px`,
+      '--wall-arrow-gutter': `${wallChrome.arrowGutter}px`,
+    }"
     @pointerdown="lock.noteActivity"
   >
     <!--
@@ -758,14 +833,14 @@ watch(activeView, () => (sheet.value = null));
       (z-30, and later in the DOM) painted over it and the wall's only exit,
       night-mode and unlock controls were unreachable while a sheet was open.
     -->
-    <header class="relative z-40 flex shrink-0 items-center gap-4 px-7 pt-5 pb-3">
+    <header class="wall-header relative z-40 flex shrink-0 items-center gap-4 pt-5 pb-3">
       <!-- ⚠️ `flex-1` as well as `min-w-0`, matching `CalendarCommandBar`. `ml-auto` on the
            cluster beside it only anchors the arrows while free space is POSITIVE; once the
            header overflows, `margin-left: auto` resolves to 0 and negative space is shared out
            in proportion to base sizes — which include the nav label — so the arrows become
            label-dependent again. Growing to take the slack keeps free space positive, and
            `truncate` on the date is what lets this actually shrink. -->
-      <div class="min-w-0 flex-1">
+      <div class="wall-header-title min-w-0">
         <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink truncate font-extrabold">
           {{
             new Date(`${today}T00:00:00`).toLocaleDateString(undefined, {
@@ -779,7 +854,7 @@ watch(activeView, () => (sheet.value = null));
           {{ subtitle }}
         </p>
       </div>
-      <div class="ml-auto flex items-center gap-3">
+      <div class="wall-header-controls ml-auto flex items-center gap-3">
         <!--
           The period navigator. Hidden on the jobs board, which has no date at
           all (`stepUnit: null` in the registry).
@@ -894,7 +969,7 @@ watch(activeView, () => (sheet.value = null));
       </div>
     </header>
 
-    <main class="relative flex min-h-0 flex-1 flex-col px-7">
+    <main class="wall-main relative flex min-h-0 flex-1 flex-col">
       <component
         :is="currentView.component"
         :week-days="weekDays"
@@ -1000,9 +1075,69 @@ watch(activeView, () => (sheet.value = null));
  * no scroll to recover the wall's only exit. Padding is inside the 100dvh
  * (border-box), so nothing overflows.
  */
+
+/*
+ * ─── The density tier ────────────────────────────────────────────────────────
+ *
+ * Keyed on the SMALLER side of the wall box via `data-tier`, not on orientation.
+ * Every value that steps between tiers is a custom property, so the step-down is
+ * legible as a table rather than scattered through overrides.
+ *
+ * ⚠️ `--wall-pad` and `--wall-arrow-gutter` are NOT set here. They are written
+ * onto the element by `BeanieWallPage` from `wallChromeFor()`, the same call
+ * that feeds `daysLayoutFor`, so the painted padding and the subtracted padding
+ * are one number. Setting them in CSS too would recreate the drift.
+ *
+ * Nothing here goes below 0.75rem (the CIG floor) and no tap target below
+ * 2.4rem, which is the smallest a child standing at a mounted tablet can hit.
+ */
 .wall-root {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+
+  --wall-date: 2.6rem;
+  --wall-subtitle: 0.95rem;
+  --wall-clock: 2.3rem;
+  --wall-clock-col: 11.5rem;
+  --wall-nav-label: 1rem;
+  --wall-tap: 2.75rem;
+  --wall-dnum: 1.65rem;
+}
+
+.wall-root[data-tier='mid'] {
+  --wall-date: 1.85rem;
+  --wall-subtitle: 0.85rem;
+  --wall-clock: 1.7rem;
+  --wall-clock-col: 8.5rem;
+  --wall-nav-label: 0.9rem;
+  --wall-tap: 2.5rem;
+  --wall-dnum: 1.35rem;
+}
+
+.wall-root[data-tier='compact'] {
+  --wall-date: 1.45rem;
+  --wall-subtitle: 0.8rem;
+  --wall-clock: 1.35rem;
+  --wall-clock-col: 5.6rem;
+  --wall-nav-label: 0.82rem;
+  --wall-tap: 2.4rem;
+  --wall-dnum: 1.15rem;
+}
+
+/* The page gutter, from the shared chrome. */
+.wall-header,
+.wall-main {
+  padding-left: var(--wall-pad, 1.75rem);
+  padding-right: var(--wall-pad, 1.75rem);
+}
+
+/*
+ * The compact wall drops the subtitle. The date already names the day, and the
+ * row it frees goes to the calendar, which is the thing being read from across
+ * the room.
+ */
+.wall-root[data-tier='compact'] :deep(.wall-subtitle) {
+  display: none;
 }
 
 .wall-exit-spinner {
@@ -1027,8 +1162,12 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root :deep(.wall-date) {
-  font-size: 2.6rem;
+  font-size: var(--wall-date);
   line-height: 1;
+
+  /* The date's floor, in `ch` so it scales with the tier's own font-size. This
+     is what makes the header wrap instead of ellipsising the date. */
+  min-width: 11ch;
 }
 
 .wall-root :deep(.wall-stamp) {
@@ -1036,11 +1175,11 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root :deep(.wall-subtitle) {
-  font-size: 0.92rem;
+  font-size: var(--wall-subtitle);
 }
 
 .wall-root :deep(.wall-clock) {
-  font-size: 2.3rem;
+  font-size: var(--wall-clock);
 }
 
 /* The period navigator. rem-based like the rest of the wall scale, so Large
@@ -1053,19 +1192,19 @@ watch(activeView, () => (sheet.value = null));
 .wall-root :deep(.wall-nav-arrow) {
   display: grid;
   font-size: 1.1rem;
-  height: 2.75rem;
+  height: var(--wall-tap);
   line-height: 1;
-  min-width: 2.75rem;
+  min-width: var(--wall-tap);
   place-items: center;
 }
 
 .wall-root :deep(.wall-nav-label) {
-  font-size: 0.92rem;
+  font-size: var(--wall-nav-label);
 }
 
 .wall-root :deep(.wall-nav-today) {
   font-size: 0.85rem;
-  min-height: 2.75rem;
+  min-height: var(--wall-tap);
 }
 
 .wall-root :deep(.wall-card-title) {
@@ -1147,13 +1286,13 @@ watch(activeView, () => (sheet.value = null));
 .wall-root .wall-clock-col {
   /* A FIXED reservation, not a floor — see the template. Wide enough for a 12-hour clock at
      2.3rem plus the longest status stamp, and the stamp truncates inside it. */
-  width: 11.5rem;
+  width: var(--wall-clock-col);
 }
 
 .wall-root :deep(.wall-switch-btn) {
   font-size: 1.2rem;
-  height: 2.75rem;
-  width: 2.9rem;
+  height: var(--wall-tap);
+  width: var(--wall-tap);
 }
 
 .wall-root :deep(.wall-lock-btn) {
@@ -1171,7 +1310,7 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root :deep(.wall-dnum) {
-  font-size: 1.65rem;
+  font-size: var(--wall-dnum);
 }
 
 .wall-root :deep(.wall-block-title) {
@@ -1322,45 +1461,70 @@ watch(activeView, () => (sheet.value = null));
  * ~60% of the width, so the header furniture has to come down or the date and
  * the clock each wrap onto two lines and eat a third of the screen.
  */
-.wall-portrait :deep(.wall-date) {
-  font-size: 1.85rem;
+
+/*
+ * ─── The header wraps before the date dies ───────────────────────────────────
+ *
+ * The header holds the date, the period navigator, the view switcher and the
+ * clock. Everything but the date has a fixed width, and the date was
+ * `flex-1 min-w-0`, so when the row ran out of space the date absorbed the
+ * ENTIRE shortfall and truncated. At a 601px-wide wall it collapsed to the
+ * single letter "W", and even the 1280px baseline was already ellipsising.
+ *
+ * ⭐ No breakpoint. An earlier cut used a tier-aware `max-width` media query and
+ * it was wrong twice: the tier is keyed on the SHORT side, so a 961x601 wall is
+ * the `mid` tier at a width that never triggered a width-keyed rule, and the
+ * date truncated anyway. The question is not "how wide is the wall" but "does
+ * the date still fit", and flexbox can answer that itself.
+ *
+ * So: the header may wrap, and the date is given a real minimum in `ch` — which
+ * scales with the tier's own font-size for free. The controls carry `ml-auto`
+ * and drop to their own row exactly when they no longer fit beside a legible
+ * date, at any width, in any tier, in any locale. `truncate` stays on the date
+ * as the last resort for a locale that overruns even a full row.
+ */
+.wall-header {
+  flex-wrap: wrap;
 }
 
-.wall-portrait :deep(.wall-subtitle) {
-  font-size: 0.82rem;
+.wall-header-title {
+  flex: 1 1 auto;
 }
 
-.wall-portrait :deep(.wall-clock) {
-  font-size: 1.7rem;
+.wall-header-controls {
+  /*
+   * The controls may wrap among themselves as well. Dropping them onto their
+   * own row is not enough on the narrowest walls: the navigator, the switcher
+   * and the clock together still overran a 533px row by ~57px, and `.wall-root`
+   * is `overflow-hidden`, so the overrun was invisible rather than absent — it
+   * simply cut the clock off. Wrapping is the honest fallback, and `min-width: 0`
+   * is what lets it happen inside a flex parent at all.
+   */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
 }
 
-.wall-portrait :deep(.wall-nav-arrow) {
-  font-size: 1rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
+/*
+ * The compact wall drops the period LABEL, not the arrows. The label restates
+ * what the day columns underneath already show, while the arrows are the only
+ * way to move the week, so the label is what can go. Matches the approved
+ * mockup (docs/mockups/wall-small-tablet-tier-2026-09-16.html).
+ */
+.wall-root[data-tier='compact'] :deep(.wall-nav-label) {
+  display: none;
 }
 
-.wall-portrait :deep(.wall-nav-label) {
-  font-size: 0.82rem;
-}
-
-.wall-portrait :deep(.wall-nav-today) {
-  font-size: 0.78rem;
-  min-height: 2.5rem;
-}
-
-.wall-portrait .wall-clock-col {
-  /* Narrower upright, exactly as .wall-clock and .wall-nav-arrow are — an upright tablet has
-     about 60% of the width, and a reservation that does not shrink with them steals it from the
-     date. Every other header hook has this partner; this one existed without it for one commit. */
-  width: 8.5rem;
-}
-
-.wall-portrait :deep(.wall-switch-btn) {
-  font-size: 1.05rem;
-  height: 2.4rem;
-  width: 2.5rem;
-}
+/*
+ * ⚠️ The portrait step-downs for the date, subtitle, clock, nav and switcher
+ * are GONE, replaced by the size tier above.
+ *
+ * They were keyed on orientation, which gets it wrong in both directions at
+ * once: an iPad in portrait is 810px wide and never needed them, while an 8"
+ * tablet in LANDSCAPE is 533px tall and never got them. What is left below is
+ * the genuinely orientation-specific rule.
+ */
 
 .wall-portrait :deep(.wall-lock-btn) {
   font-size: 1.15rem;
