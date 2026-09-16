@@ -48,15 +48,22 @@ async function rebindTo(fileId: string, fileName: string): Promise<boolean> {
   return result.ok;
 }
 
-async function pickFamilyFile(): Promise<void> {
-  // ⚠️ Every outcome is answered. This used to open with
-  // `if (picked.kind !== 'picked') return;` — a cancel, a full-page redirect and a hard Picker
-  // failure were all the same silent no-op, on the banner a family only sees because their pod
-  // is already broken.
-  //
-  // Rendered through `showToast`, which this component already uses for the sibling
-  // reconnect-failure case. A third local error channel here would be a coupling regression.
-  const result = await reselect();
+/**
+ * Pick a `.beanpod` and rebind the pod to it.
+ *
+ * ⚠️ Every outcome is answered. This used to open with
+ * `if (picked.kind !== 'picked') return;` — a cancel, a full-page redirect and a hard Picker
+ * failure were all the same silent no-op, on the banner a family only sees because their pod
+ * is already broken.
+ *
+ * Rendered through `showToast`, which this component already uses for the sibling
+ * reconnect-failure case. A third local error channel here would be a coupling regression.
+ *
+ * ONE body for both recovery buttons, so the silent path and the account-chooser path cannot
+ * drift in how they report themselves.
+ */
+async function runReselect(opts?: { chooseAccount?: boolean }): Promise<void> {
+  const result = await reselect(opts);
   switch (result.outcome) {
     case 'rebound':
     case 'declined':
@@ -66,8 +73,23 @@ async function pickFamilyFile(): Promise<void> {
       showToast('error', t('googleDrive.reconnectFailed'), t(result.messageKey));
       return;
     default:
-      assertNever(result, 'PodAccessBanner.pickFamilyFile');
+      assertNever(result, 'PodAccessBanner.runReselect');
   }
+}
+
+async function pickFamilyFile(): Promise<void> {
+  await runReselect();
+}
+
+/**
+ * The same recovery, but through Google's ACCOUNT CHOOSER.
+ *
+ * For the family whose pod broke because the browser is signed into the wrong Google account —
+ * the case `pickFamilyFile` alone cannot reach, now that the Picker takes the silent token and
+ * is pinned to that token's account. See `PodRecoveryAction`.
+ */
+async function pickFamilyFileOtherAccount(): Promise<void> {
+  await runReselect({ chooseAccount: true });
 }
 
 async function switchToCanonical(): Promise<void> {
@@ -121,6 +143,7 @@ const handlers: Record<PodRecoveryAction, () => Promise<void>> = {
     await syncStore.verifyPodAccess();
   },
   pickFamilyFile,
+  pickFamilyFileOtherAccount,
   switchToCanonical,
 };
 

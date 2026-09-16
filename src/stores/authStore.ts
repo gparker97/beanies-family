@@ -1317,13 +1317,27 @@ export const useAuthStore = defineStore('auth', () => {
    * it, so it cannot be used on yourself, on a pet, on the owner, or by someone without
    * `canManagePod`.
    *
-   * ⚠️ ALL THE MEMBER'S KEY MATERIAL GOES, NOT JUST THE HASHES. Clearing `pinHash` /
-   * `passwordHash` only changes what the roster DERIVES; the envelope's `wrappedKeys` and
-   * `passkeyWrappedKeys` entries are what actually decrypt the pod, and they are keyed
-   * separately. Clearing the claim while leaving those behind would mean the person's old
-   * password or old passkey still opens the family data — an unclaim that undid the label and
-   * none of the access. Device credentials go too, for the orphan class ADR-029 exists for;
-   * `familyStore.invalidateDeviceCredentials` is the same call the delete path uses.
+   * ⚠️ WHAT THIS DOES AND DOES NOT DO, stated plainly because an earlier version of it
+   * overpromised in its log line and its confirm copy.
+   *
+   * IT DOES block sign-in and re-enable the invite. Clearing `pinHash` / `passwordHash` and
+   * bumping `pinVersion` are Automerge writes, so they merge properly and reach every device;
+   * `requiresPassword` derives true again and the owner can mint a fresh link. That is the ask.
+   * Device credentials on THIS device go too, for the orphan class ADR-029 exists for.
+   *
+   * IT DOES NOT revoke the envelope's `wrappedKeys` / `passkeyWrappedKeys`, and no caller
+   * should claim otherwise. Those dicts merge local-wins-by-UNION, so a deletion is invisible
+   * to the merge and the wrap unions straight back on the next sync — including the very sync
+   * below. See `syncStore.retireMemberKeyMaterial`, which proves it, and `envelopeMerge.ts`,
+   * whose header has recorded the limitation all along ("requires tombstones"). Until
+   * tombstones land, an unclaimed member's OLD password or OLD passkey remains latent key
+   * material in the envelope. It is not an active sign-in path (the doc-side hashes are gone,
+   * and every sign-in checks those), but it is not revocation and must not be described as it.
+   *
+   * ⚠️ NO `reason` PARAMETER. It briefly took one, so a `'join-failed'` caller could skip the
+   * manager gate — which made the gate bypassable by any caller willing to pass the string, on
+   * an action that strips another member's access. The join path no longer needs it: the claim
+   * is now the last fallible write in `joinFamily`, so there is nothing to roll back.
    *
    * ⚠️ NO `reason` PARAMETER. It briefly had one, so a `'join-failed'` caller could skip the
    * manager gate — which made the gate bypassable by any caller willing to pass the string, on
@@ -1365,7 +1379,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     const { useSyncStore } = await import('./syncStore');
     const syncStore = useSyncStore();
-    const wrapsRetired = syncStore.retireMemberKeyMaterial(targetMemberId);
+    const retired = syncStore.retireMemberKeyMaterial(targetMemberId);
     await familyStore.invalidateDeviceCredentials(targetMemberId);
 
     logEvent({
@@ -1375,9 +1389,30 @@ export const useAuthStore = defineStore('auth', () => {
       context: {
         action: 'unclaim',
         member_id_tail: targetMemberId.slice(-8),
-        count: wrapsRetired,
+        count: retired.passkeySecretsCleared,
       },
     });
+
+    // ⚠️ SAY THE LIMITATION OUT LOUD, EVERY TIME. The envelope wraps this just deleted
+    // locally will union straight back from remote on the next merge, so the family's old key
+    // material survives an unclaim. Recording it per-invocation rather than trusting a code
+    // comment means the day tombstones ship there is a real number for how often it mattered,
+    // and until then it is visible to anyone reading the firehose rather than only to someone
+    // reading this file.
+    if (retired.localWrapsCleared > 0 || retired.noEnvelope) {
+      logEvent({
+        level: 'warn',
+        surface: 'join-flow',
+        message: retired.noEnvelope
+          ? 'unclaim ran with no envelope loaded; no key material was even attempted'
+          : 'unclaim cleared envelope wraps LOCALLY ONLY; the merge will restore them',
+        context: {
+          action: 'unclaim_wraps_not_revoked',
+          member_id_tail: targetMemberId.slice(-8),
+          count: retired.localWrapsCleared,
+        },
+      });
+    }
 
     // ⚠️ PUSH IT. The doc mutation and the envelope write both only schedule a debounced
     // autosave, and the very next thing the owner does is mint a new invite link against a
@@ -1585,7 +1620,24 @@ export const useAuthStore = defineStore('auth', () => {
 
     const pinHash = await hashPassword(newPin);
     const pinVersion = (member.pinVersion ?? 0) + 1;
-    await familyStore.updateMember(memberId, { pinHash, pinVersion });
+    // ⚠️ CHECK THE WRITE. `familyStore.updateMember` runs inside `wrapAsync`, which catches,
+    // toasts and RESOLVES — it returns `null` on failure rather than throwing. Discarding that
+    // return meant this function reported `{ success: true }` for a PIN that never landed, and
+    // `joinFamily` then signed the member in, marked onboarding complete and returned success
+    // for a claim that does not exist — leaving them unable to sign in with the PIN they had
+    // just chosen. It also silently falsified the whole reason `joinFamily` needs no rollback:
+    // that reasoning says the claim is the last FALLIBLE write, which is only true if a failed
+    // claim is actually detected here.
+    const written = await familyStore.updateMember(memberId, { pinHash, pinVersion });
+    if (!written) {
+      reportError({
+        surface: 'login-flow',
+        severity: 'critical',
+        message: 'PIN write did not land; the claim was not made',
+        context: { action: 'pin_write_failed', member_id_tail: memberId.slice(-8) },
+      });
+      return { success: false, error: translationStore.t('auth.signInFailed') };
+    }
 
     const { useSyncStore } = await import('./syncStore');
     const syncStore = useSyncStore();

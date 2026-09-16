@@ -31,13 +31,22 @@ const fileNotFoundBody = computed(() => {
   return t('googleDrive.fileNotFoundBody').replace('{email}', email);
 });
 
-async function handleReselectFile() {
+/**
+ * ONE body for both recovery buttons, so the silent path and the account-chooser path cannot
+ * drift in how they report themselves.
+ *
+ * ⚠️ NOT bound directly to `@click`. Vue passes the `PointerEvent` as the first argument, which
+ * would arrive here as `opts` and make `opts.chooseAccount` undefined-but-present — the kind of
+ * accident that turns a deliberate switch into a silent no-op. The two named handlers below are
+ * the only callers.
+ */
+async function runReselect(opts?: { chooseAccount?: boolean }) {
   reselectError.value = null;
   // ⚠️ Every outcome is answered. This used to open with
   // `if (result.kind !== 'picked') return;` — a cancel, a full-page redirect and a hard Picker
   // failure all became a banner that did nothing when tapped, on a screen a family only reaches
   // because their pod is already broken.
-  const result = await reselect();
+  const result = await reselect(opts);
   switch (result.outcome) {
     case 'rebound':
       emit('reconnected');
@@ -52,8 +61,26 @@ async function handleReselectFile() {
       // logged by the composable, and neither is an error to put in front of them.
       return;
     default:
-      assertNever(result, 'SaveFailureBanner.handleReselectFile');
+      assertNever(result, 'SaveFailureBanner.runReselect');
   }
+}
+
+async function handleReselectFile(): Promise<void> {
+  await runReselect();
+}
+
+/**
+ * The same recovery through Google's ACCOUNT CHOOSER.
+ *
+ * ⚠️ This banner had no route to the chooser at all. `pick()` used to default to
+ * `forceConsent: true`, which incidentally made the user confirm an account here; flipping
+ * that to the silent path fixed a redirect loop and took the confirmation with it. The join
+ * card gained a "different account" link in exchange, this banner gained nothing — and pinning
+ * the Picker to the cached token's account then meant the browser's own session could not
+ * surface the right one either. See `PodRecoveryAction`.
+ */
+async function handleReselectOtherAccount(): Promise<void> {
+  await runReselect({ chooseAccount: true });
 }
 
 function handleRefresh(): void {
@@ -98,6 +125,13 @@ function goToSettings() {
           @click="handleReselectFile"
         >
           {{ isBusy ? '...' : t('googleDrive.fileNotFoundReselect') }}
+        </button>
+        <button
+          :disabled="isBusy"
+          class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:cursor-not-allowed disabled:bg-white/10"
+          @click="handleReselectOtherAccount"
+        >
+          {{ t('podAccess.recovery.pickFamilyFileOtherAccount') }}
         </button>
         <button
           class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30"

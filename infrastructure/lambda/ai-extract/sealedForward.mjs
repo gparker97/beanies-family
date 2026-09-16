@@ -60,6 +60,19 @@ export const SEALED_CONFIG_PROTOCOL = 'ehbp-config';
  * it, because it would let anyone holding the bundle's api key point our key at an arbitrary host.
  */
 const EHBP_HEADER_RE = /^ehbp-[a-z0-9-]{1,48}$/i;
+/**
+ * The most keys we will even LOOK at on a caller-supplied `ehbp` object.
+ *
+ * ⚠️ A DoS BACKSTOP, NOT A FUNCTIONAL LIMIT, and the gap between those two is the whole
+ * reason for the number. A real EHBP body carries a handful of headers, so 2048 is orders of
+ * magnitude above anything legitimate — deliberately, because the requirement the tests encode
+ * is that the real `ehbp-encapsulated-key` survives ANY amount of junk in front of it (the
+ * starvation case sends 300 junk keys and expects the 301st to be relayed). A tight ceiling
+ * would satisfy the DoS concern by reintroducing exactly the starvation bug. What this bounds
+ * is the hundreds of thousands of keys an abusive caller can send, where the per-key regex work
+ * stops being free. Under the ceiling every key is still examined.
+ */
+const MAX_EHBP_KEYS = 2048;
 
 /**
  * Make a client-supplied string safe to put in a log line.
@@ -144,38 +157,56 @@ function relayEhbpHeaders(source, direction) {
   const out = {};
   const dropped = [];
   let kept = 0;
-  let seen = 0;
-  // ⚠️ `for…in`, NOT `Object.entries`. `Object.entries` builds the WHOLE array up front, before
-  // any bound in the loop body can run — and on a string it yields one [index, char] pair per
-  // character, so `ehbp: "<4.5MB string>"` allocated ~4.5M pairs and killed the 256MB process
-  // outright (`memory_size = 256` in modules/ai-extract/main.tf). A dead process never reaches
-  // this arm's try/catch, so API Gateway answered a bare 502 with no CORS headers, which pages
-  // #beanies-errors.
+
+  // ⚠️ THE BOUND IS ON THE INPUT, NOT ON THE LOOP, and both alternatives were tried and are
+  // wrong:
   //
-  // ⚠️ THE TYPE GUARD UPSTREAM IS THE REAL FIX, and an earlier version of this comment claimed
-  // `for…in` made the iteration lazy. Measured: it does not. `for (const k in '<4.5MB string>')`
-  // takes ~3.8s and ~40MB before the first loop body runs, because V8 materialises the whole
-  // own-enumerable-key list first — so `seen` cannot bound an allocation that has already
-  // happened. `for…in` is kept because it is no worse and reads plainly, but if the
-  // `typeof ehbp !== 'object'` check above is ever relaxed, this loop is NOT a second line of
-  // defence. A plain object with 300k keys still costs ~78ms before `seen` can break.
-  for (const name in source) {
-    if (!Object.hasOwn(source, name)) continue;
+  //  · A `break` inside the loop STARVES the real header. A body shaped
+  //    `{a0..a63: 'x', 'ehbp-encapsulated-key': '<real>'}` exhausts the budget on junk and
+  //    leaves before reaching the one header that matters — and this function does not refuse,
+  //    it drops silently, so execution continues into `openRead`, spends the family's one-use
+  //    grant, and pays Tinfoil for ciphertext the enclave cannot decapsulate. There is a test
+  //    named for exactly that ("does not let junk keys starve the real ehbp header").
+  //  · No bound at all leaves the walk unbounded. A rewrite that replaced the `break` with
+  //    `dropped.length < MAX && ++seen <= MAX * 4` bounded nothing: `dropped` fills to MAX
+  //    first, the `&&` short-circuits, and `seen` freezes at 16 and never reaches 64.
+  //
+  // Refusing an ABSURD key count up front satisfies both. A legitimate EHBP body carries a
+  // handful of headers, so anything past this ceiling is not a protocol upgrade we want to
+  // tolerate — and every key below it is still examined, so no amount of junk under the
+  // ceiling can hide the real header.
+  // `Object.keys` throws on null/undefined where `for…in` was simply a no-op, and an absent
+  // `ehbp` is the ORDINARY case (only the sealed arm sends one). Without this the relay turned
+  // every unsealed request into a 500.
+  if (!source || typeof source !== 'object') return out;
+
+  const names = Object.keys(source);
+  if (names.length > MAX_EHBP_KEYS) {
+    // Loud, because this is the one path that returns nothing on a request that looked sealed.
+    // Silence here would surface downstream as a decryption failure and point the reader at the
+    // cryptography, which is the misdiagnosis this whole module keeps having to undo.
+    console.warn(
+      `[ai-extract] refused ${direction} ehbp: ${names.length} keys exceeds ${MAX_EHBP_KEYS}`
+    );
+    return out;
+  }
+
+  // ⚠️ `Object.keys` ABOVE ALREADY MATERIALISED THE KEY LIST, which is the same thing
+  // `for…in` does — measured at ~3.8s and ~40MB for `for (const k in '<4.5MB string>')`,
+  // because V8 builds the whole own-enumerable-key list before the first loop body runs. So no
+  // in-loop counter could ever have bounded the allocation; only the `typeof ehbp !== 'object'`
+  // guard upstream does that, and this loop is NOT a second line of defence if it is relaxed.
+  // What the ceiling above bounds is the per-key WORK (a regex test each), which is the part
+  // that was genuinely unbounded.
+  for (const name of names) {
     const value = source[name];
-    // BOTH counters are bounded, not just `kept`. An earlier version bounded only the kept
-    // headers, so a caller could still push 50,000 junk keys into `dropped` and make us build one
-    // multi-megabyte log line per invocation.
-    // ⚠️ THE PREFIX TEST COMES FIRST, and the ordering is the defect this fixes. `seen` used to
-    // be incremented before anything looked at the name, so a body shaped
-    // `{a0..a63: 'x', 'ehbp-encapsulated-key': '<real>'}` exhausted the budget on junk and
-    // never reached the real header — and `relayEhbpHeaders` does not refuse, it drops
-    // silently, so execution continued into `openRead`, spent the family's one-use grant, and
-    // paid Tinfoil for ciphertext the enclave could not decapsulate. The client's
+    // ⚠️ THE PREFIX TEST COMES FIRST. See the starvation note above: anything that spends
+    // budget before looking at the name can drop the only header that matters. The client's
     // `selectEhbpHeaders` had the same bug and is fixed the same way.
     if (!EHBP_HEADER_RE.test(name)) {
-      if (dropped.length < MAX_EHBP_HEADERS && ++seen <= MAX_EHBP_HEADERS * 4) {
-        dropped.push(logSafe(name));
-      }
+      // `dropped` is capped independently of the walk, so a body full of junk under the ceiling
+      // still cannot build one multi-megabyte log line per invocation.
+      if (dropped.length < MAX_EHBP_HEADERS) dropped.push(logSafe(name));
       continue;
     }
     if (

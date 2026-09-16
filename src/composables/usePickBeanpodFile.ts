@@ -91,7 +91,23 @@ export function usePickBeanpodFile() {
         if (!chooseAccount) {
           // Seed a beanpod-mirrored refresh token (account-matched) so the silent path can
           // succeed without consent; harmless no-op if there is no doc token.
-          if (loginHint) await tryReconnectSilently(loginHint);
+          //
+          // ⚠️ ITS OWN CATCH, because "best-effort" was only ever a claim in a comment. Sharing
+          // the outer `try` meant a rejection here — an offline device, a Drive blip, a
+          // malformed stored token — abandoned the whole auth chain and returned
+          // `{kind:'failed', reason:'auth'}`, so an OPTIONAL optimisation could cost the joiner
+          // the Picker entirely. There may still be a perfectly good cached token one line
+          // below; find out before giving up.
+          if (loginHint) {
+            try {
+              await tryReconnectSilently(loginHint);
+            } catch (reconnectErr) {
+              console.warn(
+                '[usePickBeanpodFile] silent reconnect failed; continuing',
+                reconnectErr
+              );
+            }
+          }
           token = await tryGetSilentToken();
         }
         if (!token) {
@@ -100,7 +116,13 @@ export function usePickBeanpodFile() {
             await startRedirectAuth(returnPath, loginHint, 'join', {
               // The redirect path hardcoded `prompt=consent`, so it could not show the chooser
               // either. Pass it through so "different account" means that on iOS too.
-              prompt: chooseAccount ? 'select_account' : undefined,
+              //
+              // ⚠️ BOTH VALUES, never a bare `select_account`. Join is emphatically an
+              // offline-access caller, and Google returns a `refresh_token` only when `consent`
+              // is asked for. A second Google account that has already granted the scopes — the
+              // common case here — would otherwise come back with nothing to refresh, and the
+              // joiner would face a consent screen on every cold start thereafter.
+              prompt: chooseAccount ? 'select_account consent' : undefined,
             });
             // ⚠️ `'redirecting'`, NOT `'cancelled'` — and that distinction is a production bug fix,
             // not a nicety. The page is navigating to Google; the user has done nothing and

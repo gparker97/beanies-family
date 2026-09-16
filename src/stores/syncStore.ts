@@ -5917,39 +5917,72 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Retire ALL of a member's family-key material from the envelope: their password wrap and
-   * every passkey wrap enrolled under their id. One envelope write, one `setEnvelope`.
+   * Retire what we CAN of a member's family-key material.
    *
-   * ⚠️ WHY BOTH, AND WHY THIS EXISTS. Clearing `pinHash` / `passwordHash` in the doc only
-   * makes a member LOOK unclaimed — `requiresPassword` is derived from those two fields. The
-   * envelope wraps are what actually decrypt the pod, and they are keyed independently. Leaving
-   * them behind means an unclaimed member's old password or old passkey still opens the family
-   * data, which turns "clear this claim so I can re-invite them" into a no-op on the only part
-   * that matters.
+   * ⚠️ READ THIS BEFORE TELLING A FAMILY THEIR ACCESS IS REVOKED. It is not, and this function
+   * cannot make it so. Envelope key dicts are merged LOCAL-WINS-BY-UNION
+   * (`envelopeMerge.mergeKeyDict` is `{...remote, ...local}`), and a spread cannot express a
+   * deletion. So the very `syncNowBounded()` that follows an unclaim runs
+   * `fetchAndMergeRemote` → `adoptRemoteEnvelopeKeys` → `preserveLocalKeyDicts`, the remote copy
+   * of the wrap unions straight back in, and it is re-uploaded. Any second family device does
+   * the same on its next poll. Proven, not assumed:
    *
-   * Returns the number of entries removed, so the caller can log a real number instead of
-   * asserting a cleanup it did not observe.
+   *     mergeKeyDict({A:'w', B:'w'}, {A:'w'})  ->  {A:'w', B:'w'}
+   *
+   * `envelopeMerge.ts` states the limitation in its own header ("deletions don't propagate
+   * either direction ... requires tombstones, tracked separately"). Until tombstones exist,
+   * envelope-level revocation is NOT available to any caller, and an earlier version of this
+   * function promised it in its name, its log line and the confirm copy above it.
+   *
+   * What IS real and does stick:
+   *  · the doc-side `pinHash` / `passwordHash` clear and the `pinVersion` bump, which are
+   *    Automerge writes and merge properly — that is what blocks sign-in and re-enables the
+   *    invite, i.e. the thing the owner actually asked for;
+   *  · this device's passkey/unlock credentials, via `invalidateDeviceCredentials`;
+   *  · the in-memory `passkeySecrets` entries below, which matter because
+   *    `effectivePasskeySecrets` lets the in-memory ref WIN over the envelope — so a passkey
+   *    enrolled this session would otherwise keep offering its `wrappedFamilyKey` to
+   *    `useBiometricSignIn` for the rest of the session.
+   *
+   * Returns what happened, rather than a bare count, so the caller can report honestly instead
+   * of asserting a cleanup it did not observe.
    */
-  function retireMemberKeyMaterial(memberId: string): number {
-    if (!envelope.value) return 0;
+  function retireMemberKeyMaterial(memberId: string): {
+    localWrapsCleared: number;
+    passkeySecretsCleared: number;
+    /** True when there was no envelope at all — nothing was even attempted. */
+    noEnvelope: boolean;
+  } {
+    // In-memory passkey secrets first: this part is unconditional and genuinely effective for
+    // the rest of the session, envelope or no envelope.
+    const before = passkeySecrets.value.length;
+    passkeySecrets.value = passkeySecrets.value.filter((sec) => sec.memberId !== memberId);
+    const passkeySecretsCleared = before - passkeySecrets.value.length;
+
+    if (!envelope.value) {
+      return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: true };
+    }
+
     const wrappedKeys = { ...envelope.value.wrappedKeys };
-    let removed = 0;
+    let localWrapsCleared = 0;
     if (wrappedKeys[memberId]) {
       delete wrappedKeys[memberId];
-      removed += 1;
+      localWrapsCleared += 1;
     }
 
     const passkeyWrappedKeys = { ...envelope.value.passkeyWrappedKeys };
     for (const [credentialId, wpk] of Object.entries(passkeyWrappedKeys)) {
-      // ⚠️ An entry with NO `memberId` is an older envelope's, and is deliberately left
-      // alone: it cannot be attributed to this member, and deleting it would lock whoever it
-      // does belong to out of the pod. A stale wrap is recoverable; a destroyed one is not.
+      // ⚠️ An entry with NO `memberId` is an older envelope's, and is deliberately left alone:
+      // it cannot be attributed to this member, and deleting it would lock whoever it does
+      // belong to out of the pod. A stale wrap is recoverable; a destroyed one is not.
       if (wpk.memberId === memberId) {
         delete passkeyWrappedKeys[credentialId];
-        removed += 1;
+        localWrapsCleared += 1;
       }
     }
-    if (removed === 0) return 0;
+    if (localWrapsCleared === 0) {
+      return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: false };
+    }
 
     const env: import('@/types/syncFileV4').BeanpodFileV4 = {
       ...envelope.value,
@@ -5958,7 +5991,7 @@ export const useSyncStore = defineStore('sync', () => {
     };
     envelope.value = env;
     syncService.setEnvelope(env);
-    return removed;
+    return { localWrapsCleared, passkeySecretsCleared, noEnvelope: false };
   }
 
   function removePasskeySecretsForCredential(credentialId: string): void {

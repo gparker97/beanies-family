@@ -14,6 +14,7 @@
  * failure. `ExportStage` + `ExportError` are the single taxonomy the View and
  * the delivery helper import (no drifting string literals).
  */
+import { withTimeout } from '@/utils/timing';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { logEvent } from '@/services/telemetry';
 
@@ -65,6 +66,14 @@ function loadJsPdf(): Promise<typeof import('jspdf')> {
  * is that a slow font CDN must not cost someone their recovery kit.
  */
 const FONT_EMBED_TIMEOUT_MS = 6_000;
+
+/**
+ * ⚠️ NOT `'login-flow'`. These events were filed under the recovery-kit surface because that
+ * is where the Firefox bug was reported, but `MealPlannerPage` exports through the same
+ * function — so a meal-planner font failure filed itself against login and would have been
+ * triaged as an auth problem. One surface for the exporter, whoever calls it.
+ */
+const SHEET_EXPORT_SURFACE = 'sheet-export';
 
 let fontEmbedCssPromise: Promise<string> | null = null;
 
@@ -182,18 +191,20 @@ export async function exportElementToPng(
     // their pod. A kit in fallback fonts is a working kit.
     let fontEmbedCss: string | null = null;
     try {
-      fontEmbedCss = await Promise.race([
+      // `withTimeout` rather than an inline race: it CLEARS its timer when the promise settles
+      // first, where the hand-rolled race left one pending for the full six seconds on every
+      // successful export.
+      fontEmbedCss = await withTimeout(
         getFontEmbedCss(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('font embed timed out')), FONT_EMBED_TIMEOUT_MS)
-        ),
-      ]);
+        FONT_EMBED_TIMEOUT_MS,
+        'font embed timed out'
+      );
     } catch (fontErr) {
       // Not fatal, but never silent: a quality regression nobody can see is one nobody fixes.
       console.warn('[sheet-export] font embed failed; capturing without embedded fonts', fontErr);
       logEvent({
         level: 'warn',
-        surface: 'login-flow',
+        surface: SHEET_EXPORT_SURFACE,
         message: 'sheet export font embed failed; captured with fallback fonts',
         context: { error_code: 'font-embed-fallback' },
       });
@@ -216,7 +227,7 @@ export async function exportElementToPng(
       console.warn('[sheet-export] capture with embedded fonts failed; retrying bare', captureErr);
       logEvent({
         level: 'warn',
-        surface: 'login-flow',
+        surface: SHEET_EXPORT_SURFACE,
         message: 'sheet export capture failed with embedded fonts; retried with fallback fonts',
         context: { error_code: 'font-embed-capture-fallback' },
       });

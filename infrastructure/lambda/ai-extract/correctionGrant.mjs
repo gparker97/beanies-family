@@ -280,8 +280,18 @@ export const GRANT_REFUSAL_POLICY = Object.freeze({
   disabled: { refuse: false, hint: true },
   // DynamoDB was unreachable. `checkLimits` next door fails OPEN for the same class of blip.
   store_unavailable: { refuse: false, hint: true },
-  // A caller reached consumeGrant without a family, a correction, or a source hash. Same class
-  // as `unmeasured`: a bug on our side, so the family is not punished for it.
+  // ⚠️ SPLIT, because one of these three is CLIENT-FORCEABLE and the other two are not.
+  // `missing` used to cover all of `!familyId || !correction || !srcHash` at `hint: true`, which
+  // broke the rule stated at the top of this table: a caller holding the api key that ships in
+  // the public bundle simply OMITS `familyId`, earns no grant, spends no grant, writes no usage
+  // row — and still gets `correction.to` into the prompt on every request, for free, forever.
+  // That was a regression introduced by adding the row: before the table existed
+  // `refusalAllowsHint('missing')` evaluated `undefined?.hint === true`, which is `false`.
+  //
+  // No family id means we cannot identify, meter or charge anyone. Refuse it.
+  missing_family: { refuse: true, hint: false },
+  // No correction or no source hash with a family present is OUR bug, and `!correction` leaves
+  // nothing to hint WITH anyway, so this arm cannot be used to bias a prompt.
   missing: { refuse: false, hint: true },
 
   // ── Cannot be explained. REFUSE, and charge nothing. ───────────────────────────────────
@@ -323,9 +333,16 @@ export async function consumeGrant({
   now = Date.now(),
   ddb,
 } = {}) {
+  // ⚠️ THE CLIENT-FORCEABLE GUARD COMES FIRST, ahead of the kill switch. A correction with
+  // no family id is malformed whatever our configuration happens to be, and ordering it after
+  // `disabled` would mean the answer to "can a caller omit familyId to get a free prompt hint?"
+  // depends on an env var — which is not a property anyone can reason about or test. See the
+  // two rows in GRANT_REFUSAL_POLICY; collapsing them is what handed out the free hint.
+  if (!familyId) return { free: false, reason: 'missing_family' };
+
   const table = process.env.RATE_TABLE;
   if (!table || !process.env.CORRECTION_GRANTS) return { free: false, reason: 'disabled' };
-  if (!familyId || !correction || !srcHash) return { free: false, reason: 'missing' };
+  if (!correction || !srcHash) return { free: false, reason: 'missing' };
   // ⚠️ FAIL CLOSED on a missing measurement. The previous version passed `srcBytes: null`
   // straight through and let the condition decide, where a `srcBytes ? … : MAX_SAFE_INTEGER`
   // sentinel turned the band into [0, MAX_SAFE_INTEGER] — every possible size. An exemption

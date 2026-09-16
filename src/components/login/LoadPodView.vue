@@ -745,7 +745,16 @@ async function loadSavedFileViaPicker() {
         surface: 'load-existing-family',
         severity: 'warning',
         message: `open saved file via picker failed: ${picked.reason}`,
-        context: { action: 'no-backend', error_code: picked.reason, provider_type: 'google_drive' },
+        // ⚠️ THE NAMESPACED CODE, matching `useDriveFileReselect`. This logged the bare
+        // `picked.reason` while the sibling surface logged `describePickFailure(...).errorCode`,
+        // so the same Picker failure arrived in CloudWatch under two different names and no
+        // single filter could count it. `describePickFailure` is already the one table both
+        // surfaces read for the message; read the code from it too.
+        context: {
+          action: 'no-backend',
+          error_code: describePickFailure(picked.reason).errorCode,
+          provider_type: 'google_drive',
+        },
       });
       return;
 

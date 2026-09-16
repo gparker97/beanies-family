@@ -26,6 +26,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { reportError } from '@/utils/errorReporter';
 import type { FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
@@ -111,26 +113,33 @@ async function handleUnclaim(): Promise<void> {
   try {
     const result = await authStore.unclaimMember(props.member.id);
     if (result.success) {
-      showToast('success', fmt('bean.unclaim.done', { name: props.member.name }));
+      showToast('success', fillTemplate(t('bean.unclaim.done'), { name: props.member.name }));
     } else {
       // The store returns a typed `ResetError`; never a raw string in front of a family.
+      // ⚠️ AND IT REACHES THE FIREHOSE. A toast tells the one person looking at the screen;
+      // CLAUDE.md's no-silent-failures rule wants this diagnosable from CloudWatch without a
+      // repro, and a credential action that failed for a whole family is exactly that case.
+      reportError({
+        surface: 'join-flow',
+        severity: 'warning',
+        message: `unclaim refused: ${result.error}`,
+        context: { action: 'unclaim_refused', error_code: result.error },
+      });
       showToast('error', t('bean.unclaim.failed'));
     }
   } catch (e) {
     // Never silent: the family tapped a button and must be told it did not work.
-    console.error('[BeanAccountPanel] unclaim failed', e);
+    reportError({
+      surface: 'join-flow',
+      severity: 'critical',
+      message: 'unclaim threw',
+      error: e,
+      context: { action: 'unclaim_threw' },
+    });
     showToast('error', t('bean.unclaim.failed'));
   } finally {
     unclaiming.value = false;
   }
-}
-
-function fmt(key: string, replacements: Record<string, string>): string {
-  let out = t(key as never);
-  for (const [k, v] of Object.entries(replacements)) {
-    out = out.replace(`{${k}}`, v);
-  }
-  return out;
 }
 
 // Look up the live member reference so the modal always sees the freshest
@@ -165,11 +174,11 @@ const liveMember = computed<FamilyMember | null>(
           {{ t('bean.account.title') }}
         </h2>
         <p class="font-inter text-secondary-500/70 dark:text-ink-soft mt-1 text-sm">
-          {{ fmt('bean.account.description', { name: props.member.name }) }}
+          {{ fillTemplate(t('bean.account.description'), { name: props.member.name }) }}
         </p>
         <div v-if="canReset" class="mt-4">
           <BaseButton variant="primary" size="md" @click="showResetModal = true">
-            {{ fmt('bean.account.resetButton', { name: props.member.name }) }}
+            {{ fillTemplate(t('bean.account.resetButton'), { name: props.member.name }) }}
           </BaseButton>
         </div>
 
@@ -177,10 +186,10 @@ const liveMember = computed<FamilyMember | null>(
              who IS claimed, which is why it does not overlap the reset button above. -->
         <div v-if="canUnclaim" class="mt-4">
           <p class="font-inter text-secondary-500/70 dark:text-ink-soft mb-3 text-sm">
-            {{ fmt('bean.unclaim.description', { name: props.member.name }) }}
+            {{ fillTemplate(t('bean.unclaim.description'), { name: props.member.name }) }}
           </p>
           <BaseButton variant="secondary" size="md" :disabled="unclaiming" @click="handleUnclaim">
-            {{ fmt('bean.unclaim.button', { name: props.member.name }) }}
+            {{ fillTemplate(t('bean.unclaim.button'), { name: props.member.name }) }}
           </BaseButton>
         </div>
       </div>

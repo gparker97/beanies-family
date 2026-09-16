@@ -465,18 +465,10 @@ describe('useJoinFlow', () => {
       expect(mockPick).toHaveBeenCalledWith(expect.objectContaining({ chooseAccount: false }));
     });
 
-    it('still reaches the Picker when the best-effort silent reconnect rejects', async () => {
-      // `pick()` with no `chooseAccount` now runs `tryReconnectSilently` first, inside the auth try.
-      // It is declared best-effort, so a rejection must not cost the joiner the Picker.
-      const flow = await arriveAtNeedsPick(true);
-      mockPick.mockResolvedValueOnce({
-        kind: 'picked',
-        fileId: 'inviter-file-1',
-        fileName: 'family.beanpod',
-      });
-      await flow.handleAuthTap();
-      expect(mockPick).toHaveBeenCalledTimes(1);
-    });
+    // ⚠️ THE "best-effort silent reconnect" TEST LIVED HERE AND COULD NOT FAIL. This file
+    // `vi.mock`s `usePickBeanpodFile` wholesale, so `tryReconnectSilently` never ran: deleting
+    // the guard it named left it green. Moved to `usePickBeanpodFile.test.ts`, which mocks the
+    // layer BELOW the code under test and can actually observe the behaviour.
 
     it('does not regress the desktop popup path', async () => {
       const flow = await arriveAtNeedsPick(false);

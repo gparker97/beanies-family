@@ -53,9 +53,26 @@ export type PodAccessErrorCode =
   // a RETRYABLE warning, i.e. endless retry on a file no retry can open.
   | 'FILE_OLDER_VERSION';
 
-/** The four recovery actions. Every one restores access to the ORIGINAL file. */
+/**
+ * The recovery actions. Every one restores access to the ORIGINAL file.
+ *
+ * ⚠️ `pickFamilyFileOtherAccount` EXISTS BECAUSE THE CHOOSER BECAME UNREACHABLE HERE.
+ * `usePickBeanpodFile.pick` used to default to `forceConsent: true`, which wiped the cached
+ * token and so, incidentally, made the user confirm an account on every one of these banners.
+ * Flipping that default to the silent path fixed a redirect loop and removed the confirmation
+ * with it — and the join card got a "sign in with a different account" link in exchange while
+ * these two banners got nothing. The codes that offer `pickFamilyFile` deliberately do not
+ * offer `reconnectAccount`, so a family whose pod broke BECAUSE the browser holds the wrong
+ * Google session had no control anywhere on the banner that reaches Google's chooser. Pinning
+ * the Picker to the cached token's account (drivePicker `setAuthUser`) then sealed that in:
+ * the browser's own session can no longer surface the right account either.
+ */
 export type PodRecoveryAction =
-  'retry' | 'reconnectAccount' | 'pickFamilyFile' | 'switchToCanonical';
+  | 'retry'
+  | 'reconnectAccount'
+  | 'pickFamilyFile'
+  | 'pickFamilyFileOtherAccount'
+  | 'switchToCanonical';
 
 export interface PodAccessEntry extends StructuredErrorEntry {
   recoveries: readonly PodRecoveryAction[];
@@ -79,7 +96,7 @@ export const POD_ACCESS_ERRORS = {
   },
   PERMISSION_DENIED: {
     messageKey: 'podAccess.error.permissionDenied',
-    recoveries: ['retry', 'pickFamilyFile'],
+    recoveries: ['retry', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
   },
   CONSENT_EXPIRED: {
@@ -89,7 +106,7 @@ export const POD_ACCESS_ERRORS = {
   },
   FILE_NOT_FOUND: {
     messageKey: 'podAccess.error.fileNotFound',
-    recoveries: ['retry', 'pickFamilyFile'],
+    recoveries: ['retry', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
   },
   VERIFY_UNAVAILABLE: {
@@ -99,12 +116,12 @@ export const POD_ACCESS_ERRORS = {
   },
   CANONICAL_MISMATCH: {
     messageKey: 'podAccess.error.canonicalMismatch',
-    recoveries: ['switchToCanonical', 'pickFamilyFile'],
+    recoveries: ['switchToCanonical', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
   },
   NO_HOME: {
     messageKey: 'podAccess.error.noHome',
-    recoveries: ['pickFamilyFile'],
+    recoveries: ['pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
   },
   FILE_NEWER_VERSION: {

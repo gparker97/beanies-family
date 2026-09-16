@@ -16,7 +16,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Correcting a wrong read stays free, even in the minutes after an update.** There is a short window after we update the server when beanies cannot tell whether a free correction you had already earned is still good. It used to decide that meant no, and told you the free re-read had already been used — which was neither true nor helpful. It now just does the read you asked for, reads it as the kind you said it was, and counts it as an ordinary one.
 
+### Security
+
+- **A crafted sign-in link can no longer send you to another website.** A specially formed return address in a Google sign-in link could carry someone off beanies.family to a site of the attacker's choosing. Return addresses are now checked against the real browser address parser rather than by pattern matching.
+
 ### Fixed
+
+- **The file chooser now opens on the Google account you just signed in with.** Anyone signed into more than one Google account saw an empty list and could not join at all, because the chooser was showing whichever account the browser happened to prefer rather than the one that had just been given access. Signing out of the others is no longer needed.
 
 - **Joining a family from an iPhone no longer loops back to the Google sign-in screen.** A joiner who had just signed in was sent straight back to sign in again, over and over, with nothing on screen to say why. beanies was treating "we have not been shown your family's file yet" as "you are signed in to the wrong account", which on an iPhone, an iPad or an installed app meant leaving the page entirely instead of opening the file chooser. It now opens the chooser, which is the only thing that can actually fix it.
 
@@ -29,6 +35,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **A pod owner can now clear a stuck join.** There is a new "Let them join again" action on a family member's page, for anyone marked as joined who never actually got in or who lost their link part way through. It clears their PIN and their access so you can send a fresh invite; their beans, photos and history all stay.
 
 - **Signing in with the recovery kit gives the owner their permissions back immediately.** After setting a new PIN, the owner had no permissions at all until they signed out and signed back in.
+
+- **A broken pod can be pointed at a different Google account.** The two "something is wrong with your family file" banners could only ever look in the account already signed in, which is no help when the wrong account is the problem. Both now offer "Use a different Google account".
+
+- **Switching Google accounts in Settings now actually switches the account.** The button asked Google to re-confirm permissions on the account already signed in, which is the one setting that hides the account picker, so it handed the same account back every time.
+
+- **Declining a Google permission screen no longer leaves the join page stuck on "counting beans".**
 
 - **The recovery kit saves as a PDF in Firefox.** The kit was built with every font on the page embedded inside it, which Firefox refused to draw. It now falls back to plain fonts rather than failing, and no longer fetches those fonts during family creation, where they were competing with setting the family up.
 
