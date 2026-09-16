@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-15",
-    "translationCount": 4765
+    "lastUpdated": "2026-09-16",
+    "translationCount": 4767
   },
   "translations": {
     "app.name": {
@@ -21872,14 +21872,14 @@
       "lastUpdated": "2026-09-03"
     },
     "wall.tooNarrow.title": {
-      "translation": "墙壁需要更宽的屏幕",
-      "hash": "kkrgqy",
-      "lastUpdated": "2026-09-04"
+      "translation": "这块屏幕对墙壁来说太小了",
+      "hash": "ory9o9",
+      "lastUpdated": "2026-09-16"
     },
     "wall.tooNarrow.body": {
-      "translation": "豆豆墙专为厨房墙壁上的平板电脑而建，因此全家人都可以从房间对面阅读。在平板电脑上（向上）或更大的窗口中打开它，它就会出现在这里。",
-      "hash": "tnu668",
-      "lastUpdated": "2026-09-04"
+      "translation": "豆豆墙的建造可以从整个房间读取，因此它需要屏幕两侧的空间，而不仅仅是宽度。它可以在平板电脑上使用。在手机或小窗口中，没有足够的空间来显示一周。",
+      "hash": "c05ns3",
+      "lastUpdated": "2026-09-16"
     },
     "wall.tooNarrow.back": {
       "translation": "带我返回",
@@ -23830,6 +23830,16 @@
       "translation": "beanies停止等待那个，所以它还没有被读取，没有任何东西离开你的设备。再次点击魔豆即可发送。",
       "hash": "pftpxe",
       "lastUpdated": "2026-09-15"
+    },
+    "ai.error.attestation.title": {
+      "translation": "beanies Didn 't Send It",
+      "hash": "ohc3jc",
+      "lastUpdated": "2026-09-16"
+    },
+    "ai.error.attestation.message": {
+      "translation": "beanies无法确认AI服务是否应该是密封的，因此您的文档保留在您的设备上。没有发送任何内容，也没有收取任何费用。请稍后重试。",
+      "hash": "zfe7xj",
+      "lastUpdated": "2026-09-16"
     }
   }
 }
