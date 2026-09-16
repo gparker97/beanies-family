@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+const fetchGoogleUserEmailMock = vi.fn(
+  async (_token: string) => 'joiner@example.com' as string | null
+);
+vi.mock('@/services/google/googleAuth', () => ({
+  fetchGoogleUserEmail: (token: string) => fetchGoogleUserEmailMock(token),
+}));
+const logEventMock = vi.fn();
+vi.mock('@/services/telemetry', () => ({ logEvent: (...a: unknown[]) => logEventMock(...a) }));
+
 // Reset module state between tests
 let drivePicker: typeof import('../drivePicker');
 
@@ -13,6 +22,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
     setDeveloperKey: vi.fn().mockReturnThis(),
     setOrigin: vi.fn().mockReturnThis(),
     setAppId: vi.fn().mockReturnThis(),
+    setAuthUser: vi.fn().mockReturnThis(),
     setCallback: vi.fn().mockReturnThis(),
     build: vi.fn(() => {
       if (onBuild) {
@@ -80,6 +90,7 @@ describe('drivePicker', () => {
       setDeveloperKey: vi.fn().mockReturnThis(),
       setOrigin: vi.fn().mockReturnThis(),
       setAppId: vi.fn().mockReturnThis(),
+      setAuthUser: vi.fn().mockReturnThis(),
       setCallback: vi.fn().mockReturnThis(),
       build: vi.fn(function () {
         // Always resolve with cancel using the most recent callback
@@ -229,5 +240,88 @@ describe('drivePicker', () => {
     });
     await drivePicker.pickBeanpodFile('hint-token');
     expect(mockBuilder.setOAuthToken).toHaveBeenCalledWith('hint-token');
+  });
+});
+
+describe('the Picker is pinned to the account that consented', () => {
+  /**
+   * ⚠️ THE BUG THIS PINS, and it blocked joining outright. `setOAuthToken` decides which account
+   * receives the `drive.file` grant on selection; it does NOT decide what the Picker LISTS. The
+   * iframe enumerates with the browser's own Google session cookies, so on a browser holding
+   * several Google sessions it defaults to account index 0. When that is the pod owner,
+   * "Shared with me" is legitimately empty for it (the owner owns the `.beanpod`), the joiner
+   * sees an empty chooser, and there is no way forward. Reproduced with a clean invitee account;
+   * signing out of every other Google account made the file appear immediately.
+   */
+  // ⚠️ ITS OWN SETUP, not the block above's. A `beforeEach` does not reach a sibling
+  // describe, so leaning on it only works while the whole file runs in order and breaks under
+  // `-t` or `.only` — the two ways anyone runs a single test while fixing one. It also left
+  // `VITE_GOOGLE_PROJECT_NUMBER` unstubbed here, which silently retired the `setAppId` guard.
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_GOOGLE_API_KEY', 'test-api-key');
+    vi.stubEnv('VITE_GOOGLE_PROJECT_NUMBER', '123456789');
+    (globalThis as Record<string, unknown>).gapi = {
+      load: vi.fn((_api: string, cb: () => void) => cb()),
+    };
+    drivePicker = await import('../drivePicker');
+    fetchGoogleUserEmailMock.mockReset().mockResolvedValue('joiner@example.com');
+    logEventMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    delete (globalThis as Record<string, unknown>).google;
+    delete (globalThis as Record<string, unknown>).gapi;
+  });
+
+  it('pins to the token account, not to whichever session the browser prefers', async () => {
+    const { mockBuilder } = mockPickerNamespace();
+    void drivePicker.pickBeanpodFile('tok-joiner');
+    await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
+
+    expect(mockBuilder.setAuthUser).toHaveBeenCalledWith('joiner@example.com');
+    // Resolved from the TOKEN the grant will land on. Any other source (the inviter's typed
+    // hint, a primed cache) can name an account nobody intended, which is the bug itself.
+    expect(fetchGoogleUserEmailMock).toHaveBeenCalledWith('tok-joiner');
+  });
+
+  it('still sets appId, which the grant depends on', async () => {
+    // A fix for the pin once deleted this line in passing. The Picker UI works without it and
+    // the selection silently grants nothing, so nothing downstream would have noticed.
+    const { mockBuilder } = mockPickerNamespace();
+    void drivePicker.pickBeanpodFile('tok-joiner');
+    await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
+    expect(mockBuilder.setAppId).toHaveBeenCalledWith('123456789');
+  });
+
+  it('still opens the Picker, and says so, when the account cannot be resolved', async () => {
+    // A userinfo blip must cost a joiner nothing worse than the old behaviour — but unpinned is
+    // exactly the broken state, so it can never be silent.
+    fetchGoogleUserEmailMock.mockResolvedValue(null);
+    const { mockBuilder } = mockPickerNamespace();
+    void drivePicker.pickBeanpodFile('tok-joiner');
+    await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
+
+    expect(mockBuilder.setAuthUser).not.toHaveBeenCalled();
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ action: 'picker_authuser_unpinned' }),
+      })
+    );
+  });
+
+  it('survives a Picker build that no longer offers setAuthUser', async () => {
+    // `google-picker.d.ts` is hand-written, so it cannot notice Google withdrawing a method.
+    // The call is feature-detected; this proves the detection, not the typedef.
+    const { mockBuilder, mockPicker } = mockPickerNamespace();
+    delete (mockBuilder as { setAuthUser?: unknown }).setAuthUser;
+    void drivePicker.pickBeanpodFile('tok-joiner');
+    await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
+    // The chooser still opens. Degraded to the old behaviour, never a thrown TypeError on the
+    // one screen a joiner cannot get past.
+    await vi.waitFor(() => expect(mockPicker.setVisible).toHaveBeenCalledWith(true));
   });
 });
