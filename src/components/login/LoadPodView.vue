@@ -3,6 +3,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { payloadErrorMessageKey, PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
+import { assertNever } from '@/utils/assertNever';
 import { describePickFailure } from '@/services/google/drivePicker';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -703,36 +704,54 @@ async function handleOpenSavedFile() {
  */
 async function loadSavedFileViaPicker() {
   const email = getGoogleAccountEmail() ?? undefined;
-  const picked = await pickBeanpodFromDrive({ forceConsent: false, loginHint: email });
+  const picked = await pickBeanpodFromDrive({ loginHint: email });
 
-  if (picked.kind === 'picked') {
-    await handleDriveFileSelected({ fileId: picked.fileId, fileName: picked.fileName });
-    return;
+  // ⚠️ A `switch` with `assertNever`, so a future outcome is a compile error rather than a silent
+  // no-op. The `if` chain this replaced had ONE arm for `cancelled`, whose own comment admitted it
+  // was covering two different realities — a user backing out, and a full-page redirect. Those
+  // want opposite treatment, and conflating them elsewhere hid a production consent loop.
+  switch (picked.kind) {
+    case 'picked':
+      await handleDriveFileSelected({ fileId: picked.fileId, fileName: picked.fileName });
+      return;
+
+    case 'cancelled':
+      logEvent({
+        level: 'info',
+        surface: 'load-existing-family',
+        message: 'open saved file via picker cancelled',
+        context: { action: 'cancelled', provider_type: 'google_drive' },
+      });
+      return;
+
+    case 'redirecting':
+      // Not a cancel: we navigated them to Google and this session is going away. Logged as its
+      // own fact so "they backed out" and "we redirected them" stop sharing a number.
+      logEvent({
+        level: 'info',
+        surface: 'load-existing-family',
+        message: 'open saved file via picker redirecting to auth',
+        context: { action: 'redirecting', provider_type: 'google_drive' },
+      });
+      return;
+
+    case 'failed':
+      // ⚠️ NEVER `picked.message` — for `reason: 'config'` that is the literal string
+      // "VITE_GOOGLE_API_KEY is not configured", which was reaching users on the SIGN-IN screen.
+      // `describePickFailure` is the one table both picker surfaces read, so a new reason is a
+      // compile error rather than a raw developer string leaking somewhere nobody is looking.
+      formError.value = t(describePickFailure(picked.reason).messageKey);
+      reportError({
+        surface: 'load-existing-family',
+        severity: 'warning',
+        message: `open saved file via picker failed: ${picked.reason}`,
+        context: { action: 'no-backend', error_code: picked.reason, provider_type: 'google_drive' },
+      });
+      return;
+
+    default:
+      assertNever(picked, 'loadSavedFileViaPicker');
   }
-  if (picked.kind === 'cancelled') {
-    // Either the user backed out, or a full-page redirect kicked off (PWA/iOS)
-    // and this session is navigating away. Nothing to surface.
-    logEvent({
-      level: 'info',
-      surface: 'load-existing-family',
-      message: 'open saved file via picker cancelled',
-      context: { action: 'cancelled', provider_type: 'google_drive' },
-    });
-    return;
-  }
-  // picked.kind === 'failed'
-  // ⚠️ NEVER `picked.message` — for `reason: 'config'` that is the literal
-  // string "VITE_GOOGLE_API_KEY is not configured", which was reaching users on
-  // the SIGN-IN screen. `describePickFailure` is the one table both picker
-  // surfaces read, so a new reason is a compile error rather than a raw
-  // developer string leaking somewhere nobody is looking.
-  formError.value = t(describePickFailure(picked.reason).messageKey);
-  reportError({
-    surface: 'load-existing-family',
-    severity: 'warning',
-    message: `open saved file via picker failed: ${picked.reason}`,
-    context: { action: 'no-backend', error_code: picked.reason, provider_type: 'google_drive' },
-  });
 }
 
 /**

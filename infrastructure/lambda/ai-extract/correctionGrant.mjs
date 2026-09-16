@@ -268,6 +268,21 @@ export const GRANT_REFUSAL_POLICY = Object.freeze({
   different_arm: { refuse: false, hint: true },
   // A caller reached consumeGrant with no measurement: a bug in the calling arm.
   unmeasured: { refuse: false, hint: true },
+  //
+  // ⚠️ THE THREE THAT NEVER REACHED THE TABLE. `disabled`, `missing` and `store_unavailable`
+  // are returned from the early guards and the catch, which sit ABOVE the conditional write — so
+  // they were never declared here, and `refusalAllowsHint` answered `undefined?.hint === true`
+  // for all three. That is a policy decision taken by an optional-chain rather than by this
+  // table, which is the one thing the table exists to prevent. The completeness test in
+  // `correctionGrant.test.mjs` now fails if a fourth appears.
+  //
+  // Kill switch off, or the grants table unset. Our configuration, not their behaviour.
+  disabled: { refuse: false, hint: true },
+  // DynamoDB was unreachable. `checkLimits` next door fails OPEN for the same class of blip.
+  store_unavailable: { refuse: false, hint: true },
+  // A caller reached consumeGrant without a family, a correction, or a source hash. Same class
+  // as `unmeasured`: a bug on our side, so the family is not punished for it.
+  missing: { refuse: false, hint: true },
 
   // ── Cannot be explained. REFUSE, and charge nothing. ───────────────────────────────────
   //

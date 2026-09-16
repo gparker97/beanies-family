@@ -272,6 +272,40 @@ const STRING_DEFS = {
     beanie:
       "{name} signs in with their 6-digit pin. if they've forgotten it (or never had one), set a new one here and share it.",
   },
+  'bean.unclaim.title': {
+    en: 'Let Them Join Again',
+    beanie: 'let them join again',
+  },
+  'bean.unclaim.description': {
+    en: '{name} is marked as joined, so you cannot send them a new invite. If they never actually got in \u2014 or they lost the link part way through \u2014 clear it and you can invite them again.',
+    beanie:
+      '{name} is marked as joined, so you cannot send them a new invite. if they never actually got in \u2014 or they lost the link part way through \u2014 clear it and you can invite them again.',
+  },
+  'bean.unclaim.button': {
+    en: 'Let {name} Join Again',
+    beanie: 'let {name} join again',
+  },
+  'bean.unclaim.confirm.title': {
+    en: 'Let them join again?',
+    beanie: 'let them join again?',
+  },
+  'bean.unclaim.confirm.message': {
+    en: 'This clears their PIN and their access, so they will need a fresh invite to get back in. They keep everything in the pod: their beans, their photos, their history. You can send them a new invite straight away.',
+    beanie:
+      'this clears their pin and their access, so they will need a fresh invite to get back in. they keep everything in the pod: their beans, their photos, their history. you can send them a new invite straight away.',
+  },
+  'bean.unclaim.confirm.action': {
+    en: 'Let Them Join Again',
+    beanie: 'let them join again',
+  },
+  'bean.unclaim.done': {
+    en: 'Done \u2014 you can invite {name} again now.',
+    beanie: 'done \u2014 you can invite {name} again now.',
+  },
+  'bean.unclaim.failed': {
+    en: 'That did not work. Try again in a moment.',
+    beanie: 'that did not work. try again in a moment.',
+  },
   'bean.account.resetButton': { en: "Reset {name}'s PIN", beanie: "reset {name}'s pin" },
   'bean.notFound.title': { en: "We can't find this member", beanie: "can't find this bean" },
   'bean.notFound.body': {
@@ -5642,6 +5676,15 @@ const STRING_DEFS = {
   },
 
   // Google Picker join flow
+  'join.awaiting.cancelled': {
+    en: 'No file chosen yet. Tap below to open Google Drive and pick your family\u2019s file.',
+    beanie:
+      'no file picked yet. tap below to open google drive and choose your family\u2019s file.',
+  },
+  'join.awaiting.redirecting': {
+    en: 'Taking you to Google to sign in\u2026 if nothing happens, tap below to try again.',
+    beanie: 'taking you to google to sign in\u2026 if nothing happens, tap below to try again.',
+  },
   'join.pickerPrompt.description': {
     en: "One last step to join: open your family's data file from Google Drive so you have access.",
     beanie:

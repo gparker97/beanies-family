@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
-const mockRoute = { fullPath: '/' };
+const mockRoute = { fullPath: '/', path: '/', query: {} as Record<string, unknown> };
+type RouteTarget = { path: string; query: Record<string, unknown> };
+const mockRouterReplace = vi.fn(async (_to: RouteTarget) => {});
 vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
+  useRouter: () => ({ replace: mockRouterReplace }),
 }));
 
 const mockAuthStore = {
@@ -107,12 +110,15 @@ vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: () => mockGoogleAuth.redirectAuth,
 }));
 
-type PickFailureReason = 'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout';
+type PickFailureReason =
+  'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout' | 'popup-blocked';
 type PickResult =
   | { kind: 'picked'; fileId: string; fileName: string }
   | { kind: 'cancelled' }
+  // Distinct from `cancelled`: the page is navigating to Google, the user did nothing.
+  | { kind: 'redirecting' }
   | { kind: 'failed'; reason: PickFailureReason; message?: string };
-type PickOpts = { forceConsent?: boolean; loginHint?: string } | undefined;
+type PickOpts = { chooseAccount?: boolean; loginHint?: string } | undefined;
 const mockPick = vi.fn<(opts?: PickOpts) => Promise<PickResult>>(async () => ({
   kind: 'cancelled',
 }));
@@ -136,6 +142,11 @@ function setUrl(path: string): void {
   // hands it to parseInviteLink. jsdom's location is `http://localhost:3000/`
   // by default, which is fine.
   mockRoute.fullPath = path;
+  // `path` and `query` are what the `authError` strip rebuilds the URL from, so they have to
+  // agree with `fullPath` or that test would assert against a route no router would produce.
+  const [bare, search = ''] = path.split('?');
+  mockRoute.path = bare;
+  mockRoute.query = Object.fromEntries(new URLSearchParams(search));
 }
 
 function reset(): void {
@@ -166,6 +177,8 @@ const ALL_ERROR_CODES: JoinErrorCode[] = [
   'PICKER_SCRIPT_LOAD_FAILED',
   'PICKER_FAILED',
   'PICKER_TIMEOUT',
+  'PICKER_UNAVAILABLE',
+  'PICKER_AUTH_FAILED',
   'FILE_READ_FAILED',
   'FILE_DECRYPT_FAILED',
   'FILE_TOO_LARGE',
@@ -320,6 +333,163 @@ describe('useJoinFlow', () => {
     });
   });
 
+  describe('the two OAuth codes that were declared and never emitted', () => {
+    it('records OAUTH_SCOPE_DENIED when Google returns them with an error', async () => {
+      // ⚠️ Declining the consent prompt used to be completely invisible: the callback page threw
+      // away the invite URL and sent them to `/`, so there was no error for the user, nothing in
+      // the firehose, and no way to tell it apart from someone wandering off.
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      const link = buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+        'http://localhost:3000',
+        ''
+      );
+      setUrl(`${link}${link.includes('?') ? '&' : '?'}authError=access_denied`);
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+
+      expect(flow.currentError.value?.code).toBe('OAUTH_SCOPE_DENIED');
+    });
+
+    it('strips authError from the URL, so one decline does not poison the invite link', async () => {
+      // ⚠️ `authError` rides the invite URL — the link in the joiner's messages, which they
+      // will tap again. Left in place it short-circuits `init` on EVERY later visit, including
+      // the one right after they grant consent successfully, so no later success is ever
+      // redeemed. One decline killed the link permanently.
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      const link = buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+        'http://localhost:3000',
+        ''
+      );
+      setUrl(`${link}${link.includes('?') ? '&' : '?'}authError=access_denied`);
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      await useJoinFlow().init();
+
+      expect(mockRouterReplace).toHaveBeenCalledTimes(1);
+      const target = mockRouterReplace.mock.calls[0][0];
+      expect(target.query.authError).toBeUndefined();
+      // Everything else survives, or the strip would cost them the invite itself.
+      expect(target.query.fam).toBe('fam');
+      // `replace`, never `push`: the back button must not walk them into the poisoned URL again.
+      expect(target.path).toBe(mockRoute.path);
+    });
+
+    it('arms the retry button, which the only offered recovery depends on', async () => {
+      // `OAUTH_SCOPE_DENIED` declares exactly one recovery, `retry`, and `handleRetry` re-fires
+      // `lastFailedAction`. On this path nothing ever assigned it, so the single way forward
+      // rendered as a live control that did nothing.
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      const link = buildInviteLink({
+        familyId: 'fam',
+        provider: 'google_drive',
+        fileId: 'f-1',
+      }).replace('http://localhost:3000', '');
+      setUrl(`${link}&authError=access_denied`);
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      expect(flow.currentError.value?.code).toBe('OAUTH_SCOPE_DENIED');
+
+      mockPick.mockResolvedValueOnce({
+        kind: 'picked',
+        fileId: 'f-1',
+        fileName: 'family.beanpod',
+      });
+      await flow.handleRetry();
+
+      // It did something. Before the fix this assertion failed with zero calls.
+      expect(mockPick).toHaveBeenCalled();
+    });
+  });
+
+  describe('the iOS consent loop (the reported production bug)', () => {
+    /**
+     * ⚠️ THE REGRESSION TEST FOR THE REPORTED BUG.
+     *
+     * A joiner on iOS/PWA completes Google consent, is returned to the join page, taps the only
+     * CTA — and is sent back to Google consent. Forever. No error, no telemetry.
+     *
+     * The loop: `tryAutoLoadByFileId` 404s (a fresh `drive.file` grant cannot reach the INVITER's
+     * file — expected on a first join), returns 'needs-pick'. The old code read that as "the
+     * cached account must be wrong" and set `chooseAccount: true`, which SKIPS the silent-token
+     * fast path, which on a redirect-auth platform fires a full-page `startRedirectAuth` — so the
+     * Picker is never reached and the user lands back where they started.
+     *
+     * The category error: on a FIRST JOIN, 'needs-pick' is the expected state. The joiner has
+     * never picked the file, so of course `drive.file` cannot reach it. Only the Picker can fix
+     * that; another consent round cannot.
+     *
+     * `'needs-pick'` is only reachable WITH a live silent token (`useJoinFlow.ts:565-566` returns
+     * 'auth' when the token is falsy), so `chooseAccount: false` is guaranteed to find one and go
+     * straight to the Picker.
+     */
+    async function arriveAtNeedsPick(redirectPlatform: boolean) {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          provider: 'google_drive',
+          fileId: 'inviter-file-1',
+          inviteeEmail: 'husband@example.com',
+        }).replace('http://localhost:3000', '')
+      );
+      mockGoogleAuth.redirectAuth = redirectPlatform;
+      mockGoogleAuth.silent = vi.fn(async () => 'silent-token-from-redirect');
+      // The inviter's file is not reachable by this fresh grant — a 404 is the EXPECTED first-join
+      // state, not evidence of a wrong account.
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false, status: 404 }));
+      mockSyncStore.error = 'File not found: inviter-file-1';
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      return flow;
+    }
+
+    it('does NOT force consent on a first-join needs-pick, so the Picker is reachable on iOS', async () => {
+      const flow = await arriveAtNeedsPick(true);
+      expect(flow.currentStep.value).toBe('awaiting-auth');
+
+      mockPick.mockResolvedValueOnce({
+        kind: 'picked',
+        fileId: 'inviter-file-1',
+        fileName: 'family.beanpod',
+      });
+      await flow.handleAuthTap();
+
+      // The whole fix. `chooseAccount: true` here skips the silent token, which on a redirect
+      // platform navigates the page away instead of opening the Picker — the closed loop.
+      expect(mockPick).toHaveBeenCalledWith(expect.objectContaining({ chooseAccount: false }));
+    });
+
+    it('still reaches the Picker when the best-effort silent reconnect rejects', async () => {
+      // `pick()` with no `chooseAccount` now runs `tryReconnectSilently` first, inside the auth try.
+      // It is declared best-effort, so a rejection must not cost the joiner the Picker.
+      const flow = await arriveAtNeedsPick(true);
+      mockPick.mockResolvedValueOnce({
+        kind: 'picked',
+        fileId: 'inviter-file-1',
+        fileName: 'family.beanpod',
+      });
+      await flow.handleAuthTap();
+      expect(mockPick).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not regress the desktop popup path', async () => {
+      const flow = await arriveAtNeedsPick(false);
+      mockPick.mockResolvedValueOnce({
+        kind: 'picked',
+        fileId: 'inviter-file-1',
+        fileName: 'family.beanpod',
+      });
+      await flow.handleAuthTap();
+      expect(mockPick).toHaveBeenCalledWith(expect.objectContaining({ chooseAccount: false }));
+    });
+  });
+
   describe('handleAuthTap — Picker fires on user gesture', () => {
     it('opens Picker, loads file, decrypts, advances to pick-member', async () => {
       const { buildInviteLink } = await import('@/services/crypto/inviteService');
@@ -352,7 +522,7 @@ describe('useJoinFlow', () => {
       await flow.handleAuthTap();
 
       expect(mockPick).toHaveBeenCalledWith({
-        forceConsent: false,
+        chooseAccount: false,
         loginHint: 'wife@example.com',
       });
       expect(flow.currentStep.value).toBe('pick-member');
@@ -401,13 +571,16 @@ describe('useJoinFlow', () => {
       return flow;
     }
 
-    it("'config' reason → PICKER_SCRIPT_LOAD_FAILED", async () => {
+    it("'config' reason → PICKER_UNAVAILABLE (was PICKER_SCRIPT_LOAD_FAILED, which lied)", async () => {
+      // ⚠️ INVERTED. `config` means THIS BUILD has no `VITE_GOOGLE_API_KEY`, and the old mapping
+      // rendered that as "check your internet connection and try again" — a sentence with no
+      // relationship to the cause, shown to a user who can do nothing about it either way.
       const flow = await setupAndTap({
         kind: 'failed',
         reason: 'config',
         message: 'VITE_GOOGLE_API_KEY is not configured',
       });
-      expect(flow.currentError.value?.code).toBe('PICKER_SCRIPT_LOAD_FAILED');
+      expect(flow.currentError.value?.code).toBe('PICKER_UNAVAILABLE');
       expect(flow.currentError.value?.context).toMatchObject({
         reason: 'config',
         message: 'VITE_GOOGLE_API_KEY is not configured',
@@ -432,9 +605,16 @@ describe('useJoinFlow', () => {
       });
     });
 
-    it("'auth' reason → PICKER_FAILED", async () => {
-      const flow = await setupAndTap({ kind: 'failed', reason: 'auth', message: 'Popup blocked' });
-      expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
+    it("'auth' reason → PICKER_AUTH_FAILED (was PICKER_FAILED, which blamed the wrong thing)", async () => {
+      // ⚠️ INVERTED. Auth failed BEFORE the Picker was ever reached, so blaming the Picker sent
+      // both the user and whoever read the telemetry after the wrong component.
+      const flow = await setupAndTap({ kind: 'failed', reason: 'auth', message: 'Auth failed' });
+      expect(flow.currentError.value?.code).toBe('PICKER_AUTH_FAILED');
+    });
+
+    it("'popup-blocked' reason → OAUTH_POPUP_BLOCKED (a code that was declared and never emitted)", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'popup-blocked' });
+      expect(flow.currentError.value?.code).toBe('OAUTH_POPUP_BLOCKED');
     });
 
     it("'iframe' reason → PICKER_FAILED", async () => {
@@ -536,7 +716,18 @@ describe('useJoinFlow', () => {
   });
 
   describe('runCloudFlow — force consent on needs-pick fallthrough', () => {
-    it("passes forceConsent: true when tryAutoLoadByFileId returns 'needs-pick'", async () => {
+    it("does NOT force consent when tryAutoLoadByFileId returns 'needs-pick' (was inverted)", async () => {
+      // ⚠️ THIS TEST ASSERTED THE OPPOSITE, AND IT PINNED A PRODUCTION BUG AS INTENDED BEHAVIOUR.
+      //
+      // It was written on the theory that a 404 from the silent token proves the cached account
+      // is wrong, so the account chooser should be forced. On a FIRST JOIN that is false: the
+      // joiner has never picked the file, so their `drive.file` grant cannot reach the inviter's
+      // file by construction. 404 is the expected state.
+      //
+      // Forcing consent skipped the silent-token path, which on iOS/PWA fired a full-page
+      // redirect instead of opening the Picker — the closed loop two iPhone users hit in
+      // production. The assertion is inverted here rather than deleted, so the reversal is
+      // recorded where the next reader will look.
       const { buildInviteLink } = await import('@/services/crypto/inviteService');
       setUrl(
         buildInviteLink({
@@ -561,7 +752,7 @@ describe('useJoinFlow', () => {
       expect(mockPick).toHaveBeenCalled();
       const lastCallArgs = mockPick.mock.calls.at(-1)?.[0];
       expect(lastCallArgs).toMatchObject({
-        forceConsent: true,
+        chooseAccount: false,
         loginHint: 'invitee@example.com',
       });
     });
@@ -584,7 +775,7 @@ describe('useJoinFlow', () => {
 
       expect(mockPick).toHaveBeenCalled();
       const lastCallArgs = mockPick.mock.calls.at(-1)?.[0];
-      expect(lastCallArgs?.forceConsent).toBe(false);
+      expect(lastCallArgs?.chooseAccount).toBe(false);
     });
   });
 
@@ -1009,7 +1200,7 @@ describe('useJoinFlow', () => {
       await flow.handleSignInDifferent();
 
       expect(mockPick).toHaveBeenCalledWith({
-        forceConsent: true,
+        chooseAccount: true,
         loginHint: 'wife@example.com',
       });
       expect(flow.currentStep.value).toBe('pick-member');

@@ -15,6 +15,7 @@
  * the delivery helper import (no drifting string literals).
  */
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
+import { logEvent } from '@/services/telemetry';
 
 export type ExportStage = 'render' | 'rasterize' | 'pdf' | 'deliver';
 
@@ -58,6 +59,43 @@ function loadJsPdf(): Promise<typeof import('jspdf')> {
 }
 
 /**
+ * How long we will wait for the cross-origin font embed before giving up on it.
+ *
+ * Generous, because on a cold session this is dozens of fetches; bounded, because the whole point
+ * is that a slow font CDN must not cost someone their recovery kit.
+ */
+const FONT_EMBED_TIMEOUT_MS = 6_000;
+
+let fontEmbedCssPromise: Promise<string> | null = null;
+
+/**
+ * The `@font-face` CSS to inline into the capture, computed ONCE per session.
+ *
+ * ⚠️ THIS IS THE ACTUAL FIX FOR THE FIREFOX RECOVERY-KIT FAILURE, and the obvious one was a
+ * no-op. `PngExportOptions.fonts` only ever fed `document.fonts.load()`; it is never passed to
+ * `html-to-image` and has no effect on embedding. What actually happens without this: the
+ * library's `getCSSRules` hits a `SecurityError` reading `cssRules` on our cross-origin Google
+ * Fonts <link>, falls into a catch that refetches the stylesheet, and inlines EVERY `@font-face`
+ * it contains — Outfit x6 weights, Inter x3, Caveat x3, each across ~7 unicode-range subsets — as
+ * base64 into a single foreignObject SVG data URL. Multiple megabytes and dozens of fetches, on
+ * every export in the app. Chromium tolerates it; Firefox does not, and the rasterize step fails.
+ *
+ * Memoised with the same null-on-rejection shape as `loadHtmlToImage` above, so one bad session
+ * cannot cache a rejection forever, and so N exports pay this once rather than N times.
+ */
+function getFontEmbedCss(): Promise<string> {
+  if (!fontEmbedCssPromise) {
+    fontEmbedCssPromise = loadHtmlToImage()
+      .then((m) => m.getFontEmbedCSS(document.body))
+      .catch((err) => {
+        fontEmbedCssPromise = null;
+        throw err;
+      });
+  }
+  return fontEmbedCssPromise;
+}
+
+/**
  * Warm the lazy export deps in the background so a later Share/Export tap
  * doesn't have to await a code-split chunk fetch — important on iOS WebKit,
  * where `navigator.share({files})` loses its transient user activation if too
@@ -67,6 +105,13 @@ function loadJsPdf(): Promise<typeof import('jspdf')> {
 export function prewarmSheetExport(): void {
   void loadHtmlToImage().catch(() => {});
   void loadJsPdf().catch(() => {});
+  // ⚠️ DELIBERATELY NOT `getFontEmbedCss()`. Warming it looked free and was the opposite:
+  // it is dozens of cross-origin font fetches and megabytes of base64, and the only surface that
+  // prewarms is the recovery-kit sheet, which opens seconds after first paint during family
+  // creation — so the warm-up competed with pod setup for the network on the one flow that must
+  // not stall. It also memoises for the whole session from whatever the DOM looked like at that
+  // moment, which is not the sheet being captured. Paying it at export time is both cheaper
+  // overall and correct.
 }
 
 export interface PngExportOptions {
@@ -87,6 +132,33 @@ export interface PngExportOptions {
  * FOUT / missing-glyph. Throws `ExportError('rasterize', …)` on any failure
  * (including a lazy-import failure or a null blob).
  */
+/**
+ * One capture attempt. Extracted so the fallback below is a second CALL rather than a retry
+ * buried inside a catch — one level of nesting, not two.
+ *
+ * `fontEmbedCSS: null` means "do not embed fonts at all" (`skipFonts`), which renders in the
+ * platform fallback face. That is a cosmetic downgrade, and it is always better than no file.
+ */
+async function captureOnce(
+  el: HTMLElement,
+  opts: PngExportOptions,
+  fontEmbedCss: string | null
+): Promise<Blob> {
+  const { toBlob } = await loadHtmlToImage();
+  // No `cacheBust`: the only images are same-origin brand PNGs (no CORS), and
+  // cache-busting appends a unique query that misses the SW precache and can
+  // bake in blank marks on a cold/offline first capture.
+  const blob = await toBlob(el, {
+    pixelRatio: opts.pixelRatio ?? 2,
+    backgroundColor: opts.backgroundColor,
+    ...(fontEmbedCss === null
+      ? { skipFonts: true }
+      : { fontEmbedCSS: fontEmbedCss, preferredFontFormat: 'woff2' as const }),
+  });
+  if (!blob) throw new Error('html-to-image returned a null blob');
+  return blob;
+}
+
 export async function exportElementToPng(
   el: HTMLElement,
   opts: PngExportOptions = {}
@@ -96,22 +168,60 @@ export async function exportElementToPng(
       // Force each family/weight into flight, then let loading settle.
       // `allSettled`: a single failed font fetch (offline / flaky) is a cosmetic
       // fallback, NOT a reason to fail the whole export.
+      //
+      // NOTE this is a FOUT guard for the on-screen element, not a font-embedding lever — see
+      // `getFontEmbedCss`, which is the one that actually reaches html-to-image.
       await Promise.allSettled(opts.fonts.map((f) => document.fonts.load(f)));
     }
     if (typeof document !== 'undefined' && document.fonts) {
       await document.fonts.ready;
     }
 
-    const { toBlob } = await loadHtmlToImage();
-    // No `cacheBust`: the only images are same-origin brand PNGs (no CORS), and
-    // cache-busting appends a unique query that misses the SW precache and can
-    // bake in blank marks on a cold/offline first capture.
-    const blob = await toBlob(el, {
-      pixelRatio: opts.pixelRatio ?? 2,
-      backgroundColor: opts.backgroundColor,
-    });
-    if (!blob) throw new Error('html-to-image returned a null blob');
-    return blob;
+    // ⚠️ DEGRADE, NEVER ABORT. A font problem used to cost the user the whole export — and on the
+    // recovery-kit surface that means they cannot save the one artefact that gets them back into
+    // their pod. A kit in fallback fonts is a working kit.
+    let fontEmbedCss: string | null = null;
+    try {
+      fontEmbedCss = await Promise.race([
+        getFontEmbedCss(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('font embed timed out')), FONT_EMBED_TIMEOUT_MS)
+        ),
+      ]);
+    } catch (fontErr) {
+      // Not fatal, but never silent: a quality regression nobody can see is one nobody fixes.
+      console.warn('[sheet-export] font embed failed; capturing without embedded fonts', fontErr);
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'sheet export font embed failed; captured with fallback fonts',
+        context: { error_code: 'font-embed-fallback' },
+      });
+    }
+
+    // At most ONE fallback. A second failure is a real failure and still throws, so today's
+    // contract is preserved rather than widened.
+    if (fontEmbedCss === null) return await captureOnce(el, opts, null);
+
+    try {
+      return await captureOnce(el, opts, fontEmbedCss);
+    } catch (captureErr) {
+      // ⚠️ THIS IS THE ARM THAT ACTUALLY FIXES FIREFOX, and it was missing: the degrade
+      // above only fired when FETCHING the font CSS failed. The reported failure is the other
+      // shape entirely — `getFontEmbedCSS` SUCCEEDS, handing back multiple megabytes of base64
+      // `@font-face` rules, and it is the rasterize step that then dies on the resulting
+      // foreignObject data URL. Chromium tolerates it, Firefox does not. With one call site the
+      // `skipFonts` path could not be reached on the exact failure it was written for, and the
+      // comment above claimed a fallback the code did not have.
+      console.warn('[sheet-export] capture with embedded fonts failed; retrying bare', captureErr);
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'sheet export capture failed with embedded fonts; retried with fallback fonts',
+        context: { error_code: 'font-embed-capture-fallback' },
+      });
+      return await captureOnce(el, opts, null);
+    }
   } catch (err) {
     if (err instanceof ExportError) throw err;
     throw new ExportError('rasterize', err);

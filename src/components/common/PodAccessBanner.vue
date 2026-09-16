@@ -20,7 +20,8 @@ import { computed, ref } from 'vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
-import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
+import { useDriveFileReselect } from '@/composables/useDriveFileReselect';
+import { assertNever } from '@/utils/assertNever';
 import { showToast } from '@/composables/useToast';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { resolveErrorView } from '@/utils/structuredError';
@@ -29,7 +30,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
-const { pick } = usePickBeanpodFile();
+const { reselect } = useDriveFileReselect();
 const { reconnect } = useGoogleReconnect();
 
 /** Guards against a double-tap firing two Drive round-trips. */
@@ -48,9 +49,25 @@ async function rebindTo(fileId: string, fileName: string): Promise<boolean> {
 }
 
 async function pickFamilyFile(): Promise<void> {
-  const picked = await pick();
-  if (picked.kind !== 'picked') return; // cancelled, redirected, or pick failed
-  await rebindTo(picked.fileId, picked.fileName);
+  // ⚠️ Every outcome is answered. This used to open with
+  // `if (picked.kind !== 'picked') return;` — a cancel, a full-page redirect and a hard Picker
+  // failure were all the same silent no-op, on the banner a family only sees because their pod
+  // is already broken.
+  //
+  // Rendered through `showToast`, which this component already uses for the sibling
+  // reconnect-failure case. A third local error channel here would be a coupling regression.
+  const result = await reselect();
+  switch (result.outcome) {
+    case 'rebound':
+    case 'declined':
+    case 'redirecting':
+      return;
+    case 'failed':
+      showToast('error', t('googleDrive.reconnectFailed'), t(result.messageKey));
+      return;
+    default:
+      assertNever(result, 'PodAccessBanner.pickFamilyFile');
+  }
 }
 
 async function switchToCanonical(): Promise<void> {
@@ -60,6 +77,9 @@ async function switchToCanonical(): Promise<void> {
   // A device that has never opened that file may not hold `drive.file` scope for
   // it, so the rebind can legitimately fail with FILE_NOT_FOUND. Fall back to the
   // picker, which grants scope as a side effect of the user choosing the file.
+  //
+  // ⚠️ `pickFamilyFile` now surfaces its own failure via `showToast`, so this fallback no longer
+  // discards the outcome — which was the same silent-return defect one level up.
   if (!ok) await pickFamilyFile();
 }
 

@@ -5549,6 +5549,11 @@ export const useSyncStore = defineStore('sync', () => {
     const token = options?.silent
       ? await getValidTokenSilent()
       : await requestAccessToken({
+          // ⚠️ `forceConsent`, not `chooseAccount`, so this does NOT show the account chooser —
+          // it re-asks permission on the account already signed in. The name `forceNewAccount`
+          // has therefore always overpromised. Left as-is to keep this path's behaviour
+          // unchanged; `chooseAccount` is the flag to switch to when the Settings restore picker
+          // is revisited.
           forceConsent: options?.forceNewAccount,
         });
     // Drive-wide search so we don't resolve (and potentially create) the
@@ -5911,6 +5916,51 @@ export const useSyncStore = defineStore('sync', () => {
     syncService.setEnvelope(env);
   }
 
+  /**
+   * Retire ALL of a member's family-key material from the envelope: their password wrap and
+   * every passkey wrap enrolled under their id. One envelope write, one `setEnvelope`.
+   *
+   * ⚠️ WHY BOTH, AND WHY THIS EXISTS. Clearing `pinHash` / `passwordHash` in the doc only
+   * makes a member LOOK unclaimed — `requiresPassword` is derived from those two fields. The
+   * envelope wraps are what actually decrypt the pod, and they are keyed independently. Leaving
+   * them behind means an unclaimed member's old password or old passkey still opens the family
+   * data, which turns "clear this claim so I can re-invite them" into a no-op on the only part
+   * that matters.
+   *
+   * Returns the number of entries removed, so the caller can log a real number instead of
+   * asserting a cleanup it did not observe.
+   */
+  function retireMemberKeyMaterial(memberId: string): number {
+    if (!envelope.value) return 0;
+    const wrappedKeys = { ...envelope.value.wrappedKeys };
+    let removed = 0;
+    if (wrappedKeys[memberId]) {
+      delete wrappedKeys[memberId];
+      removed += 1;
+    }
+
+    const passkeyWrappedKeys = { ...envelope.value.passkeyWrappedKeys };
+    for (const [credentialId, wpk] of Object.entries(passkeyWrappedKeys)) {
+      // ⚠️ An entry with NO `memberId` is an older envelope's, and is deliberately left
+      // alone: it cannot be attributed to this member, and deleting it would lock whoever it
+      // does belong to out of the pod. A stale wrap is recoverable; a destroyed one is not.
+      if (wpk.memberId === memberId) {
+        delete passkeyWrappedKeys[credentialId];
+        removed += 1;
+      }
+    }
+    if (removed === 0) return 0;
+
+    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
+      ...envelope.value,
+      wrappedKeys,
+      passkeyWrappedKeys,
+    };
+    envelope.value = env;
+    syncService.setEnvelope(env);
+    return removed;
+  }
+
   function removePasskeySecretsForCredential(credentialId: string): void {
     passkeySecrets.value = passkeySecrets.value.filter((s) => s.credentialId !== credentialId);
   }
@@ -6134,6 +6184,7 @@ export const useSyncStore = defineStore('sync', () => {
     addPasskeySecret,
     addRecoveryKey,
     setRecoveryPassphraseWrap,
+    retireMemberKeyMaterial,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,
   };
