@@ -1419,13 +1419,19 @@ export const useAuthStore = defineStore('auth', () => {
     // roster the shared file has not seen yet. A second device — or the invitee's own first
     // load — would read the member as still claimed. Bounded so a slow or offline Drive
     // degrades rather than hangs the UI; the write is already durable locally either way.
-    try {
-      await syncStore.syncNowBounded();
-    } catch (e) {
+    //
+    // ⚠️ CHECK THE BOOLEAN; THE try/catch WAS DEAD CODE. `syncNowDurable` catches everything
+    // internally and `syncNowBounded` maps it to `true`/`false` — it never rejects, so the
+    // `catch` could not run and a failed push was completely silent. The owner was then told
+    // "Done. You can invite {name} again now", minted a link against a roster the shared file
+    // had never seen, and the invitee dead-ended on NO_UNCLAIMED_MEMBERS with nothing in
+    // CloudWatch. Exactly the `wrapAsync`-result defect fixed in `applyPinReset` one round
+    // earlier, reintroduced here; `resetMemberPinViaRecovery` already had the right shape.
+    const pushed = await syncStore.syncNowBounded();
+    if (!pushed) {
       reportError({
         surface: 'join-flow',
         message: 'unclaim saved locally but the push to the family file failed',
-        error: e,
         severity: 'warning',
         context: { action: 'unclaim_sync_failed', member_id_tail: targetMemberId.slice(-8) },
       });

@@ -869,14 +869,19 @@ export function useJoinFlow() {
     // unclaimed ones. The claim flow below structurally cannot serve a claimed member.
     if (linkMode.value) {
       clearError();
-      // ⚠️ THE DENOMINATOR APPLIES HERE TOO. `emitJoinCompleted` had exactly one call site,
-      // on the claim path, so the whole device-link population produced failure events and no
-      // successes — a failure count with no denominator, which cannot tell a broken release
-      // from a busy week. Worse, the `needs-pick` loop counter is cleared inside it, so a
-      // device link that reached the Picker once left the counter set: the NEXT join in the
-      // same tab logged its first, entirely normal `needs-pick` arrival at `warn` and looked
-      // like a loop.
-      emitJoinCompleted();
+      // ⚠️ NO `emitJoinCompleted()` HERE, AND THE ATTEMPT TO ADD ONE WAS WRONG. A previous
+      // round noticed this path had no success event and put one here — but `link-ready` is
+      // where the file DECRYPTS, not where anyone joins: it hands off to the standard login
+      // machine, which still has to show the person picker and prove a PIN. Counting it as a
+      // completed join means the denominator reports success for everyone who abandons at the
+      // picker, fails the PIN, or closes the tab, which is worse than having no denominator:
+      // the rate would look healthy during exactly the failure it exists to surface. It also
+      // cleared the needs-pick loop counter early, disarming the escalation for a link that
+      // had not finished.
+      //
+      // The device-link population therefore still has NO success denominator. Recorded in
+      // docs/STATUS.md rather than papered over — the event belongs wherever the login machine
+      // confirms a member, which is outside this composable.
       currentStep.value = 'link-ready';
       return;
     }
@@ -1118,7 +1123,22 @@ export function useJoinFlow() {
       //    confirmation and the expected file name vanished from the card.
       if (targetFamilyId.value) await performLookup();
       enterAwaiting('cancelled');
-      recordError('OAUTH_SCOPE_DENIED', { reason: authError });
+
+      // ⚠️ NOT EVERY GOOGLE ERROR IS A DECLINE. `OAuthCallbackPage` forwards whatever Google
+      // sent — `access_denied`, `server_error`, `temporarily_unavailable`, `invalid_scope`,
+      // `interaction_required` — and collapsing all of them into `OAUTH_SCOPE_DENIED` told a
+      // joiner hitting a Google outage, or a real console misconfiguration, to "try again and
+      // allow Drive access", then filed it as a deliberately de-paged `warning`. A provider
+      // outage and a user changing their mind became the same event in the UI and in
+      // CloudWatch.
+      //
+      // ⚠️ AND THE VALUE RIDES `message`, NOT `reason`. `reason` is not in
+      // `ALLOWED_CONTEXT_KEYS`, so it was stripped before reaching the firehose — the one
+      // discriminating datum, dropped. `recordError` builds its Slack detail from
+      // `context.message`, which is why the sibling call in `doPickAndLoad` uses that key.
+      const DECLINES = ['access_denied', 'consent_required', 'interaction_required'];
+      const code = DECLINES.includes(authError) ? 'OAUTH_SCOPE_DENIED' : 'OAUTH_REDIRECT_FAILED';
+      recordError(code, { message: authError });
       return;
     }
     if (!targetFamilyId.value) {

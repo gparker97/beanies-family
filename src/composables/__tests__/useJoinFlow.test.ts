@@ -376,6 +376,50 @@ describe('useJoinFlow', () => {
       expect(target.path).toBe(mockRoute.path);
     });
 
+    it('tells a Google outage apart from a user declining', async () => {
+      /**
+       * ⚠️ A DECLINE AND AN OUTAGE ARE NOT THE SAME EVENT. Every `?authError=` collapsed into
+       * `OAUTH_SCOPE_DENIED` — "please try again and allow Drive access", filed as a
+       * deliberately de-paged `warning`. So a Google-side `server_error`, or an `invalid_scope`
+       * from a real console misconfiguration, told the joiner to do something that could not
+       * help and told on-call nothing at all.
+       */
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      const link = buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+        'http://localhost:3000',
+        ''
+      );
+
+      setUrl(`${link}&authError=access_denied`);
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const declined = useJoinFlow();
+      await declined.init();
+      expect(declined.currentError.value?.code).toBe('OAUTH_SCOPE_DENIED');
+
+      setUrl(`${link}&authError=server_error`);
+      const failed = useJoinFlow();
+      await failed.init();
+      expect(failed.currentError.value?.code).toBe('OAUTH_REDIRECT_FAILED');
+    });
+
+    it('puts the Google error where the firehose can actually read it', async () => {
+      // `reason` is not in ALLOWED_CONTEXT_KEYS and is stripped; `recordError` builds its
+      // detail from `context.message`. The one discriminating value was being dropped.
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      const link = buildInviteLink({ familyId: 'fam', provider: 'google_drive' }).replace(
+        'http://localhost:3000',
+        ''
+      );
+      setUrl(`${link}&authError=temporarily_unavailable`);
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      expect(flow.currentError.value?.context).toMatchObject({
+        message: 'temporarily_unavailable',
+      });
+    });
+
     it('arms the retry button, which the only offered recovery depends on', async () => {
       // `OAUTH_SCOPE_DENIED` declares exactly one recovery, `retry`, and `handleRetry` re-fires
       // `lastFailedAction`. On this path nothing ever assigned it, so the single way forward

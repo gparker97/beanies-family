@@ -5,6 +5,7 @@ import {
   startRedirectAuth,
   tryGetSilentToken,
   isPopupBlocked,
+  isUserCancellation,
 } from '@/services/google/googleAuth';
 import { pickBeanpodFile, type PickBeanpodFileResult } from '@/services/google/drivePicker';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
@@ -144,6 +145,16 @@ export function usePickBeanpodFile() {
         // and collapsing it into `auth` is why `OAUTH_POPUP_BLOCKED` was a declared code that
         // nothing ever emitted — a registry entry that lied about coverage.
         if (isPopupBlocked(e)) return { kind: 'failed', reason: 'popup-blocked', message };
+        // ⚠️ A CLOSED CHOOSER IS NOT A FAILURE. `waitForAuthCode` rejects with
+        // `Error('Authentication cancelled')`, which `isUserCancellation` matches exactly — but
+        // this catch never asked, so someone opening "Use a different Google account", looking
+        // at the list and closing it got a red error card (`PICKER_AUTH_FAILED` on the join
+        // page, an error toast on the pod banners) plus a `reportError`. That is a scolding for
+        // changing your mind, on the surfaces where people are already stuck. Every other
+        // Google-auth call site in the app consults this predicate; this one was added without
+        // it, and the omission only became reachable when `chooseAccount` started opening a
+        // chooser people might close.
+        if (isUserCancellation(e)) return { kind: 'cancelled' };
         return { kind: 'failed', reason: 'auth', message };
       }
 

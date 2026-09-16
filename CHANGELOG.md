@@ -18,7 +18,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Security
 
-- **A crafted sign-in link can no longer send you to another website.** A specially formed return address in a Google sign-in link could carry someone off beanies.family to a site of the attacker's choosing. Return addresses are now checked against the real browser address parser rather than by pattern matching.
+- **A crafted sign-in link can no longer send you to another website, on any of the three return paths.** The check now runs through the browser's own address parser rather than pattern matching, which closed five different ways of writing the same trick, and it is shared by all three places a sign-in returns you to.
+
+- **The AI proxy no longer hands out free prompt influence while its safety switch is off.** When the free-correction feature was switched off, every request could still steer how the AI read a document without paying for it, which is exactly the wrong behaviour during the kind of incident that switch exists for.
 
 ### Fixed
 

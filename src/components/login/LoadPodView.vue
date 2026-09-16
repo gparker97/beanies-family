@@ -91,6 +91,13 @@ const emit = defineEmits<{
 
 const isLoadingFile = ref(false);
 const formError = ref<string | null>(null);
+/**
+ * Reveal "Use a different Google account" beneath the open-saved-file button.
+ *
+ * Set only after a cancelled Picker: an empty chooser is what a wrong-account session looks
+ * like, and that is the moment the escape becomes useful rather than noise.
+ */
+const showAccountSwitch = ref(false);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
 /** Recovery-kit entry mode on the decrypt panel (login rethink Phase 3). */
@@ -702,9 +709,17 @@ async function handleOpenSavedFile() {
  * (`usePickBeanpodFile().pick()`), then the existing `handleDriveFileSelected`
  * handoff. Never throws — `pick()` returns a structured result.
  */
-async function loadSavedFileViaPicker() {
-  const email = getGoogleAccountEmail() ?? undefined;
-  const picked = await pickBeanpodFromDrive({ loginHint: email });
+async function loadSavedFileViaPicker(opts?: { chooseAccount?: boolean }) {
+  const chooseAccount = opts?.chooseAccount ?? false;
+  // ⚠️ A CHOOSER ROUTE IS REQUIRED HERE TOO, and this screen nearly did not get one. The
+  // Picker is now PINNED to the token's account (`setAuthUser` in drivePicker), which fixed an
+  // empty chooser for multi-account joiners — but it also removed the one thing that used to
+  // rescue a returning OWNER signed into the wrong Google session: the browser's own session
+  // could previously surface the right account by accident. The two pod banners gained
+  // `pickFamilyFileOtherAccount` and the join card gained a "different account" link; this is
+  // the FIRST screen a returning owner lands on, and it had neither.
+  const email = chooseAccount ? undefined : (getGoogleAccountEmail() ?? undefined);
+  const picked = await pickBeanpodFromDrive({ chooseAccount, loginHint: email });
 
   // ⚠️ A `switch` with `assertNever`, so a future outcome is a compile error rather than a silent
   // no-op. The `if` chain this replaced had ONE arm for `cancelled`, whose own comment admitted it
@@ -716,6 +731,13 @@ async function loadSavedFileViaPicker() {
       return;
 
     case 'cancelled':
+      // ⚠️ OFFER THE CHOOSER, BUT ONLY NOW. The Picker is pinned to the signed-in account
+      // (`setAuthUser`), which is what stops a multi-account browser showing an empty list —
+      // but it also means a returning owner on the WRONG Google session sees a Drive without
+      // their pod and has nowhere to go. Revealing the escape after a cancel, rather than
+      // up front, honours CLAUDE.md's rule against pre-warning that a flow might fail:
+      // friction is surfaced only once failure is actually observed.
+      if (!chooseAccount) showAccountSwitch.value = true;
       logEvent({
         level: 'info',
         surface: 'load-existing-family',
@@ -1836,6 +1858,15 @@ async function handleDriveRefresh() {
                 d="M9 5l7 7-7 7"
               />
             </svg>
+          </button>
+          <!-- Revealed only after a cancelled chooser — see `loadSavedFileViaPicker`. -->
+          <button
+            v-if="showAccountSwitch"
+            type="button"
+            class="font-inter text-primary-500 dark:text-accent-lift mt-2 w-full text-center text-xs font-semibold underline underline-offset-2"
+            @click="loadSavedFileViaPicker({ chooseAccount: true })"
+          >
+            {{ t('podAccess.recovery.pickFamilyFileOtherAccount') }}
           </button>
         </div>
 

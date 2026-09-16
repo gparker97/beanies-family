@@ -916,7 +916,16 @@ export async function requestAccessToken(options?: {
   }
 
   // Deduplicate concurrent popup auth flows (check before opening popup)
-  if (pendingAuthPromise) {
+  //
+  // ⚠️ BUT NOT FOR `chooseAccount`. This was the one silent path the bypass above missed,
+  // and it is the worst of them because it runs AFTER `clearTokenState()` has already thrown
+  // the tokens away. Any popup already in flight — a background reconnect, a sibling surface,
+  // the user's own earlier tap still sitting on Google's screen — and "sign in with a
+  // different account" hands back THAT flow's token: `performPopupAuth` never runs, the
+  // chooser never opens, `prompt=select_account consent` is never sent, and Settings then
+  // calls `handleGoogleReconnected()` believing the switch happened. The invariant stated
+  // above says every silent path; this is one.
+  if (pendingAuthPromise && !options?.chooseAccount) {
     console.warn('[googleAuth] Auth flow already in progress — joining existing request');
     return pendingAuthPromise;
   }

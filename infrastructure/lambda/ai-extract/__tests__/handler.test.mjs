@@ -446,6 +446,47 @@ describe('ai-extract Lambda handler', () => {
         assert.ok(res.parsedBody.retryAfterSeconds > 0);
       });
 
+      it('does NOT write the ADR-030 retirement counter for a shed request', async () => {
+        /**
+         * ⚠️ THE SUNSET GATE DEPENDS ON THIS. ADR-030 step 3 allows deleting the plaintext arm
+         * once `[ai-extract] legacy plaintext request` reads ZERO for a release cycle. The log
+         * line sat ABOVE the 429 return, so every rate-limited attempt still wrote it — and
+         * the `x-api-key` ships in the public bundle, so one throttled scanner kept the gate
+         * permanently unsatisfiable and made "un-updated store builds still extracting" (do
+         * not delete) indistinguishable from "a bot being shed" (safe to delete).
+         *
+         * The comment above the line has claimed "after the LAST pre-model refusal" since
+         * before it was true. This is the assertion that makes it so.
+         */
+        const lines = [];
+        const original = console.log;
+        console.log = (...a) => lines.push(a.map(String).join(' '));
+        let res;
+        try {
+          res = parseResponse(
+            await handler(
+              makeEvent({
+                headers: keyHeader,
+                body: {
+                  task: 'share',
+                  text: 'a page about a school fair',
+                  todayIso: '2026-06-03',
+                  familyId: 'fam-1',
+                },
+              })
+            )
+          );
+        } finally {
+          console.log = original;
+        }
+
+        assert.equal(res.statusCode, 429, 'precondition: the request must actually be shed');
+        assert.ok(
+          !lines.some((l) => l.startsWith('[ai-extract] legacy plaintext request')),
+          'a shed request must not count toward the retirement gate'
+        );
+      });
+
       it('carries CORS headers, which an API-Gateway-generated 429 would not', async () => {
         // This is WHY the refusal goes through `response()`. Without them the browser sees an
         // opaque network error, classifies it as `provider_error`, and pages #beanies-errors —
@@ -1112,6 +1153,56 @@ describe('ai-extract Lambda handler', () => {
         'REAL',
         'the real header must survive any amount of junk in front of it'
       );
+    });
+
+    it('does not let PREFIX-MATCHING junk starve the real ehbp header', async () => {
+      /**
+       * ⚠️ THE CASE THE SIBLING TEST ABOVE CANNOT REACH. It builds its junk as `not-ehbp-${i}`,
+       * which fails the prefix test and never touches the `kept` counter — so it passed
+       * throughout, while sixteen keys that DO match the prefix filled the budget and the
+       * seventeenth, the encapsulated key, fell into the drop arm. Proven before the fix:
+       *
+       *     kept: 16 | real header relayed? false
+       *
+       * Moving the bound onto the input (MAX_EHBP_KEYS) did not help: 17 keys is far under the
+       * ceiling. The required header is now admitted before the budgeted walk.
+       */
+      let seen;
+      globalThis.fetch = async (url, init) => {
+        seen = init;
+        return fakeSealedUpstream();
+      };
+      const junk = Object.fromEntries(Array.from({ length: 16 }, (_, i) => [`ehbp-junk${i}`, 'x']));
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: sealedBody({ ehbp: { ...junk, 'ehbp-encapsulated-key': 'REAL' } }),
+        })
+      );
+
+      assert.equal(res.statusCode, 200);
+      assert.equal(
+        seen.headers['ehbp-encapsulated-key'],
+        'REAL',
+        'the real header must survive junk that also matches the ehbp- prefix'
+      );
+    });
+
+    it('refuses, rather than spending the grant, when nothing is relayable', async () => {
+      // `relayEhbpHeaders` DROPS by design so a protocol upgrade does not look like a malformed
+      // request. But an `ehbp` that arrived with content and relayed NOTHING — over the key
+      // ceiling, or every value failing its bounds — cannot be an upgrade. Left unchecked it
+      // sailed past `openRead`, which atomically spends the family's one-use grant, and on to
+      // `callUpstream`, which bills Tinfoil to decapsulate ciphertext with no key.
+      const tooMany = Object.fromEntries(
+        Array.from({ length: 2100 }, (_, i) => [`ehbp-k${i}`, 'x'])
+      );
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: sealedBody({ ehbp: tooMany }) })
+      );
+      assert.equal(res.statusCode, 400);
+      assert.equal(JSON.parse(res.body).code, 'bad_ehbp');
     });
 
     it('cannot be used to forge an alarm literal through a header NAME', async () => {

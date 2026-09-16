@@ -86,6 +86,37 @@ export function encodeRedirectState(payload: {
  */
 const PROBE_ORIGIN = 'https://beanies.invalid';
 
+/**
+ * Is this a same-origin relative path, judged by the BROWSER'S OWN PARSER?
+ *
+ * ⚠️ EXPORTED BECAUSE THERE ARE THREE SINKS, NOT ONE. `decodeRedirectState` was the only place
+ * this check lived, while `OAuthCallbackPage`'s legacy sessionStorage transport and
+ * `App.vue`'s native `installNativeAuthListener` callback both navigate to a stored
+ * `returnPath` without it. Both sources are app-written today, so neither is a live exploit —
+ * but a guard that protects one of three doors is the shape a future change widens by
+ * accident, and this class of bug has already shipped once here.
+ *
+ * ⚠️ RESOLVE, DO NOT PATTERN-MATCH. A prefix test on `/` and `//` looks sufficient and is not:
+ * the WHATWG parser reads a BACKSLASH as a slash in the authority position for special
+ * schemes, and strips tabs, newlines and carriage returns BEFORE parsing. So `/\evil.com`,
+ * `/\/x`, `/\<tab>\evil.com`, `/<newline>/evil.com` and `/<cr>\evil.com` all begin with a
+ * single slash, are not `//`, and still resolve clean off-origin. Verified against the same
+ * parser the browser uses:
+ *
+ *     new URL('/\evil.com', 'https://app.beanies.family').href === 'https://evil.com/'
+ *
+ * Enumerating spellings is how this was got wrong; comparing origins covers the class.
+ */
+export function isSameOriginReturnPath(returnPath: unknown): returnPath is string {
+  if (typeof returnPath !== 'string') return false;
+  if (!returnPath.startsWith('/') || returnPath.startsWith('//')) return false;
+  try {
+    return new URL(returnPath, PROBE_ORIGIN).origin === PROBE_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 export function decodeRedirectState(raw: string | null | undefined): RedirectStatePayload | null {
   if (!raw) return null;
   try {
@@ -98,15 +129,8 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
     if (obj.v !== REDIRECT_STATE_VERSION) return null;
     if (typeof obj.mode !== 'string' || !MODES.includes(obj.mode as RedirectMode)) return null;
     const returnPath = obj.returnPath;
-    // Same-origin relative path only: a single leading '/', not '//' (which a
-    // browser treats as a protocol-relative absolute URL → open-redirect).
-    if (
-      typeof returnPath !== 'string' ||
-      !returnPath.startsWith('/') ||
-      returnPath.startsWith('//')
-    ) {
-      return null;
-    }
+    // Same-origin relative path only. One implementation, shared by all three sinks.
+
     // ⚠️ THE PREFIX CHECKS ABOVE ARE NOT ENOUGH, and believing they were left an open
     // redirect. `/\evil.com` starts with a single '/' and passes both — but the WHATWG parser
     // treats a BACKSLASH as a slash in the authority position for special schemes, so
@@ -119,11 +143,7 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
     // Resolve it the way a browser will and demand the origin come back unchanged. That closes
     // the whole class — backslashes, embedded tabs and newlines (which `new URL` strips),
     // anything else a hand-written prefix test will not think of — rather than one spelling.
-    try {
-      if (new URL(returnPath, PROBE_ORIGIN).origin !== PROBE_ORIGIN) return null;
-    } catch {
-      return null;
-    }
+    if (!isSameOriginReturnPath(returnPath)) return null;
     // `grant` is optional on the wire; anything other than an explicit
     // 'calendar' (absent, unknown, malformed) resolves to the 'drive' default.
     const grant: RedirectGrant = obj.grant === 'calendar' ? 'calendar' : 'drive';
