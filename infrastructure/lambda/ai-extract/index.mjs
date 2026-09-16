@@ -11,16 +11,21 @@
  * top-level try/catch → 500. The body cap is deliberately MUCH larger than telemetry's 256 KB
  * because the payload is a base64 image data-URL (~1.33× the compressed bytes).
  *
- * GATE 3 (deferred): integrate Tinfoil's EHBP so the client encrypts the document body to the
- * attested enclave and THIS proxy forwards ciphertext it cannot read. Until then the proxy sees
- * the image plaintext transiently in memory (retains nothing) — so claims are scoped to
- * "attested confidential compute + zero retention", NOT "no intermediary sees the document"
- * (ADR-030 binding principle). Never log the document bytes.
+ * GATE 3 (#49): SHIPPED, for sealed clients. A client that sends `protocol: 'ehbp-1'` encrypts
+ * the body to the ATTESTED enclave key before it leaves the device, and `sealedForward.mjs`
+ * relays ciphertext this function cannot read. For those clients the strong claim is true.
+ *
+ * ⚠️ It is NOT true for every client, and ADR-030 says so rather than awarding the gate a tick it
+ * has not earned. The legacy plaintext arm below still exists for store builds that have not been
+ * updated, and on that arm this proxy still sees the image in memory (retaining nothing). Until
+ * the sunset condition in ADR-030 is met, the honest global claim remains "attested confidential
+ * compute + zero retention". Never log the document bytes, on either arm.
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
 import { closeRead, openRead, sourceFingerprint, validateCorrection } from './meter.mjs';
 import { checkLimits } from './rateLimit.mjs';
+import { SEALED_PROTOCOL, sealedForward } from './sealedForward.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
 const API_KEY = process.env.AI_EXTRACT_API_KEY;
@@ -99,7 +104,11 @@ export async function handler(event) {
 
   const rawBody = event?.body || '';
   if (rawBody.length > MAX_BODY_BYTES) {
-    return response(413, { error: 'Payload too large' }, event);
+    // `code` added with #49 and deliberately BEFORE the arm router, so it covers both. A sealed
+    // client cannot cheaply pre-guess this bound (it would have to model the envelope overhead),
+    // so the server's verdict is the real one and it needs to be classifiable rather than a bare
+    // status the client reports as a generic failure.
+    return response(413, { error: 'Payload too large', code: 'payload_too_large' }, event);
   }
 
   let parsed;
@@ -109,6 +118,33 @@ export async function handler(event) {
     return response(400, { error: 'Malformed JSON body' }, event);
   }
 
+  // ── Arm router (#49) ──────────────────────────────────────────────────────────────────────
+  //
+  // `protocol` absent means a client built before the sealed arm existed, which is the ONLY
+  // reason the plaintext arm below still exists: `VITE_AI_EXTRACT_URL` is baked into store
+  // builds, and a store build updates when the USER updates it, not when we deploy. Removing
+  // the legacy arm would hand every un-updated install a 400 with no `code`, which the client
+  // maps to the generic "something went wrong" toast.
+  //
+  // ⚠️ DEPLOY ORDER IS ASYMMETRIC. New Lambda + old bundle works (it takes the legacy arm). New
+  // bundle + old Lambda does not, because an old Lambda reads `protocol` as an unknown field and
+  // falls into the legacy path with no source. Lambda first, always.
+  if (parsed?.protocol === SEALED_PROTOCOL) {
+    return sealedForward(parsed, event, response);
+  }
+  if (parsed?.protocol !== undefined) {
+    // Its own code, like `unknown_task`: this is a DEPLOY-ORDER problem, not a user problem, and
+    // without a machine-readable code the client shows "something went wrong" for what is really
+    // "not deployed yet".
+    console.warn('[ai-extract] unknown protocol');
+    return response(400, { error: 'Unknown protocol', code: 'unknown_protocol' }, event);
+  }
+
+  // ── LEGACY-PLAINTEXT-ARM begins ───────────────────────────────────────────────────────────
+  //
+  // Everything from here to the end of the handler serves clients that predate the sealed arm.
+  // It is scheduled for deletion; see ADR-030's sunset condition. `grep -rn LEGACY-PLAINTEXT-ARM`
+  // finds every site that goes with it.
   const {
     imageDataUrls,
     imageDataUrl,
@@ -201,10 +237,13 @@ export async function handler(event) {
   //     consumes a family's budget;
   //   • BEFORE the try/catch around the billable upstream call.
   //
-  // Gated on `hasText`: TEXT SOURCES ONLY for now. The image path is bounded by its own size
-  // limits and `AI_PICKER_MAX_BYTES`, has not changed, and has run under the route throttle
-  // since #133 — widening to it is a strictly larger blast radius (it can break a working
-  // reader) for no new risk in this change. A deliberate follow-up, not smuggled in.
+  // Gated on `hasText`, and that is now a statement about THIS ARM ONLY. It was safe here only
+  // because this arm can SEE that a request is text. The sealed arm cannot, so it runs the
+  // limiter unconditionally — which is not an incidental tightening but the compensating control
+  // for the `sources` fence above, which ciphertext makes unenforceable forever. The follow-up
+  // that ADR-035 recorded as "widen the limits to images" has therefore landed, on the arm where
+  // it was needed. Do not reconcile the two: widening it here would change a working reader's
+  // behaviour for no new safety, on an arm scheduled for deletion.
   //
   // ⚠️ `checkLimits` never throws and fails open internally, which is why this is one `if`
   // and not a nested try/catch. Keeping this validation section flat is why it stays readable.
@@ -217,7 +256,7 @@ export async function handler(event) {
   }
 
   // ⚠️ A correction is only meaningful on `share`, and refusing it elsewhere is a FENCE, not
-  // tidiness. A grant is bound to the family, the document and the kind — but not to a task,
+  // tidiness. A grant is bound to the family and the document — but not to a task,
   // so without this a grant earned on a `share` read can be spent on a `recipe` one: the
   // builder ignores the hint, the model is called and billed, the result carries no `kind`, and
   // the wrong-kind guard below 502s a request that was never going to succeed. The grant is
@@ -368,6 +407,10 @@ export async function handler(event) {
       );
     }
 
+    // LEGACY-PLAINTEXT-ARM. The sealed arm cannot run this guard, because it never sees the
+    // result; the CLIENT reproduces it there, including the `none` split below. Two copies exist
+    // only until this arm is retired, and they must agree — `managedProvider.ts` cites this block.
+    //
     // A correction ASSERTED what this is, so a result of a different kind is a wrong-shape
     // answer rather than a re-classification. Only reachable when a grant was actually spent.
     //
