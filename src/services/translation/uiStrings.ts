@@ -6361,14 +6361,19 @@ const STRING_DEFS = {
   // One contiguous block: uiStrings.ts is ~9.6k lines and a feature's copy
   // scattered through it is unfindable. Keep new wall copy HERE.
   'wall.name': { en: 'Beanie Wall', beanie: 'beanie wall' },
+  // ⚠️ "wider" was wrong: the gate tests BOTH axes, and on the 8" tablet that
+  // prompted #96 it was the short side (the height, in landscape) that failed.
+  // It also told someone standing at a tablet to go and find a tablet. This is
+  // a device surface, so the `beanie` value keeps the real nouns and only drops
+  // case — see the beanie-mode floor in CLAUDE.md.
   'wall.tooNarrow.title': {
-    en: 'The wall needs a wider screen',
-    beanie: 'the wall needs a wider screen',
+    en: 'This screen is too small for the wall',
+    beanie: 'this screen is too small for the wall',
   },
   'wall.tooNarrow.body': {
-    en: 'The beanie wall is built for a tablet on the kitchen wall, so the whole family can read it from across the room. Open it on a tablet (either way up), or in a bigger window, and it will be here.',
+    en: 'The beanie wall is built to be read from across the room, so it needs room on both sides of the screen, not just width. It works on a tablet either way up. On a phone, or in a small window, there is not enough room to show the week.',
     beanie:
-      'the beanie wall is built for a tablet on the kitchen wall, so the whole family can read it from across the room. open it on a tablet (either way up), or in a bigger window, and it will be here.',
+      'the beanie wall is built to be read from across the room, so it needs room on both sides of the screen, not just width. it works on a tablet either way up. on a phone, or in a small window, there is not enough room to show the week.',
   },
   'wall.tooNarrow.back': { en: 'Take Me Back', beanie: 'take me back' },
   'wall.view.days': { en: 'The week', beanie: 'the week' },

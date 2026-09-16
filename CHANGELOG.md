@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **The beanie wall now works on a small tablet.** The wall is meant for the spare tablet you already own, but it turned away every 8-inch one, which is exactly the kind families mount in a kitchen. It asked for more room than those screens have, and then counted the browser's own toolbar against them as well. Any tablet can now be a wall, either way up, and on the smaller ones the wall draws itself a little more compact so it still reads from across the room.
+- **The date on the wall no longer gets cut off.** On a narrower wall the day and date shortened to a few letters, and on some screens to a single one, because everything beside it kept its space and the date gave up all of its own. The date now keeps its line and the buttons move down a row when they need to.
 - **A flight you already saved keeps naming its airport, even after the airport's code changes hands.** Airport codes occasionally move: in September, West Palm Beach's PBI was handed to a new code. beanies used to drop the old code entirely, and a trip saved against it stopped showing the place and showed the bare letters instead. Retired codes are now kept and still read properly, while never being offered as a new choice.
 
 ### Changed
