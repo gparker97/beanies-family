@@ -4,6 +4,49 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## Prove the guard fires before believing it
+
+**Date:** 2026-09-16
+**Context:** Tracker #96, making the beanie wall work on 8-inch tablets. The change is geometric, so
+it shipped with a browser harness asserting tier, overflow, date truncation and alignment across 18
+viewport/mode combinations. It went green repeatedly. It was also, three separate times, asserting
+nothing at all:
+
+1. **The day-header alignment check measured BORDER boxes.** The header row carries
+   `padding-left: AXIS_WIDTH_PX` so its columns start where the plot's do. Comparing border boxes
+   reported a constant 62px skew at every size — including the untouched 1280x800 baseline. It
+   "failed" against code it was not testing, which is only marginally better than passing.
+2. **The overflow check could not see the defect it existed for.** `.wall-root` scroll overflow
+   reports nothing when the overrunning child is `overflow-hidden` — the plot clips its own contents
+   tidily while sitting in the wrong place. A rem-based plot floor growing under Large reading mode
+   drew the rest-days row straight through the 17:00 axis label and every assertion passed. The row's
+   own comment already recorded this exact failure from a 1024x768 tablet in an earlier session.
+3. **The avatar-fit check looked for an `<img>`.** Every bean in the fixture renders INITIALS (a
+   `<span>`), so it skipped all of them. Instrumented, it reported **0 of 11 avatars measured** and
+   passed for the wrong reason.
+
+And underneath all three, the harness's first passing run measured a wall showing "Nothing on" in
+every column, because the fixture never landed: the chore board groups by LIST and the seeded to-dos
+had none, and activities need `isActive: true` or they are in the document, in the store, and
+invisible everywhere. Geometry assertions are perfectly happy on an empty grid.
+
+Every one of these was caught by an extra, deliberate step — instrumenting the count, or re-breaking
+the thing on purpose to watch the assertion go red — and none by the suite going green.
+
+**Rule:** a new guard is not trusted until you have **seen it fail**. Before believing a green run:
+(a) assert the FIXTURE landed (count the rows, count the rendered elements) and fail loudly if it did
+not; (b) re-break the defect deliberately and confirm the guard reports it, with the number; (c) make
+"measured nothing" an explicit failure, never a silent pass. This is the same lesson as
+"a guard that has never been seen to fail is not yet a guard" (2026-09-07) and it recurred three
+times in one session, so it is now a checklist rather than a principle.
+
+**Corollary for CSS guards:** measure the box that actually matters. Border box vs content box, and
+wrapper vs content, were two of the three failures here — and `BeanieAvatar` paints the bean's colour
+on the WRAPPER while its content is `h-full w-full`, so sizing the content is what pins a photo into
+the corner with the colour showing around it.
+
+---
+
 ## A cost objection is not a reason to cut a feature greg asked for
 
 **Date:** 2026-09-14
