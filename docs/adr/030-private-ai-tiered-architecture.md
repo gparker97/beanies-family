@@ -1,7 +1,7 @@
 # ADR-030: Private AI capability via a tiered architecture (on-device → BYOK → verifiable-TEE managed → cloud fallback)
 
 > Date: 2026-06-02
-> Status: **Accepted** (2026-06-02). Architecture accepted; **managed provider chosen = Tinfoil-direct (`qwen3-vl-30b`)** after Gate 1 passed empirically (quality + attestation both verified). Gate 2 (Tinfoil DPA / residency / zero-retention) **CLOSED 2026-07-10** (signed). Gate 3 (EHBP + attestation verification) remains open and is the sole blocker to the "no intermediary sees the document" claim - tracked as Notion #49. First feature wedge (event/invitation image → prefilled calendar activity) planned in `docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`.
+> Status: **Accepted** (2026-06-02). Architecture accepted; **managed provider chosen = Tinfoil-direct (`qwen3-vl-30b`)** after Gate 1 passed empirically (quality + attestation both verified). Gate 2 (Tinfoil DPA / residency / zero-retention) **CLOSED 2026-07-10** (signed). Gate 3 (EHBP + attestation verification) **shipped 2026-09-16 (#49) and is CLOSED FOR SEALED CLIENTS, open overall** while the Lambda's legacy plaintext arm still serves un-updated store builds; see the Gates section for the sunset condition. First feature wedge (event/invitation image → prefilled calendar activity) planned in `docs/plans/2026-06-02-private-ai-tiered-architecture-and-invitation-wedge.md`.
 > Research basis: `docs/research/2026-06-02-private-ai-llm-capability.md` (three deep-research passes + a trust-boundary spike (Pass 4) + empirical provider validation (Pass 5 — RedPill routing non-determinism + Tinfoil-direct verification + the live extraction gate)).
 > Related: ADR-001 (local-first IndexedDB), ADR-003 (Web-Crypto encryption), ADR-011 (file-first architecture), ADR-019 (family-key encryption), ADR-013 (admin API Lambda), ADR-027 (diagnostic logging/telemetry). Supersedes the scope of GitHub #133 (LLM help chatbot).
 
@@ -79,7 +79,30 @@ The trust boundary — _who can read the document in transit_ — is what decide
 
 1. **Extraction-quality gate — ✅ PASSED (2026-06-02).** `qwen3-vl-30b` ran on 6 real invitation images + 5 PDFs via both RedPill and Tinfoil: 6/6 + 5/5 clean, correct fields, correct `isEvent:false` on non-events. Gemma-3-27b weaker (chosen against). Model = `qwen3-vl-30b`.
 2. **DPA gate — ✅ CLOSED (2026-07-10).** The Tinfoil DPA is signed (greg). Zero-retention, no-training, GDPR Article 28 processor terms and data residency are contractually established. Note what this does and does not buy: it governs what the **enclave operator** may do with the document _after_ it arrives. It says nothing about the hop to our own proxy — that is Gate 3, and until Gate 3 ships the honest claim stays "attested confidential compute + zero retention", never "no intermediary sees the document".
-3. **Verification-SDK gate — OPEN (implementation).** Before claiming "no intermediary sees the document," integrate Tinfoil's attestation-verification SDK + EHBP in our path and confirm the proxy genuinely forwards only ciphertext.
+3. **Verification-SDK gate — ⚠️ CLOSED FOR SEALED CLIENTS, OPEN OVERALL (2026-09-16).** Shipped in #49. A client sending `protocol: 'ehbp-1'` verifies the enclave's AMD SEV-SNP attestation with `@tinfoilsh/verifier`, obtains the HPKE public key **bound to that attested measurement**, and seals the chat-completions body to it before anything leaves the device. `sealedForward.mjs` relays ciphertext our proxy cannot read. Verification failure refuses the send; there is no degrade-to-plaintext path, by construction, because a caller cannot obtain a key without verifying.
+
+   **The gate is deliberately NOT marked fully closed, and the distinction is load-bearing.** `VITE_AI_EXTRACT_URL` is baked into store builds, and a store build updates when the USER updates it. So the Lambda keeps a legacy plaintext arm for installs that have not updated, and on that arm the proxy still sees the document in memory (retaining nothing). Awarding the gate a tick while that arm serves real families would be exactly the overclaim the binding principle at the top of this ADR forbids.
+
+   **Sunset condition, in order:**
+   1. The sealed build is live on both stores.
+   2. Optionally raise `promptBelowVersion` in `web/public/min-app-version.json` to that version, per `docs/runbooks/native-store-submission.md#7-raising-the-update-floor`. That file's own `reason` records the last raise as justified by data damage, so whether a privacy improvement qualifies is a judgement call, not automatic. Skipping it simply means the tail drains on its own.
+   3. The legacy counter reads zero for a full release cycle. Logs Insights:
+      ```
+      fields @message
+      | filter @message like /LEGACY-PLAINTEXT-ARM|legacy plaintext request/
+      | stats count() by bin(1d)
+      ```
+   4. `grep -rn LEGACY-PLAINTEXT-ARM`, delete the marked block and `extractionPrompt.mjs`, drop its branch from `extractionPromptDrift.test.ts`, and flip this gate to closed.
+
+### What the sealed arm changed, beyond the encryption
+
+Recorded here because each is a real trade rather than an implementation detail, and none of them is discoverable from the code alone.
+
+- **The `sources` fence is dead and cannot come back.** It kept the proxy from being a general-purpose text-LLM endpoint anyone holding the bundle's `x-api-key` could bill us for. No server-side check can inspect a sealed body. **The compensating control is that the rate limiter now runs on EVERY sealed request**, not only text ones as on the legacy arm. That also closes ADR-035's "widen the limits to images" follow-up, on the arm where it was needed.
+- **A bean is now spent when the enclave ANSWERED, not when we could read the answer.** `closeRead` on the sealed arm fires on any successful enclave response, because there is no answer to inspect. So a model returning unparseable JSON costs a bean there where it costs nothing on the legacy arm. Accepted knowingly: every alternative routes through the client declaring "that did not parse", which is a meter bypass by construction. ⚠️ This makes one clause of the 2026-09-14 release note ("refusals, timeouts and unreadable answers cost nothing") partly untrue for sealed clients. Timeouts and refusals still cost nothing on both arms; an unreadable answer does not. Amending that public wording is greg's call and was deliberately not done as part of the code change.
+- **Correction grants lost their kind-binding**, because binding a grant to the result kind requires reading the result. Grants remain single-use and bound to `familyId + srcHash`, so the worst case is one free re-read per paid read of the same document, which is exactly the promise. A `kind: 'none'` share read now also issues a grant the UI can never spend (one extra write we pay for, never the family).
+- **The server-side "hint only when a grant was spent" fence is gone.** The client passes `correction.to` into its own prompt, exactly as the BYOK tier already does. Biasing your own read costs you a bean.
+- **What our server still learns on the sealed arm**, stated plainly because "we cannot read it" is not the same as "we see nothing": `familyId`, `task`, the sealed body's size, the timing, and `srcHash`. That hash is a SHA-256 over the exact wire bytes. It reveals no content, but it is a stable identifier: we can tell that two reads carried the same document, and could confirm a _guessed_ short text source. It is deliberately unsalted, because salting would break byte-parity with the server's `sourceFingerprint` and a family who read on one bundle then corrected after an in-hour app update would hash differently and trip the `different_source` alarm that means the feature is broken.
 
 If the DPA gate fails, the managed engine switches to **Gemini Flash-Lite (via Vertex)** behind the same abstraction; the rest of the architecture is unchanged.
 

@@ -58,6 +58,16 @@ address. Either tripping refuses.
 Widening the new limits to it is a strictly larger blast radius — it can break a working
 reader — for no new risk in this change.
 
+> **UPDATE 2026-09-16 (#49): this scope note now describes the LEGACY arm only, and the
+> follow-up it implies has landed.** The sealed arm limits **every** request, images included.
+> That was not a change of mind about blast radius; it is forced. A blind forwarder cannot see
+> whether a request is text, so the limiter cannot be conditional on it — and more importantly the
+> `sources` fence that kept this endpoint from being a general-purpose text-LLM anyone could bill
+> us for is unenforceable on ciphertext, permanently. The unconditional limiter is that fence's
+> compensating control. Do not "reconcile" the two arms by widening the legacy one: it is
+> scheduled for deletion, and changing it now would alter a working reader's behaviour for no
+> added safety. See ADR-030 Gate 3.
+
 ## What did NOT change, and is what makes the trade defensible
 
 - **Prompt-injection defence already existed.** `buildUserMessage` wraps text in

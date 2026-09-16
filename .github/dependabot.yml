@@ -34,6 +34,16 @@ updates:
           - 'astro'
     # Ignore specific dependencies if needed
     ignore:
+      # #49. The two enclave-crypto packages are pinned EXACTLY in package.json, because the
+      # sealed AI path's security depends on their behaviour and a silent minor is not something
+      # to discover in production. MAJOR-ONLY ignore, deliberately: patches and minors on a crypto
+      # library are exactly what must keep flowing, and a blanket ignore would stop security
+      # fixes reaching us. A major gets taken by hand, with the attestation spike re-run first
+      # (scripts/spikes/enclave-attestation.mjs).
+      - dependency-name: 'ehbp'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@tinfoilsh/verifier'
+        update-types: ['version-update:semver-major']
       # Major bumps blocked indefinitely on peer-dep ERESOLVE — re-enable when ecosystem catches up
       - dependency-name: 'eslint'
         update-types: ['version-update:semver-major']
