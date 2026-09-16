@@ -19,7 +19,7 @@
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
-import { closeRead, openRead, validateCorrection } from './meter.mjs';
+import { closeRead, openRead, sourceFingerprint, validateCorrection } from './meter.mjs';
 import { checkLimits } from './rateLimit.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
@@ -254,7 +254,10 @@ export async function handler(event) {
   // replays cannot both get a free read).
   const read = await openRead({
     familyId: typeof familyId === 'string' ? familyId : undefined,
-    source,
+    // The hash, not the source (#49). `openRead` is shared with the sealed arm, which has only
+    // ciphertext and reads its hash off the envelope — so the side that HAS the plaintext is the
+    // side that fingerprints it.
+    srcHash: sourceFingerprint(source),
     correction,
   });
 
@@ -403,7 +406,6 @@ export async function handler(event) {
     const grant = await closeRead(read, {
       familyId: typeof familyId === 'string' ? familyId : undefined,
       task,
-      result,
     });
 
     // Retain nothing: no document bytes, no model content — only a structured success line.

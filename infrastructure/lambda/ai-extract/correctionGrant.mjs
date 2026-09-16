@@ -19,16 +19,25 @@
  * to grant an exemption, so the read is CHARGED. It fails toward billing, and a grant only
  * exists because a read was already paid for.
  *
- * THE FOUR GUARDS, all in one ConditionExpression:
+ * THE THREE GUARDS, all in one ConditionExpression:
  *   exists          — a grant was actually issued for this family
  *   not consumed    — single use
- *   different kind  — you cannot "correct" event → event and get a free re-read
  *   same source     — the free read is a RE-read of the thing you paid for, not a new one
+ *
+ * ⚠️ A FOURTH, "different kind", was removed with #49. The sealed arm forwards ciphertext, so the
+ * Lambda never sees the model's answer and cannot bind a grant to the kind it was earned on.
+ * What still holds without it: a grant is single-use, and it is bound to `familyId + srcHash`.
+ * So the worst case is ONE free re-read per paid read of the same document — which is exactly the
+ * promise at the top of this file. What is lost is only the ability to refuse a "correction" that
+ * asserts the kind the read already returned; that now costs the user nothing and gains them one
+ * re-read they were already entitled to.
  *
  * The source binding is the one doing the heaviest lifting. Without it: pay for a 40-character
  * text read, then "correct" it with an 8-page PDF for free. The expensive half of every pair
- * would be free, forever. It is also the fence that matters most because `FAMILY_LIMIT` is
- * gated on `hasText` and does not cover the image path at all.
+ * would be free, forever. On the LEGACY arm it is also the fence that matters most, because
+ * `FAMILY_LIMIT` is gated on `hasText` there and does not cover the image path at all. On the
+ * SEALED arm that gap is closed: the limiter runs for every request, because ciphertext hides
+ * the source kind and a client-declared one would be a fence anybody could step over.
  *
  * Grants live in the RATE table, not the usage table: the usage table is billing evidence with
  * PITR and prod deletion protection, and hourly grant rows do not belong in it. The rate
@@ -51,7 +60,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * alarm — which looks identical to an alarm with nothing to report.
  *
  * `different_source` is the one refusal reason that means the FEATURE is broken rather than
- * someone probing it: missing / spent / same_kind are all expected in normal operation.
+ * someone probing it: missing / spent / expired are all expected in normal operation.
  */
 export const GRANT_MISMATCH_PREFIX = '[ai-extract] correction refused reason=different_source';
 
@@ -82,6 +91,25 @@ export function sourceFingerprint({ text, imageDataUrls }) {
  * refusal arm reports as an operator-facing store outage, triggerable by anyone holding the
  * api key that ships in the public bundle. Check the SHAPE, then the fields.
  */
+/**
+ * The token half of `validateCorrection`, on its own.
+ *
+ * Split out for the SEALED arm (#49), which sends `correction: { token }` and no `to`. There is
+ * nothing left for `to` to do there: `consumeGrant` no longer conditions on the kind, and the
+ * closed-set check below exists ONLY because `to` reaches the model's instruction — which, on the
+ * sealed arm, it never does, because the client builds the prompt itself. Sending it anyway would
+ * put the family's own assertion about their document ("this is a travel booking") on the wire in
+ * cleartext for no remaining purpose.
+ *
+ * Both arms share this so the token rule cannot drift into two spellings.
+ */
+export function validateCorrectionToken(token) {
+  // Bounds the grant key below DynamoDB's 2048-byte limit. Without it an oversized token throws
+  // ValidationException, is caught by the refusal arm, and the family is CHARGED.
+  if (typeof token !== 'string' || !UUID_RE.test(token)) return 'bad_token';
+  return null;
+}
+
 export function validateCorrection(correction) {
   if (correction === undefined || correction === null) return null;
   if (typeof correction !== 'object' || Array.isArray(correction)) return 'bad_shape';
@@ -90,18 +118,20 @@ export function validateCorrection(correction) {
   // document. An unvalidated value here is a prompt-injection channel on a call the family is
   // not even paying for — so it is a closed set, checked server-side, not a formality.
   if (!SHARE_KINDS.includes(to)) return 'bad_kind';
-  // Bounds the grant key below DynamoDB's 2048-byte limit. Without it an oversized token throws
-  // ValidationException, is caught by the refusal arm, and the family is CHARGED.
-  if (typeof token !== 'string' || !UUID_RE.test(token)) return 'bad_token';
-  return null;
+  return validateCorrectionToken(token);
 }
 
 /**
- * Which of the four guards refused, from the item `ALL_OLD` returns on the thrown error.
+ * Which of the three guards refused, from the item `ALL_OLD` returns on the thrown error.
  *
  * `unknown` is the honest answer when the runtime gave us nothing to read — it is NOT folded
  * into `different_source`, which is the one reason that means the feature is broken rather than
  * someone probing it, and the only one with an alarm.
+ *
+ * ⚠️ The final fallthrough used to be `same_kind`, because that guard existed and was the only
+ * remaining explanation. #49 removed it, so every guard that CAN refuse now has its own branch
+ * above. Reaching the end therefore means something genuinely unexplained, and saying `unknown`
+ * is the honest answer rather than naming a guard that is no longer there.
  */
 function refusalReason(err, srcHash, nowSeconds) {
   const item = err?.Item;
@@ -109,7 +139,7 @@ function refusalReason(err, srcHash, nowSeconds) {
   if (item.consumed) return 'spent';
   if (Number(item.expires_at?.N) <= nowSeconds) return 'expired';
   if (item.src?.S && item.src.S !== srcHash) return 'different_source';
-  return 'same_kind';
+  return 'unknown';
 }
 
 /**
@@ -137,22 +167,26 @@ export async function consumeGrant({ familyId, correction, srcHash, now = Date.n
         // and being wrong here throws ValidationException — caught by the same arm as a real
         // refusal, so the family would be charged for every correction forever while the UI
         // kept promising free. Do not audit the list; alias.
-        // FIVE guards. `expires_at > :now` is not redundant with the TTL attribute: DynamoDB's
+        // FOUR clauses. `expires_at > :now` is not redundant with the TTL attribute: DynamoDB's
         // TTL is a best-effort reaper that can lag by up to ~48h, so without this a grant the
         // header calls one-hour-lived stays spendable for two days — and the `expired` refusal
         // reason cannot be produced deterministically at all. The hour is a PRIVACY bound (the
         // stored source fingerprint), not just a convenience, so it has to be enforced on read.
+        //
+        // ⚠️ `#kind <> :to` was the fifth and is GONE (#49). It is not merely unnecessary now that
+        // grants carry no kind — it would be actively fatal: DynamoDB evaluates a comparison
+        // against a MISSING attribute as false, so leaving it in would refuse every correction,
+        // silently, on a path whose whole promise is that correcting our mistake is free.
         ConditionExpression:
-          'attribute_exists(pk) AND attribute_not_exists(#consumed) AND #kind <> :to AND ' +
+          'attribute_exists(pk) AND attribute_not_exists(#consumed) AND ' +
           '#src = :src AND expires_at > :now',
-        ExpressionAttributeNames: { '#consumed': 'consumed', '#kind': 'kind', '#src': 'src' },
+        ExpressionAttributeNames: { '#consumed': 'consumed', '#src': 'src' },
         ExpressionAttributeValues: {
           ':now': { N: String(Math.floor(now / 1000)) },
           ':t': { N: String(Math.floor(now / 1000)) },
-          ':to': { S: correction.to },
           ':src': { S: srcHash },
         },
-        // The old item on a conditional failure, so the four guards can be told apart without a
+        // The old item on a conditional failure, so the three guards can be told apart without a
         // second round trip. Supported since SDK v3.400; an older runtime simply omits it and
         // `refusalReason` falls back to `unknown` rather than asserting a cause.
         ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
@@ -193,22 +227,25 @@ export async function consumeGrant({ familyId, correction, srcHash, now = Date.n
  * Issue a grant for a read that was just counted.
  *
  * ⚠️ TWO INVARIANTS, both load-bearing:
- *  1. Only for a request that arrived WITHOUT a correction. Otherwise the kind rotates
- *     (event → travel → recipe → event), the different-kind guard never fires, and one paid
- *     read buys an unlimited chain of free ones.
+ *  1. Only for a request that arrived WITHOUT a correction. This is now carried ENTIRELY by
+ *     `wasCorrection`. It used to share the load with the different-kind guard in `consumeGrant`,
+ *     which #49 removed — so read this one as the whole fence, not half of it. Without it the
+ *     chain is unbounded: every free correction would buy another free correction, forever.
  *  2. Only when the count actually succeeded. An uncounted read must not also buy a free one.
  *
- * Only for the `share` task, and never for `kind: 'none'`: a `none` result opens no review
- * modal, so there is no surface a correction banner could mount on and the grant would be a row
- * nobody can spend. Without that condition this doubles the function's DynamoDB traffic for
- * grants most reads can never use.
+ * Only for the `share` task.
+ *
+ * ⚠️ It used to ALSO be conditional on the result being a real kind, which incidentally skipped
+ * `kind: 'none'`. #49 removed that, because the sealed arm never sees the result. The cost is one
+ * `UpdateItem` per `none` share read for a grant nobody can spend: a `none` result opens no review
+ * modal, so there is no surface for the correction banner to mount on. Accepted deliberately as
+ * the price of not being able to read the answer, and it is a write we pay for, never the family.
  *
  * Never throws. A failure just means no free correction, which degrades safely.
  */
 export async function issueGrant({
   familyId,
   task,
-  resultKind,
   srcHash,
   counted,
   wasCorrection,
@@ -219,7 +256,7 @@ export async function issueGrant({
   const table = process.env.RATE_TABLE;
   if (!table || !familyId || !srcHash) return undefined;
   if (wasCorrection || !counted) return undefined;
-  if (task !== 'share' || !SHARE_KINDS.includes(resultKind)) return undefined;
+  if (task !== 'share') return undefined;
 
   const token = globalThis.crypto.randomUUID();
   try {
@@ -231,10 +268,12 @@ export async function issueGrant({
         Key: Object.fromEntries(
           Object.entries(grantKey(familyId, token)).map(([k, v]) => [k, { S: v }])
         ),
-        UpdateExpression: 'SET #kind = :kind, #src = :src, expires_at = :ttl',
-        ExpressionAttributeNames: { '#kind': 'kind', '#src': 'src' },
+        // No `kind` attribute (#49). `consumeGrant` must not condition on one, and writing it
+        // would be worse than useless: a value only the legacy arm can supply would make grants
+        // behave differently depending on which arm issued them.
+        UpdateExpression: 'SET #src = :src, expires_at = :ttl',
+        ExpressionAttributeNames: { '#src': 'src' },
         ExpressionAttributeValues: {
-          ':kind': { S: resultKind },
           ':src': { S: srcHash },
           ':ttl': { N: String(Math.floor(now / 1000) + GRANT_TTL_SECONDS) },
         },
