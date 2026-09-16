@@ -111,6 +111,35 @@ test.describe('design screenshots', () => {
             createdAt: at,
             updatedAt: at,
           })),
+          /*
+           * Chores, so the chore board renders real COLUMNS. The board groups
+           * by list, not by loose to-dos — a to-do with no list produces no
+           * group and the board shows its empty state, which is how the first
+           * attempt here "verified" a header it never rendered.
+           */
+          lists: ['m-greg', 'm-sofia', 'm-leo', 'm-milo'].map((who, li) => ({
+            id: `w96-l-${li}`,
+            title: ['Morning jobs', 'Before school', 'Bedroom', 'Kitchen'][li],
+            emoji: ['🧹', '🎒', '🛏️', '🍽️'][li],
+            category: 'chores',
+            ownerId: who,
+            lifecycle: 'recurring',
+            items: [
+              'Make the bed',
+              'Reading, 20 min',
+              'Tidy the room',
+              'Feed the cat',
+              'Empty the bins',
+            ].map((title, ii) => ({
+              id: `w96-li-${li}-${ii}`,
+              title,
+              isCompleted: false,
+              createdAt: at,
+              updatedAt: at,
+            })),
+            createdAt: at,
+            updatedAt: at,
+          })),
           activities: activities.map((a, i) => ({
             id: `w96-a-${i}`,
             title: a.t,
@@ -289,6 +318,7 @@ test.describe('design screenshots', () => {
             overflowY: root.scrollHeight > root.clientHeight + 1,
             // An ellipsised date is the specific defect the header wrap fixes.
             dateTruncated: date ? date.scrollWidth > date.clientWidth + 1 : null,
+            dateClipPx: date ? Math.round(date.scrollWidth - date.clientWidth) : 0,
             dateText: date?.textContent?.trim().slice(0, 40) ?? null,
             edgeSkew,
             hookMissing,
@@ -333,7 +363,9 @@ test.describe('design screenshots', () => {
         }
         if (seen.overflowY) failures.push(`${where}: content overflows the root vertically`);
         if (seen.dateTruncated) {
-          failures.push(`${where}: the date is ellipsised ("${seen.dateText}")`);
+          failures.push(
+            `${where}: the date is ellipsised by ${seen.dateClipPx}px ("${seen.dateText}")`
+          );
         }
         if (seen.hookMissing) {
           failures.push(
@@ -344,6 +376,89 @@ test.describe('design screenshots', () => {
           failures.push(
             `${where}: the day-header row and the plot are ${seen.edgeSkew}px out of alignment, ` +
               `so every day label sits off the column it names`
+          );
+        }
+      }
+    }
+
+    /*
+     * ⭐ The header must stay ONE ROW in EVERY view, at every admitted size.
+     *
+     * greg caught this on a real Tab M8: the days view puts its step arrows
+     * INSIDE the calendar (`arrowsInView`), but lanes and today keep theirs in
+     * the header, which pushed the row over the line and made it wrap. Wrapping
+     * costs a row of height, and on a 533px-tall wall that row is the most
+     * expensive thing on the screen — so a fix for the date must not quietly
+     * spend it on three views out of four.
+     *
+     * Measured per view rather than per size, because the trigger is which
+     * controls a view puts in the header, not the width alone.
+     */
+    await page.evaluate(() => {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.removeAttribute('data-text-size');
+    });
+    /*
+     * Only the HEIGHT-CONSTRAINED walls. Above 700px of height a wrap is
+     * affordable and is the deliberate choice — the date keeps its width and the
+     * controls take a row. Asserting "never wraps" everywhere would be asserting
+     * against the design, and would have failed portrait for doing the right
+     * thing.
+     */
+    for (const size of [...SIZES.filter((s) => s.tier === 'compact')].reverse()) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await page.waitForTimeout(700);
+      const views = await page.evaluate(() => document.querySelectorAll('.wall-switch-btn').length);
+      for (let i = 0; i < views; i += 1) {
+        // Dispatched rather than clicked: the switcher lives inside a scoped
+        // child and Playwright's actionability check times out on it at this
+        // height. We only need the view to change, not to prove it is clickable.
+        /*
+         * Keep the wall awake first. It has its own idle timer and drops to the
+         * night face after a few quiet minutes — which is exactly what happened
+         * to the portrait chore-board capture on a long run, and looked for all
+         * the world like a layout bug.
+         */
+        await page.evaluate((idx) => {
+          // Leave the night face if the idle timer has dropped us onto it, or
+          // every capture after that point is a clock on a dark screen.
+          const night = document.querySelector(
+            '.wall-night, [data-wall-night]'
+          ) as HTMLElement | null;
+          night?.click();
+          document
+            .querySelector('.wall-root')
+            ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+          const b = document.querySelectorAll('.wall-switch-btn')[idx] as HTMLElement | undefined;
+          b?.click();
+        }, i);
+        await page.waitForTimeout(700);
+        const row = await page.evaluate(() => {
+          const root = document.querySelector('.wall-root') as HTMLElement | null;
+          if (!root) return null;
+          const title = root.querySelector('.wall-header-title') as HTMLElement | null;
+          const ctrls = root.querySelector('.wall-header-controls') as HTMLElement | null;
+          if (!title || !ctrls) return null;
+          const t = title.getBoundingClientRect();
+          const c = ctrls.getBoundingClientRect();
+          const active = root.querySelector(
+            '.wall-switch-btn[aria-pressed="true"]'
+          ) as HTMLElement | null;
+          return {
+            drop: Math.round(c.top - t.top),
+            view: active?.getAttribute('aria-label') ?? active?.textContent?.trim() ?? `#${0}`,
+            headerH: Math.round(
+              (root.querySelector('.wall-header') as HTMLElement).getBoundingClientRect().height
+            ),
+          };
+        });
+        await page.screenshot({ path: `scratch-shots/w96-view${i}-${size.name}.png` });
+        if (!row) continue;
+        if (size.height < 700 && row.drop > 8) {
+          failures.push(
+            `${size.name} [view ${i} "${row.view}"]: the header wrapped onto a second row ` +
+              `(controls sit ${row.drop}px below the date, header is ${row.headerH}px tall) — ` +
+              `that is a row of calendar lost on a wall that has no height to spare`
           );
         }
       }

@@ -226,7 +226,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     -->
     <div
       v-if="hasBoard"
-      class="grid min-h-0 flex-1 justify-center justify-items-center gap-2.5"
+      class="wall-chore-grid grid min-h-0 flex-1 justify-center justify-items-center gap-2.5"
       style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
     >
       <div
@@ -236,8 +236,14 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         class="dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
         :class="column.total && column.done === column.total ? 'ring-[2.5px] ring-[#27AE60]' : ''"
       >
+        <!--
+          The column's bean header. Stacked by default; on a short wall it turns
+          into a single row (see the scoped rule below), because at 533px of
+          height this block was ~170px of the ~370px a column gets, which left
+          room for exactly ONE chore.
+        -->
         <div
-          class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
+          class="wall-chore-head dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
           :style="{ background: `${member.color}2e` }"
         >
           <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
@@ -383,3 +389,81 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     </div>
   </div>
 </template>
+
+<style scoped>
+/*
+ * ─── A short wall gets a one-row bean header ─────────────────────────────────
+ *
+ * The stacked avatar-over-name-over-count block is right on a mounted 10" wall
+ * and wrong on an 8" one: at 533px of height it took ~170px of the ~370px each
+ * column has, so a bean with 44 chores showed one of them.
+ *
+ * Laid out as a row it costs roughly a third of that, which is three or four
+ * chores visible instead of one. Same information, same order, far less height.
+ * `WallLanesView` already does exactly this for its own lanes through
+ * `WallBeanHeader`'s `inline` mode; this is the same idea for the board.
+ *
+ * Keyed on HEIGHT, not on the tier or the orientation: the board's problem is
+ * vertical, and a 961x601 landscape wall needs this as much as a 853x533 one.
+ */
+
+/*
+ * A SHORT wall puts every column on ONE row.
+ *
+ * `auto-fit minmax(210px, 1fr)` fits three columns across an 853px wall, so a
+ * fourth bean wrapped to a second row and the grid's height split between them:
+ * ~130px per card, which after the header left a clipped list title and not one
+ * visible chore. One row gives every column the full height instead, and a
+ * family too wide for the wall scrolls sideways — the same answer the footer
+ * chips already use, and a far better one than showing nobody anything.
+ */
+@media (height <= 699px) {
+  .wall-chore-grid {
+    grid-auto-columns: minmax(11rem, 1fr);
+    grid-auto-flow: column;
+    grid-template-columns: none !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+
+/*
+ * The one-row bean header applies on a NARROW wall as well as a short one. In
+ * portrait the board gets two columns and two rows, so each card is ~300px, and
+ * a ~170px stacked header still leaves room for barely one chore.
+ */
+@media (width <= 700px) {
+  .wall-chore-head {
+    flex-direction: row;
+    gap: 0.5rem;
+    justify-content: center;
+    padding-bottom: 0.375rem;
+    padding-top: 0.375rem;
+    text-align: left;
+  }
+
+  .wall-chore-head > :first-child {
+    flex-shrink: 0;
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+}
+
+@media (height <= 699px) {
+  .wall-chore-head {
+    flex-direction: row;
+    gap: 0.5rem;
+    justify-content: center;
+    padding-bottom: 0.375rem;
+    padding-top: 0.375rem;
+    text-align: left;
+  }
+
+  /* The avatar is the tall part, and its size is a prop, so it is capped here. */
+  .wall-chore-head > :first-child {
+    flex-shrink: 0;
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+}
+</style>

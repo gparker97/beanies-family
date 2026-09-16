@@ -256,6 +256,21 @@ const wallTier = computed(() => wallTierFor(Math.min(viewportWidth.value, viewpo
  */
 const wallChrome = computed(() => wallChromeFor(wallTier.value));
 
+/**
+ * The date, in one place.
+ *
+ * It was written out twice — the wall face and the night screen each built their
+ * own `toLocaleDateString` with the same three options, which is two places to
+ * forget when the format changes.
+ */
+const dateLabel = computed(() =>
+  new Date(`${today.value}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+);
+
 const daysLayout = computed(() =>
   daysLayoutFor(viewportWidth.value, isPortrait.value, wallChrome.value)
 );
@@ -842,13 +857,7 @@ watch(activeView, () => (sheet.value = null));
            `truncate` on the date is what lets this actually shrink. -->
       <div class="wall-header-title min-w-0">
         <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink truncate font-extrabold">
-          {{
-            new Date(`${today}T00:00:00`).toLocaleDateString(undefined, {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })
-          }}
+          {{ dateLabel }}
         </h1>
         <p class="font-inter wall-subtitle mt-1.5 text-[var(--muted-text,#4d5d6c)]">
           {{ subtitle }}
@@ -1044,13 +1053,7 @@ watch(activeView, () => (sheet.value = null));
     <WallNightScreen
       v-if="nightNow"
       :time="clockNow.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })"
-      :date="
-        new Date(`${today}T00:00:00`).toLocaleDateString(undefined, {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        })
-      "
+      :date="dateLabel"
       :tomorrow-count="tomorrowCount"
       @wake="onWake"
     />
@@ -1165,9 +1168,9 @@ watch(activeView, () => (sheet.value = null));
   font-size: var(--wall-date);
   line-height: 1;
 
-  /* The date's floor, in `ch` so it scales with the tier's own font-size. This
-     is what makes the header wrap instead of ellipsising the date. */
-  min-width: 11ch;
+  /* Free to shrink under `nowrap` — a floor there would overflow the row rather
+     than wrap it. The floor is re-applied below, where wrapping is allowed. */
+  min-width: 0;
 }
 
 .wall-root :deep(.wall-stamp) {
@@ -1297,8 +1300,11 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-lock-btn) {
   font-size: 1.35rem;
-  height: 3.25rem;
-  width: 3.25rem;
+
+  /* On the tier scale like every other header control. At 3.25rem this was the
+     widest thing on the row and the last one still sized by orientation. */
+  height: calc(var(--wall-tap) + 0.5rem);
+  width: calc(var(--wall-tap) + 0.5rem);
 }
 
 .wall-root :deep(.wall-lock-heading) {
@@ -1483,8 +1489,41 @@ watch(activeView, () => (sheet.value = null));
  * date, at any width, in any tier, in any locale. `truncate` stays on the date
  * as the last resort for a locale that overruns even a full row.
  */
+
+/*
+ * ⚠️ NOWRAP by default, and this is the whole trade.
+ *
+ * Wrapping buys a whole date at the cost of a header row. That is the right way
+ * round on a tall wall and the WRONG way round on a short one: greg caught a
+ * mounted Tab M8 in landscape (853x533) losing a row of calendar the moment he
+ * switched to Each-bean or Today, because those views keep their step arrows in
+ * the header while the week view puts them inside the calendar.
+ *
+ * So the rule is keyed on the axis that is actually scarce. Below 700px of
+ * height the header stays on one row and the date truncates if it must; above
+ * it, the date keeps its width and the controls take their own row. It is NOT
+ * keyed on orientation — that was the original defect, and a 961x601 landscape
+ * wall and a 601x961 portrait one want opposite answers for the same reason.
+ *
+ * With the tier scale applied to every control (including the lock button,
+ * above) the date does not in fact truncate at any size we admit; the nowrap
+ * path is what guarantees the row, not a fallback we expect to hit.
+ */
 .wall-header {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+}
+
+@media (height >= 700px) {
+  .wall-header {
+    flex-wrap: wrap;
+  }
+
+  /* The date's floor, in `ch` so it scales with the tier's own font-size. This
+     is what makes the header wrap rather than ellipsising the date, and it
+     applies only where a wrap is affordable. */
+  .wall-root :deep(.wall-date) {
+    min-width: 11ch;
+  }
 }
 
 .wall-header-title {
@@ -1528,8 +1567,6 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-portrait :deep(.wall-lock-btn) {
   font-size: 1.15rem;
-  height: 2.75rem;
-  width: 2.75rem;
 }
 
 .wall-portrait :deep(.wall-card-meal) {
@@ -1538,5 +1575,100 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-portrait :deep(.wall-card-emoji) {
   font-size: 1.6rem;
+}
+
+/*
+ * A wall with no height to spare uses the COMPACT header, whatever its tier.
+ *
+ * The tier is keyed on the smaller side, which on a landscape wall is its
+ * HEIGHT — so a 961x601 wall is the `mid` tier and gets mid's larger date and
+ * its 8.5rem clock reservation, while its header still has to fit on one row
+ * (see the nowrap rule above). 108px more width does not pay for that: the date
+ * ellipsised at 961 while fitting comfortably at 853.
+ *
+ * Vertical density still follows the tier. Only the HEADER steps down, because
+ * its constraint is width and its second row is no longer spendable.
+ */
+@media (height <= 699px) {
+  .wall-root {
+    --wall-clock: 1.35rem;
+    --wall-clock-col: 5.6rem;
+    --wall-date: 1.45rem;
+    --wall-nav-label: 0.82rem;
+    --wall-tap: 2.4rem;
+  }
+
+  .wall-root :deep(.wall-nav-label),
+  .wall-root :deep(.wall-subtitle) {
+    display: none;
+  }
+
+  /*
+   * Large reading mode, on a wall whose header is pinned to one row.
+   *
+   * Every rem grows by 1.1875 while the header's width does not, so the
+   * shortfall lands entirely on the date — the only flexible item — and clipped
+   * it by 30-59px, measured. Clipping someone's date BECAUSE they asked for
+   * larger text is backwards.
+   *
+   * So the date alone holds its normal-mode rendered size (1.22 x 1.1875 ≈
+   * 1.45rem) and the whole string survives. It is still the largest text on the
+   * wall by a wide margin, and everything else — the block titles people
+   * actually squint at — keeps the full Large-mode boost. Showing all of a
+   * slightly smaller date beats showing most of a slightly larger one.
+   */
+  html[data-text-size='large'] .wall-root {
+    --wall-date: 1.22rem;
+  }
+
+  /*
+   * ⚠️ The controls stay on ONE row here, and the tighter gap is what pays for it.
+   *
+   * `.wall-header-controls` carries `flex-wrap: wrap` as a backstop so nothing
+   * can ever overflow the row. On the views that keep their step arrows in the
+   * header (Each bean, Today — the week view puts its own inside the calendar)
+   * that backstop was firing for the sake of NINETEEN pixels: 504px of controls
+   * plus 48px of gaps against a 533px line. The cost was a second header row,
+   * which on an 853x533 wall took the header from 94px to 153px, 29% of the
+   * whole screen, for two arrows.
+   *
+   * Dropping the gap from 0.75rem to 0.375rem frees 24px across the four gaps,
+   * which is more than the deficit, so the row holds and the date keeps its full
+   * width. greg caught this on a mounted Tab M8.
+   */
+  .wall-header-controls {
+    flex-wrap: nowrap;
+    gap: 0.375rem;
+  }
+}
+
+/*
+ * ─── The controls keep their own row to themselves ───────────────────────────
+ *
+ * The rule above fixes the SHORT wall, where the header is pinned to one row.
+ * A NARROW wall has the opposite shape: the date takes row one and the controls
+ * take row two, which is fine and deliberate. What is not fine is the controls
+ * then wrapping AGAIN inside that row and taking a third — which is what a
+ * 533px-wide portrait wall did on Each bean and Today, where the step arrows
+ * live in the header. 192px of header on an 853px wall, for two arrows.
+ *
+ * So on a narrow wall the controls also stay on one line, and the clock gives up
+ * its fixed reservation to pay for it: `--wall-clock-col` becomes a ceiling
+ * rather than a width, and the status stamp under the time already truncates.
+ * The clock is the only control that can yield — every other one is a tap target
+ * at its floor.
+ */
+@media (width <= 700px) {
+  .wall-header-controls {
+    flex-wrap: nowrap;
+    gap: 0.375rem;
+    min-width: 0;
+  }
+
+  .wall-root .wall-clock-col {
+    max-width: var(--wall-clock-col);
+    min-width: 0;
+    width: auto;
+  }
 }
 </style>
