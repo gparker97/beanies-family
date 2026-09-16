@@ -246,14 +246,7 @@ export default defineConfig({
         // fetched on demand for the family's country only and cached in
         // IndexedDB (see referenceDataCacheRepository) — never precache it, or
         // the service-worker install would balloon by the whole dataset.
-        globIgnores: [
-          '**/holidays/*.json',
-          // The enclave crypto (~300KB). AI extraction requires the network, so precaching its
-          // crypto buys nothing offline and costs every service-worker install. Excluding it is
-          // also what makes the "fetched only by a family that uses the managed tier" claim in
-          // src/services/ai/enclave/* actually true — it was not, before this line.
-          '**/enclave-crypto-*.js',
-        ],
+        globIgnores: ['**/holidays/*.json'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB — Automerge WASM is ~2.65 MB
         // When a new SW activates, clean up previous-deploy precache entries
         // (old hashed chunks nothing references anymore).
@@ -290,33 +283,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        /**
-         * Give the enclave crypto a STABLE chunk name so the service worker can exclude it.
-         *
-         * ⚠️ This exists for a claim-accuracy reason, not a performance one. `attestation.ts` and
-         * `seal.ts` lazy-import `@tinfoilsh/verifier` and `ehbp`, and the code comments said the
-         * result is "fetched only by a family that actually uses the managed AI tier". That was
-         * FALSE: workbox's `globPatterns` swept the hashed chunk into the precache manifest, so
-         * every service-worker install downloaded ~300KB of crypto regardless. The split out of
-         * the main chunk was real; the conditional fetch was not.
-         *
-         * Excluding it is strictly right rather than a trade: AI extraction needs the network by
-         * definition, so precaching its crypto buys nothing offline and costs every install.
-         */
-        manualChunks(id: string) {
-          if (
-            /node_modules\/(ehbp|@tinfoilsh|@panva\/hpke-noble|hpke|@freedomofpress)\//.test(id)
-          ) {
-            return 'enclave-crypto';
-          }
-          return undefined;
-        },
-      },
     },
   },
   define: {
