@@ -106,8 +106,20 @@ export function __resetEnclaveVerificationForTesting(): void {
  */
 async function runVerification(): Promise<VerifiedEnclave> {
   const startedAt = Date.now();
-  // Lazy, so ~575KB of verifier and crypto stays out of the main bundle and is fetched only by a
-  // family that actually uses the managed AI tier.
+  // Lazy, so the verifier and its crypto stay out of the main bundle and are not FETCHED until a
+  // family actually runs a managed extraction. Verified in a browser, not inferred from the build:
+  // a cold load makes 87 requests and none of them is a crypto chunk.
+  //
+  // ⚠️ "Not fetched on load" is not the same as "not downloaded". Workbox's `globPatterns` sweeps
+  // every built .js into the service-worker precache, so an installed PWA does pull these bytes
+  // once at SW install. That is the honest description and it is fine — this app is offline-first,
+  // so caching a chunk the family might need is the behaviour we want.
+  //
+  // An earlier attempt to exclude it from the precache via a named `manualChunks` entry made
+  // things WORSE and is recorded here so nobody retries it: the manual chunk became the host of
+  // Vite's own shared runtime helpers (`__vite__mapDeps` and friends), so every page chunk then
+  // depended on it and it was modulepreloaded on every cold load. Do not reach for the bundler to
+  // make a comment true; fix the comment.
   const { Verifier } = await import('@tinfoilsh/verifier');
 
   const verifier = new Verifier({ serverURL: ENCLAVE_URL, configRepo: CONFIG_REPO });
