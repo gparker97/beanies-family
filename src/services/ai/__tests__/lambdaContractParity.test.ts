@@ -69,6 +69,13 @@ describe('client / Lambda contract parity', () => {
     const src = await fs.readFile('infrastructure/lambda/ai-extract/index.mjs', 'utf-8');
     const match = /const MAX_TEXT_CHARS = ([0-9_]+);/.exec(src);
     expect(match, 'MAX_TEXT_CHARS must still exist in the Lambda').toBeTruthy();
-    expect(Number(match![1].replace(/_/g, ''))).toBe(32_000);
+
+    // Against the CLIENT'S constant, read from its own source, not a literal restated here.
+    // Pinning both sides to a number written in this file would let them drift together.
+    const clientSrc = await fs.readFile('src/services/ai/providers/managedProvider.ts', 'utf-8');
+    const clientMatch = /const MANAGED_TEXT_BILL_BOUND = ([0-9_]+);/.exec(clientSrc);
+    expect(clientMatch, 'MANAGED_TEXT_BILL_BOUND must still exist in the client').toBeTruthy();
+
+    expect(Number(clientMatch![1].replace(/_/g, ''))).toBe(Number(match![1].replace(/_/g, '')));
   });
 });

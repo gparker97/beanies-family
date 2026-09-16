@@ -61,6 +61,16 @@ export interface VerifiedEnclave {
  */
 let pending: Promise<VerifiedEnclave> | null = null;
 let verifiedAt = 0;
+/**
+ * Is the memoised promise still running?
+ *
+ * ⚠️ Needed because `verifiedAt` is stamped on COMPLETION (stamping at the start let a slow
+ * verification spend its own TTL). While in flight `verifiedAt` is therefore still 0, so a TTL
+ * check alone reads as "expired" and every concurrent caller starts its OWN verification — which
+ * is precisely the thing the memo exists to prevent, and it fails silently because each caller
+ * still gets a correct answer. Caught by the concurrency test.
+ */
+let inFlight = false;
 
 /**
  * Drop the memo so the next call re-verifies.
@@ -74,6 +84,7 @@ let verifiedAt = 0;
 export function invalidateEnclaveVerification(): void {
   pending = null;
   verifiedAt = 0;
+  inFlight = false;
 }
 
 /** Test seam, matching `__resetVersionPolicyForTesting`. */
@@ -216,12 +227,14 @@ async function runVerification(): Promise<VerifiedEnclave> {
  * the enclave could not be reached (transient, telemetry only, never a page).
  */
 export function verifyEnclave(signal?: AbortSignal): Promise<VerifiedEnclave> {
-  if (!pending || Date.now() - verifiedAt >= VERIFY_TTL_MS) {
+  if (!pending || (!inFlight && Date.now() - verifiedAt >= VERIFY_TTL_MS)) {
+    inFlight = true;
     pending = runVerification()
       .then((result) => {
         // Stamped on COMPLETION, not on start. Stamping at the start meant a slow verification
         // spent its own TTL before anyone could use it.
         verifiedAt = Date.now();
+        inFlight = false;
         return result;
       })
       .catch((err) => {

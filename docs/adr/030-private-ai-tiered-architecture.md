@@ -97,6 +97,7 @@ The trust boundary — _who can read the document in transit_ — is what decide
       | stats count() by bin(1d)
       ```
    4. `grep -rn LEGACY-PLAINTEXT-ARM`, delete the marked block and `extractionPrompt.mjs`, drop its branch from `extractionPromptDrift.test.ts`, and flip this gate to closed.
+   5. **Update the user-facing copy that is deliberately still conservative.** `src/content/help/security.ts` currently says "We are working towards encrypting it so that _only_ that secure hardware can open it, and not even our own server could read it in between." That wording is correct TODAY and must not be strengthened before the gate actually closes — but it is also the one place a family reads the claim, so it needs an anchor here or it will simply rot. Named explicitly for that reason. Strengthening it is greg's call and greg's words; this checklist only records that it is owed.
 
 ### What the sealed arm changed, beyond the encryption
 
