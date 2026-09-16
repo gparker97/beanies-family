@@ -75,6 +75,15 @@ const EHBP_HEADER_RE = /^ehbp-[a-z0-9-]{1,48}$/i;
 const MAX_EHBP_KEYS = 2048;
 
 /**
+ * The one `ehbp-*` header the enclave cannot decapsulate without.
+ *
+ * Named here so the relay can ADMIT IT FIRST. Everything else in the set is optional metadata;
+ * losing this one turns a sealed request into ciphertext nobody can open, after the grant has
+ * been spent and Tinfoil has been billed.
+ */
+const REQUIRED_EHBP_HEADER = 'ehbp-encapsulated-key';
+
+/**
  * Make a client-supplied string safe to put in a log line.
  *
  * ⚠️ NOT cosmetic. CloudWatch metric filters match quoted substrings anywhere in a line, and
@@ -85,8 +94,15 @@ const MAX_EHBP_KEYS = 2048;
  * breaks, bound the length, and keep it to characters that cannot be mistaken for structure.
  */
 function logSafe(value, max = 48) {
+  // ⚠️ SLICE FIRST. Every `.replace()` below allocates a whole new string, and a caller-chosen
+  // key name can be ~5M characters (MAX_BODY_BYTES) — so four full passes were being built and
+  // thrown away by the bound on the last line. This module's own notes record that a
+  // multi-megabyte transient kills the 256MB process before any try/catch can see it, and API
+  // Gateway then answers a bare CORS-less 502. Slicing to a few extra characters first keeps
+  // the sanitising O(1) while leaving room for the replacements to change the length.
   return (
     String(value)
+      .slice(0, max * 2)
       .replace(/[\r\n\t]/g, ' ')
       // ⚠️ SPACES TOO, and this is the whole defect the length bound could not cover. Stripping
       // control characters and bounding the length still let a caller-chosen `ehbp` key name
@@ -198,22 +214,48 @@ function relayEhbpHeaders(source, direction) {
   // guard upstream does that, and this loop is NOT a second line of defence if it is relaxed.
   // What the ceiling above bounds is the per-key WORK (a regex test each), which is the part
   // that was genuinely unbounded.
+  // Admit the one header the enclave cannot work without BEFORE anything can spend the budget.
+  // Its own value still has to pass every bound; it just cannot be crowded out by siblings.
+  const required = source[REQUIRED_EHBP_HEADER];
+  if (
+    typeof required === 'string' &&
+    required.length <= MAX_EHBP_VALUE_CHARS &&
+    EHBP_VALUE_RE.test(required)
+  ) {
+    out[REQUIRED_EHBP_HEADER] = required;
+    kept += 1;
+  }
+
   for (const name of names) {
+    if (name === REQUIRED_EHBP_HEADER) continue; // already decided, above
     const value = source[name];
     // ⚠️ THE PREFIX TEST COMES FIRST. See the starvation note above: anything that spends
     // budget before looking at the name can drop the only header that matters. The client's
     // `selectEhbpHeaders` had the same bug and is fixed the same way.
+    //
+    // ⚠️ AND THE REQUIRED HEADER IS ALREADY IN, admitted above the loop. Moving the bound
+    // onto the input did NOT remove the starvation, only change its shape: `kept` is still
+    // capped at MAX_EHBP_HEADERS inside this loop, so sixteen keys that all MATCH the prefix
+    // fill the budget and the seventeenth — the encapsulated key — falls into the `else if`
+    // and is dropped. Proven: `{ehbp-junk0..15, ehbp-encapsulated-key}` relayed 16 headers and
+    // not the real one. The named regression test builds its junk as `not-ehbp-${i}`, which
+    // never reaches this counter, so it could not fail on it.
     if (!EHBP_HEADER_RE.test(name)) {
       // `dropped` is capped independently of the walk, so a body full of junk under the ceiling
       // still cannot build one multi-megabyte log line per invocation.
       if (dropped.length < MAX_EHBP_HEADERS) dropped.push(logSafe(name));
       continue;
     }
+    // ⚠️ THE O(1) BOUNDS COME FIRST. `&&` evaluates left to right, so testing the regex
+    // before the length check forced a full scan of a value that could be 5MB (MAX_BODY_BYTES)
+    // only to discard it in constant time on the next clause. Same reason `kept` is checked
+    // here rather than last: every header past the budget was being fully scanned before being
+    // thrown away.
     if (
       typeof value === 'string' &&
-      EHBP_VALUE_RE.test(value) &&
       value.length <= MAX_EHBP_VALUE_CHARS &&
-      kept < MAX_EHBP_HEADERS
+      kept < MAX_EHBP_HEADERS &&
+      EHBP_VALUE_RE.test(value)
     ) {
       out[name] = value;
       kept += 1;
@@ -342,6 +384,28 @@ export async function sealedForward(envelope, event, respond) {
   // happen before `openRead` consumes the grant. It also keeps every "we did not like your input"
   // log line on the near side of the billing boundary, which is where a triager looks first.
   const upstreamEhbp = relayEhbpHeaders(ehbp, 'request');
+
+  // ⚠️ REFUSE, DO NOT DROP AND CARRY ON. `relayEhbpHeaders` returns `{}` when the object
+  // exceeds MAX_EHBP_KEYS, and an encapsulated key that fails its own bounds is simply omitted.
+  // Nothing downstream checked, so the request sailed past `openRead` — which atomically spends
+  // the family's one-use correction grant — and on to `callUpstream`, which bills Tinfoil to
+  // decapsulate ciphertext with no key. Grant gone, no answer, no refund, and the failure log
+  // points the triager at Tinfoil rather than at the malformed request. Every OTHER bad-`ehbp`
+  // shape 400s above, before the meter; these two were the only ones that did not.
+  //
+  // `ehbp` absent entirely is still fine and ordinary — only the sealed arm sends one, and the
+  // guard above has already rejected a present-but-wrong-typed value.
+  //
+  // ⚠️ THE TEST IS "NOTHING SURVIVED", NOT "THE KEY I EXPECT IS MISSING". Asserting a
+  // specific header name here would make a protocol upgrade look like a malformed request,
+  // which is the misdiagnosis this whole module keeps having to undo — and it is why the relay
+  // drops rather than refuses in the first place. But an `ehbp` object that arrived with
+  // content and relayed NOTHING cannot be a protocol upgrade: it is over the key ceiling, or
+  // every value failed its bounds. The enclave has nothing to work with either way.
+  if (ehbp && Object.keys(ehbp).length > 0 && Object.keys(upstreamEhbp).length === 0) {
+    console.warn('[ai-extract] refused request: ehbp carried content but nothing was relayable');
+    return respond(400, { error: 'Invalid ehbp headers', code: 'bad_ehbp' }, event);
+  }
 
   // After the refusals, before the model: the same placement the legacy arm uses, and for the same
   // two reasons (a refused request must not spend a grant; two concurrent replays must not both

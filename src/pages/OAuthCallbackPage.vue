@@ -11,7 +11,7 @@
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 import { CALENDAR_REDIRECT_CODE_KEY } from '@/services/calendar/calendarAuth';
-import { decodeRedirectState } from '@/services/google/redirectState';
+import { decodeRedirectState, isSameOriginReturnPath } from '@/services/google/redirectState';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -84,7 +84,13 @@ onMounted(() => {
     try {
       sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
       const state = JSON.parse(legacyState);
-      window.location.href = state.returnPath || '/';
+      // ⚠️ THE SAME ORIGIN CHECK AS THE MODERN TRANSPORT. This branch navigated to a stored
+      // `returnPath` with no guard at all, so the open-redirect fix applied to
+      // `decodeRedirectState` covered one of three doors. sessionStorage is app-written, so
+      // this is a structural gap rather than a live exploit — but it is the branch a future
+      // change is most likely to widen, and the whole point of extracting the predicate was
+      // that no sink should have its own answer.
+      window.location.href = isSameOriginReturnPath(state?.returnPath) ? state.returnPath : '/';
     } catch {
       window.location.href = '/';
     }
@@ -123,10 +129,30 @@ onMounted(() => {
     // and the app answered by losing their invitation, with nothing recorded anywhere.
     //
     // `decoded.returnPath` has already been through `decodeRedirectState`'s open-redirect guard,
-    // so it is safe to navigate to. `?authError=` is the convention `LoginPage` already reads.
+    // so it is safe to navigate to.
+    //
+    // ⚠️ ONLY THE JOIN FLOW READS `authError`, so only the join flow gets it. An earlier
+    // comment here claimed it was "the convention `LoginPage` already reads" — `LoginPage`
+    // matches only the literal `'storage'`, and nothing reads it on the calendar, reconnect or
+    // pod-recovery return paths. Appending it there was worse than useless: `useJoinFlow` is
+    // the only place that strips it, so elsewhere it stuck in the address bar forever, silent
+    // and unrendered, and because the return path is captured as `${pathname}${search}` each
+    // later decline appended ANOTHER copy.
+    //
+    // ⚠️ AND IT IS BUILT WITH `URL`, not string concatenation. The old `includes('?')`
+    // test puts the parameter inside the FRAGMENT when the return path carries one
+    // (`/join?fam=a#frag` became `/join?fam=a#frag&authError=…`), where no query parser will
+    // ever see it.
+    if (decoded?.returnPath && decoded.mode === 'join') {
+      const target = new URL(decoded.returnPath, window.location.origin);
+      target.searchParams.set('authError', error);
+      window.location.href = `${target.pathname}${target.search}${target.hash}`;
+      return;
+    }
     if (decoded?.returnPath) {
-      const sep = decoded.returnPath.includes('?') ? '&' : '?';
-      window.location.href = `${decoded.returnPath}${sep}authError=${encodeURIComponent(error)}`;
+      // Every other mode: go back where they came from, without a parameter nobody reads.
+      // The decline itself is already recorded by the caller that started the redirect.
+      window.location.href = decoded.returnPath;
       return;
     }
   }

@@ -18,6 +18,14 @@ const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
  */
 const ACCOUNT_RESOLVE_TIMEOUT_MS = 4_000;
 
+/**
+ * How long we will wait for Google's script and picker module before giving up.
+ *
+ * Both awaits happen BEFORE the Picker's own `PICKER_TIMEOUT_MS` is armed, so without a bound
+ * here a hang is unrecoverable for the session rather than merely slow.
+ */
+const PICKER_LOAD_TIMEOUT_MS = 20_000;
+
 let scriptPromise: Promise<void> | null = null;
 
 /**
@@ -61,7 +69,23 @@ function disposePicker(picker: BuiltPicker | null): void {
 function loadPickerScript(): Promise<void> {
   if (scriptPromise) return scriptPromise;
 
-  scriptPromise = new Promise<void>((resolve, reject) => {
+  // ⚠️ THE MEMO IS CLEARED ON ANY FAILURE, INCLUDING A TIMEOUT. `scriptPromise` was only
+  // nulled by `script.onerror`, so a load that HANGS (rather than errors) was cached and handed
+  // to every later `pickBeanpodFile` call for the rest of the session — one captive-portal
+  // moment and the file chooser is dead until a reload, on every surface that uses it.
+  scriptPromise = withTimeout(
+    loadPickerScriptOnce(),
+    PICKER_LOAD_TIMEOUT_MS,
+    'the Google API script did not load'
+  ).catch((e) => {
+    scriptPromise = null;
+    throw e;
+  });
+  return scriptPromise;
+}
+
+function loadPickerScriptOnce(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     if (typeof gapi !== 'undefined') {
       resolve();
       return;
@@ -81,22 +105,33 @@ function loadPickerScript(): Promise<void> {
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {
-      // Reset cache so a subsequent retry actually re-attempts the fetch
-      // instead of returning the same rejected promise forever.
-      scriptPromise = null;
+      // The memo reset now lives in `loadPickerScript`'s `.catch`, so EVERY failure clears it
+      // — a timeout as well as an error. Resetting it here too would be harmless but would
+      // imply two owners of one invariant.
       reject(new Error('Failed to load Google Picker script'));
     };
     document.head.appendChild(script);
   });
-
-  return scriptPromise;
 }
 
 /** Load the Picker library within gapi. */
 function loadPickerLibrary(): Promise<void> {
-  return new Promise<void>((resolve) => {
-    gapi.load('picker', resolve);
-  });
+  // ⚠️ TIMEBOXED, because `gapi.load` has no error channel at all. It takes a success
+  // callback and nothing else — no reject, no onerror, no timeout — so a CSP block, an
+  // extension, or a captive portal leaves this promise pending FOREVER. The await on it sits
+  // above the `new Promise` that arms `PICKER_TIMEOUT_MS`, so the Picker's own safety net does
+  // not exist yet, and `usePickBeanpodFile`'s `finally { isPicking = false }` never runs:
+  // `useDriveFileReselect.isBusy` latches true and every recovery button on both pod banners
+  // stays disabled at '...' until a reload. That is verbatim the consequence
+  // `resolvePickerAccount` was timeboxed to prevent — the timebox just went on the third of
+  // three unbounded awaits.
+  return withTimeout(
+    new Promise<void>((resolve) => {
+      gapi.load('picker', resolve);
+    }),
+    PICKER_LOAD_TIMEOUT_MS,
+    'the Google Picker library did not load'
+  );
 }
 
 export type PickBeanpodFileResult =

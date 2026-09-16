@@ -68,6 +68,49 @@ describe('redirectState codec', () => {
     }
   });
 
+  it('rejects every spelling that the prefix check let through', () => {
+    /**
+     * ⚠️ THE PREFIX CHECK WAS NOT ENOUGH, and `//` was only the spelling it happened to name.
+     * The WHATWG parser reads a BACKSLASH as a slash in the authority position for special
+     * schemes, and it STRIPS tabs, newlines and carriage returns before parsing — so four more
+     * shapes below start with a single '/', are not '//', and still resolve clean off-origin.
+     * Verified in node against the same parser the browser uses:
+     *
+     *     new URL('/\\evil.com',  'https://app.beanies.family').href === 'https://evil.com/'
+     *     new URL('/\n/evil.com', 'https://app.beanies.family').href === 'https://evil.com/'
+     *
+     * `state` is unsigned, non-secret base64 JSON, so anyone can craft one and the join flow is
+     * where people are already expected to tap unfamiliar links. Enumerating spellings is how
+     * this was got wrong once; the guard now resolves and compares ORIGINS, and these cases
+     * exist to prove that covers the class rather than to define it.
+     */
+    const escapes = [
+      '/\\evil.com', // backslash read as a slash in the authority position
+      '/\\/evil.com',
+      '/\\\t\\evil.com', // tab stripped, leaving a protocol-relative URL
+      '/\n/evil.com', // newline stripped
+      '/\r\\evil.com', // carriage return stripped
+    ];
+    for (const evil of escapes) {
+      const bad = btoa(
+        JSON.stringify({ returnPath: evil, mode: 'create', v: REDIRECT_STATE_VERSION })
+      )
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+      expect(decodeRedirectState(bad), `must reject ${JSON.stringify(evil)}`).toBeNull();
+    }
+  });
+
+  it('still accepts odd-looking paths that stay on our own origin', () => {
+    // The guard must not become a second prefix test. These normalise to a PATH on our origin,
+    // so rejecting them would break real return journeys for no security gain.
+    for (const fine of ['/\tevil.com', '/..//evil.com', '/join?fam=a#frag']) {
+      const ok = encodeRedirectState({ returnPath: fine, mode: 'join' });
+      expect(decodeRedirectState(ok)?.returnPath, `must accept ${JSON.stringify(fine)}`).toBe(fine);
+    }
+  });
+
   it('accepts a normal same-origin relative returnPath', () => {
     const ok = encodeRedirectState({ returnPath: '/welcome?resume=setup', mode: 'create' });
     expect(decodeRedirectState(ok)?.returnPath).toBe('/welcome?resume=setup');
