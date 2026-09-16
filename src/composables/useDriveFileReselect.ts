@@ -58,16 +58,35 @@ export function useDriveFileReselect() {
   const isRebinding = ref(false);
   const isBusy = computed(() => isPicking.value || isRebinding.value);
 
-  async function reselect(): Promise<ReselectOutcome> {
-    // ⚠️ NO ARGUMENTS, and that now means the SILENT token path. Both callers used to invoke
+  /**
+   * @param opts.chooseAccount Open Google's ACCOUNT CHOOSER first, for the case where the pod
+   *   broke because the browser is on the wrong Google session. Off by default: the silent
+   *   token is what lets the Picker open at all on a redirect-auth platform, so the chooser is
+   *   opt-in and driven by its own recovery button rather than imposed on every reselect.
+   */
+  async function reselect(opts?: { chooseAccount?: boolean }): Promise<ReselectOutcome> {
+    // ⚠️ NO `chooseAccount`, so this takes the SILENT token path. Both callers used to invoke
     // `pick()` bare when bare meant `forceConsent: true`, which skipped the silent token and so
     // guaranteed a full-page `startRedirectAuth` on every redirect-auth platform — a redirect
-    // loop on the two screens a family only reaches when their pod is ALREADY broken. Since the
-    // flag became `chooseAccount` (default `false`), bare is the correct, silent default.
+    // loop on the two screens a family only reaches when their pod is ALREADY broken.
     //
-    // Deliberately no `loginHint` either: the account is not in doubt here — the file is. The
-    // signed-in account is the one whose Drive we want to show.
-    const picked = await pick();
+    // ⚠️ BUT THE `loginHint` IS NOT OPTIONAL, and omitting it reintroduced the same class of
+    // failure one layer down. `usePickBeanpodFile.pick` gates the beanpod-mirrored token
+    // recovery on it — `if (loginHint) await tryReconnectSilently(loginHint)` — so with no hint
+    // that recovery never runs at all, `tryGetSilentToken()` returns null, and on
+    // iOS/iPadOS/PWA/native we redirect to Google with no account pre-selected. A full consent
+    // screen, on a broken-pod banner, for a family whose account was never in question.
+    // `PodAccessBanner.reconnectAccount` (the sibling handler this composable was extracted
+    // alongside) carries the same fix note, and CLAUDE.md § Cloud Auth UX requires it:
+    // "pre-populate the account chooser via `loginHint` whenever the expected identity is
+    // known". It is known here — the pod records the account it is bound to.
+    const chooseAccount = opts?.chooseAccount ?? false;
+    const picked = await pick({
+      chooseAccount,
+      // Suppressed when switching accounts: pre-selecting the bound account is the opposite of
+      // what the person asked for. `pick` also drops the hint itself, belt and braces.
+      loginHint: chooseAccount ? undefined : (syncStore.providerAccountEmail ?? undefined),
+    });
 
     switch (picked.kind) {
       case 'cancelled':

@@ -5,10 +5,18 @@
  * which is required when the file was shared by another user (not created by the app).
  */
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { fetchGoogleUserEmail } from '@/services/google/googleAuth';
+import { fetchGoogleUserEmail, getEmailVerifiedForToken } from '@/services/google/googleAuth';
+import { withTimeout } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry';
 
 const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
+
+/**
+ * How long we will wait to learn WHICH account the token belongs to before opening the Picker
+ * unpinned. Short: the answer is usually cached, the call is one small GET, and the chooser
+ * must never be held hostage to it.
+ */
+const ACCOUNT_RESOLVE_TIMEOUT_MS = 4_000;
 
 let scriptPromise: Promise<void> | null = null;
 
@@ -152,19 +160,39 @@ const PICKER_TIMEOUT_MS = 30_000;
  */
 async function resolvePickerAccount(accessToken: string): Promise<string | null> {
   try {
-    const email = await fetchGoogleUserEmail(accessToken);
-    if (!email) {
-      // Never silent. Unpinned means "empty list on a multi-account browser", so a rise in this
-      // event is the early warning for join failures we would otherwise only hear about by
-      // email.
+    // ⚠️ TIMEBOXED, because this now sits in front of the Picker. `fetchGoogleUserEmail` is a
+    // bare `fetch` with no `AbortSignal`, and this call happens BEFORE `new Promise` arms
+    // `PICKER_TIMEOUT_MS` — so on a captive portal or a stalled iOS WebKit connection the whole
+    // of `pickBeanpodFile` hung forever with no safety net. `usePickBeanpodFile`'s
+    // `finally { isPicking = false }` never ran either, latching `isBusy` true and leaving the
+    // SaveFailureBanner's only recovery button disabled at '...' until a reload. Pinning the
+    // account is a nice-to-have; blocking the chooser on it is not.
+    await withTimeout(
+      fetchGoogleUserEmail(accessToken),
+      ACCOUNT_RESOLVE_TIMEOUT_MS,
+      'resolving the Google account timed out'
+    );
+
+    // ⚠️ VERIFIED AGAINST THIS TOKEN, not whatever `fetchGoogleUserEmail` returned. Its three
+    // failure paths (`!res.ok`, a throw, an empty `data.email`) all fall back to the cached
+    // email with NO token check — a "best-known value" that suits a label and is actively
+    // dangerous here. `GoogleDriveProvider.fromExisting` primes that cache, and the #62 notes
+    // record it can hold the FILE OWNER's address. Trusting it would mean a userinfo blip pins
+    // the Picker to the owner's Drive, whose "Shared with me" is legitimately empty — a
+    // deterministic reproduction of the exact bug this pinning exists to fix, and silent.
+    const verified = getEmailVerifiedForToken(accessToken);
+    if (!verified) {
+      // Never silent. Unpinned is the broken state on a multi-account browser, so a rise in
+      // this event is the early warning for join failures we would otherwise only hear about
+      // by email.
       logEvent({
         level: 'warn',
         surface: 'drive-picker',
-        message: 'could not resolve the token account; picker not pinned to an account',
+        message: 'token account unverified; picker not pinned to an account',
         context: { action: 'picker_authuser_unpinned' },
       });
     }
-    return email;
+    return verified;
   } catch (e) {
     logEvent({
       level: 'warn',

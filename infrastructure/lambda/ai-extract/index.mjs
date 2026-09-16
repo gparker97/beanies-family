@@ -496,7 +496,16 @@ export async function handler(event) {
     // other 502 here already follows the opposite rule: a read that produced nothing usable is
     // counted in neither column.
     if (read.kindHint && result?.kind !== read.kindHint) {
-      console.error(`[ai-extract] correction returned kind=${result?.kind} want=${read.kindHint}`);
+      // ⚠️ `safeTaskLabel` ON BOTH. `result.kind` is MODEL OUTPUT derived from caller-supplied
+      // document text, so a prompt injection can make it any string — including
+      // "[ai-extract] usage-count write failed", whose metric filter (main.tf) matches as a
+      // SUBSTRING anywhere in the line and alarms at threshold 1. One request would then page
+      // #beanies-errors with a fabricated "read succeeded but was NOT counted" incident. The
+      // `ehbp` key names and `task` were sanitised for exactly this; this sink was missed.
+      console.error(
+        `[ai-extract] correction returned kind=${safeTaskLabel(result?.kind)} ` +
+          `want=${safeTaskLabel(read.kindHint)}`
+      );
       // `none` is a DISAGREEMENT, not a malformed answer: the hinted prompt asks the model to
       // extract the asserted kind and leaves it exactly one way out — "only if the document
       // contains nothing at all that could fill those fields". Observed live, correcting a

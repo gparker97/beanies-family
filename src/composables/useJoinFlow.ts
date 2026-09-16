@@ -869,6 +869,14 @@ export function useJoinFlow() {
     // unclaimed ones. The claim flow below structurally cannot serve a claimed member.
     if (linkMode.value) {
       clearError();
+      // ⚠️ THE DENOMINATOR APPLIES HERE TOO. `emitJoinCompleted` had exactly one call site,
+      // on the claim path, so the whole device-link population produced failure events and no
+      // successes — a failure count with no denominator, which cannot tell a broken release
+      // from a busy week. Worse, the `needs-pick` loop counter is cleared inside it, so a
+      // device link that reached the Picker once left the counter set: the NEXT join in the
+      // same tab logged its first, entirely normal `needs-pick` arrival at `warn` and looked
+      // like a loop.
+      emitJoinCompleted();
       currentStep.value = 'link-ready';
       return;
     }
@@ -1094,6 +1102,22 @@ export function useJoinFlow() {
       // had never been assigned: the button rendered, did nothing, and left the only offered way
       // forward as a dead control on the one screen where the person is already stuck.
       lastFailedAction = handleAuthTap;
+
+      // ⚠️ LOOK THE FAMILY UP FIRST, AND ENTER A STEP THAT RENDERS. Returning straight from
+      // here left two things broken that the error card cannot survive:
+      //
+      //  · `recordError` only assigns `currentError`. Nothing moved `currentStep` off `'lookup'`,
+      //    so the view kept the "looking up your family…" subtitle forever and the whole
+      //    `awaiting-auth` block never mounted — including the CTA and the brand-new "sign in
+      //    with a different account" escape hatch, which is the one recovery that helps here.
+      //  · `parseUrl` defaults `targetProvider` to `'local'` when the invite carries no `p=`
+      //    (older links do not). `performLookup` is what corrects that from the registry, so
+      //    skipping it left `handleAuthTap` returning immediately at its provider check — the
+      //    retry button we just armed would have done nothing, which is the very defect the
+      //    arming was added to fix. It also left `registryEntry` null, so the "family found"
+      //    confirmation and the expected file name vanished from the card.
+      if (targetFamilyId.value) await performLookup();
+      enterAwaiting('cancelled');
       recordError('OAUTH_SCOPE_DENIED', { reason: authError });
       return;
     }

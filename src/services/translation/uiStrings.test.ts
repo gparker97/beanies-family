@@ -123,6 +123,12 @@ describe('uiStrings', () => {
       'loginV6.pickBeanInfoText',
       'loginV6.signInPasswordHint',
       'join.error.',
+      // Clearing a member's claim is a credential action: it revokes a PIN and re-opens an
+      // invite. The floor exists so a reader who does not know the joke cannot act wrongly, and
+      // "bean" must never stand in for the member or their access here.
+      'bean.unclaim.',
+      // The awaiting-auth card carries the sign-in and account-switch copy a stuck joiner reads.
+      'join.awaiting.',
       // #88 — the three refusal surfaces in RecipeListSheet. A reader who does
       // not know the joke must still learn that a real family member is gone and
       // that nothing was created. The rest of `lists.fromRecipe.*` is cosmetic

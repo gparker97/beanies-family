@@ -22,6 +22,7 @@ import {
   GRANT_REFUSAL_POLICY,
   HARD_REFUSAL_REASONS,
   refusalAllowsHint,
+  consumeGrant,
 } from '../correctionGrant.mjs';
 
 const SOURCE = fileURLToPath(new URL('../correctionGrant.mjs', import.meta.url));
@@ -97,5 +98,36 @@ describe('GRANT_REFUSAL_POLICY covers every reason the module returns', () => {
 
   test('an unknown reason still refuses rather than quietly charging', () => {
     assert.equal(refusalAllowsHint('not_a_real_reason'), false);
+  });
+});
+
+describe('a client cannot buy a free prompt hint by omitting fields', () => {
+  /**
+   * ⚠️ THE HOLE THIS PINS, and it was opened by the fix for the missing-rows finding. One row
+   * covered `!familyId || !correction || !srcHash` at `hint: true`, reasoning "our bug, do not
+   * punish the family". But `familyId` comes straight off the request on BOTH arms, so a caller
+   * holding the api key that ships in the public bundle simply omits it: no grant earned, no
+   * grant spent, no usage row written, and `correction.to` still reaches the model's
+   * instruction on every request, for free, forever. The rule it broke is stated at the top of
+   * the table — `hint: true` is only for reasons a CLIENT CANNOT FORCE.
+   */
+  test('an absent familyId hard-refuses and cannot hint', async () => {
+    const res = await consumeGrant({
+      correction: { token: '11111111-1111-4111-8111-111111111111', to: 'invoice' },
+      srcHash: 'abc',
+      srcBytes: 10,
+      arm: 'sealed',
+    });
+    assert.equal(res.free, false);
+    assert.equal(res.reason, 'missing_family');
+    assert.equal(HARD_REFUSAL_REASONS.has('missing_family'), true, 'must 409, not serve');
+    assert.equal(refusalAllowsHint('missing_family'), false, 'must never reach the prompt');
+  });
+
+  test('a missing correction is still OUR bug, and still cannot bias anything', () => {
+    // Kept hintable because `!correction` leaves nothing to hint WITH, so this arm is not a
+    // channel — the split exists so that judgement is written down rather than assumed.
+    assert.equal(HARD_REFUSAL_REASONS.has('missing'), false);
+    assert.equal(refusalAllowsHint('missing'), true);
   });
 });

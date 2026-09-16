@@ -1105,11 +1105,21 @@ async function performPopupAuth(
   // ⚠️ `chooseAccount` WINS over `forceConsent`, because they request opposite screens and only
   // one caller ever asks for the chooser explicitly. `forceConsent` remains the default shape for
   // recovery surfaces that want a fresh permission grant on the SAME account.
+  //
+  // ⚠️ AND `chooseAccount` ASKS FOR BOTH, not for `select_account` alone. `prompt` is a
+  // space-delimited list, and a bare `select_account` suppresses the `refresh_token`: the very
+  // person using the chooser is picking a second Google account that has usually ALREADY
+  // granted the scopes, so Google returns an access token and nothing to refresh it with. The
+  // switch appears to work, and every later cold start needs a fresh consent. Asking for
+  // `consent` alongside it keeps offline access on the account they just chose.
   const prompt = options?.chooseAccount
-    ? 'select_account'
+    ? 'select_account consent'
     : options?.forceConsent
       ? 'consent'
-      : 'select_account';
+      : // Unchanged default. Not widened to include `consent` here: that would re-prompt every
+        // ordinary token acquisition in the app, which is a far larger behaviour change than
+        // this fix, and nothing observed points at it.
+        'select_account';
 
   // ⚠️ NO REVOKE-BEFORE-MINT HERE. Removed 2026-09-08; do not reinstate without
   // reading this comment and `docs/investigations/2026-09-08-compaction-fallout.md`.
@@ -2376,6 +2386,24 @@ export async function fetchGoogleUserEmail(token: string): Promise<string | null
 }
 
 /**
+ * The cached email ONLY when it was proven against THIS exact token.
+ *
+ * ⚠️ `fetchGoogleUserEmail` IS NOT THIS. Its fast path checks the token, but all three of
+ * its failure paths (`!res.ok`, a throw, an empty `data.email`) fall back to returning
+ * `cachedEmail` with no token check at all — a deliberate "best-known value" for callers that
+ * only want a label. That fallback can be a PRIMED guess: `GoogleDriveProvider.fromExisting`
+ * calls `setGoogleAccountEmail`, which the #62 notes record can hold the FILE OWNER's address
+ * rather than the signed-in user's.
+ *
+ * Any caller that makes a decision on WHICH ACCOUNT this is must use this instead, and treat
+ * `null` as "unknown" rather than falling back. `getVerifiedGoogleAccountEmail` is not enough
+ * either: it only asserts that SOME token verified the cache, not this one.
+ */
+export function getEmailVerifiedForToken(token: string): string | null {
+  return cachedEmailToken === token ? cachedEmail : null;
+}
+
+/**
  * Get the cached Google account email. Returns null if not yet fetched.
  */
 export function getGoogleAccountEmail(): string | null {
@@ -2486,19 +2514,33 @@ export interface RedirectAuthOptions {
    * is the one that lets a person pick a different one. This was hardcoded to `'consent'`, so
    * the redirect path could not offer the chooser at all — which is half of why a joiner signed
    * into the wrong Google account had no way out.
+   *
+   * ⚠️ BUT `'select_account'` ALONE BREAKS OFFLINE ACCESS, which is why the combined value
+   * exists and is the one every real caller should pass. The invariant below is not negotiable:
+   * Google returns a `refresh_token` only with `prompt=consent` + `access_type=offline`. Ask for
+   * `select_account` on its own and a second Google account that has ALREADY granted the scopes
+   * — the common case for the very person using the chooser — comes back with no refresh token
+   * at all. `commitAcquiredToken` files a warning and carries on, the join completes, and then
+   * every later cold start has no token to refresh: a consent prompt every single session. That
+   * is the failure class this work set out to remove.
+   *
+   * `prompt` is a SPACE-DELIMITED list (OpenID Connect core §3.1.2.1), so `'select_account
+   * consent'` asks for both and is the only value that gets a chooser AND a refresh token.
    */
-  prompt?: 'consent' | 'select_account';
+  prompt?: 'consent' | 'select_account' | 'select_account consent';
 }
 
 /**
  * Start a redirect-based OAuth flow (for mobile where popups are blocked).
  * After auth, OAuthCallbackPage redirects back to `returnPath`.
  *
- * INVARIANT: redirect auth ALWAYS forces `prompt=consent`. Every caller
- * establishes offline Drive access (reconnect, connect-pod, switch-account,
- * re-pick a .beanpod), and Google only returns a refresh_token with
- * prompt=consent + access_type=offline. Do not change to 'select_account'
- * without an explicit non-offline caller.
+ * INVARIANT: redirect auth ALWAYS asks for `consent`, on its own or alongside
+ * `select_account`. Every caller establishes offline Drive access (reconnect,
+ * connect-pod, switch-account, re-pick a .beanpod), and Google only returns a
+ * refresh_token with prompt=consent + access_type=offline. A caller that needs
+ * the account CHOOSER passes `prompt: 'select_account consent'` — never a bare
+ * 'select_account', which suppresses the refresh token and costs the user a
+ * consent screen on every later cold start.
  * See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
  *
  * @param returnPath Same-origin relative path to land on after the redirect.

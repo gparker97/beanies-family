@@ -46,6 +46,23 @@ import {
   type ExtractionTask,
 } from '../types';
 import { isCancellation, markCancelled, raceCallerSignal } from '../callerSignal';
+
+/**
+ * Did the server give us a considered ANSWER rather than fail?
+ *
+ * A refusal, a disagreement and a rate-limit all mean the round trip worked end to end: the
+ * enclave was reached and the attestation held. Only a failure that could plausibly indicate
+ * stale key material justifies discarding the shared attestation and model memos, because
+ * discarding them costs every concurrent caller a full re-verification.
+ */
+function isServerVerdict(err: unknown): boolean {
+  return (
+    err instanceof ExtractionProviderError &&
+    (err.code === 'correction_refused' ||
+      err.code === 'correction_disagreed' ||
+      err.code === 'rate_limited')
+  );
+}
 import { buildSignal, parseChatCompletion } from './openaiCompatible';
 import { invalidateEnclaveVerification, verifyEnclave } from '../enclave/attestation';
 import { openSealed, sealForEnclave } from '../enclave/seal';
@@ -514,7 +531,15 @@ export const managedProvider: ExtractionProvider = {
       // backoff, then signature verification on the main thread) plus a second config round
       // trip. Worse, clearing `inFlight` while the first verification is still running starts a
       // SECOND attestation beside it. Nothing failed; one person changed their mind.
-      if (!isCancellation(err)) {
+      //
+      // ⚠️ AND EXCEPT THE SERVER ANSWERING US PROPERLY. A 409 `correction_refused`, a 422
+      // `correction_disagreed` and a 429 `rate_limited` are the Lambda replying exactly as
+      // designed — the enclave was reached, the attestation was fine, and nothing about the
+      // key material is in doubt. Throwing the memos away on those made a rate-limited
+      // family's retry pay six extra attestation requests plus a config round trip, which is
+      // load amplification precisely when the limiter is shedding load. `isCancellation`
+      // covered only the one case we happened to be looking at when this was written.
+      if (!isCancellation(err) && !isServerVerdict(err)) {
         invalidateEnclaveVerification();
         __resetManagedModelForTesting();
       }
