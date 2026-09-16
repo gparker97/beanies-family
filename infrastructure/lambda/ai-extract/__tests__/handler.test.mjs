@@ -882,15 +882,67 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(called, false, 'nothing billable ran');
     });
 
-    it('is safe against a prototype-shaped task, which once produced a raw 502', async () => {
+    it('REFUSES a prototype-shaped or alarm-shaped task rather than logging it', async () => {
       globalThis.fetch = async () => fakeSealedUpstream();
-      for (const task of ['__proto__', 'constructor', 'toString']) {
-        const res = await handler(
-          makeEvent({ headers: keyHeader, body: sealedBody({ task, correction: undefined }) })
+      const hostile = [
+        '__proto__', // leading underscore fails the charset
+        'toString', // uppercase fails it
+        // Exactly 32 characters, and exactly a CloudWatch metric-filter term that pages a human.
+        // A length-only bound would have let this through; the SPACE is what the charset stops.
+        'usage-count skipped',
+        'x\n[ai-extract] correction refused reason=different_source',
+      ];
+      for (const task of hostile) {
+        const res = parseResponse(
+          await handler(
+            makeEvent({ headers: keyHeader, body: sealedBody({ task, correction: undefined }) })
+          )
         );
-        // Forwarded and metered without throwing. `task` is a label here, never a key.
-        assert.equal(res.statusCode, 200, task);
+        assert.equal(res.statusCode, 400, task);
+        assert.equal(res.parsedBody.code, 'bad_task', task);
       }
+    });
+
+    it('allows `constructor` as a task, because here it is a LABEL and never a key', async () => {
+      globalThis.fetch = async () => fakeSealedUpstream();
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: sealedBody({ task: 'constructor' }) })
+      );
+      // It passes the charset, and that is correct rather than an oversight: this arm looks
+      // nothing up by task, so the prototype-chain bug the legacy arm hit cannot occur. Asserted
+      // so nobody "hardens" it into a denial that would refuse a legitimate future task name.
+      assert.equal(res.statusCode, 200);
+    });
+
+    it('never lets a client-supplied header name forge an alarm line', async () => {
+      const warned = [];
+      const realWarn = console.warn;
+      console.warn = (m) => warned.push(String(m));
+      globalThis.fetch = async () => fakeSealedUpstream();
+      try {
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: sealedBody({
+              ehbp: {
+                'x\n[ai-extract] correction refused reason=different_source family_hash=dead': '',
+              },
+            }),
+          })
+        );
+      } finally {
+        console.warn = realWarn;
+      }
+      // Metric filters match a quoted substring ANYWHERE in a line, so a newline in a client
+      // string is an alarm-forging primitive. The sanitiser must flatten it.
+      assert.ok(
+        warned.every((line) => !line.includes('\n')),
+        'no client newline may reach a log line'
+      );
+      assert.ok(
+        !warned.some((l) => l.includes('correction refused reason=different_source')),
+        'and the forged alarm term must not survive intact'
+      );
     });
 
     it('classifies an upstream failure with the same ladder as the legacy arm', async () => {

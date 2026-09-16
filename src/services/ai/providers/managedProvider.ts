@@ -53,6 +53,48 @@ const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
 const PROXY_API_KEY = import.meta.env.VITE_AI_EXTRACT_API_KEY;
 /** The wire discriminator. Must match `SEALED_PROTOCOL` in the Lambda; the parity test asserts it. */
 const SEALED_PROTOCOL = 'ehbp-1';
+/** Asks the proxy which model to name inside the sealed body. Same route, no new endpoint. */
+const SEALED_CONFIG_PROTOCOL = 'ehbp-config';
+
+/**
+ * The model id, from the proxy, memoised for the session.
+ *
+ * ⚠️ THIS IS NOT OPTIONAL AND NOT COSMETIC. The enclave rejects a body with no `model`
+ * (`400 Missing required parameter: 'model'`, checked before auth), and because our body is
+ * ciphertext the Lambda cannot add it on the way through — so the client must name it before it
+ * seals. A first version of this code omitted it and would have failed 100% of managed
+ * extractions; every test passed because the seal was mocked and its payload never asserted.
+ *
+ * Fetched rather than hardcoded so the `TINFOIL_MODEL` Terraform lever keeps working.
+ * `variables.tf` records that lever hotfixing a Tinfoil model retirement the same day; a baked-in
+ * constant would make the next retirement need an App Store release.
+ */
+let modelPromise: Promise<string> | null = null;
+
+async function enclaveModel(signal?: AbortSignal): Promise<string> {
+  modelPromise ??= (async () => {
+    const body = (await postToProxy({ protocol: SEALED_CONFIG_PROTOCOL }, signal)) as {
+      model?: string;
+    };
+    if (typeof body?.model !== 'string' || !body.model) {
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed proxy did not report which model to use'
+      );
+    }
+    return body.model;
+  })().catch((err) => {
+    // Never cache a failure, or one blip disables the tier for the session.
+    modelPromise = null;
+    throw err;
+  });
+  return modelPromise;
+}
+
+/** Test seam, and used by the provider when a sealed request fails for any reason. */
+export function __resetManagedModelForTesting(): void {
+  modelPromise = null;
+}
 
 /**
  * The bill bound that moved client-side when the Lambda stopped being able to read the text (#49).
@@ -75,6 +117,12 @@ interface SealedProxyBody {
   ehbp?: Record<string, string>;
   /** A one-use grant to re-read this document as a different kind, free. Managed tier only. */
   correction?: { token: string };
+  /**
+   * Did the proxy actually SPEND a grant on this request? The client's kind-guard needs it: the
+   * Lambda's equivalent ran on a value set only for a spent grant, so it could never fire on the
+   * kill-switch or store-blip paths, and the client's must not either.
+   */
+  correctionFree?: boolean;
 }
 
 /**
@@ -271,6 +319,7 @@ export const managedProvider: ExtractionProvider = {
     }
 
     let body: SealedProxyBody;
+    let envelope: unknown;
     let context: Awaited<ReturnType<typeof sealForEnclave>>['context'];
     let enclave: Awaited<ReturnType<typeof verifyEnclave>>;
     try {
@@ -291,6 +340,9 @@ export const managedProvider: ExtractionProvider = {
       );
 
       const sealed = await sealForEnclave(enclave.hpkePublicKey, {
+        // ⚠️ `model` is REQUIRED by the enclave and must be inside the CIPHERTEXT — the proxy
+        // cannot add it to a body it cannot read. Omitting it fails every extraction.
+        model: await enclaveModel(request.signal),
         messages,
         temperature: 0,
       });
@@ -308,9 +360,33 @@ export const managedProvider: ExtractionProvider = {
           // put the family's own assertion about their document in cleartext for nothing.
           ...(request.correction?.token ? { correction: { token: request.correction.token } } : {}),
           ehbp: sealed.headers,
+          // The PLAINTEXT body's type, which EHBP keeps in cleartext; the enclave's inner handler
+          // needs it. See seal.ts — overriding it with a binary type risks a 415 on every request.
+          contentType: sealed.contentType,
           sealed: bufferToBase64(sealed.ciphertext),
         },
         request.signal
+      );
+      if (typeof body.sealed !== 'string' || body.sealed.length === 0) {
+        throw new ExtractionProviderError(
+          'malformed_output',
+          'Managed proxy returned no sealed body'
+        );
+      }
+
+      // ⚠️ INSIDE the try, all of it. `base64ToBuffer` throws a bare `Error` (and `atob` a
+      // DOMException) on malformed input — neither an ExtractionProviderError, so outside a
+      // handler they escape `run()`, miss the `instanceof` check downstream, and render a
+      // developer string like "decoded N bytes, expected M" straight to the family.
+      //
+      // And `openSealed` failing IS the stale-key symptom: after a key rotation the seal succeeds
+      // against the memoised key and the enclave still answers 200, so outside the catch the dead
+      // key would stay memoised for the full TTL while every retry re-sealed to it, cost a bean,
+      // and told the family to try a clearer photo.
+      envelope = await openSealed(
+        context,
+        new Uint8Array(base64ToBuffer(body.sealed)),
+        body.ehbp ?? {}
       );
     } catch (err) {
       // Clear the memo after ANY failed sealed request, not only a stale-key-shaped one. We have
@@ -318,21 +394,17 @@ export const managedProvider: ExtractionProvider = {
       // failure nobody has seen is how you write a branch nobody can test. The cost is one extra
       // verification after a failure that already cost the user a retry.
       invalidateEnclaveVerification();
-      throw err;
-    }
-
-    if (typeof body.sealed !== 'string' || body.sealed.length === 0) {
+      __resetManagedModelForTesting();
+      // Everything this module throws is an ExtractionProviderError and callers rely on it;
+      // base64ToBuffer and atob do not honour that, so classify rather than let one escape.
+      if (err instanceof ExtractionProviderError) throw err;
       throw new ExtractionProviderError(
         'malformed_output',
-        'Managed proxy returned no sealed body'
+        'Could not read the managed proxy response',
+        err
       );
     }
 
-    const envelope = await openSealed(
-      context,
-      new Uint8Array(base64ToBuffer(body.sealed)),
-      body.ehbp ?? {}
-    );
     const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
     const result = parseChatCompletion(envelope, parse);
 
@@ -341,7 +413,13 @@ export const managedProvider: ExtractionProvider = {
     // answer is a DISAGREEMENT, not a malformed one — the hinted prompt leaves the model exactly
     // one way out, and reporting "try a clearer photo" for a perfectly legible page is both false
     // and an invitation to a retry that costs a bean.
-    const asserted = request.correction?.to;
+    // ⚠️ Gated on `body.correctionFree`, NOT merely on the user having asserted a kind. The
+    // Lambda's guard ran on `read.kindHint`, which `meter.mjs` sets only when a grant was actually
+    // SPENT, so it deliberately could not fire on the two fall-through outcomes: the
+    // CORRECTION_GRANTS kill switch, and a DynamoDB blip. Without this gate, during exactly the
+    // incident the kill switch exists for, a family taps the free-correction banner, is charged
+    // against the billable column, and is then shown a toast whose copy says nothing was charged.
+    const asserted = body.correctionFree ? request.correction?.to : undefined;
     if (asserted && (result as { kind?: string }).kind !== asserted) {
       const disagreed = (result as { kind?: string }).kind === 'none';
       throw new ExtractionProviderError(

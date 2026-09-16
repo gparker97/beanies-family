@@ -79,13 +79,23 @@ export const ALARMING_PREFIXES = Object.freeze({
 export async function openRead({
   familyId,
   srcHash = null,
+  /**
+   * Bytes the Lambda MEASURED on this request. Sealed arm only; null on the legacy arm, whose
+   * source binding already rests on a hash the server computed itself.
+   *
+   * ⚠️ This is the unforgeable half of the sealed arm's source binding. `srcHash` there is
+   * client-supplied, so on its own it can be forged to buy a free EXPENSIVE read with a cheap
+   * one. See GRANT_BYTES_TOLERANCE in correctionGrant.mjs.
+   */
+  srcBytes = null,
   correction,
   now = Date.now(),
   ddb,
 } = {}) {
-  if (!correction) return { free: false, kindHint: undefined, srcHash, wasCorrection: false };
+  if (!correction)
+    return { free: false, kindHint: undefined, srcHash, srcBytes, wasCorrection: false };
 
-  const verdict = await consumeGrant({ familyId, correction, srcHash, now, ddb });
+  const verdict = await consumeGrant({ familyId, correction, srcHash, srcBytes, now, ddb });
   return {
     free: verdict.free,
     // WHY the grant was not spent, so the handler can tell a genuine refusal from the kill
@@ -98,6 +108,7 @@ export async function openRead({
     // different thing from a positional hint before the model has looked.
     kindHint: verdict.free ? correction.to : undefined,
     srcHash,
+    srcBytes,
     wasCorrection: true,
   };
 }
@@ -144,6 +155,7 @@ export async function closeRead(read, { familyId, task, now = Date.now(), ddb } 
     familyId,
     task,
     srcHash: read?.srcHash,
+    srcBytes: read?.srcBytes ?? null,
     counted,
     wasCorrection: Boolean(read?.wasCorrection),
     now,
