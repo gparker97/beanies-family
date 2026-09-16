@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-16
 
+### Changed
+
+- **Your document is now encrypted on your device before it is sent to the AI.** On the standard setting, what you hand over is sealed to the AI's secure hardware before it leaves your phone, so it passes through the beanies server as something we cannot read. beanies checks that the hardware really is what it claims to be first, and if that check does not pass it refuses to send at all rather than sending anyway. Not yet switched on for everyone: it needs one more round of real-device testing first.
+
 ### Fixed
 
 - **The beanie wall now works on a small tablet.** The wall is meant for the spare tablet you already own, but it turned away every 8-inch one, which is exactly the kind families mount in a kitchen. It asked for more room than those screens have, and then counted the browser's own toolbar against them as well. Any tablet can now be a wall, either way up, and on the smaller ones the wall draws itself a little more compact so it still reads from across the room.
