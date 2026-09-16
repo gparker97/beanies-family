@@ -1302,6 +1302,103 @@ export const useAuthStore = defineStore('auth', () => {
     return null;
   }
 
+  /**
+   * Clear a member's claim so they can be invited again.
+   *
+   * ⚠️ WHY THIS HAS TO EXIST. "Joined" is not a stored flag — it is DERIVED, as
+   * `requiresPassword: !passwordHash && !pinHash`. So the moment a `pinHash` lands the invite UI
+   * stops offering that person a link, and until now nothing anywhere ever cleared one. A join
+   * that fell over after the PIN write, a person who lost their link half way through, an invite
+   * sent to the wrong bean — all of them left a member permanently un-invitable, with only two
+   * remedies: set their PIN for them and read it out, or delete the bean and lose its id and
+   * history.
+   *
+   * It is deliberately the same shape as the other manager actions: `assertCanResetMember` gates
+   * it, so it cannot be used on yourself, on a pet, on the owner, or by someone without
+   * `canManagePod`.
+   *
+   * ⚠️ ALL THE MEMBER'S KEY MATERIAL GOES, NOT JUST THE HASHES. Clearing `pinHash` /
+   * `passwordHash` only changes what the roster DERIVES; the envelope's `wrappedKeys` and
+   * `passkeyWrappedKeys` entries are what actually decrypt the pod, and they are keyed
+   * separately. Clearing the claim while leaving those behind would mean the person's old
+   * password or old passkey still opens the family data — an unclaim that undid the label and
+   * none of the access. Device credentials go too, for the orphan class ADR-029 exists for;
+   * `familyStore.invalidateDeviceCredentials` is the same call the delete path uses.
+   *
+   * ⚠️ NO `reason` PARAMETER. It briefly had one, so a `'join-failed'` caller could skip the
+   * manager gate — which made the gate bypassable by any caller willing to pass the string, on
+   * an action that strips another member's access. The join path no longer needs it: the claim
+   * is now the last fallible write in `joinFamily`, so there is nothing to roll back.
+   */
+  async function unclaimMember(
+    targetMemberId: string
+  ): Promise<{ success: true } | { success: false; error: ResetError }> {
+    const refused = assertCanResetMember(targetMemberId);
+    if (refused) return { success: false, error: refused };
+
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === targetMemberId);
+    if (!member) return { success: false, error: 'memberNotFound' };
+
+    // ⚠️ Bump `pinVersion` rather than resetting it. It is a monotonic fence other devices
+    // compare against; winding it back would make a stale device's cached credential look
+    // current again.
+    //
+    // ⚠️ AND CHECK THE RETURN. `familyStore.updateMember` runs inside `wrapAsync`, which
+    // catches, toasts and resolves — so it returns `null` on failure rather than throwing.
+    // Ignoring that meant this function reported `{ success: true }` for a claim it had not
+    // cleared, and the UI told the owner they could re-invite someone they still could not.
+    const updated = await familyStore.updateMember(targetMemberId, {
+      pinHash: undefined,
+      passwordHash: undefined,
+      pinVersion: (member.pinVersion ?? 0) + 1,
+    });
+    if (!updated) {
+      reportError({
+        surface: 'join-flow',
+        severity: 'critical',
+        message: 'unclaim failed: the member doc write did not land',
+        context: { action: 'unclaim_failed', member_id_tail: targetMemberId.slice(-8) },
+      });
+      return { success: false, error: 'updateFailed' };
+    }
+
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    const wrapsRetired = syncStore.retireMemberKeyMaterial(targetMemberId);
+    await familyStore.invalidateDeviceCredentials(targetMemberId);
+
+    logEvent({
+      level: 'info',
+      surface: 'join-flow',
+      message: 'member claim cleared; they can be invited again',
+      context: {
+        action: 'unclaim',
+        member_id_tail: targetMemberId.slice(-8),
+        count: wrapsRetired,
+      },
+    });
+
+    // ⚠️ PUSH IT. The doc mutation and the envelope write both only schedule a debounced
+    // autosave, and the very next thing the owner does is mint a new invite link against a
+    // roster the shared file has not seen yet. A second device — or the invitee's own first
+    // load — would read the member as still claimed. Bounded so a slow or offline Drive
+    // degrades rather than hangs the UI; the write is already durable locally either way.
+    try {
+      await syncStore.syncNowBounded();
+    } catch (e) {
+      reportError({
+        surface: 'join-flow',
+        message: 'unclaim saved locally but the push to the family file failed',
+        error: e,
+        severity: 'warning',
+        context: { action: 'unclaim_sync_failed', member_id_tail: targetMemberId.slice(-8) },
+      });
+    }
+
+    return { success: true };
+  }
+
   async function resetMemberPassword(
     targetMemberId: string,
     newPassword: string
@@ -1628,7 +1725,25 @@ export const useAuthStore = defineStore('auth', () => {
       sessionRejected.value = false;
       freshSignIn.value = true;
       await persistSession(user);
-      familyStore.setCurrentMember(member.id);
+      // ⚠️ `preselectSessionMember`, NOT `setCurrentMember`, and the difference is a reported bug.
+      //
+      // `setCurrentMember` checks the id against `members` and does NOTHING when it is absent —
+      // silently. On the recovery-kit path the roster is not reliably populated at this instant:
+      // the kit decrypt goes through `decryptPendingFileWithKey`, which (unlike the password
+      // path's `decryptPendingFile`) has no identity-before-roster bind, so `loadMembers` can run
+      // first, fail to resolve the session and null `currentMemberId` out.
+      //
+      // The result is exactly what `preselectSessionMember`'s own docblock describes and what an
+      // owner reported: signing in with the recovery kit, setting a new PIN, and then having NO
+      // permissions — `usePermissions` ignores the session role once the roster is loaded
+      // (`rosterLoaded`), so an unresolved `currentMember` over a populated roster is every
+      // permission false. Signing out and back in "fixed" it only because that forces a fresh
+      // `loadMembers`, the one place identity is re-resolved.
+      //
+      // The claim is EARNED here in the strongest sense available: we just verified this family's
+      // recovery kit and reset THIS member's PIN. `loadMembers` still re-validates the id against
+      // the roster it loads, so the check is deferred, not skipped.
+      familyStore.preselectSessionMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
       track('login', { props: { method: 'recovery-reset' } });
       logEvent({
@@ -1845,45 +1960,69 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
 
     try {
+      const familyStore = useFamilyStore();
+      const familyContextStore = useFamilyContextStore();
+      const joiningMember = familyStore.members.find((m) => m.id === params.memberId);
+      if (!joiningMember) {
+        return { success: false, error: useTranslationStore().t('auth.memberNotFound') };
+      }
+
+      // ⚠️ EVERYTHING THAT CAN FAIL RUNS BEFORE THE CLAIM. Writing `pinHash` is the one
+      // irreversible step here: `requiresPassword` is derived as `!passwordHash && !pinHash`, so
+      // the instant that hash lands the pod owner's invite UI stops offering this person a link,
+      // and the doc mutation schedules its own debounced autosave — the claim reaches the shared
+      // file whether or not the rest of the join works.
+      //
+      // That is the wrong direction to fail in, and it is exactly what was reported: a member
+      // marked joined who never got in, and who could no longer be sent a link. The first fix
+      // wrote the claim first and rolled it back in the catch, which left two ways to end up
+      // stuck anyway — the rollback can itself fail, and it cleared the credentials while
+      // leaving the session authenticated and persisted.
+      //
+      // So the ordering carries the guarantee instead of a compensating write. Anything that
+      // fails BELOW leaves the member unclaimed, and an unclaimed member simply retries. Anything
+      // that fails ABOVE the claim leaves them claimed AND able to sign in with the PIN they just
+      // set, because nothing above it can fail in a way that takes that away.
+      const registryDb = await getRegistryDatabase();
+      await registryDb.add('userFamilyMappings', {
+        id: generateUUID(),
+        email: joiningMember.email ?? '',
+        familyId: params.familyId,
+        memberId: params.memberId,
+        lastActiveAt: toISODateString(new Date()),
+      });
+
       // ONE set-PIN mutation body (R2-F13 DRY): validate → hash → doc write → this
       // device's unlock wrap, shared with the recovery and admin resets. The pod is
       // open at claim time (the invite/file was just decrypted), so the wrap enrols
       // here; a wrap failure is reported inside and is non-fatal.
+      //
+      // ⚠️ THE CLAIM. Keep it last among the fallible steps — see the block above.
       const pinResult = await applyPinReset(params.memberId, params.pin);
       if (!pinResult.success) return pinResult;
-      const joiningMember = pinResult.member;
 
       // Sign the member in — the shared session shape (see `signIn`'s tail).
-      const familyStoreForPin = useFamilyStore();
-      const familyContextStoreForPin = useFamilyContextStore();
       const user: AuthUser = {
         memberId: params.memberId,
-        email: joiningMember.email ?? '',
-        familyId: familyContextStoreForPin.activeFamilyId ?? params.familyId,
-        role: joiningMember.role,
+        email: pinResult.member.email ?? '',
+        familyId: familyContextStore.activeFamilyId ?? params.familyId,
+        role: pinResult.member.role,
       };
       currentUser.value = user;
       isAuthenticated.value = true;
       sessionRejected.value = false;
       freshSignIn.value = true;
       await persistSession(user);
-      familyStoreForPin.setCurrentMember(params.memberId);
-
-      // Create UserFamilyMapping in registry DB
-      const familyStore = useFamilyStore();
+      // ⚠️ `preselectSessionMember`, for the same reason the recovery path uses it:
+      // `setCurrentMember` is a SILENT no-op when the roster does not yet hold the id, which
+      // leaves `currentMemberId` null over a loaded roster — and `usePermissions` then reports
+      // every permission false until something forces a fresh `loadMembers`. The claim is earned:
+      // we just wrote this member's PIN.
+      familyStore.preselectSessionMember(params.memberId);
 
       // Track last login timestamp for the newly joined member
-      const now = toISODateString(new Date());
-      await familyStore.updateMember(params.memberId, { lastLoginAt: now });
-
-      const member = familyStore.members.find((m) => m.id === params.memberId);
-      const registryDb = await getRegistryDatabase();
-      await registryDb.add('userFamilyMappings', {
-        id: generateUUID(),
-        email: member?.email ?? '',
-        familyId: params.familyId,
-        memberId: params.memberId,
-        lastActiveAt: toISODateString(new Date()),
+      await familyStore.updateMember(params.memberId, {
+        lastLoginAt: toISODateString(new Date()),
       });
 
       // Mark onboarding as completed
@@ -1896,6 +2035,21 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to join family';
       error.value = message;
+
+      // ⚠️ NO CLAIM ROLLBACK HERE, AND THAT IS THE FIX, NOT AN OMISSION. The claim is the
+      // last fallible write in the try block above, so reaching this catch means either it was
+      // never written — nothing to undo — or it was written and the member can sign in with the
+      // PIN they just set. A compensating write would only reintroduce the two holes it had:
+      // it can fail on its own, and it left the session authenticated and persisted with the
+      // credentials gone.
+      reportError({
+        surface: 'join-flow',
+        severity: 'error',
+        message: 'join failed',
+        error: e,
+        context: { action: 'join_failed' },
+      });
+
       return { success: false, error: message };
     } finally {
       isLoading.value = false;
@@ -2707,6 +2861,7 @@ export const useAuthStore = defineStore('auth', () => {
     verifyMemberPin,
     resetMemberPinViaRecovery,
     adminResetMemberPin,
+    unclaimMember,
     enrollDevicePinWrapForMember,
     createRecoveryKit,
     setRecoveryPassphrase,

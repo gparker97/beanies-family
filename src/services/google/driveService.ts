@@ -6,7 +6,6 @@
  */
 
 import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
-import { isSafetyCopyName } from '@/constants/compaction';
 import { extractGoogleError, isGoogleThrottleReason } from '@/utils/googleApiError';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -361,7 +360,7 @@ export interface BeanpodFileEntry {
  * If folder-based search returns empty, falls back to a Drive-wide search
  * for .beanpod files (handles broken folder associations).
  */
-// ⚠️ NOT filtered for safety copies — see the note in `findBeanpodInFolder`.
+// ⚠️ NOT filtered for safety copies.
 // The pre-create collision check must see every file in the folder.
 export async function listBeanpodFiles(
   token: string,
@@ -769,62 +768,4 @@ export class DriveFileNotFoundError extends DriveApiError {
     super(message, status);
     this.name = 'DriveFileNotFoundError';
   }
-}
-
-/**
- * Thrown by `findBeanpodInFolder` when a caller picks a folder that
- * doesn't contain any `.beanpod` file. Distinct from 404/403 so the
- * recovery/join flow can surface a specific "this folder isn't a
- * beanies.family pod — pick a different one" message instead of a
- * generic Drive error.
- */
-export class NoBeanpodInFolderError extends Error {
-  readonly folderId: string;
-  constructor(folderId: string) {
-    super(`No .beanpod file found in folder ${folderId}`);
-    this.name = 'NoBeanpodInFolderError';
-    this.folderId = folderId;
-  }
-}
-
-/**
- * Strict in-folder lookup for a `.beanpod` file. Unlike `listBeanpodFiles`
- * this does NOT fall back to a Drive-wide search — callers (Picker-driven
- * join + recovery flows) must reject folders that don't actually contain
- * this family's pod.
- *
- * Returns the most-recently-modified `.beanpod` in the folder. Throws
- * `NoBeanpodInFolderError` if none are found; any Drive API failure
- * surfaces as `DriveApiError` / `DriveFileNotFoundError` from the shared
- * `driveRequest` path.
- */
-export async function findBeanpodInFolder(
-  token: string,
-  folderId: string
-): Promise<{ fileId: string; name: string; modifiedTime: string }> {
-  const query = `'${folderId}' in parents and name contains '.beanpod' and trashed=false`;
-  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=10`;
-  const res = await driveRequest(token, url);
-  const data = await res.json();
-  // ⚠️ THE SAFETY COPY IS EXCLUDED HERE, AND ONLY HERE (ADR-033). This helper
-  // AUTO-SELECTS — it returns `files[0]` — and is documented as the preferred
-  // join/recovery entry point, so handing a joiner the pre-compaction file is
-  // exactly the "never fork a family pod" failure. Stated where pods are
-  // IDENTIFIED rather than at a call site, so a future caller inherits it.
-  //
-  // Deliberately NOT applied to its two neighbours: `searchBeanpodFilesGlobal`
-  // feeds the human file picker, where the copy MUST stay visible — that is
-  // what makes it a rollback route someone can choose — and `listBeanpodFiles`
-  // backs the pre-create collision check, which has to see EVERY file in the
-  // folder or it re-opens the 2026-05-15 duplicate-pod incident. Do not
-  // "finish the job" on either.
-  const all = mapFileResults(data.files).filter((f) => f.name.endsWith('.beanpod'));
-  const files = all.filter((f) => !isSafetyCopyName(f.name));
-  if (all.length !== files.length) {
-    console.warn(
-      `[driveService] findBeanpodInFolder: skipped ${all.length - files.length} safety copy/copies in ${folderId}`
-    );
-  }
-  if (files.length === 0) throw new NoBeanpodInFolderError(folderId);
-  return files[0];
 }

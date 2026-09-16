@@ -877,6 +877,9 @@ export const useFamilyStore = defineStore('family', () => {
     updateMember,
     learnAliases,
     deleteMember,
+    // Exported for `authStore.unclaimMember`: clearing a claim must take the device credentials
+    // with it, or a wrap outlives the PIN it belonged to — the orphan class ADR-029 exists for.
+    invalidateDeviceCredentials,
     transferOwnership,
     setCurrentMember,
     preselectSessionMember,

@@ -22,6 +22,22 @@ import { useSyncStore } from '@/stores/syncStore';
 import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 import type { FamilyMember } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { AwaitingReason } from '@/composables/useJoinFlow';
+
+/**
+ * Why the joiner is on this card, in words.
+ *
+ * `initial` and `needs-pick` deliberately reuse the EXISTING
+ * `join.pickerPrompt.description` — "One last step to join: open your family's data file from
+ * Google Drive so you have access" — which is already the right sentence for both. Only the two
+ * genuinely new states needed new copy.
+ */
+const AWAITING_COPY = {
+  initial: 'join.pickerPrompt.description',
+  'needs-pick': 'join.pickerPrompt.description',
+  cancelled: 'join.awaiting.cancelled',
+  redirecting: 'join.awaiting.redirecting',
+} as const satisfies Record<AwaitingReason, UIStringKey>;
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
@@ -248,7 +264,9 @@ function handleBack(): void {
     confirmPin.value = '';
     flow.clearError();
   } else if (flow.currentStep.value === 'pick-member') {
-    flow.currentStep.value = 'awaiting-auth';
+    // ⚠️ Through `enterAwaiting`, never a direct step write. This was the fifth site that could
+    // reach the awaiting card without a reason; a required argument is what stops a sixth.
+    flow.enterAwaiting('initial');
     flow.clearError();
   } else {
     emit('back');
@@ -398,8 +416,12 @@ onMounted(() => {
              carried the file name) names the exact .beanpod to pick. -->
         <template v-if="flow.targetProvider.value === 'google_drive'">
           <div class="space-y-3">
+            <!-- ⚠️ WHY the joiner is sitting here, not just that they are.
+                 This card was reached from five places with no reason attached, so "waiting for
+                 your tap", "you closed the chooser" and "you just came back from Google" all
+                 rendered identically. A user reported that as the app doing nothing. -->
             <p class="dark:text-ink-soft text-center text-sm text-slate-600">
-              {{ t('join.pickerPrompt.description') }}
+              {{ t(AWAITING_COPY[flow.awaitingReason.value]) }}
             </p>
             <div
               v-if="flow.expectedFileName.value"
@@ -415,6 +437,20 @@ onMounted(() => {
             <BaseButton class="w-full" @click="flow.handleAuthTap">
               {{ t('join.pickerPrompt.button') }}
             </BaseButton>
+            <!-- ⚠️ THE ESCAPE HATCH, and it is not optional.
+                 Dropping `forceConsent` from the needs-pick path (the loop fix) also removed
+                 Google's account chooser from it. A joiner whose cached account is the WRONG one
+                 now opens the Picker against their own Drive, finds nothing, cancels — and
+                 `signInDifferentAccount` is reachable only via `currentErrorView.recoveries`,
+                 which a cancel deliberately does not populate. Without this link that is an
+                 infinite redirect loop traded for a silent Picker loop. -->
+            <button
+              type="button"
+              class="dark:text-ink-faint dark:hover:text-accent-lift hover:text-primary-600 w-full text-center text-xs text-slate-500 underline underline-offset-2"
+              @click="flow.handleSignInDifferent"
+            >
+              {{ t('join.recovery.signInDifferentAccount') }}
+            </button>
           </div>
         </template>
 
