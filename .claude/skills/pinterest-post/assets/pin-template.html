@@ -1,145 +1,470 @@
 <!--
   beanies.family — Pinterest pin template (1000 x 1500, 2:3)
   ----------------------------------------------------------
-  Brand-locked chrome that reproduces the look of the first shipped pins
-  (pin-01 "why i built" photo pin, pin-02 "greatest family app" mascot pin).
-  Fill the {{TOKENS}}, pick a ground + layout + alignment on <body>.
+  Fill the {{TOKENS}}, then pick a ground + layout + alignment on <body>.
 
-  Rendering: scripts/render-pin.mjs loads this file in Playwright at 1000x1500,
-  deviceScaleFactor 2 -> a 2000x3000 @2x PNG. It rewrites {{ASSET_BASE}} to an
-  absolute file:// path at web/public/brand, so leave that token as-is.
-  Fonts load from Google Fonts (needs network at render time; system fallback
-  keeps it legible offline).
+  WHY THIS FILE GREW. The first version offered three grounds (two of them
+  near-white), three layouts, and a HARDCODED hero image, so every pin came out
+  looking like the last one. The variety now lives in the knobs below. Vary the
+  GROUND and the LAYOUT and the ART together — three recolours of one composition
+  is not three pins, and Pinterest rewards a feed that does not look repetitive.
 
-  data-ground:  cloud | slate | sky        (background + text colour)
-  data-layout:  mascot | photo | text      (mascot = centred hero cluster;
-                                            photo = full-bleed photo + scrim;
-                                            text  = typographic, no image)
+  Rendering: scripts/render-pin.mjs loads this in Playwright at 1000x1500,
+  deviceScaleFactor 2 -> a 2000x3000 @2x PNG. {{ASSET_BASE}} is rewritten to
+  packages/brand/assets, so reference art as:
+      {{ASSET_BASE}}/shared/beanies_family_hugging_transparent_1600x1600.png
+      {{ASSET_BASE}}/marketing/beanies-pricing-pockets.webp
+      {{ASSET_BASE}}/blog/<image-from-the-post>
+  The renderer FAILS if any image 404s, so a typo stops the pin rather than
+  shipping a hole. See references/asset-catalogue.md for everything available.
+
+  data-ground:  cloud | sky | slate | midnight | ember | terracotta | paper | mint
+  data-layout:  mascot | hero-bottom | split | ring | strip | portrait | photo | text
   data-align:   center | left
+  data-deco:    none | confetti | arc | blobs      (decorative accents)
 
-  ESTABLISHED CONVENTIONS (match the shipped pins):
-  - Eyebrow: UPPERCASE, Heritage Orange, letter-spaced, on every ground.
-  - Headline: Outfit 800, all-lowercase, with the keyword phrase wrapped in
-    <em>…</em> to paint it Heritage Orange.
-  - Signature: the hugging-beanies family cluster is the brand mark — centred as
-    the hero (mascot layout) or small bottom-right (photo layout).
-  - Footer lockup: optional italic kicker (e.g. "why i built") + the single-bean
-    favicon + "beanies.family" wordmark. Never a bare app screenshot.
+  BRAND RULES THAT DO NOT BEND (CIG + beanies-theme skill):
+  - Heritage Orange #F15D22 is the accent and the alert colour. Alert Red is never
+    used decoratively.
+  - The beanies hold hands and are never separated; never rotate the arrow.
+  - Headline: Outfit 800, all-lowercase, keyword wrapped in <em> to paint it orange
+    (or cream, on the dark/warm grounds - handled automatically below).
+  - Eyebrow: UPPERCASE, letter-spaced.
+  - Footer lockup: single-bean favicon + "beanies.family" wordmark. Never a bare
+    app screenshot as the pin.
+  - Every ground below is a CIG colour or a gradient between two of them.
 -->
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --slate: #2C3E50;
-    --orange: #F15D22;
-    --terracotta: #E67E22;
-    --sky: #AED6F1;
-    --cloud: #F8F9FA;
-    --outfit: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --inter: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 1000px; height: 1500px; }
-  body {
-    position: relative; overflow: hidden; font-family: var(--inter);
-    --bg: var(--cloud); --ink: var(--slate); --muted: rgba(44,62,80,0.55);
-    background: var(--bg); color: var(--ink);
-  }
-  body[data-ground="slate"] { --bg: var(--slate); --ink: #FFFFFF; --muted: rgba(255,255,255,0.72); }
-  body[data-ground="cloud"] { --bg: linear-gradient(180deg,#FFFFFF 0%, var(--cloud) 55%, #EEF4F9 100%); --ink: var(--slate); --muted: rgba(44,62,80,0.55); }
-  body[data-ground="sky"]   { --bg: linear-gradient(165deg,#F4FAFF 0%, #DCEEFB 60%, var(--sky) 100%); --ink: var(--slate); --muted: rgba(44,62,80,0.60); }
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --slate: #2c3e50;
+        --slate-deep: #1b2733;
+        --orange: #f15d22;
+        --orange-soft: #ff8a4c;
+        --terracotta: #e67e22;
+        --sky: #aed6f1;
+        --cloud: #f8f9fa;
+        --cream: #fff6ec;
+        --mint: #cdebe3;
+        --outfit: 'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --inter: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1000px;
+        height: 1500px;
+      }
+      body {
+        position: relative;
+        overflow: hidden;
+        font-family: var(--inter);
+        --bg: var(--cloud);
+        --ink: var(--slate);
+        --muted: rgba(44, 62, 80, 0.55);
+        --accent: var(--orange);
+        background: var(--bg);
+        color: var(--ink);
+      }
 
-  /* safe zone: all key text inside the middle 80% (100px side gutters) */
-  .pin { position: absolute; inset: 0; padding: 130px 90px 260px; display: flex; flex-direction: column; z-index: 1; }
-  body[data-align="center"] .pin { text-align: center; align-items: center; }
-  body[data-align="left"] .pin { text-align: left; align-items: flex-start; }
+      /* ---- GROUNDS. Light four first, then the dark/warm four that the early
+             pins never used and that make a feed stop looking washed out. ---- */
+      body[data-ground='cloud'] {
+        --bg: linear-gradient(180deg, #ffffff 0%, var(--cloud) 55%, #eef4f9 100%);
+      }
+      body[data-ground='sky'] {
+        --bg: linear-gradient(165deg, #f4faff 0%, #dceefb 60%, var(--sky) 100%);
+        --muted: rgba(44, 62, 80, 0.6);
+      }
+      body[data-ground='paper'] {
+        --bg: linear-gradient(170deg, var(--cream) 0%, #ffeedd 100%);
+        --muted: rgba(44, 62, 80, 0.58);
+      }
+      body[data-ground='mint'] {
+        --bg: linear-gradient(200deg, #eafaf5 0%, var(--mint) 100%);
+        --muted: rgba(44, 62, 80, 0.58);
+      }
+      /* Dark + saturated. On these, the keyword goes CREAM, not orange: Heritage
+         Orange on slate is 3.1:1 and turns to mud at thumbnail size. */
+      body[data-ground='slate'] {
+        --bg: linear-gradient(175deg, #38506a 0%, var(--slate) 55%, var(--slate-deep) 100%);
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.72);
+        --accent: #ffc9a8;
+      }
+      body[data-ground='midnight'] {
+        --bg: radial-gradient(120% 90% at 50% 0%, #2f4a63 0%, #16202b 100%), var(--slate-deep);
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.7);
+        --accent: #ffb489;
+      }
+      body[data-ground='ember'] {
+        --bg: linear-gradient(160deg, var(--orange) 0%, var(--terracotta) 55%, #c9591a 100%);
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.86);
+        --accent: var(--cream);
+      }
+      body[data-ground='terracotta'] {
+        --bg: linear-gradient(200deg, #f5a361 0%, var(--terracotta) 60%, #cf6f19 100%);
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.88);
+        --accent: var(--cream);
+      }
 
-  .eyebrow {
-    font-family: var(--outfit); font-weight: 700; font-size: 32px;
-    letter-spacing: 0.14em; text-transform: uppercase; color: var(--orange);
-    margin-bottom: 30px;
-  }
-  .headline {
-    font-family: var(--outfit); font-weight: 800; font-size: 98px; line-height: 1.02;
-    letter-spacing: -0.02em; text-wrap: balance;
-  }
-  .headline em { font-style: normal; color: var(--orange); }
-  .subtitle {
-    font-family: var(--inter); font-style: italic; font-weight: 400; font-size: 44px;
-    line-height: 1.25; color: var(--muted); margin-top: 40px; max-width: 760px;
-  }
+      /* safe zone: key text inside the middle 80% (90px side gutters) */
+      .pin {
+        position: absolute;
+        inset: 0;
+        padding: 130px 90px 260px;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+      }
+      body[data-align='center'] .pin {
+        text-align: center;
+        align-items: center;
+      }
+      body[data-align='left'] .pin {
+        text-align: left;
+        align-items: flex-start;
+      }
 
-  /* hero mascot cluster (mascot layout) */
-  .hero { flex: 1; display: flex; align-items: center; justify-content: center; margin-top: 48px; min-height: 0; }
-  .hero img { max-width: 620px; max-height: 640px; object-fit: contain; }
+      .eyebrow {
+        font-family: var(--outfit);
+        font-weight: 700;
+        font-size: 32px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 30px;
+      }
+      .headline {
+        font-family: var(--outfit);
+        font-weight: 800;
+        font-size: 98px;
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+      }
+      .headline em {
+        font-style: normal;
+        color: var(--accent);
+      }
+      .subtitle {
+        font-family: var(--inter);
+        font-style: italic;
+        font-weight: 400;
+        font-size: 44px;
+        line-height: 1.25;
+        color: var(--muted);
+        margin-top: 40px;
+        max-width: 760px;
+      }
 
-  /* photo layout */
-  body[data-layout="photo"] .pin { justify-content: flex-start; }
-  body[data-layout="photo"] { --ink: #FFFFFF; --muted: rgba(255,255,255,0.82); }
-  .photo { position: absolute; inset: 0; z-index: 0; }
-  .photo img { width: 100%; height: 100%; object-fit: cover; filter: brightness(var(--photo-brightness,1.12)); }
-  /* top + bottom scrim so eyebrow/headline (top) and lockup (bottom) always read */
-  .photo::after {
-    content: ""; position: absolute; inset: 0;
-    background:
-      linear-gradient(to bottom, rgba(20,29,38,0.82) 0%, rgba(20,29,38,0.30) 30%, rgba(20,29,38,0.0) 46%),
-      linear-gradient(to top, rgba(20,29,38,0.78) 0%, rgba(20,29,38,0.0) 26%);
-  }
+      /* ---- LAYOUTS ---- */
 
-  /* footer lockup: kicker + bean signature + wordmark */
-  .lockup { position: absolute; left: 90px; right: 90px; bottom: 92px; z-index: 2; }
-  body[data-align="center"] .lockup { text-align: center; }
-  .kicker {
-    font-family: var(--inter); font-style: italic; font-weight: 500; font-size: 34px;
-    color: var(--muted); margin-bottom: 14px;
-  }
-  .mark { display: inline-flex; align-items: center; gap: 18px; }
-  body[data-align="center"] .mark { justify-content: center; }
-  .mark .bean { width: 62px; height: 62px; flex: none; }
-  .mark .wordmark { font-family: var(--outfit); font-weight: 700; font-size: 52px; letter-spacing: -0.01em; color: var(--ink); }
-  .mark .wordmark .dot { color: var(--orange); }
+      /* mascot: art centred between the copy and the lockup (the original). */
+      .hero {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 48px;
+        min-height: 0;
+      }
+      .hero img {
+        max-width: 620px;
+        max-height: 640px;
+        object-fit: contain;
+      }
 
-  /* small mascot accent, bottom-right (photo layout signature, like pin-01) */
-  .mascot-accent { position: absolute; right: 70px; bottom: 70px; width: 250px; z-index: 2; }
-  .mascot-accent img { width: 100%; }
-</style>
-</head>
+      /* hero-bottom: art sits low and large, grounded rather than floating in the
+         middle. It stops ABOVE the lockup on purpose — bleeding it off the bottom
+         edge crops the character's feet and puts the wordmark on top of its face. */
+      body[data-layout='hero-bottom'] .pin {
+        padding-bottom: 700px;
+      }
+      body[data-layout='hero-bottom'] .hero {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: auto;
+        bottom: 215px;
+        height: 620px;
+        margin: 0;
+        align-items: flex-end;
+      }
+      body[data-layout='hero-bottom'] .hero img {
+        max-width: 660px;
+        max-height: 620px;
+      }
 
-<!-- EDIT: ground / layout / align per pin -->
-<body data-ground="cloud" data-layout="mascot" data-align="center">
+      /* split: a full-width band of contrasting colour holds the art, so the pin
+         reads as two decisive blocks rather than one pale field. */
+      body[data-layout='split'] .pin {
+        padding-bottom: 700px;
+      }
+      body[data-layout='split'] .hero {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 640px;
+        margin: 0;
+        background: var(--band, rgba(44, 62, 80, 0.06));
+        border-radius: 64px 64px 0 0;
+      }
+      body[data-layout='split'] .hero img {
+        max-width: 560px;
+        max-height: 520px;
+      }
 
-  <!-- PHOTO layout only: set the src + brightness, delete for other layouts -->
-  <!--
-  <div class="photo"><img src="{{ASSET_BASE}}/beanies-family-reading.webp" style="--photo-brightness:1.2" alt="" /></div>
+      /* ring: headline sits INSIDE the ring of celebrating beanies, which has a
+         deliberate hole in the middle for exactly this. */
+      body[data-layout='ring'] .pin {
+        justify-content: center;
+        padding-top: 0;
+      }
+      body[data-layout='ring'] .ring {
+        position: absolute;
+        top: 300px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 780px;
+        z-index: 1;
+      }
+      body[data-layout='ring'] .ring img {
+        width: 100%;
+      }
+      body[data-layout='ring'] .headline {
+        font-size: 84px;
+        max-width: 470px;
+      }
+
+      /* portrait: tall art (the beanstalk mascot) beside the copy. The only asset
+         that is natively portrait, so it fills a 2:3 pin with no cropping. */
+      body[data-layout='portrait'] .pin {
+        padding-right: 430px;
+        justify-content: center;
+      }
+      body[data-layout='portrait'] .hero {
+        position: absolute;
+        right: 40px;
+        bottom: 150px;
+        top: 200px;
+        width: 400px;
+        margin: 0;
+      }
+      body[data-layout='portrait'] .hero img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        object-position: bottom;
+      }
+
+      /* strip: wide banner art as a bottom band (the hand-holding celebration
+         line is 560x225 and made for this). */
+      body[data-layout='strip'] .pin {
+        padding-bottom: 480px;
+      }
+      body[data-layout='strip'] .hero {
+        position: absolute;
+        left: 60px;
+        right: 60px;
+        bottom: 210px;
+        margin: 0;
+      }
+      body[data-layout='strip'] .hero img {
+        width: 100%;
+        max-width: none;
+        max-height: none;
+      }
+
+      /* text: typographic only, no art. Let the headline be the whole pin. */
+      body[data-layout='text'] .hero {
+        display: none;
+      }
+      body[data-layout='text'] .headline {
+        font-size: 118px;
+      }
+
+      /* photo: full-bleed photo + scrim. Needs a real photo greg supplies. */
+      body[data-layout='photo'] .pin {
+        justify-content: flex-start;
+      }
+      body[data-layout='photo'] {
+        --ink: #ffffff;
+        --muted: rgba(255, 255, 255, 0.82);
+        --accent: #ffc9a8;
+      }
+      body[data-layout='photo'] .hero {
+        display: none;
+      }
+      .photo {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+      }
+      .photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: brightness(var(--photo-brightness, 1.12));
+      }
+      .photo::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(
+            to bottom,
+            rgba(20, 29, 38, 0.82) 0%,
+            rgba(20, 29, 38, 0.3) 30%,
+            rgba(20, 29, 38, 0) 46%
+          ),
+          linear-gradient(to top, rgba(20, 29, 38, 0.78) 0%, rgba(20, 29, 38, 0) 26%);
+      }
+
+      /* ---- DECORATION. Subtle, never competing with the headline. ---- */
+      .deco {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+      body[data-deco='none'] .deco {
+        display: none;
+      }
+      .deco .tick {
+        position: absolute;
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        opacity: 0.5;
+      }
+      .deco .blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(0.5px);
+        opacity: 0.16;
+      }
+      .deco .arc {
+        position: absolute;
+        border-radius: 50%;
+        border: 3px solid currentColor;
+        opacity: 0.14;
+      }
+
+      /* ---- footer lockup ---- */
+      .lockup {
+        position: absolute;
+        left: 90px;
+        right: 90px;
+        bottom: 92px;
+        z-index: 3;
+      }
+      body[data-align='center'] .lockup {
+        text-align: center;
+      }
+      .kicker {
+        font-family: var(--inter);
+        font-style: italic;
+        font-weight: 500;
+        font-size: 34px;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 18px;
+      }
+      body[data-align='center'] .mark {
+        justify-content: center;
+      }
+      .mark .bean {
+        width: 62px;
+        height: 62px;
+        flex: none;
+      }
+      .mark .wordmark {
+        font-family: var(--outfit);
+        font-weight: 700;
+        font-size: 52px;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+      }
+      .mark .wordmark .dot {
+        color: var(--accent);
+      }
+
+      /* small mascot accent, bottom-right (photo layout signature) */
+      .mascot-accent {
+        position: absolute;
+        right: 70px;
+        bottom: 70px;
+        width: 250px;
+        z-index: 3;
+      }
+      .mascot-accent img {
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <!-- EDIT: ground / layout / align / deco per pin. VARY ALL OF THEM between pins. -->
+  <body data-ground="cloud" data-layout="mascot" data-align="center" data-deco="none">
+    <!-- PHOTO layout only: set the src + brightness, delete for other layouts -->
+    <!--
+  <div class="photo"><img src="{{ASSET_BASE}}/marketing/beanies-family-reading.webp" style="--photo-brightness:1.2" alt="" /></div>
   -->
 
-  <div class="pin">
-    <div class="eyebrow">{{EYEBROW}}</div>
-    <h1 class="headline">{{HEADLINE}}</h1>
-    <p class="subtitle">{{SUBTITLE}}</p>
-
-    <!-- MASCOT layout only: the hugging-beanies cluster as the hero -->
-    <div class="hero">
-      <img src="{{ASSET_BASE}}/beanies_family_hugging_transparent_1024x1024.png" alt="" />
+    <!-- Decoration. Delete the ones you are not using; positions are per-pin. -->
+    <div class="deco">
+      <!-- confetti: <span class="tick" style="left:120px; top:250px; background:var(--orange); transform:rotate(18deg)"></span> -->
+      <!-- blobs:    <span class="blob" style="left:-120px; top:180px; width:420px; height:420px; background:var(--sky)"></span> -->
+      <!-- arc:      <span class="arc"  style="right:-160px; top:620px; width:520px; height:520px;"></span> -->
     </div>
-  </div>
 
-  <!-- PHOTO layout only: small mascot signature bottom-right (uncomment) -->
-  <!-- <div class="mascot-accent"><img src="{{ASSET_BASE}}/beanies_family_hugging_transparent_512x512.png" alt="" /></div> -->
+    <div class="pin">
+      <div class="eyebrow">{{EYEBROW}}</div>
+      <h1 class="headline">{{HEADLINE}}</h1>
+      <p class="subtitle">{{SUBTITLE}}</p>
 
-  <div class="lockup">
-    <!-- optional italic kicker, e.g. "why i built" — delete if unused -->
-    <div class="kicker">{{KICKER}}</div>
-    <span class="mark">
-      <img class="bean" src="{{ASSET_BASE}}/beanies_small_bean_favicon_512x512.png" alt="" />
-      <span class="wordmark">beanies<span class="dot">.family</span></span>
-    </span>
-  </div>
+      <!-- THE ART. Swap this src per pin — see references/asset-catalogue.md.
+           Do NOT default to the family-hugging cluster every time; that habit is
+           what made the first batch of pins interchangeable. -->
+      <div class="hero">
+        <img src="{{ASSET_BASE}}/shared/beanies_family_hugging_transparent_1600x1600.png" alt="" />
+      </div>
+    </div>
 
-</body>
+    <!-- RING layout only: the celebrating ring behind the headline (uncomment) -->
+    <!-- <div class="ring"><img src="{{ASSET_BASE}}/shared/beanies_celebrating_circle_transparent_600x600.png" alt="" /></div> -->
+
+    <!-- PHOTO layout only: small mascot signature bottom-right (uncomment) -->
+    <!-- <div class="mascot-accent"><img src="{{ASSET_BASE}}/shared/beanies_small_bean_favicon_512x512.png" alt="" /></div> -->
+
+    <div class="lockup">
+      <!-- optional italic kicker, e.g. "why i built" — delete if unused -->
+      <div class="kicker">{{KICKER}}</div>
+      <span class="mark">
+        <img class="bean" src="{{ASSET_BASE}}/shared/beanies_small_bean_favicon_512x512.png" alt="" />
+        <span class="wordmark">beanies<span class="dot">.family</span></span>
+      </span>
+    </div>
+  </body>
 </html>

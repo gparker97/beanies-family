@@ -21,10 +21,12 @@ our goal is **content traffic + SEO** (pins → a beanies.family blog/guide → 
 direct installs. Follower count is a vanity metric; the KPIs are **outbound clicks →
 referral sessions → saves → impressions**.
 
-Read `references/pinterest-playbook.md` (strategy, boards, UTMs, metrics, collab, paid) and
-`references/voice-and-copy.md` (voice, title/description rules, examples) before producing
-anything. For brand visuals, defer to `.claude/skills/beanies-theme/SKILL.md` and
-`docs/brand/beanies-cig-v2.html` — don't duplicate the palette here.
+Read `references/pinterest-playbook.md` (strategy, boards, UTMs, metrics, collab, paid),
+`references/voice-and-copy.md` (voice, title/description rules, examples) and
+`references/asset-catalogue.md` (**every** graphic available, what it depicts, and which
+are defective) before producing anything. For brand visuals, defer to
+`.claude/skills/beanies-theme/SKILL.md` and `docs/brand/beanies-cig-v2.html` — don't
+duplicate the palette here.
 
 ## Two modes
 
@@ -67,29 +69,62 @@ Propose, don't interrogate. Confirm only what you genuinely can't infer:
 - hashtags yes/no (default: minimize — see voice doc).
 
 ### 4. Propose 2–3 fresh pins (for approval, before rendering)
-"Fresh pins" = new image + same URL, each a **genuinely different angle/design** (different
-ground colour, hook, and/or layout — not three recolours). For each pin present:
+"Fresh pins" = new image + same URL, each a **genuinely different angle/design**. For each pin present:
 
 | field | notes |
 | --- | --- |
 | **pin code** | `utm_content` value, `<slug-short>-<angle>`, lowercase-hyphen — the tracker id |
 | **angle / keyword** | the search phrase it targets |
-| **image direction** | ground (`cloud`/`slate`/`sky`) + layout (`mascot`/`photo`/`text`) + eyebrow + headline (with the orange `<em>` keyword) + optional subtitle/kicker + which mascot/photo |
+| **image direction** | ground + layout + align + deco + eyebrow + headline (keyword in `<em>`) + optional subtitle/kicker + **which artwork, by path from the catalogue** |
 | **title** | ≤100 chars, hook+keyword in first ~40, lowercase, greg's voice |
 | **description** | ≤500 chars, 2–3 keywords front-loaded in sentence 1, greg's voice |
 | **board** | the single best-fit board (playbook lists the 8) |
 | **tagged URL** | `…/blog/<slug>?utm_source=pinterest&utm_medium=social&utm_campaign=<slug>&utm_content=<pin-code>` |
+
+#### The variety rule (this is the point of the step)
+
+The first batch of pins all looked the same: near-white ground, centred mascot, the
+family-hugging cluster, every time. That happened because the template hardcoded that image
+and offered two pale grounds, and because "fresh" was read as "recoloured". Two things now
+prevent it.
+
+**Vary all three axes across a set, not one.** A set of pins must differ in **ground**,
+**layout** AND **artwork**. Three grounds behind the same centred cluster is one pin three
+times. Concretely, from `assets/pin-template.html`:
+
+- **grounds** — `cloud` `sky` `paper` `mint` (light) and `slate` `midnight` `ember`
+  `terracotta` (dark/saturated). **At least one pin in every set uses a dark or saturated
+  ground.** A Pinterest feed of pale cards disappears; the orange and terracotta grounds are
+  the ones that stop a scroll.
+- **layouts** — `mascot` `hero-bottom` `split` `ring` `strip` `portrait` `photo` `text`.
+- **artwork** — pick from `references/asset-catalogue.md`. **Do not default to the
+  family-hugging cluster.** Match the art to the angle: money copy gets the pockets graphic,
+  a bedtime post gets the reading hero, growth gets the beanstalk in the `portrait` layout,
+  a milestone gets the ring, privacy gets the covering-eyes bean.
+
+**Keyword colour is handled for you.** On the dark and saturated grounds the `<em>` keyword
+and eyebrow go cream, not Heritage Orange, because orange on slate is about 3.1:1 and turns to
+mud at thumbnail size. The template's `--accent` does this per ground; do not override it.
+
+**Reuse the post's own image when it has a strong one.** `{{ASSET_BASE}}/blog/` holds every
+beanstalk post image, so a pin can carry the same photo, screenshot or meme the reader is
+about to land on. Not every pin, but it is the cheapest way to make the pin and the page feel
+like one thing.
 
 Show the copy and image direction and **wait for greg's approval / edits**. Voiced copy gets
 his pass — that's his standing rule.
 
 ### 5. Render the approved pins
 For each approved pin:
-1. Copy `assets/pin-template.html` into the scratchpad, set `data-ground`/`data-layout`/
-   `data-align` on `<body>`, and fill `{{EYEBROW}}`, `{{HEADLINE}}` (wrap the keyword in
-   `<em>…</em>`), `{{SUBTITLE}}`, `{{KICKER}}` (delete the node if unused). For a photo pin,
-   uncomment the `.photo` block and set the image + `--photo-brightness`, and uncomment the
-   bottom-right `.mascot-accent`. Mascot/photo assets live in `web/public/brand/`.
+1. Copy `assets/pin-template.html` into the scratchpad, set
+   `data-ground`/`data-layout`/`data-align`/`data-deco` on `<body>`, fill `{{EYEBROW}}`,
+   `{{HEADLINE}}` (wrap the keyword in `<em>…</em>`), `{{SUBTITLE}}`, `{{KICKER}}` (delete the
+   node if unused), and **set the `.hero` image to the artwork you chose** — the template ships
+   with the family-hugging cluster as a placeholder, and leaving it is how the pins all ended up
+   identical. For a photo pin, uncomment the `.photo` block and set the image +
+   `--photo-brightness`. For `ring`, uncomment the `.ring` block.
+   All art lives under `packages/brand/assets/`, referenced as `{{ASSET_BASE}}/shared/…`,
+   `{{ASSET_BASE}}/marketing/…` or `{{ASSET_BASE}}/blog/…`. See `references/asset-catalogue.md`.
 2. Render to a 1000×1500 @2x PNG, writing the final file into the Drive Pinterest folder:
    ```bash
    node .claude/skills/pinterest-post/scripts/render-pin.mjs <filled.html> \
@@ -99,7 +134,9 @@ For each approved pin:
    `npx playwright install chromium`.)
 3. **Look at the PNG** and sanity-check: text inside the safe zone, keyword legible at
    thumbnail size, contrast holds, mascot/bean signature present, wordmark reads
-   `beanies.family`. Re-render if off.
+   `beanies.family`. Re-render if off. The renderer now **fails rather than writing a pin with a
+   missing image**, so a path typo stops you instead of shipping a hole; but it cannot tell you
+   the composition is dull, which is what your eyes are for.
 
 **Where files go — important.** Pins are launch/marketing content, which per the project
 rules must **NOT be committed to the repo**. Render the final PNG into the Google Drive
@@ -162,6 +199,9 @@ live Pinterest URL back into the tracker's `Pinterest URL`), and any seasonal ti
   filler; his pass before anything voiced is final (see `references/voice-and-copy.md`).
 - **Brand visuals** come from the theme skill + CIG; the Pod motif order and mascots are
   never redrawn or recoloured.
+- **Variety is a requirement, not a preference.** Every set varies ground, layout AND artwork,
+  and at least one pin per set uses a dark or saturated ground. Never leave the template's
+  placeholder hero in place. See the variety rule in step 4.
 
 ## Pin Tracker schema (Notion)
 
@@ -195,7 +235,8 @@ Inline DB "Pin Tracker" on the Pinterest Strategy page, section 6.
 - Influencer Outreach DB: `data_source_id 397247d9-a99f-800b-ad22-000be07e8dd2`
 - Pin Tracker DB: `data_source_id 3be247d9-a99f-80d9-a310-000bd37b083d`
 - Blog Posts DB (for resolving a post → URL): `data_source_id 33a247d9-a99f-815e-a53a-000b24c88de0`
-- Brand images: `web/public/brand/` — bean signature `beanies_small_bean_favicon_512x512.png`,
-  family cluster `beanies_family_hugging_transparent_1024x1024.png`, plus father/mother/
-  neutral/celebrating mascots and photos (`beanies-family-reading.webp`).
+- Brand images: **`packages/brand/assets/`** — the one home for beanies media
+  (`shared/`, `marketing/`, `blog/`). Full visual index with defects flagged:
+  `references/asset-catalogue.md`. The old `web/public/brand/` path is now generated output and
+  holds only part of the set; do not point at it.
 - Template: `assets/pin-template.html` · Renderer: `scripts/render-pin.mjs`
