@@ -347,6 +347,44 @@ Surface `ai-enclave` (new, kebab-case, greppable). **No new context keys**: only
 
 3. **Update floor for retirement (finding K, step 2): DEFERRED, not blocking.** It only matters once the sealed build is live on both stores. Revisit then.
 
+## Root of trust: RESOLVED 2026-09-16 (was the one build blocker)
+
+`Verifier` needs a `configRepo`, and the plan never named one. It is **Tinfoil's repo, not ours**: its signed releases publish the expected enclave measurement that the attestation is checked against. (A third party CAN own one for their own enclave, e.g. `OpenMined/syft-enclave-tinfoil`, but for Tinfoil's hosted inference it is Tinfoil's.)
+
+```
+configRepo: 'tinfoilsh/confidential-model-router'
+serverURL:  'https://inference.tinfoil.sh'      // the scheme is required, a bare host throws "Invalid URL"
+```
+
+Verified end to end, not inferred. `scripts/spikes/enclave-attestation.mjs` runs the real verifier against the live enclave and is kept for re-running when the enclave, the config repo or the verifier version changes. Measured 2026-09-16:
+
+```
+VERIFY OK
+  result keys : measurement, tlsPublicKeyFingerprint, hpkePublicKey
+  hpkePublicKey: ed86fde6...           <- what Identity.fromPublicKeyHex() consumes
+  configRepo  : tinfoilsh/confidential-model-router
+  enclaveHost : inference.tinfoil.sh
+  releaseTag  : v0.0.150
+  codeMeasurement predicate: https://tinfoil.sh/predicate/snp-tdx-multiplatform/v1
+```
+
+Note `tlsPublicKey` is absent from the result while `hpkePublicKey` and `tlsPublicKeyFingerprint` are present. We need the HPKE key, so that is fine, but do not write code expecting `tlsPublicKey`.
+
+**A design detail the plan missed, from docs.tinfoil.sh/guides/proxy-server**: the documented blind-proxy pattern has the proxy forward to the enclave URL given in an **`X-Tinfoil-Enclave-Url`** header, adding the API key on the way through. Our Lambda already knows its enclave from `TINFOIL_API_BASE`, so it does not need to trust a client-supplied URL, and it should NOT: honouring that header from a caller holding the bundle's `x-api-key` would let anyone point our key at an arbitrary host. Decision: keep using `TINFOIL_API_BASE`, and never relay `X-Tinfoil-Enclave-Url`. Note this beside the `ehbp-*` relay allowlist, which already excludes it by shape.
+
+### The ehbp API, corrected
+
+The plan assumed standalone `seal(publicKey, bytes)` / `open(context, bytes)`. Those do not exist. The real API, confirmed by reading the installed `.d.ts`:
+
+```
+Identity.fromPublicKeyHex(hex)                        // "for clients who already have the key", i.e. us
+identity.encryptRequestWithContext(Request)           // the plan's seal()  -> { request, context }
+identity.decryptResponseWithContext(Response, context)// the plan's open()
+PROTOCOL.ENCAPSULATED_KEY_HEADER / RESPONSE_NONCE_HEADER   // import these, never hardcode
+```
+
+The architecture is unchanged; only `seal.ts`'s internals differ.
+
 ## Still owed before this is done
 
 - **Assumption 1 remains BLOCKING for native.** The CORS spike was run from a browser origin. The native WebView origin differs (`capacitor://app.beanies.family` on iOS). This cannot be verified from CI or a simulator, so it joins the on-device list: confirm a real managed-tier extraction works from a TestFlight/Play build before the sealed client is promoted. If it is refused there, the `CapacitorHttp` contingency in requirement 1 applies.
