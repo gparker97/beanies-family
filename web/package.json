@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "astro": "astro",
     "build": "astro check && astro build",
+    "dev": "astro dev",
+    "prebuild": "npm run sync-brand-assets",
+    "predev": "npm run sync-brand-assets",
     "preview": "astro preview",
-    "astro": "astro"
+    "sync-brand-assets": "node ../scripts/sync-brand-assets.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^4.3.0",
