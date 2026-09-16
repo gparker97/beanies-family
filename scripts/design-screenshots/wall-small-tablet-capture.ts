@@ -490,6 +490,51 @@ test.describe('design screenshots', () => {
               `plot is overflow-hidden`
           );
         }
+        /*
+         * ⭐ Whatever an avatar contains must FILL its circle.
+         *
+         * `BeanieAvatar` paints the bean's colour on the WRAPPER — a tinted fill
+         * and a 2px border — and its content, an `<img>` for a photo or a
+         * `<span>` for initials, is sized `h-full w-full`. Size that content
+         * instead of the wrapper and it shrinks into the corner with the bean's
+         * colour showing around it, which is what a compaction rule here did.
+         *
+         * ⚠️ Measured on the wrapper's first ELEMENT child, not on `img`. The
+         * first cut of this guard looked for an `img` and reported 0 of 11
+         * avatars had one — every bean in this fixture renders initials, so it
+         * skipped all of them and passed for the wrong reason.
+         */
+        const avatars = await page.evaluate(() => {
+          const bad: string[] = [];
+          let checked = 0;
+          for (const w of document.querySelectorAll('[data-testid="beanie-avatar"]')) {
+            const inner = w.firstElementChild as HTMLElement | null;
+            if (!inner) continue;
+            const a = w.getBoundingClientRect();
+            const b = inner.getBoundingClientRect();
+            if (a.width < 1) continue;
+            checked += 1;
+            if (Math.abs(a.width - b.width) > 2 || Math.abs(a.height - b.height) > 2) {
+              bad.push(
+                `${Math.round(b.width)}x${Math.round(b.height)} inside ` +
+                  `${Math.round(a.width)}x${Math.round(a.height)}`
+              );
+            }
+          }
+          return { bad, checked };
+        });
+        if (!avatars.checked) {
+          failures.push(
+            `${size.name} [view ${i}]: no bean avatars were measured, so the fit check ` +
+              `proved nothing — which is the state it exists to stop being possible`
+          );
+        } else if (avatars.bad.length) {
+          failures.push(
+            `${size.name} [view ${i}]: ${avatars.bad.length} of ${avatars.checked} bean avatars ` +
+              `do not fill their circle (${avatars.bad[0]}) — the bean's colour shows around it`
+          );
+        }
+
         if (!row) continue;
         if (size.height < 700 && row.drop > 8) {
           failures.push(
