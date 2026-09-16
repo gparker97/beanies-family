@@ -335,11 +335,21 @@ Surface `ai-enclave` (new, kebab-case, greppable). **No new context keys**: only
 9. Browser: a real extraction end to end with the network tab showing a sealed body and no `to` field; and a real correction end to end.
 10. Bundle: verifier and `ehbp` not in the main chunk.
 
-## Open Questions for greg
+## Decisions taken (greg, 2026-09-16)
 
-1. **What "surfaced" means for `verified`.** Nothing in the app renders `result.attestation` today (only `managedProvider.ts` and one help-article string). Surfacing it needs new UI and copy, which collides with "new privacy copy is out of scope". This plan sets the flag truthfully from the client's own verification, carries it on the result and logs it, and treats in-product chrome as a follow-up.
-2. **Does a privacy gate justify raising the update floor?** `min-app-version.json`'s own `reason` field records the last raise as justified by data damage and ends "NEXT: raise only to a version live on both stores". Retiring the legacy arm is a privacy improvement and a maintenance saving, not a correctness risk to anyone's file. If the answer is no, the counter still drains on its own and step 2 of the retirement sequence is simply skipped.
-3. **Is the bean-on-an-unparseable-answer trade (finding M) acceptable?** It is a real, small regression for sealed clients, and every alternative is a client-declared refund, which is a meter bypass. Flagging it rather than deciding it silently.
+1. **What "surfaced" means for `verified`: RESOLVED, no new UI.** The honest reading is "actually check it rather than taking Tinfoil's word", which is the substance of this whole change. The flag is set only on a real verification, carried on the result and logged. No new component, no new privacy copy.
+
+   The settling evidence: `src/content/help/security.ts:732` **already** tells users "You can verify it: the enclave publishes a live _attestation_, a cryptographic proof of exactly what hardware and code are running, so the privacy promise is not just our word for it." That claim is currently AHEAD of the code, which is precisely what ADR-030's "never claim more than the shipped code verifies" principle exists to prevent. This change makes the existing copy true rather than aspirational, so nothing new needs saying. A visible "verified" badge is a small follow-up with wording greg writes.
+
+2. **The bean-count trade (finding M): ACCEPTED, and to be documented loudly.** On the sealed arm a bean is spent when the enclave answered, not when we could read the answer. It is rare (it needs the model to emit unparseable JSON), and every alternative is a client-declared refund, which is a meter bypass by construction.
+
+   ⚠️ **This makes one clause of the 2026-09-14 CHANGELOG partly untrue for sealed clients**: "Refusals, timeouts and unreadable answers cost nothing." Timeouts and refusals still cost nothing (a non-200 upstream never reaches `closeRead`). An _unreadable answer_ now costs a bean on the sealed path. It must be written into `meter.mjs`, `closeRead`'s docstring and ADR-030. Amending the public wording is greg's call and is NOT done here.
+
+3. **Update floor for retirement (finding K, step 2): DEFERRED, not blocking.** It only matters once the sealed build is live on both stores. Revisit then.
+
+## Still owed before this is done
+
+- **Assumption 1 remains BLOCKING for native.** The CORS spike was run from a browser origin. The native WebView origin differs (`capacitor://app.beanies.family` on iOS). This cannot be verified from CI or a simulator, so it joins the on-device list: confirm a real managed-tier extraction works from a TestFlight/Play build before the sealed client is promoted. If it is refused there, the `CapacitorHttp` contingency in requirement 1 applies.
 
 ## Review Passes
 
