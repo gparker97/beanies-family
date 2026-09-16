@@ -10,47 +10,89 @@
 //      by every caller — the backstop, and the reason the limiter below may fail open;
 //   2. a per-FAMILY hourly limit, keyed on the `familyId` this provider sends;
 //   3. a per-IP hourly limit, keyed on the source address API Gateway observed.
-// (2) and (3) apply to TEXT sources only for now, and neither is authoritative: family is
-// forgeable (it is client-supplied), IP is shared behind NAT. Either tripping refuses.
+// (2) and (3) apply to EVERY sealed request as of #49, not just text ones: ciphertext hides the
+// source kind, so the limiter cannot be conditional on it, and it is the compensating control for
+// the server-side `sources` fence that ciphertext retires permanently. Neither is authoritative:
+// family is forgeable (it is client-supplied), IP is shared behind NAT. Either tripping refuses.
 //
-// The proxy returns our typed JSON contract ({ ...ExtractionResult }), so this
-// provider validates that shape rather than parsing a raw chat completion.
+// ⚠️ The proxy NO LONGER returns a typed result. It returns the enclave's sealed reply, which
+// this provider opens and parses itself with the same `parseChatCompletion` the BYOK tier uses.
+// Prompt building moved here too: the Lambda cannot build a prompt for a document it cannot read.
 //
-// GATE 3 (deferred — lands with the Phase-2 backend): integrate Tinfoil's verification SDK
-// + EHBP so the client encrypts the document body to the ATTESTED enclave and the proxy
-// forwards ciphertext it cannot read. Until that ships, do NOT claim "no intermediary sees
-// the document"; scope to "attested confidential compute + zero retention" (ADR-030).
+// GATE 3 — SHIPPED (#49). This provider verifies the enclave's AMD SEV-SNP attestation, gets the
+// HPKE public key BOUND to that attested measurement, and encrypts the chat-completions body to it
+// before anything leaves the device. Our proxy forwards ciphertext it cannot read. Verification
+// failure REFUSES the send; there is no degrade-to-plaintext path, by construction, because a
+// caller cannot obtain a key without verifying.
+//
+// ⚠️ The claim is true for THIS client, not for every client. Store builds that have not been
+// updated still use the Lambda's legacy plaintext arm, which is why ADR-030 records Gate 3 as
+// "closed for sealed clients, open overall" rather than awarding it a tick the fleet has not
+// earned. See the sunset condition there.
 //
 // Until the proxy is deployed, the endpoint env var is unset and this provider degrades to a
 // typed `not_available` — an honest seam, not a fake success. The BYOK and on-device paths,
 // and the whole wedge UX, are exercisable without it.
 
-import { EXTRACTION_PARSERS } from '../extractionPrompt';
+import { EXTRACTION_PARSERS, EXTRACTION_TASKS } from '../extractionPrompt';
 import {
   ExtractionProviderError,
-  type AttestationInfo,
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResultByTask,
   type ExtractionTask,
 } from '../types';
+import { buildSignal, parseChatCompletion } from './openaiCompatible';
+import { invalidateEnclaveVerification, verifyEnclave } from '../enclave/attestation';
+import { openSealed, sealForEnclave } from '../enclave/seal';
+import { base64ToBuffer, bufferToBase64, sha256Hex } from '@/utils/encoding';
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
 const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
 /** Soft key the proxy expects (in the public bundle; deters casual abuse). */
 const PROXY_API_KEY = import.meta.env.VITE_AI_EXTRACT_API_KEY;
-const DEFAULT_TIMEOUT_MS = 30_000;
+/** The wire discriminator. Must match `SEALED_PROTOCOL` in the Lambda; the parity test asserts it. */
+const SEALED_PROTOCOL = 'ehbp-1';
 
-function buildSignal(signal?: AbortSignal): AbortSignal {
-  const timeout = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
-  return signal ? AbortSignal.any([signal, timeout]) : timeout;
-}
+/**
+ * The bill bound that moved client-side when the Lambda stopped being able to read the text (#49).
+ *
+ * ⚠️ There are deliberately THREE text limits in this codebase and they are not duplicates:
+ *   • `MAX_SHARE_TEXT_CHARS` (share/types.ts)   — what the share path TRUNCATES to before sending
+ *   • `MAX_SHARE_TEXT_CEILING` (share/types.ts) — the share path's hard refusal
+ *   • this one                                  — what a MANAGED read may cost us, for any source
+ *
+ * The link arm is why this has to exist: its text comes back from the content-fetch Lambda and the
+ * client never bounded it, because `MAX_TEXT_CHARS` did that server-side. Ciphertext ends that.
+ * Pinned to the Lambda's value by `lambdaContractParity.test.ts`; do not fold the three together.
+ */
+const MANAGED_TEXT_BILL_BOUND = 32_000;
 
-interface ProxyBody {
+interface SealedProxyBody {
+  /** The enclave's reply, still sealed. */
+  sealed?: string;
+  /** `ehbp-*` headers the proxy relayed back; the response nonce lives here. */
+  ehbp?: Record<string, string>;
   /** A one-use grant to re-read this document as a different kind, free. Managed tier only. */
   correction?: { token: string };
-  result?: unknown;
-  attestation?: AttestationInfo;
+}
+
+/**
+ * Fingerprint of what is actually being sent, mirroring the Lambda's `sourceFingerprint`.
+ *
+ * ⚠️ Byte-parity with the server is load-bearing and pinned by `lambdaContractParity.test.ts`. A
+ * divergence would refuse every correction AND fire `GRANT_MISMATCH_PREFIX`, which is the one
+ * alarm that means the feature is broken rather than someone probing it.
+ *
+ * Deliberately UNSALTED. Salting per family would break that parity, and a family that read on one
+ * bundle then corrected after an in-hour app update would hash differently and trip that alarm. It
+ * is the one new piece of cleartext metadata the sealed arm adds: it reveals no content, but it is
+ * a stable identifier, so ADR-030 states plainly what the server still learns.
+ */
+async function sourceHash(request: ExtractionRequest): Promise<string> {
+  return request.source.kind === 'text'
+    ? sha256Hex(`t:${request.source.text}`)
+    : sha256Hex(`i:${request.source.imageDataUrls.join('\n')}`);
 }
 
 /**
@@ -58,7 +100,7 @@ interface ProxyBody {
  * envelope. Owns the shared transport + error classification (timeout / upstream_busy /
  * provider_error / malformed) so the event and travel paths don't duplicate it.
  */
-async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Promise<ProxyBody> {
+async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<SealedProxyBody> {
   if (!PROXY_URL) {
     throw new ExtractionProviderError(
       'not_available',
@@ -66,9 +108,6 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
     );
   }
 
-  // GATE 3 TODO: replace this plaintext-body POST with EHBP — encrypt `imageDataUrls`
-  // to the attested enclave's HPKE key (via the Tinfoil verification SDK) so the proxy
-  // forwards ciphertext only. The proxy contract (one document → typed JSON) is unchanged.
   let res: Response;
   try {
     res = await fetch(PROXY_URL, {
@@ -77,31 +116,13 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
         'Content-Type': 'application/json',
         ...(PROXY_API_KEY ? { 'x-api-key': PROXY_API_KEY } : {}),
       },
-      // WIRE FORMAT IS FROZEN for the image path: the bundle and the Lambda deploy
-      // independently, so renaming these fields would 400 every extraction from a new
-      // bundle hitting a not-yet-applied Lambda. A text source adds a field, never renames.
-      body: JSON.stringify({
-        ...(request.source.kind === 'images'
-          ? { imageDataUrls: request.source.imageDataUrls }
-          : { text: request.source.text }),
-        todayIso: request.todayIso,
-        task,
-        // ADDED beside `todayIso`, never a rename — see the frozen-wire-format note above.
-        // Omitted entirely when absent, so an old bundle's body is byte-identical to what it
-        // sends today and the Lambda's absent-id fallback is what handles it.
-        ...(request.familyId ? { familyId: request.familyId } : {}),
-        // Same rule as `familyId`: ADDED beside `todayIso`, never a rename, and omitted
-        // entirely when absent so a normal read's body is byte-identical to what it always was.
-        //
-        // Gated on the TOKEN, not on the correction: the proxy 400s a correction whose token is
-        // not a UUID, so sending a tokenless one would turn "the grant never issued" into "the
-        // correction fails outright". Without it the read is simply charged — which is the
-        // direction every other fence in the meter fails in.
-        ...(request.correction?.token
-          ? { correction: { token: request.correction.token, to: request.correction.to } }
-          : {}),
-      }),
-      signal: buildSignal(request.signal),
+      // The envelope is PLAINTEXT METADATA ONLY — protocol, familyId, task, srcHash, the
+      // correction token and the ehbp headers. The document itself is inside `sealed`, encrypted
+      // to the enclave. Deliberately NOT here: `todayIso` (the client builds the prompt now) and
+      // `correction.to` (see the run() comment; it would leak the family's own assertion about
+      // their document in cleartext for no remaining server-side purpose).
+      body: JSON.stringify(envelope),
+      signal: buildSignal(signal),
     });
   } catch (err) {
     if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
@@ -173,6 +194,34 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
         `Managed proxy refused this correction (HTTP ${res.status})`
       );
     }
+    if (code === 'unknown_protocol') {
+      // The deployed Lambda predates the sealed arm. A DEPLOY-ORDER problem, not a user problem,
+      // so it maps to the existing `not_available` that the shared toast mapper already renders
+      // as the friendly "not set up yet" notice. No new code, no new string.
+      console.error(
+        '[ai-extract] the deployed proxy does not understand the sealed protocol. The ai-extract ' +
+          'Lambda must be deployed BEFORE a bundle that sends it. Deploy ' +
+          'infrastructure/lambda/ai-extract, then reload.'
+      );
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed proxy does not support encrypted requests yet'
+      );
+    }
+    if (code === 'payload_too_large' || res.status === 413) {
+      // The SERVER's verdict, deliberately, rather than a client-side size guess: a client bound
+      // would have to model the envelope and base64 overhead to avoid being wrong in the direction
+      // that matters. Developer channel, matching the precedents below.
+      console.error(
+        '[ai-extract] the sealed request exceeded the proxy body cap. Sealing adds roughly 33% ' +
+          'over the compressed bytes, so a 5-page document is the practical ceiling. Ask the ' +
+          'family for fewer pages.'
+      );
+      throw new ExtractionProviderError(
+        'provider_error',
+        `Managed proxy refused an oversized request (HTTP ${res.status})`
+      );
+    }
     if (code === 'unknown_task') {
       // The client is ahead of the proxy: this build asks for a task the deployed Lambda
       // does not know yet. That is a DEPLOY-ORDER problem, not a user problem, so it maps
@@ -195,7 +244,7 @@ async function postToProxy(request: ExtractionRequest, task: ExtractionTask): Pr
   }
 
   try {
-    return (await res.json()) as ProxyBody;
+    return (await res.json()) as SealedProxyBody;
   } catch (err) {
     throw new ExtractionProviderError(
       'malformed_output',
@@ -211,25 +260,102 @@ export const managedProvider: ExtractionProvider = {
     task: T,
     request: ExtractionRequest
   ): Promise<ExtractionResultByTask[T]> {
-    const body = await postToProxy(request, task);
-    let result: ExtractionResultByTask[T];
-    try {
-      const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
-      result = parse(body.result);
-    } catch (err) {
+    // The ONE validation the Lambda genuinely lost. Mime and page count are not re-checked here:
+    // every image goes through `compress()`, which always emits JPEG, and the page count is bounded
+    // by `MAX_EXTRACT_PAGES` — so a client-side validator for those would be dead code.
+    if (request.source.kind === 'text' && request.source.text.length > MANAGED_TEXT_BILL_BOUND) {
       throw new ExtractionProviderError(
-        'malformed_output',
-        `Managed proxy returned unparseable or wrong-shape ${task} JSON`,
-        err
+        'provider_error',
+        `Text source exceeds the managed bill bound (${request.source.text.length} chars)`
       );
     }
-    // Attestation is managed-tier-only metadata declared once on AttestedResult, which
-    // every task's result extends. ASSIGNMENT, not a spread: `{ ...result, attestation }`
-    // depends on TS's generic-spread intersection behaviour and is where an implementer
-    // reaches for `as`. Assigning onto `T extends AttestedResult` is unambiguously typed.
-    if (body.attestation) result.attestation = body.attestation;
-    // Rides the same channel as attestation, for the same reason: it belongs to ANY task's
-    // result, so folding it in here needs no cast and no per-task branch.
+
+    let body: SealedProxyBody;
+    let context: Awaited<ReturnType<typeof sealForEnclave>>['context'];
+    let enclave: Awaited<ReturnType<typeof verifyEnclave>>;
+    try {
+      // Verify BEFORE anything is built or sent. Throws on failure, so there is no branch in which
+      // an unverified enclave gets a document: the key simply does not exist to encrypt to.
+      enclave = await verifyEnclave(request.signal);
+
+      // The prompt is built HERE now. The Lambda cannot build one for a document it cannot read,
+      // and this is the same `EXTRACTION_TASKS` seam the BYOK tier uses, so adding a task still
+      // touches neither file.
+      const messages = EXTRACTION_TASKS[task].buildMessages(
+        request.source,
+        request.todayIso,
+        // The hint reaches OUR prompt, never the wire. The server-side "hint only when a grant was
+        // spent" fence dies with plaintext, exactly as it already does for BYOK; biasing your own
+        // read costs you a bean, which is the same trade that tier already makes.
+        request.correction?.to
+      );
+
+      const sealed = await sealForEnclave(enclave.hpkePublicKey, {
+        messages,
+        temperature: 0,
+      });
+      context = sealed.context;
+
+      body = await postToProxy(
+        {
+          protocol: SEALED_PROTOCOL,
+          task,
+          srcHash: await sourceHash(request),
+          ...(request.familyId ? { familyId: request.familyId } : {}),
+          // TOKEN ONLY. `to` is deliberately absent from the wire: `consumeGrant` no longer
+          // conditions on the kind, and the closed-set check on `to` existed only because it
+          // reached the model's instruction server-side, which it cannot do now. Sending it would
+          // put the family's own assertion about their document in cleartext for nothing.
+          ...(request.correction?.token ? { correction: { token: request.correction.token } } : {}),
+          ehbp: sealed.headers,
+          sealed: bufferToBase64(sealed.ciphertext),
+        },
+        request.signal
+      );
+    } catch (err) {
+      // Clear the memo after ANY failed sealed request, not only a stale-key-shaped one. We have
+      // never observed what a Tinfoil key rotation looks like on the wire, and classifying a
+      // failure nobody has seen is how you write a branch nobody can test. The cost is one extra
+      // verification after a failure that already cost the user a retry.
+      invalidateEnclaveVerification();
+      throw err;
+    }
+
+    if (typeof body.sealed !== 'string' || body.sealed.length === 0) {
+      throw new ExtractionProviderError(
+        'malformed_output',
+        'Managed proxy returned no sealed body'
+      );
+    }
+
+    const envelope = await openSealed(
+      context,
+      new Uint8Array(base64ToBuffer(body.sealed)),
+      body.ehbp ?? {}
+    );
+    const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
+    const result = parseChatCompletion(envelope, parse);
+
+    // The kind guard, moved from the Lambda (which can no longer run it). Mirrors
+    // `index.mjs`'s LEGACY-PLAINTEXT-ARM block exactly, INCLUDING the `none` split: a `none`
+    // answer is a DISAGREEMENT, not a malformed one — the hinted prompt leaves the model exactly
+    // one way out, and reporting "try a clearer photo" for a perfectly legible page is both false
+    // and an invitation to a retry that costs a bean.
+    const asserted = request.correction?.to;
+    if (asserted && (result as { kind?: string }).kind !== asserted) {
+      const disagreed = (result as { kind?: string }).kind === 'none';
+      throw new ExtractionProviderError(
+        disagreed ? 'correction_disagreed' : 'malformed_output',
+        disagreed
+          ? 'The document does not support that correction'
+          : `Managed enclave returned wrong-shape ${task} JSON`
+      );
+    }
+
+    // Built from OUR verification, never from a server header. The old code trusted a
+    // `tinfoil-enclave` string the proxy passed through; this is the first version in which
+    // `verified` means something a reader can rely on.
+    result.attestation = { enclave: enclave.enclave, verified: true };
     if (body.correction) result.correction = body.correction;
     return result;
   },

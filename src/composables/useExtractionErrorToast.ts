@@ -98,6 +98,19 @@ export function useExtractionErrorToast() {
         // #beanies-errors.
         showToast('warning', t('ai.error.busy.title'), t('ai.error.busy.message'));
         return;
+      case 'attestation_failed':
+        // The enclave could not be VERIFIED, so nothing was sent. An error surface is right here
+        // (unlike `upstream_busy` above): this is not provider flapping, it means our root of
+        // trust did not check out, and we want to know every time.
+        console.error(
+          '[ai-enclave] the enclave attestation did not verify, so the document was NOT sent. ' +
+            'Re-run scripts/spikes/enclave-attestation.mjs: either Tinfoil rotated the enclave ' +
+            'measurement, or the configRepo in src/services/ai/enclave/attestation.ts is stale.'
+        );
+        showToast('error', t('ai.error.attestation.title'), t('ai.error.attestation.message'), {
+          surface: ERROR_SURFACE,
+        });
+        return;
       case 'timeout':
         showToast('error', t('ai.error.title'), t('ai.error.timeout'), { surface: ERROR_SURFACE });
         return;
