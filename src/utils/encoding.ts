@@ -148,7 +148,49 @@ export async function sha256(input: string): Promise<ArrayBuffer> {
 /** SHA-256 a UTF-8 string, returning lowercase hex. */
 export async function sha256Hex(input: string): Promise<string> {
   const hash = await sha256(input);
-  return Array.from(new Uint8Array(hash))
+  return toHex(new Uint8Array(hash));
+}
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+/**
+ * SHA-256 over several strings joined by `separator`, without ever building the joined string.
+ *
+ * ⚠️ The note above says these helpers take short strings, never document bytes. This one is the
+ * deliberate exception, and it exists so the rule above can stay true: the AI source fingerprint
+ * (`managedProvider.sourceHash`) hashes multi-megabyte base64 data URLs, and routing that through
+ * `sha256Hex` built the joined string AND the prefixed template literal as two further full copies
+ * of the document on the main thread before any hashing began.
+ *
+ * Byte-identical to `sha256Hex(parts.join(separator))` — each part is encoded whole, so no
+ * multi-byte character is ever split across a chunk boundary — which is what keeps it in parity
+ * with the Lambda's `createHash('sha256').update(...)`. That parity is load-bearing: a divergence
+ * silently refuses every correction and fires the one alarm that means the feature is broken.
+ */
+export async function sha256HexOfParts(parts: string[], separator = ''): Promise<string> {
+  const encoder = new TextEncoder();
+  const sep = encoder.encode(separator);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  parts.forEach((part, i) => {
+    if (i > 0 && sep.length) {
+      chunks.push(sep);
+      total += sep.length;
+    }
+    const encoded = encoder.encode(part);
+    chunks.push(encoded);
+    total += encoded.length;
+  });
+
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', joined)));
 }

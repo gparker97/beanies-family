@@ -45,7 +45,8 @@ import {
 import { buildSignal, parseChatCompletion } from './openaiCompatible';
 import { invalidateEnclaveVerification, verifyEnclave } from '../enclave/attestation';
 import { openSealed, sealForEnclave } from '../enclave/seal';
-import { base64ToBuffer, bufferToBase64, sha256Hex } from '@/utils/encoding';
+import { base64ToBuffer, bufferToBase64, sha256HexOfParts } from '@/utils/encoding';
+import * as perfTiming from '@/utils/perfTiming';
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
 const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
@@ -138,9 +139,30 @@ interface SealedProxyBody {
  * a stable identifier, so ADR-030 states plainly what the server still learns.
  */
 export async function sourceHash(request: ExtractionRequest): Promise<string> {
-  return request.source.kind === 'text'
-    ? sha256Hex(`t:${request.source.text}`)
-    : sha256Hex(`i:${request.source.imageDataUrls.join('\n')}`);
+  const started = performance.now();
+  // Parts, not a joined string. The images arm hashes multi-megabyte base64 data URLs, and the
+  // obvious `sha256Hex(\`i:\${urls.join('\\n')}\`)` built TWO further full copies of the document
+  // on the main thread — the join, then the template literal — before any hashing started. This is
+  // byte-identical (each part is encoded whole), which is what keeps parity with the Lambda.
+  // The Lambda hashes `'i:' + urls.join('\n')`, so the prefix belongs to the FIRST part and the
+  // separator only between urls. Spelled out rather than clever, because the parity test is the
+  // only thing standing between a subtle change here and every correction silently being refused.
+  const [first = '', ...rest] =
+    request.source.kind === 'images' ? request.source.imageDataUrls : [];
+  const hash =
+    request.source.kind === 'text'
+      ? await sha256HexOfParts(['t:', request.source.text])
+      : await sha256HexOfParts([`i:${first}`, ...rest], '\n');
+
+  // The one new per-extraction cost on the main thread, so it is measured rather than assumed.
+  // `perf_doc_bytes` is an allowlisted PerfContext field, so this needs no new context key.
+  perfTiming.record('ai-source-hash', performance.now() - started, {
+    perf_doc_bytes:
+      request.source.kind === 'text'
+        ? request.source.text.length
+        : request.source.imageDataUrls.reduce((n, u) => n + u.length, 0),
+  });
+  return hash;
 }
 
 /**

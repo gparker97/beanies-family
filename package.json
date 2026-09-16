@@ -138,6 +138,33 @@
     "vue-tsc": "^3.3.11"
   },
   "overrides": {
-    "serialize-javascript": "^7.0.3"
+    "serialize-javascript": "^7.0.3",
+    "ehbp": {
+      "@panva/hpke-noble": "1.1.7",
+      "hpke": "1.1.7"
+    },
+    "@panva/hpke-noble": {
+      "@noble/ciphers": "2.4.0",
+      "@noble/curves": "2.4.0",
+      "@noble/hashes": "2.4.0",
+      "@noble/post-quantum": "0.7.1"
+    },
+    "@noble/post-quantum": {
+      "@noble/curves": "2.4.0",
+      "@noble/hashes": "2.4.0"
+    },
+    "@tinfoilsh/verifier": {
+      "@freedomofpress/sigstore-browser": "0.1.14",
+      "@freedomofpress/tuf-browser": "0.1.11",
+      "@freedomofpress/crypto-browser": "0.1.7"
+    },
+    "@freedomofpress/sigstore-browser": {
+      "@noble/curves": "2.4.0",
+      "@noble/hashes": "2.4.0"
+    },
+    "@freedomofpress/crypto-browser": {
+      "@noble/curves": "1.9.7",
+      "@noble/hashes": "1.8.0"
+    }
   }
 }
