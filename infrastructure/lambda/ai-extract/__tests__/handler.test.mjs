@@ -1,4 +1,4 @@
-/* global process */
+/* global process, Buffer */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -757,6 +757,158 @@ describe('ai-extract Lambda handler', () => {
       const mod = await import(`../index.mjs?t=${Date.now()}-${Math.random()}-b`);
       const res = await mod.handler(makeEvent({ headers: keyHeader, body: goodBody }));
       assert.equal(res.statusCode, 500);
+    });
+  });
+
+  // ── The sealed arm (#49) ────────────────────────────────────────────────────────────────
+  //
+  // Every case here is NEW. Nothing above changed, which is the proof that extracting
+  // `upstream.mjs` and adding the router left the legacy arm byte-for-byte as it was.
+  describe('sealed arm — the blind forwarder', () => {
+    const SEALED = Buffer.from('pretend-ciphertext').toString('base64');
+    const sealedBody = (over = {}) => ({
+      protocol: 'ehbp-1',
+      familyId: 'fam-sealed-01',
+      task: 'share',
+      srcHash: 'a'.repeat(64),
+      sealed: SEALED,
+      ...over,
+    });
+
+    /** A sealed upstream reply: opaque bytes plus its own ehbp headers. */
+    function fakeSealedUpstream({ ok = true, status = 200, headers = {} } = {}) {
+      const all = {
+        'ehbp-response-nonce': 'nonce-xyz',
+        'content-type': 'application/octet-stream',
+        ...headers,
+      };
+      return {
+        ok,
+        status,
+        headers: {
+          get: (k) => all[String(k).toLowerCase()] ?? null,
+          entries: () => Object.entries(all),
+        },
+        arrayBuffer: async () => new TextEncoder().encode('sealed-reply').buffer,
+      };
+    }
+
+    it('forwards the decoded bytes and returns the sealed reply, never a result', async () => {
+      let seen;
+      globalThis.fetch = async (url, init) => {
+        seen = { url, init };
+        return fakeSealedUpstream();
+      };
+
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: sealedBody() }))
+      );
+
+      assert.equal(res.statusCode, 200);
+      assert.ok(res.parsedBody.sealed, 'the reply is sealed');
+      assert.equal(res.parsedBody.result, undefined, 'we cannot produce a result we cannot read');
+      assert.equal(res.parsedBody.attestation, undefined, 'the client verified it, not us');
+      // The body that went upstream is the DECODED ciphertext, not our JSON envelope.
+      assert.ok(Buffer.isBuffer(seen.init.body) || seen.init.body instanceof Uint8Array);
+      assert.equal(Buffer.from(seen.init.body).toString(), 'pretend-ciphertext');
+    });
+
+    it('relays ehbp-* headers upstream and back, and NEVER a credential', async () => {
+      let seen;
+      globalThis.fetch = async (url, init) => {
+        seen = init;
+        return fakeSealedUpstream();
+      };
+
+      const res = parseResponse(
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: sealedBody({
+              ehbp: {
+                'ehbp-encapsulated-key': 'KEY',
+                // Every one of these must be dropped. A relayed Authorization would overwrite our
+                // Tinfoil key; a relayed X-Tinfoil-Enclave-Url would let anyone holding the
+                // bundle's api key point that key at a host of their choosing.
+                Authorization: 'Bearer stolen',
+                'x-api-key': 'stolen',
+                Cookie: 'session=stolen',
+                'X-Tinfoil-Enclave-Url': 'https://evil.example',
+              },
+            }),
+          })
+        )
+      );
+
+      assert.equal(seen.headers['ehbp-encapsulated-key'], 'KEY', 'the protocol header crosses');
+      assert.equal(seen.headers.Authorization, 'Bearer tinfoil-secret', 'OUR key, not theirs');
+      assert.ok(!('x-api-key' in seen.headers), 'no api key upstream');
+      assert.ok(!('Cookie' in seen.headers), 'no cookie upstream');
+      assert.ok(
+        !Object.keys(seen.headers).some((h) => /tinfoil-enclave-url/i.test(h)),
+        'never let a caller name the enclave'
+      );
+      assert.equal(res.parsedBody.ehbp['ehbp-response-nonce'], 'nonce-xyz', 'and back again');
+    });
+
+    it('refuses an unknown protocol with a code the client can act on', async () => {
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: sealedBody({ protocol: 'ehbp-9' }) }))
+      );
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.parsedBody.code, 'unknown_protocol');
+    });
+
+    it('still serves a legacy body with no protocol — the whole reason that arm survives', async () => {
+      globalThis.fetch = async () => fakeUpstream();
+      const res = parseResponse(await handler(makeEvent({ headers: keyHeader, body: goodBody })));
+      assert.equal(res.statusCode, 200);
+      assert.ok(res.parsedBody.result, 'the old path still produces a parsed result');
+    });
+
+    it('refuses a malformed sealed envelope before any upstream call', async () => {
+      let called = false;
+      globalThis.fetch = async () => {
+        called = true;
+        return fakeSealedUpstream();
+      };
+
+      for (const over of [{ sealed: '' }, { task: '' }, { srcHash: '' }]) {
+        const res = parseResponse(
+          await handler(makeEvent({ headers: keyHeader, body: sealedBody(over) }))
+        );
+        assert.equal(res.statusCode, 400, JSON.stringify(over));
+      }
+      assert.equal(called, false, 'nothing billable ran');
+    });
+
+    it('is safe against a prototype-shaped task, which once produced a raw 502', async () => {
+      globalThis.fetch = async () => fakeSealedUpstream();
+      for (const task of ['__proto__', 'constructor', 'toString']) {
+        const res = await handler(
+          makeEvent({ headers: keyHeader, body: sealedBody({ task, correction: undefined }) })
+        );
+        // Forwarded and metered without throwing. `task` is a label here, never a key.
+        assert.equal(res.statusCode, 200, task);
+      }
+    });
+
+    it('classifies an upstream failure with the same ladder as the legacy arm', async () => {
+      globalThis.fetch = async () => fakeSealedUpstream({ ok: false, status: 503 });
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: sealedBody() }))
+      );
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.parsedBody.code, 'upstream_unavailable');
+    });
+
+    it('classifies an oversized body so the client can say WHY', async () => {
+      const huge = 'x'.repeat(5 * 1024 * 1024 + 10);
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: sealedBody({ sealed: huge }) }))
+      );
+      assert.equal(res.statusCode, 413);
+      assert.equal(res.parsedBody.code, 'payload_too_large');
     });
   });
 });
