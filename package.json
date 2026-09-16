@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "sync-brand-assets": "node scripts/sync-brand-assets.mjs",
-    "predev": "npm run sync-brand-assets",
-    "prebuild": "npm run sync-brand-assets",
+    "predev": "npm run sync-brand-assets && node scripts/convert-images.mjs",
+    "prebuild": "npm run sync-brand-assets && node scripts/convert-images.mjs",
     "dev": "vite",
     "dev:web": "npm --workspace=@beanies/web run dev",
     "dev:all": "concurrently --names 'vue,astro' --prefix-colors 'cyan,magenta' --kill-others-on-fail 'npm:dev' 'npm:dev:web'",

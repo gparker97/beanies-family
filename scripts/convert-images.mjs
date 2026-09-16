@@ -1,7 +1,18 @@
 #!/usr/bin/env node
 /**
- * One-off image-conversion pass: adds a .webp companion next to every
- * .png/.jpg/.jpeg file under web/public/ in the directories listed below.
+ * Adds a .webp companion next to every .png/.jpg/.jpeg file in the directories
+ * listed below.
+ *
+ * NOT a one-off, despite how it started. The .webp companions are NOT committed
+ * (see .gitignore); they are build output, so this has to run on every build or
+ * the deploy ships broken images. It is wired into `prebuild` on both workspaces
+ * and MUST run AFTER `sync-brand-assets.mjs`, which puts the masters in place.
+ *
+ * `public/help/pwa-install` is in the list because the in-app help centre
+ * hard-references `.webp` for those screenshots with no <picture> fallback
+ * (src/content/help/getting-started.ts), while only the .jpg masters are
+ * committed. Before this script covered that directory, those help images were
+ * broken in the app.
  *
  * - Keeps the original PNG/JPG files in place (legacy URL compat)
  * - Idempotent: skips conversion if the .webp already exists and is
@@ -21,6 +32,7 @@ const DIRS = [
   join(ROOT, 'web/public/brand'),
   join(ROOT, 'web/public/blog'),
   join(ROOT, 'web/public/help/pwa-install'),
+  join(ROOT, 'public/help/pwa-install'),
 ];
 const QUALITY = 85;
 
