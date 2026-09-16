@@ -25,6 +25,18 @@ export interface SealedRequest {
   ciphertext: Uint8Array;
   /** `ehbp-*` only. The Lambda relays these by prefix and drops everything else. */
   headers: Record<string, string>;
+  /**
+   * The Content-Type of the PLAINTEXT body, which EHBP deliberately preserves in cleartext.
+   *
+   * ⚠️ Not `application/octet-stream`. In EHBP the content type describes what is INSIDE the
+   * envelope, not the envelope: `encryptRequestWithContext` copies the caller's headers verbatim,
+   * and the response leg strips only `content-length`/`transfer-encoding` ("framing headers
+   * describe the encrypted body"), pointedly not content-type. The enclave's inner
+   * `/v1/chat/completions` handler still needs to know it is being handed JSON, so overriding
+   * this with a binary type risks a 415 on every sealed request. The "framing" EHBP carries is
+   * the length prefix inside the body, not the media type.
+   */
+  contentType: string;
   /** Opaque; hand it straight back to {@link openSealed}. Never serialise or log it. */
   context: RequestContext;
 }
@@ -73,14 +85,13 @@ export async function sealForEnclave(
 
   const headers: Record<string, string> = {};
   for (const [name, value] of sealed.request.headers.entries()) {
-    // Only the protocol's own headers cross. Content-Type and anything else the Request carries
-    // are ours to decide on the far side.
     if (/^ehbp-/i.test(name)) headers[name] = value;
   }
 
   return {
     ciphertext: new Uint8Array(await sealed.request.arrayBuffer()),
     headers,
+    contentType: sealed.request.headers.get('content-type') || 'application/json',
     context: sealed.context,
   };
 }

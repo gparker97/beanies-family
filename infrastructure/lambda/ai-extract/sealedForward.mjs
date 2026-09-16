@@ -38,6 +38,14 @@ import { UPSTREAM_ERROR_TEXT, callUpstream } from './upstream.mjs';
 export const SEALED_PROTOCOL = 'ehbp-1';
 
 /**
+ * A client asking which model to name inside its sealed body.
+ *
+ * Shares the POST route deliberately, so this needs no new API Gateway path and no terraform.
+ * See the handler for why the client cannot simply hardcode it.
+ */
+export const SEALED_CONFIG_PROTOCOL = 'ehbp-config';
+
+/**
  * Which headers may cross, in EITHER direction.
  *
  * A PREFIX RULE rather than a frozen allowlist, deliberately: `ehbp` is a pinned dependency that
@@ -51,10 +59,38 @@ export const SEALED_PROTOCOL = 'ehbp-1';
  * it, because it would let anyone holding the bundle's api key point our key at an arbitrary host.
  */
 const EHBP_HEADER_RE = /^ehbp-[a-z0-9-]{1,48}$/i;
+
+/**
+ * Make a client-supplied string safe to put in a log line.
+ *
+ * ⚠️ NOT cosmetic. CloudWatch metric filters match quoted substrings anywhere in a line, and
+ * several of ours page a human (`main.tf`). A JSON key may contain a newline, so an unsanitised
+ * value interpolated into a log lets any caller holding the public `x-api-key` FORGE a production
+ * alarm on demand — including `correction refused reason=different_source`, the one this codebase
+ * documents as meaning the feature is broken rather than someone probing it. Strip the line
+ * breaks, bound the length, and keep it to characters that cannot be mistaken for structure.
+ */
+function logSafe(value, max = 48) {
+  return String(value)
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[^\x20-\x7e]/g, '')
+    .slice(0, max);
+}
 /** Bounded so a hostile caller cannot make us build an unbounded header map. */
 const MAX_EHBP_HEADERS = 16;
-/** `task` is metering label only, but it is still logged and compared, so bound it. */
-const MAX_TASK_CHARS = 32;
+/**
+ * `task` is a metering label, but it is LOGGED, and our log lines feed CloudWatch metric filters
+ * that page a human. Bounding the length is not enough on its own: `[ai-extract] usage-count
+ * skipped` is exactly 32 characters, so a length-only rule still lets a caller forge that alarm.
+ * A charset with no spaces makes every one of our alarm terms unrepresentable as a task.
+ *
+ * The legacy arm never needed this because `Object.hasOwn(EXTRACTION_TASKS, task)` gated it; the
+ * sealed arm has no registry to check against, so the shape is the fence.
+ */
+const TASK_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+
+/** A closed set, because this value is caller-supplied and becomes an upstream request header. */
+const ALLOWED_CONTENT_TYPES = new Set(['application/json']);
 
 /**
  * Keep only `ehbp-*`, and say out loud what was dropped.
@@ -66,16 +102,17 @@ function relayEhbpHeaders(source, direction) {
   const out = {};
   const dropped = [];
   let kept = 0;
+  let seen = 0;
   for (const [name, value] of Object.entries(source || {})) {
-    if (EHBP_HEADER_RE.test(name) && typeof value === 'string') {
-      if (kept >= MAX_EHBP_HEADERS) {
-        dropped.push(name);
-        continue;
-      }
+    // ⚠️ BOTH counters are bounded, not just `kept`. An earlier version bounded only the kept
+    // headers, so a caller could still push 50,000 junk keys into `dropped` and make us build one
+    // multi-megabyte log line per invocation.
+    if (++seen > MAX_EHBP_HEADERS * 4) break;
+    if (EHBP_HEADER_RE.test(name) && typeof value === 'string' && kept < MAX_EHBP_HEADERS) {
       out[name] = value;
       kept += 1;
-    } else {
-      dropped.push(name);
+    } else if (dropped.length < MAX_EHBP_HEADERS) {
+      dropped.push(logSafe(name));
     }
   }
   if (dropped.length) {
@@ -101,14 +138,22 @@ function collectEhbpFrom(headers) {
  * @param {(status:number, body:unknown, event:object)=>object} respond  the handler's `response`
  */
 export async function sealedForward(envelope, event, respond) {
-  const { familyId, task: rawTask, srcHash, correction, ehbp, sealed } = envelope || {};
+  const {
+    familyId,
+    task: rawTask,
+    srcHash,
+    correction,
+    ehbp,
+    sealed,
+    contentType,
+  } = envelope || {};
 
   // ── Shape. Each refusal is BEFORE any billable work and costs the family nothing. ──────────
   if (typeof sealed !== 'string' || sealed.length === 0) {
     return respond(400, { error: 'Expected a sealed body', code: 'bad_sealed' }, event);
   }
   const task = typeof rawTask === 'string' ? rawTask : '';
-  if (!task || task.length > MAX_TASK_CHARS) {
+  if (!TASK_RE.test(task)) {
     return respond(400, { error: 'Invalid task', code: 'bad_task' }, event);
   }
   // Client-computed, and forgeable at exactly the same trust level as `familyId`, which this
@@ -160,10 +205,31 @@ export async function sealedForward(envelope, event, respond) {
     );
   }
 
+  // ⚠️ DECODE BEFORE THE METER. `openRead` atomically consumes a one-use grant, so anything that
+  // can reject the request must happen first or a malformed body spends the family's free
+  // correction and then 400s — with no refund path, and the banner's host modal already closed.
+  // The legacy arm states this rule explicitly ("so a malformed request never consumes a family's
+  // budget"); an earlier version of this arm inverted it.
+  //
+  // Node's base64 decoder never throws, it silently discards non-alphabet characters, so a
+  // try/catch here would be dead code and garbage would reach the billable enclave. Round-trip
+  // instead: re-encode and compare, which is the only way to tell well-formed input from mush.
+  const bytes = Buffer.from(sealed, 'base64');
+  if (
+    bytes.length === 0 ||
+    bytes.toString('base64').replace(/=+$/, '') !== sealed.replace(/=+$/, '')
+  ) {
+    return respond(400, { error: 'Sealed body is not valid base64', code: 'bad_sealed' }, event);
+  }
+
   // After the refusals, before the model: the same placement the legacy arm uses, and for the same
   // two reasons (a refused request must not spend a grant; two concurrent replays must not both
   // get a free read).
-  const read = await openRead({ familyId: family, srcHash, correction });
+  //
+  // `srcBytes` is what THIS Lambda measured. On the sealed arm `srcHash` is client-supplied and
+  // therefore forgeable, so the measured size is the half of the source binding a caller cannot
+  // lie about. See GRANT_BYTES_TOLERANCE in correctionGrant.mjs.
+  const read = await openRead({ familyId: family, srcHash, srcBytes: bytes.length, correction });
 
   // A correction the grant store REFUSED is refused here too, never silently downgraded to a
   // charged read. Gated on `reason === 'refused'` specifically: the kill switch and a store blip
@@ -172,20 +238,14 @@ export async function sealedForward(envelope, event, respond) {
     return respond(409, { error: 'Correction refused', code: 'correction_refused' }, event);
   }
 
-  let bytes;
-  try {
-    bytes = Buffer.from(sealed, 'base64');
-  } catch {
-    return respond(400, { error: 'Sealed body is not base64', code: 'bad_sealed' }, event);
-  }
-  if (bytes.length === 0) {
-    return respond(400, { error: 'Sealed body is empty', code: 'bad_sealed' }, event);
-  }
-
   const result = await callUpstream({
     body: bytes,
-    // EHBP carries its own framing; the enclave reads the sealed body, not JSON.
-    contentType: 'application/octet-stream',
+    // ⚠️ The client's value, describing the PLAINTEXT inside the envelope, not the envelope. EHBP
+    // keeps content-type in cleartext for exactly this reason, and the enclave's inner
+    // /v1/chat/completions handler still needs to know it is being handed JSON. Hardcoding
+    // application/octet-stream here risks a 415 on every sealed request. Bounded and allowlisted
+    // because it is caller-supplied and ends up in an upstream header.
+    contentType: ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : 'application/json',
     extraHeaders: relayEhbpHeaders(ehbp, 'request'),
   });
 
@@ -214,13 +274,19 @@ export async function sealedForward(envelope, event, respond) {
 
   // Retain nothing, and here there is nothing to retain: no document bytes ever existed in this
   // process, and the response bytes are opaque to us.
-  console.log(`[ai-extract] ok task=${task} sealed`);
+  console.log(`[ai-extract] ok task=${task} arm=sealed`);
   return respond(
     200,
     {
       sealed: responseBytes.toString('base64'),
       ehbp: collectEhbpFrom(result.upstream.headers),
       correction: grant,
+      // Whether a grant was actually SPENT on this request. The client's moved kind-guard needs
+      // it: the Lambda's version ran on `read.kindHint`, set only on a spent grant, so it could
+      // never fire on the kill-switch or store-blip fall-through paths. Without this the client
+      // would charge a family during exactly the incident the kill switch exists for, then show a
+      // toast saying nothing was charged.
+      correctionFree: read.free === true,
       // No `attestation`. The CLIENT verified the enclave itself and holds the only trustworthy
       // answer; echoing our own view of it back would be theatre, and worse, something a reader
       // might mistake for a second, independent confirmation.

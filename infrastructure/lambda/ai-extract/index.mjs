@@ -25,13 +25,11 @@
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
 import { closeRead, openRead, sourceFingerprint, validateCorrection } from './meter.mjs';
 import { checkLimits } from './rateLimit.mjs';
-import { SEALED_PROTOCOL, sealedForward } from './sealedForward.mjs';
+import { SEALED_CONFIG_PROTOCOL, SEALED_PROTOCOL, sealedForward } from './sealedForward.mjs';
+import { UPSTREAM_ERROR_TEXT, callUpstream } from './upstream.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
 const API_KEY = process.env.AI_EXTRACT_API_KEY;
-const TINFOIL_API_BASE = (
-  process.env.TINFOIL_API_BASE || 'https://inference.tinfoil.sh/v1'
-).replace(/\/+$/, '');
 // Prod sets TINFOIL_MODEL via Terraform (default gemma4-31b). This fallback must stay a
 // CURRENT multimodal model — the old qwen3-vl-30b was retired by Tinfoil (every call 503'd).
 const TINFOIL_MODEL = process.env.TINFOIL_MODEL || 'gemma4-31b';
@@ -55,8 +53,6 @@ const MAX_IMAGES = 8;
 const MAX_TEXT_CHARS = 32_000;
 // Allowed document mime prefixes (JPEG/PNG only — data-minimization).
 const ALLOWED_DATA_URL = /^data:image\/(jpeg|png);base64,/;
-// Upstream call deadline (Lambda timeout is 29s; leave headroom to return a clean error).
-const UPSTREAM_TIMEOUT_MS = 25_000;
 
 function getHeaders(event) {
   const origin = event?.headers?.origin || ALLOWED_ORIGINS[0];
@@ -129,8 +125,31 @@ export async function handler(event) {
   // ⚠️ DEPLOY ORDER IS ASYMMETRIC. New Lambda + old bundle works (it takes the legacy arm). New
   // bundle + old Lambda does not, because an old Lambda reads `protocol` as an unknown field and
   // falls into the legacy path with no source. Lambda first, always.
+  // The model id a sealed client must put INSIDE its sealed body.
+  //
+  // ⚠️ WHY THIS EXISTS AT ALL. The enclave requires `model` and rejects a body without it
+  // (`400 Missing required parameter: 'model'`, validated before auth). The body is ciphertext,
+  // so this Lambda CANNOT add the field on the way through — the client has to know it before it
+  // seals. Baking it into the bundle would work but would destroy the `TINFOIL_MODEL` Terraform
+  // lever, and `variables.tf` records that lever being used to hotfix a Tinfoil model retirement
+  // the same day; without it the next retirement would need an App Store release.
+  //
+  // So the client asks, on this same route (no new API Gateway path, no terraform), and memoises
+  // the answer alongside its attestation. A model change stays a Lambda env change.
+  if (parsed?.protocol === SEALED_CONFIG_PROTOCOL) {
+    return response(200, { model: TINFOIL_MODEL }, event);
+  }
   if (parsed?.protocol === SEALED_PROTOCOL) {
-    return sealedForward(parsed, event, response);
+    // AWAITED inside the handler's own try/catch below would be ideal, but the legacy arm owns
+    // that try. So the sealed arm gets its own here: without it a throw rejects the handler
+    // promise and API Gateway synthesises a raw 502 with NO CORS headers, which a browser sees as
+    // an opaque network error. That is the exact incident the task-registry comment below records.
+    try {
+      return await sealedForward(parsed, event, response);
+    } catch (err) {
+      console.error('[ai-extract] sealed arm error:', err);
+      return response(500, { error: 'Internal server error' }, event);
+    }
   }
   if (parsed?.protocol !== undefined) {
     // Its own code, like `unknown_task`: this is a DEPLOY-ORDER problem, not a user problem, and
@@ -321,47 +340,25 @@ export async function handler(event) {
   }
 
   try {
-    let upstream;
-    try {
-      upstream = await fetch(`${TINFOIL_API_BASE}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${TINFOIL_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: TINFOIL_MODEL,
-          messages: taskConfig.buildMessages(source, todayDate, read.kindHint),
-          temperature: 0,
-        }),
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-      });
-    } catch (err) {
-      const timedOut = err && err.name === 'TimeoutError';
-      console.error(`[ai-extract] upstream ${timedOut ? 'timeout' : 'network error'}`);
-      return timedOut
-        ? response(504, { error: 'AI service timed out', code: 'upstream_timeout' }, event)
-        : response(502, { error: 'Upstream inference failed', code: 'upstream_network' }, event);
+    // ⚠️ Through `upstream.mjs`, the SHARED ladder. An earlier version of #49 left this inline
+    // and added a second copy in that module, so "both arms need it" was aspiration rather than
+    // fact: a new retryable status or a timeout change applied there would have silently missed
+    // every legacy request, which is the fleet of un-updated store builds that cannot self-heal.
+    const call = await callUpstream({
+      body: JSON.stringify({
+        model: TINFOIL_MODEL,
+        messages: taskConfig.buildMessages(source, todayDate, read.kindHint),
+        temperature: 0,
+      }),
+    });
+    if (!call.ok) {
+      return response(
+        call.status,
+        { error: UPSTREAM_ERROR_TEXT[call.code] ?? 'Upstream inference failed', code: call.code },
+        event
+      );
     }
-
-    if (!upstream.ok) {
-      // Classify the failure so the client can react correctly (byte-free log either way):
-      //   • 5xx  → the provider is overloaded/down. TRANSIENT — tell the client it's retryable
-      //            (503 + upstream_unavailable), and don't treat it like a hard error.
-      //   • 401/403 → OUR Tinfoil key is bad. Hard config failure (502 + upstream_auth).
-      //   • other non-2xx → generic upstream HTTP error (502 + upstream_http).
-      const isAuth = upstream.status === 401 || upstream.status === 403;
-      const isUpstreamBusy = upstream.status >= 500;
-      const code = isAuth
-        ? 'upstream_auth'
-        : isUpstreamBusy
-          ? 'upstream_unavailable'
-          : 'upstream_http';
-      console.error(`[ai-extract] ${code} status=${upstream.status}`);
-      return isUpstreamBusy
-        ? response(503, { error: 'AI service temporarily unavailable', code }, event)
-        : response(502, { error: 'Upstream inference failed', code }, event);
-    }
+    const upstream = call.upstream;
 
     // Pass through the attested enclave identity (NOT yet client-verified — Gate 3).
     const enclave = upstream.headers.get('tinfoil-enclave') || undefined;

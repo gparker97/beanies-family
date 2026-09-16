@@ -81,7 +81,19 @@ export function __resetEnclaveVerificationForTesting(): void {
   invalidateEnclaveVerification();
 }
 
-async function runVerification(signal?: AbortSignal): Promise<VerifiedEnclave> {
+/**
+ * The shared verification. Deliberately takes NO caller signal.
+ *
+ * ⚠️ Threading a per-caller signal into a memoised promise produced two bugs. An already-aborted
+ * signal made `AbortSignal.any([aborted, timeout])` return an already-aborted signal, so the
+ * listener below never fired and the 10-second budget silently became unbounded — and
+ * `verifier.verify()` is not cheap (six requests over four serial rounds, each retried with
+ * backoff, then signature verification on the main thread). And the memo bound every later caller
+ * to the FIRST caller's cancellation: caller A cancels, caller B — still on screen, never
+ * cancelled — gets a timeout error it cannot explain. The work is shared, so its lifetime must be
+ * shared too; each caller races the memo against its own signal at the call site instead.
+ */
+async function runVerification(): Promise<VerifiedEnclave> {
   const startedAt = Date.now();
   // Lazy, so ~575KB of verifier and crypto stays out of the main bundle and is fetched only by a
   // family that actually uses the managed AI tier.
@@ -89,20 +101,18 @@ async function runVerification(signal?: AbortSignal): Promise<VerifiedEnclave> {
 
   const verifier = new Verifier({ serverURL: ENCLAVE_URL, configRepo: CONFIG_REPO });
 
-  // The SDK does not take a signal, so race it rather than let a hung verification consume the
-  // caller's whole extraction budget.
-  const timeout = signal
-    ? AbortSignal.any([signal, AbortSignal.timeout(VERIFY_TIMEOUT_MS)])
-    : AbortSignal.timeout(VERIFY_TIMEOUT_MS);
+  // The SDK takes no signal, so race it against our own deadline rather than let a hung
+  // verification consume the caller's whole extraction budget.
+  const timeout = AbortSignal.timeout(VERIFY_TIMEOUT_MS);
   const aborted = new Promise<never>((_, reject) => {
-    timeout.addEventListener(
-      'abort',
-      () =>
-        reject(
-          new ExtractionProviderError('upstream_busy', 'Enclave verification timed out', undefined)
-        ),
-      { once: true }
-    );
+    const fail = () =>
+      reject(
+        new ExtractionProviderError('upstream_busy', 'Enclave verification timed out', undefined)
+      );
+    // The fast path matters: a signal that is ALREADY aborted never fires `abort` again, so a
+    // listener alone would wait forever on it.
+    if (timeout.aborted) fail();
+    else timeout.addEventListener('abort', fail, { once: true });
   });
 
   let result: { hpkePublicKey?: string; measurement?: unknown };
@@ -110,13 +120,47 @@ async function runVerification(signal?: AbortSignal): Promise<VerifiedEnclave> {
     result = (await Promise.race([verifier.verify(), aborted])) as typeof result;
   } catch (err) {
     if (err instanceof ExtractionProviderError) throw err;
+
+    // ⚠️ THE DISCRIMINATION MATTERS MORE THAN ANYTHING ELSE IN THIS FILE, and an earlier version
+    // got it backwards. `@tinfoilsh/verifier` signals a FAILED VERIFICATION with `AttestationError`
+    // ("Code measurement mismatch", "Report signature or certificate chain is invalid", "HPKE key
+    // mismatch", "Certificate domain mismatch"). Those are the events this module exists to
+    // detect: a rotated measurement, a broken root of trust, or an active MITM. Folding them in
+    // with a network blip would tell the family "beanies AI is busy, try again in a moment" and
+    // page nobody — the single worst outcome available here.
+    //
+    // A FetchError or ConfigurationError, by contrast, genuinely is transient or ours to fix.
+    const name = err instanceof Error ? err.name : 'unknown';
+    const isVerificationFailure = name === 'AttestationError';
+
+    if (isVerificationFailure) {
+      console.error(
+        '[ai-enclave] the enclave attestation FAILED to verify, so nothing was sent. This is not ' +
+          'a network problem: either Tinfoil rotated the enclave measurement, the configRepo in ' +
+          'this file is stale, or the connection is being tampered with. Re-run ' +
+          'scripts/spikes/enclave-attestation.mjs before assuming the first.'
+      );
+      reportError({
+        surface: 'ai-enclave',
+        severity: 'critical',
+        message: `attestation verification failed, send refused: ${name}`,
+        context: { error_code: 'attestation_failed' },
+        error: err,
+      });
+      throw new ExtractionProviderError(
+        'attestation_failed',
+        'The AI enclave could not be verified',
+        err
+      );
+    }
+
     // The well-known fetch or the bundle lookup failed. Transient from the user's point of view,
     // so it reuses the EXISTING `upstream_busy`, which `useExtractionErrorToast` already renders
     // as a friendly retry with no error surface. No new code, no new string.
     reportError({
       surface: 'ai-enclave',
       severity: 'error',
-      message: `enclave key fetch failed: ${err instanceof Error ? err.name : 'unknown'}`,
+      message: `enclave key fetch failed: ${name}`,
       context: { error_code: 'upstream_busy' },
       error: err,
     });
@@ -172,13 +216,33 @@ async function runVerification(signal?: AbortSignal): Promise<VerifiedEnclave> {
  * the enclave could not be reached (transient, telemetry only, never a page).
  */
 export function verifyEnclave(signal?: AbortSignal): Promise<VerifiedEnclave> {
-  if (pending && Date.now() - verifiedAt < VERIFY_TTL_MS) return pending;
+  if (!pending || Date.now() - verifiedAt >= VERIFY_TTL_MS) {
+    pending = runVerification()
+      .then((result) => {
+        // Stamped on COMPLETION, not on start. Stamping at the start meant a slow verification
+        // spent its own TTL before anyone could use it.
+        verifiedAt = Date.now();
+        return result;
+      })
+      .catch((err) => {
+        // A failed verification must not be cached, or one blip locks the tier out for ten minutes.
+        invalidateEnclaveVerification();
+        throw err;
+      });
+  }
 
-  verifiedAt = Date.now();
-  pending = runVerification(signal).catch((err) => {
-    // A failed verification must not be cached, or one blip locks the tier out for ten minutes.
-    invalidateEnclaveVerification();
-    throw err;
-  });
-  return pending;
+  const shared = pending;
+  if (!signal) return shared;
+
+  // Each caller races the SHARED work against its OWN signal, so cancelling one extraction never
+  // cancels or poisons another's. The shared promise keeps running for whoever is still waiting.
+  return Promise.race([
+    shared,
+    new Promise<never>((_, reject) => {
+      const fail = () =>
+        reject(new ExtractionProviderError('timeout', 'Extraction cancelled', undefined));
+      if (signal.aborted) fail();
+      else signal.addEventListener('abort', fail, { once: true });
+    }),
+  ]);
 }

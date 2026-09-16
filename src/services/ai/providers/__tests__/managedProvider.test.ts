@@ -63,6 +63,20 @@ const originalFetch = globalThis.fetch;
 /** What the proxy returns now: the enclave's reply, still sealed. `openSealed` is mocked above. */
 const OK_SEALED = { sealed: 'AQIDBA==', ehbp: { 'ehbp-response-nonce': 'n' } };
 
+/**
+ * Answer the `ehbp-config` probe, then the real request.
+ *
+ * The provider asks the proxy which model to name inside the sealed body, so every test that
+ * reaches the network now sees two calls. Memoised per module, hence the reset in beforeEach.
+ */
+function routed(handler: (body: Record<string, unknown>) => Response) {
+  return vi.fn(async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    if (body.protocol === 'ehbp-config') return respond(200, { model: 'gemma4-31b' });
+    return handler(body);
+  });
+}
+
 function respond(status: number, body: unknown, ok = status < 400) {
   return {
     ok,
@@ -77,16 +91,18 @@ const request = {
   todayIso: '2026-09-03',
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+  const mod = await import('../managedProvider');
+  mod.__resetManagedModelForTesting();
 });
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
 async function runExpectingError(response: Response) {
-  globalThis.fetch = vi.fn(async () => response) as unknown as typeof fetch;
+  globalThis.fetch = routed(() => response) as unknown as typeof fetch;
   try {
     await managedProvider.run('share', request);
   } catch (err) {
@@ -141,14 +157,14 @@ describe('managedProvider — the 429 mapping (#83)', () => {
 
 describe('managedProvider — the sealed wire format (#49)', () => {
   async function bodySentFor(req: Parameters<typeof managedProvider.run>[1]) {
-    const fetchMock = vi.fn(async (_url: unknown, init: RequestInit) => {
-      void init;
-      return respond(200, OK_SEALED);
-    });
+    const fetchMock = routed(() => respond(200, OK_SEALED));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     await managedProvider.run('share', req);
-    const init = fetchMock.mock.calls[0][1];
-    return JSON.parse(init.body as string) as Record<string, unknown>;
+    // calls[0] is the config probe; the sealed request is the one after it.
+    const sealedCall = fetchMock.mock.calls.find(
+      (c) => JSON.parse(c[1].body as string).protocol === 'ehbp-1'
+    )!;
+    return JSON.parse(sealedCall[1].body as string) as Record<string, unknown>;
   }
 
   it('sends the sealed envelope, and the document is NOT in it', async () => {
@@ -174,7 +190,7 @@ describe('managedProvider — the sealed wire format (#49)', () => {
     // Asserts the WIRE, so it deliberately does not care what happens downstream: with a
     // correction in play the moved kind-guard may well reject the mocked reply, and that is the
     // guard working. Capture the request body and let the rest fall where it falls.
-    const fetchMock = vi.fn(async (_url: unknown, _init: RequestInit) => respond(200, OK_SEALED));
+    const fetchMock = routed(() => respond(200, OK_SEALED));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     await managedProvider
       .run('share', {
@@ -184,7 +200,10 @@ describe('managedProvider — the sealed wire format (#49)', () => {
       })
       .catch(() => undefined);
 
-    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as Record<string, unknown>;
+    const body = JSON.parse(
+      fetchMock.mock.calls.find((c) => JSON.parse(c[1].body as string).protocol === 'ehbp-1')![1]
+        .body as string
+    ) as Record<string, unknown>;
     // `to` would put the family's own assertion about their document on the wire in cleartext,
     // and nothing server-side needs it any more: consumeGrant stopped conditioning on the kind,
     // and the closed-set check existed only because `to` reached the model's instruction, which
@@ -208,9 +227,58 @@ describe('managedProvider — the sealed wire format (#49)', () => {
   });
 });
 
+describe('managedProvider — what is actually SEALED', () => {
+  // ⚠️ THE TEST THAT WAS MISSING. The first version of this feature omitted `model` from the
+  // sealed body, and every test passed because `sealForEnclave` was mocked and its PAYLOAD never
+  // asserted. The enclave rejects a body without it (`400 Missing required parameter: 'model'`,
+  // checked before auth), so 100% of managed extractions would have failed with a generic toast.
+  // Assert the payload, not just that sealing happened.
+  it('seals a body carrying the model the proxy named', async () => {
+    globalThis.fetch = routed(() => respond(200, OK_SEALED)) as unknown as typeof fetch;
+    sealForEnclave.mockClear();
+
+    await managedProvider.run('share', request);
+
+    const [key, payload] = sealForEnclave.mock.calls[0]!;
+    expect(key).toBe('deadbeef');
+    const sealedBody = payload as { model?: string; messages?: unknown[]; temperature?: number };
+    expect(sealedBody.model).toBe('gemma4-31b');
+    expect(Array.isArray(sealedBody.messages)).toBe(true);
+    expect(sealedBody.temperature).toBe(0);
+  });
+
+  it('asks the proxy for the model rather than hardcoding it, so the terraform lever still works', async () => {
+    globalThis.fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      // A model retirement is a Lambda env change; the client must follow it without a release.
+      if (body.protocol === 'ehbp-config') return respond(200, { model: 'some-new-model' });
+      return respond(200, OK_SEALED);
+    }) as unknown as typeof fetch;
+    sealForEnclave.mockClear();
+
+    await managedProvider.run('share', request);
+
+    expect((sealForEnclave.mock.calls[0]![1] as { model?: string }).model).toBe('some-new-model');
+  });
+
+  it('refuses rather than sealing a bodyless model when the proxy will not say', async () => {
+    globalThis.fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      if (body.protocol === 'ehbp-config') return respond(200, {});
+      return respond(200, OK_SEALED);
+    }) as unknown as typeof fetch;
+    sealForEnclave.mockClear();
+
+    await expect(managedProvider.run('share', request)).rejects.toMatchObject({
+      code: 'not_available',
+    });
+    expect(sealForEnclave).not.toHaveBeenCalled();
+  });
+});
+
 describe('managedProvider — verification gates the send', () => {
   it('REFUSES to send when the enclave does not verify, and makes no proxy call at all', async () => {
-    const fetchMock = vi.fn(async () => respond(200, OK_SEALED));
+    const fetchMock = routed(() => respond(200, OK_SEALED));
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     verifyEnclave.mockRejectedValueOnce(new ExtractionProviderError('attestation_failed', 'nope'));
 
@@ -239,7 +307,7 @@ describe('managedProvider — verification gates the send', () => {
   });
 
   it('marks the result verified from OUR verification, not a server header', async () => {
-    globalThis.fetch = vi.fn(async () => respond(200, OK_SEALED)) as unknown as typeof fetch;
+    globalThis.fetch = routed(() => respond(200, OK_SEALED)) as unknown as typeof fetch;
     const result = await managedProvider.run('share', request);
     expect(result.attestation).toEqual({ enclave: 'inference.tinfoil.sh', verified: true });
   });
