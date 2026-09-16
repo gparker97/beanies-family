@@ -450,7 +450,7 @@ function refColour(kind: DayExtraKind): string {
       plan, the calendar is the last thing that should yield: if the wall is
       genuinely too short for everything, the peripherals clip.
     -->
-    <div class="relative flex min-h-[13.75rem] flex-1">
+    <div class="wall-plot-row relative flex min-h-[13.75rem] flex-1">
       <!-- the axis: event start times only. An hourly ruler is noise on a folded
            axis, and cannot be drawn inside a fold at all. -->
       <div class="relative shrink-0" :style="{ width: `${axisWidth}px` }">
@@ -630,6 +630,44 @@ function refColour(kind: DayExtraKind): string {
 </template>
 
 <style scoped>
+/*
+ * ─── The plot's floor is PHYSICAL, and must stay physical ────────────────────
+ *
+ * `min-h-[13.75rem]` is the right floor and the wrong unit on a short wall. In
+ * Large reading mode every rem grows by 1.1875, so 13.75rem becomes 261px, and
+ * on an 853x533 wall the header, day row, rest-days row, peripheral strip and
+ * footer no longer fit beside it. The plot then overran its slot and the
+ * rest-days row was drawn straight through the 17:00 axis label.
+ *
+ * That is the exact failure the block comment above this row describes from the
+ * 1024x768 case, and it is invisible for the same reason: the plot is
+ * `overflow-hidden`, so it clips its own contents tidily while sitting in the
+ * wrong place. The `.wall-root` overflow assertion in the verification harness
+ * cannot see it either.
+ *
+ * The floor is a statement about PIXELS — "a calendar narrower than this is two
+ * fold bands and a row of slivers" — so on a wall with no height to spare it is
+ * held at its normal-mode size rather than allowed to scale. Bigger screens keep
+ * the rem floor untouched; there, growing it is free.
+ */
+@media (height <= 699px) {
+  /*
+   * 190, not 220. Holding the floor at its normal-mode size stopped the plot
+   * overrunning the peripheral strip, but the days view also carries a
+   * rest-days row under the grid, and in Large reading mode that row was still
+   * drawn through the 18:00 axis label. Measured on an 853x533 wall: header 94,
+   * day row ~55, rest-days ~48, strip 45, footer ~55, gaps ~30 — which leaves
+   * the plot about 200px, not 220.
+   *
+   * 190 keeps a real calendar (the comment on the row itself puts the unusable
+   * point near 90px) and leaves the rest-days row its own space rather than
+   * painting over the hours.
+   */
+  .wall-plot-row {
+    min-height: 190px;
+  }
+}
+
 /* The fold: the signature of this design. Not blank space saved — the label
    answers the question the gap poses ("what happens next, and when?"). */
 .wall-fold {

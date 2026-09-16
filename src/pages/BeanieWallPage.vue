@@ -1617,8 +1617,29 @@ watch(activeView, () => (sheet.value = null));
    * actually squint at — keeps the full Large-mode boost. Showing all of a
    * slightly smaller date beats showing most of a slightly larger one.
    */
+
+  /*
+   * Large reading mode, on a wall whose header is pinned to one row.
+   *
+   * Every rem grows by 1.1875 while the header's width does not, so the
+   * shortfall lands on the date — the only flexible item — and clipped it.
+   *
+   * So the whole HEADER holds its normal-mode rendered size here (each value is
+   * its normal figure divided by 1.1875), and the calendar underneath keeps the
+   * full boost. That is the right split: the header is chrome you glance at, and
+   * the blocks, chores and lane names are the reading content Large mode exists
+   * for. Holding only the date was not enough on its own — it still clipped by
+   * ~10px, because the clock's reservation had grown by 26px beside it.
+   *
+   * ⚠️ `--wall-tap` is held too, and that is deliberate rather than an
+   * oversight: 2.021 x 1.1875 = 2.4rem, so the tap targets keep their 38px
+   * PHYSICAL floor. Letting them grow is what squeezed the date.
+   */
   html[data-text-size='large'] .wall-root {
-    --wall-date: 1.22rem;
+    --wall-clock: 1.137rem;
+    --wall-clock-col: 4.716rem;
+    --wall-date: 1.221rem;
+    --wall-tap: 2.021rem;
   }
 
   /*

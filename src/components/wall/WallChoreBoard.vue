@@ -369,7 +369,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       v-if="partitioned.idle.length"
       data-test="idle-strip"
       class="dark:bg-surface-raised flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[22px] bg-white px-4 py-3 shadow-[var(--card-shadow)]"
-      :class="hasBoard ? 'shrink-0' : 'min-h-0 flex-1 justify-center'"
+      :class="hasBoard ? 'wall-idle-strip shrink-0' : 'min-h-0 flex-1 justify-center'"
     >
       <p class="font-outfit text-secondary-500 wall-list-title dark:text-ink font-bold uppercase">
         {{ t('wall.jobs.allClear') }}
@@ -417,6 +417,39 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
  * family too wide for the wall scrolls sideways — the same answer the footer
  * chips already use, and a far better one than showing nobody anything.
  */
+
+/*
+ * ─── The "all clear" strip earns its height on a short wall ──────────────────
+ *
+ * It says one short sentence and names the beans with nothing on, and it was
+ * costing ~60px of an 853x533 wall — about a chore and a half per column, spent
+ * on an absence. Tighter padding, smaller faces, and it may not wrap onto a
+ * second line; a family too wide for the row scrolls sideways instead, the same
+ * answer the board and the footer chips already use.
+ *
+ * Only in STRIP mode (`.wall-idle-strip`, applied when there is a board above
+ * it). When nobody has jobs this element IS the board, and shrinking the only
+ * thing on screen would be the opposite of the point.
+ *
+ * Short OR narrow: a portrait wall has height to spare but the strip is just as
+ * much of an absence there, and the saving buys a chore in every column.
+ */
+@media (height <= 699px), (width <= 700px) {
+  .wall-idle-strip {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding: 0.4rem 0.75rem;
+    scrollbar-width: none;
+  }
+
+  .wall-idle-strip :deep(img),
+  .wall-idle-strip :deep(.beanie-avatar) {
+    height: 1.35rem;
+    width: 1.35rem;
+  }
+}
+
 @media (height <= 699px) {
   .wall-chore-grid {
     grid-auto-columns: minmax(11rem, 1fr);
