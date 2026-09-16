@@ -139,6 +139,8 @@ function refusalReason(err, srcHash, nowSeconds) {
   if (item.consumed) return 'spent';
   if (Number(item.expires_at?.N) <= nowSeconds) return 'expired';
   if (item.src?.S && item.src.S !== srcHash) return 'different_source';
+  // A forged `srcHash` that matches but a body that does not: the cheap-buys-expensive attempt.
+  if (item.bytes?.N) return 'different_size';
   return 'unknown';
 }
 
@@ -148,7 +150,31 @@ function refusalReason(err, srcHash, nowSeconds) {
  * NEVER throws. Returns `{ free: boolean, reason?: string }` — `free: false` means charge
  * normally, which is the conservative outcome for every failure including an unavailable store.
  */
-export async function consumeGrant({ familyId, correction, srcHash, now = Date.now(), ddb } = {}) {
+/**
+ * How far a re-read's sealed size may differ from the read that earned the grant.
+ *
+ * ⚠️ THIS IS A SECURITY FENCE, not a tolerance for convenience. On the sealed arm `srcHash` is
+ * CLIENT-supplied, so the source binding above — the guard this file calls the one doing the
+ * heaviest lifting — can be forged: seal a ten-character prompt with `srcHash: 'a'.repeat(64)`
+ * (cheap, charged, earns a grant), then seal an eight-page document with the SAME hash and that
+ * token (expensive, free). `#src = :src` matches every time, and every cheap read buys a free
+ * expensive one.
+ *
+ * The byte count is the half the client CANNOT forge, because the Lambda measures what it actually
+ * received. A genuine re-read of the same document seals to within a few bytes of the original
+ * (HPKE adds a fixed overhead and the plaintext is identical), so a tight band costs nothing real
+ * while making the cheap-buys-expensive trade impossible.
+ */
+const GRANT_BYTES_TOLERANCE = 0.05;
+
+export async function consumeGrant({
+  familyId,
+  correction,
+  srcHash,
+  srcBytes = null,
+  now = Date.now(),
+  ddb,
+} = {}) {
   const table = process.env.RATE_TABLE;
   if (!table || !process.env.CORRECTION_GRANTS) return { free: false, reason: 'disabled' };
   if (!familyId || !correction || !srcHash) return { free: false, reason: 'missing' };
@@ -177,14 +203,28 @@ export async function consumeGrant({ familyId, correction, srcHash, now = Date.n
         // grants carry no kind — it would be actively fatal: DynamoDB evaluates a comparison
         // against a MISSING attribute as false, so leaving it in would refuse every correction,
         // silently, on a path whose whole promise is that correcting our mistake is free.
+        //
+        // The BYTES clause is the sealed arm's real source binding (see GRANT_BYTES_TOLERANCE).
+        // `attribute_not_exists(#bytes)` keeps legacy grants — issued before this shipped, and
+        // legacy-arm grants, which bind on a server-computed hash — spendable rather than
+        // refusing every in-flight correction on deploy.
         ConditionExpression:
           'attribute_exists(pk) AND attribute_not_exists(#consumed) AND ' +
-          '#src = :src AND expires_at > :now',
-        ExpressionAttributeNames: { '#consumed': 'consumed', '#src': 'src' },
+          '#src = :src AND expires_at > :now AND ' +
+          '(attribute_not_exists(#bytes) OR (#bytes BETWEEN :lo AND :hi))',
+        ExpressionAttributeNames: { '#consumed': 'consumed', '#src': 'src', '#bytes': 'bytes' },
         ExpressionAttributeValues: {
           ':now': { N: String(Math.floor(now / 1000)) },
           ':t': { N: String(Math.floor(now / 1000)) },
           ':src': { S: srcHash },
+          // With no measurement to compare against, the band is everything: the clause then
+          // depends entirely on `attribute_not_exists`, which is the legacy case.
+          ':lo': { N: String(srcBytes ? Math.floor(srcBytes * (1 - GRANT_BYTES_TOLERANCE)) : 0) },
+          ':hi': {
+            N: String(
+              srcBytes ? Math.ceil(srcBytes * (1 + GRANT_BYTES_TOLERANCE)) : Number.MAX_SAFE_INTEGER
+            ),
+          },
         },
         // The old item on a conditional failure, so the three guards can be told apart without a
         // second round trip. Supported since SDK v3.400; an older runtime simply omits it and
@@ -247,6 +287,11 @@ export async function issueGrant({
   familyId,
   task,
   srcHash,
+  /**
+   * Bytes THIS LAMBDA measured on the request that earned the grant, or `null` on the legacy arm
+   * where the source binding already rests on a server-computed hash. See `consumeGrant`.
+   */
+  srcBytes = null,
   counted,
   wasCorrection,
   now = Date.now(),
@@ -271,10 +316,15 @@ export async function issueGrant({
         // No `kind` attribute (#49). `consumeGrant` must not condition on one, and writing it
         // would be worse than useless: a value only the legacy arm can supply would make grants
         // behave differently depending on which arm issued them.
-        UpdateExpression: 'SET #src = :src, expires_at = :ttl',
-        ExpressionAttributeNames: { '#src': 'src' },
+        UpdateExpression: srcBytes
+          ? 'SET #src = :src, #bytes = :bytes, expires_at = :ttl'
+          : 'SET #src = :src, expires_at = :ttl',
+        ExpressionAttributeNames: srcBytes
+          ? { '#src': 'src', '#bytes': 'bytes' }
+          : { '#src': 'src' },
         ExpressionAttributeValues: {
           ':src': { S: srcHash },
+          ...(srcBytes ? { ':bytes': { N: String(srcBytes) } } : {}),
           ':ttl': { N: String(Math.floor(now / 1000) + GRANT_TTL_SECONDS) },
         },
       })
