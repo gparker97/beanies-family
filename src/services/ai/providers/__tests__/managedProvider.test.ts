@@ -11,7 +11,7 @@
  *     frozen contract, because the bundle and the Lambda deploy independently.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
-import { ExtractionProviderError } from '../../types';
+import { ExtractionProviderError, type ShareKindHint } from '../../types';
 import type { managedProvider as ManagedProvider } from '../managedProvider';
 
 // ⚠️ `managedProvider` reads `import.meta.env.VITE_AI_EXTRACT_URL` at MODULE LOAD, and ESM
@@ -155,6 +155,230 @@ describe('managedProvider — the 429 mapping (#83)', () => {
   });
 });
 
+describe('managedProvider — the memoised model lookup must not bind one caller (#49)', () => {
+  // ⚠️ `attestation.ts` documents this exact anti-pattern at length, having already been bitten
+  // by it: "Threading a per-caller signal into a memoised promise produced two bugs… the memo
+  // bound every later caller to the first caller's signal." `enclaveModel` was then written the
+  // same way — `modelPromise ??= (async () => postToProxy({…}, signal))()` — so the FIRST
+  // caller's AbortSignal is captured inside a promise every subsequent caller awaits.
+  //
+  // The consequence is not theoretical: a family who opens the reader, backs out, and opens it
+  // again cancels the first extraction, and the second one fails on a signal belonging to a
+  // request that no longer exists.
+  /**
+   * A fetch mock that HONOURS `init.signal`, which the plain one does not.
+   *
+   * ⚠️ Written this way on purpose. The first version of this test slept and then resolved,
+   * ignoring the signal entirely — so aborting a caller did nothing, both assertions passed,
+   * and the bug they exist for sailed through. A cancellation test whose transport cannot be
+   * cancelled proves only that the test runs.
+   */
+  function cancellableFetch(onConfigSignal: (s: AbortSignal | null | undefined) => void) {
+    // ⚠️ The config probe is held open by an explicit RELEASE, not a timer. With a timer the
+    // abort raced the timeout and sometimes landed after the probe had already resolved, so the
+    // test passed against the buggy code roughly half the time — a flake that would eventually
+    // be "fixed" by weakening the assertion it exists for.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const fetchMock = vi.fn(async (_url: unknown, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      if (body.protocol !== 'ehbp-config') return respond(200, OK_SEALED);
+      onConfigSignal(init.signal);
+      return await new Promise<Response>((resolve, reject) => {
+        void gate.then(() => resolve(respond(200, { model: 'gemma4-31b' })));
+        init.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('Aborted', 'AbortError')),
+          { once: true }
+        );
+      });
+    });
+    return { fetchMock: fetchMock as unknown as typeof fetch, release: () => release() };
+  }
+
+  it('does not let one caller cancel the shared config probe', async () => {
+    const a = new AbortController();
+    let configSignal: AbortSignal | null | undefined;
+    const { fetchMock, release } = cancellableFetch((s) => (configSignal = s));
+    globalThis.fetch = fetchMock;
+
+    const first = managedProvider
+      .run('share', { ...request, signal: a.signal })
+      .catch(() => 'a-failed');
+    await vi.waitFor(() => expect(configSignal).toBeDefined());
+    a.abort();
+    release();
+    await first;
+
+    // The shared lookup must outlive the caller that happened to start it.
+    expect(configSignal?.aborted).toBe(false);
+  });
+
+  it('does not fail a second extraction when the first one is cancelled', async () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    let configSignal: AbortSignal | null | undefined;
+    const { fetchMock, release } = cancellableFetch((s) => (configSignal = s));
+    globalThis.fetch = fetchMock;
+
+    const first = managedProvider
+      .run('share', { ...request, signal: a.signal })
+      .catch(() => 'a-failed');
+    await vi.waitFor(() => expect(configSignal).toBeDefined());
+    const second = managedProvider.run('share', { ...request, signal: b.signal });
+
+    // Abort while the probe is definitively still in flight, THEN let it finish.
+    a.abort();
+    release();
+
+    // The first caller may fail or may already have got what it needed — the abort races the
+    // probe, and which side wins is not the property under test. Deliberately NOT asserted, so
+    // this does not become a flake that gets "fixed" by weakening the line below.
+    await first;
+    // This is the property: B never asked to be cancelled, and A's cancellation is not B's.
+    await expect(second).resolves.toBeDefined();
+  });
+});
+
+describe('managedProvider — a cancel is not a failure (#49)', () => {
+  // ⚠️ THE CASE THE CONCURRENCY TESTS DO NOT COVER. Those check a peer that was ALREADY waiting
+  // when another caller aborted. This is the sequential one: cancel, then start again — which is
+  // the actual story `callerSignal.ts` describes (open the reader, back out, open it again).
+  //
+  // `run()`'s catch clears both shared memos after any failed sealed request. A cancellation
+  // landing in that catch throws away an attestation that is perfectly good, so the re-opened
+  // reader pays a full fresh SEV-SNP verification plus a second config round trip — the exact
+  // cost the memo exists to avoid, triggered by someone changing their mind.
+  it('does not invalidate the shared memos when the caller cancelled', async () => {
+    const controller = new AbortController();
+    invalidateEnclaveVerification.mockClear();
+    controller.abort();
+
+    globalThis.fetch = routed(() => respond(200, OK_SEALED)) as unknown as typeof fetch;
+
+    await expect(
+      managedProvider.run('share', { ...request, signal: controller.signal })
+    ).rejects.toBeInstanceOf(ExtractionProviderError);
+
+    expect(invalidateEnclaveVerification).not.toHaveBeenCalled();
+  });
+
+  it('does not invalidate them when the SEALED POST is cancelled', async () => {
+    // ⚠️ THE ONLY CANCELLATION WINDOW A PERSON CAN REALISTICALLY HIT. `raceCallerSignal` wraps
+    // the two memo lookups, which are instant after the first read of a session; the long leg
+    // is this POST. The other test aborts before `run()` and so never exercises it.
+    invalidateEnclaveVerification.mockClear();
+    const controller = new AbortController();
+
+    globalThis.fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
+      const body = JSON.parse(init.body as string) as Record<string, unknown>;
+      if (body.protocol === 'ehbp-config') return respond(200, { model: 'gemma4-31b' });
+      // The sealed POST: hang until the caller's signal aborts, exactly as fetch would.
+      return await new Promise<Response>((_, reject) => {
+        init.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+          { once: true }
+        );
+      });
+    }) as unknown as typeof fetch;
+
+    const run = managedProvider
+      .run('share', { ...request, signal: controller.signal })
+      .catch((e: ExtractionProviderError) => e);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(2));
+    controller.abort();
+    await run;
+
+    expect(invalidateEnclaveVerification).not.toHaveBeenCalled();
+  });
+
+  it('still invalidates them when something actually failed', async () => {
+    // The other half of the branch, so "never invalidate" cannot pass this file.
+    invalidateEnclaveVerification.mockClear();
+    globalThis.fetch = routed(() =>
+      respond(500, { error: 'boom' }, false)
+    ) as unknown as typeof fetch;
+
+    await expect(managedProvider.run('share', request)).rejects.toBeInstanceOf(
+      ExtractionProviderError
+    );
+
+    expect(invalidateEnclaveVerification).toHaveBeenCalled();
+  });
+});
+
+describe('managedProvider — the envelope-rejection family (#49)', () => {
+  // ⚠️ The sealed arm added five `bad_*` refusals — `bad_sealed`, `bad_task`, `bad_srchash`,
+  // `bad_ehbp`, `bad_correction` — and NONE of them had a ladder entry, so every one fell
+  // through to `provider_error` carrying the detail "Managed proxy returned HTTP 400". For an
+  // English-locale family `genericFailure` appends that detail straight into the toast, so a
+  // bug in OUR envelope construction read to the family as an HTTP status code, and it reported
+  // on `ERROR_SURFACE`, i.e. it paged.
+  //
+  // These are never a family's fault and never fixable by retrying: they mean this build sent
+  // an envelope the proxy could not parse. The branch is keyed on the `bad_` PREFIX rather than
+  // on five literals, because the gap was created by the Lambda growing a code the client did
+  // not know about — a list of literals would reopen it the next time that happens.
+  const CODES = ['bad_sealed', 'bad_task', 'bad_srchash', 'bad_ehbp', 'bad_correction'];
+
+  it('does not put an HTTP status in front of the family for any of them', async () => {
+    for (const code of CODES) {
+      const err = await runExpectingError(respond(400, { error: 'nope', code }));
+      expect(err).toBeInstanceOf(ExtractionProviderError);
+      expect(err.message).not.toMatch(/HTTP \d/);
+    }
+  });
+
+  it('still reports, because a malformed envelope means the feature is broken for everyone', async () => {
+    const err = await runExpectingError(respond(400, { error: 'nope', code: 'bad_sealed' }));
+    // NOT `not_available`: that renders a friendly info toast with no error surface, which
+    // would hide a total client-side breakage from us entirely.
+    expect(err.code).toBe('provider_error');
+  });
+
+  it('tells a developer WHICH field the proxy rejected', async () => {
+    await runExpectingError(respond(400, { error: 'nope', code: 'bad_srchash' }));
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('bad_srchash'));
+  });
+
+  it('never leaks an HTTP status to the family for ANY unrecognised code', async () => {
+    // The prefix branch covers `bad_*`. These five are emitted by the same two files, match no
+    // prefix and no status rung, and reached the terminal branch — which used to put the status
+    // straight into an English family's toast.
+    for (const code of [
+      'upstream_badbody',
+      'upstream_badjson',
+      'upstream_network',
+      'model_unparseable',
+      'model_shape',
+    ]) {
+      const err = await runExpectingError(respond(502, { error: 'x', code }));
+      expect(err.message, `code ${code} leaked a status`).not.toMatch(/HTTP \d/);
+    }
+    // And the codeless case, which is how a 401 or 500 arrives.
+    expect((await runExpectingError(respond(500, {}))).message).not.toMatch(/HTTP \d/);
+  });
+
+  it('still tells a developer the status and code', async () => {
+    await runExpectingError(respond(502, { code: 'upstream_badbody' }));
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 502 code=upstream_badbody')
+    );
+  });
+
+  it('leaves the neighbouring 400 mappings alone', async () => {
+    // `unknown_protocol` and `unknown_task` are deploy-order problems with their own friendly
+    // mapping; a greedy prefix match must not capture them.
+    expect((await runExpectingError(respond(400, { code: 'unknown_protocol' }))).code).toBe(
+      'not_available'
+    );
+    expect((await runExpectingError(respond(400, { code: 'unknown_task' }))).code).toBe(
+      'not_available'
+    );
+  });
+});
+
 describe('managedProvider — the sealed wire format (#49)', () => {
   async function bodySentFor(req: Parameters<typeof managedProvider.run>[1]) {
     const fetchMock = routed(() => respond(200, OK_SEALED));
@@ -276,6 +500,122 @@ describe('managedProvider — what is actually SEALED', () => {
   });
 });
 
+describe('managedProvider — the client kind-guard (#49)', () => {
+  // The guard MOVED from the Lambda to here, because a blind forwarder cannot read the answer.
+  // Testing-Plan item 6 asked for it "over every (resultKind, hint) pair" and it was never
+  // written, so the move was unverified: three distinct outcomes, no coverage at all.
+  //
+  // ⚠️ The `none` split is the part that matters and the part most likely to be "simplified"
+  // away. A `none` answer to a HINTED prompt is the model DISAGREEING, not failing — the hint
+  // leaves it exactly one way out — so reporting "try a clearer photo" for a perfectly legible
+  // page is both false and an invitation to a retry that costs a bean.
+  /** A share reply the REAL parser accepts — a bare `{ kind }` is rejected before the guard. */
+  const EVENT_PAYLOAD = {
+    isEvent: true,
+    title: 'Sports Day',
+    date: '2026-07-12',
+    startTime: '09:00',
+    endTime: '12:00',
+    isAllDay: false,
+    location: 'School Field',
+    description: '',
+    confidence: { title: 0.9, date: 0.9, startTime: 0.8, endTime: 0.8, location: 0.9 },
+  };
+  function replyOfKind(kind: string) {
+    // Only 'event' and 'none' are used. Every case below varies the ASSERTED kind instead of
+    // the result kind, so a parser rejection can never be mistaken for the guard firing — both
+    // produce `malformed_output`, and an earlier draft of these tests passed on exactly that
+    // ambiguity.
+    const body = kind === 'none' ? { kind: 'none' } : { kind: 'event', event: EVENT_PAYLOAD };
+    openSealed.mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify(body) } }],
+    });
+  }
+
+  async function runCorrection({
+    to,
+    correctionFree,
+    resultKind,
+  }: {
+    to: ShareKindHint;
+    correctionFree: boolean;
+    resultKind: string;
+  }) {
+    globalThis.fetch = routed(() =>
+      respond(200, { ...OK_SEALED, correctionFree })
+    ) as unknown as typeof fetch;
+    replyOfKind(resultKind);
+    return managedProvider
+      .run('share', { ...request, correction: { token: 't', to } })
+      .then(() => 'ok')
+      .catch((e: ExtractionProviderError) => e.code);
+  }
+
+  it('accepts a result that MATCHES the asserted kind', async () => {
+    expect(await runCorrection({ to: 'event', correctionFree: true, resultKind: 'event' })).toBe(
+      'ok'
+    );
+  });
+
+  it('reports a `none` answer as a DISAGREEMENT, not a malformed one', async () => {
+    expect(await runCorrection({ to: 'event', correctionFree: true, resultKind: 'none' })).toBe(
+      'correction_disagreed'
+    );
+  });
+
+  it('reports a different, non-none kind as malformed', async () => {
+    // Asserted `recipe`, model answered `event`: a real disagreement of shape, and the result
+    // PARSED cleanly, so `malformed_output` here can only have come from the guard.
+    expect(await runCorrection({ to: 'recipe', correctionFree: true, resultKind: 'event' })).toBe(
+      'malformed_output'
+    );
+  });
+
+  it('does NOT fire when no grant was actually spent, whatever the user asserted', async () => {
+    // ⚠️ Gated on `correctionFree`, not on the user having asserted a kind. The Lambda's guard
+    // ran on `read.kindHint`, which is set only when a grant was SPENT, so it could not fire on
+    // the two fall-through outcomes: the CORRECTION_GRANTS kill switch, and a DynamoDB blip.
+    // Without this gate, during exactly the incident the kill switch exists for, a family taps
+    // a banner labelled free, is charged, and is shown a toast saying nothing was charged.
+    // Same mismatch as the case above — asserted `recipe`, answered `event` — differing ONLY in
+    // that no grant was spent. It must now pass through untouched.
+    expect(await runCorrection({ to: 'recipe', correctionFree: false, resultKind: 'event' })).toBe(
+      'ok'
+    );
+  });
+});
+
+describe('managedProvider — the client-side bill bound (#49)', () => {
+  it('refuses oversized text BEFORE sealing, and makes no network call at all', async () => {
+    // The one validation the Lambda genuinely lost: `MAX_TEXT_CHARS` cannot be enforced on
+    // ciphertext. The link arm is why it has to exist — its text comes back from the
+    // content-fetch Lambda and nothing else bounds it. Code existed; no test called `run()`
+    // with oversized text, so the refusal was unverified.
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      managedProvider.run('share', {
+        ...request,
+        source: { kind: 'text', text: 'x'.repeat(32_001) },
+      })
+    ).rejects.toBeInstanceOf(ExtractionProviderError);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sealForEnclave).not.toHaveBeenCalled();
+  });
+
+  it('allows text exactly at the bound', async () => {
+    globalThis.fetch = routed(() => respond(200, OK_SEALED)) as unknown as typeof fetch;
+    await expect(
+      managedProvider.run('share', {
+        ...request,
+        source: { kind: 'text', text: 'x'.repeat(32_000) },
+      })
+    ).resolves.toBeDefined();
+  });
+});
+
 describe('managedProvider — verification gates the send', () => {
   it('REFUSES to send when the enclave does not verify, and makes no proxy call at all', async () => {
     const fetchMock = routed(() => respond(200, OK_SEALED));
@@ -292,8 +632,14 @@ describe('managedProvider — verification gates the send', () => {
   });
 
   it('clears the verification memo after ANY failed sealed request', async () => {
+    // ⚠️ This used to fail EVERY fetch with a 500, which meant it never got past the
+    // `ehbp-config` probe inside `enclaveModel` — so it exercised the catch block via a failed
+    // CONFIG call and proved nothing about the sealed request its name describes. `routed`
+    // answers the config probe and fails only the sealed POST, which is the path that matters:
+    // `openSealed` failing IS the stale-key symptom, and if the memo survived it the dead key
+    // would stay cached for the full TTL while every retry re-sealed to it and cost a bean.
     invalidateEnclaveVerification.mockClear();
-    globalThis.fetch = vi.fn(async () =>
+    globalThis.fetch = routed(() =>
       respond(500, { error: 'boom' }, false)
     ) as unknown as typeof fetch;
 
@@ -304,6 +650,30 @@ describe('managedProvider — verification gates the send', () => {
     // Not "on a stale-key-shaped failure": we have never observed what a Tinfoil key rotation
     // looks like on the wire, so clearing unconditionally is what covers every shape.
     expect(invalidateEnclaveVerification).toHaveBeenCalled();
+  });
+
+  it('clears the memo when OPENING the reply fails, which is the stale-key shape', async () => {
+    invalidateEnclaveVerification.mockClear();
+    globalThis.fetch = routed(() => respond(200, OK_SEALED)) as unknown as typeof fetch;
+    // After a key rotation the seal succeeds against the memoised key and the enclave still
+    // answers 200 — the failure lands here, on the open, and nowhere earlier.
+    openSealed.mockRejectedValueOnce(new Error('AEAD tag mismatch'));
+
+    await expect(managedProvider.run('share', request)).rejects.toBeInstanceOf(
+      ExtractionProviderError
+    );
+
+    expect(invalidateEnclaveVerification).toHaveBeenCalled();
+  });
+
+  it('maps the proxy 413 to a classified error with a developer console line', async () => {
+    // The SERVER's verdict, deliberately, rather than a client-side size guess. Code existed;
+    // nothing tested it.
+    const err = await runExpectingError(
+      respond(413, { error: 'Payload too large', code: 'payload_too_large' })
+    );
+    expect(err.code).toBe('provider_error');
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('body cap'));
   });
 
   it('marks the result verified from OUR verification, not a server header', async () => {

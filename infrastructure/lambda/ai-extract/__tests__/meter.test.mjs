@@ -15,6 +15,7 @@ import { ALARMING_PREFIXES, closeRead, openRead, validateCorrection } from '../m
 import {
   GRANT_MISMATCH_PREFIX,
   GRANT_REFUSED_PREFIX,
+  HARD_REFUSAL_REASONS,
   sourceFingerprint,
 } from '../correctionGrant.mjs';
 import { USAGE_ATTRS } from '../ddb.mjs';
@@ -22,6 +23,10 @@ import { USAGE_ATTRS } from '../ddb.mjs';
 const FAMILY = 'fam-correction-01';
 const NOW = Date.UTC(2026, 8, 14, 12, 0);
 const SOURCE = { text: 'Ollie party Sat 2pm at the hall' };
+// Every grant is now bound to a server-measured size AND the arm that measured it (#49), so a
+// meter test that omits either is testing a state the handler can no longer produce.
+const SRC_BYTES = 2048;
+const ARM = 'legacy';
 
 class ConditionalCheckFailedException extends Error {
   constructor() {
@@ -106,12 +111,14 @@ describe('validateCorrection — the fence in front of the model instruction', (
 describe('openRead — spending a grant', () => {
   const correction = { token: '11111111-2222-3333-4444-555555555555', to: 'travel' };
 
-  it('consumes atomically, with all three guards in ONE condition', async () => {
+  it('consumes atomically, with every guard in ONE condition', async () => {
     const { sent, ddb } = stub();
 
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb,
@@ -135,6 +142,8 @@ describe('openRead — spending a grant', () => {
     await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb,
@@ -154,6 +163,8 @@ describe('openRead — spending a grant', () => {
     const spent = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub().ddb,
@@ -164,6 +175,8 @@ describe('openRead — spending a grant', () => {
     const refused = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub({ failCondition: true }).ddb,
@@ -182,6 +195,8 @@ describe('openRead — spending a grant', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub({ failCondition: true }).ddb,
@@ -203,7 +218,7 @@ describe('openRead — spending a grant', () => {
   });
 
   it('names different_source ONLY when the old item proves it', async () => {
-    // `ALL_OLD` on the conditional failure is what makes the four guards distinguishable. A
+    // `ALL_OLD` on the conditional failure is what makes the six guards distinguishable. A
     // runtime that does not supply it logs `unknown` rather than asserting a cause.
     class WithItem extends ConditionalCheckFailedException {
       constructor(item) {
@@ -216,6 +231,8 @@ describe('openRead — spending a grant', () => {
       await openRead({
         familyId: FAMILY,
         srcHash: sourceFingerprint(SOURCE),
+        srcBytes: SRC_BYTES,
+        arm: ARM,
         correction,
         now: NOW,
         ddb: stub({ throws: new WithItem(item) }).ddb,
@@ -239,7 +256,8 @@ describe('openRead — spending a grant', () => {
 
   it('does NOT give a spent grant back when the read fails — and that is the decision', async () => {
     // A refund is the obvious kindness and it is WRONG here, twice over. A grant is bound to
-    // the family, the document and the kind but not to a TASK, so refunding on failure turns
+    // the family, the document, its size and the arm that measured it — but not to a TASK, so
+    // refunding on failure turns
     // the wrong-kind 502 into an unbounded loop of free, uncounted, billable model calls. And
     // it cannot help the person it refunds: the banner closes its host review modal before the
     // re-read starts, so there is no surface left to spend it from. Pinned so the next reader
@@ -248,6 +266,8 @@ describe('openRead — spending a grant', () => {
     await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb,
@@ -258,24 +278,36 @@ describe('openRead — spending a grant', () => {
   });
 
   it('says WHY a grant was not spent, so a refusal is not confused with a blip', async () => {
-    // Three outcomes that must never share a response: only `refused` means "do not read this".
-    // `disabled` is the kill switch, which promises corrections simply cost a bean; and a store
-    // outage must fail OPEN, exactly as the limiter next door does on the identical failure.
+    // Three outcomes that must never share a response. `disabled` is the kill switch, which
+    // promises corrections simply cost a bean; a store outage must fail OPEN, exactly as the
+    // limiter next door does on the identical failure; and a genuine conditional failure names
+    // WHICH guard refused.
+    //
+    // ⚠️ The refusal reason used to be flattened to the single string `'refused'`, and both arms
+    // turned that into a hard 409. It is now the specific reason, and the arms decide via
+    // `HARD_REFUSAL_REASONS` — because some of these are our doing, not the family's, and must
+    // fall through to a charged read rather than denying them the read entirely.
     const q = quiet('warn');
     const refused = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub({ failCondition: true }).ddb,
     });
     q.restore();
-    assert.equal(refused.reason, 'refused');
+    // No `ALL_OLD` item on this stub, so nothing can be established about WHY — and `unknown`
+    // is deliberately a HARD refusal: claiming a cause we cannot prove is worse than refusing.
+    assert.equal(refused.reason, 'unknown');
 
     const e = quiet('error');
     const blip = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub({ throws: new Error('ddb down') }).ddb,
@@ -287,6 +319,8 @@ describe('openRead — spending a grant', () => {
     const off = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction,
       now: NOW,
       ddb: stub().ddb,
@@ -303,6 +337,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -324,6 +360,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction: { token: '11111111-2222-3333-4444-555555555555', to: 'travel' },
       now: NOW,
       ddb,
@@ -341,6 +379,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       correction: { token: '11111111-2222-3333-4444-555555555555', to: 'travel' },
       now: NOW,
       ddb,
@@ -353,8 +393,9 @@ describe('closeRead — counting, then granting', () => {
       ddb,
     });
 
-    // event → travel → recipe → event, kind rotating, the different-kind guard never firing:
-    // one paid read buying free reads forever.
+    // event → travel → recipe → event, kind rotating: without the `task !== 'share'` fence one
+    // paid read buys free reads forever. (The different-kind guard that also used to block this
+    // is gone — #49 removed it — so this fence now carries the invariant alone.)
     assert.equal(grant, undefined);
   });
 
@@ -364,6 +405,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -383,6 +426,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -412,6 +457,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -426,6 +473,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -447,6 +496,8 @@ describe('closeRead — counting, then granting', () => {
     const read = await openRead({
       familyId: FAMILY,
       srcHash: sourceFingerprint(SOURCE),
+      srcBytes: SRC_BYTES,
+      arm: ARM,
       now: NOW,
       ddb,
     });
@@ -459,6 +510,87 @@ describe('closeRead — counting, then granting', () => {
     });
 
     assert.equal(grant, undefined);
+  });
+});
+
+describe('refusalReason names every guard that can refuse (#49)', () => {
+  // ⚠️ All three reasons #49 introduced — `different_size`, `different_arm`,
+  // `unbound_legacy_grant` — shipped with no test at all. `different_size` is the one that
+  // matters most: it IS the cheap-buys-expensive attempt, the thing the whole byte band exists
+  // to detect, and it is now the fallthrough. An untested fallthrough is how a future clause
+  // with no branch of its own gets reported as a deliberate bypass attempt, sending an operator
+  // hunting an attacker who does not exist.
+  const correction = { token: '11111111-2222-3333-4444-555555555555', to: 'travel' };
+  const now = NOW;
+  const nowSec = Math.floor(NOW / 1000);
+
+  /** A stub whose conditional failure carries the old item, the way ALL_OLD does. */
+  function withItem(item) {
+    return {
+      send: async (cmd) => {
+        if (!cmd.input.ConditionExpression?.includes('#consumed')) return {};
+        const err = new Error('condition failed');
+        err.name = 'ConditionalCheckFailedException';
+        err.Item = item;
+        throw err;
+      },
+      commands: {
+        UpdateItemCommand: class {
+          constructor(input) {
+            this.input = input;
+          }
+        },
+      },
+    };
+  }
+
+  const live = { expires_at: { N: String(nowSec + 600) } };
+  const rightSrc = { S: sourceFingerprint(SOURCE) };
+
+  const cases = [
+    ['spent', { ...live, src: rightSrc, consumed: { N: '1' } }],
+    ['expired', { ...live, src: rightSrc, expires_at: { N: String(nowSec - 1) } }],
+    ['different_source', { ...live, src: { S: 'a'.repeat(64) } }],
+    ['unbound_legacy_grant', { ...live, src: rightSrc }],
+    ['different_arm', { ...live, src: rightSrc, bytes: { N: '2048' }, arm: { S: 'sealed' } }],
+    ['different_size', { ...live, src: rightSrc, bytes: { N: '40' }, arm: { S: 'legacy' } }],
+  ];
+
+  for (const [expected, item] of cases) {
+    it(`names ${expected}`, async () => {
+      const q = quiet('warn');
+      await openRead({
+        familyId: FAMILY,
+        srcHash: sourceFingerprint(SOURCE),
+        srcBytes: SRC_BYTES,
+        arm: ARM,
+        correction,
+        now,
+        ddb: withItem(item),
+      });
+      q.restore();
+      assert.ok(
+        q.lines.some((l) => l.includes(`reason=${expected}`)),
+        `expected reason=${expected}, got: ${q.lines.join(' | ')}`
+      );
+    });
+  }
+
+  it('routes only the family-caused reasons to a hard refusal', async () => {
+    // The set is the whole point: what is OUR doing must fall through to a charged read, not
+    // deny the family the read entirely.
+    for (const r of ['spent', 'expired', 'different_source', 'different_size', 'unknown']) {
+      assert.ok(HARD_REFUSAL_REASONS.has(r), `${r} must refuse`);
+    }
+    for (const r of [
+      'unbound_legacy_grant',
+      'different_arm',
+      'unmeasured',
+      'disabled',
+      'store_unavailable',
+    ]) {
+      assert.ok(!HARD_REFUSAL_REASONS.has(r), `${r} must NOT deny the read`);
+    }
   });
 });
 
@@ -478,4 +610,139 @@ describe('the alarming prefixes are asserted against terraform', () => {
       );
     });
   }
+});
+
+describe('the byte fence is a fence, not a suggestion (#49)', () => {
+  // ⚠️ THE BUG THESE EXIST FOR. The grant's size band was written as
+  //   `(attribute_not_exists(#bytes) OR (#bytes BETWEEN :lo AND :hi))`
+  // and the legacy arm wrote no `bytes` attribute at all, so for every legacy-issued grant the
+  // band evaluated TRUE unconditionally. A caller could therefore earn a grant with a cheap read
+  // on the legacy plaintext arm and spend it on an eight-page document on the sealed arm, where
+  // `srcHash` is client-supplied and forgeable. That is the whole cheap-buys-expensive trade the
+  // band exists to prevent, and it had ZERO coverage: deleting `srcBytes` from sealedForward.mjs
+  // left all 271 lambda tests green.
+  //
+  // The fix is structural rather than another clause: a grant is pinned to the ARM that issued
+  // it and always carries a server-measured byte count, so there is no attribute-absent path left
+  // to take. The arm matters because the two arms measure DIFFERENT quantities — the legacy arm
+  // measures the SOURCE's own length, the sealed arm the ciphertext — so comparing one
+  // against the other is meaningless in both directions.
+  const correction = { token: '11111111-2222-3333-4444-555555555555', to: 'travel' };
+
+  it('has no attribute-absent escape from the size band', async () => {
+    const { sent, ddb } = stub();
+
+    await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: 2048,
+      arm: 'sealed',
+      correction,
+      now: NOW,
+      ddb,
+    });
+
+    const cond = sent[0].input.ConditionExpression;
+    assert.doesNotMatch(
+      cond,
+      /attribute_not_exists\(#bytes\)/,
+      'an absent `bytes` must NOT satisfy the band — that is the legacy-grant bypass'
+    );
+    assert.match(cond, /#bytes BETWEEN :lo AND :hi/, 'the band must still be enforced');
+  });
+
+  it('pins the grant to the arm that issued it', async () => {
+    const { sent, ddb } = stub();
+
+    await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: 2048,
+      arm: 'sealed',
+      correction,
+      now: NOW,
+      ddb,
+    });
+
+    const cond = sent[0].input.ConditionExpression;
+    assert.match(cond, /#arm = :arm/, 'a legacy grant must not be spendable on the sealed arm');
+    assert.equal(sent[0].input.ExpressionAttributeNames['#arm'], 'arm', '#arm must be aliased');
+    assert.equal(sent[0].input.ExpressionAttributeValues[':arm'].S, 'sealed');
+  });
+
+  it('bands an honest measurement tightly around it', async () => {
+    const { sent, ddb } = stub();
+
+    await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: 2048,
+      arm: 'sealed',
+      correction,
+      now: NOW,
+      ddb,
+    });
+
+    const { ':lo': lo, ':hi': hi } = sent[0].input.ExpressionAttributeValues;
+    assert.ok(Number(lo.N) <= 2048 && Number(hi.N) >= 2048, 'the honest size must pass');
+    assert.ok(Number(lo.N) > 1024 && Number(hi.N) < 4096, 'but the band must stay tight');
+  });
+
+  it('treats a ZERO-byte measurement as a measurement, not as "no opinion"', async () => {
+    const { sent, ddb } = stub();
+
+    // ⚠️ `srcBytes ? … : MAX_SAFE_INTEGER` was a TRUTHINESS test where `!= null` was meant, so a
+    // measurement of 0 fell through to the sentinel and produced the band [0, MAX_SAFE_INTEGER] —
+    // every possible size. A zero-length body cannot reach here today (sealedForward rejects it
+    // as `bad_sealed` first), which is exactly why the bug survived: the only input that exposes
+    // it is one the happy path never produces.
+    await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: 0,
+      arm: 'sealed',
+      correction,
+      now: NOW,
+      ddb,
+    });
+
+    const { ':hi': hi } = sent[0].input.ExpressionAttributeValues;
+    assert.ok(
+      Number(hi.N) < Number.MAX_SAFE_INTEGER,
+      "the ceiling must never be the sentinel — that is a tautology wearing a band's clothes"
+    );
+  });
+
+  it('refuses to spend a grant when the measurement is missing, rather than waving it through', async () => {
+    const { sent, ddb } = stub();
+
+    const read = await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: null,
+      arm: 'sealed',
+      correction,
+      now: NOW,
+      ddb,
+    });
+
+    assert.equal(read.free, false, 'no measurement means no exemption');
+    assert.equal(sent.length, 0, 'and we do not even ask DynamoDB');
+  });
+
+  it('always writes both `bytes` and `arm` when issuing, so no grant can lack them', async () => {
+    const { sent, ddb } = stub();
+
+    await closeRead(
+      { familyId: FAMILY, srcHash: sourceFingerprint(SOURCE), srcBytes: 4096, arm: 'legacy' },
+      { familyId: FAMILY, task: 'share', now: NOW, ddb }
+    );
+
+    const issue = sent.find((c) => c.input.UpdateExpression?.includes('#src = :src'));
+    assert.ok(issue, 'a grant must have been issued');
+    assert.match(issue.input.UpdateExpression, /#bytes = :bytes/, 'bytes is not optional');
+    assert.match(issue.input.UpdateExpression, /#arm = :arm/, 'arm is not optional');
+    assert.equal(issue.input.ExpressionAttributeValues[':bytes'].N, '4096');
+    assert.equal(issue.input.ExpressionAttributeValues[':arm'].S, 'legacy');
+  });
 });

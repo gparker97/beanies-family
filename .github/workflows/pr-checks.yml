@@ -81,3 +81,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Enclave crypto stays lazy (no HPKE in the cold-load path)
+        run: npm run check:crypto-chunk
