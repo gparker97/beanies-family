@@ -21,7 +21,8 @@
   data-ground:  cloud | sky | slate | midnight | ember | terracotta | paper | mint
   data-layout:  mascot | hero-bottom | split | ring | strip | portrait | photo | text
   data-align:   center | left
-  data-deco:    none | confetti | arc | blobs      (decorative accents)
+  data-deco:    none | confetti | arc | blobs | flightpath   (decorative accents;
+                mix freely, they are separate elements in the .deco block)
 
   BRAND RULES THAT DO NOT BEND (CIG + beanies-theme skill):
   - Heritage Orange #F15D22 is the accent and the alert colour. Alert Red is never
@@ -367,6 +368,25 @@
         border: 3px solid currentColor;
         opacity: 0.14;
       }
+      /* flight path: a dashed arc with a paper plane at its head. Drawn rather
+         than an emoji on purpose — the Noto plane is blue and grey, which fights
+         Heritage Orange and the hand-drawn beanie look. Inline SVG also stays
+         crisp at the @2x export, which a font glyph does not guarantee. */
+      .deco .flightpath {
+        position: absolute;
+        overflow: visible;
+      }
+      .deco .flightpath .track {
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-dasharray: 2 16;
+        opacity: 0.85;
+      }
+      .deco .flightpath .plane {
+        fill: var(--accent);
+      }
 
       /* ---- footer lockup ---- */
       .lockup {
@@ -437,6 +457,16 @@
       <!-- confetti: <span class="tick" style="left:120px; top:250px; background:var(--orange); transform:rotate(18deg)"></span> -->
       <!-- blobs:    <span class="blob" style="left:-120px; top:180px; width:420px; height:420px; background:var(--sky)"></span> -->
       <!-- arc:      <span class="arc"  style="right:-160px; top:620px; width:520px; height:520px;"></span> -->
+      <!-- flight path (travel pins): dashed arc + paper plane, in the ground's accent colour.
+           Geometry tuned on pin-16: at scale 2.1 the plane read as a plain arrow in a
+           thumbnail, which is the size that decides whether anyone stops.
+      <svg class="flightpath" style="left:70px; top:640px; width:860px; height:240px" viewBox="0 0 860 240" fill="none">
+        <path class="track" d="M8 215 C 195 45, 580 32, 772 108" />
+        <g class="plane" transform="translate(770,104) rotate(24) scale(3.1)">
+          <path d="M2 21 L23 12 L2 3 L2 10 L17 12 L2 14 Z" />
+        </g>
+      </svg>
+      -->
     </div>
 
     <div class="pin">
