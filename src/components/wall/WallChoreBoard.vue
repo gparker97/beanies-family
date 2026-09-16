@@ -443,8 +443,19 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     scrollbar-width: none;
   }
 
-  .wall-idle-strip :deep(img),
-  .wall-idle-strip :deep(.beanie-avatar) {
+  /*
+   * ⚠️ The avatar's WRAPPER, never its `img`.
+   *
+   * `BeanieAvatar` draws the member's colour on the wrapper — a tinted fill and
+   * a 2px border — and the `img` inside is `h-full w-full object-contain`, so it
+   * already fills whatever the wrapper is. Sizing the image instead shrinks the
+   * photo into the top-left corner and leaves the bean's colour showing around
+   * it, which is exactly what it did here.
+   *
+   * There is no `.beanie-avatar` CLASS either; the wrapper is identified by
+   * `data-testid`, so half the selector that caused this matched nothing at all.
+   */
+  .wall-idle-strip :deep([data-testid='beanie-avatar']) {
     height: 1.35rem;
     width: 1.35rem;
   }
