@@ -137,7 +137,7 @@ interface SealedProxyBody {
  * is the one new piece of cleartext metadata the sealed arm adds: it reveals no content, but it is
  * a stable identifier, so ADR-030 states plainly what the server still learns.
  */
-async function sourceHash(request: ExtractionRequest): Promise<string> {
+export async function sourceHash(request: ExtractionRequest): Promise<string> {
   return request.source.kind === 'text'
     ? sha256Hex(`t:${request.source.text}`)
     : sha256Hex(`i:${request.source.imageDataUrls.join('\n')}`);
