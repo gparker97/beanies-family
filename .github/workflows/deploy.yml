@@ -193,6 +193,14 @@ jobs:
           # bugs to specific deploys. Falls back to 'dev' for local builds.
           VITE_BUILD_SHA: ${{ github.sha }}
 
+      # ⚠️ Against the bundle that actually SHIPS, not a CI rebuild of it. The same check runs
+      # in main-ci and pr-checks, but those build without the prod env injected above — so a
+      # prod-only difference in chunking would be invisible there, and `/deploy-prod-skip-ci`
+      # bypasses those jobs entirely. On native this matters most: workbox precaches every
+      # built .js, so an eagerly-loaded crypto chunk is downloaded at install and the user
+      # cannot self-heal by reloading.
+      - name: Enclave crypto stays lazy (no HPKE in the cold-load path)
+        run: npm run check:crypto-chunk
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:

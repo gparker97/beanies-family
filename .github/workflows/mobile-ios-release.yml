@@ -181,6 +181,14 @@ jobs:
       # App group lists its children explicitly and nothing here regenerates the project.
       # BiometricKeystorePlugin.swift was in exactly that state for months (#74), shipping a
       # feature that could not run. Fail before the archive rather than after the release.
+      # ⚠️ Against the bundle that actually SHIPS, not a CI rebuild of it. The same check runs
+      # in main-ci and pr-checks, but those build without the prod env injected above — so a
+      # prod-only difference in chunking would be invisible there, and `/deploy-prod-skip-ci`
+      # bypasses those jobs entirely. On native this matters most: workbox precaches every
+      # built .js, so an eagerly-loaded crypto chunk is downloaded at install and the user
+      # cannot self-heal by reloading.
+      - name: Enclave crypto stays lazy (no HPKE in the cold-load path)
+        run: npm run check:crypto-chunk
       - name: Check every iOS Swift source is in Compile Sources
         run: node scripts/check-ios-sources.mjs
 

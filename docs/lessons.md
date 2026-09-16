@@ -4,6 +4,101 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A guard that cannot fail: the four species
+
+**Date:** 2026-09-16
+**Context:** Resuming #49 (AI end-to-end encryption). Three `/code-review max` rounds had already
+each found real defects in the previous round's fixes, and the feature was "code complete" with
+8113 unit tests and 271 lambda tests green. An audit against the plan's own acceptance criteria
+found ~10 further gaps. Every one of them, and the two headline defects greg had set aside, were
+the same thing wearing different clothes: **an assertion structurally incapable of failing.**
+This is the third consecutive session to land on that, so it is worth naming the species rather
+than repeating the headline.
+
+1. **The test mocks the thing under test.** No test anywhere performed a real HPKE seal —
+   `sealForEnclave` was mocked in the provider tests and `ehbp` was mocked in `seal.test.ts`. That
+   is precisely how a 100%-broken feature shipped green: the sealed body omitted `model`, which
+   the enclave rejects outright. Round 1's fix then added payload assertions _against the mock_.
+   A stub is shaped like whatever we believed on the day we wrote it, so it can never catch a
+   wrong belief.
+2. **The fixture never wires the dependency, so the guarded path fails open.** The sealed-arm test
+   block set no `RATE_TABLE`, `USAGE_TABLE` or `CORRECTION_GRANTS`, so the limiter, the meter and
+   the grant store were all no-ops. Three acceptance criteria were "covered" by tests that ran
+   against switched-off code. Proof: deleting `srcBytes` from `sealedForward.mjs` — the
+   unforgeable half of the source binding — left all 271 tests green.
+3. **The parity test restates instead of importing.** `lambdaContractParity.test.ts` re-stated the
+   client's hashing rule and compared _that_ to the server, while the shipped `sourceHash()` used
+   a different primitive entirely. Two copies agreed perfectly while the function families
+   actually run could drift from both.
+4. **The seam is the same function under two names.** The sealed-arm limiter test counted sends
+   through `__setRateLimitClientForTests`, which `rateLimit.mjs` re-exports as literally
+   `__setDdbClientForTests` — so the meter's own writes satisfied it, and replacing `checkLimits`
+   with `{ allowed: true }` left it green.
+
+**And the same defect in prose, which is the part that keeps being underrated.** The change's own
+thesis was "a comment asserting a guarantee nobody verifies is worse than no comment" — and the
+review found that thesis violated five times _inside the fix_: a crypto-chunk guard not wired
+into CI while two files said it "fails the build"; that guard unable to detect one of the two
+regressions its own header cites; Gate-3 headers contradicting the ADR they both defer to; and
+the legacy measurement documented in four places as the exact thing the code had just been
+changed to stop doing.
+
+**The sharpest version, learned the hard way in round 2 of the same session.** After writing the
+rules below, I added guards for five review findings and **four of them were vacuous** — proven
+by mutation, not by review. The common cause is worth stating precisely, because "write better
+tests" is not actionable and this is:
+
+> **If a guard's only observable effect is the same outcome as its absence, no test written
+> against that surface can distinguish them.**
+
+`openSealed`'s header policy had four rules — reject a non-object, skip an unencodable value,
+bound the count, count after the prefix test — and inside the try block every one of them
+produced the identical `ExtractionProviderError('malformed_output')`. I wrote four tests against
+that error, all four passed with the entire policy reverted to a naive one-liner, and I only
+found out because I re-ran the mutation. Two further attempts failed the same way: deleting
+`Object.hasOwn` globally broke unrelated code in the stack, and relying on `Headers.set` to
+throw tested the runner's DOM shim rather than our code.
+
+What worked was not a better assertion. It was **extracting the policy into a pure exported
+function** (`selectEhbpHeaders`) so each rule had its own observable return value; the same
+mutation then failed three tests immediately. The structural move: _when a guard resists being
+tested, that is information — the thing being guarded is in the wrong place._
+
+**Rules.**
+
+- **Test the shipped function, not a restatement of it.** If constructing the real input feels
+  like "testing the plumbing", construct it anyway — that is the input production uses.
+- **Assert the fixture landed before asserting behaviour.** A test whose dependency is unset is
+  testing that the code was skipped.
+- **Mutation-test every security or billing guard once, by hand.** Delete the line the guard
+  protects and watch the suite go red. If it stays green, the guard is decoration. This caught
+  the byte-fence bypass, the limiter tautology, and the crypto-chunk blind spot in this session
+  alone.
+- **A status belongs in exactly one place.** Any comment that says "X is the authority" while
+  restating X is already a bug; make it a pointer.
+- **Verify the recorded fix shape, do not apply it.** The previous session's note said to fix an
+  `Object.entries` OOM by iterating lazily with `for…in`. Measured: `for…in` over a 4.5MB string
+  _also_ dies at 256MB. Only the type rejection works. The written fix was wrong and would have
+  shipped as a fix.
+
+---
+
+## Answer the question that was asked
+
+**Date:** 2026-09-16
+**Context:** greg asked "is everything end to end encrypted now?" in a plainly celebratory
+register, right after a successful dev run. The answer was a four-point correction covering the
+undeployed bundle, store-build lag, the `content-fetch` plaintext hop, and what "end to end"
+means. He replied "yes i'm aware" to all four — he had been sharing a win.
+
+**Rule:** match the depth of the answer to the register of the question. Lead with the direct
+answer ("no — dev only, prod isn't deployed"), then offer the detail rather than deploying it.
+Caveats the user has already written into their own ADR are not news to them; listing them reads
+as correction rather than information. This does not licence vagueness on a precision question —
+when the claim would be _wrong_, say so plainly and immediately.
+
+---
+
 ## Prove the guard fires before believing it
 
 **Date:** 2026-09-16

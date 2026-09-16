@@ -8,6 +8,15 @@
 // They are kept identical by a unit test that fails CI if PROMPT_VERSION, the JSON shape, the
 // required keys, or the built messages diverge (src/services/ai/__tests__/extractionPromptDrift.test.ts).
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
+//
+// ⚠️ LEGACY-PLAINTEXT-ARM. This whole FILE is legacy-only and is deleted with the plaintext arm
+// (ADR-030's sunset condition, step 4). It exists because the Lambda used to build the prompt
+// for a document it could read; a sealed client builds its own from `src/services/ai/
+// extractionPrompt.ts`, so nothing here runs for sealed traffic.
+//
+// While the arm survives, a task ADDED to the client's registry must be copied here too, or a
+// family on an un-updated store build gets `unknown_task` for a feature the app offers them. If
+// that ever feels like too much to carry: retire the arm first, then add the task.
 
 export const PROMPT_VERSION = '2026-09-15.3';
 

@@ -11,21 +11,31 @@
  * top-level try/catch → 500. The body cap is deliberately MUCH larger than telemetry's 256 KB
  * because the payload is a base64 image data-URL (~1.33× the compressed bytes).
  *
- * GATE 3 (#49): SHIPPED, for sealed clients. A client that sends `protocol: 'ehbp-1'` encrypts
- * the body to the ATTESTED enclave key before it leaves the device, and `sealedForward.mjs`
- * relays ciphertext this function cannot read. For those clients the strong claim is true.
+ * GATE 3 (#49): see ADR-030 § Gates for the current status. Do NOT restate it here.
  *
- * ⚠️ It is NOT true for every client, and ADR-030 says so rather than awarding the gate a tick it
- * has not earned. The legacy plaintext arm below still exists for store builds that have not been
- * updated, and on that arm this proxy still sees the image in memory (retaining nothing). Until
- * the sunset condition in ADR-030 is met, the honest global claim remains "attested confidential
- * compute + zero retention". Never log the document bytes, on either arm.
+ * ⚠️ This header has carried a WRONG Gate-3 status three times now — "SHIPPED" when the feature
+ * was 100% broken, then "NOT YET PROVEN" after a real sealed extraction had succeeded. Each
+ * version also said "ADR-030 is the authority", which is the tell: a status duplicated in a
+ * comment drifts from the document that owns it, and the comment is always the stale copy. So it
+ * is a pointer now, and the only rules kept here are the ones that are local and durable:
+ *
+ *   · a client sending `protocol: 'ehbp-1'` encrypts to the ATTESTED enclave key before anything
+ *     leaves the device, and `sealedForward.mjs` relays ciphertext this function cannot read;
+ *   · the legacy plaintext arm below still serves store builds that have not updated, and on
+ *     that arm this proxy DOES see the document in memory (retaining nothing);
+ *   · NEVER log the document bytes, on either arm.
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
 import { closeRead, openRead, sourceFingerprint, validateCorrection } from './meter.mjs';
+import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
 import { checkLimits } from './rateLimit.mjs';
-import { SEALED_CONFIG_PROTOCOL, SEALED_PROTOCOL, sealedForward } from './sealedForward.mjs';
+import {
+  SEALED_CONFIG_PROTOCOL,
+  SEALED_PROTOCOL,
+  safeTaskLabel,
+  sealedForward,
+} from './sealedForward.mjs';
 import { UPSTREAM_ERROR_TEXT, callUpstream } from './upstream.mjs';
 
 const TINFOIL_API_KEY = process.env.TINFOIL_API_KEY;
@@ -71,6 +81,30 @@ function response(statusCode, body, event) {
     headers: getHeaders(event),
     body: body === null ? '' : JSON.stringify(body),
   };
+}
+
+/**
+ * A stable SIZE for the source, for the correction grant's band. Never the request envelope.
+ *
+ * ⚠️ Two constraints, and the obvious implementations break one each.
+ *
+ *  1. It must be IDENTICAL on the paid read and on the correction re-read. `rawBody.length` is
+ *     not: the correction request carries ~76 extra bytes of `correction:{token,to}` JSON, which
+ *     only falls inside the ±5% band above ~1500 bytes — so every short text share would have its
+ *     free correction refused and charged.
+ *  2. It must not ALLOCATE. `JSON.stringify(source).length` satisfies (1) but builds a complete
+ *     second copy of the payload — up to ~5MB of base64 — purely to read a length, in a 256MB
+ *     Lambda that already holds `rawBody`, `parsed`, the image array and the fingerprint's own
+ *     join. `sealedForward.mjs` documents what a large transient costs here: the process dies
+ *     before any try/catch, and API Gateway answers a bare 502 with no CORS headers.
+ *
+ * Summing the lengths satisfies both. Note this counts UTF-16 code units, not bytes — the grant
+ * attribute is called `bytes` for historical reasons. That is fine: it only ever has to be a
+ * stable, server-measured number compared against itself.
+ */
+function sourceSize(source) {
+  if (source.kind === 'text') return source.text.length;
+  return source.imageDataUrls.reduce((n, url) => n + url.length, 0);
 }
 
 /** Strip ```json … ``` fences a model may wrap its JSON in, then parse. */
@@ -161,9 +195,10 @@ export async function handler(event) {
 
   // ── LEGACY-PLAINTEXT-ARM begins ───────────────────────────────────────────────────────────
   //
-  // Everything from here to the end of the handler serves clients that predate the sealed arm.
-  // It is scheduled for deletion; see ADR-030's sunset condition. `grep -rn LEGACY-PLAINTEXT-ARM`
-  // finds every site that goes with it.
+  // Everything from here to `LEGACY-PLAINTEXT-ARM ends` serves clients that predate the sealed
+  // arm. It is scheduled for deletion; see ADR-030's sunset condition. `grep -rn
+  // LEGACY-PLAINTEXT-ARM` finds every site that goes with it.
+  //
   const {
     imageDataUrls,
     imageDataUrl,
@@ -284,6 +319,32 @@ export async function handler(event) {
     return response(400, { error: 'Bad correction', code: 'bad_correction' }, event);
   }
 
+  // ⚠️ THE COUNTER THE WHOLE RETIREMENT DEPENDS ON. ADR-030 step 3 says "the legacy counter
+  // reads zero for a full release cycle", and its Logs Insights query filters for exactly this
+  // literal. The line was specified in the plan and then never written, so the query matched
+  // nothing and the counter read zero FROM DAY ONE — which would have read as "no legacy
+  // traffic, safe to delete" while every un-updated store build was still using this arm. A
+  // retirement trigger indistinguishable from a broken trigger is worse than none.
+  //
+  // ⚠️ PLACEMENT AND LABEL ARE BOTH LOAD-BEARING, and the first version got both wrong.
+  //
+  //  · It sat immediately after the arm router, so every authenticated POST merely lacking a
+  //    `protocol` counted — including junk that 400s a few lines later. The `x-api-key` ships in
+  //    the public bundle, so one scanner would keep "reads zero" permanently unsatisfiable and
+  //    the operator could not tell "un-updated store builds still extracting" (do not delete)
+  //    from "a bot" (safe to delete). It now sits after the LAST pre-model refusal, so it counts
+  //    requests that were actually going to be served.
+  //  · It logged `safeTaskLabel(parsed?.task)`, and the OLDEST clients send no `task` at all —
+  //    that is what the `rawTask === undefined ? 'event'` default above exists for. So the exact
+  //    generation the sunset is waiting out was labelled `task=invalid`, byte-identical to a
+  //    forged task. It now logs the RESOLVED task.
+  //
+  // Deliberately NOT alarming: it must stay out of ALARMING_PREFIXES so ordinary legacy traffic
+  // never pages. Note `meter.test.mjs` only asserts the FORWARD direction (every alarming prefix
+  // has a filter in main.tf) — nothing stops someone adding a filter that pages on this line, so
+  // that remains a review matter rather than a guarded one.
+  console.log(`[ai-extract] legacy plaintext request task=${safeTaskLabel(task)}`);
+
   if (hasText) {
     const verdict = await checkLimits({
       familyId: typeof familyId === 'string' ? familyId : undefined,
@@ -316,6 +377,25 @@ export async function handler(event) {
     // ciphertext and reads its hash off the envelope — so the side that HAS the plaintext is the
     // side that fingerprints it.
     srcHash: sourceFingerprint(source),
+    // The legacy arm's own measuring stick: THE SOURCE, not the request that carried it.
+    //
+    // This arm used to pass no measurement at all, which combined with
+    // `attribute_not_exists(#bytes)` in the grant condition to make the size band a no-op for
+    // every grant it issued — the cheap-buys-expensive bypass (#49).
+    //
+    // ⚠️ AND IT MUST NOT BE `rawBody.length`, which was the obvious first answer and is wrong.
+    // The band compares the PAID read against the CORRECTION re-read, and the correction request
+    // carries an extra `correction: { token, to }` field — about 75 bytes of JSON the paid read
+    // did not have. As a fraction of the whole body those 75 bytes only fall inside ±5% once the
+    // body exceeds ~1500 bytes, so every SHORT TEXT share (a pasted line is ~100 bytes) would
+    // have had its free correction refused and charged, silently, on the arm every un-updated
+    // client still uses. The source is byte-identical across both requests; the envelope is not.
+    //
+    // Tagged `legacy` because this number is plaintext source bytes and the sealed arm's is
+    // ciphertext length; the two are not interchangeable, and the `arm` clause is what stops
+    // them ever being compared.
+    srcBytes: sourceSize(source),
+    arm: 'legacy',
     correction,
   });
 
@@ -335,7 +415,7 @@ export async function handler(event) {
   //                        would make that documentation false.
   //   · `store_unavailable` — a DynamoDB blip. `checkLimits` next door deliberately fails OPEN
   //                        on the identical failure, because a blip must not lock a family out.
-  if (correction && read.reason === 'refused') {
+  if (correction && HARD_REFUSAL_REASONS.has(read.reason)) {
     return response(409, { error: 'Correction refused', code: 'correction_refused' }, event);
   }
 
@@ -459,4 +539,31 @@ export async function handler(event) {
     console.error('[ai-extract] error:', err);
     return response(500, { error: 'Internal server error' }, event);
   }
+  // ── LEGACY-PLAINTEXT-ARM ends ─────────────────────────────────────────────────────────────
+
+  // ⚠️ THE TERMINAL REFUSAL, AND IT LIVES OUTSIDE THE MARKED BLOCK ON PURPOSE.
+  //
+  // Everything from `LEGACY-PLAINTEXT-ARM begins` to `ends` goes in one deletion at retirement
+  // (ADR-030 sunset step 4), together with `extractionPrompt.mjs`. Unreachable while that block
+  // is here, because every path above returns.
+  //
+  // The first version of these markers put `ends` after this line, which made the deletion the
+  // runbook describes actively unsafe: removing the block would have taken the handler's only
+  // terminal path with it, so a request with no `protocol` fell off the end of the function and
+  // returned undefined. API Gateway answers that with a bare 502 carrying NO CORS headers — the
+  // exact incident this file documents twice — for every un-updated store build, at the moment
+  // we believed we were tidying up. A boundary marker that makes the deletion wrong is worse
+  // than no marker.
+  //
+  // After retirement this is what an un-updated client gets, and it is the honest answer: the
+  // client maps `unknown_protocol` to the friendly "not set up yet" notice rather than an opaque
+  // failure, and the update prompt (`min-app-version.json`) is what actually resolves it.
+  // ⚠️ The `no-unreachable` suppression below is DELIBERATE, and the lint error is the proof
+  // that this line is doing its job. It is unreachable precisely because the legacy arm above
+  // still returns on every path — that is the point. It is the floor the handler lands on once
+  // that block is deleted at retirement. Deleting it to silence the lint would restore the exact
+  // defect it exists to prevent: a handler that returns undefined, which API Gateway renders as
+  // a CORS-less 502 for every un-updated store build.
+  // eslint-disable-next-line no-unreachable
+  return response(400, { error: 'Unknown protocol', code: 'unknown_protocol' }, event);
 }

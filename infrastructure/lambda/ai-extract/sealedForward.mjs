@@ -1,3 +1,4 @@
+import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
 /* global Buffer */
 /**
  * The SEALED arm (#49, ADR-030 Gate 3): forward a body we cannot read.
@@ -71,13 +72,42 @@ const EHBP_HEADER_RE = /^ehbp-[a-z0-9-]{1,48}$/i;
  * breaks, bound the length, and keep it to characters that cannot be mistaken for structure.
  */
 function logSafe(value, max = 48) {
-  return String(value)
-    .replace(/[\r\n\t]/g, ' ')
-    .replace(/[^\x20-\x7e]/g, '')
-    .slice(0, max);
+  return (
+    String(value)
+      .replace(/[\r\n\t]/g, ' ')
+      // ⚠️ SPACES TOO, and this is the whole defect the length bound could not cover. Stripping
+      // control characters and bounding the length still let a caller-chosen `ehbp` key name
+      // reproduce one of our alarm literals verbatim: `[ai-extract] usage-count write failed` is
+      // 37 printable-ASCII characters, so it passed through unchanged and was echoed into the
+      // dropped-header warn line. The metric filter in main.tf matches that string as a
+      // SUBSTRING anywhere in a line, at threshold 1 — so one request with the api key that
+      // ships in the public bundle pages #beanies-errors with a fabricated "we lost a usage
+      // count" incident, and `dropped.length < MAX_EHBP_HEADERS` allows 16 per body.
+      //
+      // This is exactly the reasoning `safeTaskLabel` already carries for `task`. It was applied
+      // there and not here, which is how a fence ends up guarding one door of two.
+      .replace(/[^\x20-\x7e]/g, '')
+      .replace(/[^a-zA-Z0-9_.-]/g, '?')
+      .slice(0, max)
+  );
 }
 /** Bounded so a hostile caller cannot make us build an unbounded header map. */
 const MAX_EHBP_HEADERS = 16;
+
+/**
+ * ⚠️ VALUES are validated too, not just names. A name that passed the prefix rule used to carry
+ * ANY string straight into `fetch(...)`, where undici throws on a control character ("invalid
+ * header value") or on any codepoint above 255 ("Cannot convert argument to a ByteString").
+ * `callUpstream` classifies that throw as `upstream_network` → 502 — after `openRead` has already
+ * atomically consumed the family's free correction, so the grant is spent, no model is called,
+ * and CloudWatch points whoever triages it at Tinfoil.
+ *
+ * Printable ASCII only, which is what an HTTP field value may contain unencoded anyway, and a
+ * length bound so 16 slots cannot ship multi-megabyte headers upstream — the same resource class
+ * as the `Object.entries` OOM above, one level down.
+ */
+const EHBP_VALUE_RE = /^[\x20-\x7e]*$/;
+const MAX_EHBP_VALUE_CHARS = 4096;
 /**
  * `task` is a metering label, but it is LOGGED, and our log lines feed CloudWatch metric filters
  * that page a human. Bounding the length is not enough on its own: `[ai-extract] usage-count
@@ -88,6 +118,18 @@ const MAX_EHBP_HEADERS = 16;
  * sealed arm has no registry to check against, so the shape is the fence.
  */
 const TASK_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+
+/**
+ * A caller-supplied `task` rendered safe to put in a log line, from EITHER arm.
+ *
+ * Exported because the legacy arm needs exactly this and must not grow its own copy: its
+ * retirement counter logs the task before the arm has validated it, and the charset is what
+ * stops a caller forging one of our alarm literals (`[ai-extract] usage-count skipped` is 32
+ * characters, so a length bound alone is not enough — a space is the whole attack).
+ */
+export function safeTaskLabel(task) {
+  return typeof task === 'string' && TASK_RE.test(task) ? task : 'invalid';
+}
 
 /** A closed set, because this value is caller-supplied and becomes an upstream request header. */
 const ALLOWED_CONTENT_TYPES = new Set(['application/json']);
@@ -103,12 +145,45 @@ function relayEhbpHeaders(source, direction) {
   const dropped = [];
   let kept = 0;
   let seen = 0;
-  for (const [name, value] of Object.entries(source || {})) {
-    // ⚠️ BOTH counters are bounded, not just `kept`. An earlier version bounded only the kept
+  // ⚠️ `for…in`, NOT `Object.entries`. `Object.entries` builds the WHOLE array up front, before
+  // any bound in the loop body can run — and on a string it yields one [index, char] pair per
+  // character, so `ehbp: "<4.5MB string>"` allocated ~4.5M pairs and killed the 256MB process
+  // outright (`memory_size = 256` in modules/ai-extract/main.tf). A dead process never reaches
+  // this arm's try/catch, so API Gateway answered a bare 502 with no CORS headers, which pages
+  // #beanies-errors.
+  //
+  // ⚠️ THE TYPE GUARD UPSTREAM IS THE REAL FIX, and an earlier version of this comment claimed
+  // `for…in` made the iteration lazy. Measured: it does not. `for (const k in '<4.5MB string>')`
+  // takes ~3.8s and ~40MB before the first loop body runs, because V8 materialises the whole
+  // own-enumerable-key list first — so `seen` cannot bound an allocation that has already
+  // happened. `for…in` is kept because it is no worse and reads plainly, but if the
+  // `typeof ehbp !== 'object'` check above is ever relaxed, this loop is NOT a second line of
+  // defence. A plain object with 300k keys still costs ~78ms before `seen` can break.
+  for (const name in source) {
+    if (!Object.hasOwn(source, name)) continue;
+    const value = source[name];
+    // BOTH counters are bounded, not just `kept`. An earlier version bounded only the kept
     // headers, so a caller could still push 50,000 junk keys into `dropped` and make us build one
     // multi-megabyte log line per invocation.
-    if (++seen > MAX_EHBP_HEADERS * 4) break;
-    if (EHBP_HEADER_RE.test(name) && typeof value === 'string' && kept < MAX_EHBP_HEADERS) {
+    // ⚠️ THE PREFIX TEST COMES FIRST, and the ordering is the defect this fixes. `seen` used to
+    // be incremented before anything looked at the name, so a body shaped
+    // `{a0..a63: 'x', 'ehbp-encapsulated-key': '<real>'}` exhausted the budget on junk and
+    // never reached the real header — and `relayEhbpHeaders` does not refuse, it drops
+    // silently, so execution continued into `openRead`, spent the family's one-use grant, and
+    // paid Tinfoil for ciphertext the enclave could not decapsulate. The client's
+    // `selectEhbpHeaders` had the same bug and is fixed the same way.
+    if (!EHBP_HEADER_RE.test(name)) {
+      if (dropped.length < MAX_EHBP_HEADERS && ++seen <= MAX_EHBP_HEADERS * 4) {
+        dropped.push(logSafe(name));
+      }
+      continue;
+    }
+    if (
+      typeof value === 'string' &&
+      EHBP_VALUE_RE.test(value) &&
+      value.length <= MAX_EHBP_VALUE_CHARS &&
+      kept < MAX_EHBP_HEADERS
+    ) {
       out[name] = value;
       kept += 1;
     } else if (dropped.length < MAX_EHBP_HEADERS) {
@@ -160,6 +235,15 @@ export async function sealedForward(envelope, event, respond) {
   // Lambda has always treated as forgeable. Forging it only lets a family mis-bind its OWN grant.
   if (typeof srcHash !== 'string' || srcHash.length === 0 || srcHash.length > 128) {
     return respond(400, { error: 'Invalid source hash', code: 'bad_srchash' }, event);
+  }
+  // ⚠️ Type-check BEFORE anything walks it. A string here used to be enumerated character by
+  // character by `Object.entries`, allocating one pair per character and killing a 256MB
+  // process on a few megabytes of input — see the note on `relayEhbpHeaders`. Absent is fine
+  // and ordinary; present-but-not-a-plain-object is a malformed request, never our own client.
+  if (ehbp !== undefined && ehbp !== null) {
+    if (typeof ehbp !== 'object' || Array.isArray(ehbp)) {
+      return respond(400, { error: 'Invalid ehbp headers', code: 'bad_ehbp' }, event);
+    }
   }
 
   // A sealed correction carries a TOKEN ONLY. `to` is deliberately absent: `consumeGrant` no
@@ -222,6 +306,12 @@ export async function sealedForward(envelope, event, respond) {
     return respond(400, { error: 'Sealed body is not valid base64', code: 'bad_sealed' }, event);
   }
 
+  // Decide what to relay BEFORE the meter, for the same reason the decode sits above it: this is
+  // the last thing that inspects caller-supplied input, and anything that can reject or drop must
+  // happen before `openRead` consumes the grant. It also keeps every "we did not like your input"
+  // log line on the near side of the billing boundary, which is where a triager looks first.
+  const upstreamEhbp = relayEhbpHeaders(ehbp, 'request');
+
   // After the refusals, before the model: the same placement the legacy arm uses, and for the same
   // two reasons (a refused request must not spend a grant; two concurrent replays must not both
   // get a free read).
@@ -229,12 +319,20 @@ export async function sealedForward(envelope, event, respond) {
   // `srcBytes` is what THIS Lambda measured. On the sealed arm `srcHash` is client-supplied and
   // therefore forgeable, so the measured size is the half of the source binding a caller cannot
   // lie about. See GRANT_BYTES_TOLERANCE in correctionGrant.mjs.
-  const read = await openRead({ familyId: family, srcHash, srcBytes: bytes.length, correction });
+  const read = await openRead({
+    familyId: family,
+    srcHash,
+    srcBytes: bytes.length,
+    arm: 'sealed',
+    correction,
+  });
 
   // A correction the grant store REFUSED is refused here too, never silently downgraded to a
-  // charged read. Gated on `reason === 'refused'` specifically: the kill switch and a store blip
-  // must still fall through to a charged read. The legacy arm's comment explains why at length.
-  if (correction && read.reason === 'refused') {
+  // charged read — but ONLY for the reasons that are the family's doing. `HARD_REFUSAL_REASONS`
+  // draws that line: the kill switch, a store blip, a grant minted before the size band shipped,
+  // and a grant earned on the other arm all fall through to a CHARGED read instead, because none
+  // of those is something the family did. See the set's own comment.
+  if (correction && HARD_REFUSAL_REASONS.has(read.reason)) {
     return respond(409, { error: 'Correction refused', code: 'correction_refused' }, event);
   }
 
@@ -246,7 +344,7 @@ export async function sealedForward(envelope, event, respond) {
     // application/octet-stream here risks a 415 on every sealed request. Bounded and allowlisted
     // because it is caller-supplied and ends up in an upstream header.
     contentType: ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : 'application/json',
-    extraHeaders: relayEhbpHeaders(ehbp, 'request'),
+    extraHeaders: upstreamEhbp,
   });
 
   if (!result.ok) {

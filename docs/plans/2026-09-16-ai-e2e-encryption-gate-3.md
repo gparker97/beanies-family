@@ -311,7 +311,7 @@ Surface `ai-enclave` (new, kebab-case, greppable). **No new context keys**: only
 - [ ] A bean is counted exactly once per **answered** read, `kind: 'none'` included, and the sealed arm's changed count point (finding M) is written into `meter.mjs` and ADR-030.
 - [ ] An old bundle (no `protocol`) still extracts successfully against the new Lambda.
 - [ ] A new bundle against an unknown protocol gets the friendly "not set up yet" notice, never an opaque error and never a plaintext send.
-- [ ] `task: '__proto__'` and `task: 'constructor'` on the sealed arm are forwarded and metered without throwing.
+- [x] `task: 'constructor'` on the sealed arm is forwarded and metered without throwing. **AMENDED:** `task: '__proto__'` is REFUSED with a 400 `bad_task`, not forwarded. The implementation added `TASK_RE` (`/^[a-z][a-z0-9_-]{0,31}$/`) because the sealed arm has no `EXTRACTION_TASKS` registry to gate on and the task is LOGGED — and a length bound alone still lets a caller forge an alarm literal (`[ai-extract] usage-count skipped` is 32 characters), so the charset is the fence. Refusing is strictly safer than forwarding and the criterion is corrected to match the code rather than the code loosened to match the criterion.
 - [ ] Rate limiting applies to every sealed request, image reads included.
 - [ ] `Authorization`, `x-api-key` and `Cookie` supplied in the `ehbp` map are never relayed upstream, proven by a test.
 - [ ] The comment checklist is complete in the commit that changes the behaviour, verified by `grep -rn "different.kind\|four guards\|FIVE guards\|and the kind\|TEXT SOURCES ONLY\|GATE 3 (deferred)"` returning nothing stale.

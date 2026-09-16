@@ -414,6 +414,62 @@ resource "aws_cloudwatch_metric_alarm" "correction_source_mismatch" {
   }
 }
 
+# The one correction refusal that means someone is PROBING THE METER, rather than the feature
+# being broken (different_source, above) or a user being ordinary (spent, expired).
+#
+# `different_size` fires when a grant is spent against a document of a materially different size
+# to the one it was earned on, with a `srcHash` that matches anyway. On the sealed arm `srcHash`
+# is client-supplied, so matching it while the size differs means it was forged - which is the
+# cheap-buys-expensive trade the byte band exists to prevent: pay for a 40-character text read,
+# then "correct" it with an eight-page PDF for free.
+#
+# Without this filter the condition caught the attempt and then dropped the evidence into an
+# unalarmed log line, indistinguishable from a user who left a review modal open past the hour.
+#
+# Threshold is 3, LOWER than the 5 used for different_source, and the reason is that the expected
+# steady state here is exactly zero rather than a trickle. The measurement is deterministic for a
+# genuine re-read: the legacy arm measures the source's own length, and the sealed arm a
+# ciphertext whose only variation between the paid read and the correction is the hint threaded
+# into the prompt - about 0.07% of a ~14KB body, against a 5% band. So a handful in an hour is
+# not noise to be tuned out; it is someone trying the door.
+
+resource "aws_cloudwatch_log_metric_filter" "correction_size_mismatch" {
+  name           = "${var.app_name}-ai-extract-correction-size-${var.environment}"
+  log_group_name = aws_cloudwatch_log_group.ai_extract.name
+  pattern        = "\"[ai-extract] correction refused reason=different_size\""
+
+  metric_transformation {
+    name          = "CorrectionSizeMismatch"
+    namespace     = "${var.app_name}/ai-extract"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "correction_size_mismatch" {
+  count = var.alerts_topic_arn == "" ? 0 : 1
+
+  alarm_name        = "${var.app_name}-ai-extract-correction-size-${var.environment}"
+  alarm_description = "A correction grant was spent against a differently-sized document with a matching source hash. On the sealed arm that hash is client-supplied, so this is a forged fingerprint - the cheap-buys-expensive meter bypass. Check the family_hash in the log line."
+
+  namespace           = aws_cloudwatch_log_metric_filter.correction_size_mismatch.metric_transformation[0].namespace
+  metric_name         = aws_cloudwatch_log_metric_filter.correction_size_mismatch.metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 3
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [var.alerts_topic_arn]
+  ok_actions    = [var.alerts_topic_arn]
+
+  tags = {
+    Name        = "${var.app_name}-ai-extract-correction-size"
+    Environment = var.environment
+  }
+}
+
 # A reservation without a Throttles alarm is a ceiling nobody finds out about. The sibling
 # module states the reasoning (modules/content-fetch/main.tf): "either real demand outgrew the
 # reservation, or abuse is hitting the ceiling. Both are worth a look." That applies with more

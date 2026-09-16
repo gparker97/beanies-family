@@ -51,6 +51,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Enclave crypto stays lazy (no HPKE in the cold-load path)
+        run: npm run check:crypto-chunk
+
   # E2E tests run in the dedicated `E2E Tests` workflow (.github/workflows/e2e.yml)
   # on push to main (chromium + webkit), on PRs labelled `run-e2e`, and weekly
   # (all three browsers).
