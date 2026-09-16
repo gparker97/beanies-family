@@ -3,8 +3,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 const fetchGoogleUserEmailMock = vi.fn(
   async (_token: string) => 'joiner@example.com' as string | null
 );
+/**
+ * Verified-for-THIS-token lookup. Mocked separately from `fetchGoogleUserEmail` on purpose:
+ * the two disagreeing IS the bug being guarded. `fetchGoogleUserEmail` falls back to a cached
+ * email on every failure path with no token check, so the Picker must read the account through
+ * this one or a userinfo blip pins it to whoever the cache last held.
+ */
+const getEmailVerifiedForTokenMock = vi.fn(
+  (_token: string) => 'joiner@example.com' as string | null
+);
 vi.mock('@/services/google/googleAuth', () => ({
   fetchGoogleUserEmail: (token: string) => fetchGoogleUserEmailMock(token),
+  getEmailVerifiedForToken: (token: string) => getEmailVerifiedForTokenMock(token),
 }));
 const logEventMock = vi.fn();
 vi.mock('@/services/telemetry', () => ({ logEvent: (...a: unknown[]) => logEventMock(...a) }));
@@ -266,6 +276,7 @@ describe('the Picker is pinned to the account that consented', () => {
     };
     drivePicker = await import('../drivePicker');
     fetchGoogleUserEmailMock.mockReset().mockResolvedValue('joiner@example.com');
+    getEmailVerifiedForTokenMock.mockReset().mockReturnValue('joiner@example.com');
     logEventMock.mockReset();
   });
 
@@ -300,6 +311,7 @@ describe('the Picker is pinned to the account that consented', () => {
     // A userinfo blip must cost a joiner nothing worse than the old behaviour — but unpinned is
     // exactly the broken state, so it can never be silent.
     fetchGoogleUserEmailMock.mockResolvedValue(null);
+    getEmailVerifiedForTokenMock.mockReturnValue(null);
     const { mockBuilder } = mockPickerNamespace();
     void drivePicker.pickBeanpodFile('tok-joiner');
     await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
@@ -323,5 +335,71 @@ describe('the Picker is pinned to the account that consented', () => {
     // The chooser still opens. Degraded to the old behaviour, never a thrown TypeError on the
     // one screen a joiner cannot get past.
     await vi.waitFor(() => expect(mockPicker.setVisible).toHaveBeenCalledWith(true));
+  });
+});
+
+describe('the pin cannot be poisoned by a stale or unverified email', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_GOOGLE_API_KEY', 'test-api-key');
+    vi.stubEnv('VITE_GOOGLE_PROJECT_NUMBER', '123456789');
+    (globalThis as Record<string, unknown>).gapi = {
+      load: vi.fn((_api: string, cb: () => void) => cb()),
+    };
+    drivePicker = await import('../drivePicker');
+    fetchGoogleUserEmailMock.mockReset().mockResolvedValue('joiner@example.com');
+    getEmailVerifiedForTokenMock.mockReset().mockReturnValue('joiner@example.com');
+    logEventMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    delete (globalThis as Record<string, unknown>).google;
+    delete (globalThis as Record<string, unknown>).gapi;
+  });
+
+  it('does NOT pin when userinfo fell back to a cached email from another account', async () => {
+    /**
+     * ⚠️ THE FIX REPRODUCING ITS OWN BUG. `fetchGoogleUserEmail` returns `cachedEmail` on
+     * `!res.ok`, on a throw, and on an empty `data.email` — none of which re-check the token.
+     * `GoogleDriveProvider.fromExisting` primes that cache, and it can hold the FILE OWNER's
+     * address. So a joiner whose userinfo call 401s would have had the Picker pinned to the
+     * owner's Drive, whose "Shared with me" is legitimately empty: the exact empty chooser this
+     * pinning exists to prevent, now deterministic instead of intermittent.
+     */
+    fetchGoogleUserEmailMock.mockResolvedValue('pod-owner@example.com'); // the stale fallback
+    getEmailVerifiedForTokenMock.mockReturnValue(null); // nothing proven for THIS token
+    const { mockBuilder } = mockPickerNamespace();
+    void drivePicker.pickBeanpodFile('tok-joiner');
+    await vi.waitFor(() => expect(mockBuilder.build).toHaveBeenCalled());
+
+    expect(mockBuilder.setAuthUser).not.toHaveBeenCalled();
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ action: 'picker_authuser_unpinned' }),
+      })
+    );
+  });
+
+  it('opens the Picker anyway when userinfo hangs, instead of hanging with it', async () => {
+    /**
+     * ⚠️ The resolve runs BEFORE `PICKER_TIMEOUT_MS` is armed, so an untimed fetch here hung
+     * `pickBeanpodFile` forever: no result, no telemetry, and `usePickBeanpodFile`'s
+     * `finally { isPicking = false }` never ran — latching the SaveFailureBanner's only
+     * recovery button disabled at '...' until a reload.
+     */
+    vi.useFakeTimers();
+    try {
+      fetchGoogleUserEmailMock.mockImplementation(() => new Promise<string | null>(() => {}));
+      getEmailVerifiedForTokenMock.mockReturnValue(null);
+      const { mockBuilder } = mockPickerNamespace();
+      void drivePicker.pickBeanpodFile('tok-joiner');
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mockBuilder.build).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

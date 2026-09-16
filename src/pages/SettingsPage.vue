@@ -372,10 +372,17 @@ async function handleSettingsReconnect() {
  * Cancellation contract: if the user dismisses Google's chooser, we
  * disarm the pending-switch flag (so the next legitimate token
  * acquisition isn't silently overwritten) and stay on the previous
- * account. The IDB refresh token is preserved on entry — `forceConsent`
- * already wipes the in-memory tokens, which is enough to force the
- * chooser, while keeping the IDB token means file polling can silently
- * recover from any cancel without spamming the chooser on every tick.
+ * account. The IDB refresh token is preserved on entry — wiping the
+ * in-memory tokens is enough to reach an interactive flow, while keeping
+ * the IDB token means file polling can silently recover from any cancel
+ * without spamming the chooser on every tick.
+ *
+ * ⚠️ `chooseAccount`, NOT `forceConsent`, and the previous wording here was simply wrong:
+ * it claimed `forceConsent` "is enough to force the chooser". `forceConsent` maps to
+ * `prompt=consent`, which re-asks permission on the account ALREADY signed in and SUPPRESSES
+ * the chooser — so this control handed the user back the same account, on desktop and on iOS
+ * alike (the redirect arm passed no prompt at all and defaulted to `consent` too). Same
+ * inversion the join flow hit; fixed there first, and this call site was missed.
  */
 async function handleSwitchGoogleAccount() {
   isSwitchingAccount.value = true;
@@ -391,11 +398,15 @@ async function handleSwitchGoogleAccount() {
       await startRedirectAuth(
         `${window.location.pathname}${window.location.search}`,
         undefined,
-        'reconnect'
+        'reconnect',
+        // Both values: `select_account` for the chooser, `consent` because Google returns a
+        // refresh_token only when consent is asked for, and switching accounts without offline
+        // access costs a consent screen on every later cold start.
+        { prompt: 'select_account consent' }
       );
       return; // page navigates away
     }
-    await requestAccessToken({ forceConsent: true });
+    await requestAccessToken({ chooseAccount: true });
     await syncStore.handleGoogleReconnected();
   } catch (e) {
     // Cancellation is a deliberate user action — disarm the switch flag

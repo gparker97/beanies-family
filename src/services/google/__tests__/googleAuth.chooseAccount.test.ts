@@ -14,7 +14,7 @@
  * before the chooser is ever reached. That is why `chooseAccount` bypasses all three, and why
  * the second test here matters as much as the first.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../pkce', () => ({
   generateCodeVerifier: vi.fn(() => 'verifier'),
@@ -43,13 +43,23 @@ vi.mock('../googleRevoke', () => ({
 
 let googleAuth: typeof import('../googleAuth');
 
-/** The URL the web redirect path navigated to, captured off `window.location`. */
+/** The real `window.location`, restored after every test. */
+const REAL_LOCATION = window.location;
+
+/**
+ * Capture the URL the web redirect path navigates to.
+ *
+ * ⚠️ PAIRED WITH THE `afterEach` BELOW. The first version redefined `window.location` and
+ * never put it back, and each call spread the ALREADY-STUBBED object — so the boxes chained
+ * and later tests in the run inherited a location belonging to an earlier one. A test harness
+ * that leaks into its neighbours makes every failure after it untrustworthy.
+ */
 function captureNavigation(): { get href(): string } {
   const box = { href: '' };
   Object.defineProperty(window, 'location', {
     configurable: true,
     value: {
-      ...window.location,
+      ...REAL_LOCATION,
       get href() {
         return box.href;
       },
@@ -70,6 +80,10 @@ describe('the account chooser is reachable at all', () => {
     vi.clearAllMocks();
     sessionStorage.clear();
     googleAuth = await import('../googleAuth');
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: REAL_LOCATION });
   });
 
   it('startRedirectAuth asks for select_account when told to', async () => {

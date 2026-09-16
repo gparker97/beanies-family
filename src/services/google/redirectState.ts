@@ -79,6 +79,13 @@ export function encodeRedirectState(payload: {
  * Callers treat `null` as "state lost" and route to an actionable, reported
  * surface (never a silent drop).
  */
+/**
+ * A throwaway origin to resolve `returnPath` against. Never navigated to; it exists only so the
+ * real browser URL parser can tell us whether the path escapes its origin. `.invalid` is
+ * reserved by RFC 2606 and can never resolve to a real host.
+ */
+const PROBE_ORIGIN = 'https://beanies.invalid';
+
 export function decodeRedirectState(raw: string | null | undefined): RedirectStatePayload | null {
   if (!raw) return null;
   try {
@@ -98,6 +105,23 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
       !returnPath.startsWith('/') ||
       returnPath.startsWith('//')
     ) {
+      return null;
+    }
+    // ⚠️ THE PREFIX CHECKS ABOVE ARE NOT ENOUGH, and believing they were left an open
+    // redirect. `/\evil.com` starts with a single '/' and passes both — but the WHATWG parser
+    // treats a BACKSLASH as a slash in the authority position for special schemes, so
+    // `new URL('/\evil.com', 'https://app.beanies.family').href` is `https://evil.com/`.
+    // `state` is unsigned, non-secret base64 JSON, so anyone can craft one: a victim tapping
+    // `…/oauth/callback?error=access_denied&state=<crafted>` leaves the real origin carrying
+    // the error. Aimed squarely at the join flow, where tapping an unfamiliar link IS the
+    // expected behaviour.
+    //
+    // Resolve it the way a browser will and demand the origin come back unchanged. That closes
+    // the whole class — backslashes, embedded tabs and newlines (which `new URL` strips),
+    // anything else a hand-written prefix test will not think of — rather than one spelling.
+    try {
+      if (new URL(returnPath, PROBE_ORIGIN).origin !== PROBE_ORIGIN) return null;
+    } catch {
       return null;
     }
     // `grant` is optional on the wire; anything other than an explicit

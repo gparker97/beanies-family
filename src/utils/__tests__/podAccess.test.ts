@@ -207,7 +207,17 @@ describe('POD_ACCESS_ERRORS registry', () => {
     // The binding constraint. Every recovery must restore access to the ORIGINAL
     // file; creating a second copy is what caused the incident this module exists
     // to prevent. If this fails, do not relax the assertion — remove the recovery.
-    const ALLOWED = new Set(['retry', 'reconnectAccount', 'pickFamilyFile', 'switchToCanonical']);
+    // `pickFamilyFileOtherAccount` added 2026-09-17. It is the SAME `rebindPodFile` call as
+    // `pickFamilyFile`, reached through Google's account chooser, for the family whose pod
+    // broke because the browser holds the wrong Google session. It cannot create a file:
+    // `useDriveFileReselect` only ever rebinds to a fileId the user picked.
+    const ALLOWED = new Set([
+      'retry',
+      'reconnectAccount',
+      'pickFamilyFile',
+      'pickFamilyFileOtherAccount',
+      'switchToCanonical',
+    ]);
     for (const code of ALL_CODES) {
       for (const action of POD_ACCESS_ERRORS[code].recoveries) {
         expect(ALLOWED.has(action), `${code} → ${action}`).toBe(true);

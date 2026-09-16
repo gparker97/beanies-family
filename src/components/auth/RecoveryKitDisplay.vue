@@ -53,10 +53,15 @@ watch(
       kitQr.value = '';
       return;
     }
-    // ⚠️ Warm the export chunks AND the font CSS the moment the kit is shown, not when it is
-    // tapped. This surface opens seconds after first paint during family creation, so it was
-    // paying a cold dynamic-import while competing with pod setup for the network — the worst
-    // moment, on the one artefact that gets a person back into their pod.
+    // ⚠️ Warm the export CHUNKS, not the font CSS — this comment used to claim both, after
+    // the font prewarm was deliberately removed from `prewarmSheetExport` for competing with
+    // pod setup for the network during family creation. The chunks are a different trade: they
+    // are needed for `navigator.share({files})` to survive iOS WebKit's transient user
+    // activation, which a cold dynamic-import at tap time loses.
+    //
+    // Deliberately kept despite the same critical-path concern: this is fire-and-forget, the
+    // alternative is a Share button that silently does nothing on iOS, and the kit is the one
+    // artefact that gets a person back into their pod.
     prewarmSheetExport();
     try {
       // The QR is a DEEP LINK: a phone camera pointed at the printed kit opens the

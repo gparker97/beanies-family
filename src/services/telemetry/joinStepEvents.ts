@@ -51,6 +51,19 @@ export function watchJoinSteps(
       level,
       surface: SURFACE,
       message: `join step ${from ?? 'none'} -> ${to}${reason ? ` (${reason})` : ''}`,
+      // ⚠️ STEP AND REASON RIDE `message`, NOT `context`, and that is a deliberate call
+      // against CLAUDE.md observability rule 4 rather than an oversight. A new `context` key is
+      // not a code change: `ALLOWED_CONTEXT_KEYS` strips anything unlisted, and adding one
+      // obliges us to update the collected-Diagnostics declarations filed with Apple and Google
+      // (`docs/runbooks/native-store-submission.md`, `PrivacyInfo.xcprivacy`, the Data Safety
+      // answers, `privacy.astro`). That is not a change to make quietly in a fix pass.
+      //
+      // The cost is small here because both values come from CLOSED UNIONS and are already in
+      // the message in a bounded, greppable form — `join step X -> Y (reason)` — which a
+      // CloudWatch filter matches as a substring exactly the way the Lambda metric filters do.
+      // `count` is used because it is already allowlisted. If step/reason ever need to be
+      // aggregated rather than grepped, add `join_step` / `join_reason` to the allowlist AND
+      // the four declaration surfaces in the same change.
       context: { action: 'join_step', ...(isNeedsPick ? { count: arrivals } : {}) },
     });
   });
@@ -72,9 +85,16 @@ const NEEDS_PICK_COUNT_KEY = 'beanies.join.needsPickArrivals';
 
 function bumpNeedsPickCount(): number {
   try {
-    const next = Number(sessionStorage.getItem(NEEDS_PICK_COUNT_KEY) ?? '0') + 1;
+    // ⚠️ VALIDATE BEFORE WRITING BACK. The first version computed `next` and STORED it
+    // before checking `Number.isFinite`, so any junk already in the slot wrote `'NaN'` back and
+    // every later bump read `NaN`, stored `'NaN'`, and returned 1 — permanently disarming the
+    // `warn` escalation that is the only reason this counter exists, for the lifetime of the
+    // tab. Read, sanitise, then store.
+    const raw = Number(sessionStorage.getItem(NEEDS_PICK_COUNT_KEY));
+    const previous = Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 0;
+    const next = previous + 1;
     sessionStorage.setItem(NEEDS_PICK_COUNT_KEY, String(next));
-    return Number.isFinite(next) ? next : 1;
+    return next;
   } catch {
     return 1;
   }

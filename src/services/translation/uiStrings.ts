@@ -277,9 +277,9 @@ const STRING_DEFS = {
     beanie: 'let them join again',
   },
   'bean.unclaim.description': {
-    en: '{name} is marked as joined, so you cannot send them a new invite. If they never actually got in \u2014 or they lost the link part way through \u2014 clear it and you can invite them again.',
+    en: '{name} is marked as joined, so you cannot send them a new invite. If they never actually got in, or they lost the link part way through, clear it and you can invite them again.',
     beanie:
-      '{name} is marked as joined, so you cannot send them a new invite. if they never actually got in \u2014 or they lost the link part way through \u2014 clear it and you can invite them again.',
+      '{name} is marked as joined, so you cannot send them a new invite. if they never actually got in, or they lost the link part way through, clear it and you can invite them again.',
   },
   'bean.unclaim.button': {
     en: 'Let {name} Join Again',
@@ -290,17 +290,17 @@ const STRING_DEFS = {
     beanie: 'let them join again?',
   },
   'bean.unclaim.confirm.message': {
-    en: 'This clears their PIN and their access, so they will need a fresh invite to get back in. They keep everything in the pod: their beans, their photos, their history. You can send them a new invite straight away.',
+    en: 'This clears their PIN, so they will need a fresh invite to get back in. They keep everything in the pod: their beans, their photos, their history. You can send them a new invite straight away.',
     beanie:
-      'this clears their pin and their access, so they will need a fresh invite to get back in. they keep everything in the pod: their beans, their photos, their history. you can send them a new invite straight away.',
+      'this clears their pin, so they will need a fresh invite to get back in. they keep everything in the pod: their beans, their photos, their history. you can send them a new invite straight away.',
   },
   'bean.unclaim.confirm.action': {
     en: 'Let Them Join Again',
     beanie: 'let them join again',
   },
   'bean.unclaim.done': {
-    en: 'Done \u2014 you can invite {name} again now.',
-    beanie: 'done \u2014 you can invite {name} again now.',
+    en: 'Done. You can invite {name} again now.',
+    beanie: 'done. you can invite {name} again now.',
   },
   'bean.unclaim.failed': {
     en: 'That did not work. Try again in a moment.',
@@ -5641,6 +5641,10 @@ const STRING_DEFS = {
   'podAccess.recovery.pickFamilyFile': {
     en: "Choose your family's file",
     beanie: "choose your family's file",
+  },
+  'podAccess.recovery.pickFamilyFileOtherAccount': {
+    en: 'Use a different Google account',
+    beanie: 'use a different google account',
   },
   'podAccess.recovery.switchToCanonical': {
     en: "Switch to your family's file",
