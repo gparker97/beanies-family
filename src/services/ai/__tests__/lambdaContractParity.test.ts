@@ -17,21 +17,34 @@ import { sourceFingerprint } from '../../../../infrastructure/lambda/ai-extract/
 // @ts-expect-error — as above.
 import { SEALED_PROTOCOL } from '../../../../infrastructure/lambda/ai-extract/sealedForward.mjs';
 
-import { sha256Hex } from '@/utils/encoding';
+import { sourceHash } from '../providers/managedProvider';
+import type { ExtractionRequest } from '../types';
 
 /**
- * The client's fingerprint, mirrored from `managedProvider.ts`.
+ * The client's fingerprint — THE SHIPPED FUNCTION, not a restatement of it.
  *
- * Deliberately re-stated here rather than exported from the provider: the provider computes it
- * from an `ExtractionRequest`, and pinning THAT shape would test the plumbing instead of the
- * hashing rule, which is the thing that has to match.
+ * ⚠️ This file used to re-state the rule here as ``sha256Hex(`i:${urls.join('\n')}`)`` and
+ * compare THAT against the server, with a comment arguing that importing the provider would
+ * "test the plumbing instead of the hashing rule". That argument is wrong, and it made the
+ * load-bearing assertion in this file incapable of failing:
+ *
+ *   · the provider does not use `sha256Hex` at all. It uses `sha256HexOfParts(parts, '\n')`,
+ *     a different primitive, chosen so the images arm does not build two extra multi-megabyte
+ *     copies of the document on the main thread.
+ *   · so the test compared a local copy of the OLD rule against the server. Both could agree
+ *     perfectly while the function actually shipped to families diverged from both, which is
+ *     precisely the failure this file exists to prevent: grants stop matching, every correction
+ *     is refused, and `GRANT_MISMATCH_PREFIX` — the one alarm that means the feature is broken
+ *     rather than someone probing it — starts firing.
+ *
+ * Constructing an `ExtractionRequest` is not "plumbing"; it is the input the provider is handed
+ * in production. A parity test that does not call the shipped function is a parity test between
+ * two things nobody runs.
  */
 async function clientHash(
   source: { kind: 'text'; text: string } | { kind: 'images'; imageDataUrls: string[] }
 ) {
-  return source.kind === 'text'
-    ? sha256Hex(`t:${source.text}`)
-    : sha256Hex(`i:${source.imageDataUrls.join('\n')}`);
+  return sourceHash({ source, todayIso: '2026-09-16' } as ExtractionRequest);
 }
 
 describe('client / Lambda contract parity', () => {

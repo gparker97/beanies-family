@@ -17,6 +17,7 @@
  */
 
 import { ExtractionProviderError } from '../types';
+import { raceCallerSignal } from '../callerSignal';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 
@@ -108,7 +109,9 @@ async function runVerification(): Promise<VerifiedEnclave> {
   const startedAt = Date.now();
   // Lazy, so the verifier and its crypto stay out of the main bundle and are not FETCHED until a
   // family actually runs a managed extraction. Verified in a browser, not inferred from the build:
-  // a cold load makes 87 requests and none of them is a crypto chunk.
+  // a cold load makes 87 requests and none of them is a crypto chunk. Now also pinned by
+  // `scripts/checkCryptoChunk.mjs`, so a regression fails the build rather than waiting for
+  // someone to re-check by hand.
   //
   // ⚠️ "Not fetched on load" is not the same as "not downloaded". Workbox's `globPatterns` sweeps
   // every built .js into the service-worker precache, so an installed PWA does pull these bytes
@@ -256,18 +259,12 @@ export function verifyEnclave(signal?: AbortSignal): Promise<VerifiedEnclave> {
       });
   }
 
-  const shared = pending;
-  if (!signal) return shared;
-
   // Each caller races the SHARED work against its OWN signal, so cancelling one extraction never
   // cancels or poisons another's. The shared promise keeps running for whoever is still waiting.
-  return Promise.race([
-    shared,
-    new Promise<never>((_, reject) => {
-      const fail = () =>
-        reject(new ExtractionProviderError('timeout', 'Extraction cancelled', undefined));
-      if (signal.aborted) fail();
-      else signal.addEventListener('abort', fail, { once: true });
-    }),
-  ]);
+  //
+  // This used to be an inline `Promise.race` here. It was extracted because `enclaveModel` was
+  // written WITHOUT it and reintroduced the exact bug this function's comments warn about — the
+  // reasoning was documented in one place and the mechanism lived in another, so the next
+  // memoised thing got it wrong. One implementation, nowhere left to diverge.
+  return raceCallerSignal(pending, signal);
 }

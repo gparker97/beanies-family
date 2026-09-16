@@ -19,16 +19,19 @@
 // this provider opens and parses itself with the same `parseChatCompletion` the BYOK tier uses.
 // Prompt building moved here too: the Lambda cannot build a prompt for a document it cannot read.
 //
-// GATE 3 — SHIPPED (#49). This provider verifies the enclave's AMD SEV-SNP attestation, gets the
-// HPKE public key BOUND to that attested measurement, and encrypts the chat-completions body to it
-// before anything leaves the device. Our proxy forwards ciphertext it cannot read. Verification
-// failure REFUSES the send; there is no degrade-to-plaintext path, by construction, because a
-// caller cannot obtain a key without verifying.
+// GATE 3 (#49): see ADR-030 § Gates for the current status. Do NOT restate it here.
 //
-// ⚠️ The claim is true for THIS client, not for every client. Store builds that have not been
-// updated still use the Lambda's legacy plaintext arm, which is why ADR-030 records Gate 3 as
-// "closed for sealed clients, open overall" rather than awarding it a tick the fleet has not
-// earned. See the sunset condition there.
+// ⚠️ This header has carried a WRONG Gate-3 status three times — "SHIPPED" while the sealed body
+// omitted `model` and every extraction would have failed, then "NOT YET PROVEN" after a real
+// sealed extraction had already succeeded against the live enclave. Every version also said
+// "ADR-030 is the authority", which is exactly the tell: a status duplicated in a comment drifts
+// from the document that owns it, and the comment is always the stale copy. Pointer only now.
+//
+// What IS local and durable, and therefore stays here: this provider verifies the enclave's AMD
+// SEV-SNP attestation, takes the HPKE public key BOUND to that attested measurement, and
+// encrypts the chat-completions body to it before anything leaves the device. Verification
+// failure REFUSES the send — there is no degrade-to-plaintext path, by construction, because a
+// caller cannot obtain a key without verifying.
 //
 // Until the proxy is deployed, the endpoint env var is unset and this provider degrades to a
 // typed `not_available` — an honest seam, not a fake success. The BYOK and on-device paths,
@@ -42,11 +45,13 @@ import {
   type ExtractionResultByTask,
   type ExtractionTask,
 } from '../types';
+import { isCancellation, markCancelled, raceCallerSignal } from '../callerSignal';
 import { buildSignal, parseChatCompletion } from './openaiCompatible';
 import { invalidateEnclaveVerification, verifyEnclave } from '../enclave/attestation';
 import { openSealed, sealForEnclave } from '../enclave/seal';
 import { base64ToBuffer, bufferToBase64, sha256HexOfParts } from '@/utils/encoding';
 import * as perfTiming from '@/utils/perfTiming';
+import { reportError } from '@/utils/errorReporter';
 
 /** Proxy endpoint (our Lambda). Unset until the Phase-2 backend is deployed. */
 const PROXY_URL = import.meta.env.VITE_AI_EXTRACT_URL;
@@ -72,9 +77,16 @@ const SEALED_CONFIG_PROTOCOL = 'ehbp-config';
  */
 let modelPromise: Promise<string> | null = null;
 
-async function enclaveModel(signal?: AbortSignal): Promise<string> {
+/**
+ * ⚠️ Takes NO caller signal, deliberately — see {@link raceCallerSignal}. Threading one in here
+ * bound every later caller of the memo to whichever extraction happened to start it, which is
+ * the bug `attestation.ts` had already been fixed for. `postToProxy` with no signal still gets
+ * `buildSignal(undefined)`, i.e. its own `DEFAULT_TIMEOUT_MS` deadline, so nothing can hang.
+ * Callers race their own cancellation at the call site instead.
+ */
+async function enclaveModel(): Promise<string> {
   modelPromise ??= (async () => {
-    const body = (await postToProxy({ protocol: SEALED_CONFIG_PROTOCOL }, signal)) as {
+    const body = (await postToProxy({ protocol: SEALED_CONFIG_PROTOCOL })) as {
       model?: string;
     };
     if (typeof body?.model !== 'string' || !body.model) {
@@ -195,6 +207,18 @@ async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<Sea
       signal: buildSignal(signal),
     });
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError' && signal?.aborted) {
+      // ⚠️ A CALLER CANCELLED — distinct from our own deadline, and it must be marked. This is
+      // the long leg of an extraction and therefore the ONLY cancellation window a person can
+      // realistically hit; `raceCallerSignal` wraps just the two memo lookups, which are
+      // instant after the first read of a session. Collapsing this into a plain `timeout` left
+      // `isCancellation()` false in `run()`'s catch, so backing out of the reader threw away
+      // the attestation and model memos and the re-opened reader paid a full fresh SEV-SNP
+      // verification — exactly the cost the exemption was added to prevent.
+      throw markCancelled(
+        new ExtractionProviderError('timeout', 'Managed extraction cancelled', err)
+      );
+    }
     if (err instanceof DOMException && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
       throw new ExtractionProviderError('timeout', 'Managed extraction timed out', err);
     }
@@ -292,6 +316,46 @@ async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<Sea
         `Managed proxy refused an oversized request (HTTP ${res.status})`
       );
     }
+    if (typeof code === 'string' && code.startsWith('bad_')) {
+      // The proxy could not parse the envelope THIS BUILD sent it: `bad_sealed`, `bad_task`,
+      // `bad_srchash`, `bad_ehbp`, `bad_correction`. Every one is a client-construction bug —
+      // never the family's doing, and never fixed by retrying.
+      //
+      // ⚠️ Keyed on the PREFIX, not on a list of literals, and that is the whole point. These
+      // codes had no ladder entry at all because the Lambda grew them after the client's ladder
+      // was written, so each fell through to `provider_error` with the detail "Managed proxy
+      // returned HTTP 400" — which `genericFailure` appends verbatim into the toast for an
+      // English-locale family. A literal list would reopen the gap the next time the sealed arm
+      // adds a refusal; a prefix cannot drift.
+      //
+      // It stays `provider_error` rather than the friendlier `not_available` deliberately:
+      // `not_available` renders an info toast with NO error surface, so a total breakage of our
+      // own envelope construction would page nobody. This must page. What changes is only what
+      // the family reads — a plain sentence instead of a status code.
+      console.error(
+        `[ai-extract] the proxy rejected our sealed envelope: ${code}. This is a CLIENT bug — ` +
+          'the envelope this build sent does not match what infrastructure/lambda/ai-extract ' +
+          'accepts. Check the field that code names; retrying will not help.'
+      );
+      // ⚠️ The console alone is not observability. CLAUDE.md's rule is "diagnose from the logs
+      // alone", and a client-construction bug means the feature is broken for EVERY family on
+      // this build — the one failure mode that most needs to be visible in CloudWatch rather
+      // than in one person's devtools. `error_code` is already allowlisted
+      // (diagnosticContext.ts), so this adds no new context key and no store-declaration work.
+      //
+      // `severity: 'error'`, not `'critical'`: the toast below already surfaces on ERROR_SURFACE,
+      // and paging twice for one event is how an on-call rota learns to ignore a channel.
+      reportError({
+        surface: 'ai-enclave',
+        severity: 'error',
+        message: `managed proxy rejected our sealed envelope (${code})`,
+        context: { error_code: code },
+      });
+      throw new ExtractionProviderError(
+        'provider_error',
+        'The managed proxy rejected this request'
+      );
+    }
     if (code === 'unknown_task') {
       // The client is ahead of the proxy: this build asks for a task the deployed Lambda
       // does not know yet. That is a DEPLOY-ORDER problem, not a user problem, so it maps
@@ -307,10 +371,37 @@ async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<Sea
         'Managed proxy does not support this extraction task yet'
       );
     }
-    throw new ExtractionProviderError(
-      'provider_error',
-      `Managed proxy returned HTTP ${res.status}`
+    // ⚠️ THE TERMINAL BRANCH, AND IT IS FAMILY-SAFE BY CONSTRUCTION RATHER THAN BY CONVENTION.
+    //
+    // It used to throw `Managed proxy returned HTTP ${res.status}`, and `genericFailure` appends
+    // that detail verbatim into the toast for an English-locale family — so a parent whose read
+    // failed because OUR Tinfoil key was rejected read "Managed proxy returned HTTP 502".
+    //
+    // The `bad_*` prefix branch above fixed one family of codes, and the prefix rule is not
+    // enough on its own: `upstream_badbody` (emitted by the SEALED arm), `upstream_badjson`,
+    // `upstream_network`, `model_unparseable`, `model_shape`, and the codeless 401/500 all reach
+    // here and match no prefix and no status rung. Rather than chase each one across two deploy
+    // units, the unrecognised case is now safe by default — a plain sentence for the family, and
+    // the code and status in the developer channel where they belong.
+    console.error(
+      `[ai-extract] managed proxy failed: HTTP ${res.status}` +
+        (typeof code === 'string' ? ` code=${code}` : ' (no code)')
     );
+    // ⚠️ The status has to reach the FIREHOSE, not just the console. Taking it out of the
+    // user-facing detail (rightly — a parent should not read "HTTP 502") also took it out of
+    // CloudWatch, because the old detail rode into `reportError` via the toast's own
+    // `reportMessage`. Nothing else records it: `index.mjs` returns a codeless 401 and logs
+    // nothing server-side either, so a bundle shipped with a stale `VITE_AI_EXTRACT_API_KEY`
+    // would fail every managed extraction with neither side recording why — diagnosable only
+    // from API Gateway metrics. `error_code` is already allowlisted, so this costs no new
+    // context key and no store-declaration work.
+    reportError({
+      surface: 'ai-enclave',
+      severity: 'error',
+      message: `managed proxy failed with HTTP ${res.status}`,
+      context: { error_code: typeof code === 'string' ? code : `http_${res.status}` },
+    });
+    throw new ExtractionProviderError('provider_error', 'The managed AI could not read this');
   }
 
   try {
@@ -364,7 +455,7 @@ export const managedProvider: ExtractionProvider = {
       const sealed = await sealForEnclave(enclave.hpkePublicKey, {
         // ⚠️ `model` is REQUIRED by the enclave and must be inside the CIPHERTEXT — the proxy
         // cannot add it to a body it cannot read. Omitting it fails every extraction.
-        model: await enclaveModel(request.signal),
+        model: await raceCallerSignal(enclaveModel(), request.signal),
         messages,
         temperature: 0,
       });
@@ -411,12 +502,22 @@ export const managedProvider: ExtractionProvider = {
         body.ehbp ?? {}
       );
     } catch (err) {
-      // Clear the memo after ANY failed sealed request, not only a stale-key-shaped one. We have
-      // never observed what a Tinfoil key rotation looks like on the wire, and classifying a
-      // failure nobody has seen is how you write a branch nobody can test. The cost is one extra
-      // verification after a failure that already cost the user a retry.
-      invalidateEnclaveVerification();
-      __resetManagedModelForTesting();
+      // Clear the memos after ANY failed sealed request, not only a stale-key-shaped one. We
+      // have never observed what a Tinfoil key rotation looks like on the wire, and classifying
+      // a failure nobody has seen is how you write a branch nobody can test. The cost is one
+      // extra verification after a failure that already cost the user a retry.
+      //
+      // ⚠️ EXCEPT a cancellation, which is not a failure at all. Without this exemption a family
+      // who opens the reader, backs out and opens it again — the exact story `callerSignal.ts`
+      // was extracted to fix — throws away both shared memos, so the re-opened reader pays a
+      // full fresh SEV-SNP verification (six requests over four serial rounds, each retried with
+      // backoff, then signature verification on the main thread) plus a second config round
+      // trip. Worse, clearing `inFlight` while the first verification is still running starts a
+      // SECOND attestation beside it. Nothing failed; one person changed their mind.
+      if (!isCancellation(err)) {
+        invalidateEnclaveVerification();
+        __resetManagedModelForTesting();
+      }
       // Everything this module throws is an ExtractionProviderError and callers rely on it;
       // base64ToBuffer and atob do not honour that, so classify rather than let one escape.
       if (err instanceof ExtractionProviderError) throw err;

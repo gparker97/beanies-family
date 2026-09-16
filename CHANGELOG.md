@@ -12,7 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- **Your document is now encrypted on your device before it is sent to the AI.** On the standard setting, what you hand over is sealed to the AI's secure hardware before it leaves your phone, so it passes through the beanies server as something we cannot read. beanies checks that the hardware really is what it claims to be first, and if that check does not pass it refuses to send at all rather than sending anyway. Not yet switched on for everyone: it needs one more round of real-device testing first.
+- **Your document is now encrypted on your device before it is sent to the AI.** On the standard setting, what you hand over is sealed to the AI's secure hardware before it leaves your phone, so it passes through the beanies server as something we cannot read. beanies checks that the hardware really is what it claims to be first, and if that check does not pass it refuses to send at all rather than sending anyway. This has now been proven working end to end against the real hardware. Not yet switched on for everyone: the app update that carries it has still to go out, and it needs a round of testing on real phones first.
+
+- **Correcting a wrong read stays free, even in the minutes after an update.** There is a short window after we update the server when beanies cannot tell whether a free correction you had already earned is still good. It used to decide that meant no, and told you the free re-read had already been used — which was neither true nor helpful. It now just does the read you asked for, reads it as the kind you said it was, and counts it as an ordinary one.
 
 ### Fixed
 

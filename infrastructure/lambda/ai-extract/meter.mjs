@@ -19,6 +19,8 @@ import { COUNT_FAILED_PREFIX, COUNT_SKIPPED_PREFIX, countUsage } from './countUs
 import { USAGE_ATTRS } from './ddb.mjs';
 import {
   GRANT_MISMATCH_PREFIX,
+  refusalAllowsHint,
+  GRANT_SIZE_MISMATCH_PREFIX,
   SHARE_KINDS,
   consumeGrant,
   issueGrant,
@@ -48,6 +50,7 @@ export const ALARMING_PREFIXES = Object.freeze({
   countFailed: COUNT_FAILED_PREFIX,
   countSkipped: COUNT_SKIPPED_PREFIX,
   grantMismatch: GRANT_MISMATCH_PREFIX,
+  grantSizeMismatch: GRANT_SIZE_MISMATCH_PREFIX,
 });
 
 /**
@@ -74,41 +77,60 @@ export const ALARMING_PREFIXES = Object.freeze({
  * shared meter the place where two transport arms became visible, which is exactly where that
  * knowledge must not leak to.
  *
- * @returns {{ free: boolean, reason: string|undefined, kindHint: string|undefined, srcHash: string|null, wasCorrection: boolean }}
+ * @returns {{ free: boolean, reason: string|undefined, kindHint: string|undefined, srcHash: string|null, srcBytes: number|null, arm: string|null, wasCorrection: boolean }}
  */
 export async function openRead({
   familyId,
   srcHash = null,
   /**
-   * Bytes the Lambda MEASURED on this request. Sealed arm only; null on the legacy arm, whose
-   * source binding already rests on a hash the server computed itself.
+   * The SIZE the Lambda measured for this read's SOURCE. Required on BOTH arms.
+   *
+   * ⚠️ It is not the request body, and the difference is not cosmetic: the correction re-read
+   * carries an extra `correction` field the paid read did not, so measuring the envelope put
+   * every short text share outside its own ±5% band. The legacy arm measures the source's own
+   * length; the sealed arm measures the ciphertext. See `arm` below for why those two must never
+   * be compared with each other.
    *
    * ⚠️ This is the unforgeable half of the sealed arm's source binding. `srcHash` there is
    * client-supplied, so on its own it can be forged to buy a free EXPENSIVE read with a cheap
    * one. See GRANT_BYTES_TOLERANCE in correctionGrant.mjs.
    */
   srcBytes = null,
+  /**
+   * Which arm measured `srcBytes`: `'legacy'` or `'sealed'`. Required, because the two measure
+   * different quantities (the source's own length vs the sealed ciphertext) and a grant earned under one
+   * must never be spent against the other's number. See the ARM note in correctionGrant.mjs.
+   */
+  arm = null,
   correction,
   now = Date.now(),
   ddb,
 } = {}) {
   if (!correction)
-    return { free: false, kindHint: undefined, srcHash, srcBytes, wasCorrection: false };
+    return { free: false, kindHint: undefined, srcHash, srcBytes, arm, wasCorrection: false };
 
-  const verdict = await consumeGrant({ familyId, correction, srcHash, srcBytes, now, ddb });
+  const verdict = await consumeGrant({ familyId, correction, srcHash, srcBytes, arm, now, ddb });
   return {
     free: verdict.free,
     // WHY the grant was not spent, so the handler can tell a genuine refusal from the kill
     // switch and from a store outage. Those three must not share an outcome: only the first
     // means "do not read this".
     reason: verdict.reason,
-    // ⚠️ The hint is honoured ONLY when a grant was actually spent. Accepting it otherwise would
-    // let any client bias every extraction, which is the "what IS this?" guess the one-surface
-    // work exists to remove. A user-stated kind AFTER seeing a wrong answer is a categorically
-    // different thing from a positional hint before the model has looked.
-    kindHint: verdict.free ? correction.to : undefined,
+    // ⚠️ The hint is honoured when a grant was spent, OR when the grant could not be honoured
+    // for a reason that is OUR doing and a client cannot manufacture — see
+    // `GRANT_REFUSAL_POLICY`. Anything else gets no hint, because accepting one unconditionally
+    // lets any client bias every extraction by sending a token that does not exist, which is
+    // the "what IS this?" guess the one-surface work exists to remove.
+    //
+    // ⚠️ THE SECOND CLAUSE IS NOT OPTIONAL. Without it a soft refusal produces the worst of
+    // both: the family is CHARGED and the model gets no hint, so at temperature 0 on the same
+    // bytes it returns the same wrong answer. A plain 409 is kinder than that, because it at
+    // least charges nothing. Soft-refusing and dropping the hint is a combination that should
+    // not exist; the policy table is what keeps the two decisions together.
+    kindHint: verdict.free || refusalAllowsHint(verdict.reason) ? correction.to : undefined,
     srcHash,
     srcBytes,
+    arm,
     wasCorrection: true,
   };
 }
@@ -156,6 +178,7 @@ export async function closeRead(read, { familyId, task, now = Date.now(), ddb } 
     task,
     srcHash: read?.srcHash,
     srcBytes: read?.srcBytes ?? null,
+    arm: read?.arm ?? null,
     counted,
     wasCorrection: Boolean(read?.wasCorrection),
     now,
