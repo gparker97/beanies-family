@@ -83,16 +83,49 @@ describe('GRANT_REFUSAL_POLICY covers every reason the module returns', () => {
     for (const [reason, policy] of Object.entries(GRANT_REFUSAL_POLICY)) {
       assert.equal(typeof policy.refuse, 'boolean', `${reason}.refuse`);
       assert.equal(typeof policy.hint, 'boolean', `${reason}.hint`);
-      // The combination the table exists to make impossible: charged for a re-read that, at
-      // temperature 0 on the same bytes with no hint, returns the same wrong answer.
-      assert.ok(policy.refuse || policy.hint, `${reason} charges the family and hints nothing`);
+    }
+  });
+
+  test('only reasons a client CANNOT force may carry a hint', () => {
+    /**
+     * ⚠️ AN ALLOWLIST, NOT A RULE, because the rule cannot be checked mechanically and the cost
+     * of getting it wrong is a free prompt-bias channel on every request. `hint: true` puts
+     * caller-supplied `correction.to` into the model's INSTRUCTION with no grant spent, so it
+     * is only ever safe for a reason our own code produces and a client cannot provoke.
+     *
+     * This exists because the rule was broken twice in two rounds: first by giving `missing` a
+     * hint (forceable by omitting `familyId`), then by giving `disabled` one (returned for
+     * EVERY correction while the kill switch is off, so an operator containing an incident
+     * would hand the abuser prompt control). Both proven by execution, not argued.
+     *
+     * Adding a name here is a security decision. Make it deliberately.
+     */
+    const MAY_HINT = new Set([
+      // A grant minted before the size band shipped. Requires having EARNED a real grant.
+      'unbound_legacy_grant',
+      // Earned on one arm, spent on the other. Also requires a real earned grant.
+      'different_arm',
+      // Our own caller reached consumeGrant with no measurement. `srcBytes` and `arm` are set
+      // by this Lambda, never by the request, so no client can provoke it.
+      'unmeasured',
+    ]);
+    for (const [reason, policy] of Object.entries(GRANT_REFUSAL_POLICY)) {
+      if (!policy.hint) continue;
+      assert.ok(
+        MAY_HINT.has(reason),
+        `${reason} carries hint:true but is not on the cannot-be-forced list`
+      );
     }
   });
 
   test('the three that used to fall through are now decided explicitly', () => {
+    // They reach a caller from the early guards and the catch, above the conditional write, so
+    // none was in the table and `refusalAllowsHint` was answering `undefined?.hint`. None may
+    // hint: `disabled` and `store_unavailable` fire on every correction during their
+    // respective conditions, and `missing` has no correction to hint with.
     for (const reason of ['disabled', 'store_unavailable', 'missing']) {
-      assert.equal(HARD_REFUSAL_REASONS.has(reason), false, `${reason} must not refuse`);
-      assert.equal(refusalAllowsHint(reason), true, `${reason} must still hint`);
+      assert.equal(HARD_REFUSAL_REASONS.has(reason), false, `${reason} must not 409`);
+      assert.equal(refusalAllowsHint(reason), false, `${reason} must not reach the prompt`);
     }
   });
 
@@ -124,10 +157,8 @@ describe('a client cannot buy a free prompt hint by omitting fields', () => {
     assert.equal(refusalAllowsHint('missing_family'), false, 'must never reach the prompt');
   });
 
-  test('a missing correction is still OUR bug, and still cannot bias anything', () => {
-    // Kept hintable because `!correction` leaves nothing to hint WITH, so this arm is not a
-    // channel — the split exists so that judgement is written down rather than assumed.
+  test('a missing correction is our bug, served but never hinted', () => {
     assert.equal(HARD_REFUSAL_REASONS.has('missing'), false);
-    assert.equal(refusalAllowsHint('missing'), true);
+    assert.equal(refusalAllowsHint('missing'), false);
   });
 });

@@ -12,6 +12,7 @@ import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import { useAppUpdate } from '@/composables/useAppUpdate';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
+import { isSameOriginReturnPath } from '@/services/google/redirectState';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useHelpfulHints } from '@/composables/useHelpfulHints';
@@ -1707,7 +1708,12 @@ useAppUpdate();
 // resume-setup continuation the web full-page redirect produces). No-op on web.
 // See ADR-029. Router navigation is injected here to keep googleAuth router-free.
 installNativeAuthListener((returnPath) => {
-  void router.replace(returnPath);
+  // ⚠️ THE THIRD `returnPath` SINK, and the last one without the origin check. It arrives
+  // from our own stash today, so this is a structural gap rather than a live exploit — but the
+  // open-redirect that shipped in `decodeRedirectState` was also "app-written" until it was
+  // not, and one shared predicate is the only shape where a future change cannot widen a door
+  // nobody remembered. Falling back to '/' loses only the resume-setup continuation.
+  void router.replace(isSameOriginReturnPath(returnPath) ? returnPath : '/');
 });
 
 // On-device reminders for today's briefing (native only). Schedules a local

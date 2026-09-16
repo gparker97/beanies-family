@@ -276,10 +276,20 @@ export const GRANT_REFUSAL_POLICY = Object.freeze({
   // table, which is the one thing the table exists to prevent. The completeness test in
   // `correctionGrant.test.mjs` now fails if a fourth appears.
   //
+  // ⚠️ `hint: false`, AND SETTING THEM `true` RE-OPENED THE CHANNEL THE SPLIT BELOW CLOSED.
+  // "Our fault, so be generous" is the wrong instinct here: `disabled` is returned for EVERY
+  // correction while the kill switch is off, so any caller holding the api key that ships in
+  // the public bundle gets `correction.to` into the model's instruction on every request, for
+  // free — during precisely the incident an operator flipped the switch to contain. Proven by
+  // execution with `CORRECTION_GRANTS` unset. `store_unavailable` is the same shape on a
+  // DynamoDB blip. This restores what predates the table, where `kindHint` was
+  // `verdict.free ? correction.to : undefined`: the read is still served and charged normally,
+  // only the free prompt bias goes.
+  //
   // Kill switch off, or the grants table unset. Our configuration, not their behaviour.
-  disabled: { refuse: false, hint: true },
+  disabled: { refuse: false, hint: false },
   // DynamoDB was unreachable. `checkLimits` next door fails OPEN for the same class of blip.
-  store_unavailable: { refuse: false, hint: true },
+  store_unavailable: { refuse: false, hint: false },
   // ⚠️ SPLIT, because one of these three is CLIENT-FORCEABLE and the other two are not.
   // `missing` used to cover all of `!familyId || !correction || !srcHash` at `hint: true`, which
   // broke the rule stated at the top of this table: a caller holding the api key that ships in
@@ -290,9 +300,10 @@ export const GRANT_REFUSAL_POLICY = Object.freeze({
   //
   // No family id means we cannot identify, meter or charge anyone. Refuse it.
   missing_family: { refuse: true, hint: false },
-  // No correction or no source hash with a family present is OUR bug, and `!correction` leaves
-  // nothing to hint WITH anyway, so this arm cannot be used to bias a prompt.
-  missing: { refuse: false, hint: true },
+  // No correction or no source hash with a family present is OUR bug. `hint: false` because
+  // `!correction` leaves nothing to hint with anyway, so `true` bought nothing and only kept
+  // the row on the list of things that could bias a prompt.
+  missing: { refuse: false, hint: false },
 
   // ── Cannot be explained. REFUSE, and charge nothing. ───────────────────────────────────
   //

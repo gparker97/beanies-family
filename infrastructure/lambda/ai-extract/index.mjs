@@ -343,8 +343,6 @@ export async function handler(event) {
   // never pages. Note `meter.test.mjs` only asserts the FORWARD direction (every alarming prefix
   // has a filter in main.tf) — nothing stops someone adding a filter that pages on this line, so
   // that remains a review matter rather than a guarded one.
-  console.log(`[ai-extract] legacy plaintext request task=${safeTaskLabel(task)}`);
-
   if (hasText) {
     const verdict = await checkLimits({
       familyId: typeof familyId === 'string' ? familyId : undefined,
@@ -367,6 +365,15 @@ export async function handler(event) {
       );
     }
   }
+
+  // ⚠️ AFTER THE RATE LIMIT, which is what the comment above already claimed ("it now sits
+  // after the LAST pre-model refusal") and the code did not: the 429 return above sat BELOW
+  // this line. The `x-api-key` ships in the public bundle, so a throttled scanner was writing
+  // this counter on every shed request — keeping ADR-030 step 3's "reads zero for a release
+  // cycle" deletion gate permanently unsatisfiable, and making "un-updated store builds still
+  // extracting" (do not delete) indistinguishable from "a bot being shed" (safe to delete),
+  // which is the exact discrimination the earlier move was made to restore.
+  console.log(`[ai-extract] legacy plaintext request task=${safeTaskLabel(task)}`);
 
   // Everything the meter needs to know, decided once and here: after the refusals (so a
   // rate-limited correction does not spend its grant) and before the model (so two concurrent
