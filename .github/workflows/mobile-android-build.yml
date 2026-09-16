@@ -60,6 +60,11 @@ jobs:
           # prod web bundle already ships — no new exposure. The token exchange
           # uses the registry/OAuth-proxy Lambda (api.beanies.family).
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          # ⚠️ The Picker needs these too, and their absence here shipped builds whose
+          # Google Picker could never open — it refuses without a developerKey, which is
+          # the one path a JOINER cannot route around under `drive.file`.
+          VITE_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.GOOGLE_PROJECT_NUMBER }}
           VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
           VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
           # The official-build guard in vite.config.ts requires BOTH webhooks

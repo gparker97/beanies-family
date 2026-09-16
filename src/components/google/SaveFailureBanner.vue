@@ -3,13 +3,13 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { showToast } from '@/composables/useToast';
 import { useSyncStore } from '@/stores/syncStore';
 import { hardReload } from '@/utils/hardReload';
 import { reportError } from '@/utils/errorReporter';
 import { FAMILY_DATA_DEEP_LINK } from '@/constants/deepLinks';
-import { POD_ACCESS_ERRORS } from '@/utils/podAccess';
+import { assertNever } from '@/utils/assertNever';
+import { useDriveFileReselect } from '@/composables/useDriveFileReselect';
 
 const props = defineProps<{
   show: boolean;
@@ -19,7 +19,7 @@ const props = defineProps<{
 const { t } = useTranslation();
 const router = useRouter();
 const syncStore = useSyncStore();
-const { isPicking, pick } = usePickBeanpodFile();
+const { reselect, isBusy } = useDriveFileReselect();
 const reselectError = ref<string | null>(null);
 
 const emit = defineEmits<{
@@ -33,16 +33,26 @@ const fileNotFoundBody = computed(() => {
 
 async function handleReselectFile() {
   reselectError.value = null;
-  const result = await pick();
-  if (result.kind !== 'picked') return; // cancelled, redirected, or pick failed
-  const recovery = await syncStore.rebindPodFile(result.fileId, result.fileName);
-  if (recovery.ok) {
-    emit('reconnected');
-  } else {
-    // `rebindPodFile` now returns a typed code instead of raw English prose —
-    // the message comes from the shared registry so it is translated like
-    // everything else the user reads.
-    reselectError.value = t(POD_ACCESS_ERRORS[recovery.code].messageKey);
+  // ⚠️ Every outcome is answered. This used to open with
+  // `if (result.kind !== 'picked') return;` — a cancel, a full-page redirect and a hard Picker
+  // failure all became a banner that did nothing when tapped, on a screen a family only reaches
+  // because their pod is already broken.
+  const result = await reselect();
+  switch (result.outcome) {
+    case 'rebound':
+      emit('reconnected');
+      return;
+    case 'failed':
+      // A `UIStringKey` from the shared registry, never raw prose.
+      reselectError.value = t(result.messageKey);
+      return;
+    case 'declined':
+    case 'redirecting':
+      // Nothing to say: they closed it, or the page is navigating to Google. Both are already
+      // logged by the composable, and neither is an error to put in front of them.
+      return;
+    default:
+      assertNever(result, 'SaveFailureBanner.handleReselectFile');
   }
 }
 
@@ -83,11 +93,11 @@ function goToSettings() {
     <template #actions>
       <template v-if="props.fileNotFound">
         <button
-          :disabled="isPicking"
+          :disabled="isBusy"
           class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
           @click="handleReselectFile"
         >
-          {{ isPicking ? '...' : t('googleDrive.fileNotFoundReselect') }}
+          {{ isBusy ? '...' : t('googleDrive.fileNotFoundReselect') }}
         </button>
         <button
           class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30"

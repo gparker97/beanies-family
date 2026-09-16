@@ -4,6 +4,56 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A boolean whose name is the opposite of its meaning
+
+**Date:** 2026-09-16
+**Context:** A joiner on an iPhone bounced between Google consent and the join card forever. The
+whole bug was one flag. `requestAccessToken({ forceConsent: true })` computed
+`prompt = forceConsent ? 'consent' : 'select_account'` — and `prompt=consent` re-asks permission
+on the account ALREADY signed in, which actively SUPPRESSES Google's account chooser. So the flag
+named for surfacing the chooser was the flag that hid it.
+
+Every caller had read the name and believed it. `GoogleDriveProvider.createNew`'s docblock said
+"re-prompts the Google account chooser". `syncStore.listGoogleDriveFiles`'s option was called
+`forceNewAccount`. The join flow's "sign in with a different Google account" link was built on it
+and could not, on any platform, sign you in with a different account. Four independent authors
+wrote four correct-sounding comments about behaviour none of them had.
+
+**Rule:** when a boolean's name asserts a user-visible OUTCOME ("force consent", "force new
+account"), the test must assert that outcome, not the flag's propagation. `expect(pick).toHaveBeenCalledWith({ forceConsent: true })`
+passes just as happily when the flag does the opposite thing. Assert the artefact the user meets:
+the `prompt=` in the URL, the screen that opens.
+
+**Corollary, and the more expensive half:** renaming the flag to `chooseAccount` was not the fix
+on its own. Anyone reaching "sign in with a different account" is by definition already signed in,
+so the cached token is valid, the refresh token works, and the silent auth-code exchange succeeds
+— each one returning a token for the account they are trying to leave, before the prompt is ever
+sent. A flag that changes what we ASK for has to also change what we ACCEPT. Ask, for any such
+flag: what short-circuits before the thing I just changed?
+
+---
+
+## A compensating write is weaker than an ordering
+
+**Date:** 2026-09-16
+**Context:** `joinFamily` wrote the member's `pinHash` first, and "joined" is derived from it
+(`requiresPassword: !passwordHash && !pinHash`). So a join that fell over anywhere afterwards left
+someone marked joined who had never got in, and the invite UI then refused to offer them a link
+ever again. The first fix kept the order and added a rollback in the catch. Review found two holes
+in the fix: the rollback can itself fail (the catch had a nested catch reporting exactly that), and
+it cleared the credentials while leaving the session authenticated and persisted.
+
+The second fix moved every fallible step ABOVE the claim. A failure below the claim now leaves the
+member unclaimed, which is simply retryable; a failure above it leaves them claimed and able to
+sign in with the PIN they just set. The rollback was deleted, not improved.
+
+**Rule:** when a workflow has one irreversible write, reorder so it is last, before reaching for a
+compensating write. A rollback is a second thing that can fail on the path where something has
+already failed — the worst possible place for one. And test the ORDER: "the hash is cleared after
+a failure" passes against both designs, including the one that shipped the bug.
+
+---
+
 ## A guard that cannot fail: the four species
 
 **Date:** 2026-09-16

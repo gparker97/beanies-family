@@ -89,138 +89,25 @@ function loadPickerLibrary(): Promise<void> {
   });
 }
 
-/**
- * Open the Google Picker to select the `beanies.family` FOLDER.
- *
- * This is the preferred join/recovery entry point: picking the folder
- * grants the app `drive.file` scope access to the folder AND every file
- * inside it (including the `.beanpod` itself and every photo). Picking
- * a single `.beanpod` file via `pickBeanpodFile` only grants access to
- * that one file, which leaves photos unreachable from joined members'
- * apps even when the folder is shared at the Drive level — see
- * ADR-021 for the full scope discussion.
- *
- * Returns `{ folderId, folderName }` on pick, or `null` if the user
- * cancelled. Caller validates the folder contents with
- * `findBeanpodInFolder` from driveService.
- */
-export async function pickBeanpodFolder(
-  accessToken: string
-): Promise<{ folderId: string; folderName: string } | null> {
-  const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
-  if (!apiKey) {
-    throw new Error('VITE_GOOGLE_API_KEY is not configured');
-  }
-
-  await loadPickerScript();
-  await loadPickerLibrary();
-
-  return new Promise((resolve, reject) => {
-    let built: BuiltPicker | null = null;
-    try {
-      const FOLDER_MIME = 'application/vnd.google-apps.folder';
-
-      // `setIncludeFolders` / `setSelectFolderEnabled` exist at runtime on
-      // Google Picker's DocsView but aren't declared in `@types/google.picker`.
-      // Narrow extension locally so we don't need a catch-all cast.
-      type FolderCapableDocsView = google.picker.DocsView & {
-        setIncludeFolders(value: boolean): FolderCapableDocsView;
-        setSelectFolderEnabled(value: boolean): FolderCapableDocsView;
-      };
-
-      // "Shared with me" — most common case for joiners whose invite came
-      // from another family member. Name-hint so the canonical folder
-      // surfaces first but the user can browse if they've renamed it.
-      const sharedView = new google.picker.DocsView(
-        google.picker.ViewId.DOCS
-      ) as FolderCapableDocsView;
-      sharedView.setMimeTypes(FOLDER_MIME);
-      sharedView.setIncludeFolders(true);
-      sharedView.setSelectFolderEnabled(true);
-      sharedView.setQuery('beanies.family');
-      sharedView.setOwnedByMe(false);
-      sharedView.setMode(google.picker.DocsViewMode.LIST);
-
-      // "My Drive" — for pod owners running recovery (their folder isn't
-      // "shared with me" since they own it).
-      const myDriveView = new google.picker.DocsView(
-        google.picker.ViewId.DOCS
-      ) as FolderCapableDocsView;
-      myDriveView.setMimeTypes(FOLDER_MIME);
-      myDriveView.setIncludeFolders(true);
-      myDriveView.setSelectFolderEnabled(true);
-      myDriveView.setQuery('beanies.family');
-      myDriveView.setOwnedByMe(true);
-      myDriveView.setMode(google.picker.DocsViewMode.LIST);
-
-      const appId = import.meta.env.VITE_GOOGLE_PROJECT_NUMBER;
-
-      const builder = new google.picker.PickerBuilder()
-        .addView(sharedView)
-        .addView(myDriveView)
-        .setOAuthToken(accessToken)
-        .setDeveloperKey(apiKey)
-        .setOrigin(window.location.origin);
-
-      // AppId (numeric project number) is required so the Picker-granted
-      // `drive.file` access actually attaches to our OAuth token.
-      if (appId) builder.setAppId(appId);
-
-      const picker = builder
-        .setCallback((data: google.picker.PickerResponse) => {
-          if (data.action === google.picker.Action.PICKED && data.docs?.[0]) {
-            const picked = data.docs[0];
-            disposePicker(built);
-            resolve({ folderId: picked.id, folderName: picked.name });
-          } else if (data.action === google.picker.Action.CANCEL) {
-            console.debug('[drivePicker] folder pick cancelled');
-            disposePicker(built);
-            resolve(null);
-          }
-        })
-        .build();
-
-      // Recorded BEFORE `setVisible`, so a synchronous throw inside it still
-      // leaves the catch below something to close.
-      built = picker as unknown as BuiltPicker;
-      picker.setVisible(true);
-    } catch (e) {
-      console.error('[drivePicker] folder picker failed to open', e);
-      disposePicker(built);
-      reject(e);
-    }
-  });
-}
-
-/**
- * Discriminated outcome of a `pickBeanpodFile` call.
- *
- * - `picked`     — user chose a file successfully.
- * - `cancelled`  — user opened the Picker normally (LOADED fired) and
- *                  closed it without picking.
- * - `failed`     — Picker could not be invoked or rendered. `reason` is a
- *                  fine-grained taxonomy so the join flow can route the
- *                  symptom to a useful error message and the diagnostic
- *                  blob carries the underlying Error.message:
- *     - `'config'`  → `VITE_GOOGLE_API_KEY` not configured at runtime.
- *     - `'load'`    → Google API JS or Picker library could not be loaded
- *                     (network blip, CSP/ITP block, blocked apis.google.com).
- *     - `'open'`    → Synchronous throw from `PickerBuilder` / `setVisible`
- *                     (typically `google.picker` undefined post-load).
- *     - `'auth'`    → Token-acquisition step threw before the Picker call.
- *                     Set by `usePickBeanpodFile.pick`'s outer catch, not
- *                     here directly.
- *     - `'iframe'`  → Picker iframe errored before LOADED fired (iOS WebKit
- *                     storage-partitioning symptom — "API developer key
- *                     invalid" / cookie-consent path).
- *     - `'timeout'` → No callback fired within 30s of `setVisible(true)`.
- */
 export type PickBeanpodFileResult =
   | { kind: 'picked'; fileId: string; fileName: string }
   | { kind: 'cancelled' }
+  /**
+   * A full-page redirect has been started; this page is going away.
+   *
+   * ⚠️ NOT a cancellation, and conflating the two is what hid a production bug. The joiner had
+   * done nothing wrong — we had just navigated them to Google — but three of the four call sites
+   * treated the result as "the user dismissed the chooser" and silently did nothing, which on
+   * iOS/PWA produced a closed consent loop with no error and no telemetry.
+   *
+   * Vocabulary borrowed deliberately from `ReconnectOutcome` in `useGoogleReconnect.ts`, which
+   * already defines this case and warns that on native the WebView does NOT unload — so "the page
+   * is leaving" is not a guard you can rely on.
+   */
+  | { kind: 'redirecting' }
   | {
       kind: 'failed';
-      reason: 'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout';
+      reason: 'config' | 'load' | 'open' | 'auth' | 'iframe' | 'timeout' | 'popup-blocked';
       message?: string;
     };
 
@@ -364,10 +251,7 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
 }
 
 /** The failure reasons `pickBeanpodFile` can report. */
-export type PickFailureReason = Exclude<
-  PickBeanpodFileResult,
-  { kind: 'picked' } | { kind: 'cancelled' }
->['reason'];
+export type PickFailureReason = Extract<PickBeanpodFileResult, { kind: 'failed' }>['reason'];
 
 /**
  * User-facing copy + a queryable code for a pick failure, in ONE place.
@@ -391,6 +275,9 @@ const PICK_FAILURE_COPY = {
   open: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-open' },
   iframe: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-iframe' },
   timeout: { messageKey: 'settings.drivePickerFailed', errorCode: 'picker-timeout' },
+  // The browser refused the popup. Distinct from a user cancel, and distinct from the Picker
+  // failing — `isUserCancellation` deliberately does not match it (see googleAuth.ts).
+  'popup-blocked': { messageKey: 'join.error.popupBlocked', errorCode: 'picker-popup-blocked' },
 } as const satisfies Record<PickFailureReason, { messageKey: UIStringKey; errorCode: string }>;
 
 export function describePickFailure(reason: PickFailureReason): {

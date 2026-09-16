@@ -544,12 +544,17 @@ export class GoogleDriveProvider implements StorageProvider {
    * Create a new .beanpod file on Google Drive.
    * Authenticates, creates/finds the app folder, and creates the file.
    *
-   * `forceConsent` (default `true`) re-prompts the Google account chooser so
-   * a brand-new family is created under an explicitly-picked account. Pass
-   * `false` when an account is already established this session (e.g. moving
-   * an existing pod to Drive) — that reuses the cached token, which avoids a
-   * redirect-auth loop on standalone PWAs (`prompt=consent` forces the
-   * redirect path even when a token is cached).
+   * `forceConsent` (default `true`) forces a fresh interactive grant so a brand-new family is
+   * created under a deliberately-confirmed account. Pass `false` when an account is already
+   * established this session (e.g. moving an existing pod to Drive) — that reuses the cached
+   * token, which avoids a redirect-auth loop on standalone PWAs.
+   *
+   * ⚠️ IT DOES NOT SHOW THE ACCOUNT CHOOSER, despite what this comment claimed until 2026-09-16.
+   * It maps to `prompt=consent`, which re-asks permission on the account already signed in and
+   * SUPPRESSES the chooser; `chooseAccount` is the flag that shows it. Behaviour here is
+   * unchanged and deliberately so — switching this to `chooseAccount` changes the create-a-pod
+   * flow, which is outside the join-flow work that found the inversion. See
+   * `docs/plans/2026-09-16-join-flow-consent-loop-and-picker-retirement.md`.
    */
   static async createNew(
     fileName: string,

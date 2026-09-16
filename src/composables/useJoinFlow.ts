@@ -13,7 +13,10 @@
  */
 
 import { ref, computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { assertNever } from '@/utils/assertNever';
+import { watchJoinSteps, emitJoinCompleted } from '@/services/telemetry/joinStepEvents';
+import type { PickFailureReason } from '@/services/google/drivePicker';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -48,6 +51,19 @@ import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 
 // ─── State machine + error registry ──────────────────────────────────────────
 
+/**
+ * Why the joiner is on the awaiting-auth card.
+ *
+ * Deliberately NOT `JoinErrorCode` values. A registry entry routes through `recordError`, which
+ * pages `#beanies-errors` at its declared severity — and "you closed the file chooser" is not an
+ * incident. These are states to explain, not failures to report.
+ */
+export type AwaitingReason =
+  | 'initial' // first arrival, or a local-provider flow waiting on the drop zone
+  | 'needs-pick' // consent is done; the file still has to be picked to grant access
+  | 'cancelled' // the user dismissed the Picker
+  | 'redirecting'; // we just navigated them to Google; this page is going away
+
 export type JoinStep =
   | 'lookup' // parsing URL, registry lookup, post-redirect-auth probe
   | 'awaiting-auth' // user must tap "Choose your data file"
@@ -64,6 +80,8 @@ export type JoinErrorCode =
   | 'OAUTH_POPUP_BLOCKED'
   | 'PICKER_SCRIPT_LOAD_FAILED'
   | 'PICKER_FAILED'
+  | 'PICKER_UNAVAILABLE'
+  | 'PICKER_AUTH_FAILED'
   | 'PICKER_TIMEOUT'
   | 'FILE_READ_FAILED'
   | 'FILE_DECRYPT_FAILED'
@@ -186,15 +204,27 @@ export const JOIN_ERRORS = {
     recoveries: ['retry', 'tryAnotherDevice'],
     severity: 'critical',
   },
+  /**
+   * ⚠️ `severity: 'warning'`, NOT critical, and for the same reason `PICKER_UNAVAILABLE` is.
+   * The overwhelmingly common cause is a person tapping "Cancel" on Google's consent screen,
+   * which is a choice, not an incident. At `'critical'` every such decline paged
+   * `#beanies-errors` — the surest way to teach an on-call human to ignore the channel.
+   * It still reaches the CloudWatch firehose, which is where the decline RATE belongs.
+   */
   OAUTH_SCOPE_DENIED: {
     messageKey: 'join.error.scopeDenied',
     recoveries: ['retry'],
-    severity: 'critical',
+    severity: 'warning',
   },
+  /**
+   * ⚠️ `severity: 'warning'` for the same reason: a browser's popup blocker firing is a
+   * local browser setting, actionable only by the person in front of it — and the recoveries
+   * below are exactly that action. Nothing for on-call to do at 2am.
+   */
   OAUTH_POPUP_BLOCKED: {
     messageKey: 'join.error.popupBlocked',
     recoveries: ['retry', 'tryAnotherDevice'],
-    severity: 'critical',
+    severity: 'warning',
   },
   PICKER_SCRIPT_LOAD_FAILED: {
     messageKey: 'join.error.pickerScript',
@@ -205,6 +235,32 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.pickerFailed',
     recoveries: ['retry', 'signInDifferentAccount', 'tryAnotherDevice'],
     severity: 'critical',
+  },
+  /**
+   * The Picker cannot run because THIS BUILD is misconfigured — `VITE_GOOGLE_API_KEY` is unset,
+   * so `drivePicker` refuses before touching gapi.
+   *
+   * ⚠️ `severity: 'warning'`, NOT critical, and the distinction is the point: only `'critical'`
+   * pages `#beanies-errors` (errorReporter.ts), and a build-configuration fault is not an
+   * incident an on-call person can act on at 2am. It also used to render as "check your internet
+   * connection and try again", which is a sentence with no relationship to the cause.
+   *
+   * `messageKey` is taken from `PICK_FAILURE_COPY` rather than invented, so the Picker's own
+   * words and the join flow's stay one string.
+   */
+  PICKER_UNAVAILABLE: {
+    messageKey: 'settings.drivePickerUnavailable',
+    recoveries: ['tryAnotherDevice'],
+    severity: 'warning',
+  },
+  /**
+   * Google auth failed BEFORE the Picker could open. Previously collapsed into `PICKER_FAILED`,
+   * which blamed the Picker for something it never got to attempt.
+   */
+  PICKER_AUTH_FAILED: {
+    messageKey: 'settings.drivePickerAuth',
+    recoveries: ['signInDifferentAccount', 'retry', 'tryAnotherDevice'],
+    severity: 'warning',
   },
   PICKER_TIMEOUT: {
     messageKey: 'join.error.pickerTimeout',
@@ -296,6 +352,7 @@ const log = (msg: string, ctx?: Record<string, unknown>): void => {
 
 export function useJoinFlow() {
   const route = useRoute();
+  const router = useRouter();
   const authStore = useAuthStore();
   const familyStore = useFamilyStore();
   const familyContextStore = useFamilyContextStore();
@@ -305,6 +362,33 @@ export function useJoinFlow() {
   // ─── State ────────────────────────────────────────────────────────────────
 
   const currentStep = ref<JoinStep>('lookup');
+
+  /**
+   * WHY the joiner is sitting on the awaiting-auth card.
+   *
+   * ⚠️ This exists because the card used to be reached from five places with no reason attached,
+   * so "we are waiting for your tap", "you closed the chooser" and "we just sent you to Google and
+   * you came back" all rendered as the same silent screen. A user reported it as the app doing
+   * nothing.
+   */
+  const awaitingReason = ref<AwaitingReason>('initial');
+
+  /**
+   * The ONLY way to reach `awaiting-auth`.
+   *
+   * ⚠️ Structural, not conventional. There were FIVE direct writes of
+   * `currentStep.value = 'awaiting-auth'` (four here, one in `JoinPodView.handleBack`), so "also
+   * set the reason" would have been a five-site invariant policed by a test — the same shape as
+   * the bug it is meant to prevent. As a required argument it is a compile error instead.
+   */
+  // ⚠️ Armed HERE, inside the composable's setup scope, so `watch` binds to the component
+  // effect scope. The loop this exists to make visible produced no telemetry at all.
+  watchJoinSteps(currentStep, awaitingReason);
+
+  function enterAwaiting(reason: AwaitingReason): void {
+    awaitingReason.value = reason;
+    currentStep.value = 'awaiting-auth';
+  }
   const currentError = ref<JoinError | null>(null);
 
   // Parsed from URL on mount.
@@ -625,29 +709,62 @@ export function useJoinFlow() {
    *
    * `cancelled` is silent (no error; step regresses to `awaiting-auth`).
    */
-  async function doPickAndLoad(forceConsent = false): Promise<boolean> {
+  /**
+   * Which join error a Picker failure becomes.
+   *
+   * ⚠️ A TABLE, NOT A NESTED TERNARY, and `satisfies` is the point: adding a `PickFailureReason`
+   * without a mapping here fails the build instead of silently taking the last ternary arm. The
+   * ternary this replaced told two lies — it rendered a build-configuration fault as "check your
+   * internet connection", and it blamed the Picker for an auth failure.
+   *
+   * Keep in step with `PICK_FAILURE_COPY` in `drivePicker.ts`, which is the sibling table over the
+   * same union and supplies the user-facing words. Both are `satisfies Record<PickFailureReason,…>`
+   * so a new reason breaks BOTH builds.
+   */
+  const JOIN_CODE_FOR_PICK_REASON = {
+    config: 'PICKER_UNAVAILABLE',
+    auth: 'PICKER_AUTH_FAILED',
+    'popup-blocked': 'OAUTH_POPUP_BLOCKED',
+    load: 'PICKER_SCRIPT_LOAD_FAILED',
+    timeout: 'PICKER_TIMEOUT',
+    open: 'PICKER_FAILED',
+    iframe: 'PICKER_FAILED',
+  } as const satisfies Record<PickFailureReason, JoinErrorCode>;
+
+  async function doPickAndLoad(chooseAccount = false): Promise<boolean> {
     const picked = await pickBeanpod({
-      forceConsent,
+      chooseAccount,
       loginHint: inviteEmailHint.value ?? undefined,
     });
 
-    if (picked.kind === 'cancelled') {
-      currentStep.value = 'awaiting-auth';
-      return false;
-    }
+    // ⚠️ A `switch` with `assertNever`, NOT an `if` chain. A fifth `kind` must be a compile error
+    // rather than another silent fall-through — which is precisely how `redirecting` spent its
+    // life disguised as `cancelled`.
+    switch (picked.kind) {
+      case 'cancelled':
+        // The user dismissed the chooser. Not an error, but they must be told something and
+        // offered a way on, or the awaiting card looks identical to "nothing happened".
+        enterAwaiting('cancelled');
+        return false;
 
-    if (picked.kind === 'failed') {
-      const code: JoinErrorCode =
-        picked.reason === 'timeout'
-          ? 'PICKER_TIMEOUT'
-          : picked.reason === 'config' || picked.reason === 'load'
-            ? 'PICKER_SCRIPT_LOAD_FAILED'
-            : 'PICKER_FAILED'; // 'open' | 'auth' | 'iframe'
-      recordError(code, {
-        reason: picked.reason,
-        message: picked.message,
-      });
-      return false;
+      case 'redirecting':
+        // We navigated them to Google. Nothing is wrong and nothing is owed to the UI — but the
+        // step still carries a reason so the return journey is legible in telemetry.
+        enterAwaiting('redirecting');
+        return false;
+
+      case 'failed':
+        recordError(JOIN_CODE_FOR_PICK_REASON[picked.reason], {
+          reason: picked.reason,
+          message: picked.message,
+        });
+        return false;
+
+      case 'picked':
+        break;
+
+      default:
+        return assertNever(picked, 'unhandled pick result');
     }
 
     targetFileId.value = picked.fileId;
@@ -801,21 +918,46 @@ export function useJoinFlow() {
 
     // 'auth' or 'needs-pick' — both require an interactive Picker tap.
     if (!triggeredByGesture) {
-      // We were called from init() without a user gesture (e.g. fresh
-      // load on a redirect-auth-completed session). Defer to the user's
-      // explicit CTA tap so popups aren't blocked.
-      currentStep.value = 'awaiting-auth';
+      // We were called from init() without a user gesture (e.g. a fresh load on a
+      // redirect-auth-completed session). Defer to the user's explicit CTA tap so popups aren't
+      // blocked.
+      //
+      // ⚠️ `autoResult` is the reason, and carrying it is what makes this screen legible. A
+      // redirect return lands here with 'needs-pick' — the joiner has consented and now needs to
+      // pick the file. Before, that was indistinguishable from the very first page load.
+      enterAwaiting(autoResult === 'needs-pick' ? 'needs-pick' : 'initial');
       return;
     }
 
     currentStep.value = 'authenticating';
-    // `'needs-pick'` is set when the silent token couldn't reach the
-    // target file (404/403) — strong proof the cached account is wrong.
-    // Force consent so Google's account chooser appears with `loginHint`
-    // pre-filled, instead of silently re-using the same wrong-account
-    // token to render the picker against the wrong Drive.
-    const forceConsent = autoResult === 'needs-pick';
-    const picked = await doPickAndLoad(forceConsent);
+    // ⚠️ NO `forceConsent` HERE, AND THAT DELETION IS THE WHOLE BUG FIX.
+    //
+    // This used to read `const forceConsent = autoResult === 'needs-pick'`, on the theory that a
+    // 404 from the silent token was "strong proof the cached account is wrong". On a FIRST JOIN
+    // that theory is simply false: the joiner has never picked the file, so their fresh
+    // `drive.file` grant cannot reach the INVITER's file by construction. 404 is the expected
+    // state, not evidence of a wrong account — and no amount of re-consenting fixes it. Only the
+    // Picker can, because under `drive.file` the Picker selection IS the access grant.
+    //
+    // What that mistaken diagnosis cost: forcing an interactive grant skips the silent-token fast path
+    // (`usePickBeanpodFile.ts`), so `token` is null, so on a redirect-auth platform
+    // (iOS/iPadOS/PWA/native) `startRedirectAuth` fires and the page navigates away. The call
+    // returns before the Picker ever opens; the user comes back, `init()` runs, 404 again,
+    // 'needs-pick' again, tap again — a closed loop that emitted nothing and paged nobody. Two
+    // iPhone users hit it in production before it was reported by hand.
+    //
+    // Safe because `'needs-pick'` is only reachable WITH a live silent token: `tryAutoLoadByFileId`
+    // returns `'auth'` when the token is falsy. So the silent path here is guaranteed to find that
+    // token and go straight to the Picker.
+    //
+    // `handleSignInDifferent` passes `chooseAccount: true` — that is the ONE place the account
+    // chooser is genuinely wanted, and the awaiting-auth block now offers it as a recovery.
+    //
+    // ⚠️ `chooseAccount`, NOT the old `forceConsent`. They read as synonyms and are opposites:
+    // `forceConsent` maps to `prompt=consent`, which re-asks permission on the account already
+    // signed in and SUPPRESSES the chooser. A joiner stuck on the wrong Google account could tap
+    // "sign in with a different account" and be handed the same account back, forever.
+    const picked = await doPickAndLoad(false);
     if (!picked) return; // cancel, redirect, or file-read-error — no advance
 
     // File loaded; reflect that in the step before any decrypt-stage
@@ -851,7 +993,7 @@ export function useJoinFlow() {
     clearError();
     lastFailedAction = handleSignInDifferent;
     currentStep.value = 'authenticating';
-    const picked = await doPickAndLoad(/* forceConsent */ true);
+    const picked = await doPickAndLoad(/* chooseAccount */ true);
     if (!picked) return;
     currentStep.value = 'loading';
     if (syncStore.pendingEncryptedFile && inviteToken.value) {
@@ -901,9 +1043,16 @@ export function useJoinFlow() {
     });
     if (!ok) {
       // Step regresses so the user can retry from the same form.
+      //
+      // NOTE a `syncNow` failure here is NOT the claim bug: `joinFamily` succeeded, so this
+      // person really is in the pod on this device, and the claim converges to the shared file
+      // on the next save. Rolling it back would sign them out of a join that worked. The
+      // rollback that matters lives inside `joinFamily`, for a failure DURING the claim.
       currentStep.value = 'set-pin';
       return false;
     }
+    // The denominator. Without it the firehose can count failed joins but never the rate.
+    emitJoinCompleted();
     return true;
   }
 
@@ -917,9 +1066,40 @@ export function useJoinFlow() {
 
   async function init(): Promise<void> {
     parseUrl();
+
+    // ⚠️ Google sent them back with an error — record it. `OAUTH_SCOPE_DENIED` was a declared
+    // code that NOTHING in the app ever emitted, so declining the consent prompt (by far the
+    // commonest of these) was invisible: no error for the user, no event in the firehose, and
+    // until the companion fix in `OAuthCallbackPage` the invite URL was discarded too. A
+    // registry entry nothing emits is a lie about coverage.
+    // Read from `route.fullPath`, the same source `parseUrl` uses — not `window.location`, so
+    // this works identically under the router, in tests, and after a redirect return.
+    const authError = new URLSearchParams(route.fullPath.split('?')[1] ?? '').get('authError');
+    if (authError) {
+      // ⚠️ STRIP IT FIRST, and this is a bug fix rather than tidiness. `authError` rides the
+      // invite URL, which is the link the joiner has in their messages and will tap again. Left
+      // in place it short-circuits THIS branch on every subsequent visit — including the visit
+      // right after they grant consent successfully — so one declined prompt poisoned the link
+      // permanently and no later success could ever be redeemed. Replace, not push, so the back
+      // button does not walk them into the poisoned URL again.
+      await router
+        .replace({ path: route.path, query: { ...route.query, authError: undefined } })
+        .catch(() => {
+          // A redundant-navigation rejection is not a failure worth surfacing; the error below
+          // is what the joiner needs to see either way.
+        });
+
+      // ⚠️ AND GIVE `retry` SOMETHING TO DO. `OAUTH_SCOPE_DENIED` declares exactly one
+      // recovery — `retry` — and `handleRetry` re-fires `lastFailedAction`, which on this path
+      // had never been assigned: the button rendered, did nothing, and left the only offered way
+      // forward as a dead control on the one screen where the person is already stuck.
+      lastFailedAction = handleAuthTap;
+      recordError('OAUTH_SCOPE_DENIED', { reason: authError });
+      return;
+    }
     if (!targetFamilyId.value) {
       // No URL params — view shows the "how to join" instructions.
-      currentStep.value = 'awaiting-auth';
+      enterAwaiting('initial');
       return;
     }
     await consumePendingRedirectAuth();
@@ -930,7 +1110,7 @@ export function useJoinFlow() {
       await runCloudFlow(false);
     } else {
       // Local provider — wait for drop-zone interaction.
-      currentStep.value = 'awaiting-auth';
+      enterAwaiting('initial');
     }
   }
 
@@ -939,6 +1119,11 @@ export function useJoinFlow() {
     init,
     // state
     currentStep,
+    awaitingReason,
+    // ⚠️ Exported so `JoinPodView.handleBack` stops writing `currentStep.value` directly. The
+    // reason must travel with every entry to that step, and a required argument is the only way
+    // to guarantee it.
+    enterAwaiting,
     currentError,
     targetFamilyId,
     targetProvider,

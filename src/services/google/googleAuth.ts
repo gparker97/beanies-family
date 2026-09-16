@@ -436,6 +436,22 @@ export function isUserCancellation(e: unknown): boolean {
 }
 
 /**
+ * Whether the browser REFUSED to open the popup — as opposed to the user closing it.
+ *
+ * ⚠️ A sibling of `isUserCancellation`, which deliberately does NOT match this shape: a browser
+ * blocking the popup is not a "never mind", it is a condition the user can actually fix (allow
+ * popups) and must therefore be told about. Collapsing the two is why `OAUTH_POPUP_BLOCKED`
+ * existed in the join error registry and was emitted by precisely nothing.
+ *
+ * Matches the message `openBlankPopup` throws below; kept as a predicate beside it so the two
+ * cannot drift apart in separate files.
+ */
+export function isPopupBlocked(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /popup blocked/i.test(msg);
+}
+
+/**
  * Whether the current browser should skip popup-based OAuth and use full-page
  * redirect auth instead. Two cases trigger this:
  *
@@ -850,13 +866,23 @@ export async function loadGIS(): Promise<void> {
  * Additional callers receive the same promise. This prevents PKCE verifier
  * mismatches when the same popup window is reused by a second call.
  *
- * @param options.forceConsent - Force the account chooser / consent screen.
+ * @param options.forceConsent - Re-ask for permissions on the SAME account (`prompt=consent`).
+ *   ⚠️ This SUPPRESSES the account chooser. For "let me pick a different account", pass
+ *   `chooseAccount` instead.
  * @param options.loginHint - Email to pre-fill Google's account chooser
  *   with (e.g. the user's expected Google account). Helps users with
  *   multiple Google accounts pick the right one and reduces account drift.
  */
 export async function requestAccessToken(options?: {
   forceConsent?: boolean;
+  /**
+   * Show Google's account chooser.
+   *
+   * ⚠️ Distinct from `forceConsent`, which maps to `prompt='consent'` and SUPPRESSES the
+   * chooser. The two read like synonyms and are opposites; a caller wanting "let me pick a
+   * different account" needs this one.
+   */
+  chooseAccount?: boolean;
   loginHint?: string;
   // Optional OAuth scope string. Defaults to DRIVE_SCOPES (existing callers
   // unchanged). The unified reconnect (tracker #62, commit 5) passes the
@@ -871,13 +897,21 @@ export async function requestAccessToken(options?: {
     );
   }
 
+  // ⚠️ `chooseAccount` MUST BYPASS EVERY SILENT PATH BELOW, not just the consent screen.
+  // "Sign in with a different account" is only ever reached by someone who is already signed
+  // in — so the cached token is valid, the refresh token works, and the silent auth-code
+  // exchange succeeds. Each one returns a token for the account they are trying to leave, and
+  // the chooser never opens. Honouring the `prompt` alone would have left the escape hatch as
+  // dead as the bug it exists to escape.
+  const wantsFreshGrant = Boolean(options?.forceConsent || options?.chooseAccount);
+
   // If forcing consent, clear existing token so we don't short-circuit
-  if (options?.forceConsent) {
+  if (wantsFreshGrant) {
     clearTokenState();
   }
 
   // Return cached token if still valid
-  if (isTokenValid()) {
+  if (!options?.chooseAccount && isTokenValid()) {
     return accessToken!;
   }
 
@@ -896,7 +930,7 @@ export async function requestAccessToken(options?: {
   const popup = openBlankPopup();
 
   // Try silent refresh first (if we have a refresh token)
-  if (currentRefreshToken) {
+  if (currentRefreshToken && !options?.chooseAccount) {
     const silentToken = await attemptSilentRefresh();
     if (silentToken) {
       // Don't need the popup after all — close it
@@ -908,7 +942,7 @@ export async function requestAccessToken(options?: {
   // Try silent auth-code (handles the Marketplace-installed case where
   // scopes are pre-granted at install time). forceConsent skips this —
   // the caller is explicitly asking for a fresh consent flow.
-  if (!options?.forceConsent) {
+  if (!wantsFreshGrant) {
     const silentToken = await attemptSilentAuthCode(clientId);
     if (silentToken) {
       if (!popup.closed) popup.close();
@@ -1062,13 +1096,20 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
 async function performPopupAuth(
   clientId: string,
   popup: Window,
-  options?: { forceConsent?: boolean; loginHint?: string; scope?: string }
+  options?: { forceConsent?: boolean; chooseAccount?: boolean; loginHint?: string; scope?: string }
 ): Promise<string> {
   const epochAtStart = sessionEpoch;
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  const prompt = options?.forceConsent ? 'consent' : 'select_account';
+  // ⚠️ `chooseAccount` WINS over `forceConsent`, because they request opposite screens and only
+  // one caller ever asks for the chooser explicitly. `forceConsent` remains the default shape for
+  // recovery surfaces that want a fresh permission grant on the SAME account.
+  const prompt = options?.chooseAccount
+    ? 'select_account'
+    : options?.forceConsent
+      ? 'consent'
+      : 'select_account';
 
   // ⚠️ NO REVOKE-BEFORE-MINT HERE. Removed 2026-09-08; do not reinstate without
   // reading this comment and `docs/investigations/2026-09-08-compaction-fallout.md`.
@@ -2113,6 +2154,19 @@ export function __notifyTokenAcquiredForTesting(
   return notifyTokenAcquired(token, interactive, expectedEpoch);
 }
 
+/**
+ * Test-only: seed the in-memory token cache.
+ *
+ * Exists so the `chooseAccount` bypass can be tested at all. The whole point of that flag is
+ * that a VALID cached token must not satisfy the request, and there is no other seam that puts
+ * one in place without driving a full popup OAuth flow that jsdom cannot host. Production code
+ * never calls this.
+ */
+export function __setTokenForTesting(token: string | null, expiresAtMs: number): void {
+  accessToken = token;
+  expiresAt = expiresAtMs;
+}
+
 // --- Internal helpers ---
 
 function clearTokenState(): void {
@@ -2424,6 +2478,16 @@ export interface RedirectAuthOptions {
   grant?: RedirectGrant;
   /** OAuth scope string; default the Drive set. Calendar passes its own scopes. */
   scope?: string;
+  /**
+   * OAuth `prompt`. Defaults to `'consent'`, which is what every caller wanted until one wanted
+   * the ACCOUNT CHOOSER.
+   *
+   * ⚠️ `'consent'` re-asks for permissions on the account already signed in; `'select_account'`
+   * is the one that lets a person pick a different one. This was hardcoded to `'consent'`, so
+   * the redirect path could not offer the chooser at all — which is half of why a joiner signed
+   * into the wrong Google account had no way out.
+   */
+  prompt?: 'consent' | 'select_account';
 }
 
 /**
@@ -2503,7 +2567,17 @@ export async function startRedirectAuth(
         ...(grant === 'calendar' ? { grant } : {}),
       } satisfies RedirectAuthState)
     );
-    const authUrl = buildAuthUrl(clientId, codeChallenge, 'consent', loginHint, state, scope);
+    // ⚠️ `opts.prompt`, not a hardcoded `'consent'`. The native WebView needs the account
+    // chooser for exactly the same reason the web redirect does: "sign in with a different
+    // account" is unreachable without it, and `prompt=consent` actively SUPPRESSES it.
+    const authUrl = buildAuthUrl(
+      clientId,
+      codeChallenge,
+      opts.prompt ?? 'consent',
+      loginHint,
+      state,
+      scope
+    );
     // Resolves immediately; the redirect returns via the appUrlOpen listener.
     await Browser.open({ url: authUrl });
     // Pairs with the `return_*` / `complete` events so a started-but-never-
@@ -2529,7 +2603,14 @@ export async function startRedirectAuth(
   // intercepted code can't be redeemed. If any token exchange ever bypasses that
   // proxy, PKCE MUST return here. See ADR-026 amendment (2026-06-20).
   const stateParam = encodeRedirectState({ returnPath, mode, grant });
-  const authUrl = buildAuthUrl(clientId, undefined, 'consent', loginHint, stateParam, scope);
+  const authUrl = buildAuthUrl(
+    clientId,
+    undefined,
+    opts.prompt ?? 'consent',
+    loginHint,
+    stateParam,
+    scope
+  );
   window.location.href = authUrl;
 }
 

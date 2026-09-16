@@ -107,12 +107,27 @@ onMounted(() => {
     return;
   }
 
-  // Error or genuinely unexpected state (no code) — redirect home.
+  // Error or genuinely unexpected state (no code).
   if (error) {
     try {
       sessionStorage.removeItem('beanies_redirect_auth');
     } catch {
       // sessionStorage unavailable — nothing to clean up.
+    }
+
+    // ⚠️ RETURN THEM WHERE THEY CAME FROM, and this is a real bug fix rather than tidying.
+    //
+    // Sending an `?error=` (overwhelmingly `access_denied` — the user declined consent) to `/`
+    // threw away the invite URL entirely. For a JOINER that is the whole context: the family id,
+    // the file id and the invite token all live in that link. They declined a permission prompt
+    // and the app answered by losing their invitation, with nothing recorded anywhere.
+    //
+    // `decoded.returnPath` has already been through `decodeRedirectState`'s open-redirect guard,
+    // so it is safe to navigate to. `?authError=` is the convention `LoginPage` already reads.
+    if (decoded?.returnPath) {
+      const sep = decoded.returnPath.includes('?') ? '&' : '?';
+      window.location.href = `${decoded.returnPath}${sep}authError=${encodeURIComponent(error)}`;
+      return;
     }
   }
   window.location.href = '/';

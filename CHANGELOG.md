@@ -18,6 +18,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Joining a family from an iPhone no longer loops back to the Google sign-in screen.** A joiner who had just signed in was sent straight back to sign in again, over and over, with nothing on screen to say why. beanies was treating "we have not been shown your family's file yet" as "you are signed in to the wrong account", which on an iPhone, an iPad or an installed app meant leaving the page entirely instead of opening the file chooser. It now opens the chooser, which is the only thing that can actually fix it.
+
+- **"Sign in with a different Google account" now offers a different Google account.** The link asked Google to re-confirm permissions on the account already signed in, which is the one setting that hides the account picker. Anyone stranded on the wrong account was handed the same account back, on every device.
+
+- **Declining the Google permission screen no longer breaks the invite link for good.** The refusal was written into the invite link itself, so every later tap on that link stopped at the same refusal, including the tap right after permission was granted. The "try again" button on that screen also did nothing at all. Both fixed.
+
+- **A family member who never finished joining is no longer marked as joined.** A join that fell over part way through still marked the person as joined, which meant no new invite could be sent to them, and nothing anywhere could undo it. beanies now leaves the claim until the very last step, so a join that does not finish leaves the person exactly as invitable as before.
+
+- **A pod owner can now clear a stuck join.** There is a new "Let them join again" action on a family member's page, for anyone marked as joined who never actually got in or who lost their link part way through. It clears their PIN and their access so you can send a fresh invite; their beans, photos and history all stay.
+
+- **Signing in with the recovery kit gives the owner their permissions back immediately.** After setting a new PIN, the owner had no permissions at all until they signed out and signed back in.
+
+- **The recovery kit saves as a PDF in Firefox.** The kit was built with every font on the page embedded inside it, which Firefox refused to draw. It now falls back to plain fonts rather than failing, and no longer fetches those fonts during family creation, where they were competing with setting the family up.
+
 - **The beanie wall now works on a small tablet.** The wall is meant for the spare tablet you already own, but it turned away every 8-inch one, which is exactly the kind families mount in a kitchen. It asked for more room than those screens have, and then counted the browser's own toolbar against them as well. Any tablet can now be a wall, either way up, and on the smaller ones the wall draws itself a little more compact so it still reads from across the room.
 - **More of the wall is the wall.** Switching to Each bean or Today pushed the whole calendar down a row, and on the chore board each bean's name and photo took so much room that only one chore showed. Both now use the space they need and no more, so a small tablet shows several chores per bean and a taller calendar.
 - **The date on the wall no longer gets cut off.** On a narrower wall the day and date shortened to a few letters, and on some screens to a single one, because everything beside it kept its space and the date gave up all of its own. The date now keeps its line and the buttons move down a row when they need to.

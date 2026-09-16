@@ -16,7 +16,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateInviteQR } from '@/utils/qrCode';
-import { useSheetExport, ExportError } from '@/composables/useSheetExport';
+import { useSheetExport, ExportError, prewarmSheetExport } from '@/composables/useSheetExport';
 import { deliverFile } from '@/utils/deliverFile';
 import { kitDeepLink } from '@/services/auth/recoveryKit';
 import { reportError } from '@/utils/errorReporter';
@@ -53,6 +53,11 @@ watch(
       kitQr.value = '';
       return;
     }
+    // ⚠️ Warm the export chunks AND the font CSS the moment the kit is shown, not when it is
+    // tapped. This surface opens seconds after first paint during family creation, so it was
+    // paying a cold dynamic-import while competing with pod setup for the network — the worst
+    // moment, on the one artefact that gets a person back into their pod.
+    prewarmSheetExport();
     try {
       // The QR is a DEEP LINK: a phone camera pointed at the printed kit opens the
       // app straight into recovery with the code pre-filled (code rides the fragment).

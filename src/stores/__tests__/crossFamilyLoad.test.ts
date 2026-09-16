@@ -234,3 +234,60 @@ describe("loading another family's data file", () => {
     expect(useFamilyStore().currentMemberId).not.toBe('m-new');
   });
 });
+
+describe('the recovery-kit sign-in binds identity too (the owner-with-no-permissions bug)', () => {
+  // ⚠️ ITS OWN `setActivePinia`. The describe above has one in ITS `beforeEach`, which does
+  // not reach this block — so these passed only when the whole file ran in order and failed on
+  // `-t` or `.only`, the two ways anyone actually runs a single test while fixing it.
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  /**
+   * ⚠️ THE SAME BUG, ON THE OTHER DECRYPT PATH — reported by a pod OWNER.
+   *
+   * Signing in with the recovery kit and setting a new PIN left the owner with no permissions at
+   * all: could not edit family members, no Family Data section. Signing out and back in fixed it.
+   *
+   * That signature is exact. `usePermissions` ignores the session role once the roster is loaded
+   * (`rosterLoaded`), so an unresolved `currentMember` over a populated roster is every permission
+   * false. And sign-out/sign-in "fixes" it only because it forces a fresh `loadMembers`, which is
+   * the single place identity is ever re-resolved.
+   *
+   * The mechanism: `setCurrentMember` checks the id against `members` and does NOTHING when it is
+   * absent — silently. The kit path decrypts via `decryptPendingFileWithKey`, which has no
+   * identity-before-roster bind (unlike the password path tested above), so the roster can be
+   * empty or stale at the moment the session tail runs.
+   */
+  it('setCurrentMember is a SILENT no-op for an id the roster does not hold', () => {
+    const family = useFamilyStore();
+    family.members = [] as never;
+    family.setCurrentMember('m-owner');
+    // No throw, no warning, no assignment. This silence is the entire defect.
+    expect(family.currentMemberId).toBeNull();
+  });
+
+  it('preselectSessionMember binds anyway, deferring the check to loadMembers', () => {
+    const family = useFamilyStore();
+    family.members = [] as never;
+    family.preselectSessionMember('m-owner');
+    expect(family.currentMemberId).toBe('m-owner');
+  });
+
+  it('resetMemberPinViaRecovery uses the binding call that cannot silently fail', async () => {
+    // A source-level guard, because the runtime path needs the whole kit-redeem stack. It pins
+    // the one line that mattered: swapping it back to `setCurrentMember` reintroduces the bug
+    // with every existing test still green, which is how it shipped.
+    // ⚠️ COMMENTS STRIPPED. The sibling guard in `joinClaimRollback.test.ts` learned this the
+    // hard way: a prose mention in an explanatory comment satisfied the assertion, so deleting
+    // the real call left the test green. Shared helper, so there is one implementation of the
+    // stripping rather than two that can drift.
+    const { codeOfAuthStoreFn } = await import('./helpers/authStoreSource');
+    const fn = await codeOfAuthStoreFn(
+      'async function resetMemberPinViaRecovery',
+      'async function verifyMemberPin'
+    );
+    expect(fn).toContain('preselectSessionMember');
+    expect(fn).not.toContain('familyStore.setCurrentMember(');
+  });
+});
