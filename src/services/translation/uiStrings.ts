@@ -9978,6 +9978,18 @@ const STRING_DEFS = {
     en: 'Something went wrong reading that. Please try again.',
     beanie: 'something went wrong reading that. please try again.',
   },
+  // #49. The document did NOT leave the device, and the copy has to say so plainly: this is an
+  // important surface (a security refusal), so the beanie value keeps the real nouns and only
+  // drops case — no "beans" standing in for the document.
+  'ai.error.attestation.title': {
+    en: "beanies Didn't Send It",
+    beanie: "beanies didn't send it",
+  },
+  'ai.error.attestation.message': {
+    en: "beanies couldn't confirm the AI service is the sealed one it should be, so your document stayed on your device. Nothing was sent and nothing was charged. Try again in a moment.",
+    beanie:
+      "beanies couldn't confirm the ai service is the sealed one it should be, so your document stayed on your device. nothing was sent and nothing was charged. try again in a moment.",
+  },
   'ai.error.busy.title': { en: 'beanies AI Is Busy', beanie: 'beanies ai is busy' },
   'ai.error.busy.message': {
     en: 'beanies AI is busy right now. Please try again in a moment.',

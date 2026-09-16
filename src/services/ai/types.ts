@@ -314,6 +314,10 @@ export type ExtractionErrorCode =
   | 'correction_disagreed' // the free re-read ran, and beanies still does not think the
   // document is the kind the user asserted. NOT a failure of the read: nothing is wrong with
   // the document, so "try a clearer photo" would be false and would invite a paid retry.
+  | 'attestation_failed' // the AI enclave could not be VERIFIED, so nothing was sent (#49).
+  // The document never left the device. Distinct from provider_error on purpose: nothing is
+  // wrong with the document or the network, and the honest thing to tell a family is that we
+  // refused to send rather than trust an enclave we could not check.
   | 'correction_refused' // the free re-read's grant was missing, spent, or for another
   // document. The proxy REFUSES rather than quietly running a charged, unhinted re-read that
   // would return the same wrong answer — so nothing was read and nothing was charged.

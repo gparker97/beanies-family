@@ -36,8 +36,11 @@ function parseJsonContent(content: string): unknown {
 /**
  * Combine the caller's optional abort signal with our own timeout so either can cancel
  * the fetch. `AbortSignal.any` is widely supported; the timeout guards against a hung host.
+ *
+ * Exported because `managedProvider` held a byte-identical copy until #49. One definition, so
+ * the two tiers cannot drift into different timeout semantics.
  */
-function buildSignal(signal?: AbortSignal): AbortSignal {
+export function buildSignal(signal?: AbortSignal): AbortSignal {
   const timeout = AbortSignal.timeout(DEFAULT_TIMEOUT_MS);
   return signal ? AbortSignal.any([signal, timeout]) : timeout;
 }
@@ -89,14 +92,35 @@ async function callOpenAiCompatible<T>(
     );
   }
 
-  let content: string;
+  let envelope: unknown;
   try {
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    content = data?.choices?.[0]?.message?.content ?? '';
+    envelope = await res.json();
   } catch (err) {
     throw new ExtractionProviderError('malformed_output', 'Could not read provider response', err);
   }
 
+  return parseChatCompletion(envelope, parse);
+}
+
+/**
+ * Turn an OpenAI-compatible chat-completion envelope into a typed result.
+ *
+ * Extracted at #49 so the sealed managed path reuses it rather than growing a second copy of the
+ * `choices[0].message.content` read, the fence strip and the `malformed_output` classification.
+ * The enclave path differs from this one only in TRANSPORT, so everything downstream of the
+ * envelope is genuinely the same code.
+ *
+ * ⚠️ The thrown message is deliberately STATIC and the cause goes only in the `cause` slot.
+ * V8's `JSON.parse` SyntaxError quotes a slice of its input, and on the sealed path that input is
+ * model output derived from the family's document. `useExtractionErrorToast` already documents the
+ * rule that keeps this contained: a provider detail may reach the console and the toast, never the
+ * telemetry firehose, whose context is an allowlist precisely because free-form text can carry
+ * anything. Do not fold the cause into a user- or telemetry-visible detail string.
+ */
+export function parseChatCompletion<T>(envelope: unknown, parse: (raw: unknown) => T): T {
+  const content =
+    (envelope as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0]?.message
+      ?.content ?? '';
   try {
     return parse(parseJsonContent(content));
   } catch (err) {

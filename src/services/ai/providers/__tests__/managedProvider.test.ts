@@ -25,6 +25,34 @@ import type { managedProvider as ManagedProvider } from '../managedProvider';
 vi.stubEnv('VITE_AI_EXTRACT_URL', 'https://api.example.test/ai-extract');
 vi.stubEnv('VITE_AI_EXTRACT_API_KEY', 'soft-key');
 
+// The enclave is mocked, not reached. Verification is a real network round trip against Tinfoil
+// plus a GitHub release lookup, and a unit test must not depend on either being up. The live
+// path has its own proof: `scripts/spikes/enclave-attestation.mjs` runs the real verifier.
+const verifyEnclave = vi.fn(async (_signal?: AbortSignal) => ({
+  hpkePublicKey: 'deadbeef',
+  enclave: 'inference.tinfoil.sh',
+  verified: true as const,
+}));
+const invalidateEnclaveVerification = vi.fn();
+vi.mock('../../enclave/attestation', () => ({
+  verifyEnclave: (signal?: AbortSignal) => verifyEnclave(signal),
+  invalidateEnclaveVerification: () => invalidateEnclaveVerification(),
+}));
+
+const sealForEnclave = vi.fn(async (_key: string, _payload: unknown) => ({
+  ciphertext: new Uint8Array([1, 2, 3, 4]),
+  headers: { 'ehbp-encapsulated-key': 'KEY' },
+  context: { marker: 'ctx' } as unknown as never,
+}));
+const openSealed = vi.fn(async (_ctx: unknown, _bytes: Uint8Array, _headers: unknown) => ({
+  choices: [{ message: { content: JSON.stringify({ kind: 'none' }) } }],
+}));
+vi.mock('../../enclave/seal', () => ({
+  sealForEnclave: (key: string, payload: unknown) => sealForEnclave(key, payload),
+  openSealed: (ctx: unknown, bytes: Uint8Array, headers: unknown) =>
+    openSealed(ctx, bytes, headers),
+}));
+
 let managedProvider: typeof ManagedProvider;
 beforeAll(async () => {
   ({ managedProvider } = await import('../managedProvider'));
@@ -32,8 +60,8 @@ beforeAll(async () => {
 
 const originalFetch = globalThis.fetch;
 
-/** A minimal share-task success body, so the happy path can be asserted too. */
-const OK_RESULT = { kind: 'none' };
+/** What the proxy returns now: the enclave's reply, still sealed. `openSealed` is mocked above. */
+const OK_SEALED = { sealed: 'AQIDBA==', ehbp: { 'ehbp-response-nonce': 'n' } };
 
 function respond(status: number, body: unknown, ok = status < 400) {
   return {
@@ -111,11 +139,11 @@ describe('managedProvider — the 429 mapping (#83)', () => {
   });
 });
 
-describe('managedProvider — the frozen wire format', () => {
+describe('managedProvider — the sealed wire format (#49)', () => {
   async function bodySentFor(req: Parameters<typeof managedProvider.run>[1]) {
     const fetchMock = vi.fn(async (_url: unknown, init: RequestInit) => {
       void init;
-      return respond(200, { result: OK_RESULT });
+      return respond(200, OK_SEALED);
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     await managedProvider.run('share', req);
@@ -123,22 +151,96 @@ describe('managedProvider — the frozen wire format', () => {
     return JSON.parse(init.body as string) as Record<string, unknown>;
   }
 
-  it('sends familyId as an ADDED field beside todayIso', async () => {
+  it('sends the sealed envelope, and the document is NOT in it', async () => {
     const body = await bodySentFor({ ...request, familyId: 'fam-1' });
-    expect(body).toMatchObject({ text: 'a school fair', todayIso: '2026-09-03', task: 'share' });
+
+    expect(body.protocol).toBe('ehbp-1');
+    expect(body.sealed).toBe('AQIDBA==');
     expect(body.familyId).toBe('fam-1');
+    expect(body.task).toBe('share');
+    expect(typeof body.srcHash).toBe('string');
+    // The whole point: the plaintext the old contract carried is gone from the wire.
+    expect('text' in body).toBe(false);
+    expect('imageDataUrls' in body).toBe(false);
+    expect(JSON.stringify(body)).not.toContain('a school fair');
   });
 
-  it('OMITS familyId entirely when absent, so an old body stays byte-identical', async () => {
-    // The wire contract is additive in both directions: a bundle without a family id must
-    // produce exactly the request it produced before #83, and the Lambda falls back to its IP
-    // limit rather than 400ing.
+  it('omits todayIso — the client builds the prompt now, so the server has no use for it', async () => {
+    const body = await bodySentFor(request);
+    expect('todayIso' in body).toBe(false);
+  });
+
+  it('sends a correction TOKEN only, never the asserted kind', async () => {
+    // Asserts the WIRE, so it deliberately does not care what happens downstream: with a
+    // correction in play the moved kind-guard may well reject the mocked reply, and that is the
+    // guard working. Capture the request body and let the rest fall where it falls.
+    const fetchMock = vi.fn(async (_url: unknown, _init: RequestInit) => respond(200, OK_SEALED));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await managedProvider
+      .run('share', {
+        ...request,
+        familyId: 'fam-1',
+        correction: { token: '11111111-2222-3333-4444-555555555555', to: 'travel' as const },
+      })
+      .catch(() => undefined);
+
+    const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string) as Record<string, unknown>;
+    // `to` would put the family's own assertion about their document on the wire in cleartext,
+    // and nothing server-side needs it any more: consumeGrant stopped conditioning on the kind,
+    // and the closed-set check existed only because `to` reached the model's instruction, which
+    // it cannot do now that the CLIENT builds the prompt.
+    expect(body.correction).toEqual({ token: '11111111-2222-3333-4444-555555555555' });
+    expect(JSON.stringify(body)).not.toContain('travel');
+  });
+
+  it('OMITS familyId entirely when absent', async () => {
     const body = await bodySentFor(request);
     expect('familyId' in body).toBe(false);
   });
 
-  it('never renames the existing fields', async () => {
-    const body = await bodySentFor({ ...request, familyId: 'fam-1' });
-    expect(Object.keys(body).sort()).toEqual(['familyId', 'task', 'text', 'todayIso']);
+  it('hashes the source into srcHash rather than sending it', async () => {
+    const a = await bodySentFor(request);
+    const b = await bodySentFor({ ...request, source: { kind: 'text', text: 'something else' } });
+    expect(a.srcHash).not.toBe(b.srcHash);
+    // Same input, same hash: the grant binding depends on it being stable.
+    const again = await bodySentFor(request);
+    expect(again.srcHash).toBe(a.srcHash);
+  });
+});
+
+describe('managedProvider — verification gates the send', () => {
+  it('REFUSES to send when the enclave does not verify, and makes no proxy call at all', async () => {
+    const fetchMock = vi.fn(async () => respond(200, OK_SEALED));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    verifyEnclave.mockRejectedValueOnce(new ExtractionProviderError('attestation_failed', 'nope'));
+
+    await expect(managedProvider.run('share', request)).rejects.toMatchObject({
+      code: 'attestation_failed',
+    });
+
+    // The assertion that matters. There is no degrade-to-plaintext path, so an unverified
+    // enclave must produce ZERO network traffic carrying the document.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('clears the verification memo after ANY failed sealed request', async () => {
+    invalidateEnclaveVerification.mockClear();
+    globalThis.fetch = vi.fn(async () =>
+      respond(500, { error: 'boom' }, false)
+    ) as unknown as typeof fetch;
+
+    await expect(managedProvider.run('share', request)).rejects.toBeInstanceOf(
+      ExtractionProviderError
+    );
+
+    // Not "on a stale-key-shaped failure": we have never observed what a Tinfoil key rotation
+    // looks like on the wire, so clearing unconditionally is what covers every shape.
+    expect(invalidateEnclaveVerification).toHaveBeenCalled();
+  });
+
+  it('marks the result verified from OUR verification, not a server header', async () => {
+    globalThis.fetch = vi.fn(async () => respond(200, OK_SEALED)) as unknown as typeof fetch;
+    const result = await managedProvider.run('share', request);
+    expect(result.attestation).toEqual({ enclave: 'inference.tinfoil.sh', verified: true });
   });
 });
