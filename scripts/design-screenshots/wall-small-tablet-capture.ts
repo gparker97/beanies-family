@@ -453,6 +453,43 @@ test.describe('design screenshots', () => {
           };
         });
         await page.screenshot({ path: `scratch-shots/w96-view${i}-${size.name}.png` });
+        /*
+         * ⭐ Does the plot overrun its slot and paint over what sits under it?
+         *
+         * `.wall-root` scroll overflow CANNOT see this: the plot is
+         * `overflow-hidden`, so it clips its own contents tidily while sitting in
+         * the wrong place, and the root reports no overflow at all. A rem-based
+         * plot floor growing under Large reading mode drew the rest-days row
+         * straight through the 17:00 axis label and every assertion passed.
+         *
+         * `wall-grid-capture.ts` carries the same check after the same bug on a
+         * 1024x768 tablet. Stacked-only: beside the grid, a rail cannot overlap.
+         */
+        const overrun = await page.evaluate(() => {
+          const plot = document.querySelector('.wall-plot') as HTMLElement | null;
+          if (!plot) return null;
+          const p = plot.getBoundingClientRect();
+          // Everything that legitimately sits UNDER the plot. The rest-days row
+          // is inside the days view and the peripheral strip is outside it; both
+          // were painted over at different points, so both are checked.
+          const unders = ['[data-wall-restdays]', '.wall-peripherals']
+            .map((sel) => document.querySelector(sel) as HTMLElement | null)
+            .filter((el): el is HTMLElement => !!el);
+          let worst = 0;
+          for (const el of unders) {
+            const b = el.getBoundingClientRect();
+            if (b.top < p.top) continue; // beside the grid, cannot overlap it
+            worst = Math.max(worst, Math.round(p.bottom - b.top));
+          }
+          return worst;
+        });
+        if (overrun !== null && overrun > 2) {
+          failures.push(
+            `${size.name} [view ${i}]: the plot overruns its slot by ${overrun}px and paints ` +
+              `over what sits beneath it — invisible to a scroll-overflow check, because the ` +
+              `plot is overflow-hidden`
+          );
+        }
         if (!row) continue;
         if (size.height < 700 && row.drop > 8) {
           failures.push(

@@ -290,6 +290,7 @@ function colourFor(activity: FamilyActivity) {
         <!-- the days that did not fit as columns, tappable. Landscape too, now. -->
         <div
           v-if="rest.length"
+          data-wall-restdays
           class="grid shrink-0 gap-2"
           :style="{ gridTemplateColumns: `repeat(${rest.length}, 1fr)` }"
         >
@@ -324,3 +325,27 @@ function colourFor(activity: FamilyActivity) {
     </template>
   </WallViewShell>
 </template>
+
+<style scoped>
+/*
+ * ─── Large reading mode on a short wall gives the calendar the rest row ──────
+ *
+ * The days view stacks day headers, the plot and a rest-days row of the days
+ * that did not fit as columns. On an 853x533 wall in Large reading mode the
+ * three together overrun the view: the plot's floor cannot shrink any further
+ * without the day becoming a band of slivers, so the rest-days row was drawn
+ * through the bottom of the hour axis.
+ *
+ * The rest row is the secondary of the two — every day it names is one arrow
+ * tap away, and the plot is the thing the wall exists to show. So in that one
+ * corner it yields its ~48px to the calendar, which is the difference between
+ * blocks you can read and blocks that are a colour.
+ *
+ * ONLY in that corner: short AND large text. At every other size both fit.
+ */
+@media (height <= 699px) {
+  html[data-text-size='large'] [data-wall-restdays] {
+    display: none;
+  }
+}
+</style>
