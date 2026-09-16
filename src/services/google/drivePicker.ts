@@ -5,6 +5,8 @@
  * which is required when the file was shared by another user (not created by the app).
  */
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { fetchGoogleUserEmail } from '@/services/google/googleAuth';
+import { logEvent } from '@/services/telemetry';
 
 const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
 
@@ -127,6 +129,54 @@ const PICKER_TIMEOUT_MS = 30_000;
  * permissions + the Google CDN, so the join flow does not need folder
  * scope.
  */
+/**
+ * Which Google account the Picker should LIST, resolved from the token it will grant against.
+ *
+ * ⚠️ WITHOUT THIS THE PICKER SHOWS AN EMPTY LIST to anyone signed into more than one Google
+ * account, and a joiner cannot join at all. The reason is not obvious and cost the better part
+ * of a day to find: `setOAuthToken` does NOT decide what the Picker lists. The Picker runs in a
+ * `docs.google.com` iframe that enumerates using the BROWSER's own Google session cookies; the
+ * token only decides which account receives the `drive.file` grant once something is selected.
+ * With several sessions present the iframe defaults to account index 0, and when that is the pod
+ * OWNER, "Shared with me" is legitimately empty for it — the owner owns the `.beanpod`, so it
+ * sits in their My Drive. Signing out of every other Google account made the file appear
+ * instantly, which is the observation that identified this.
+ *
+ * ⚠️ FROM THE TOKEN, NOT FROM `inviteEmailHint`. The hint is what the inviter typed. The whole
+ * failure mode is the browser using an account nobody intended, so the only email worth pinning
+ * to is the one belonging to the token whose grant the selection will actually land on.
+ * `fetchGoogleUserEmail` returns its cache only when it was verified against THIS exact token,
+ * so a primed guess from persisted provider config cannot leak in here.
+ *
+ * Never throws: a userinfo blip must cost a joiner nothing worse than today's behaviour.
+ */
+async function resolvePickerAccount(accessToken: string): Promise<string | null> {
+  try {
+    const email = await fetchGoogleUserEmail(accessToken);
+    if (!email) {
+      // Never silent. Unpinned means "empty list on a multi-account browser", so a rise in this
+      // event is the early warning for join failures we would otherwise only hear about by
+      // email.
+      logEvent({
+        level: 'warn',
+        surface: 'drive-picker',
+        message: 'could not resolve the token account; picker not pinned to an account',
+        context: { action: 'picker_authuser_unpinned' },
+      });
+    }
+    return email;
+  } catch (e) {
+    logEvent({
+      level: 'warn',
+      surface: 'drive-picker',
+      message: 'resolving the token account failed; picker not pinned to an account',
+      context: { action: 'picker_authuser_unpinned' },
+    });
+    console.warn('[drivePicker] could not resolve the account to pin the Picker to', e);
+    return null;
+  }
+}
+
 export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodFileResult> {
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
@@ -146,6 +196,8 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
     console.error('[drivePicker] script/library load failed', e);
     return { kind: 'failed', reason: 'load', message };
   }
+
+  const account = await resolvePickerAccount(accessToken);
 
   return new Promise<PickBeanpodFileResult>((resolve) => {
     // Tracks whether the Picker iframe successfully bootstrapped. Used
@@ -202,6 +254,12 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
       // drive.file scope access to the selected file. Without it, the Picker
       // UI works but the OAuth token doesn't get file-level access.
       if (appId) builder.setAppId(appId);
+
+      // Pin the Picker to the account that just consented. See `resolvePickerAccount` for why
+      // `setOAuthToken` does not already do this, and what an unpinned Picker costs a joiner.
+      if (account && typeof builder.setAuthUser === 'function') {
+        builder.setAuthUser(account);
+      }
 
       const picker = builder
         .setCallback((data: google.picker.PickerResponse) => {
