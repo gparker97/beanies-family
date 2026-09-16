@@ -7,8 +7,8 @@
     "astro": "astro",
     "build": "astro check && astro build",
     "dev": "astro dev",
-    "prebuild": "npm run sync-brand-assets",
-    "predev": "npm run sync-brand-assets",
+    "prebuild": "npm run sync-brand-assets && node ../scripts/convert-images.mjs",
+    "predev": "npm run sync-brand-assets && node ../scripts/convert-images.mjs",
     "preview": "astro preview",
     "sync-brand-assets": "node ../scripts/sync-brand-assets.mjs"
   },
