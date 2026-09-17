@@ -10,6 +10,7 @@ import PinInput from '@/components/ui/PinInput.vue';
 import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
 import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
 import { generateInviteQR } from '@/utils/qrCode';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -334,6 +335,20 @@ function handleBack(): void {
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 
+/**
+ * A link was pasted while we are already on the join screen.
+ *
+ * `LoginPage` keys this component on the link's identity, so a DIFFERENT link remounts it
+ * and `onMounted` re-runs `init()` on its own. The same link changes nothing, and that is
+ * the commonest retry — so re-run the flow explicitly rather than waiting for a remount
+ * that will not happen.
+ */
+function handlePastedLink(): void {
+  flow.init().catch((e) => {
+    console.warn('[JoinPodView] re-init after paste failed', e);
+  });
+}
+
 onMounted(() => {
   flow.init().catch((e) => {
     console.warn('[JoinPodView] flow.init crashed', e);
@@ -614,6 +629,17 @@ onMounted(() => {
             <p class="text-xs font-semibold opacity-50">{{ t('join.linkExpiryNote') }}</p>
           </div>
         </template>
+
+        <!-- ⚠️ OUTSIDE the provider branches, deliberately. This sat inside the
+             `google_drive` arm, so the one case that needs it most never rendered it:
+             tapping "Join your family" from the welcome gate arrives with NO url params,
+             which takes the `v-else` instructions arm below. Someone who came here holding
+             a link was shown three steps telling them to go and get a link.
+             All three arms are places a person can be standing with a link that did not
+             open, so the panel belongs to the step, not to one branch of it. -->
+        <div class="mt-5">
+          <PasteLinkPanel @submitted="handlePastedLink" />
+        </div>
       </template>
 
       <!-- Footer link (always visible at the bottom of step 1) -->

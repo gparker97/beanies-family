@@ -14,6 +14,7 @@ import RecoveryKitLink from './RecoveryKitLink.vue';
 import NoPodEmptyState from './NoPodEmptyState.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
+import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -2074,6 +2075,16 @@ async function handleDriveRefresh() {
           </div>
         </div>
       </template>
+
+      <!-- ⚠️ ALSO HERE, not only on the welcome gate and the join screen. "Welcome back" is
+           what someone taps when they think of themselves as signing in, which is exactly
+           what a magic link IS — so a person holding one lands on this page and finds
+           storage-provider cards and no way to use what they are holding. Same shared panel;
+           it routes to `/join`, which is where a link is redeemed regardless of which door
+           was used to get here. -->
+      <div class="mt-6">
+        <PasteLinkPanel />
+      </div>
     </template>
   </div>
 </template>
