@@ -16,6 +16,7 @@ import { ref } from 'vue';
 
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
 import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
+import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateInviteQR } from '@/utils/qrCode';
 
@@ -47,6 +48,15 @@ generateInviteQR(LINK)
       :magic-link="LINK"
       @stored="kitOpen = false"
     />
+
+    <!-- The paste affordance, both states side by side, on the card ground it actually sits
+         on. Collapsed it must read as a control; open it must read as something you type in. -->
+    <section class="dark:bg-surface-raised mx-auto max-w-md space-y-6 rounded-2xl bg-white p-4">
+      <PasteLinkPanel />
+      <div class="dark:border-line border-t border-gray-200 pt-4">
+        <PasteLinkPanel />
+      </div>
+    </section>
 
     <!-- The join surface's `link-saved` pane, rendered standalone: the same panel with the
          same hint, so the copy can be read at both widths without a real join. -->
