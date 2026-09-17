@@ -2,7 +2,16 @@
 /* global process */
 /* eslint-disable no-console -- this is a CLI; its output IS the interface */
 /**
- * Optimize a blog image for beanies.family/blog and write it to `web/public/blog/`.
+ * Optimize a blog image for beanies.family/blog and write it to
+ * `packages/brand/assets/blog/` — the COMMITTED source of truth.
+ *
+ * ⚠️ Do NOT write to `web/public/blog/`. That path is gitignored build output,
+ * regenerated from this directory by `scripts/sync-brand-assets.mjs`. Images written
+ * there are invisible to git and vanish on a clean checkout, and nothing warns you —
+ * which is exactly what happened on 2026-09-17: a post's images were optimized, then
+ * `git status` showed nothing to stage. The web workspace's `predev`/`prebuild` hooks
+ * run the sync, so `npm run dev:web` picks up a new image on start; a dev server that
+ * was ALREADY running needs a restart to see it.
  *
  * Notion serves images from expiring S3 URLs, so the usual shape is: download to a
  * temp file, run this, commit the .webp. Nothing else in the repo resizes blog
@@ -39,7 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const REPO_ROOT = process.env.BEANIES_REPO_ROOT ?? process.cwd();
-const OUT_DIR = path.join(REPO_ROOT, 'web', 'public', 'blog');
+const OUT_DIR = path.join(REPO_ROOT, 'packages', 'brand', 'assets', 'blog');
 
 const MAX_WIDTH = 1200;
 const QUALITY = 80;

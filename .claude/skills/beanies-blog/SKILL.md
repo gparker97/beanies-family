@@ -130,8 +130,14 @@ mass-editing the other posts uninvited.
 
 ## Images
 
-Blog images live in `web/public/blog/` and are referenced as `/blog/<name>.webp`. The
-repo-root `public/blog/` is **not served** — a file there renders as a broken image.
+Blog images are **committed to `packages/brand/assets/blog/`** and referenced as
+`/blog/<name>.webp`. `scripts/sync-brand-assets.mjs` copies that directory to
+`web/public/blog/`, which is where Astro serves them from.
+
+⚠️ **Never write an image straight into `web/public/blog/`.** It is gitignored build
+output, so the file is invisible to `git status` and is lost on a clean checkout —
+with no warning at any point. This cost a post its images on 2026-09-17. The repo-root
+`public/blog/` is **not served** either; a file there renders as a broken image.
 
 Notion serves images from **expiring S3 URLs** (roughly an hour). Download them the
 moment you read the blocks; a URL captured now and fetched later will 403.
@@ -143,8 +149,13 @@ q80, strips EXIF, refuses to upscale, and verifies its own output:
 node .claude/skills/beanies-blog/scripts/optimize-blog-image.mjs <file> [--name slug-ish-name]
 ```
 
-It prints the exact `/blog/...` path to paste into the markdown. Name images after the
-post (`aloe-vera-big-island-2002.webp`), not `image1.png`.
+It writes to `packages/brand/assets/blog/` and prints the exact `/blog/...` URL to paste
+into the markdown — the two differ because of the sync step above. Name images after the
+post (`aloe-vera-big-island-2002.webp`), not `image1.png`. **Stage the new `.webp` files
+with the post**; `git status` should list them.
+
+The web workspace's `predev`/`prebuild` hooks run the sync, so `npm run dev:web` picks up
+new images on start. A dev server that was already running needs a restart.
 
 Animated input (gif, animated webp) is handled: the script detects it, keeps every frame,
 and asserts the frame count on the way out, printing `animated (N frames kept)`. Before
