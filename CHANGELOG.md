@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-17
+
+### Security
+
+- **Invite links are no longer written into the diagnostic logs when joining fails.** If something went wrong while you were joining a family, the report sent back to us included the full invite link code, rather than just the last few characters of it as intended. Anyone who could read those logs could have used the code to join. The code is now shortened before it is recorded, which is all that was ever needed to trace a problem.
+
 ## 2026-09-16
 
 ### Changed
