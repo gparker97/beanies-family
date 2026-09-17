@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scan to sign in — beanies.family #97</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ───────────────────────────────────────────────────────────────
+         CIG tokens. Light values, then dark partners.
+         Dark values come from packages/brand/theme.css — the semantic
+         scale, never Tailwind's raw grey ramp.
+         ─────────────────────────────────────────────────────────────── */
+      :root {
+        --slate: #2c3e50;
+        --orange: #f15d22;
+        --orange-press: #d14d1a;
+        --silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud: #f8f9fa;
+
+        --ground: var(--cloud);
+        --raised: #ffffff;
+        --overlay: #ffffff;
+        --hover: #f1f3f5;
+
+        --ink: var(--slate);
+        --ink-soft: #5b6b7a;
+        --ink-faint: #8595a3;
+        --line: #e4e9ee;
+        --line-strong: #c9d3db;
+
+        /* accents as READABLE TEXT — light mode uses the true brand value */
+        --accent-text: var(--orange);
+        --silk-text: #2b6c96;
+        --success-text: #1e8449;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-success-10: rgba(39, 174, 96, 0.1);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+
+        --sq: 24px;
+
+        /* faux-QR module colour, flipped in dark */
+        --qr-ink: var(--slate);
+        --qr-paper: #ffffff;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --ground: #151e27;
+          --raised: #1e2a36;
+          --overlay: #26343f;
+          --hover: #2f3e4b;
+
+          --ink: #f2f5f7;
+          --ink-soft: #c3ced6;
+          --ink-faint: #9aa9b4;
+          --line: #4a5b69;
+          --line-strong: #7a8a97;
+
+          --accent-text: #ff8b5e; /* accent-lift */
+          --silk-text: #8fc7e8; /* silk-lift */
+          --success-text: #5fd08a; /* success-lift */
+
+          --tint-orange-8: rgba(255, 139, 94, 0.1);
+          --tint-orange-15: rgba(255, 139, 94, 0.18);
+          --tint-silk-20: rgba(143, 199, 232, 0.16);
+          --tint-slate-5: rgba(255, 255, 255, 0.04);
+          --tint-success-10: rgba(95, 208, 138, 0.14);
+
+          --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+          --soft-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+
+          --qr-ink: #f2f5f7;
+          --qr-paper: #1e2a36;
+        }
+      }
+
+      :root[data-theme='dark'] {
+        --ground: #151e27;
+        --raised: #1e2a36;
+        --overlay: #26343f;
+        --hover: #2f3e4b;
+
+        --ink: #f2f5f7;
+        --ink-soft: #c3ced6;
+        --ink-faint: #9aa9b4;
+        --line: #4a5b69;
+        --line-strong: #7a8a97;
+
+        --accent-text: #ff8b5e;
+        --silk-text: #8fc7e8;
+        --success-text: #5fd08a;
+
+        --tint-orange-8: rgba(255, 139, 94, 0.1);
+        --tint-orange-15: rgba(255, 139, 94, 0.18);
+        --tint-silk-20: rgba(143, 199, 232, 0.16);
+        --tint-slate-5: rgba(255, 255, 255, 0.04);
+        --tint-success-10: rgba(95, 208, 138, 0.14);
+
+        --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+        --soft-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+
+        --qr-ink: #f2f5f7;
+        --qr-paper: #1e2a36;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 0.875rem;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      .display,
+      .amount {
+        font-family: 'Outfit', system-ui, sans-serif;
+        margin: 0;
+      }
+
+      /* ── Mockup chrome (not part of the product) ───────────────── */
+      .sheetdoc {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 2.5rem 1rem 6rem;
+      }
+
+      .doc-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 2rem;
+      }
+
+      .doc-head h1 {
+        font-size: 1.5rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+
+      .doc-head p {
+        margin: 0.35rem 0 0;
+        color: var(--ink-soft);
+        max-width: 62ch;
+      }
+
+      .theme-toggle {
+        display: inline-flex;
+        gap: 0.25rem;
+        background: var(--tint-slate-5);
+        border-radius: 999px;
+        padding: 0.25rem;
+        border: 1px solid var(--line);
+      }
+
+      .theme-toggle button {
+        font: 600 0.75rem 'Outfit', sans-serif;
+        color: var(--ink-soft);
+        background: none;
+        border: 0;
+        border-radius: 999px;
+        padding: 0.4rem 0.9rem;
+        cursor: pointer;
+      }
+
+      .theme-toggle button[aria-pressed='true'] {
+        background: var(--raised);
+        color: var(--ink);
+        box-shadow: var(--card-shadow);
+      }
+
+      .surface-head {
+        margin: 3.25rem 0 1.25rem;
+      }
+
+      .surface-head h2 {
+        font-size: 1.125rem;
+        font-weight: 700;
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+      }
+
+      .surface-head .tag {
+        font: 600 0.75rem 'Outfit', sans-serif;
+        color: var(--accent-text);
+        background: var(--tint-orange-8);
+        border-radius: 999px;
+        padding: 0.15rem 0.6rem;
+      }
+
+      .surface-head p {
+        margin: 0.4rem 0 0;
+        color: var(--ink-soft);
+        max-width: 70ch;
+      }
+
+      .rail {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+
+      .caption {
+        font: 600 0.75rem 'Outfit', sans-serif;
+        color: var(--ink-faint);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.6rem;
+      }
+
+      /* ── Device frames ─────────────────────────────────────────── */
+      .phone {
+        width: 340px;
+        flex: 0 0 340px;
+        border-radius: 34px;
+        border: 1px solid var(--line-strong);
+        background: var(--ground);
+        padding: 0.75rem;
+        box-shadow: var(--soft-shadow);
+      }
+
+      .phone-screen {
+        border-radius: 26px;
+        background: var(--ground);
+        overflow: hidden;
+        min-height: 580px;
+        display: flex;
+        flex-direction: column;
+        padding: 1.25rem 1.1rem 1.5rem;
+      }
+
+      .laptop {
+        flex: 1 1 520px;
+        min-width: 320px;
+        border-radius: var(--sq);
+        border: 1px solid var(--line-strong);
+        background: var(--ground);
+        padding: 0.75rem;
+        box-shadow: var(--soft-shadow);
+      }
+
+      .laptop-screen {
+        border-radius: 18px;
+        background: var(--ground);
+        padding: 2rem 1.75rem;
+        min-height: 420px;
+      }
+
+      /* ── Product primitives (CIG) ──────────────────────────────── */
+      .brandmark {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .pod {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 0.9rem;
+        flex: none;
+      }
+
+      .wordmark {
+        font: 700 0.9375rem 'Outfit', sans-serif;
+        color: var(--ink);
+      }
+
+      .tagline {
+        font: italic 400 0.75rem 'Inter', sans-serif;
+        color: var(--ink-faint);
+      }
+
+      .h-page {
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .h-section {
+        font-size: 1.125rem;
+        font-weight: 600;
+      }
+
+      .h-item {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .sub {
+        color: var(--ink-soft);
+        margin: 0.4rem 0 0;
+        max-width: 42ch;
+      }
+
+      .meta {
+        font-size: 0.75rem;
+        color: var(--ink-faint);
+      }
+
+      .card {
+        background: var(--raised);
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 1.25rem;
+        border: 1px solid transparent;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 100%;
+        border: 0;
+        border-radius: 1rem;
+        padding: 0.85rem 1.1rem;
+        font: 600 0.875rem 'Outfit', sans-serif;
+        cursor: pointer;
+        transition:
+          transform 200ms,
+          box-shadow 200ms,
+          background 200ms;
+      }
+
+      .btn:focus-visible {
+        outline: 2px solid var(--silk);
+        outline-offset: 2px;
+      }
+
+      .btn-primary {
+        background: var(--orange);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        background: var(--orange-press);
+      }
+
+      .btn-secondary {
+        background: var(--slate);
+        color: #fff;
+      }
+
+      :root[data-theme='dark'] .btn-secondary {
+        background: var(--overlay);
+        color: var(--ink);
+        box-shadow: inset 0 0 0 1px var(--line-strong);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) .btn-secondary {
+          background: var(--overlay);
+          color: var(--ink);
+          box-shadow: inset 0 0 0 1px var(--line-strong);
+        }
+      }
+
+      .btn-quiet {
+        background: transparent;
+        color: var(--ink-soft);
+        box-shadow: inset 0 0 0 1px var(--line-strong);
+      }
+
+      .linkish {
+        display: inline-block;
+        background: none;
+        border: 0;
+        padding: 0.35rem 0;
+        font: 500 0.875rem 'Inter', sans-serif;
+        color: var(--accent-text);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        cursor: pointer;
+      }
+
+      .linkish.muted {
+        color: var(--ink-soft);
+      }
+
+      .stack > * + * {
+        margin-top: 0.75rem;
+      }
+
+      .stack-lg > * + * {
+        margin-top: 1.25rem;
+      }
+
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--ink-faint);
+        font-size: 0.75rem;
+        margin: 1.25rem 0;
+      }
+
+      .divider::before,
+      .divider::after {
+        content: '';
+        height: 1px;
+        background: var(--line);
+        flex: 1;
+      }
+
+      .input {
+        width: 100%;
+        border-radius: 0.75rem;
+        border: 1px solid var(--line-strong);
+        background: var(--raised);
+        color: var(--ink);
+        padding: 0.75rem 0.9rem;
+        font: 400 0.875rem 'Inter', sans-serif;
+      }
+
+      .input::placeholder {
+        color: var(--ink-faint);
+      }
+
+      .input:focus-visible {
+        outline: 2px solid var(--silk);
+        outline-offset: 1px;
+        border-color: var(--silk);
+      }
+
+      .field-label {
+        font: 600 0.75rem 'Outfit', sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--ink-faint);
+        display: block;
+        margin-bottom: 0.4rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.25rem 0.7rem;
+        font: 600 0.75rem 'Outfit', sans-serif;
+      }
+
+      .pill-silk {
+        background: var(--tint-silk-20);
+        color: var(--silk-text);
+      }
+
+      .pill-success {
+        background: var(--tint-success-10);
+        color: var(--success-text);
+      }
+
+      .pill-orange {
+        background: var(--tint-orange-15);
+        color: var(--accent-text);
+      }
+
+      /* ── The QR, the one place the design spends its boldness ──── */
+      .qr-frame {
+        background: var(--qr-paper);
+        border-radius: var(--sq);
+        padding: 1rem;
+        display: grid;
+        place-items: center;
+        box-shadow: var(--card-shadow);
+        position: relative;
+      }
+
+      .qr-frame::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: var(--sq);
+        padding: 2px;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        -webkit-mask:
+          linear-gradient(#000 0 0) content-box,
+          linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+
+      .qr {
+        --m: 7px;
+        width: calc(var(--m) * 21);
+        height: calc(var(--m) * 21);
+        display: grid;
+        grid-template-columns: repeat(21, var(--m));
+        grid-template-rows: repeat(21, var(--m));
+      }
+
+      .qr i {
+        background: var(--qr-ink);
+      }
+
+      .qr.lg {
+        --m: 9px;
+      }
+
+      .qr.sm {
+        --m: 5px;
+      }
+
+      .qr-pod {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        display: grid;
+        place-items: center;
+        font-size: 1rem;
+        box-shadow: 0 0 0 4px var(--qr-paper);
+      }
+
+      .qr-wrap {
+        position: relative;
+        display: grid;
+        place-items: center;
+      }
+
+      /* fingerprint — the thing two people read aloud to each other */
+      .fingerprint {
+        display: inline-flex;
+        gap: 0.5rem;
+        align-items: center;
+        font: 700 1.125rem 'Outfit', sans-serif;
+        letter-spacing: 0.22em;
+        color: var(--ink);
+        background: var(--tint-slate-5);
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.9rem;
+      }
+
+      .waiting {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--ink-soft);
+        font-size: 0.875rem;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--orange);
+        animation: breathe 1.6s ease-in-out infinite;
+      }
+
+      @keyframes breathe {
+        0%,
+        100% {
+          opacity: 0.35;
+          transform: scale(0.85);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .dot {
+          animation: none;
+          opacity: 1;
+        }
+      }
+
+      .tile {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-start;
+        width: 100%;
+        text-align: left;
+        background: var(--overlay);
+        border: 1px solid var(--line);
+        border-radius: 1rem;
+        padding: 0.9rem;
+        cursor: pointer;
+        color: inherit;
+        font: inherit;
+        transition:
+          transform 200ms,
+          box-shadow 200ms;
+      }
+
+      .tile:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--card-shadow);
+      }
+
+      .tile-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 1.05rem;
+        flex: none;
+        background: var(--tint-orange-8);
+      }
+
+      .tile-icon.silk {
+        background: var(--tint-silk-20);
+      }
+
+      .tile-title {
+        font: 600 1rem 'Outfit', sans-serif;
+      }
+
+      .tile-sub {
+        color: var(--ink-soft);
+        font-size: 0.875rem;
+        margin-top: 0.1rem;
+      }
+
+      .grow {
+        flex: 1;
+      }
+
+      .sheet {
+        background: var(--raised);
+        border-radius: var(--sq) var(--sq) 0 0;
+        padding: 1.5rem 1.25rem 1.75rem;
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.12);
+        margin: auto -1.1rem -1.5rem;
+      }
+
+      .grabber {
+        width: 40px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--line-strong);
+        margin: 0 auto 1rem;
+      }
+
+      .pinrow {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+      }
+
+      .pincell {
+        width: 42px;
+        height: 52px;
+        border-radius: 0.75rem;
+        border: 1px solid var(--line-strong);
+        background: var(--overlay);
+        display: grid;
+        place-items: center;
+        font: 700 1.25rem 'Outfit', sans-serif;
+        color: var(--ink);
+      }
+
+      .pincell.filled {
+        border-color: var(--orange);
+        background: var(--tint-orange-8);
+      }
+
+      .note {
+        background: var(--tint-orange-8);
+        border-radius: 1rem;
+        padding: 0.75rem 0.9rem;
+        color: var(--ink-soft);
+        font-size: 0.8125rem;
+      }
+
+      .note strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .menu {
+        background: var(--raised);
+        border-radius: var(--sq);
+        box-shadow: var(--soft-shadow);
+        padding: 0.5rem;
+        border: 1px solid var(--line);
+        width: 260px;
+      }
+
+      .menu-item {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        padding: 0.65rem 0.7rem;
+        border-radius: 1rem;
+        color: var(--ink);
+        font: 500 0.875rem 'Inter', sans-serif;
+        cursor: pointer;
+      }
+
+      .menu-item:hover {
+        background: var(--hover);
+      }
+
+      .menu-item.is-new {
+        background: var(--tint-orange-8);
+      }
+
+      .menu-sep {
+        height: 1px;
+        background: var(--line);
+        margin: 0.4rem 0.3rem;
+      }
+
+      .kit-code {
+        font:
+          600 0.9375rem ui-monospace,
+          'SFMono-Regular',
+          monospace;
+        letter-spacing: 0.08em;
+        color: var(--ink-soft);
+        word-spacing: 0.2em;
+      }
+
+      .split {
+        display: grid;
+        gap: 1rem;
+      }
+
+      @media (min-width: 640px) {
+        .split.two {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .legend {
+        margin-top: 0.9rem;
+        padding: 0.85rem 1rem;
+        border-left: 3px solid var(--orange);
+        background: var(--tint-orange-8);
+        border-radius: 0 1rem 1rem 0;
+        color: var(--ink-soft);
+        font-size: 0.8125rem;
+        max-width: 68ch;
+      }
+
+      .legend strong {
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheetdoc">
+      <header class="doc-head">
+        <div>
+          <h1>Scan to sign in</h1>
+          <p>
+            Tracker #97 — cold-device sign-in surfaces. Scanning from a device that is already signed
+            in becomes the first-class way into a beanpod; the recovery kit stays as the last resort.
+            Every surface is drawn for light and dark.
+          </p>
+        </div>
+        <div class="theme-toggle" role="group" aria-label="Theme">
+          <button type="button" data-set-theme="light" aria-pressed="true">Light</button>
+          <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+        </div>
+      </header>
+
+      <div class="legend">
+        <strong>Vocabulary, per the CIG.</strong> Opening a family is two steps: <em>unlock the
+        beanpod</em> (family-wide) and then <em>sign in</em> (per person, PIN). "Recovery" names the
+        printed kit and nothing else — so the scan flow is an <strong>unlock</strong>, never a
+        "recovery". Headings name the object as the beanpod; body copy explains what that is.
+      </div>
+
+      <!-- ══════════════ SURFACE 1 — three directions ══════════════ -->
+      <section class="surface-head">
+        <h2>1. Cold entry <span class="tag">approved direction</span></h2>
+        <p>
+          The screen a person meets on a device that has never opened this beanpod. The cold device
+          <strong>shows its own code</strong> and a signed-in device scans it, because the camera is
+          almost always on the phone and the cold device may well be a laptop. One QR, one
+          instruction, identical on both form factors. The code is shown immediately, so the common
+          case needs no decision at all, and the two real fallbacks are still named in plain words
+          rather than hidden behind one vague link.
+        </p>
+      </section>
+
+      <div class="rail">
+        <!-- ── Approved: quiet disclosure ── -->
+        <div>
+          <div class="caption">Cold entry · phone</div>
+          <div class="phone">
+            <div class="phone-screen">
+              <div class="brandmark">
+                <span class="pod" aria-hidden="true">🫘</span>
+                <span>
+                  <span class="wordmark">beanies.family</span><br />
+                  <span class="tagline">every bean counts</span>
+                </span>
+              </div>
+
+              <h2 class="h-page">Unlock my beanpod</h2>
+              <p class="sub">Scan this with a device that's already signed in.</p>
+
+              <div style="margin: 1.1rem 0 0.75rem" class="qr-wrap">
+                <div class="qr-frame">
+                  <div class="qr" data-qr="entry" aria-label="Sign-in code"></div>
+                </div>
+              </div>
+
+              <div style="text-align: center">
+                <span class="fingerprint">7F2A</span>
+              </div>
+
+              <div class="waiting" style="justify-content: center; margin: 0.9rem 0">
+                <span class="dot" aria-hidden="true"></span> Waiting for approval
+              </div>
+
+              <div class="divider">or</div>
+
+              <div class="stack">
+                <button class="btn btn-quiet" type="button">Paste a link instead</button>
+                <button class="linkish muted" type="button" style="width: 100%">
+                  Use a passphrase or recovery kit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <strong>Why this shape.</strong> Two alternatives were drawn and rejected. Leading with the
+        code but hiding every alternative behind a single "other ways in" link repeats the trap the
+        current screen already falls into from the other side. Opening with a menu of three labelled
+        doors is honest, but it spends the whole first screen asking a question most people cannot
+        answer yet — they do not know whether another device counts. This version answers the common
+        case before it is asked, and it extends ProveView's existing progressive disclosure rather
+        than inventing a second pattern.
+      </div>
+
+      <!-- ══════════════ SURFACE 2 — cold decrypt ══════════════ -->
+      <section class="surface-head">
+        <h2>2. Cold unlock, kit demoted <span class="tag">LoadPodView state B · ProveView</span></h2>
+        <p>
+          Today this screen leads with a secret field and offers the kit as a peer. Now the scan path
+          sits on top, the credential the envelope actually accepts sits below it, and the kit is a
+          quiet last line.
+        </p>
+      </section>
+
+      <div class="rail">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="brandmark">
+              <span class="pod" aria-hidden="true">🫘</span>
+              <span class="wordmark">beanies.family</span>
+            </div>
+
+            <span class="pill pill-success" style="align-self: flex-start"
+              >✓ Parker family beanpod found</span
+            >
+
+            <h2 class="h-page" style="margin-top: 0.9rem">Unlock my beanpod</h2>
+            <p class="sub">The quickest way in is a device that's already signed in.</p>
+
+            <div class="card" style="margin-top: 1.1rem; text-align: center">
+              <div class="qr-wrap">
+                <div class="qr-frame" style="box-shadow: none">
+                  <div class="qr sm" data-qr="d" aria-label="Sign-in code"></div>
+                </div>
+              </div>
+              <p class="meta" style="margin: 0.75rem 0 0">
+                Scan with a signed-in device · code <strong style="color: var(--ink)">7F2A</strong>
+              </p>
+            </div>
+
+            <div class="divider">or</div>
+
+            <div>
+              <label class="field-label" for="pp">Family passphrase</label>
+              <input class="input" id="pp" type="password" placeholder="Your family passphrase" />
+            </div>
+
+            <button class="btn btn-primary" type="button" style="margin-top: 0.75rem">
+              Unlock
+            </button>
+
+            <div class="grow"></div>
+            <button class="linkish muted" type="button" style="width: 100%">
+              Use my recovery kit
+            </button>
+          </div>
+        </div>
+
+        <div class="legend" style="flex: 1 1 320px; margin-top: 2.1rem">
+          <strong>Why the kit sits at the very bottom.</strong> Six of twenty-two families redeemed a
+          kit, every one on a cold device, and five of those six then replaced a PIN that was working
+          — they did not need recovery, they needed a way in. Demoting the kit is the whole point of
+          the issue. It is still one tap away, and the wording never calls it "recovery" for anything
+          other than the printed kit itself.<br /><br />
+          <strong>The passphrase field is conditional.</strong> Offer copy derives from
+          <code>envelopeCapabilities()</code>; a family born without a passphrase never sees this
+          field, and a kit-born family is never offered a password it does not have.
+        </div>
+      </div>
+
+      <!-- ══════════════ SURFACE 3 — kit entry ══════════════ -->
+      <section class="surface-head">
+        <h2>3. Recovery kit entry <span class="tag">scan first, type last</span></h2>
+        <p>
+          The decoder already ships — a kit PDF or a photo of the printed QR both work. What is
+          missing is the priority, and a <code>capture</code> attribute so a phone offers its camera
+          directly.
+        </p>
+      </section>
+
+      <div class="rail">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="brandmark">
+              <span class="pod" aria-hidden="true">🫘</span>
+              <span class="wordmark">beanies.family</span>
+            </div>
+
+            <h2 class="h-page">Use your recovery kit</h2>
+            <p class="sub">
+              The kit is the sheet you saved when the family was created. Point your camera at the
+              code on it.
+            </p>
+
+            <div class="stack" style="margin-top: 1.25rem">
+              <button class="btn btn-primary" type="button">📷 Scan the kit</button>
+              <button class="btn btn-quiet" type="button">Choose the kit file or a photo</button>
+            </div>
+
+            <div class="divider">or</div>
+
+            <div>
+              <label class="field-label" for="kit">Recovery code</label>
+              <input class="input" id="kit" placeholder="XXXX-XXXX-XXXX-XXXX" />
+              <p class="meta" style="margin-top: 0.5rem">
+                32 characters from the bottom of your kit.
+              </p>
+            </div>
+
+            <button class="btn btn-secondary" type="button" style="margin-top: 0.75rem">
+              Unlock
+            </button>
+
+            <div class="grow"></div>
+            <div class="note">
+              Using your kit won't change your PIN. You can set a new one afterwards if you want to.
+            </div>
+          </div>
+        </div>
+
+        <div class="legend" style="flex: 1 1 320px; margin-top: 2.1rem">
+          <strong>That last note is a product change, not decoration.</strong> Greg's original report
+          was that redeeming a kit silently reset the PIN a person had just created. The copy here
+          promises the opposite, so if the behaviour still resets, the plan has to fix the behaviour
+          rather than soften the sentence.
+        </div>
+      </div>
+
+      <!-- ══════════════ SURFACE 4 — mint sheet ══════════════ -->
+      <section class="surface-head">
+        <h2>4. Bringing a new device on <span class="tag">profile menu · PIN-gated</span></h2>
+        <p>
+          The other half of the story: you are signed in and want to add a device. Today this is four
+          taps deep in Settings. It moves beside "Switch member", which is where device-mode actions
+          already live — and the PIN comes first, because this code opens everything the family has.
+        </p>
+      </section>
+
+      <div class="rail">
+        <div>
+          <div class="caption">Profile menu</div>
+          <div class="menu">
+            <div class="menu-item">✏️ Edit profile</div>
+            <div class="menu-item is-new">
+              📱 Sign in another device
+              <span class="pill pill-orange" style="margin-left: auto">New</span>
+            </div>
+            <div class="menu-item">🖼️ Start the beanie wall</div>
+            <div class="menu-item">🔄 Switch member</div>
+            <div class="menu-sep"></div>
+            <div class="menu-item">⚙️ Settings</div>
+            <div class="menu-item">❔ Help</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Step 1 — PIN</div>
+          <div class="phone">
+            <div class="phone-screen" style="justify-content: flex-end; padding-bottom: 0">
+              <div class="sheet">
+                <div class="grabber" aria-hidden="true"></div>
+                <h3 class="h-section">Sign in another device</h3>
+                <p class="sub">Enter your PIN to show a sign-in code.</p>
+
+                <div class="pinrow" style="margin: 1.5rem 0">
+                  <span class="pincell filled">•</span>
+                  <span class="pincell filled">•</span>
+                  <span class="pincell filled">•</span>
+                  <span class="pincell"></span>
+                  <span class="pincell"></span>
+                  <span class="pincell"></span>
+                </div>
+
+                <div class="note">
+                  This code opens your whole family's beanpod, so it's worth a quick check that it's
+                  you.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Step 2 — the code</div>
+          <div class="phone">
+            <div class="phone-screen" style="justify-content: flex-end; padding-bottom: 0">
+              <div class="sheet">
+                <div class="grabber" aria-hidden="true"></div>
+                <h3 class="h-section">Scan this on your new device</h3>
+                <p class="sub">Point the new device's camera at the code.</p>
+
+                <div style="margin: 1.1rem 0" class="qr-wrap">
+                  <div class="qr-frame">
+                    <div class="qr" data-qr="e" aria-label="Sign-in code"></div>
+                    <span class="qr-pod" aria-hidden="true">🫘</span>
+                  </div>
+                </div>
+
+                <div class="stack">
+                  <button class="btn btn-quiet" type="button">Copy the link instead</button>
+                </div>
+
+                <p class="meta" style="margin-top: 0.9rem">
+                  Works for 7 days. Making a new code stops the last one working.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <strong>"Making a new code stops the last one working" is not optional copy.</strong> The
+        token is deliberately never stored, so the app cannot re-show a live code — a second tap
+        genuinely revokes the first. There is no way to make this idempotent, so the sentence is the
+        fix.
+      </div>
+
+      <!-- ══════════════ SURFACE 5 — the pull pair ══════════════ -->
+      <section class="surface-head">
+        <h2>5. The approval pair <span class="tag">laptop asks · phone approves</span></h2>
+        <p>
+          Two halves of one conversation. The laptop shows a code that carries no secret — only a
+          throwaway public key — so photographing it gains nothing. All the authority is in the tap
+          on the phone, and the two screens show the same four characters to compare.
+        </p>
+      </section>
+
+      <div class="rail">
+        <div class="laptop">
+          <div class="caption" style="padding: 0 0 0.4rem">Cold laptop</div>
+          <div class="laptop-screen">
+            <div class="brandmark">
+              <span class="pod" aria-hidden="true">🫘</span>
+              <span class="wordmark">beanies.family</span>
+            </div>
+
+            <div class="split two" style="align-items: center">
+              <div>
+                <h2 class="h-page">Unlock my beanpod</h2>
+                <p class="sub">
+                  Open beanies on your phone and scan this code. Your family's data never leaves your
+                  devices.
+                </p>
+
+                <div style="margin-top: 1.1rem">
+                  <span class="fingerprint">7F2A</span>
+                </div>
+
+                <div class="waiting" style="margin-top: 1.1rem">
+                  <span class="dot" aria-hidden="true"></span> Waiting for approval
+                </div>
+
+                <div style="margin-top: 1.25rem">
+                  <button class="linkish muted" type="button">Other ways in</button>
+                </div>
+              </div>
+
+              <div class="qr-wrap">
+                <div class="qr-frame">
+                  <div class="qr lg" data-qr="f" aria-label="Sign-in code"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Signed-in phone</div>
+          <div class="phone">
+            <div class="phone-screen" style="justify-content: flex-end; padding-bottom: 0">
+              <div class="sheet">
+                <div class="grabber" aria-hidden="true"></div>
+
+                <div style="text-align: center">
+                  <span class="tile-icon" style="margin: 0 auto 0.75rem; width: 48px; height: 48px"
+                    >💻</span
+                  >
+                  <h3 class="h-section">Let this device in?</h3>
+                  <p class="sub" style="margin-inline: auto">
+                    A laptop is asking to open the Parker family beanpod as Greg.
+                  </p>
+
+                  <div style="margin: 1.25rem 0 0.5rem">
+                    <span class="fingerprint">7F2A</span>
+                  </div>
+                  <p class="meta">Approve only if the laptop shows these same characters.</p>
+                </div>
+
+                <div class="stack" style="margin-top: 1.35rem">
+                  <button class="btn btn-primary" type="button">Yes, let it in</button>
+                  <button class="btn btn-quiet" type="button">No, that's not me</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <strong>Reject is as easy as approve.</strong> The corpus is consistent that a one-sided
+        approval sheet trains people to tap the bright button. Both actions are full-width and equally
+        reachable, and the destructive-looking one is not red — under the CIG, red is for deleting
+        things, not for declining them.
+      </div>
+
+      <!-- ══════════════ SURFACE 6 — creation ══════════════ -->
+      <section class="surface-head">
+        <h2>6. The moment the family is created <span class="tag">one code, then a gate</span></h2>
+        <p>
+          This screen already gives the recovery kit a QR and gives the way in a line of select-all
+          text. That is backwards, and it sits exactly where families leak: someone finishing setup on
+          a laptop who is about to install the app. Only the sign-in code is scannable here — the kit
+          keeps its own QR on the saved sheet, where it is actually needed. Two codes side by side
+          read as alternatives, and they are not: one is for the next minute, the other for a bad day
+          next year.
+        </p>
+      </section>
+
+      <div class="rail">
+        <div class="laptop">
+          <div class="caption" style="padding: 0 0 0.4rem">Desktop</div>
+          <div class="laptop-screen">
+            <div style="text-align: center; margin-bottom: 1.5rem">
+              <span class="pill pill-success">✓ The Parker family is ready</span>
+              <h2 class="h-page" style="margin-top: 0.75rem">Get beanies on your phone</h2>
+              <p class="sub" style="margin-inline: auto">
+                Scan this with your phone's camera and beanies opens, already unlocked.
+              </p>
+            </div>
+
+            <div class="qr-wrap" style="margin-bottom: 0.75rem">
+              <div class="qr-frame">
+                <div class="qr lg" data-qr="g" aria-label="Sign-in code"></div>
+                <span class="qr-pod" aria-hidden="true">🫘</span>
+              </div>
+            </div>
+
+            <div style="text-align: center">
+              <button class="linkish" type="button">Copy the link instead</button>
+              <p class="meta">Works for 7 days.</p>
+            </div>
+
+            <div class="divider">before you go</div>
+
+            <div class="card" style="background: var(--overlay)">
+              <div style="display: flex; gap: 0.85rem; align-items: flex-start">
+                <span class="tile-icon silk" aria-hidden="true">🗝️</span>
+                <div class="grow">
+                  <p class="h-item">Save your recovery kit</p>
+                  <p class="sub" style="margin-top: 0.15rem">
+                    If you ever lose every signed-in device, this sheet is the only way back into
+                    your family's beans. Keep it somewhere you'd keep a passport.
+                  </p>
+                  <p class="kit-code" style="margin-top: 0.6rem">R7K2 · 9QW4 · MN3X · 8BTD</p>
+                </div>
+              </div>
+
+              <div class="split two" style="margin-top: 1rem">
+                <button class="btn btn-primary" type="button">Save as PDF</button>
+                <button class="btn btn-quiet" type="button">Print it</button>
+              </div>
+
+              <label
+                style="
+                  display: flex;
+                  gap: 0.6rem;
+                  align-items: flex-start;
+                  margin-top: 0.9rem;
+                  cursor: pointer;
+                "
+              >
+                <input type="checkbox" style="margin-top: 0.2rem; accent-color: var(--orange)" />
+                <span class="meta" style="color: var(--ink-soft)"
+                  >I've written it down somewhere safe.</span
+                >
+              </label>
+            </div>
+
+            <button
+              class="btn btn-secondary"
+              type="button"
+              style="margin-top: 1rem; opacity: 0.45"
+              disabled
+            >
+              Take me to my nook
+            </button>
+            <p class="meta" style="text-align: center; margin-top: 0.5rem">
+              Save, print, or tick the box to carry on.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <div class="caption">Same screen, phone width</div>
+          <div class="phone">
+            <div class="phone-screen">
+              <span class="pill pill-success" style="align-self: flex-start"
+                >✓ The Parker family is ready</span
+              >
+              <h2 class="h-page" style="margin-top: 0.75rem">Get beanies on your other devices</h2>
+              <p class="sub">Scan this from your laptop or tablet.</p>
+
+              <div class="qr-wrap" style="margin: 1.1rem 0 0.5rem">
+                <div class="qr-frame">
+                  <div class="qr" data-qr="g2" aria-label="Sign-in code"></div>
+                  <span class="qr-pod" aria-hidden="true">🫘</span>
+                </div>
+              </div>
+
+              <div style="text-align: center">
+                <button class="linkish" type="button">Copy the link instead</button>
+              </div>
+
+              <div class="divider">before you go</div>
+
+              <div class="card" style="background: var(--overlay); padding: 1rem">
+                <p class="h-item">🗝️ Save your recovery kit</p>
+                <p class="sub" style="margin-top: 0.15rem">
+                  The only way back if you lose every signed-in device.
+                </p>
+                <p class="kit-code" style="margin-top: 0.5rem; font-size: 0.8125rem">
+                  R7K2 · 9QW4 · MN3X · 8BTD
+                </p>
+                <button class="btn btn-primary" type="button" style="margin-top: 0.75rem">
+                  Save as PDF
+                </button>
+                <label
+                  style="
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: flex-start;
+                    margin-top: 0.75rem;
+                    cursor: pointer;
+                  "
+                >
+                  <input type="checkbox" style="margin-top: 0.2rem; accent-color: var(--orange)" />
+                  <span class="meta">I've written it down somewhere safe.</span>
+                </label>
+              </div>
+
+              <div class="grow"></div>
+              <button class="btn btn-secondary" type="button" style="opacity: 0.45" disabled>
+                Take me to my nook
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <strong>The gate opens on an action or an acknowledgement, never on a verification.</strong>
+        Saving, printing, or ticking the box all release the Continue button. beanies cannot know
+        whether a PDF really reached a safe place, and pretending otherwise would strand someone at
+        the last step of onboarding if a platform's save silently failed — the worst place in the
+        product to trap a new family.<br /><br />
+        <strong>Only one QR on screen.</strong> The kit still carries its own QR on the saved sheet,
+        which is what makes scanning it possible later. Showing both here would make them look like a
+        choice between two ways in.
+      </div>
+    </div>
+
+    <script>
+      // Theme toggle (mockup chrome only).
+      const root = document.documentElement;
+      document.querySelectorAll('[data-set-theme]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const next = btn.dataset.setTheme;
+          root.setAttribute('data-theme', next);
+          document.querySelectorAll('[data-set-theme]').forEach((b) => {
+            b.setAttribute('aria-pressed', String(b.dataset.setTheme === next));
+          });
+        });
+      });
+
+      // Faux QR modules — deterministic per key so the picture is stable,
+      // with the three finder squares drawn properly so it reads as a QR.
+      function buildQr(el, seed) {
+        const N = 21;
+        let h = 0;
+        for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+        const rand = () => ((h = (h * 1103515245 + 12345) >>> 0), h / 4294967296);
+
+        const finder = (r, c) =>
+          (r < 7 && c < 7) || (r < 7 && c >= N - 7) || (r >= N - 7 && c < 7);
+
+        const inFinderInk = (r, c) => {
+          const lr = r < 7 ? r : r - (N - 7);
+          const lc = c < 7 ? c : c - (N - 7);
+          const edge = lr === 0 || lr === 6 || lc === 0 || lc === 6;
+          const core = lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4;
+          return edge || core;
+        };
+
+        const frag = document.createDocumentFragment();
+        for (let r = 0; r < N; r++) {
+          for (let c = 0; c < N; c++) {
+            const on = finder(r, c) ? inFinderInk(r, c) : rand() > 0.52;
+            const cell = document.createElement('i');
+            if (!on) cell.style.background = 'transparent';
+            frag.appendChild(cell);
+          }
+        }
+        el.appendChild(frag);
+      }
+
+      document.querySelectorAll('[data-qr]').forEach((el) => buildQr(el, el.dataset.qr));
+    </script>
+  </body>
+</html>
