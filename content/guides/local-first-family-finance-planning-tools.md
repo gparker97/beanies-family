@@ -4,8 +4,9 @@ slug: local-first-family-finance-planning-tools
 excerpt: "a guide to family and financial planning apps that don't harvest your data. what local-first actually means, the trade-offs, and the tools worth trying."
 heroEmoji: 🔒
 publishedDate: 2026-04-22
-lastUpdated: 2026-08-20
+lastUpdated: 2026-09-18
 relatedPosts:
+  - getting-down-to-brass-tacks
   - maple-alternative
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
@@ -57,7 +58,7 @@ Local-first is a small philosophical shift with big practical consequences - you
 
 **short answer:** when an app stores your data on someone else's server, you're renting access to your own information. The software or app provider owns the storage, the format, the export rules, and the ability to shut you out at any time. This is all as per terms that you agreed to when you started using the app.
 
-Perhaps you've experienced an app you know and love suddenly changing its pricing model. Typically this happens after being acquired by another company, but not always. Or maybe one of your favorite apps just quietly disappeared. That is the cost of using cloud-first software, and most of us accepted it as a given for doing business on the internet.
+Perhaps you've experienced an app you know and love [suddenly changing its pricing model](/blog/getting-down-to-brass-tacks). Typically this happens after being acquired by another company, but not always. Or maybe one of your favorite apps just quietly disappeared. That is the cost of using cloud-first software, and most of us accepted it as a given for doing business on the internet.
 
 For some real-world examples, see: the [Mint shutdown](https://techcrunch.com/2023/11/02/personal-finance-monarch-intuit-mint/) and [Sunrise calendar](https://fortune.com/2016/05/11/microsoft-sunset-sunrise-calendar-app/). It's a real risk - not theoretical.
 

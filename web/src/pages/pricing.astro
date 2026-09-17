@@ -154,7 +154,7 @@ const faqSchema = {
                   <span data-price="basicPerMonth">{p.basicPerMonth}</span> / mo
                 </p>
                 <ul>
-                  <li><span>✅</span><span>every feature, every world</span></li>
+                  <li><span>✅</span><span>every feature, every bean</span></li>
                   <li><span>✅</span><span>your whole family, no seat limits</span></li>
                   <li><span>✅</span><span>your data in your own encrypted file</span></li>
                   <li><span>✅</span><span>export the lot, any time</span></li>
@@ -873,8 +873,25 @@ const faqSchema = {
       padding: 56px 20px;
     }
 
+    /* The letter is by far the longest prose on the page, and on a 375px phone
+       the section's own 20px gutter plus the card's 44px inset left roughly a
+       247px measure - about 35 characters, which is punishing for a piece this
+       long. On a phone the card hands most of its horizontal padding back to
+       the text and the section gutter narrows, taking the measure to ~43
+       characters. The card's top/bottom padding stays generous so it still
+       reads as a letter rather than a full-bleed slab. */
+    /* .wrap carries its own 24px gutter, so the section's own inline padding
+       was doubling it - 40px a side before the card's inset even started. The
+       section gives its inline padding up on a phone and the wrap alone holds
+       the 16px edge gutter. Scoped to .whopays: every other section on the page
+       is short-form and reads fine as-is. */
     .pricing-page .whopays {
-      padding: 48px 20px;
+      padding: 48px 0;
+    }
+
+    .pricing-page .whopays .wrap {
+      padding-left: 16px;
+      padding-right: 16px;
     }
   }
 
@@ -977,6 +994,19 @@ const faqSchema = {
   .pricing-page .handout.letter { max-width: 680px; padding: 40px 44px; }
   .pricing-page .handout.letter p { margin-bottom: 1.35rem; }
   .pricing-page .handout.letter p:first-of-type { font-size: 1.06rem; }
+
+  /* Phones get most of that 44px inset back. At 375px the section gutter plus
+     the card inset left a ~207px measure - 24 characters, which is punishing
+     for the longest piece of prose on the site. This takes it to ~43. These
+     live here rather than in the 640px block above because that block sits
+     BEFORE the base rule and would lose to it on source order at equal
+     specificity - which is exactly how the first attempt at this silently did
+     nothing. */
+  @media (max-width: 640px) {
+    .pricing-page .handout.letter { padding: 30px 20px; }
+    .pricing-page .handout.letter p { line-height: 1.7; margin-bottom: 1.15rem; }
+    .pricing-page .handout.letter p:first-of-type { font-size: 1rem; }
+  }
   .pricing-page .tagline { color: var(--heritage-orange); font-style: italic; }
 
   /* Inline links: preflight resets a{color:inherit}, so in-prose links are
