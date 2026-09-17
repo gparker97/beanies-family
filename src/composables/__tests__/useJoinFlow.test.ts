@@ -744,7 +744,9 @@ describe('useJoinFlow', () => {
       // every join error. Long values here on purpose — `tail()` returns short strings
       // unchanged, so a 3-character fixture would pass against the unfixed code.
       const FULL_TOKEN = 'inv_9f3a91c4e85b2d06a7c1f94e3b8d52a0';
-      const FULL_FILE_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456';
+      // Low-entropy on purpose: a realistic-looking Drive id trips the no-secrets lint,
+      // and length is the only property this test needs from it.
+      const FULL_FILE_ID = 'drive-000000000011111111112222222222';
       const { buildInviteLink } = await import('@/services/crypto/inviteService');
       setUrl(
         buildInviteLink({
@@ -767,9 +769,8 @@ describe('useJoinFlow', () => {
       const flow = useJoinFlow();
       await flow.init();
 
-      const ctx = (
-        mockReportError.mock.calls[0]?.[0] as { context: Record<string, unknown> }
-      ).context;
+      const ctx = (mockReportError.mock.calls[0]?.[0] as { context: Record<string, unknown> })
+        .context;
 
       // The assertion that actually matters: the secret is not in there.
       expect(ctx.invite_token_tail).not.toBe(FULL_TOKEN);
