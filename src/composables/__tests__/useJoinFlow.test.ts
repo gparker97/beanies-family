@@ -737,6 +737,49 @@ describe('useJoinFlow', () => {
       );
     });
 
+    it('TAILS the invite token and file id — they must never reach the firehose whole', async () => {
+      // The leak this guards: `file_id_tail` and `invite_token_tail` are on the telemetry
+      // allowlist, so their values reach CloudWatch and, on a critical, Slack. They were
+      // assigned RAW despite the `_tail` names, which published a live 24h invite token on
+      // every join error. Long values here on purpose — `tail()` returns short strings
+      // unchanged, so a 3-character fixture would pass against the unfixed code.
+      const FULL_TOKEN = 'inv_9f3a91c4e85b2d06a7c1f94e3b8d52a0';
+      const FULL_FILE_ID = '1AbCdEfGhIjKlMnOpQrStUvWxYz0123456';
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          token: FULL_TOKEN,
+          provider: 'google_drive',
+          fileId: FULL_FILE_ID,
+        }).replace('http://localhost:3000', '')
+      );
+      mockGoogleAuth.silent = vi.fn(async () => 'silent-token');
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({
+        success: false,
+        needsPassword: true,
+      }));
+      mockSyncStore.pendingEncryptedFile = {
+        envelope: { inviteKeys: { 'hash:other': {} as unknown as Record<string, unknown> } },
+      };
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+
+      const ctx = (
+        mockReportError.mock.calls[0]?.[0] as { context: Record<string, unknown> }
+      ).context;
+
+      // The assertion that actually matters: the secret is not in there.
+      expect(ctx.invite_token_tail).not.toBe(FULL_TOKEN);
+      expect(String(ctx.invite_token_tail)).not.toContain(FULL_TOKEN);
+      expect(ctx.file_id_tail).not.toBe(FULL_FILE_ID);
+      // ...and what IS there is the last four, which is all triage ever needed.
+      expect(ctx.invite_token_tail).toBe('\u2026' + FULL_TOKEN.slice(-4));
+      expect(ctx.file_id_tail).toBe('\u2026' + FULL_FILE_ID.slice(-4));
+    });
+
     it('does NOT fire reportError on the cancelled path', async () => {
       await setupBasicGoogleDriveJoin();
       mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
