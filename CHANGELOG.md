@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-18
+
+### Added
+
+- **New beanstalk post: "getting down to brass tacks".** The money conversation - what beanies costs, the 90-day trial, the early-bean rewards, and why you can always self-host it and pay nothing at all.
+
 ## 2026-09-17
 
 ### Fixed
