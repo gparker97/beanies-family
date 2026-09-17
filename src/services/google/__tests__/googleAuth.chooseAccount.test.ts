@@ -79,10 +79,18 @@ describe('the account chooser is reachable at all', () => {
     vi.resetModules();
     vi.clearAllMocks();
     sessionStorage.clear();
+    // ⚠️ STUB THE CLIENT ID BEFORE IMPORTING, as the five sibling googleAuth suites do.
+    // Without it `googleAuth` throws 'Google Client ID not configured' and all three tests
+    // here fail — on CI only, because a developer machine has it in `.env` and the runner
+    // does not. It went unnoticed because these tests shipped alongside a brand-asset
+    // regression that made 34 suites fail to COLLECT, and a collection failure masks the
+    // assertions underneath it.
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
     googleAuth = await import('../googleAuth');
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     Object.defineProperty(window, 'location', { configurable: true, value: REAL_LOCATION });
   });
 
