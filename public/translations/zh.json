@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-16",
-    "translationCount": 4767
+    "lastUpdated": "2026-09-17",
+    "translationCount": 4778
   },
   "translations": {
     "app.name": {
@@ -23840,6 +23840,61 @@
       "translation": "beanies无法确认AI服务是否应该是密封的，因此您的文档保留在您的设备上。没有发送任何内容，也没有收取任何费用。请稍后重试。",
       "hash": "zfe7xj",
       "lastUpdated": "2026-09-16"
+    },
+    "bean.unclaim.title": {
+      "translation": "让他们再次加入",
+      "hash": "3v0dux",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.description": {
+      "translation": "{name}已标记为已加入，因此您无法向其发送新邀请。如果他们从未真正进入，或者中途丢失了链接，请清除链接，然后您可以再次邀请他们。",
+      "hash": "s1q3jz",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.button": {
+      "translation": "让{name}再次加入",
+      "hash": "jnrg8i",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.confirm.title": {
+      "translation": "让他们再次加入？",
+      "hash": "kuovl6",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.confirm.message": {
+      "translation": "这会清除他们的PIN码，因此他们需要重新收到邀请才能重新加入。他们把所有东西都放在吊舱里：他们的豆子，他们的照片，他们的历史。您可以立即向他们发送新的邀请。",
+      "hash": "ep0mrm",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.confirm.action": {
+      "translation": "让他们再次加入",
+      "hash": "3v0dux",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.done": {
+      "translation": "完成。您现在可以再次邀请{name}。",
+      "hash": "99yfcf",
+      "lastUpdated": "2026-09-17"
+    },
+    "bean.unclaim.failed": {
+      "translation": "那行不通。请稍后重试。",
+      "hash": "8girlv",
+      "lastUpdated": "2026-09-17"
+    },
+    "podAccess.recovery.pickFamilyFileOtherAccount": {
+      "translation": "使用其它账户",
+      "hash": "9kn6hn",
+      "lastUpdated": "2026-09-17"
+    },
+    "join.awaiting.cancelled": {
+      "translation": "尚未选择文件。轻触下方以打开Google云端硬盘并选择您家人的文件。",
+      "hash": "9zh2h6",
+      "lastUpdated": "2026-09-17"
+    },
+    "join.awaiting.redirecting": {
+      "translation": "正在将您带到Google登录……如果没有出现任何问题，请轻触下方重试。",
+      "hash": "cmegsf",
+      "lastUpdated": "2026-09-17"
     }
   }
 }
