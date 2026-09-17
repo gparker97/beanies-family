@@ -291,3 +291,100 @@ Just created:
 **Standing rule**: every failure names the way out, and none of them says only "create a new one in
 Settings" — a person holding a dead link is on a device that cannot self-serve, so the route is
 always "a device where you're already signed in" or "ask someone in your family".
+
+---
+
+## Session 4 — 2026-09-17 (cold-device recovery research)
+
+Continuation of the same thread. Started as "prepare the issue for magic link email" and became a
+research session once the crypto ruled the literal request out.
+
+**~09:00** — `/good-morning`
+
+**~09:10** — "no need to calculate metrics or news"
+
+**~09:15** — `/beanies-new-issue`:
+
+> let's now prepare the issue for magic link email - we will need to do the following:
+>
+> - enable the ability for users to request an email to their known email address (the one
+>   registered in beanies) from the welcome - login page - follow as per standard industry
+>   conventions for email input -> magic link sign-in from a ui/ux perspective
+> - this will send them a beautiful, welcoming, beanies themed well formatted email with their
+>   beanies magic link to sign in directly either to the website or app
+> - propose and enable the relevant infra to facilitate this feature
+> - keep the implementation as simple, robust, and maintainable as possible
+>
+> let me know if any questions, once clear, create the issue and start /beanies-pre-plan then move
+> to /beanies-plan
+
+**~09:40** — after being told a locator-only email would not decrypt anything:
+
+> If the drive is not decrypted and the link provides locator info only, how does the file get
+> decrypted? would the user still need the recovery kit?
+
+This was the pivot. The answer was yes, and it exposed that the requested UX (request from the
+welcome page, i.e. from the locked-out position) cannot be satisfied by any design where beanies
+holds no key material.
+
+**~09:50** — the brief that defined the rest of the session:
+
+> what would you propose? the settings-side send is only marginally better than generating a link
+> on the spot to login to another device, but it's still not the level of convenience that we need.
+>
+> while i know it's hard to reconcile privacy vs convenience, especially to resolve that initial
+> friction to login, we really need to think hard to figure out a way we can make this work,
+> seamlessly, easily, that somehow feels like a typical saas product and not jumping thru hoops, so
+> a typical non-technical person does not have to think or worry about where their recovery kit is,
+> or who has it, but just needs to remember (1) the pin and (2) one other thing (i.e. access to
+> their email, etc) so that we can combine those things, decrypt the file, and log them in
+> seamlessly.
+>
+> if we don't figure out a way to reduce this initial joining and login friction, it would be very
+> hard for ppl to accept the trade off if they cannot get into their pod or remember where the kit
+> is they printed one time several months ago (then need to copy each letter one by one).
+>
+> can you do deep research, kick off agents if needed, and do as much thinking and reasoning as
+> needed to propose some options we could consider to reduce this friction. feel free to propose
+> anything you think would be an feasible option, even if it requires us to change some things
+> about the app, do not by limited by our current architecture.
+
+**~10:05** — "please pull the latest version of the repo now"
+
+**~10:30** — interleaved, while research ran:
+
+> in the meantime - can you please fix the issue identified during the last session with the images
+> from the optimizer being stored to a git ignored dir? i need to push the blog
+
+**~10:45** — "yes commit those and re-push the images as well if needed. note that i've pushed the
+updated screenshot to the notion blog now"
+
+**~11:00** — "yes write it up to research and include all 4 rungs of the ladder, go ahead to write
+it up to /beanies-new-issue . once done run /end-session"
+
+## Outcome
+
+**Research, not implementation.** Five parallel research streams (industry prior art at mechanism
+level, the Tinfoil enclave's actual capability, beanies' own credential model, Drive
+`appDataFolder` feasibility, AWS costings). Output:
+
+- `docs/research/2026-09-17-cold-device-recovery-options.md`
+- Notion tracker **#97**, `Not started`, all four rungs in scope with rung 3 gated on greg's
+  decision.
+
+**The finding that reframed it:** minting a magic link wraps the family key, so only a device that
+already holds the key can mint one. A locked-out device has no origin for a token. "Email me a
+link" is therefore not buildable as asked without beanies holding something that opens pods.
+
+**The finding that surprised me most:** every vendor that built the sophisticated thing (Signal
+SVR3, Apple Cloud Key Vault, WhatsApp, 1Password) shipped, to ordinary users, a high-entropy code
+the user holds themselves. Signal deleted SVR3 from its clients across 2025 and shipped a
+64-character recovery key. The object they all converged on is structurally our recovery kit. That
+argues for keeping rung 4 proudly rather than trying to delete it.
+
+**Also shipped this session** (small, unrelated): `40d01705` fixed the blog skill's image
+optimizer writing into a gitignored directory, and `6a4fe741` refreshed the brass-tacks pricing
+screenshot through the fixed path.
+
+**Owed:** greg's answers to the five open questions on #97, and a separate tracker row for the
+Google six-month refresh-token expiry found incidentally.
