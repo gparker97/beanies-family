@@ -5690,10 +5690,17 @@ const STRING_DEFS = {
     beanie: 'that link is for someone who is no longer in this family. pick who you are below.',
   },
   'magicLink.pastePrompt': {
-    en: 'Have a link? Paste it here',
-    beanie: 'have a link? paste it here',
+    en: 'Have a magic link? Paste it here',
+    beanie: 'have a magic link? paste it here',
   },
-  'magicLink.pasteLabel': { en: 'Your beanies link', beanie: 'your beanies link' },
+  'magicLink.pasteLabel': {
+    en: 'Paste your beanies magic link here',
+    beanie: 'paste your beanies magic link here',
+  },
+  'magicLink.pastePlaceholder': {
+    en: 'https://app.beanies.family/join?...',
+    beanie: 'https://app.beanies.family/join?...',
+  },
   'magicLink.pasteAction': { en: 'Open link', beanie: 'open link' },
   'magicLink.pasteUnparseable': {
     en: "That doesn't look like a complete beanies link — check it copied fully.",

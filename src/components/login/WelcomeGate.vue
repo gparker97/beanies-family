@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import { getBuildVersionLabel } from '@/utils/diagnosticContext';
 // REVIEW-DEMO: gates the app-review access affordance below.
 import { isReviewDemoAvailable } from '@/utils/reviewDemo';
 import LoginChoiceCard from './LoginChoiceCard.vue';
 import { track } from '@/services/analytics/plausible';
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { parseInviteLink } from '@/services/crypto/inviteService';
 
 const { t } = useTranslation();
-const router = useRouter();
 
 /**
  * Paste-a-link fallback.
@@ -30,59 +27,6 @@ const router = useRouter();
  * clipboard access, and for a product whose pitch is privacy, reading what someone
  * copied without asking is the wrong instinct.
  */
-const showPaste = ref(false);
-const pastedLink = ref('');
-const pasteError = ref(false);
-
-function openPastedLink(): void {
-  pasteError.value = false;
-  // ⚠️ Normalise a missing scheme first. `parseInviteLink` does `new URL(raw)` with no
-  // base, and the commonest way a chat app renders a copied link is `app.beanies.family/
-  // join?…` with no `https://`. The fallback that exists to rescue a failed deep link was
-  // rejecting the most likely input with "check it copied fully" — when it had.
-  const raw = pastedLink.value.trim();
-  const normalised = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  const parsed = parseInviteLink(normalised);
-  // ⚠️ `parseInviteLink` returns null on a malformed URL and SILENTLY DROPS an
-  // undecodable `ref`/`hint`. A paste box is exactly where a truncated link arrives —
-  // chat apps wrap long URLs — so that silence has to be broken here rather than
-  // becoming a dead-end spinner three screens later.
-  if (!parsed) {
-    pasteError.value = true;
-    return;
-  }
-  // ⚠️ Forward what `parseInviteLink` RESOLVED, never a re-parse of the raw string.
-  // It deliberately accepts hash-routed links (`…/#/join?fam=…&t=…`), so re-deriving from
-  // `new URL(...).search` validated the hash form and then forwarded an EMPTY query —
-  // routing to a bare `/join`, where the joiner met the generic "how to join" card with no
-  // error, no token and no family. One parser, one answer.
-  void router.push({
-    path: '/join',
-    query: {
-      fam: parsed.familyId,
-      ...(parsed.token ? { t: parsed.token } : {}),
-      ...(parsed.provider ? { p: parsed.provider } : {}),
-      ...(parsed.fileId ? { fileId: parsed.fileId } : {}),
-      ...(parsed.fileName ? { ref: btoa(unescape(encodeURIComponent(parsed.fileName))) } : {}),
-      ...(parsed.inviteeEmail
-        ? { hint: btoa(unescape(encodeURIComponent(parsed.inviteeEmail))) }
-        : {}),
-      ...(parsed.linkMode ? { lk: '1' } : {}),
-      ...(parsed.magicLink ? { ml: '1' } : {}),
-      ...(parsed.memberId ? { m: parsed.memberId } : {}),
-    },
-  });
-
-  // ⚠️ EMIT AS WELL AS PUSH, because the push alone does nothing on the most likely retry.
-  // Someone whose link failed is already sitting at `/join?...`; stepping back to this gate
-  // moves `activeView` only, so the URL is unchanged. Pasting THE SAME link then resolves as
-  // a duplicated navigation: `fullPath` never changes, no watcher fires, and the screen sits
-  // there. The gesture that exists to rescue a failed link silently did nothing.
-  //
-  // `handleNavigate('join')` mounts `JoinPodView`, whose `onMounted` re-runs `flow.init()`
-  // against whatever the URL now holds — which is the whole point either way.
-  emit('navigate', 'join');
-}
 
 // Subtle build marker so we can tell which deployed bundle is running (matches
 // the `Build:` SHA in #beanies-errors). Computed once — the build is static.
@@ -325,46 +269,11 @@ function promptParts() {
     </div>
 
     <!-- Paste fallback: neutral on whether you are "joining" or "signing in", because
-         someone whose link failed to open the app does not know which they are. One line
-         under the cards rather than a fourth card. -->
-    <div class="mt-3 text-center">
-      <button
-        v-if="!showPaste"
-        type="button"
-        class="dark:text-ink-soft text-xs text-gray-500 underline underline-offset-2"
-        data-testid="open-paste-link"
-        @click="showPaste = true"
-      >
-        {{ t('magicLink.pastePrompt') }}
-      </button>
-      <div v-else class="space-y-2 text-left">
-        <label
-          for="pasted-link"
-          class="dark:text-ink-soft block text-xs font-semibold text-gray-600"
-        >
-          {{ t('magicLink.pasteLabel') }}
-        </label>
-        <input
-          id="pasted-link"
-          v-model="pastedLink"
-          type="url"
-          inputmode="url"
-          autocomplete="off"
-          class="dark:border-line dark:bg-surface-raised dark:text-ink w-full rounded-xl border border-gray-200 p-2.5 text-xs"
-          :placeholder="t('magicLink.pasteLabel')"
-        />
-        <button
-          type="button"
-          class="bg-primary-500 hover:bg-primary-600 w-full rounded-xl px-3 py-2 text-xs font-semibold text-white"
-          data-testid="submit-paste-link"
-          @click="openPastedLink"
-        >
-          {{ t('magicLink.pasteAction') }}
-        </button>
-        <p v-if="pasteError" role="alert" class="dark:text-danger-lift text-xs text-red-600">
-          {{ t('magicLink.pasteUnparseable') }}
-        </p>
-      </div>
+         someone whose link failed to open the app does not know which they are. Shared with
+         the join screen, which is the other place people land holding a link that did not
+         work — see `PasteLinkPanel`. -->
+    <div class="mt-4">
+      <PasteLinkPanel @submitted="emit('navigate', 'join')" />
     </div>
 
     <div class="mt-2 text-center">

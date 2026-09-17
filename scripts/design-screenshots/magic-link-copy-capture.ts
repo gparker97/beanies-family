@@ -65,5 +65,11 @@ for (const theme of ['light', 'dark'] as const)
       await page.getByRole('button', { name: /saved both/i }).click();
       await page.waitForTimeout(400);
       await page.screenshot({ path: `${OUT}/join-copy-${theme}-${w.name}.png`, fullPage: true });
+
+      // Open the SECOND paste panel so both states are in one frame: the collapsed control
+      // and the expanded form. Contrast on the open form is the thing being reviewed.
+      await page.getByTestId('open-paste-link').nth(1).click();
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${OUT}/paste-${theme}-${w.name}.png`, fullPage: true });
     });
   }

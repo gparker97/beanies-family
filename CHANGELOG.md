@@ -14,7 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Your beanies magic link.** Everyone now gets a personal link and QR code that signs them in on another device and lands them straight on their own PIN. It is shown once when you create a pod and once when you join, alongside your recovery kit, and you can create a fresh one any time in Settings. Links last 7 days, and making a new one cancels the old one.
 - **Links sent by message now open the app.** Tapping a beanies link in WhatsApp or a text opens the installed app rather than a browser tab, on both iPhone and Android.
-- **Paste a link to sign in.** If a link will not open by itself, there is now a place on the welcome screen to paste it in instead. Available everywhere beanies runs.
+- **Paste a link to sign in.** If a link will not open by itself, you can paste it in instead. It is offered on the welcome screen, on "Join your family" and on "Welcome back", so it is there wherever you happen to land holding a link. Available everywhere beanies runs.
 
 ### Fixed
 
