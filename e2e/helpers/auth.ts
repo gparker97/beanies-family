@@ -20,11 +20,6 @@ const E2E_FAMILY_NAME = 'E2E Test Family';
  * surface's PIN entry (Phase 4: families are born password-free) and the
  * mandatory recovery-kit confirmation.
  */
-/** Escape a UI string so it can be used inside a RegExp alternation. */
-function escapeForRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Promise<void> {
   // Step 1 — identity only (no password; it moved to the finish surface).
   await page.getByLabel(ui('auth.familyName')).fill(familyName);
@@ -61,12 +56,14 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
   // depends on whether `setMemberLinkWrap` reached the durable file — i.e. on Drive, i.e.
   // on the environment. Pinning the helper to one label made the whole E2E suite depend
   // on a network outcome; this is how that was discovered, so keep it tolerant.
+  //
+  // ⚠️ `.or()`, NOT a built `new RegExp(...)`. The security lint forbids a non-literal
+  // RegExp argument (`security/detect-non-literal-regexp`) and it is right to: building a
+  // pattern out of interpolated strings is how an unescaped metacharacter becomes a silently
+  // wrong matcher. Playwright composes alternatives natively, which needs no escaping at all.
   const kitStored = page
-    .getByRole('button', {
-      name: new RegExp(
-        `${escapeForRegExp(ui('recovery.kitConfirmStored'))}|${escapeForRegExp(ui('setup.saveBothConfirm'))}`
-      ),
-    })
+    .getByRole('button', { name: ui('recovery.kitConfirmStored') })
+    .or(page.getByRole('button', { name: ui('setup.saveBothConfirm') }))
     .first();
   await kitStored.waitFor({ state: 'visible', timeout: 15000 });
   await kitStored.click();
