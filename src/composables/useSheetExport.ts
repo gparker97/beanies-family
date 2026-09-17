@@ -148,6 +148,21 @@ export interface PngExportOptions {
  * `fontEmbedCSS: null` means "do not embed fonts at all" (`skipFonts`), which renders in the
  * platform fallback face. That is a cosmetic downgrade, and it is always better than no file.
  */
+/**
+ * Drop `[data-export-hide]` subtrees from the capture.
+ *
+ * A sheet is one layout serving two audiences: a live surface people click, and a flat file.
+ * Interactive affordances belong only to the first — a "Copy link" button rasterised into a
+ * PDF is a button someone taps on paper. This is the seam for that, and it lives in the
+ * exporter rather than in each caller so a sheet marks its own non-printing parts and every
+ * export path honours it.
+ *
+ * `filter` is not called for the root node, so a caller cannot accidentally erase its own sheet.
+ */
+function excludeFromExport(node: Node): boolean {
+  return !(node instanceof Element) || !node.hasAttribute('data-export-hide');
+}
+
 async function captureOnce(
   el: HTMLElement,
   opts: PngExportOptions,
@@ -160,6 +175,7 @@ async function captureOnce(
   const blob = await toBlob(el, {
     pixelRatio: opts.pixelRatio ?? 2,
     backgroundColor: opts.backgroundColor,
+    filter: excludeFromExport,
     ...(fontEmbedCss === null
       ? { skipFonts: true }
       : { fontEmbedCSS: fontEmbedCss, preferredFontFormat: 'woff2' as const }),

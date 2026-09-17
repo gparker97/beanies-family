@@ -15,6 +15,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useClipboard } from '@/composables/useClipboard';
 import { generateInviteQR } from '@/utils/qrCode';
 import { useSheetExport, ExportError, prewarmSheetExport } from '@/composables/useSheetExport';
 import { deliverFile } from '@/utils/deliverFile';
@@ -27,6 +28,23 @@ const props = defineProps<{
   kitId: string;
   /** The one-time secret code — shown once, never persisted by this component. */
   code: string;
+  /**
+   * The member's magic link, when this is the CREATION step (Requirement 10: kit and
+   * link on ONE screen, one confirm).
+   *
+   * ⚠️ Rendered INSIDE `kitCardEl`, deliberately. That element is what the PDF/share
+   * stack exports, so both artefacts land in the one saved file — which is what "save
+   * these two things" should actually mean. Putting the link beside the card instead
+   * would have needed its own export path for no gain.
+   *
+   * Absent on the Settings regenerate flow, where there is no link to show.
+   */
+  magicLink?: string;
+  /**
+   * Set when the creation step TRIED to mint a link and could not (offline, publish
+   * refused). The step degrades to kit-only and says so — it never blocks. See below.
+   */
+  magicLinkErrorKey?: string;
 }>();
 
 const emit = defineEmits<{
@@ -35,6 +53,12 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+// Its own instance so a magic-link copy failure dedupes separately from the kit code's.
+const {
+  copied: magicLinkCopied,
+  error: magicLinkCopyError,
+  copy: copyMagicLink,
+} = useClipboard({ surface: 'login-flow' });
 const familyContextStore = useFamilyContextStore();
 const { exportElementToPng, pngBlobToPdf } = useSheetExport();
 
@@ -141,6 +165,14 @@ async function exportKitPdf(preferDownload: boolean) {
 <template>
   <!-- One-time kit modal: not closable except via the explicit stored confirmation -->
   <BaseModal :open="open" :title="t('recovery.kitModalTitle')" size="md" :closable="false">
+    <!-- ⚠️ ABOVE the card, not below it. This explains what the kit IS, and it used to sit
+         underneath as a footnote — which put "save this now" ahead of "here is what this
+         is" on the one screen where someone has to decide how carefully to treat an
+         artefact they have never seen before. -->
+    <p class="dark:text-ink-soft mb-4 rounded-xl bg-[#F15D22]/10 p-3 text-sm text-gray-700">
+      {{ t('recovery.kitStoreWarning') }}
+    </p>
+
     <div ref="kitCardEl" class="dark:bg-surface-raised rounded-2xl bg-white p-5 text-center">
       <img
         src="/brand/beanies_logo_transparent_logo_only_192x192.png"
@@ -191,11 +223,70 @@ async function exportKitPdf(preferDownload: boolean) {
           </svg>
         </button>
       </div>
+
+      <!-- CREATION STEP ONLY. Inside `kitCardEl` so the saved PDF carries BOTH artefacts.
+           Each states its own lifetime, because they do not share one: the kit is
+           permanent, the link lasts 7 days, and a single heading over both would flatten
+           exactly the distinction that decides how carefully each is stored. -->
+      <template v-if="magicLink || magicLinkErrorKey">
+        <hr class="dark:border-line my-4 border-gray-200" />
+        <p class="font-outfit dark:text-ink text-left text-sm font-bold text-gray-900">
+          {{ t('magicLink.title') }}
+        </p>
+        <template v-if="magicLink">
+          <!-- Emphasised deliberately: at `text-xs text-gray-600` this read as a footnote
+               under the kit, and it is the line that tells someone the link is the
+               temporary artefact of the two on this screen. -->
+          <p class="dark:text-ink mt-1 text-left text-sm font-semibold text-gray-900">
+            {{ t('magicLink.creationLead') }}
+          </p>
+          <div
+            class="dark:bg-surface-overlay mt-2 flex items-start gap-2 rounded-xl bg-gray-50 p-2.5"
+          >
+            <p
+              class="dark:text-ink-soft flex-1 text-left font-mono text-xs break-all text-gray-600 select-all"
+            >
+              {{ magicLink }}
+            </p>
+            <!-- ⚠️ A BUTTON, not just `select-all`. Copying is the save action here, and
+                 tap-to-select then long-press on a wrapped monospace URL is not one.
+                 `useClipboard` surfaces and reports a failed copy, which a selection
+                 cannot. Excluded from the PDF export — a printed page has no clipboard. -->
+            <!-- ⚠️ `outline`, NOT `secondary`. `secondary` paints `dark:bg-surface-overlay`,
+                 which is exactly this container's own background — in dark mode the button
+                 vanished into the box and read as bare text while the footer buttons kept
+                 their chrome. An outline's affordance is its border, so it stays a button
+                 whatever surface it lands on. -->
+            <BaseButton
+              variant="outline"
+              size="sm"
+              type="button"
+              data-testid="copy-magic-link"
+              data-export-hide
+              @click="copyMagicLink(magicLink)"
+            >
+              {{ magicLinkCopied ? t('login.copied') : t('login.copyLink') }}
+            </BaseButton>
+          </div>
+          <p
+            v-if="magicLinkCopyError"
+            role="alert"
+            class="dark:text-danger-lift mt-1 text-left text-xs text-red-600"
+          >
+            {{ t('share.copyFailedHelp') }}
+          </p>
+        </template>
+        <!-- ⚠️ DEGRADED, NEVER BLOCKING. This step is an unclosable modal at the end of a
+             create flow that already loses 47% of its starters; a network dependency that
+             can wedge the final screen is not an acceptable trade for a convenience
+             credential. The kit above is the guaranteed artefact, the confirm button
+             stays enabled, and the person is told where to get a link later. -->
+        <p v-else class="dark:text-ink-soft mt-1 text-left text-xs text-gray-600">
+          {{ t('magicLink.mintFailed') }}
+        </p>
+      </template>
     </div>
 
-    <p class="dark:text-ink-soft mt-4 rounded-xl bg-[#F15D22]/10 p-3 text-sm text-gray-700">
-      {{ t('recovery.kitStoreWarning') }}
-    </p>
     <p
       v-if="kitPdfError"
       role="alert"
@@ -225,7 +316,7 @@ async function exportKitPdf(preferDownload: boolean) {
           </BaseButton>
         </div>
         <BaseButton class="w-full" type="button" @click="emit('stored')">
-          {{ t('recovery.kitConfirmStored') }}
+          {{ magicLink ? t('setup.saveBothConfirm') : t('recovery.kitConfirmStored') }}
         </BaseButton>
       </div>
     </template>

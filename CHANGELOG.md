@@ -10,6 +10,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-17
 
+### Added
+
+- **Your beanies magic link.** Everyone now gets a personal link and QR code that signs them in on another device and lands them straight on their own PIN. It is shown once when you create a pod and once when you join, alongside your recovery kit, and you can create a fresh one any time in Settings. Links last 7 days, and making a new one cancels the old one.
+- **Links sent by message now open the app.** Tapping a beanies link in WhatsApp or a text opens the installed app rather than a browser tab, on both iPhone and Android.
+- **Paste a link to sign in.** If a link will not open by itself, there is now a place on the welcome screen to paste it in instead. Available everywhere beanies runs.
+
+### Fixed
+
+- **Signing in on a new device no longer asks you to find your own file.** If beanies already has access to your family file, it now opens it directly instead of showing you a file chooser, which previously started on a tab your own file could not appear in.
+- **"Your link wasn't saved" when joining on a good connection.** Joining did two full uploads of your family file back to back and gave the second one five seconds, which was rarely enough. It now does one upload and waits properly.
+- **Google access no longer quietly stops working an hour after joining.** New members were not always being given the permission beanies needs to keep their connection alive, and the part that repairs a dropped connection was never switched on for them.
+- **Removing someone now really removes their access.** Cancelling a member's saved link could be undone by a poor connection, silently putting their access back.
+
 ### Security
 
 - **Invite links are no longer written into the diagnostic logs when joining fails.** If something went wrong while you were joining a family, the report sent back to us included the full invite link code, rather than just the last few characters of it as intended. Anyone who could read those logs could have used the code to join. The code is now shortened before it is recorded, which is all that was ever needed to trace a problem.

@@ -223,7 +223,42 @@ export function initAnalytics(): void {
         queue.o = i || {};
       };
     window.plausible = queue;
-    queue.init({});
+
+    // ⚠️ SCRUB CREDENTIAL-BEARING QUERY PARAMS OUT OF THE PAGEVIEW URL.
+    //
+    // `/join` carries `t=<32-byte token>` — an invite token, or since the magic link a
+    // SEVEN-DAY credential that unwraps the family key — plus `fam` and `m`. The default
+    // autocapture pageview sends `location.href` verbatim, which would hand plausible.io
+    // a key to the family's encrypted data along with the ids identifying whose it is.
+    //
+    // `transformRequest` rewrites the reported URL only; it does not change the address
+    // bar, so the token stays where `usePickBeanpodFile` reads it from to build the OAuth
+    // returnPath (removing it there breaks every redirect-auth platform — see the long
+    // comment in `useJoinFlow.parseUrl`). We lose nothing analytically: `/join` is the
+    // interesting dimension, not which token was used.
+    queue.init({
+      transformRequest: (payload: Record<string, unknown>) => {
+        const raw = typeof payload.u === 'string' ? payload.u : null;
+        if (!raw) return payload;
+        try {
+          const url = new URL(raw);
+          let touched = false;
+          for (const key of ['t', 'm', 'fam', 'hint', 'fileId', 'ref']) {
+            if (url.searchParams.has(key)) {
+              url.searchParams.delete(key);
+              touched = true;
+            }
+          }
+          // Keep the shape visible without the values.
+          if (touched) url.searchParams.set('scrubbed', '1');
+          return { ...payload, u: url.toString() };
+        } catch {
+          // An unparseable URL is not worth losing the pageview over, but it must not be
+          // forwarded either — it could be the raw string we were trying to scrub.
+          return { ...payload, u: 'about:scrub-failed' };
+        }
+      },
+    });
 
     const domain = import.meta.env.VITE_PLAUSIBLE_DOMAIN;
     const script = document.createElement('script');

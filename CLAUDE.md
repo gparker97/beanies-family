@@ -252,6 +252,31 @@ npm run type-check
 npm run lint
 ```
 
+## Run Expensive Commands Once
+
+`npm run validate` is a production build plus ~8200 unit tests. `npm run build`, `npm test`, a
+`git push` with hooks, `terraform plan`, and a Playwright run are all in the same class: minutes
+each. **Run any of them once, and never a second time to look at the same output again.**
+
+Redirect to a file on the FIRST run, then answer every later question by reading that file:
+
+```bash
+npm run validate > "$SCRATCH/validate.log" 2>&1; echo "EXIT=$?"
+grep -E "Test Files|Tests  |problems \(" "$SCRATCH/validate.log"
+```
+
+Capture the exit code on that same line. A command piped straight into `grep` reports the **grep's**
+exit status, not the command's, so `EXIT=0` from a pipeline is not evidence the gate passed -- it is
+a wrong answer obtained slowly.
+
+A second run is justified only when the inputs actually changed (you edited code and are re-checking)
+or when the first run was inconclusive for a reason re-running would resolve. "I want a different
+slice of the same output" is never a reason -- that data is already on disk. Wanting to be sure is
+not a reason either; re-reading the log is the way to be sure.
+
+The same discipline applies to reading: prefer one command that answers several questions over a
+series that each answer one, and never re-run a search to re-read output already in the transcript.
+
 ## Key Implementation Details
 
 1. **Automerge-First Architecture**: Automerge CRDT document in memory is the source of truth. Encrypted `.beanpod` V4 file is the durable copy. IndexedDB is an ephemeral encrypted cache deleted on sign-out

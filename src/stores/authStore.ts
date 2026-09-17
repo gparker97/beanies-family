@@ -1380,6 +1380,18 @@ export const useAuthStore = defineStore('auth', () => {
     const { useSyncStore } = await import('./syncStore');
     const syncStore = useSyncStore();
     const retired = syncStore.retireMemberKeyMaterial(targetMemberId);
+    // ⚠️ CALLED HERE, NOT INSIDE `retireMemberKeyMaterial`. Two reasons, both fatal to the
+    // obvious placement: that function is SYNCHRONOUS (an async call inside it would be a
+    // floating promise, and an unhandled rejection is exactly the silent failure we forbid),
+    // and it early-returns when `localWrapsCleared === 0` — which is the NORMAL case for a
+    // kit-born family, since those are born with `wrappedKeys: {}`. A revoke placed after
+    // that return would never run for the families this feature exists for.
+    //
+    // Unlike the wraps above, this one GENUINELY revokes: it overwrites rather than deletes,
+    // and the dict merges newest-wins, so it propagates.
+    // Awaited: it now merges before stamping the tombstone, so that an unseen remote
+    // mint cannot out-date the revocation. See `revokeMemberLink`.
+    const linkRevoked = await syncStore.revokeMemberLink(targetMemberId);
     await familyStore.invalidateDeviceCredentials(targetMemberId);
 
     logEvent({
@@ -1399,13 +1411,19 @@ export const useAuthStore = defineStore('auth', () => {
     // comment means the day tombstones ship there is a real number for how often it mattered,
     // and until then it is visible to anyone reading the firehose rather than only to someone
     // reading this file.
-    if (retired.localWrapsCleared > 0 || retired.noEnvelope) {
+    if (retired.localWrapsCleared > 0 || retired.noEnvelope || linkRevoked) {
       logEvent({
         level: 'warn',
         surface: 'join-flow',
+        // ⚠️ The magic link is the ONE exception and must not be tarred with this: it is
+        // overwritten, not deleted, so it does propagate. Saying "the merge will restore
+        // them" about everything would tell a reader the opposite of what just happened to
+        // that link. Password and passkey wraps remain genuinely unrevocable until #117.
         message: retired.noEnvelope
           ? 'unclaim ran with no envelope loaded; no key material was even attempted'
-          : 'unclaim cleared envelope wraps LOCALLY ONLY; the merge will restore them',
+          : linkRevoked
+            ? 'unclaim REVOKED the magic link (propagates); password/passkey wraps cleared LOCALLY ONLY and the merge will restore them'
+            : 'unclaim cleared envelope wraps LOCALLY ONLY; the merge will restore them',
         context: {
           action: 'unclaim_wraps_not_revoked',
           member_id_tail: targetMemberId.slice(-8),

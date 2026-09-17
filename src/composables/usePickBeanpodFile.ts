@@ -9,6 +9,7 @@ import {
 } from '@/services/google/googleAuth';
 import { pickBeanpodFile, type PickBeanpodFileResult } from '@/services/google/drivePicker';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /**
  * Composable for re-picking a `.beanpod` file from Google Drive — used by
@@ -66,9 +67,38 @@ export function usePickBeanpodFile() {
      * platform, sign you in with a different account.
      */
     chooseAccount?: boolean;
+    /**
+     * Request OFFLINE ACCESS on the interactive call, so Google returns a refresh token.
+     *
+     * ⚠️ Does NOT skip the silent token. `chooseAccount` does, and that bypass is what
+     * produced the iOS closed consent loop — so the two must stay separate however similar
+     * their prompts end up looking. Forwarded to BOTH auth arms: the popup derives its
+     * prompt from the flag, the redirect arm is handed the prompt string directly.
+     */
+    offlineAccess?: boolean;
     loginHint?: string;
+    /**
+     * Called with the FRESHLY ACQUIRED token, before the Picker opens. Return true if the
+     * file was loaded without it, and the Picker never opens.
+     *
+     * ⚠️ WHY THIS EXISTS. Under `drive.file` the Picker selection is one way to grant the
+     * app access to a file — but it is not the only one. The app ALSO holds a permanent
+     * grant for any file it created itself, stored server-side per (app, Google account,
+     * file). So the owner of a pod, signing in on a new device with a link that already
+     * carries the `fileId`, can read it directly the moment they have a token.
+     *
+     * They were being shown the Picker anyway, because the silent direct read is attempted
+     * only BEFORE authentication — where a fresh browser has no token — and nothing
+     * retried it once the token existed. The result was a file chooser presented to
+     * someone whose own file it is, defaulting to a tab that by definition cannot contain
+     * it. Retrying here costs one API call on the paths where it fails (a genuine first
+     * join, where a 404 is expected and the Picker IS the grant) and removes a whole
+     * confusing step on the paths where it succeeds.
+     */
+    resolveWithoutPicker?: (token: string) => Promise<boolean>;
   }): Promise<PickBeanpodFileResult> {
     const chooseAccount = opts?.chooseAccount ?? false;
+    const offlineAccess = opts?.offlineAccess ?? false;
     // Suppress the hint when the whole point is to pick a different account.
     const loginHint = chooseAccount ? undefined : opts?.loginHint;
     isPicking.value = true;
@@ -123,7 +153,9 @@ export function usePickBeanpodFile() {
               // is asked for. A second Google account that has already granted the scopes — the
               // common case here — would otherwise come back with nothing to refresh, and the
               // joiner would face a consent screen on every cold start thereafter.
-              prompt: chooseAccount ? 'select_account consent' : undefined,
+              // `offlineAccess` reaches the same pair, for the join's first grant. See
+              // `offlineAccess` in this file's options and in `requestAccessToken`.
+              prompt: chooseAccount || offlineAccess ? 'select_account consent' : undefined,
             });
             // ⚠️ `'redirecting'`, NOT `'cancelled'` — and that distinction is a production bug fix,
             // not a nicety. The page is navigating to Google; the user has done nothing and
@@ -135,7 +167,7 @@ export function usePickBeanpodFile() {
             // does NOT unload, so "the page is leaving" cannot be relied on as a guard.
             return { kind: 'redirecting' };
           }
-          token = await requestAccessToken({ chooseAccount, loginHint });
+          token = await requestAccessToken({ chooseAccount, offlineAccess, loginHint });
         }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
@@ -156,6 +188,23 @@ export function usePickBeanpodFile() {
         // chooser people might close.
         if (isUserCancellation(e)) return { kind: 'cancelled' };
         return { kind: 'failed', reason: 'auth', message };
+      }
+
+      // ⚠️ BEFORE the Picker. See `resolveWithoutPicker`. Guarded: a throwing callback must
+      // fall through to the Picker, which is the behaviour that has always worked, rather
+      // than dead-ending the one flow that cannot be retried from anywhere else.
+      if (opts?.resolveWithoutPicker) {
+        try {
+          if (await opts.resolveWithoutPicker(token)) return { kind: 'loaded' };
+        } catch (e) {
+          console.warn('[usePickBeanpodFile] direct load before picker threw; opening picker', e);
+          logEvent({
+            level: 'warn',
+            surface: 'login-flow',
+            message: 'direct load before picker threw; falling back to the picker',
+            context: { action: 'direct_load_threw' },
+          });
+        }
       }
 
       // pickBeanpodFile always resolves to a structured result by

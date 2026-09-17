@@ -133,6 +133,13 @@ export function useDriveFileReselect() {
         }
       }
 
+      // Unreachable here: `'loaded'` is produced only when a caller passes
+      // `resolveWithoutPicker`, and this surface does not. Handled explicitly because
+      // `assertNever` makes a new result kind a COMPILE error rather than a silent
+      // fall-through — which is the whole point of the switch.
+      case 'loaded':
+        return { outcome: 'declined' };
+
       default:
         return assertNever(picked, 'useDriveFileReselect');
     }

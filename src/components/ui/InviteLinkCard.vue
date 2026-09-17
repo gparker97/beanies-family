@@ -1,11 +1,28 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
 
-defineProps<{
-  link: string;
-  qrUrl: string;
-  loading?: boolean;
-}>();
+/**
+ * Three ADDITIVE optionals so this can serve the magic link as well as an invite, each
+ * defaulting to today's string so the invite wizard renders byte-identically.
+ *
+ * ⚠️ The `alt` and the hint matter as much as the footnote. Shipping only a footnote
+ * slot would leave a screen reader announcing "QR code for your invite" on a magic-link
+ * card — an accessibility defect, not a copy nit.
+ */
+withDefaults(
+  defineProps<{
+    link: string;
+    qrUrl: string;
+    loading?: boolean;
+    /** Override the QR's alt text. */
+    qrAlt?: string;
+    /** Override the scan/share hint under the QR. */
+    hint?: string;
+    /** Set false to drop the default expiry footnote (use the `#footnote` slot instead). */
+    showDefaultFootnote?: boolean;
+  }>(),
+  { showDefaultFootnote: true }
+);
 
 const { t } = useTranslation();
 </script>
@@ -26,7 +43,7 @@ const { t } = useTranslation();
         >
           <img
             :src="qrUrl"
-            :alt="t('invite.qrAlt')"
+            :alt="qrAlt ?? t('invite.qrAlt')"
             class="h-48 w-48 rounded-2xl"
             data-testid="invite-qr"
           />
@@ -41,15 +58,17 @@ const { t } = useTranslation();
 
     <!-- Scan/share hint -->
     <p class="dark:text-ink-soft text-center text-sm text-gray-500">
-      {{ t('family.scanOrShare') }}
+      {{ hint ?? t('family.scanOrShare') }}
     </p>
 
     <!-- Action slot (share button) -->
     <slot name="actions" />
 
-    <!-- Expiry note -->
-    <p class="dark:text-ink-faint text-center text-xs text-gray-400">
-      {{ t('family.linkExpiry') }}
-    </p>
+    <!-- Footnote: the invite's expiry by default, overridable for other link kinds. -->
+    <slot name="footnote">
+      <p v-if="showDefaultFootnote" class="dark:text-ink-faint text-center text-xs text-gray-400">
+        {{ t('family.linkExpiry') }}
+      </p>
+    </slot>
   </div>
 </template>

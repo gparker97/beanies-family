@@ -84,6 +84,19 @@ const offered = computed<MethodKind[]>(() => props.methods.map((m) => m.kind));
  */
 type ActiveKind = MethodKind | 'reset-pin';
 const firstNonRecovery = props.methods.find((m) => m.kind !== 'recovery')?.kind;
+// ⚠️ The KIT arm needs a stricter predicate. `resolveProveMethods` emits `invite-needed`
+// for a non-child member with no credential on an OPEN pod — exactly the state after an
+// adult with no PIN redeems the kit. Letting that win the kit landing drops them on a
+// message-only "ask a family admin for an invite" pane, reached BY redeeming the
+// break-glass secret, with `invite-needed` in NON_SWITCHABLE and `forgotCredential` null
+// for a kit opener: no way forward at all. It must fall through to `reset-pin`, which is
+// the whole point of that tail.
+//
+// It is NOT excluded from `firstNonRecovery` above: on a NON-kit arrival `invite-needed`
+// is the correct landing and its own pane explains the situation.
+const firstProvableForKit = props.methods.find(
+  (m) => m.kind !== 'recovery' && m.kind !== 'invite-needed'
+)?.kind;
 /**
  * The credential to restore after a failed attempt: the one actually used, not a
  * hardcoded 'password'. Falls back to today's rule when that method is no longer offered
@@ -97,13 +110,27 @@ const retryTarget =
       ? 'password'
       : null;
 const activeMethod = ref<ActiveKind>(
-  // Only a KIT leads with the reset; a passphrase falls through to the member's own
-  // methods, with the reset one tap away in `switchTargets` below.
-  // A kit LANDS on the reset, but `retryTarget` still wins: the component remounts after
-  // every failed attempt, so an unconditional 'reset-pin' threw a kit user who had
-  // switched to their PIN back onto the reset form with the PIN error above it.
+  // A kit arrival lands on the member's OWN first method (`firstNonRecovery` — usually the
+  // PIN; biometric on a native device where one is enrolled), NOT on the reset. The kit opened
+  // the file; it does not follow that the person wants to replace the PIN they already have.
+  // Measured: 5 of the 6 real families who redeemed a kit went on to reset a working PIN,
+  // because the reset form was what they were handed.
+  //
+  // `reset-pin` stays as the LAST resort rather than the first, which is what still catches the
+  // genuinely-forced case: a member with no PIN at all has no non-recovery method, so
+  // `firstNonRecovery` is undefined and they land on the reset — preserved by the expression
+  // rather than by a second condition.
+  //
+  // `retryTarget` still wins in both arms: the component remounts after every failed attempt,
+  // so an unconditional landing threw a user who had switched panes back onto the wrong one
+  // with the previous pane's error above it.
+  //
+  // The reset remains ONE TAP away — `switchTargets` below unshifts it whenever the opener was
+  // a kit and we are not already on it, which after this change is exactly the kit-on-PIN
+  // state. No separate affordance is needed, and the authorization gate in
+  // `useLoginFlow.onResetPin` (kit-only) is untouched.
   props.recoveryOpenedBy === 'kit'
-    ? (retryTarget ?? 'reset-pin')
+    ? (retryTarget ?? firstProvableForKit ?? 'reset-pin')
     : (retryTarget ?? firstNonRecovery ?? 'recovery')
 );
 const resetPin = ref('');
@@ -197,6 +224,14 @@ const NON_SWITCHABLE: readonly ActiveKind[] = [
  * something you forget, and on `reset-pin` the kit has already been redeemed.
  */
 const forgotCredential = computed<'pin' | 'password' | 'passphrase' | null>(() => {
+  // ⚠️ The kit is SPENT. Offering "use a recovery kit" to someone who just redeemed one
+  // is nonsense on any pane, not just on `reset-pin`. This used to be implied by the
+  // pane — a kit arrival always landed on `reset-pin`, where the switch below returns
+  // null — so it was never stated. Now that a kit arrival lands on the member's PIN, it
+  // has to be explicit, or the first thing a kit user sees is an offer to fetch the kit
+  // they are holding. A PASSPHRASE opener is deliberately NOT gated here: a passphrase
+  // holder who has forgotten their PIN does reach the kit through this link.
+  if (props.recoveryOpenedBy === 'kit') return null;
   switch (activeMethod.value) {
     case 'pin':
       return 'pin';
@@ -480,8 +515,14 @@ function handlePassphraseSubmit() {
       </div>
 
       <!-- The recovery terminal: a member who has forgotten everything reaches the
-           kit / passphrase / bootstrap here. Always present (never-blank guarantee). -->
-      <div class="pt-2">
+           kit / passphrase / bootstrap here.
+           ⚠️ ONE EXCEPTION to the never-blank guarantee: a KIT arrival. Setting
+           `forgotCredential` to null was not enough — that only drops the "forgot your
+           PIN?" line ABOVE the chip, while the chip itself still reads "Use a recovery
+           kit". So the first thing someone saw after redeeming their kit was an offer to
+           go and fetch the kit they were holding. The screen is not blank without it: it
+           carries the PIN entry and the reset is one tap away. -->
+      <div v-if="recoveryOpenedBy !== 'kit'" class="pt-2">
         <RecoveryKitLink
           :disabled="isBusy"
           :forgot="forgotCredential"

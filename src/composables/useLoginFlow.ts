@@ -39,10 +39,11 @@ import { getRosterCache } from '@/services/indexeddb/repositories/rosterCacheRep
 import { resolveDeviceKeys } from '@/services/auth/passkeyService';
 import { getMemberAvatarUrl } from '@/composables/useMemberInfo';
 import {
+  emitEnvelopeCapabilitiesUnknown,
+  emitLinkRedeemed,
   emitOpenFetchRecovery,
   emitProveOutcome,
   emitRosterFallbackUsed,
-  emitEnvelopeCapabilitiesUnknown,
 } from '@/services/telemetry/loginFlowEvents';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import {
@@ -104,7 +105,13 @@ export interface UseLoginFlow {
    * all (no open pod, no roster, no credential records) — the caller falls back to the
    * bootstrap load surface, exactly like a brand-new device.
    */
-  startForFamily(familyId: string, familyName: string): Promise<boolean>;
+  pickerNotice: Ref<string | null>;
+  startForFamily(
+    familyId: string,
+    familyName: string,
+    /** Link arrivals only — see the implementation for why `preselectMemberId` is inert. */
+    opts?: { preselectMemberId?: string; openedByLink?: 'device' | 'magic' }
+  ): Promise<boolean>;
   /** Trusted-device cached-key decrypt of the STAGED pending file. Shared with the bootstrap branch. */
   tryCachedKeyDecrypt(familyId: string): Promise<boolean>;
   dispatch(event: LoginFlowEvent): void;
@@ -367,7 +374,40 @@ export function useLoginFlow(opts: {
     }
   }
 
-  async function startForFamily(familyId: string, familyName: string): Promise<boolean> {
+  /**
+   * Which kind of link opened THIS arrival, if any. Closure-local and never
+   * module-level, for the reason `stageInFlight` documents above: a module-level value
+   * outlives the arrival and a stale one would credit a later, unrelated manual login to
+   * a link the user is not using.
+   *
+   * Cleared on `done` and on `idle` beside `recoveryOpenedBy`, and re-set (or nulled) on
+   * every `startForFamily`. ⚠️ It differs from `recoveryOpenedBy` in being reset per
+   * START — a link opener is per-arrival, a recovery opener survives the picker — which
+   * is why the assignment below sits AFTER `dispatch({ type: 'START' })`.
+   */
+  let openedByLink: 'device' | 'magic' | null = null;
+
+  /**
+   * A message for the PERSON PICKER, distinct from `proveError` (which only reaches
+   * `ProveView`/`OpenRecoveryPanel`, and which `onPickPerson` nulls on the first tap).
+   * Used when a magic link names a member who is no longer in the roster: they fall
+   * through to the picker, and this is what tells them why.
+   */
+  const pickerNotice = ref<string | null>(null);
+
+  async function startForFamily(
+    familyId: string,
+    familyName: string,
+    /**
+     * `preselectMemberId` is a UI HINT WITH ZERO AUTHORIZATION WEIGHT. It is validated
+     * against the built roster, it selects the same person a tap would, it is never
+     * persisted, and it grants nothing — the full prove ladder still runs afterwards.
+     * Threaded explicitly through the callers rather than parked in a store precisely
+     * BECAUSE it is inert: shared state here would be a stale value pre-selecting a
+     * member on some later, unrelated login.
+     */
+    opts2?: { preselectMemberId?: string; openedByLink?: 'device' | 'magic' }
+  ): Promise<boolean> {
     try {
       // Same family-activation sequence the old handleFamilySelected ran — PLUS clearing
       // the previous family's resident members: without it, family A's roster would be
@@ -398,6 +438,7 @@ export function useLoginFlow(opts: {
       const built = await buildPeople(familyId);
       if (!built) return false;
       proveError.value = null;
+      pickerNotice.value = null;
       pendingPassword = null;
       dispatch({
         type: 'START',
@@ -406,10 +447,38 @@ export function useLoginFlow(opts: {
         people: built.people,
         source: built.source,
       });
+      // ⚠️ AFTER the dispatch, never before: `START` resets per-arrival state, so an
+      // assignment above it would be wiped by the very dispatch it is meant to describe.
+      openedByLink = opts2?.openedByLink ?? null;
+
+      // A magic link already knows who it belongs to, so skip the picker — but through
+      // the SAME `onPickPerson` a tap calls, so the prove ladder, the capability
+      // resolution and every guard behave identically. If the member is not in the
+      // roster (deleted on another device), fall through to the picker rather than
+      // dead-ending, and say why.
+      const preselect = opts2?.preselectMemberId
+        ? built.people.find((person) => person.id === opts2.preselectMemberId)
+        : undefined;
+      if (opts2?.preselectMemberId && !preselect) {
+        emitLinkRedeemed({ kind: openedByLink ?? 'magic', ok: false, errorCode: 'member-missing' });
+        // ⚠️ NOT `proveError` — `PersonSelectView` never receives it (only `ProveView` and
+        // `OpenRecoveryPanel` do) and `onPickPerson` nulls it on the first tap, so the
+        // message was unreachable on every path. The person whose member was deleted on
+        // another device landed on an unexplained picker, which is the silent dead-end
+        // the plan's 1d.5 forbids. `pickerNotice` is rendered by the picker itself.
+        pickerNotice.value = t('magicLink.memberMissing');
+        // ⚠️ And CLEAR the link attribution. Left set, picking someone else and proving
+        // emits `{ok:true}` for the same arrival that already emitted `{ok:false}` — the
+        // denominator this change exists to create could exceed 100% in exactly the
+        // failure mode most likely to recur.
+        openedByLink = null;
+      }
+
       // Start staging the envelope NOW, unawaited, so the fetch overlaps with the user
       // reading the picker. `prove-loading` awaits it before resolving the offer list, so
       // no race is possible — this only decides whether the wait is felt.
       if (!podOpen()) beginStage(familyId);
+      if (preselect) void onPickPerson(preselect);
       return true;
     } catch (e) {
       // Review F12: an IndexedDB/initialize throw here used to escape into the caller's
@@ -537,6 +606,20 @@ export function useLoginFlow(opts: {
       return;
     }
     if (s.kind === 'done') {
+      // ⚠️ THE LINK SUCCESS IS EMITTED HERE, and nowhere else.
+      //
+      // Not at `link-ready` — `useJoinFlow` explains why that is too early: it hands off
+      // to the login machine, which still has to prove a PIN, so a success counted there
+      // "would look healthy during exactly the failure it exists to surface". And not at
+      // `PROVE_SUCCEEDED`, which is a milder version of the same mistake: the credential
+      // proved but the pod can still fail to open, and it is dispatched from FIVE sites,
+      // so it would be five copies of one emit. `done` is the honest terminal — the
+      // person is in — and it is one branch.
+      //
+      // This is also what finally gives the DEVICE link a denominator, which it has
+      // never had: mints were countable, successes were not.
+      if (openedByLink) emitLinkRedeemed({ kind: openedByLink, ok: true });
+      openedByLink = null;
       recoveryOpenedBy.value = null;
       opts.onSignedIn(s.destination);
       return;
@@ -549,6 +632,8 @@ export function useLoginFlow(opts: {
       pendingPassword = null;
       lastAttempted.value = null;
       recoveryOpenedBy.value = null;
+      // Abandoned arrival: clear it, or the next manual login inherits the attribution.
+      openedByLink = null;
       opts.onExit();
     }
   }
@@ -1216,6 +1301,7 @@ export function useLoginFlow(opts: {
     proveError,
     isBusy,
     recoveryOpenedBy,
+    pickerNotice,
     startForFamily,
     tryCachedKeyDecrypt,
     dispatch,

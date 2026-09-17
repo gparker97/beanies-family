@@ -45,6 +45,7 @@ const mockSyncStore = {
   decryptPendingFileWithKey: vi.fn(async () => ({ success: true })),
   wrapFamilyKeyForMember: vi.fn(async () => {}),
   syncNow: vi.fn(async () => {}),
+  syncNowBounded: vi.fn(async () => true),
   pendingEncryptedFile: null as { envelope?: { inviteKeys?: Record<string, unknown> } } | null,
   envelope: null as { familyId?: string } | null,
   error: null as string | null,
@@ -188,6 +189,15 @@ const ALL_ERROR_CODES: JoinErrorCode[] = [
   'FILE_FAMILY_MISMATCH',
   'INVITE_TOKEN_EXPIRED',
   'INVITE_TOKEN_INVALID',
+  // Magic link: three codes rather than one shared "link didn't work", because the way
+  // OUT differs for each and a person holding a dead link is on a device that cannot
+  // create a new one themselves.
+  'MAGIC_LINK_REVOKED',
+  'MAGIC_LINK_NOT_FOUND',
+  'MAGIC_LINK_EXPIRED',
+  'MAGIC_LINK_KEY_ROTATED',
+  'MAGIC_LINK_INCOMPLETE',
+  'INVITE_LINK_UNPARSEABLE',
   'NO_UNCLAIMED_MEMBERS',
 ];
 
@@ -506,7 +516,16 @@ describe('useJoinFlow', () => {
 
       // The whole fix. `chooseAccount: true` here skips the silent token, which on a redirect
       // platform navigates the page away instead of opening the Picker — the closed loop.
-      expect(mockPick).toHaveBeenCalledWith(expect.objectContaining({ chooseAccount: false }));
+      //
+      // ⚠️ BOTH PROPERTIES, ASSERTED TOGETHER, because they are the two halves of one
+      // decision and the risk is that a later change collapses them. The join needs the
+      // `consent` prompt so Google returns a refresh token (without it Drive dies an hour
+      // after joining), and `chooseAccount: true` would produce exactly that prompt — while
+      // also reintroducing the loop. `offlineAccess` is the flag that buys the prompt
+      // WITHOUT the silent-token bypass, so seeing them asserted side by side is the point.
+      expect(mockPick).toHaveBeenCalledWith(
+        expect.objectContaining({ chooseAccount: false, offlineAccess: true })
+      );
     });
 
     // ⚠️ THE "best-effort silent reconnect" TEST LIVED HERE AND COULD NOT FAIL. This file
@@ -557,10 +576,15 @@ describe('useJoinFlow', () => {
       await flow.init();
       await flow.handleAuthTap();
 
-      expect(mockPick).toHaveBeenCalledWith({
-        chooseAccount: false,
-        loginHint: 'wife@example.com',
-      });
+      // `objectContaining`: the call also carries `resolveWithoutPicker`, the hook that
+      // retries the direct `fileId` read before the Picker opens. What these tests pin is
+      // the account/hint behaviour, not the full option bag.
+      expect(mockPick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chooseAccount: false,
+          loginHint: 'wife@example.com',
+        })
+      );
       expect(flow.currentStep.value).toBe('pick-member');
       expect(flow.currentError.value).toBeNull();
     });
@@ -1132,8 +1156,15 @@ describe('useJoinFlow', () => {
       // Phase 4: NO envelope password wrap is created any more — the claim is
       // doc-side hash + device unlock wrap, both inside authStore.joinFamily.
       expect(mockSyncStore.wrapFamilyKeyForMember).not.toHaveBeenCalled();
-      // The PIN hash still gets persisted to the file before handing off.
-      expect(mockSyncStore.syncNow).toHaveBeenCalledWith(true);
+      // ⚠️ ONE publish, not two. The join used to `syncNow(true)` for the PIN hash and then
+      // publish the WHOLE pod again for the link wrap ~200ms later. The second upload queued
+      // behind the first on the save mutex, which is how a joiner on a good connection was
+      // told "your link wasn't saved". The claim now rides the mint's single publish.
+      expect(mockSyncStore.syncNow).not.toHaveBeenCalledWith(true);
+      // This harness has no family key, so the mint cannot publish — and that is precisely
+      // when the fallback must carry the claim rather than leaving it to the autosave timer.
+      // The invariant under test is that exactly one of the two paths always publishes it.
+      expect(mockSyncStore.syncNowBounded).toHaveBeenCalled();
     });
 
     it('regresses to set-password if joinFamily fails', async () => {
@@ -1279,10 +1310,15 @@ describe('useJoinFlow', () => {
 
       await flow.handleSignInDifferent();
 
-      expect(mockPick).toHaveBeenCalledWith({
-        chooseAccount: true,
-        loginHint: 'wife@example.com',
-      });
+      // `objectContaining`: the call also carries `resolveWithoutPicker`, the hook that
+      // retries the direct `fileId` read before the Picker opens. What these tests pin is
+      // the account/hint behaviour, not the full option bag.
+      expect(mockPick).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chooseAccount: true,
+          loginHint: 'wife@example.com',
+        })
+      );
       expect(flow.currentStep.value).toBe('pick-member');
     });
   });
@@ -1332,5 +1368,63 @@ describe('useJoinFlow', () => {
       flow.clearError();
       expect(flow.currentError.value).toBeNull();
     });
+  });
+});
+
+/**
+ * Regression guard for the invite token surviving a full-page OAuth redirect.
+ *
+ * WHY THIS EXISTS. A privacy tidy-up added a `router.replace` in `parseUrl` that removed
+ * `t=` from the address bar once the token was in memory. It looked harmless. It was not:
+ * `usePickBeanpodFile` composes the OAuth returnPath as
+ * `${window.location.pathname}${window.location.search}`, read from the LIVE address bar,
+ * and that returnPath is the ONLY carrier of the token across a redirect — nothing stashes
+ * it anywhere else.
+ *
+ * So on every redirect-auth platform (iPhone, iPad, installed PWA, native shell) the
+ * joiner would have gone to Google, consented, come back with an empty token, had the
+ * decrypt silently skipped, and landed on "contact a family admin" — indistinguishable
+ * from the consent-loop bug that had just been fixed.
+ *
+ * Nothing in the suite could catch it, which is the actual lesson. These tests make the
+ * URL contract explicit so the next person who wants to tidy it has to argue with a test
+ * rather than with a comment.
+ */
+describe('the invite token must survive a full-page OAuth redirect', () => {
+  it('parseUrl does NOT rewrite the URL to remove the token', async () => {
+    mockRouterReplace.mockClear();
+    mockRoute.fullPath = '/join?fam=fam-1&t=tok-abc&p=google_drive';
+    mockRoute.path = '/join';
+    mockRoute.query = { fam: 'fam-1', t: 'tok-abc', p: 'google_drive' };
+
+    const { useJoinFlow } = await import('../useJoinFlow');
+    const flow = useJoinFlow();
+    flow.parseUrl();
+
+    // The token is read into memory...
+    expect(flow.inviteToken.value).toBe('tok-abc');
+    // ...and MUST still be in the URL, because the OAuth returnPath is built from it.
+    const strippedToken = mockRouterReplace.mock.calls.some(
+      ([to]) => to?.query && 't' in to.query && to.query.t === undefined
+    );
+    expect(strippedToken).toBe(false);
+  });
+
+  it('a magic link keeps its token and member id in the URL too', async () => {
+    mockRouterReplace.mockClear();
+    mockRoute.fullPath = '/join?fam=fam-1&t=tok-xyz&ml=1&m=mem-7';
+    mockRoute.path = '/join';
+    mockRoute.query = { fam: 'fam-1', t: 'tok-xyz', ml: '1', m: 'mem-7' };
+
+    const { useJoinFlow } = await import('../useJoinFlow');
+    const flow = useJoinFlow();
+    flow.parseUrl();
+
+    expect(flow.inviteToken.value).toBe('tok-xyz');
+    expect(flow.magicLinkMemberId.value).toBe('mem-7');
+    const strippedToken = mockRouterReplace.mock.calls.some(
+      ([to]) => to?.query && 't' in to.query && to.query.t === undefined
+    );
+    expect(strippedToken).toBe(false);
   });
 });

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { mergeKeyDict, preserveLocalKeyDicts } from '@/services/sync/envelopeMerge';
+import {
+  ENVELOPE_KEY_DICTS,
+  keyDictSize,
+  mergeKeyDict,
+  mergeNewestWinsDict,
+  preserveLocalKeyDicts,
+} from '@/services/sync/envelopeMerge';
+import type { EnvelopeKeyDictField, MergeRule } from '@/services/sync/envelopeMerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 // Helper: build a minimal envelope. Tests only care about the three key
@@ -205,5 +212,167 @@ describe('preserveLocalKeyDicts and the envelope version', () => {
     const incoming = buildEnvelope({ version: '4.0' });
     const local = buildEnvelope({ version: '5.0' });
     expect(preserveLocalKeyDicts(incoming, local).version).toBe('4.0');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The registry (ENVELOPE_KEY_DICTS) and the invariants it exists to enforce.
+//
+// Context for the next reader: this replaced TWO hand-maintained lists of the same
+// dicts — one in `preserveLocalKeyDicts`, one in `keyDictSize` — with neither aware of
+// the other. A dict missing from the first was silently DROPPED on the next merge,
+// destroying key material; a dict missing from the second meant an offline mint never
+// published. Both failures were silent. These tests are what make them loud.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('ENVELOPE_KEY_DICTS — the registry guard', () => {
+  it('is exhaustive: omitting a dict is a TYPE error, not a silent drop', () => {
+    // @ts-expect-error - `recoveryKeys` is deliberately missing. If this line ever
+    // STOPS erroring, the guard is gone and a forgotten dict is silent again.
+    const missing: Record<EnvelopeKeyDictField, { rule: MergeRule; required: boolean }> = {
+      wrappedKeys: { rule: 'local-wins', required: true },
+      passkeyWrappedKeys: { rule: 'local-wins', required: true },
+      inviteKeys: { rule: 'local-wins', required: true },
+    };
+    expect(missing).toBeDefined();
+  });
+
+  it('rejects a key that is not an envelope wrap dict', () => {
+    const extra: Record<EnvelopeKeyDictField, { rule: MergeRule; required: boolean }> = {
+      wrappedKeys: { rule: 'local-wins', required: true },
+      passkeyWrappedKeys: { rule: 'local-wins', required: true },
+      inviteKeys: { rule: 'local-wins', required: true },
+      recoveryKeys: { rule: 'local-wins', required: false },
+      // @ts-expect-error - `encryptedPayload` is not a wrap dict.
+      encryptedPayload: { rule: 'local-wins', required: true },
+    };
+    expect(extra).toBeDefined();
+  });
+
+  it('does not include the scalar passphrase — it is a wrap, not a map of wraps', () => {
+    expect(Object.keys(ENVELOPE_KEY_DICTS)).not.toContain('recoveryPassphrase');
+    expect(Object.keys(ENVELOPE_KEY_DICTS).sort()).toEqual([
+      'inviteKeys',
+      'memberLinkKeys',
+      'passkeyWrappedKeys',
+      'recoveryKeys',
+      'wrappedKeys',
+    ]);
+  });
+
+  it('memberLinkKeys is newest-wins — the whole of revocation', () => {
+    // Asserted DIRECTLY, not just via behaviour, because this single value is what
+    // separates "creating a new link cancels the old one" from a button that looks like
+    // it worked and did nothing.
+    expect(ENVELOPE_KEY_DICTS.memberLinkKeys.rule).toBe('newest-wins');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROOF 2 of the revocation contract: the rotation must survive a peer that still
+// holds the pre-rotation entry in memory.
+//
+// This is the test that fails under 'local-wins'. It was written and OBSERVED failing
+// against that rule before the registry entry was changed, because a propagation test
+// nobody has seen red proves nothing about the rule it is supposed to be pinning.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('revocation propagation (Proof 2)', () => {
+  const dead = {
+    wrapped: 'w-old',
+    salt: 's',
+    expiresAt: '2026-09-24T00:00:00.000Z',
+    tokenHash: 'h-old',
+    keyId: 'k1',
+    createdAt: '2026-09-17T10:00:00.000Z',
+  };
+  const live = {
+    ...dead,
+    wrapped: 'w-new',
+    tokenHash: 'h-new',
+    createdAt: '2026-09-17T11:00:00.000Z',
+  };
+
+  it('a rotation on the remote survives a peer holding the old wrap locally', () => {
+    const merged = preserveLocalKeyDicts(
+      buildEnvelope({ memberLinkKeys: { m1: live } }),
+      buildEnvelope({ memberLinkKeys: { m1: dead } })
+    );
+    expect(merged.memberLinkKeys?.m1.tokenHash).toBe('h-new');
+  });
+
+  it('and the same when the rotation is the LOCAL side (symmetry)', () => {
+    // A one-directional test also passes under a plain "remote-wins" rule, which is not
+    // what was asked for.
+    const merged = preserveLocalKeyDicts(
+      buildEnvelope({ memberLinkKeys: { m1: dead } }),
+      buildEnvelope({ memberLinkKeys: { m1: live } })
+    );
+    expect(merged.memberLinkKeys?.m1.tokenHash).toBe('h-new');
+  });
+});
+
+describe('preserveLocalKeyDicts — required vs optional asymmetry', () => {
+  it('writes the three REQUIRED dicts as {} when absent on both sides', () => {
+    const merged = preserveLocalKeyDicts(buildEnvelope(), buildEnvelope());
+    expect(merged.wrappedKeys).toEqual({});
+    expect(merged.passkeyWrappedKeys).toEqual({});
+    expect(merged.inviteKeys).toEqual({});
+  });
+
+  it('OMITS an optional dict absent on both sides — the key must not appear at all', () => {
+    // Not `toBeUndefined()`: an envelope that gains `recoveryKeys: undefined` serialises
+    // differently and is a different file on Drive.
+    const merged = preserveLocalKeyDicts(buildEnvelope(), buildEnvelope());
+    expect('recoveryKeys' in merged).toBe(false);
+  });
+});
+
+describe('mergeNewestWinsDict', () => {
+  const old = { wrapped: 'w-old', createdAt: '2026-01-01T00:00:00.000Z' };
+  const fresh = { wrapped: 'w-new', createdAt: '2026-06-01T00:00:00.000Z' };
+
+  it('returns undefined when both sides are undefined', () => {
+    expect(mergeNewestWinsDict(undefined, undefined)).toBeUndefined();
+  });
+
+  it('unions keys that do not collide', () => {
+    expect(mergeNewestWinsDict({ a: old }, { b: fresh })).toEqual({ a: old, b: fresh });
+  });
+
+  it('the NEWER entry wins a collision, whichever side it is on', () => {
+    // Both directions, deliberately. A one-directional test also passes under a plain
+    // "remote-wins" rule, which is not what this is for.
+    expect(mergeNewestWinsDict({ a: old }, { a: fresh })).toEqual({ a: fresh });
+    expect(mergeNewestWinsDict({ a: fresh }, { a: old })).toEqual({ a: fresh });
+  });
+
+  it('an entry with no createdAt sorts oldest', () => {
+    const undated: { wrapped: string; createdAt?: string } = { wrapped: 'w-undated' };
+    expect(mergeNewestWinsDict({ a: undated }, { a: old })).toEqual({ a: old });
+    expect(mergeNewestWinsDict({ a: old }, { a: undated })).toEqual({ a: old });
+  });
+});
+
+describe('keyDictSize', () => {
+  it('counts every registry dict plus the scalar passphrase', () => {
+    const env = buildEnvelope({
+      wrappedKeys: { m1: { wrapped: 'w', salt: 's' } } as BeanpodFileV4['wrappedKeys'],
+      recoveryKeys: { k1: { wrapped: 'w', salt: 's', createdAt: 'x' } },
+      recoveryPassphrase: { wrapped: 'w', salt: 's' } as BeanpodFileV4['recoveryPassphrase'],
+    });
+    expect(keyDictSize(env)).toBe(3);
+  });
+
+  it('is UNCHANGED by an in-place overwrite — the limitation, pinned', () => {
+    // syncStore publishes on `keyDictSize(merged) > keyDictSize(remote)`, a strict `>`.
+    // Replacing an entry leaves the count identical, so a rotation or a revocation is
+    // INVISIBLE to that signal and must publish explicitly. This test exists so nobody
+    // re-derives "the count will publish it".
+    const before = buildEnvelope({
+      recoveryKeys: { k1: { wrapped: 'a', salt: 's', createdAt: '1' } },
+    });
+    const after = buildEnvelope({
+      recoveryKeys: { k1: { wrapped: 'b', salt: 's', createdAt: '2' } },
+    });
+    expect(keyDictSize(after)).toBe(keyDictSize(before));
   });
 });

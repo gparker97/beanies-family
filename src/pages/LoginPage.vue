@@ -63,6 +63,41 @@ const props = withDefaults(defineProps<{ initialView?: LoginView }>(), {
 
 const activeView = ref<LoginView>(props.initialView);
 
+// ⚠️ RE-DERIVE ON ROUTE CHANGE. `/welcome`, `/login` and `/join` all resolve to THIS
+// component and `<router-view />` carries no `:key`, so Vue reuses the instance and
+// `setup()` never runs again. Seeding `activeView` once therefore made every CLIENT-SIDE
+// arrival at /join a no-op — which silently killed both entry points added in the
+// magic-link change: the WelcomeGate paste box (`router.push('/join', …)`) and the native
+// inbound-link bridge (`router.replace`). The address bar changed and nothing else did.
+// It was invisible because every pre-existing /join arrival is a full page load.
+watch(
+  () => props.initialView,
+  (view) => {
+    activeView.value = view;
+  }
+);
+
+// ⚠️ AND THE ROUTE ITSELF, because the watch above is not enough for `/join` → `/join`.
+// `/join` is the only route that resolves to `initialView: 'join'`, so arriving at /join
+// FROM /join — a different link, same path — leaves the watched value at 'join' both
+// before and after and the callback never runs.
+//
+// That is not a hypothetical path, it is the paste fallback's. Someone whose deep link
+// failed lands on /join, steps back to the welcome gate (which only moves `activeView`, a
+// local ref — the URL is still /join), pastes the link they were sent, and `WelcomeGate`
+// pushes `/join?fam=…&t=…`. Query differs, path does not, `initialView` does not, so the
+// address bar updates and the screen does not. The one recovery route offered after a
+// failed link silently did nothing.
+//
+// Narrow on purpose: it only forces the view the route already resolves to, so it cannot
+// fight the resume dispatcher or any other view decision.
+watch(
+  () => route.fullPath,
+  (next, previous) => {
+    if (next !== previous && props.initialView === 'join') activeView.value = 'join';
+  }
+);
+
 // REVIEW-DEMO: the demo code modal is an overlay over whatever view is active,
 // so it gets its own visibility flag rather than a LoginView member.
 const showReviewDemoModal = ref(false);
@@ -129,8 +164,17 @@ const flowBusy = flow.isBusy;
  * device has no person list at all (fresh device — load the file, decrypt, identity
  * inferred from the password).
  */
-async function enterFlow(familyId: string, familyName: string): Promise<boolean> {
-  const ok = await flow.startForFamily(familyId, familyName);
+async function enterFlow(
+  familyId: string,
+  familyName: string,
+  /**
+   * Link arrivals only. `preselectMemberId` skips the person picker for a magic link;
+   * `openedByLink` is what lets the machine emit the link's success at `done` — the one
+   * point where "the person is actually in" is true.
+   */
+  opts?: { preselectMemberId?: string; openedByLink?: 'device' | 'magic' }
+): Promise<boolean> {
+  const ok = await flow.startForFamily(familyId, familyName, opts);
   if (ok) activeView.value = 'flow';
   return ok;
 }
@@ -665,9 +709,20 @@ async function handleFileLoaded(openedBy?: RecoveryOpener | null) {
  * standard machine (person picker; the member proves with their doc-synced PIN or
  * taps through). Falls back to the welcome gate if the machine can't start.
  */
-async function handleLinkReady(familyId: string, familyName: string) {
+async function handleLinkReady(payload: {
+  familyId: string;
+  familyName: string;
+  preselectMemberId?: string;
+  linkKind: 'device' | 'magic';
+}) {
   activeView.value = 'loading';
-  if (await enterFlow(familyId, familyName)) return;
+  if (
+    await enterFlow(payload.familyId, payload.familyName, {
+      preselectMemberId: payload.preselectMemberId,
+      openedByLink: payload.linkKind,
+    })
+  )
+    return;
   activeView.value = 'welcome';
 }
 
@@ -719,6 +774,7 @@ async function handleStartOver() {
           v-if="flowState.kind === 'person-select'"
           :family-name="flowState.familyName"
           :people="flowState.people"
+          :notice="flow.pickerNotice.value"
           @pick="flow.onPickPerson"
           @back="flow.dispatch({ type: 'BACK' })"
         />
@@ -838,8 +894,16 @@ async function handleStartOver() {
         @use-recovery="handleUseRecoveryKit"
       />
 
+      <!-- ⚠️ KEYED ON THE LINK'S IDENTITY, so a DIFFERENT link arriving while this is already
+           mounted remounts it and re-runs `flow.init()`. Without a key, the native inbound
+           bridge's warm path (tap a second magic link while sitting on the join screen)
+           changed the address bar and nothing else.
+           ⚠️ NOT `route.fullPath`: the join flow itself does a `router.replace` to strip
+           `authError`, and keying on the whole path would remount mid-flow on its own
+           housekeeping. These three params identify the LINK and are untouched by that. -->
       <JoinPodView
         v-else-if="activeView === 'join'"
+        :key="`${route.query.fam ?? ''}|${route.query.t ?? ''}|${route.query.m ?? ''}`"
         @back="activeView = 'welcome'"
         @signed-in="handleSignedIn"
         @navigate="handleNavigate"

@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Your beanies magic link</title>
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  /* ── Tokens ────────────────────────────────────────────────────────────────
+     Light values are the CIG five-colour palette (Cloud White #F8F9FA, Deep
+     Slate #2C3E50, Heritage Orange #F15D22, Terracotta #E67E22, Sky Silk
+     #AED6F1). Dark values are the semantic scale from CIG slides 8-9 and
+     packages/brand/theme.css: surface-ground/raised/overlay/hover, ink /
+     ink-soft / ink-faint, line / line-strong, and the -lift accents.
+     Every painted background below resolves through a token, so it has a dark
+     partner by construction (trap 2 and trap 3 on slide 9). */
+  :root {
+    --board: #eef1f4;          /* mockup board only, not an app surface */
+    --page: #f8f9fa;           /* Cloud White page ground */
+    --card: #ffffff;           /* card / modal panel */
+    --card-2: #f2f4f6;         /* a tile sitting ON a card */
+    --card-3: #e9edf1;         /* pressed / recessed tile */
+    --ink: #2c3e50;
+    --ink-soft: #55677a;
+    --ink-faint: #7d8b99;
+    --line: rgba(44, 62, 80, 0.12);
+    --line-strong: rgba(44, 62, 80, 0.26);
+    --accent: #f15d22;         /* accent AS TEXT: lifts to #FF8B5E on dark */
+    --accent-wash: rgba(241, 93, 34, 0.09);
+    --accent-edge: rgba(241, 93, 34, 0.28);
+    --silk-ink: #3f6f95;       /* Sky Silk as readable text: lifts on dark */
+    --silk-wash: rgba(174, 214, 241, 0.3);
+    --silk-edge: rgba(174, 214, 241, 0.75);
+    --good: #1e8449;
+    --good-wash: rgba(39, 174, 96, 0.12);
+    --qr-bg: #ffffff;
+    --qr-ink: #2c3e50;
+    --shadow: 0 8px 40px rgba(44, 62, 80, 0.1);
+    --shadow-soft: 0 4px 20px rgba(44, 62, 80, 0.06);
+    --scrim: rgba(23, 33, 43, 0.5);
+    --panel-edge: transparent;
+  }
+
+  /* Dark partner. Declared twice on purpose: once for the system preference
+     (guarded so an explicit light stamp wins) and once for the explicit stamp. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --board: #0e151c;
+      --page: #151e27;         /* surface-ground */
+      --card: #1e2a36;         /* surface-raised */
+      --card-2: #26343f;       /* surface-overlay */
+      --card-3: #2f3e4b;       /* surface-hover */
+      --ink: #f2f5f7;
+      --ink-soft: #c3ced6;
+      --ink-faint: #9aa9b4;
+      --line: #4a5b69;
+      --line-strong: #7a8a97;
+      --accent: #ff8b5e;       /* accent-lift */
+      --accent-wash: rgba(255, 139, 94, 0.14);
+      --accent-edge: rgba(255, 139, 94, 0.36);
+      --silk-ink: #8fc7e8;     /* silk-lift */
+      --silk-wash: rgba(143, 199, 232, 0.14);
+      --silk-edge: rgba(143, 199, 232, 0.34);
+      --good: #5fd08a;         /* success-lift */
+      --good-wash: rgba(95, 208, 138, 0.15);
+      --qr-bg: #e9eef2;        /* a QR stays a light plaque: scanners need it */
+      --qr-ink: #151e27;
+      --shadow: none;
+      --shadow-soft: none;
+      --scrim: rgba(5, 9, 13, 0.62);
+      --panel-edge: #4a5b69;
+    }
+  }
+  :root[data-theme='dark'] {
+    --board: #0e151c;
+    --page: #151e27;
+    --card: #1e2a36;
+    --card-2: #26343f;
+    --card-3: #2f3e4b;
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: #4a5b69;
+    --line-strong: #7a8a97;
+    --accent: #ff8b5e;
+    --accent-wash: rgba(255, 139, 94, 0.14);
+    --accent-edge: rgba(255, 139, 94, 0.36);
+    --silk-ink: #8fc7e8;
+    --silk-wash: rgba(143, 199, 232, 0.14);
+    --silk-edge: rgba(143, 199, 232, 0.34);
+    --good: #5fd08a;
+    --good-wash: rgba(95, 208, 138, 0.15);
+    --qr-bg: #e9eef2;
+    --qr-ink: #151e27;
+    --shadow: none;
+    --shadow-soft: none;
+    --scrim: rgba(5, 9, 13, 0.62);
+    --panel-edge: #4a5b69;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 2.25rem 1.5rem 4.5rem;
+    background: var(--board);
+    color: var(--ink);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1480px; margin: 0 auto; }
+
+  /* ── Mockup chrome ─────────────────────────────────────────────────────── */
+  header.page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.25rem;
+  }
+  .eyebrow {
+    margin: 0 0 0.375rem;
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    margin: 0 0 0.5rem;
+    font-family: Outfit, sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .standfirst { margin: 0; max-width: 62ch; font-size: 0.875rem; color: var(--ink-soft); }
+
+  .theme-btn {
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .theme-btn:hover { background: var(--card-2); }
+
+  section.sec { margin-bottom: 3.25rem; }
+  .sec-head { margin-bottom: 1.125rem; max-width: 74ch; }
+  .sec-head h2 {
+    margin: 0 0 0.375rem;
+    font-family: Outfit, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: baseline;
+    gap: 0.625rem;
+  }
+  .sec-key {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent);
+    border: 1px solid var(--accent-edge);
+    background: var(--accent-wash);
+    border-radius: 999px;
+    padding: 0.125rem 0.5rem;
+  }
+  .sec-note { margin: 0; font-size: 0.875rem; color: var(--ink-soft); }
+  .sec-note + .sec-note { margin-top: 0.375rem; }
+
+  .views { display: flex; gap: 1.75rem; align-items: flex-start; flex-wrap: wrap; }
+  .view { min-width: 0; }
+  .view-label {
+    margin: 0 0 0.5rem;
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+  }
+
+  /* Desktop stage: a 1024px slice of the app. */
+  .stage {
+    width: 1024px;
+    max-width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 1.25rem;
+    background: var(--page);
+    padding: 1.75rem;
+    overflow: hidden;
+  }
+  .stage.scrim {
+    background:
+      linear-gradient(var(--scrim), var(--scrim)),
+      repeating-linear-gradient(115deg, var(--page) 0 34px, var(--card-2) 34px 68px);
+    display: flex;
+    justify-content: center;
+  }
+  .stage.pair { display: flex; gap: 1.25rem; align-items: flex-start; }
+  .stage.column { display: flex; flex-direction: column; gap: 1.25rem; align-items: center; }
+
+  /* Phone: 390px, the app at hand height. */
+  .phone {
+    width: 390px;
+    max-width: 100%;
+    height: 780px;
+    border: 1px solid var(--line-strong);
+    border-radius: 2.25rem;
+    background: var(--page);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone .notch {
+    height: 1.75rem;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--page);
+  }
+  .phone .notch::after {
+    content: '';
+    width: 6rem;
+    height: 0.3125rem;
+    border-radius: 999px;
+    background: var(--line-strong);
+    opacity: 0.55;
+  }
+  .phone-scroll { flex: 1 1 auto; overflow-y: auto; }
+  .phone-pad { padding: 1rem 1rem 1.5rem; }
+  .phones { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+
+  /* ── Type scale (six levels, rem only) ─────────────────────────────────── */
+  .t-page { font-family: Outfit, sans-serif; font-size: 1.5rem; font-weight: 700; line-height: 1.25; margin: 0; }
+  .t-section { font-family: Outfit, sans-serif; font-size: 1.125rem; font-weight: 600; line-height: 1.3; margin: 0; }
+  .t-item { font-family: Outfit, sans-serif; font-size: 1rem; font-weight: 600; line-height: 1.35; margin: 0; }
+  .t-body { font-size: 0.875rem; margin: 0; }
+  .t-caption { font-size: 0.75rem; margin: 0; }
+  .soft { color: var(--ink-soft); }
+  .faint { color: var(--ink-faint); }
+  .field-label {
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0;
+  }
+
+  /* ── App primitives ────────────────────────────────────────────────────── */
+  .modal {
+    width: 560px;
+    max-width: 100%;
+    background: var(--card);
+    border: 1px solid var(--panel-edge);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone .modal {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .modal-head {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 1.125rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--card);
+    flex: 0 0 auto;
+  }
+  .modal-body {
+    background: var(--page);
+    padding: 1.25rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+  }
+  .modal-foot {
+    padding: 1rem 1.5rem 1.25rem;
+    border-top: 1px solid var(--line);
+    background: var(--card);
+    flex: 0 0 auto;
+  }
+  .phone .modal-body { flex: 1 1 auto; }
+
+  .tile {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.875rem;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    background: var(--accent-wash);
+    color: var(--accent);
+  }
+  .tile.silk { background: var(--silk-wash); color: var(--silk-ink); }
+  .tile svg { width: 1.375rem; height: 1.375rem; }
+  .tile.sm { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; }
+  .tile.sm svg { width: 1.125rem; height: 1.125rem; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 1.5rem;
+    padding: 1.125rem;
+    box-shadow: var(--shadow-soft);
+  }
+  .card.flat { box-shadow: none; }
+  .card-head { display: flex; gap: 0.75rem; align-items: flex-start; }
+  .card-head > div { min-width: 0; }
+
+  .btn {
+    font-family: Outfit, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    border-radius: 1rem;
+    border: 1px solid transparent;
+    padding: 0.8125rem 1.125rem;
+    cursor: pointer;
+    transition: transform 150ms ease, background 150ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  /* Filled buttons keep TRUE Heritage Orange with white ink in both modes
+     (CIG slide 9: the -lift tokens are for accent text and icons, not fills). */
+  .btn-primary { background: linear-gradient(135deg, #f15d22, #e67e22); color: #ffffff; }
+  .btn-secondary {
+    background: var(--card-2);
+    color: var(--ink);
+    border-color: var(--line);
+  }
+  .btn-secondary:hover { background: var(--card-3); }
+  .btn.auto { width: auto; }
+  .btn-quiet {
+    font-family: Inter, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background: none;
+    border: 0;
+    color: var(--ink-soft);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    padding: 0.5rem 0.25rem;
+    width: auto;
+  }
+  .btn-quiet:hover { color: var(--ink); }
+  .btn-quiet .accent-word { color: var(--accent); font-weight: 600; }
+  button:focus-visible, a:focus-visible {
+    outline: 2px solid var(--silk-edge);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+
+  /* ── The magic-link block (one unit, four hosts) ───────────────────────── */
+  .magic { display: flex; flex-direction: column; gap: 0.875rem; }
+  .magic-grid { display: flex; gap: 1rem; align-items: stretch; }
+  .qr-plaque {
+    flex: 0 0 auto;
+    width: 9.5rem;
+    background: var(--qr-bg);
+    border: 1px solid var(--silk-edge);
+    border-radius: 1.25rem;
+    padding: 0.625rem;
+    display: grid;
+    place-items: center;
+  }
+  .qr-plaque svg { width: 100%; height: auto; display: block; border-radius: 0.5rem; }
+  .magic-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.625rem; justify-content: center; }
+  .linkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  }
+  .link-text {
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+    word-break: break-all;
+    flex: 1 1 auto;
+  }
+  .copy-btn {
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    border-radius: 0.75rem;
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .copy-btn:hover { background: var(--card-3); }
+
+  /* ── Recovery kit artifact ─────────────────────────────────────────────── */
+  .code-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.375rem;
+  }
+  .code-group {
+    font-family: Outfit, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 0.625rem;
+    padding: 0.375rem 0.25rem;
+    color: var(--ink);
+  }
+  .kit-actions { display: flex; gap: 0.5rem; }
+  .kit-id {
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+  }
+
+  /* ── Notices ───────────────────────────────────────────────────────────── */
+  .notice {
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    background: var(--accent-wash);
+    border: 1px solid var(--accent-edge);
+    border-radius: 0.875rem;
+    padding: 0.75rem 0.875rem;
+  }
+  .notice svg { width: 1.125rem; height: 1.125rem; flex: 0 0 auto; color: var(--accent); margin-top: 0.0625rem; }
+  .notice p { color: var(--ink-soft); }
+  .notice.calm { background: var(--silk-wash); border-color: var(--silk-edge); }
+  .notice.calm svg { color: var(--silk-ink); }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    border-radius: 0.875rem;
+    padding: 0.625rem 0.75rem;
+  }
+  .dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; flex: 0 0 auto; background: var(--good); }
+  .dot.none { background: var(--ink-faint); }
+
+  /* ── Sign-in card ──────────────────────────────────────────────────────── */
+  .auth-card {
+    width: 400px;
+    max-width: 100%;
+    background: var(--card);
+    border: 1px solid var(--panel-edge);
+    border-radius: 1.5rem;
+    box-shadow: var(--shadow);
+    padding: 1.75rem 1.5rem 1.375rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    align-items: center;
+  }
+  .avatar {
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: var(--silk-wash);
+    border: 2px solid var(--silk-edge);
+    font-family: Outfit, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .pin-row { display: flex; gap: 0.5rem; justify-content: center; }
+  .pin-cell {
+    width: 2.75rem;
+    height: 3.25rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--line-strong);
+    background: var(--card-2);
+    display: grid;
+    place-items: center;
+  }
+  .pin-cell.filled { border-color: var(--accent-edge); background: var(--accent-wash); }
+  .pin-cell.caret { border-color: var(--accent); }
+  .pin-cell .pip { width: 0.625rem; height: 0.625rem; border-radius: 999px; background: var(--ink); }
+  .pin-cell .bar { width: 0.0625rem; height: 1.25rem; background: var(--accent); }
+  .divider { width: 100%; height: 1px; background: var(--line); margin: 0.25rem 0; }
+  .subordinate { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+
+  /* Annotation strips sit OUTSIDE the product frames. */
+  .anno {
+    margin-top: 0.625rem;
+    max-width: 44ch;
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    border-left: 2px solid var(--accent-edge);
+    padding-left: 0.625rem;
+  }
+
+  .field-stack { display: flex; flex-direction: column; gap: 0.375rem; width: 100%; }
+  .field-stack .field-label { text-align: left; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+    .btn:hover { transform: none; }
+  }
+  @media (max-width: 860px) {
+    body { padding: 1.5rem 1rem 3rem; }
+    .stage.pair { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<symbol id="qr-code" viewBox="0 0 33 33"><rect width="33" height="33" fill="var(--qr-bg)"/><path fill="var(--qr-ink)" d="M2 2h7v1h-7zM10 2h1v1h-1zM12 2h7v1h-7zM21 2h1v1h-1zM24 2h7v1h-7zM2 3h1v1h-1zM8 3h1v1h-1zM13 3h3v1h-3zM17 3h6v1h-6zM24 3h1v1h-1zM30 3h1v1h-1zM2 4h1v1h-1zM4 4h3v1h-3zM8 4h1v1h-1zM10 4h1v1h-1zM12 4h1v1h-1zM14 4h1v1h-1zM16 4h2v1h-2zM22 4h1v1h-1zM24 4h1v1h-1zM26 4h3v1h-3zM30 4h1v1h-1zM2 5h1v1h-1zM4 5h3v1h-3zM8 5h1v1h-1zM14 5h1v1h-1zM17 5h2v1h-2zM24 5h1v1h-1zM26 5h3v1h-3zM30 5h1v1h-1zM2 6h1v1h-1zM4 6h3v1h-3zM8 6h1v1h-1zM12 6h1v1h-1zM15 6h4v1h-4zM24 6h1v1h-1zM26 6h3v1h-3zM30 6h1v1h-1zM2 7h1v1h-1zM8 7h1v1h-1zM10 7h1v1h-1zM16 7h1v1h-1zM18 7h4v1h-4zM24 7h1v1h-1zM30 7h1v1h-1zM2 8h7v1h-7zM10 8h1v1h-1zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM24 8h7v1h-7zM11 9h1v1h-1zM13 9h2v1h-2zM19 9h3v1h-3zM2 10h1v1h-1zM4 10h2v1h-2zM7 10h1v1h-1zM10 10h5v1h-5zM17 10h1v1h-1zM20 10h1v1h-1zM2 11h2v1h-2zM5 11h1v1h-1zM7 11h1v1h-1zM11 11h3v1h-3zM17 11h2v1h-2zM20 11h3v1h-3zM25 11h1v1h-1zM29 11h1v1h-1zM5 12h1v1h-1zM8 12h3v1h-3zM12 12h1v1h-1zM17 12h1v1h-1zM19 12h5v1h-5zM25 12h4v1h-4zM3 13h3v1h-3zM7 13h1v1h-1zM10 13h1v1h-1zM12 13h5v1h-5zM19 13h1v1h-1zM21 13h4v1h-4zM27 13h2v1h-2zM2 14h3v1h-3zM6 14h1v1h-1zM8 14h1v1h-1zM11 14h1v1h-1zM18 14h2v1h-2zM22 14h1v1h-1zM24 14h3v1h-3zM28 14h1v1h-1zM2 15h2v1h-2zM5 15h1v1h-1zM7 15h1v1h-1zM9 15h1v1h-1zM11 15h2v1h-2zM14 15h1v1h-1zM16 15h2v1h-2zM19 15h1v1h-1zM21 15h2v1h-2zM25 15h3v1h-3zM29 15h1v1h-1zM2 16h8v1h-8zM15 16h1v1h-1zM18 16h3v1h-3zM22 16h4v1h-4zM29 16h2v1h-2zM2 17h2v1h-2zM5 17h1v1h-1zM10 17h1v1h-1zM15 17h2v1h-2zM20 17h3v1h-3zM25 17h1v1h-1zM29 17h1v1h-1zM4 18h6v1h-6zM11 18h2v1h-2zM14 18h2v1h-2zM18 18h4v1h-4zM23 18h1v1h-1zM25 18h6v1h-6zM5 19h3v1h-3zM10 19h2v1h-2zM13 19h1v1h-1zM15 19h2v1h-2zM18 19h2v1h-2zM24 19h2v1h-2zM2 20h3v1h-3zM7 20h2v1h-2zM10 20h1v1h-1zM15 20h2v1h-2zM19 20h2v1h-2zM22 20h1v1h-1zM24 20h3v1h-3zM28 20h1v1h-1zM2 21h3v1h-3zM6 21h1v1h-1zM9 21h2v1h-2zM13 21h1v1h-1zM15 21h1v1h-1zM19 21h2v1h-2zM24 21h1v1h-1zM26 21h2v1h-2zM29 21h1v1h-1zM2 22h1v1h-1zM8 22h4v1h-4zM16 22h1v1h-1zM22 22h5v1h-5zM28 22h1v1h-1zM10 23h1v1h-1zM12 23h1v1h-1zM14 23h2v1h-2zM20 23h3v1h-3zM26 23h2v1h-2zM2 24h7v1h-7zM11 24h3v1h-3zM15 24h4v1h-4zM20 24h1v1h-1zM22 24h1v1h-1zM24 24h1v1h-1zM26 24h1v1h-1zM28 24h1v1h-1zM2 25h1v1h-1zM8 25h1v1h-1zM11 25h4v1h-4zM17 25h2v1h-2zM20 25h1v1h-1zM22 25h1v1h-1zM26 25h1v1h-1zM28 25h3v1h-3zM2 26h1v1h-1zM4 26h3v1h-3zM8 26h1v1h-1zM13 26h4v1h-4zM21 26h9v1h-9zM2 27h1v1h-1zM4 27h3v1h-3zM8 27h1v1h-1zM11 27h2v1h-2zM16 27h7v1h-7zM25 27h6v1h-6zM2 28h1v1h-1zM4 28h3v1h-3zM8 28h1v1h-1zM11 28h1v1h-1zM13 28h1v1h-1zM15 28h3v1h-3zM20 28h2v1h-2zM23 28h1v1h-1zM26 28h2v1h-2zM30 28h1v1h-1zM2 29h1v1h-1zM8 29h1v1h-1zM11 29h1v1h-1zM13 29h1v1h-1zM15 29h2v1h-2zM20 29h1v1h-1zM22 29h1v1h-1zM26 29h1v1h-1zM29 29h1v1h-1zM2 30h7v1h-7zM11 30h2v1h-2zM14 30h1v1h-1zM16 30h5v1h-5zM22 30h2v1h-2zM25 30h3v1h-3zM29 30h2v1h-2z"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">Authentication &middot; 17 September 2026</p>
+      <h1>Your beanies magic link</h1>
+      <p class="standfirst">
+        Four surfaces for the magic link: the combined save step at the end of pod creation, the
+        joiner's copy of it, the revised recovery-kit arrival, and the Settings card that can only
+        ever mint a new one. Each surface is drawn at 1024px and at 390px, in light and dark.
+        Use the theme button to switch; it starts on your system setting.
+      </p>
+    </div>
+    <button class="theme-btn" id="theme-btn" type="button">Theme: system</button>
+  </header>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       A. Creation: save these
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="sec" id="sec-a">
+    <div class="sec-head">
+      <h2><span class="sec-key">A</span> Creation &mdash; the combined save step</h2>
+      <p class="sec-note">
+        An unclosable modal at the end of pod creation. Two artifacts, one screen, one confirm.
+        The kit card keeps its existing shape (code in Crockford groups, Save as PDF, Share); the
+        magic link sits under it as a peer, not a footnote.
+      </p>
+      <p class="sec-note">
+        Each artifact owns its own save actions, so a person can act on one, then the other, and
+        the single button at the bottom is the only way out.
+      </p>
+    </div>
+
+    <div class="views">
+      <div class="view">
+        <p class="view-label">Desktop &middot; 1024px</p>
+        <div class="stage scrim">
+          <div class="modal">
+            <div class="modal-head">
+              <span class="tile" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V7z"/><path d="M9.5 12.2l1.8 1.8 3.4-3.6"/></svg>
+              </span>
+              <div>
+                <p class="t-section">Save these two things</p>
+                <p class="t-caption faint">The Parker Pod is ready.</p>
+              </div>
+            </div>
+
+            <div class="modal-body">
+              <!-- Artifact 1: recovery kit -->
+              <div class="card flat">
+                <div class="card-head">
+                  <span class="tile sm" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5a4 4 0 105.7 5.7l-8.4 8.4-3.6.5.5-3.6z"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your Recovery Kit</p>
+                    <p class="t-caption soft">Opens your family file if you lose your PIN. Shown once.</p>
+                  </div>
+                </div>
+                <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.625rem;">
+                  <p class="kit-id">Kit ID&nbsp; 4KD2</p>
+                  <div class="code-grid">
+                    <span class="code-group">7QK4</span>
+                    <span class="code-group">M2PX</span>
+                    <span class="code-group">9T0V</span>
+                    <span class="code-group">W8NJ</span>
+                    <span class="code-group">3RZB</span>
+                    <span class="code-group">6HFY</span>
+                    <span class="code-group">5GD1</span>
+                    <span class="code-group">QSCM</span>
+                  </div>
+                  <div class="kit-actions">
+                    <button class="btn btn-secondary" type="button">Save as PDF</button>
+                    <button class="btn btn-secondary" type="button">Share</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Artifact 2: magic link -->
+              <div class="card flat">
+                <div class="card-head">
+                  <span class="tile sm silk" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your beanies magic link</p>
+                    <p class="t-caption soft">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+                  </div>
+                </div>
+                <div class="magic" style="margin-top:0.875rem;">
+                  <div class="magic-grid">
+                    <div class="qr-plaque"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                    <div class="magic-side">
+                      <div class="linkbox">
+                        <span class="link-text">app.beanies.family/welcome#beanies-link=7QK4M2PX9T0V</span>
+                        <button class="copy-btn" type="button">Copy</button>
+                      </div>
+                      <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                      <p class="t-caption faint">You can cancel this link and create a new one in Settings.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-foot">
+              <button class="btn btn-primary" type="button">I've saved both</button>
+            </div>
+          </div>
+        </div>
+        <p class="anno">
+          The backdrop is drawn without a close affordance on purpose: no X, no Escape, no
+          backdrop dismiss. The button is the only exit.
+        </p>
+      </div>
+
+      <div class="view">
+        <p class="view-label">Mobile &middot; 390px</p>
+        <div class="phone" style="height:1000px;">
+          <div class="notch"></div>
+          <div class="modal">
+            <div class="modal-head">
+              <span class="tile" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 4v5c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V7z"/><path d="M9.5 12.2l1.8 1.8 3.4-3.6"/></svg>
+              </span>
+              <div>
+                <p class="t-section">Save these two things</p>
+                <p class="t-caption faint">The Parker Pod is ready.</p>
+              </div>
+            </div>
+            <div class="modal-body">
+              <div class="card flat">
+                <div class="card-head">
+                  <span class="tile sm" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5.5a4 4 0 105.7 5.7l-8.4 8.4-3.6.5.5-3.6z"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your Recovery Kit</p>
+                    <p class="t-caption soft">Opens your family file if you lose your PIN. Shown once.</p>
+                  </div>
+                </div>
+                <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.625rem;">
+                  <p class="kit-id">Kit ID&nbsp; 4KD2</p>
+                  <div class="code-grid">
+                    <span class="code-group">7QK4</span>
+                    <span class="code-group">M2PX</span>
+                    <span class="code-group">9T0V</span>
+                    <span class="code-group">W8NJ</span>
+                    <span class="code-group">3RZB</span>
+                    <span class="code-group">6HFY</span>
+                    <span class="code-group">5GD1</span>
+                    <span class="code-group">QSCM</span>
+                  </div>
+                  <div class="kit-actions">
+                    <button class="btn btn-secondary" type="button">Save as PDF</button>
+                    <button class="btn btn-secondary" type="button">Share</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card flat">
+                <div class="card-head">
+                  <span class="tile sm silk" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your beanies magic link</p>
+                    <p class="t-caption soft">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+                  </div>
+                </div>
+                <div class="magic" style="margin-top:0.875rem;">
+                  <div class="magic-grid" style="flex-direction:column;align-items:center;">
+                    <div class="qr-plaque" style="width:10.5rem;"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                    <div class="magic-side" style="width:100%;">
+                      <div class="linkbox">
+                        <span class="link-text">app.beanies.family/welcome#beanies-link=7QK4M2PX9T0V</span>
+                        <button class="copy-btn" type="button">Copy</button>
+                      </div>
+                      <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                      <p class="t-caption faint">You can cancel this link and create a new one in Settings.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button class="btn btn-primary" type="button">I've saved both</button>
+            </div>
+          </div>
+        </div>
+        <p class="anno">
+          Full-bleed sheet on mobile, body scrolls, footer pinned. The QR moves above the link so
+          both keep their full width at 390px.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       B. Join flow
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="sec" id="sec-b">
+    <div class="sec-head">
+      <h2><span class="sec-key">B</span> Join flow &mdash; after the PIN is set</h2>
+      <p class="sec-note">
+        The same magic-link block, alone. A joiner gets no recovery kit, so the link is the whole
+        screen, and the loss line points at the person who can actually help.
+      </p>
+    </div>
+
+    <div class="views">
+      <div class="view">
+        <p class="view-label">Desktop &middot; 1024px</p>
+        <div class="stage column">
+          <div class="modal">
+            <div class="modal-head">
+              <span class="tile silk" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+              </span>
+              <div>
+                <p class="t-section">Your beanies magic link</p>
+                <p class="t-caption faint">You're in, Sam. One thing to keep.</p>
+              </div>
+            </div>
+            <div class="modal-body">
+              <p class="t-body soft">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+              <div class="card flat">
+                <div class="magic">
+                  <div class="magic-grid">
+                    <div class="qr-plaque"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                    <div class="magic-side">
+                      <div class="linkbox">
+                        <span class="link-text">app.beanies.family/welcome#beanies-link=B4XN7HQ2VK50</span>
+                        <button class="copy-btn" type="button">Copy</button>
+                      </div>
+                      <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                      <p class="t-caption faint">You can cancel this link and create a new one in Settings.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="notice calm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+                <p class="t-body">If you lose it, ask the family owner to help you sign in on a new device.</p>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button class="btn btn-primary" type="button">I've saved my link</button>
+            </div>
+          </div>
+        </div>
+        <p class="anno">
+          Sky Silk, not orange, on the notice: the CIG reserves Sky Silk for calm and safety, and
+          nothing here has gone wrong. Orange stays on the one button that moves the person on.
+        </p>
+      </div>
+
+      <div class="view">
+        <p class="view-label">Mobile &middot; 390px</p>
+        <div class="phone" style="height:790px;">
+          <div class="notch"></div>
+          <div class="modal">
+            <div class="modal-head">
+              <span class="tile silk" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+              </span>
+              <div>
+                <p class="t-section">Your beanies magic link</p>
+                <p class="t-caption faint">You're in, Sam. One thing to keep.</p>
+              </div>
+            </div>
+            <div class="modal-body">
+              <p class="t-body soft">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+              <div class="card flat">
+                <div class="magic">
+                  <div class="magic-grid" style="flex-direction:column;align-items:center;">
+                    <div class="qr-plaque" style="width:11rem;"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                    <div class="magic-side" style="width:100%;">
+                      <div class="linkbox">
+                        <span class="link-text">app.beanies.family/welcome#beanies-link=B4XN7HQ2VK50</span>
+                        <button class="copy-btn" type="button">Copy</button>
+                      </div>
+                      <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                      <p class="t-caption faint">You can cancel this link and create a new one in Settings.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="notice calm">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+                <p class="t-body">If you lose it, ask the family owner to help you sign in on a new device.</p>
+              </div>
+            </div>
+            <div class="modal-foot">
+              <button class="btn btn-primary" type="button">I've saved my link</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       C. Recovery-kit arrival
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="sec" id="sec-c">
+    <div class="sec-head">
+      <h2><span class="sec-key">C</span> Recovery-kit arrival &mdash; PIN first, reset second</h2>
+      <p class="sec-note">
+        Today a kit lands the person on a Set a New PIN form, which takes the PIN away from
+        someone who still knows it. The kit now lands on ordinary PIN entry, with the reset kept
+        below the fold of attention: plain text, no tile, no orange fill, no border.
+      </p>
+      <p class="sec-note">
+        The reset line renders only when the beanpod was opened with a recovery kit. A family
+        passphrase arrival shows the left panel without it.
+      </p>
+    </div>
+
+    <div class="views">
+      <div class="view">
+        <p class="view-label">Desktop &middot; 1024px &middot; default, then after tapping reset</p>
+        <div class="stage pair">
+          <!-- Default: PIN entry -->
+          <div class="auth-card">
+            <div class="avatar" aria-hidden="true">M</div>
+            <div>
+              <p class="t-page">Welcome back, Maya</p>
+              <p class="t-body soft" style="margin-top:0.25rem;">The Parker Pod is open on this device.</p>
+            </div>
+            <div class="field-stack" style="align-items:center;">
+              <p class="field-label" style="text-align:center;">Enter Your PIN</p>
+              <div class="pin-row">
+                <span class="pin-cell filled"><span class="pip"></span></span>
+                <span class="pin-cell filled"><span class="pip"></span></span>
+                <span class="pin-cell filled"><span class="pip"></span></span>
+                <span class="pin-cell caret"><span class="bar"></span></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+              </div>
+            </div>
+            <button class="btn btn-primary" type="button">Sign In with PIN</button>
+            <span class="divider"></span>
+            <div class="subordinate">
+              <button class="btn-quiet" type="button">Forgot your PIN? <span class="accent-word">Reset it</span></button>
+            </div>
+          </div>
+
+          <!-- After tapping reset -->
+          <div class="auth-card">
+            <div class="avatar" aria-hidden="true">M</div>
+            <div>
+              <p class="t-page">Set a New PIN</p>
+              <p class="t-body soft" style="margin-top:0.25rem;">Your recovery kit lets you replace it now.</p>
+            </div>
+            <div class="field-stack">
+              <p class="field-label">New PIN</p>
+              <div class="pin-row">
+                <span class="pin-cell filled"><span class="pip"></span></span>
+                <span class="pin-cell filled"><span class="pip"></span></span>
+                <span class="pin-cell caret"><span class="bar"></span></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+              </div>
+            </div>
+            <div class="field-stack">
+              <p class="field-label">Confirm PIN</p>
+              <div class="pin-row">
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+                <span class="pin-cell"></span>
+              </div>
+            </div>
+            <button class="btn btn-primary" type="button">Save New PIN</button>
+            <span class="divider"></span>
+            <div class="subordinate">
+              <button class="btn-quiet" type="button">Back to PIN entry</button>
+            </div>
+          </div>
+        </div>
+        <p class="anno">
+          Both panels are the same card at the same size, so the reset reads as a detour on one
+          screen rather than a different screen the kit dropped you into.
+        </p>
+      </div>
+
+      <div class="view">
+        <p class="view-label">Mobile &middot; 390px</p>
+        <div class="phones">
+          <div class="phone" style="height:600px;">
+            <div class="notch"></div>
+            <div class="phone-scroll">
+              <div class="phone-pad">
+                <div class="auth-card" style="width:100%;box-shadow:none;border-color:var(--line);">
+                  <div class="avatar" aria-hidden="true">M</div>
+                  <div>
+                    <p class="t-page">Welcome back, Maya</p>
+                    <p class="t-body soft" style="margin-top:0.25rem;">The Parker Pod is open on this device.</p>
+                  </div>
+                  <div class="field-stack" style="align-items:center;">
+                    <p class="field-label" style="text-align:center;">Enter Your PIN</p>
+                    <div class="pin-row">
+                      <span class="pin-cell filled"><span class="pip"></span></span>
+                      <span class="pin-cell filled"><span class="pip"></span></span>
+                      <span class="pin-cell filled"><span class="pip"></span></span>
+                      <span class="pin-cell caret"><span class="bar"></span></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary" type="button">Sign In with PIN</button>
+                  <span class="divider"></span>
+                  <div class="subordinate">
+                    <button class="btn-quiet" type="button">Forgot your PIN? <span class="accent-word">Reset it</span></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone" style="height:600px;">
+            <div class="notch"></div>
+            <div class="phone-scroll">
+              <div class="phone-pad">
+                <div class="auth-card" style="width:100%;box-shadow:none;border-color:var(--line);">
+                  <div class="avatar" aria-hidden="true">M</div>
+                  <div>
+                    <p class="t-page">Set a New PIN</p>
+                    <p class="t-body soft" style="margin-top:0.25rem;">Your recovery kit lets you replace it now.</p>
+                  </div>
+                  <div class="field-stack">
+                    <p class="field-label">New PIN</p>
+                    <div class="pin-row">
+                      <span class="pin-cell filled"><span class="pip"></span></span>
+                      <span class="pin-cell filled"><span class="pip"></span></span>
+                      <span class="pin-cell caret"><span class="bar"></span></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                    </div>
+                  </div>
+                  <div class="field-stack">
+                    <p class="field-label">Confirm PIN</p>
+                    <div class="pin-row">
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                      <span class="pin-cell"></span>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary" type="button">Save New PIN</button>
+                  <span class="divider"></span>
+                  <div class="subordinate">
+                    <button class="btn-quiet" type="button">Back to PIN entry</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       D. Settings card
+       ══════════════════════════════════════════════════════════════════ -->
+  <section class="sec" id="sec-d">
+    <div class="sec-head">
+      <h2><span class="sec-key">D</span> Settings &mdash; Security &amp; Recovery</h2>
+      <p class="sec-note">
+        The token is never stored, so this card can report a link but never show one again. It
+        carries a status line and exactly one action, and the warning sits attached to that
+        action rather than floating at the top of the card.
+      </p>
+      <p class="sec-note">
+        After generating, the card becomes the same magic-link block used everywhere else, so the
+        person recognises what they are looking at.
+      </p>
+    </div>
+
+    <div class="views">
+      <div class="view">
+        <p class="view-label">Desktop &middot; 1024px &middot; idle, then after generating</p>
+        <div class="stage column" style="align-items:stretch;">
+          <p class="field-label">Security &amp; Recovery</p>
+
+          <!-- Idle -->
+          <div class="card" style="max-width:680px;">
+            <div class="card-head">
+              <span class="tile silk" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+              </span>
+              <div>
+                <p class="t-item">Your beanies magic link</p>
+                <p class="t-body soft" style="margin-top:0.125rem;">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+              </div>
+            </div>
+            <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.75rem;">
+              <div class="status-row">
+                <span class="dot" aria-hidden="true"></span>
+                <p class="t-body soft">One link active, created 12 September. The link itself can't be shown again.</p>
+              </div>
+              <div class="notice">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5l8 14H4z"/><path d="M12 10v4"/><path d="M12 16.5h.01"/></svg>
+                <p class="t-body">Creating a new link cancels your current one.</p>
+              </div>
+              <button class="btn btn-primary auto" type="button" style="align-self:flex-start;">Create a new magic link</button>
+            </div>
+          </div>
+
+          <!-- After generating -->
+          <div class="card" style="max-width:680px;">
+            <div class="card-head">
+              <span class="tile silk" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+              </span>
+              <div>
+                <p class="t-item">Your beanies magic link</p>
+                <p class="t-body soft" style="margin-top:0.125rem;">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+              </div>
+            </div>
+            <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.75rem;">
+              <div class="status-row">
+                <span class="dot" aria-hidden="true"></span>
+                <p class="t-body soft">New link created just now. Any earlier link has been cancelled.</p>
+              </div>
+              <div class="magic">
+                <div class="magic-grid">
+                  <div class="qr-plaque"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                  <div class="magic-side">
+                    <div class="linkbox">
+                      <span class="link-text">app.beanies.family/welcome#beanies-link=ZP93KRT6X4M2</span>
+                      <button class="copy-btn" type="button">Copy</button>
+                    </div>
+                    <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                    <p class="t-caption faint">This is the only time it will be shown.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="anno">
+          The status dot is the only status colour on the card: green when a link is live, grey
+          when none has ever been made. The warning uses Heritage Orange, never Alert Red, since
+          nothing is being deleted.
+        </p>
+      </div>
+
+      <div class="view">
+        <p class="view-label">Mobile &middot; 390px</p>
+        <div class="phone" style="height:900px;">
+          <div class="notch"></div>
+          <div class="phone-scroll">
+            <div class="phone-pad" style="display:flex;flex-direction:column;gap:0.875rem;">
+              <p class="field-label">Security &amp; Recovery</p>
+
+              <div class="card">
+                <div class="card-head">
+                  <span class="tile sm silk" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your beanies magic link</p>
+                    <p class="t-body soft" style="margin-top:0.125rem;">This link unlocks your family file. Open it on a new device and sign in with your PIN.</p>
+                  </div>
+                </div>
+                <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.75rem;">
+                  <div class="status-row">
+                    <span class="dot" aria-hidden="true"></span>
+                    <p class="t-caption soft">One link active, created 12 September. The link itself can't be shown again.</p>
+                  </div>
+                  <div class="notice">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5l8 14H4z"/><path d="M12 10v4"/><path d="M12 16.5h.01"/></svg>
+                    <p class="t-caption">Creating a new link cancels your current one.</p>
+                  </div>
+                  <button class="btn btn-primary" type="button">Create a new magic link</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-head">
+                  <span class="tile sm silk" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a4.5 4.5 0 006.4.2l2.6-2.6a4.5 4.5 0 10-6.4-6.4l-1.5 1.5"/><path d="M14 11a4.5 4.5 0 00-6.4-.2L5 13.4a4.5 4.5 0 006.4 6.4l1.5-1.5"/></svg>
+                  </span>
+                  <div>
+                    <p class="t-item">Your beanies magic link</p>
+                    <p class="t-caption soft" style="margin-top:0.125rem;">New link created just now.</p>
+                  </div>
+                </div>
+                <div class="magic" style="margin-top:0.875rem;">
+                  <div class="magic-grid" style="flex-direction:column;align-items:center;">
+                    <div class="qr-plaque" style="width:10.5rem;"><svg viewBox="0 0 33 33" role="img" aria-label="QR code for your beanies magic link"><use href="#qr-code"/></svg></div>
+                    <div class="magic-side" style="width:100%;">
+                      <div class="linkbox">
+                        <span class="link-text">app.beanies.family/welcome#beanies-link=ZP93KRT6X4M2</span>
+                        <button class="copy-btn" type="button">Copy</button>
+                      </div>
+                      <p class="t-body soft">Save or bookmark it on a trusted device only.</p>
+                      <p class="t-caption faint">This is the only time it will be shown.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  // Theme stamp only: system -> light -> dark. Nothing else on this page is scripted.
+  (function () {
+    var order = ['', 'light', 'dark'];
+    var labels = { '': 'Theme: system', light: 'Theme: light', dark: 'Theme: dark' };
+    var i = 0;
+    var btn = document.getElementById('theme-btn');
+    btn.addEventListener('click', function () {
+      i = (i + 1) % order.length;
+      var v = order[i];
+      if (v) document.documentElement.setAttribute('data-theme', v);
+      else document.documentElement.removeAttribute('data-theme');
+      btn.textContent = labels[v];
+    });
+  })();
+</script>
+</body>
+</html>

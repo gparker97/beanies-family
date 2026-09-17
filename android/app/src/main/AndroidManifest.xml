@@ -32,6 +32,27 @@
                 <data android:scheme="https" android:host="beanies.family" android:pathPrefix="/oauth/native" />
             </intent-filter>
 
+            <!-- SHARED LINKS (magic link + invite link). These live on the APP
+                 subdomain, not the apex: `shareableOrigin()` builds every shared
+                 URL as https://app.beanies.family/..., which is why claiming only
+                 the apex meant a tapped invite never opened the app.
+
+                 ⚠️ Do NOT "simplify" this by claiming the apex path instead. The
+                 apex 301s /join to app.beanies.family (apex-cutover.js), and both
+                 platforms match the URL that was TAPPED without following
+                 redirects — so an apex claim would verify and then never fire.
+
+                 assetlinks.json is already hosted and correct on this origin.
+                 Verify on a device with:
+                   adb shell pm get-app-links family.beanies.app -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.beanies.family" android:pathPrefix="/join" />
+                <data android:scheme="https" android:host="app.beanies.family" android:pathPrefix="/welcome" />
+            </intent-filter>
+
             <!-- OAuth custom-scheme bridge. Android does not NEED this (the
                  verified App Link above is the normal path), but iOS does:
                  Apple fires Universal Links only on user-initiated taps, so the

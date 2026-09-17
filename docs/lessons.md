@@ -1869,3 +1869,52 @@ stub `Element.prototype.animate` themselves and so were never exposed.
 State the default you want, and make the other branch opt in. And when a dependency bump breaks
 tests, probe what actually changed before reporting a cause -- a story that fits the symptoms is not
 evidence, and a confident wrong diagnosis costs more than saying "not yet diagnosed".
+
+---
+
+## Capture an expensive command's output once, then query the file
+
+**2026-09-17** -- during the magic-link copy pass I ran `npm run validate` four times in a row.
+It is a full production build plus 8218 unit tests, roughly two minutes each. Only the first run
+did any work. The other three existed because I piped the command into a different `grep` each
+time, hunting for the test totals and the error count, and a pipeline reruns the command rather
+than re-reading its output. greg noticed before I did and asked why it was taking so long.
+
+**Rule:** any command measured in minutes gets redirected to a file on its FIRST run
+(`npm run validate > "$SCRATCH/validate.log" 2>&1; echo "EXIT=$?"`), and every subsequent question
+is answered by grepping that log. Capture the exit code in the same breath, because a `grep` in a
+pipeline swallows it -- that is also why three of those runs reported `EXIT=0` for the grep rather
+than for `validate`, which is a wrong answer as well as a slow one. This applies to the full test
+suite, production builds, a hooked `git push`, `terraform plan`, and Playwright runs.
+
+greg's framing when he raised it: this "has been happening a lot lately" -- so treat it as a standing
+efficiency rule, not a one-off slip. A second run is earned only by changed inputs or a genuinely
+inconclusive first run; wanting a different slice of the same output never earns one. The general
+form: prefer one command that answers several questions over several that each answer one, and never
+re-run a search to re-read output already in the transcript. Codified as **"Run Expensive Commands
+Once"** in `CLAUDE.md` so it loads every session rather than living only here.
+
+---
+
+## `git checkout -- <file>` is a destructive command, not an undo for your last edit
+
+**2026-09-17** -- while proving that an un-stubbed test really caught a regression, I made a
+temporary one-line edit to `ProveView.vue` with `sed`, confirmed the test failed as intended,
+and then "undid" it with `git checkout -- src/components/login/ProveView.vue`. That does not
+revert my one line. It restores the file from the index, which at that moment was the freshly
+pushed HEAD -- so it discarded all 47 lines of uncommitted magic-link work in that file.
+
+It was recoverable only because a `git stash create` snapshot had been pinned to
+`refs/backup/magic-link-safety` at the start of the session. Without it the work was gone; it
+was never committed anywhere.
+
+**Rule:** to undo a temporary edit, reverse the edit (keep the exact original text and put it
+back, or write the file to the scratchpad first and copy it back). NEVER reach for
+`git checkout --`, `git restore`, or `git reset` on a file with uncommitted work you want to
+keep -- those read from the index/HEAD and cannot know about your edit. The safe negative-test
+pattern is: snapshot the file to `$SCRATCH` → mutate → run the test → copy the snapshot back.
+
+This is the same family as [never `git reset` with a concurrent session running]: the danger is
+always a git command that writes the working tree from a ref, used as if it were an editor undo.
+And take the `git stash create` + `git update-ref refs/backup/<name>` snapshot BEFORE any session
+that touches a large uncommitted tree -- it costs one command and it is what saved this one.

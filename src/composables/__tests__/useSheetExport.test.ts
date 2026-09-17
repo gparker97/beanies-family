@@ -58,6 +58,31 @@ describe('exportElementToPng', () => {
     expect(toBlob.mock.calls[0][1]).toMatchObject({ pixelRatio: 2 });
   });
 
+  it('excludes [data-export-hide] subtrees from the capture, but never the root', async () => {
+    toBlob.mockResolvedValue(new Blob(['png']));
+    const el = document.createElement('div');
+
+    await exportElementToPng(el);
+
+    const filter = toBlob.mock.calls[0][1].filter as (n: Node) => boolean;
+
+    // The marked node and nothing else. A copy button on the recovery kit is the
+    // motivating case: tappable on screen, meaningless rasterised into the PDF.
+    const button = document.createElement('button');
+    button.setAttribute('data-export-hide', '');
+    expect(filter(button)).toBe(false);
+    expect(filter(document.createElement('button'))).toBe(true);
+
+    // Text nodes carry no attributes — they must survive rather than throw.
+    expect(filter(document.createTextNode('the link'))).toBe(true);
+
+    // Guarding the root is html-to-image's job (it never calls `filter` on it), but a sheet
+    // that marked ITSELF would otherwise export as nothing, so pin the assumption.
+    el.setAttribute('data-export-hide', '');
+    await exportElementToPng(el);
+    expect(await exportElementToPng(el)).toBeInstanceOf(Blob);
+  });
+
   it('memoises the lazy import — a second export reuses it and still works', async () => {
     toBlob.mockResolvedValue(new Blob(['png']));
     const el = document.createElement('div');

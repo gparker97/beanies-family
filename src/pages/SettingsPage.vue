@@ -7,6 +7,7 @@ import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import PinSettings from '@/components/settings/PinSettings.vue';
 import RecoverySettings from '@/components/settings/RecoverySettings.vue';
 import DeviceLinkCard from '@/components/settings/DeviceLinkCard.vue';
+import MagicLinkCard from '@/components/settings/MagicLinkCard.vue';
 import WallSetupCard from '@/components/settings/WallSetupCard.vue';
 import GoogleDisconnectCard from '@/components/settings/GoogleDisconnectCard.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
@@ -2254,6 +2255,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
 
       <RecoverySettings class="mt-4" />
+      <MagicLinkCard class="mt-4" />
       <DeviceLinkCard class="mt-4" />
       <GoogleDisconnectCard class="mt-4" />
     </BeanieFormModal>

@@ -38,6 +38,53 @@ branch; shipping is a separate, deliberate act with its own decision gate.
 
 ---
 
+## Run to completion
+
+Invoking this skill IS the approval. It authorises the whole sequence — implement, validate,
+infra, browser, review, fix, decide on a second review, report — so **do not stop between phases
+to ask whether to continue.** greg invoked it precisely so he does not have to sit there saying
+"yes, carry on" eight times.
+
+**Interim updates are not stopping, and they are welcome.** Narrate as you go: what just landed,
+what a test caught, what you decided. The distinction that matters is whether you keep working
+afterwards. Reporting a finding and continuing is good. Reporting a finding and waiting for a
+reply is the thing this section exists to prevent — especially when greg is away, where it burns
+hours for nothing.
+
+**Stop and wait only for these three:**
+
+1. **A genuinely blocking question** — proceeding under any assumption would be unsafe, wrong, or
+   throw the work away. Not "which of these two reasonable options", which you decide and report.
+2. **A showstopper that is greg's call, not yours.** A terraform plan with an unexpected destroy or
+   replace. A security finding that changes what should be built. A plan assumption discovered to
+   be false in a way that changes the deliverable rather than the route to it.
+3. **A stop point greg or the plan named for this run.** These do happen ("stop if browser
+   verification turns up a judgement call") and they override this section for that run only.
+
+**These are NOT reasons to stop**, and treating them as such is the failure mode:
+
+- an interesting finding, however good
+- correcting something you said earlier — say it in one line and move on
+- a test that needed updating because the behaviour deliberately changed
+- a design detail with a sensible default
+- wanting sign-off on a judgement call you are capable of making
+- the work turning out to be large
+
+For every one of those: make the call, write down what you assumed and what would reverse it, and
+keep going.
+
+**This is not a licence to paper over problems.** Running without interruption raises the bar on
+the Phase 8 report, it does not lower it. Every autonomous decision gets named there, with the
+assumption behind it. Anything you could not verify still goes on the manual-test list rather than
+being quietly claimed as done. A silent run that overstates what happened is worse than one that
+stopped too often, because greg has no way to catch it.
+
+**Completion still means reviewed, verified code — never a deploy.** "Do not stop" and "never
+deploy" are not in tension: finishing this skill means arriving at code that is reviewed and
+verified on the branch, and handing the shipping decision over.
+
+---
+
 ## Workflow
 
 ### Phase 0: Establish the plan and the preconditions
@@ -245,6 +292,11 @@ that overstates what was verified is worse than no report, because it retires th
 
 ## Rules
 
+- **Run to completion; stop only for a blocking question or a showstopper.** See "Run to
+  completion" above. Invoking this skill is the approval for the whole sequence, so phase
+  boundaries are not check-in points. Post progress freely — that is narrating, not stopping — but
+  keep working. If you catch yourself about to end a turn with "shall I continue?", the answer is
+  yes, and the question costs greg an hour if he is away from the terminal.
 - **The plan is the yardstick, at every phase.** Implementation follows it, the browser check exercises its
   acceptance criteria, the review checks against it. When the plan turns out to be wrong, change the plan
   out loud — never silently build something else and let the review measure against a fiction.

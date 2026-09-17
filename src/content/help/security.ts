@@ -141,7 +141,90 @@ const CLASH_NUDGE_ARTICLE: HelpArticle = {
   ],
 };
 
+/**
+ * "Your beanies magic link" (2026-09-17). The article a locked-out person actually
+ * lands on, so it has to answer the question they have — how do I get in, or get
+ * another link — before it explains anything.
+ *
+ * Two things it must NOT do. It must not suggest the link limits access to one
+ * person's data: it unwraps the FAMILY key, and the PIN that follows gates the screen,
+ * not the ciphertext. And it must not say "create a new one in Settings" without
+ * saying WHERE, because the reader is on a device that cannot self-serve.
+ */
+const MAGIC_LINK_ARTICLE: HelpArticle = {
+  slug: 'your-beanies-magic-link',
+  category: 'security',
+  title: 'Your beanies Magic Link',
+  excerpt:
+    'A personal link that lets you sign in on a new device with just your PIN. It lasts 7 days, and you can create a new one any time.',
+  icon: '\u{1F517}',
+  readTime: 3,
+  updatedDate: '2026-09-17',
+  sections: [
+    { type: 'heading', content: 'What it is', level: 2, id: 'what-it-is' },
+    {
+      type: 'paragraph',
+      content:
+        'Your magic link unlocks your family file. Open it on a new device and you go straight to your own PIN entry — no recovery kit, no passwords. You get one when you create a family and when you join one, and you can create a new one any time in <strong>Settings → Security &amp; Recovery</strong>.',
+    },
+    { type: 'heading', content: 'Keep it somewhere you trust', level: 2, id: 'keep-it-safe' },
+    {
+      type: 'paragraph',
+      content:
+        '<strong>Anyone who has your link can open your family’s information.</strong> It is not limited to you, and the PIN afterwards does not change that — the link is what unlocks the file. Save it the way you would save a password, on a device you trust. Do not post it in a group chat.',
+    },
+    { type: 'heading', content: 'It lasts 7 days', level: 2, id: 'expiry' },
+    {
+      type: 'paragraph',
+      content:
+        'A magic link works for 7 days from the moment you create it. After that it stops working and you need a new one. This is deliberate: a link that unlocks your family file should not sit in an old message forever.',
+    },
+    {
+      type: 'heading',
+      content: 'If your link has expired or stopped working',
+      level: 2,
+      id: 'expired',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Create a new one from a device where you are <strong>already signed in</strong> — Settings → Security &amp; Recovery → Create a magic link. You cannot create one from the device you are locked out of, because making a link requires your family file to be open.',
+    },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'If you have another device signed in, create a new link there and open it on the new device.',
+        'If you do not, ask someone in your family to send you a fresh invite, or use your recovery kit.',
+        'If a link opens your browser instead of the app, open beanies and use <strong>“Have a link? Paste it here”</strong> on the first screen.',
+      ],
+    },
+    {
+      type: 'heading',
+      content: 'Creating a new link cancels the old one',
+      level: 2,
+      id: 'revoking',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Only one magic link works at a time. The moment you create a new one, any earlier link stops working — so if you think a link has gone somewhere it should not have, creating a new one is how you shut it off. beanies never shows you an existing link again; it can only make you a new one.',
+    },
+    { type: 'heading', content: 'Magic link, recovery kit, or invite?', level: 2, id: 'which-one' },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        '<strong>Magic link</strong> — your own way onto another device. Lasts 7 days.',
+        '<strong>Recovery kit</strong> — the family’s break-glass. It does not expire, and it is the only thing that can reset a PIN.',
+        '<strong>Invite link</strong> — for someone who is not in the family yet.',
+      ],
+    },
+  ],
+};
+
 export const SECURITY_ARTICLES: HelpArticle[] = [
+  MAGIC_LINK_ARTICLE,
   {
     slug: 'how-your-data-is-encrypted',
     category: 'security',
@@ -464,7 +547,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Ask another parent</strong> \u2014 any pod manager can reset your PIN from your bean page, right in the app. (This is also how parents set or reset a child\u2019s PIN.)',
-          '<strong>Use your recovery kit or family passphrase</strong> \u2014 either one unlocks your family\u2019s data on the device, and you can then set yourself a new PIN.',
+          '<strong>Use your recovery kit</strong> \u2014 it unlocks your family\u2019s data on the device and then offers to set you a new PIN. (Using the kit does <em>not</em> replace your PIN by itself: if you remember it after all, just sign in with it. The kit is the only thing that can reset a PIN, which is why the option appears there and nowhere else.)',
+          '<strong>Or your family passphrase</strong> \u2014 it unlocks your family\u2019s data the same way, but it cannot reset a PIN.',
         ],
       },
       {
@@ -472,6 +556,11 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: 'Signing in on a new device',
         level: 2,
         id: 'new-device',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Most of the time you will not need the kit for this at all \u2014 use <a href="/help/security/your-beanies-magic-link">your beanies magic link</a>, the personal link you were given when you created or joined your family. Open it on the new device and you go straight to your PIN. The kit is for when that is gone too.',
       },
       {
         type: 'steps',

@@ -51,6 +51,50 @@ describe('native manifests declare the bridge scheme', () => {
   });
 });
 
+/**
+ * The SHARED-LINK association (magic links + invite links), separate from OAuth.
+ *
+ * These assertions exist because every one of them was wrong in production at once, and
+ * all three failures are silent — a tapped link simply opens the browser and nobody can
+ * tell why. There is no error, no log, and no way to notice except by trying it on a
+ * real phone.
+ */
+describe('shared links open the app', () => {
+  const APP_HOST = 'app.beanies.family';
+
+  it('iOS claims the APP subdomain, not just the apex', () => {
+    // Every shared URL is built by `shareableOrigin()` as https://app.beanies.family/...
+    // The entitlement used to claim only `beanies.family`, so no shared link ever matched.
+    const entitlements = repoFile('ios/App/App/App.entitlements');
+    expect(entitlements).toContain(`applinks:${APP_HOST}`);
+  });
+
+  it('the app-origin AASA claims /join and /welcome', () => {
+    const aasa = JSON.parse(repoFile('public/.well-known/apple-app-site-association'));
+    const paths = aasa.applinks.details.flatMap((d: { components: { '/': string }[] }) =>
+      d.components.map((c) => c['/'])
+    );
+    expect(paths).toContain('/join');
+    expect(paths).toContain('/welcome');
+  });
+
+  it('Android claims the same host and paths with autoVerify', () => {
+    const manifest = repoFile('android/app/src/main/AndroidManifest.xml');
+    expect(manifest).toContain(`android:host="${APP_HOST}"`);
+    expect(manifest).toMatch(/android:host="app\.beanies\.family" android:pathPrefix="\/join"/);
+  });
+
+  it('does NOT claim the apex /join — the 301 would defeat it', () => {
+    // apex-cutover.js 301s /join to the app subdomain, and both platforms match the
+    // TAPPED url without following redirects. An apex claim verifies and never fires.
+    const apexAasa = JSON.parse(repoFile('web/public/.well-known/apple-app-site-association'));
+    const apexPaths = apexAasa.applinks.details.flatMap((d: { components: { '/': string }[] }) =>
+      d.components.map((c) => c['/'])
+    );
+    expect(apexPaths).not.toContain('/join');
+  });
+});
+
 describe('nativeOAuth.ts stays dependency-free', () => {
   it('has no module-level imports, re-exports, or requires', () => {
     const source = repoFile('src/constants/nativeOAuth.ts');

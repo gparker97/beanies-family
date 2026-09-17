@@ -105,6 +105,7 @@ import {
 } from '@/services/sync/fileSync';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { preserveLocalKeyDicts, keyDictSize, withoutPayload } from '@/services/sync/envelopeMerge';
+import type { EnvelopeKeyDictField } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
   deriveMemberKey,
@@ -383,6 +384,150 @@ export const useSyncStore = defineStore('sync', () => {
     syncService.setEnvelope(null);
     // A new session must not inherit the previous family's "snapshot painted" state.
     snapshotPaintedThisSession.value = false;
+  }
+
+  /**
+   * ⚠️ THE authoritative envelope. Not `envelope.value`.
+   *
+   * A sync updates syncService's copy and NOT this store's ref — `syncService.ts:1748`
+   * does `setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope))` with no
+   * path back into the store. So immediately after any sync, `envelope.value` is a
+   * PRE-MERGE snapshot. Building a new envelope from it and committing that overwrites
+   * whatever the merge just brought in, including another member's freshly-arrived
+   * passkey or wrapped key. That is not hypothetical: it is the shape of the rollback
+   * defect this helper was written to make unrepresentable.
+   *
+   * Falls back to the store ref only for the window before syncService has been seeded.
+   */
+  function authoritativeEnvelope(): BeanpodFileV4 | null {
+    return syncService.getEnvelope() ?? envelope.value;
+  }
+
+  /** The ONE place the in-memory envelope is published to both holders. */
+  function commitEnvelope(env: BeanpodFileV4): void {
+    envelope.value = env;
+    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
+  }
+
+  type EnvelopeEntryOf<F extends EnvelopeKeyDictField> = NonNullable<BeanpodFileV4[F]>[string];
+
+  /**
+   * Apply a single key-dict entry change to `base`, immutably. `value === null` removes
+   * the key. Returns the new envelope plus whatever was displaced, so a caller can undo
+   * exactly its own change rather than restoring a whole snapshot.
+   */
+  function withEntry<F extends EnvelopeKeyDictField>(
+    base: BeanpodFileV4,
+    dict: F,
+    key: string,
+    value: EnvelopeEntryOf<F> | null
+  ): { next: BeanpodFileV4; previous: EnvelopeEntryOf<F> | undefined } {
+    const existing = base[dict] as Record<string, EnvelopeEntryOf<F>> | undefined;
+    const previous = existing?.[key];
+    let nextDict: Record<string, EnvelopeEntryOf<F>> | undefined;
+    if (value === null) {
+      if (!existing || previous === undefined) return { next: base, previous: undefined };
+      nextDict = { ...existing };
+      delete nextDict[key];
+    } else {
+      nextDict = { ...(existing ?? {}), [key]: value };
+    }
+    return { next: { ...base, [dict]: nextDict } as BeanpodFileV4, previous };
+  }
+
+  /**
+   * Commit a single key-dict entry, in memory, immediately. The entry rides the next
+   * save (`keyDictSize` counts a NEW key, so an added entry still triggers a publish).
+   *
+   * Correct when the artefact is also on screen — a recovery kit whose code the user is
+   * reading — so a deferred publish costs nothing. When the user is being handed a
+   * credential as their only way back in, use `putEnvelopeEntry` instead: a wrap that
+   * never reached the file is a dead credential.
+   */
+  function setEnvelopeEntry<F extends EnvelopeKeyDictField>(
+    dict: F,
+    key: string,
+    value: EnvelopeEntryOf<F> | null
+  ): { committed: boolean; previous: EnvelopeEntryOf<F> | undefined } {
+    const base = authoritativeEnvelope();
+    if (!base) return { committed: false, previous: undefined };
+    const { next, previous } = withEntry(base, dict, key, value);
+    commitEnvelope(next);
+    return { committed: true, previous };
+  }
+
+  /**
+   * Commit a key-dict entry AND publish it, reporting whether it reached the file.
+   *
+   * ⚠️ `keyDictSize` cannot carry this. Its publish signal is
+   * `size(merged) > size(remote)` — a strict `>` on a COUNT — so an OVERWRITE at an
+   * existing key leaves it unchanged. Every rotation and every revocation is invisible
+   * to it, which is why this publishes explicitly rather than trusting the entry to ride.
+   *
+   * ⚠️ BOUNDED. This is awaited on the pod-creation critical path and again right after
+   * a join commits. An unbounded sync there means a stalled Drive does not merely fail
+   * the write, it holds up the whole flow behind it. On timeout this returns false, the
+   * caller degrades, and the family gets on with creating their pod.
+   *
+   * ⚠️ Rollback re-reads the authoritative envelope. A merge may have run during the
+   * publish attempt, so the undo is applied to what is current, touching ONLY our key —
+   * never by restoring the snapshot we started from, which would discard whatever that
+   * merge brought in (another member's passkey, say). That was a real defect; this is
+   * the shape that makes it unrepresentable.
+   */
+  async function putEnvelopeEntry<F extends EnvelopeKeyDictField>(opts: {
+    dict: F;
+    key: string;
+    value: EnvelopeEntryOf<F> | null;
+    timeoutMs?: number;
+    /**
+     * ⚠️ MUST be false for a REVOCATION, and the default is wrong for one.
+     *
+     * Rollback restores whatever the key held before. For a mint that is correct: a wrap
+     * that never reached the file is a dead credential and leaving it in the envelope makes
+     * the Settings card claim a link is live. For a TOMBSTONE the same line restores the
+     * live 7-day wrap it was written to kill — and `doSave` returns false for a merely
+     * QUEUED write, so going offline while removing someone silently reinstates their
+     * credential and the next sync publishes it. A tombstone must persist locally and ride
+     * the next save whatever the publish did.
+     */
+    rollbackOnFailure?: boolean;
+  }): Promise<boolean> {
+    const { committed, previous } = setEnvelopeEntry(opts.dict, opts.key, opts.value);
+    if (!committed) throw new Error('No envelope loaded');
+
+    const outcome = await syncNowDurable(opts.timeoutMs ?? POST_AUTH_SAVE_TIMEOUT_MS);
+    if (outcome === 'saved') return true;
+
+    // ⚠️ 'timeout' IS NOT 'failed'. On a timeout the upload may still be in flight and may
+    // well land, so we neither roll back (that could revert a write that succeeded) nor
+    // claim success. The caller withholds the credential.
+    //
+    // ⚠️ KNOWN GAP, recorded rather than papered over: the staged entry stays in the
+    // envelope, so `MagicLinkCard` — which derives its status from
+    // `envelope.memberLinkKeys[memberId]` — will show a green "active until <date>" for a
+    // token that was destroyed and never shown, and the next autosave may publish it and
+    // kill the link the member actually holds. Closing this properly means publishing from
+    // a candidate envelope and committing only on 'saved'; until then the 20s budget is
+    // what makes a timeout rare, and this event is how we measure whether it is.
+    logEvent({
+      level: 'warn',
+      surface: 'login-flow',
+      message: 'envelope entry publish did not confirm',
+      context: {
+        action: 'envelope_entry_publish_unconfirmed',
+        error_code: outcome,
+        kind: opts.dict,
+      },
+    });
+
+    // ⚠️ ONLY on a CLEAN failure. On 'timeout'/'unknown' the write may still be in
+    // flight, and undoing it could itself revert a rotation that actually landed.
+    if (outcome === 'failed' && opts.rollbackOnFailure !== false) {
+      const after = authoritativeEnvelope();
+      if (after) commitEnvelope(withEntry(after, opts.dict, opts.key, previous ?? null).next);
+    }
+    return false;
   }
 
   // Pending encrypted file — V4 envelope that needs password to unlock
@@ -980,6 +1125,23 @@ export const useSyncStore = defineStore('sync', () => {
    * the best-effort post-auth bound because here we are trading spinner time for
    * a hard durability guarantee, not merely avoiding a wedge. */
   const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 12000;
+  /**
+   * Budget for publishing a credential the user is WAITING to be handed.
+   *
+   * ⚠️ NOT `POST_AUTH_SAVE_TIMEOUT_MS`. That constant is 5s and is sized for post-auth
+   * bookkeeping. A magic-link publish is a different animal: a full document re-export and
+   * re-encrypt in the worker, then an upload of the ENTIRE multi-MB envelope, which on the
+   * join path queues behind the debounced save that `joinFamily` just armed. Five seconds
+   * routinely expires before the upload has even started, and the joiner is told "your link
+   * wasn't saved" on a connection that is working perfectly — the reported bug.
+   *
+   * 20s because `withRetry` alone can legitimately spend 15s on one attempt
+   * (`driveService` aborts a request at 15s). There is nothing behind this step: the whole
+   * point of it is that the joiner waits for their link, so trading spinner time for a real
+   * durability answer is the right trade. It stays BOUNDED so a stalled Drive degrades to
+   * a Settings pointer instead of hanging the join forever.
+   */
+  const CREDENTIAL_PUBLISH_TIMEOUT_MS = 20000;
 
   /**
    * Three-state bounded save — the SINGLE implementation of the
@@ -3168,11 +3330,20 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await reloadAllStores();
-      setupAutoSync();
 
-      // A real pod was decrypted (the invite/join cached-key path) — establish
-      // the podCreated invariant so a joinee is never routed to create recovery.
-      useAuthStore().markPodCreated();
+      // ⚠️ THE FULL HOUSEKEEPING, not a bare `setupAutoSync()` — this is the join/kit
+      // terminus and it was the ONLY load terminus that skipped it. What a joiner was
+      // therefore missing, for the life of the session:
+      //   · `setupTokenExpiryHandler` — no self-recovery and no reconnect escalation when
+      //     the access token dies, so an hour after joining Drive simply stops working
+      //     with nothing on screen to explain it or offer a way back;
+      //   · `reconcileDriveTokenForMember` — their refresh token is never mirrored into
+      //     the `.beanpod`, so the family file never learns this member can reach Drive;
+      //   · `updateProviderEmailAfterLoad` — the connected-account display stays blank.
+      // It is a superset of what was here: it ends in `setupAutoSync()` and
+      // `markPodCreated()` itself, the latter being the podCreated invariant that keeps a
+      // joinee from being routed into "create recovery".
+      await runPostLoadDriveHousekeeping();
       return { success: true };
     } catch (e) {
       // Carry the class out, exactly as `decryptPendingFile` does. This is the
@@ -5867,22 +6038,12 @@ export const useSyncStore = defineStore('sync', () => {
       secret,
     ];
 
-    // Persist to envelope's passkeyWrappedKeys so it survives re-encryption
-    if (envelope.value) {
-      const env: import('@/types/syncFileV4').BeanpodFileV4 = {
-        ...envelope.value,
-        passkeyWrappedKeys: {
-          ...envelope.value.passkeyWrappedKeys,
-          [secret.credentialId]: {
-            wrapped: secret.wrappedFamilyKey,
-            hkdfSalt: secret.hkdfSalt,
-            memberId: secret.memberId,
-          },
-        },
-      };
-      envelope.value = env;
-      syncService.setEnvelope(env);
-    }
+    // Persist to envelope's passkeyWrappedKeys so it survives re-encryption.
+    setEnvelopeEntry('passkeyWrappedKeys', secret.credentialId, {
+      wrapped: secret.wrappedFamilyKey,
+      hkdfSalt: secret.hkdfSalt,
+      memberId: secret.memberId,
+    });
   }
 
   /**
@@ -5894,26 +6055,169 @@ export const useSyncStore = defineStore('sync', () => {
     kitId: string,
     pkg: import('@/types/syncFileV4').RecoveryKeyPackage
   ): void {
-    if (!envelope.value) return;
-    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
-      ...envelope.value,
-      recoveryKeys: { ...envelope.value.recoveryKeys, [kitId]: pkg },
-    };
-    envelope.value = env;
-    syncService.setEnvelope(env);
+    setEnvelopeEntry('recoveryKeys', kitId, pkg);
+  }
+
+  /**
+   * The `createdAt` of the entry a mint is about to REPLACE, if any.
+   *
+   * Exists so the caller can stamp monotonically: `pickNewerByCreatedAt` resolves an
+   * exact tie to the incoming side, so without this a second mint in the same
+   * millisecond — or a first mint on a device whose clock is behind the one that wrote
+   * the existing entry — can lose the merge and leave the OLD link alive.
+   */
+  function memberLinkCreatedAt(memberId: string): string | undefined {
+    // Authoritative, not `envelope.value`: a mint right after a sync must stamp newer
+    // than what the merge just brought in, not newer than our pre-merge snapshot.
+    return authoritativeEnvelope()?.memberLinkKeys?.[memberId]?.createdAt;
+  }
+
+  /**
+   * Store (or REPLACE) a member's magic-link wrap.
+   *
+   * ⚠️ Mirrors `addInvitePackage`, NOT `addRecoveryKey`. The difference is the whole
+   * contract: `addRecoveryKey` is fire-and-forget and rides the next save, which is fine
+   * for a kit whose code is printed on screen. A magic link whose wrap never reached the
+   * durable file is a QR that cannot be redeemed — a dead link handed to someone as
+   * their way back in. So this awaits the publish and RETURNS whether it landed, and the
+   * caller must withhold the link when it did not (the R2-F15 rule `DeviceLinkCard`
+   * already follows).
+   *
+   * ⚠️ `keyDictSize` does NOT cover this once the member already has an entry. That
+   * signal is `keyDictSize(merged) > keyDictSize(remote)` — a strict `>` on a COUNT — and
+   * an overwrite leaves the count identical. Every rotation and every revocation is
+   * therefore invisible to it, which is exactly why the publish here is explicit rather
+   * than left to ride.
+   */
+  async function setMemberLinkWrap(
+    memberId: string,
+    pkg: import('@/types/syncFileV4').MemberLinkKeyPackage,
+    /**
+     * ⚠️ PER CALL, because the right budget is a property of the SCREEN, not of the write.
+     * The join step exists to hand over the link and has nothing behind it, so it can
+     * afford the full 20s. The creation step's mint runs inside an UNCLOSABLE modal at the
+     * end of a flow that already loses most of its starters, and the Settings re-mint has
+     * nothing queued ahead of it — wedging either for 20s to gain a rarely-different answer
+     * is a bad trade. Defaults to the rotation budget, which is what those two want.
+     */
+    timeoutMs: number = DURABLE_ROTATION_SAVE_TIMEOUT_MS
+  ): Promise<boolean> {
+    const saved = await putEnvelopeEntry({
+      dict: 'memberLinkKeys',
+      key: memberId,
+      value: pkg,
+      timeoutMs,
+    });
+    if (!saved) {
+      console.error(
+        '[syncStore] setMemberLinkWrap: publish failed/timed out — link is NOT on Drive'
+      );
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'magic link publish deferred — not yet on the durable file',
+        context: { action: 'magic_link_publish_deferred' },
+      });
+    }
+    return saved;
+  }
+
+  /**
+   * Revoke a member's magic link by OVERWRITING it with a package nothing can unwrap.
+   *
+   * Synchronous and crypto-free on purpose. It is called from `authStore`'s unclaim,
+   * which is already async and already awaits + checks its own `syncNowBounded()` a few
+   * lines later — so this must not start a second publish, and must not be an
+   * unawaited promise inside a synchronous caller.
+   *
+   * ⚠️ NOT a delete. `envelopeMerge` is a union: a deletion does not propagate, so any
+   * peer would resurrect the live wrap on its next sync. An overwrite does propagate,
+   * under the dict's `newest-wins` rule. This is the FIRST envelope key material the app
+   * can genuinely retire — see `retireMemberKeyMaterial`, whose own docstring covers the
+   * material that still cannot be.
+   *
+   * Returns whether there was anything to revoke.
+   */
+  async function revokeMemberLink(memberId: string): Promise<boolean> {
+    if (!authoritativeEnvelope()) return false;
+
+    // ⚠️ OBSERVE BEFORE STAMPING. This is the correction to a fix that did not work.
+    //
+    // The previous version stamped `max(now, localEntry.createdAt + 1)` and called that
+    // monotonic. It is monotonic only against an entry THIS DEVICE ALREADY HOLDS. Against
+    // a remote entry we have never seen it is just our wall clock, and `mintMagicLinkPackage`
+    // actively manufactures future-dated stamps (it too stamps strictly-newer-than-what-it-saw),
+    // so a member minting on a device with a fast clock produces an entry that BEATS the
+    // owner's tombstone under newest-wins. The owner is told the link is revoked; it is not.
+    //
+    // Wall clocks cannot express causality, so the only sound fix is to look first: merge,
+    // then stamp newer than what is actually out there. One extra round trip on a rare,
+    // deliberate, owner-initiated action is a fair price for the guarantee.
+    // No try/catch: `syncNowDurable` classifies and logs internally and never rejects, so a
+    // wrapper here would be the same dead `catch {}` this file already removed once from
+    // `unclaimMember`. Any outcome other than 'saved' simply means we did not observe.
+    const observed = (await syncNowDurable(POST_AUTH_SAVE_TIMEOUT_MS)) === 'saved';
+
+    const base = authoritativeEnvelope();
+    if (!base) return false;
+    const existing = base.memberLinkKeys?.[memberId];
+
+    // ⚠️ NOT a delete. `envelopeMerge` unions, so a deletion does not propagate and any
+    // peer would resurrect the live wrap on its next sync. An overwrite DOES propagate,
+    // under the dict's newest-wins rule. And it is written even when this device holds no
+    // local entry: a member can mint on their own phone and publish while the owner still
+    // holds an older envelope, and an early return would let that wrap union straight back.
+    //
+    // Inlined rather than imported: a static import of `magicLink` here pulls
+    // `inviteService` → `familyKeyService` into the eager boot graph and silently no-ops
+    // the deliberate `await import(...)` sites elsewhere. It is a pure 6-line value —
+    // a package nothing can unwrap.
+    const published = await putEnvelopeEntry({
+      dict: 'memberLinkKeys',
+      key: memberId,
+      value: {
+        salt: '',
+        wrapped: '',
+        tokenHash: '',
+        keyId: base.keyId,
+        createdAt: new Date(
+          Math.max(Date.now(), (Date.parse(existing?.createdAt ?? '') || 0) + 1)
+        ).toISOString(),
+        expiresAt: new Date(0).toISOString(),
+      },
+      // ⚠️ NEVER roll this back. See the option's own docstring: the default would restore
+      // the live wrap this tombstone exists to kill, and `doSave` reports a merely QUEUED
+      // write as a failure — so revoking while offline would reinstate the credential.
+      rollbackOnFailure: false,
+    });
+
+    // Never silent. These two failure shapes are the difference between "revoked" and
+    // "we think we revoked", and only the firehose can tell anyone which happened.
+    if (!observed || !published) {
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: !published
+          ? 'magic link tombstone did not reach the durable file'
+          : 'magic link tombstone written without observing remote first',
+        context: {
+          action: 'magic_link_revoke_degraded',
+          error_code: !published ? 'tombstone-publish-failed' : 'tombstone-unobserved',
+        },
+      });
+    }
+    return published;
   }
 
   /** Store (or replace) the family recovery-passphrase wrap in the envelope (Phase 3). */
   function setRecoveryPassphraseWrap(
     pkg: import('@/types/syncFileV4').BeanpodFileV4['recoveryPassphrase'] & object
   ): void {
-    if (!envelope.value) return;
-    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
-      ...envelope.value,
-      recoveryPassphrase: pkg,
-    };
-    envelope.value = env;
-    syncService.setEnvelope(env);
+    // Authoritative, not `envelope.value` — see `authoritativeEnvelope`. Not routed through
+    // `setEnvelopeEntry`: this is a SCALAR field, not a key dict.
+    const base = authoritativeEnvelope();
+    if (!base) return;
+    commitEnvelope({ ...base, recoveryPassphrase: pkg });
   }
 
   /**
@@ -5959,18 +6263,19 @@ export const useSyncStore = defineStore('sync', () => {
     passkeySecrets.value = passkeySecrets.value.filter((sec) => sec.memberId !== memberId);
     const passkeySecretsCleared = before - passkeySecrets.value.length;
 
-    if (!envelope.value) {
+    const base = authoritativeEnvelope();
+    if (!base) {
       return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: true };
     }
 
-    const wrappedKeys = { ...envelope.value.wrappedKeys };
+    const wrappedKeys = { ...base.wrappedKeys };
     let localWrapsCleared = 0;
     if (wrappedKeys[memberId]) {
       delete wrappedKeys[memberId];
       localWrapsCleared += 1;
     }
 
-    const passkeyWrappedKeys = { ...envelope.value.passkeyWrappedKeys };
+    const passkeyWrappedKeys = { ...base.passkeyWrappedKeys };
     for (const [credentialId, wpk] of Object.entries(passkeyWrappedKeys)) {
       // ⚠️ An entry with NO `memberId` is an older envelope's, and is deliberately left alone:
       // it cannot be attributed to this member, and deleting it would lock whoever it does
@@ -5984,13 +6289,7 @@ export const useSyncStore = defineStore('sync', () => {
       return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: false };
     }
 
-    const env: import('@/types/syncFileV4').BeanpodFileV4 = {
-      ...envelope.value,
-      wrappedKeys,
-      passkeyWrappedKeys,
-    };
-    envelope.value = env;
-    syncService.setEnvelope(env);
+    commitEnvelope({ ...base, wrappedKeys, passkeyWrappedKeys });
     return { localWrapsCleared, passkeySecretsCleared, noEnvelope: false };
   }
 
@@ -6164,6 +6463,7 @@ export const useSyncStore = defineStore('sync', () => {
     syncNowDurable,
     canDurablySaveNow,
     DURABLE_ROTATION_SAVE_TIMEOUT_MS,
+    CREDENTIAL_PUBLISH_TIMEOUT_MS,
     forceSyncNow,
     loadFromFile,
     loadFromNewFile,
@@ -6218,6 +6518,9 @@ export const useSyncStore = defineStore('sync', () => {
     addRecoveryKey,
     setRecoveryPassphraseWrap,
     retireMemberKeyMaterial,
+    memberLinkCreatedAt,
+    setMemberLinkWrap,
+    revokeMemberLink,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,
   };
