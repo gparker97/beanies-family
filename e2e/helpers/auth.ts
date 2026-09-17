@@ -20,6 +20,11 @@ const E2E_FAMILY_NAME = 'E2E Test Family';
  * surface's PIN entry (Phase 4: families are born password-free) and the
  * mandatory recovery-kit confirmation.
  */
+/** Escape a UI string so it can be used inside a RegExp alternation. */
+function escapeForRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Promise<void> {
   // Step 1 — identity only (no password; it moved to the finish surface).
   await page.getByLabel(ui('auth.familyName')).fill(familyName);
@@ -49,7 +54,20 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
   await page.getByRole('button', { name: ui('action.continue') }).click();
 
   // Recovery-kit phase (Phase 4, mandatory): the one-time kit modal — confirm stored.
-  const kitStored = page.getByRole('button', { name: ui('recovery.kitConfirmStored') });
+  //
+  // ⚠️ TWO POSSIBLE LABELS, and the helper must accept either. The kit step now also
+  // shows the owner's magic link when one could be minted, and the confirm then reads
+  // "I've saved both" instead of "I've stored my kit somewhere safe". Which one appears
+  // depends on whether `setMemberLinkWrap` reached the durable file — i.e. on Drive, i.e.
+  // on the environment. Pinning the helper to one label made the whole E2E suite depend
+  // on a network outcome; this is how that was discovered, so keep it tolerant.
+  const kitStored = page
+    .getByRole('button', {
+      name: new RegExp(
+        `${escapeForRegExp(ui('recovery.kitConfirmStored'))}|${escapeForRegExp(ui('setup.saveBothConfirm'))}`
+      ),
+    })
+    .first();
   await kitStored.waitFor({ state: 'visible', timeout: 15000 });
   await kitStored.click();
 

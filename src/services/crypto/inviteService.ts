@@ -25,6 +25,16 @@ const INVITE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
  * shrinks the leak surface of a full-FK transport link.
  */
 export const LINK_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+/**
+ * Magic-link expiry: a member's SAVED sign-in link. Longer than a device link because
+ * it is kept rather than redeemed on the spot, and far shorter than permanent because
+ * it is a full-FK transport the user is told to store.
+ *
+ * ⚠️ This is a CLIENT-SIDE POLICY CHECK (`isInviteExpired`), not a cryptographic bound —
+ * the AES-KW wrap has no time binding. It bounds exposure for honest clients; the thing
+ * that actually kills a link is overwriting its `memberLinkKeys` entry.
+ */
+export const MAGIC_LINK_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // ── Token generation ────────────────────────────────────────────────
 
@@ -148,6 +158,16 @@ export interface InviteLinkParams {
    * card's copy says the other device needs 0.14+.
    */
   linkMode?: boolean;
+  /**
+   * Magic-link marker (`ml=1` on the wire): the redeemer resolves the wrap from
+   * `memberLinkKeys[memberId]` rather than `inviteKeys[hash]`, and lands on THAT
+   * member's PIN instead of the person picker. Older clients ignore the param and fall
+   * through to the classic invite path, which will not find a matching inviteKey and
+   * fails with a named reason.
+   */
+  magicLink?: boolean;
+  /** The member a magic link belongs to (`m=` on the wire). Required when `magicLink`. */
+  memberId?: string;
 }
 
 /**
@@ -178,6 +198,8 @@ export function buildInviteLink(params: InviteLinkParams): string {
   if (params.token) search.set('t', params.token);
   if (params.inviteeEmail) search.set('hint', encodeBase64(params.inviteeEmail));
   if (params.linkMode) search.set('lk', '1');
+  if (params.magicLink) search.set('ml', '1');
+  if (params.memberId) search.set('m', params.memberId);
   return `${origin}/join?${search.toString()}`;
 }
 
@@ -232,6 +254,16 @@ export function parseInviteLink(url: string): InviteLinkParams | null {
   }
 
   if (sp.get('lk') === '1') result.linkMode = true;
+
+  if (sp.get('ml') === '1') {
+    result.magicLink = true;
+    // ⚠️ Deliberately NOT defaulted or silently dropped. `ml=1` with no `m=` is an
+    // unusable link (chat apps truncate long URLs), and the caller must be able to tell
+    // that apart from a classic invite so it can say "this link is incomplete" rather
+    // than falling through and failing later with something misleading.
+    const memberId = sp.get('m');
+    if (memberId) result.memberId = memberId;
+  }
 
   return result;
 }

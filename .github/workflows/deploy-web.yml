@@ -68,7 +68,21 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        run: aws s3 sync web/dist/ s3://${{ vars.WEB_S3_BUCKET }} --delete
+        run: |
+          aws s3 sync web/dist/ s3://${{ vars.WEB_S3_BUCKET }} --delete
+          # ⚠️ RE-UPLOAD THE AASA WITH AN EXPLICIT CONTENT-TYPE.
+          # `aws s3 sync` guesses from the extension, and `apple-app-site-association`
+          # has none — so it lands as `binary/octet-stream`. Apple documents
+          # `application/json` as required, and refuses the association otherwise.
+          # This was wrong in production and invisible, because iOS Universal Links
+          # had never actually been exercised: the OAuth return that looked like it
+          # proved them working was Android's App Link, while iOS always fell through
+          # to the custom scheme (Apple fires Universal Links on user TAPS only, never
+          # on a server redirect). A tapped invite link is the first thing that will
+          # ever depend on this file being served correctly.
+          aws s3 cp web/dist/.well-known/apple-app-site-association \
+            s3://${{ vars.WEB_S3_BUCKET }}/.well-known/apple-app-site-association \
+            --content-type "application/json"
 
       - name: Invalidate CloudFront cache
         run: |

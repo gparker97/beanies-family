@@ -13,8 +13,9 @@
  * IDENTITY. Decryption alone does not, since whoever holds the passphrase can already
  * read everything, so a secret that can reset any PIN is a full member-impersonation
  * credential. Of the two, the passphrase is the loosely-held one: memorised, typed on
- * devices, plausibly spoken aloud in a house with children. Nobody is stranded, because
- * `RecoveryKitLink` is unconditionally on this screen (the never-blank guarantee).
+ * devices, plausibly spoken aloud in a house with children. Nobody is stranded: the chip
+ * is on this screen for every arrival EXCEPT a kit one, where the kit is already spent and
+ * the PIN entry plus its one-tap reset is what the screen offers instead.
  *
  * The UI half of this is only half: `useLoginFlow.onResetPin` carries the matching
  * authorization gate, tested separately.
@@ -52,14 +53,32 @@ function mountProve(openedBy: 'kit' | 'passphrase' | null) {
       podOpen: true,
       recoveryOpenedBy: openedBy,
     },
-    global: { stubs: { RecoveryKitLink: { template: '<a class="kit-link" />' } } },
+    // ⚠️ NOT STUBBED. `RecoveryKitLink` used to be stubbed out here, which made the
+    // "does not offer the kit again" assertion below test its own mock — it passed while
+    // the real component went on rendering "Use a recovery kit" to every kit arrival.
+    // ADR-007: never assert against your own stub.
   });
 }
 
 describe('ProveView — which secret opened the pod', () => {
-  it('KIT leads with the PIN reset', () => {
+  it('KIT lands on the member’s own PIN, with the reset one tap away', () => {
     const w = mountProve('kit');
-    expect(w.text().toLowerCase()).toContain("you're in with your recovery kit");
+    const text = w.text().toLowerCase();
+    // Was: a kit arrival was handed a "Set a New PIN" form. Measured consequence —
+    // 5 of the 6 real families who redeemed a kit went on to replace a PIN that worked,
+    // because replacing it was what the screen asked them to do.
+    expect(text).not.toContain("you're in with your recovery kit");
+    expect(text).toContain('enter your pin');
+    // ...but the reset stays reachable, because the kit is the ONLY thing that
+    // authorises one (`useLoginFlow.onResetPin` tests `=== 'kit'`).
+    expect(text).toContain('set a new pin');
+  });
+
+  it('KIT does not offer the kit again — it is already spent', () => {
+    // The regression this pairs with: `forgotCredential` keyed on the PANE, so moving
+    // the kit arrival off `reset-pin` started offering "Forgot your PIN? Use a recovery
+    // kit" to someone who had just used theirs.
+    expect(mountProve('kit').text().toLowerCase()).not.toContain('use a recovery kit');
   });
 
   it('PASSPHRASE lands on the member’s own methods, not a reset', () => {
@@ -80,8 +99,10 @@ describe('ProveView — which secret opened the pod', () => {
   it('PASSPHRASE still shows the kit link, which is the route to a reset', () => {
     // Not a lockout: someone who arrived by passphrase BECAUSE they forgot their PIN
     // reaches the reset through the kit, without starting over.
+    // Asserted on the REAL chip's label, not on a stub's class name. The class was the
+    // stub's own invention, so this assertion could never have seen the component change.
     const w = mountProve('passphrase');
-    expect(w.find('.kit-link').exists()).toBe(true);
+    expect(w.text().toLowerCase()).toContain('use a recovery kit');
   });
 
   it('a member credential offers no reset and names no recovery secret', () => {

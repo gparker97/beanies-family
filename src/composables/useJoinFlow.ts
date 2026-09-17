@@ -46,8 +46,10 @@ import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
-import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
+import { refuseMagicLink, type MagicLinkRefusal } from '@/services/auth/magicLink';
+import { emitLinkMinted, emitLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 
 // ─── State machine + error registry ──────────────────────────────────────────
 
@@ -72,7 +74,8 @@ export type JoinStep =
   | 'pick-member' // unclaimed-member grid
   | 'set-pin' // the invitee chooses their 6-digit PIN
   | 'link-ready' // Phase 4 device link: pod open — hand off to the standard login machine
-  | 'joining'; // final commit
+  | 'joining' // final commit
+  | 'link-saved'; // the joiner saves their magic link before the hand-off
 
 export type JoinErrorCode =
   | 'OAUTH_REDIRECT_FAILED'
@@ -85,6 +88,12 @@ export type JoinErrorCode =
   | 'PICKER_TIMEOUT'
   | 'FILE_READ_FAILED'
   | 'FILE_DECRYPT_FAILED'
+  | 'MAGIC_LINK_REVOKED'
+  | 'MAGIC_LINK_NOT_FOUND'
+  | 'MAGIC_LINK_EXPIRED'
+  | 'MAGIC_LINK_KEY_ROTATED'
+  | 'MAGIC_LINK_INCOMPLETE'
+  | 'INVITE_LINK_UNPARSEABLE'
   | 'FILE_TOO_LARGE'
   | 'FILE_CORRUPT'
   | 'FILE_NEWER_VERSION'
@@ -323,6 +332,51 @@ export const JOIN_ERRORS = {
     recoveries: ['retry'],
     severity: 'critical',
   },
+  // ── Magic link ──────────────────────────────────────────────────────────────
+  // Three codes rather than one shared "link didn't work", because the way OUT differs
+  // and a person holding a dead link is on a device that cannot self-serve. `retry` is
+  // deliberately absent from all three: retrying a revoked, expired or stale-keyId link
+  // does the same nothing every time, and offering a button that cannot work is worse
+  // than offering none.
+  MAGIC_LINK_NOT_FOUND: {
+    messageKey: 'join.error.magicLinkNotFound',
+    recoveries: [],
+    severity: 'warning',
+  },
+  MAGIC_LINK_EXPIRED: {
+    messageKey: 'join.error.magicLinkExpired',
+    recoveries: [],
+    severity: 'warning',
+  },
+  MAGIC_LINK_REVOKED: {
+    messageKey: 'join.error.magicLinkRevoked',
+    recoveries: [],
+    severity: 'warning',
+  },
+  MAGIC_LINK_KEY_ROTATED: {
+    messageKey: 'join.error.magicLinkKeyRotated',
+    recoveries: [],
+    severity: 'warning',
+  },
+  INVITE_LINK_UNPARSEABLE: {
+    // The URL carried invite-shaped params but `parseInviteLink` rejected it outright.
+    // ⚠️ ITS OWN CODE, and 'warning' NOT 'critical'. Routing this to
+    // `INVITE_TOKEN_INVALID` (severity 'critical') meant every truncated link someone
+    // pasted paged `#beanies-errors` — and truncation is expected input here, not an
+    // exceptional event, so that is a noise generator aimed at the alerting channel.
+    // A separate code also makes it distinguishable in CloudWatch from a token that
+    // parsed fine but matched no key, which is a genuinely different failure.
+    messageKey: 'join.error.linkUnparseable',
+    recoveries: [],
+    severity: 'warning',
+  },
+  MAGIC_LINK_INCOMPLETE: {
+    // `ml=1` with no `m=`. Expected input, not an edge case: chat apps wrap and truncate
+    // long URLs, so a half-copied link is a normal thing to arrive with.
+    messageKey: 'join.error.magicLinkIncomplete',
+    recoveries: [],
+    severity: 'warning',
+  },
   INVITE_TOKEN_INVALID: {
     // Most common cause is a stale Drive read — the inviter just generated
     // the link, but the device read a cached version of the .beanpod from
@@ -397,6 +451,17 @@ export function useJoinFlow() {
   // decrypt, hand off to the standard login machine (full person picker + PIN prove)
   // instead of the unclaimed-only claim flow.
   const linkMode = ref(false);
+  /**
+   * Set when the URL carried `ml=1&m=<memberId>` — a magic link. It reuses every
+   * `linkMode` branch (both skip the unclaimed-only claim flow and land on
+   * `link-ready`); the only difference is WHERE the wrap comes from and that the
+   * receiving screen already knows which member it is.
+   */
+  const magicLinkMemberId = ref<string | null>(null);
+  /** Which link kind this arrival is, for telemetry. One funnel, two kinds. */
+  function linkKind(): 'device' | 'magic' {
+    return magicLinkMemberId.value ? 'magic' : 'device';
+  }
   const targetProvider = ref<'google_drive' | 'local'>('local');
   const targetFileId = ref('');
   const targetFileName = ref('');
@@ -587,17 +652,60 @@ export function useJoinFlow() {
   // ─── Step orchestration ───────────────────────────────────────────────────
 
   /** Read URL params into reactive state. */
-  function parseUrl(): void {
+  /**
+   * @returns false when the URL is unusable and the caller must NOT continue. It used to
+   * return void, so `init()` recorded the correct "this link is incomplete" error and then
+   * ran the entire cloud flow anyway — walking the user through a full Google consent
+   * round-trip for a link already known to be dead, and ending on "ask for a new invite
+   * link" from the CLASSIC branch, because `magicLinkMemberId` was null. Exactly the
+   * misleading fall-through the comment inside it claims to prevent.
+   */
+  function parseUrl(): boolean {
     const url = `${window.location.origin}${route.fullPath}`;
     const parsed = parseInviteLink(url);
-    if (!parsed) return;
+    if (!parsed) return false;
     targetFamilyId.value = parsed.familyId;
     targetProvider.value = parsed.provider ?? 'local';
     targetFileName.value = parsed.fileName ?? '';
     targetFileId.value = parsed.fileId ?? '';
     inviteToken.value = parsed.token ?? '';
     inviteEmailHint.value = parsed.inviteeEmail ?? null;
-    linkMode.value = parsed.linkMode === true;
+    linkMode.value = parsed.linkMode === true || parsed.magicLink === true;
+    magicLinkMemberId.value = parsed.magicLink === true ? (parsed.memberId ?? null) : null;
+    // ⚠️ `ml=1` with no `m=` is an UNUSABLE link, not a classic invite. Chat apps
+    // truncate long URLs, so this is expected input rather than an edge case, and it must
+    // say so instead of falling through to the invite path and failing later with
+    // something misleading.
+    // ⚠️ DO NOT STRIP `t=` FROM THE URL HERE. This was tried and reverted in the same
+    // change that added the magic link, because it breaks the primary platform.
+    //
+    // The intent was good: this repo's convention is that a full-key secret rides the
+    // FRAGMENT, never the query string (`recoveryKit`: "fragments never leave the
+    // browser"), so leaving a 7-day token in the address bar, the history entry and any
+    // `Referer` is not ideal.
+    //
+    // But `usePickBeanpodFile` composes the OAuth returnPath as
+    // `${window.location.pathname}${window.location.search}` — read from the LIVE address
+    // bar — and that returnPath is the ONLY carrier of the invite token across a
+    // full-page redirect. Nothing stashes it anywhere else. So a `router.replace` that
+    // removes `t=` means: joiner taps the CTA, goes to Google, consents, comes back with
+    // `inviteToken` empty, the decrypt is skipped with no error, and they land on
+    // "contact a family admin" (classic invite) or on an UNDECRYPTED pod (`ml=1`). That is
+    // every redirect-auth platform — iPhone, iPad, installed PWA, native shell — failing
+    // in a way indistinguishable from the consent loop that was just fixed.
+    //
+    // Deferring the strip until after decrypt does not save it either: iOS Safari discards
+    // backgrounded tabs, and a reload of a stripped URL has nothing to recover from.
+    //
+    // The real fix is the fragment, and it is blocked on the returnPath carrying one.
+    // Until then the token stays in the query string, which is the same risk CLASS as the
+    // existing 24-hour invite rather than a new one.
+    if (parsed.magicLink === true && !parsed.memberId) {
+      emitLinkRedeemed({ kind: 'magic', ok: false, errorCode: 'no-member-param' });
+      recordError('MAGIC_LINK_INCOMPLETE');
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -739,7 +847,36 @@ export function useJoinFlow() {
   async function doPickAndLoad(chooseAccount = false): Promise<boolean> {
     const picked = await pickBeanpod({
       chooseAccount,
+      // ⚠️ ASK FOR OFFLINE ACCESS. Google returns a refresh token only when the prompt
+      // includes `consent`, and the join's default prompt is `select_account` alone. A
+      // joiner whose Google account had already granted these scopes elsewhere (their
+      // phone, another browser) therefore received an access token with nothing to refresh
+      // it, and Drive stopped working about an hour after they joined, silently — the
+      // `auth-no-refresh-token` warning is that happening.
+      //
+      // ⚠️ NOT `chooseAccount: true`, which would produce the same prompt. That flag also
+      // skips the silent token, and skipping it forces a full-page redirect instead of
+      // opening the Picker — the closed consent loop two iPhone users hit in production.
+      // `offlineAccess` changes the prompt and nothing else.
+      offlineAccess: true,
       loginHint: inviteEmailHint.value ?? undefined,
+      // ⚠️ RETRY THE DIRECT READ FIRST. The silent attempt in `runCloudFlow` runs BEFORE
+      // authentication, so on a fresh browser it returns 'auth' without ever trying the
+      // `fileId` — and nothing retried it once a token existed. Anyone whose app already
+      // has a `drive.file` grant for that file (always true for the pod's OWNER, since the
+      // app created it, and for any member who has picked it before on this account) was
+      // therefore shown a file chooser for a file they already had access to.
+      //
+      // `tryAutoLoadByFileId` is reused rather than reimplemented so the 404/403 → Picker
+      // classification stays in ONE place. On a genuine first join it returns 'needs-pick'
+      // and the Picker opens exactly as before — that path is unchanged.
+      resolveWithoutPicker: async () => {
+        if (!targetFileId.value) return false;
+        const direct = await tryAutoLoadByFileId();
+        // 'error' means it already recorded a classified failure; treat it as handled so
+        // the Picker does not open on top of an error card.
+        return direct === 'loaded' || direct === 'error';
+      },
     });
 
     // ⚠️ A `switch` with `assertNever`, NOT an `if` chain. A fifth `kind` must be a compile error
@@ -764,6 +901,18 @@ export function useJoinFlow() {
           message: picked.message,
         });
         return false;
+
+      case 'loaded':
+        // Already loaded by `resolveWithoutPicker`; the Picker never opened. `currentError`
+        // is set only on the classified-failure arm, so it is what tells the two apart.
+        if (currentError.value) return false;
+        logEvent({
+          level: 'info',
+          surface: 'join-flow',
+          message: 'file loaded directly; picker not needed',
+          context: { action: 'direct_load_no_picker' },
+        });
+        return true;
 
       case 'picked':
         break;
@@ -791,13 +940,91 @@ export function useJoinFlow() {
   }
 
   /**
+   * Each magic-link refusal maps onto the join-error registry, which already owns the
+   * user-facing copy, the severity and the recovery affordance for every code.
+   */
+  /**
+   * ⚠️ MAGIC-LINK REFUSALS GET THEIR OWN CODES. Reusing `INVITE_TOKEN_*` looked like
+   * sensible DRY and was wrong twice over:
+   *
+   *  · both are `severity: 'critical'`, so every lapsed 7-day link would page
+   *    `#beanies-errors`. Links minted in the same week lapse in the same week, so that
+   *    is a self-inflicted alert storm on the one channel that must stay readable;
+   *  · their copy says "ask the inviter for a new link". There is no inviter — the person
+   *    minted their own link — and the real remedy (Settings, on a device where they are
+   *    already signed in) is never named.
+   *
+   * The three codes added with this feature are `warning` with `recoveries: []`, for the
+   * documented reason that retrying a revoked, expired or stale-key link fails
+   * identically every time. These two must match them.
+   */
+  const MAGIC_LINK_JOIN_ERROR: Record<MagicLinkRefusal, JoinErrorCode> = {
+    'no-entry': 'MAGIC_LINK_NOT_FOUND',
+    'link-revoked': 'MAGIC_LINK_REVOKED',
+    'token-expired': 'MAGIC_LINK_EXPIRED',
+    'key-rotated': 'MAGIC_LINK_KEY_ROTATED',
+  };
+
+  /**
    * Try to decrypt the pending V4 file using the cached invite token.
    * Returns true if decryption succeeded; false if a password modal is
    * needed instead (no invite token, or the token isn't recognized).
    * Sets `INVITE_TOKEN_EXPIRED` / `INVITE_TOKEN_INVALID` /
    * `FILE_DECRYPT_FAILED` as appropriate.
    */
+  /**
+   * The shared tail: unwrap, decrypt, classify. Extracted so the invite resolver and the
+   * magic-link resolver differ ONLY in how they find the wrap. Every error arm below is
+   * unchanged from the invite-only version.
+   */
+  async function decryptPendingWithWrap(
+    wrapped: string,
+    salt: string,
+    token: string
+  ): Promise<boolean> {
+    const decrypted = await tryStep('FILE_DECRYPT_FAILED', async () => {
+      const fk = await redeemInviteToken(wrapped, salt, token);
+      const result = await syncStore.decryptPendingFileWithKey(fk);
+      if (!result.success) throw asJoinDecryptError(result);
+      return true;
+    });
+    if (!decrypted && linkMode.value)
+      emitLinkRedeemed({ kind: linkKind(), ok: false, errorCode: 'decrypt-failed' });
+    return decrypted ?? false;
+  }
+
+  /**
+   * Magic link: resolve the wrap from `memberLinkKeys[memberId]` and run the four
+   * ordered refusal checks, each with its OWN named reason. Deliberately a sibling of
+   * `tryInviteTokenDecrypt` rather than a branch inside it — that function is named for
+   * the invite token and guards on `inviteKeys` being present on its first line, so a
+   * magic-link branch above it makes the name a lie and one below it makes the whole
+   * feature depend on a dict it does not use.
+   */
+  async function tryMagicLinkDecrypt(): Promise<boolean> {
+    const memberId = magicLinkMemberId.value;
+    if (!memberId || !inviteToken.value) return false;
+    const envelope = syncStore.pendingEncryptedFile?.envelope;
+    if (!envelope) return false;
+
+    const pkg = envelope.memberLinkKeys?.[memberId];
+    const refusal = await refuseMagicLink(pkg, inviteToken.value, envelope.keyId);
+    if (refusal) {
+      emitLinkRedeemed({ kind: 'magic', ok: false, errorCode: refusal });
+      // Each refusal has its own copy because the way out differs: a revoked link means
+      // "a newer one exists", an expired one means "ask a signed-in device", a rotated
+      // key means "this is out of date". A shared generic message would send all three
+      // to the wrong remedy.
+      recordError(MAGIC_LINK_JOIN_ERROR[refusal]);
+      return false;
+    }
+
+    // Non-null: `refuseMagicLink` returns 'no-entry' when the package is missing.
+    return decryptPendingWithWrap(pkg!.wrapped, pkg!.salt, inviteToken.value);
+  }
+
   async function tryInviteTokenDecrypt(): Promise<boolean> {
+    if (magicLinkMemberId.value) return tryMagicLinkDecrypt();
     if (!inviteToken.value) return false;
     const pending = syncStore.pendingEncryptedFile;
     if (!pending?.envelope?.inviteKeys) return false;
@@ -808,25 +1035,19 @@ export function useJoinFlow() {
     if (!pkg) {
       // R2-F15: the redeem failure arm must reach the firehose for device links —
       // "minted with no matching redeem" is otherwise untriageable.
-      if (linkMode.value) emitDeviceLinkRedeemed(false, 'token-invalid');
+      if (linkMode.value)
+        emitLinkRedeemed({ kind: linkKind(), ok: false, errorCode: 'token-invalid' });
       recordError('INVITE_TOKEN_INVALID');
       return false;
     }
     if (isInviteExpired(pkg.expiresAt)) {
-      if (linkMode.value) emitDeviceLinkRedeemed(false, 'token-expired');
+      if (linkMode.value)
+        emitLinkRedeemed({ kind: linkKind(), ok: false, errorCode: 'token-expired' });
       recordError('INVITE_TOKEN_EXPIRED', { expiresAt: pkg.expiresAt });
       return false;
     }
 
-    const decrypted = await tryStep('FILE_DECRYPT_FAILED', async () => {
-      const fk = await redeemInviteToken(pkg.wrapped, pkg.salt, inviteToken.value);
-      const result = await syncStore.decryptPendingFileWithKey(fk);
-      if (!result.success) throw asJoinDecryptError(result);
-      return true;
-    });
-
-    if (!decrypted && linkMode.value) emitDeviceLinkRedeemed(false, 'decrypt-failed');
-    return decrypted ?? false;
+    return decryptPendingWithWrap(pkg.wrapped, pkg.salt, inviteToken.value);
   }
 
   /**
@@ -1055,14 +1276,21 @@ export function useJoinFlow() {
         familyId: familyContextStore.activeFamilyId ?? targetFamilyId.value,
       });
       if (!result.success) throw new Error(result.error ?? 'Join failed');
-      // Persist the PIN hash to the file before handing off.
-      await syncStore.syncNow(true);
+      // ⚠️ NO PUBLISH HERE. It used to `await syncStore.syncNow(true)` to persist the PIN
+      // hash, and then the magic-link mint ~200ms later published the ENTIRE pod a second
+      // time. The second upload queued behind the first on syncService's save mutex, which
+      // is how a 5s link-publish budget expired before its upload had even started, and why
+      // a joiner on a perfectly good connection was told "your link wasn't saved".
+      //
+      // The mint below stages its wrap in the envelope and then runs ONE publish that
+      // carries both. The fallback after `mintJoinerMagicLink` covers the case where that
+      // publish never happens, so the claim is never left to the autosave timer alone.
       return true;
     });
     if (!ok) {
       // Step regresses so the user can retry from the same form.
       //
-      // NOTE a `syncNow` failure here is NOT the claim bug: `joinFamily` succeeded, so this
+      // NOTE a publish failure is NOT the claim bug: `joinFamily` succeeded, so this
       // person really is in the pod on this device, and the claim converges to the shared file
       // on the next save. Rolling it back would sign them out of a join that worked. The
       // rollback that matters lives inside `joinFamily`, for a failure DURING the claim.
@@ -1071,7 +1299,125 @@ export function useJoinFlow() {
     }
     // The denominator. Without it the firehose can count failed joins but never the rate.
     emitJoinCompleted();
+
+    // ⚠️ THE ONE MOMENT THE JOINER CAN EVER SEE THEIR LINK. The token is never persisted,
+    // so if it is not shown now it is gone — minted and destroyed in the same tick, a dead
+    // entry in the envelope and a member with no saved way back in. Hence a step rather
+    // than a toast.
+    const published = await mintJoinerMagicLink(selectedMember.value.id);
+    if (!published) {
+      // The mint's publish is what carries the PIN hash to the file as well. If it never
+      // ran (the mint threw before staging) or did not confirm, push once more rather than
+      // leaving the claim to the autosave timer. Best-effort by design: the person is
+      // already a member on this device either way, so this must not block the step.
+      // Outcome recorded, not discarded: this is the write that carries the joiner's PIN
+      // hash to the family file. If it fails the claim is local-only, the inviter still
+      // sees the bean unclaimed, and without this event the firehose cannot tell us how
+      // often that happens. Emitted on BOTH arms so the rate is measurable, per the
+      // observability rule.
+      void syncStore.syncNowBounded().then((ok) =>
+        logEvent({
+          level: ok ? 'info' : 'warn',
+          surface: 'join-flow',
+          message: 'join claim fallback publish',
+          context: { action: 'join_claim_fallback', error_code: ok ? undefined : 'not-saved' },
+        })
+      );
+    }
+    currentStep.value = 'link-saved';
     return true;
+  }
+
+  /** The joiner's magic link, shown once on the `link-saved` step. */
+  const joinerMagicLink = ref('');
+  /** A `uiStrings` key when the mint failed. The step degrades; it never blocks. */
+  const joinerMagicLinkErrorKey = ref('');
+
+  /**
+   * Mint the joiner's link. BEST-EFFORT, for the same reason the creation step is: this
+   * runs AFTER `joinFamily` has already committed, so a failure here must not strand
+   * someone who is, at this point, genuinely a member of the family. They reach the app
+   * with their PIN exactly as before, plus a pointer to Settings.
+   */
+  async function mintJoinerMagicLink(memberId: string): Promise<boolean> {
+    joinerMagicLink.value = '';
+    joinerMagicLinkErrorKey.value = '';
+    try {
+      const fk = syncStore.familyKey;
+      const envelope = syncStore.envelope;
+      if (!fk || !envelope) {
+        joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
+        emitLinkMinted({
+          kind: 'magic',
+          ok: false,
+          errorCode: 'no_family_key',
+          detail: 'origin=join',
+        });
+        return false;
+      }
+      const { mintMagicLinkPackage, buildMagicLinkUrl } = await import('@/services/auth/magicLink');
+      const { token, pkg } = await mintMagicLinkPackage(
+        fk,
+        envelope.keyId,
+        syncStore.memberLinkCreatedAt(memberId)
+      );
+      // ⚠️ The JOIN budget explicitly, not the default. This step's whole job is to hand
+      // over the link and there is nothing behind it, so it can afford to wait; the
+      // creation and Settings mints deliberately cannot. See `setMemberLinkWrap`.
+      if (
+        !(await syncStore.setMemberLinkWrap(memberId, pkg, syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS))
+      ) {
+        joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
+        emitLinkMinted({
+          kind: 'magic',
+          ok: false,
+          errorCode: 'publish-failed',
+          detail: 'origin=join',
+        });
+        reportError({
+          surface: 'login-flow',
+          message: 'joiner magic link never reached the durable file',
+          severity: 'critical',
+          context: { action: 'publish_failed', kind: 'magic' },
+        });
+        return false;
+      }
+      joinerMagicLink.value = buildMagicLinkUrl({
+        familyId: envelope.familyId,
+        memberId,
+        // ⚠️ The STORE's provider, not `targetProvider`. The latter comes from the invite
+        // URL and `parseUrl` defaults it to 'local' when the link carries no `p=` — so a
+        // joiner could be handed a permanent `p=local` link that also carries a Drive
+        // `fileId`, which on redemption shows the local-file drop zone for a file that
+        // only exists in Drive. The other two mint sites already read the store.
+        provider:
+          syncStore.storageProviderType === 'google_drive' ||
+          syncStore.storageProviderType === 'local'
+            ? syncStore.storageProviderType
+            : undefined,
+        fileName: syncStore.fileName ?? undefined,
+        fileId: syncStore.driveFileId ?? undefined,
+        token,
+      });
+      emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=join' });
+      return true;
+    } catch (e) {
+      joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
+      emitLinkMinted({ kind: 'magic', ok: false, errorCode: 'mint-threw', detail: 'origin=join' });
+      reportError({
+        surface: 'login-flow',
+        message: 'joiner magic link mint threw; continuing without it',
+        severity: 'error',
+        error: e,
+        context: { action: 'mint_threw', kind: 'magic' },
+      });
+      return false;
+    }
+  }
+
+  /** The joiner confirmed they saved it — drop the link and hand off. */
+  function handleMagicLinkSaved(): void {
+    joinerMagicLink.value = '';
   }
 
   // ─── View-side modal toggle for the "Continue on another device" recovery ──
@@ -1083,7 +1429,23 @@ export function useJoinFlow() {
   // ─── Init ─────────────────────────────────────────────────────────────────
 
   async function init(): Promise<void> {
-    parseUrl();
+    // ⚠️ THE RETURN VALUE IS LOAD-BEARING. `parseUrl` records its own error for the one
+    // case it can name (`ml=1` with no `m=`); its OTHER false case is `parseInviteLink`
+    // rejecting the URL outright, and that was silent. A bare `/join` visit is also
+    // false, and correctly falls through to the instructions screen — so the two were
+    // indistinguishable, and someone who tapped a TRUNCATED link (chat apps wrap long
+    // URLs; this is expected input, not an edge case) got the generic "how to join" card
+    // with nothing to act on and nothing in the firehose.
+    if (!parseUrl() && !currentError.value) {
+      // `route.query`, not a hand-split of `fullPath` — the manual version mis-slices when
+      // a hash follows the query, and this is the parsed source the rest of the app uses.
+      // Any of these means the URL was TRYING to be an invite. Absent them, it is a bare
+      // visit and the instructions screen is the right answer.
+      const looksLikeInvite = ['fam', 't', 'fid', 'fileId', 'ml', 'm', 'lk'].some(
+        (k) => route.query[k] !== undefined
+      );
+      if (looksLikeInvite) recordError('INVITE_LINK_UNPARSEABLE');
+    }
 
     // ⚠️ Google sent them back with an error — record it. `OAUTH_SCOPE_DENIED` was a declared
     // code that NOTHING in the app ever emitted, so declining the consent prompt (by far the
@@ -1179,6 +1541,12 @@ export function useJoinFlow() {
     targetFileId,
     targetFileName,
     inviteToken,
+    // Exposed for the URL-contract test in useJoinFlow.test.ts. The contract — that the
+    // invite token stays in the address bar because the OAuth returnPath is built from it
+    // — has no other observable seam, and it is worth a test rather than a comment: the
+    // bug it guards against broke every redirect-auth platform and looked exactly like a
+    // different bug that had just been fixed.
+    parseUrl,
     inviteEmailHint,
     registryEntry,
     selectedMember,
@@ -1195,6 +1563,10 @@ export function useJoinFlow() {
     handleSelectMember,
     handleSubmitPin,
     linkMode,
+    magicLinkMemberId,
+    joinerMagicLink,
+    joinerMagicLinkErrorKey,
+    handleMagicLinkSaved,
     handleTryAnotherDevice,
     clearError,
     // diagnostics

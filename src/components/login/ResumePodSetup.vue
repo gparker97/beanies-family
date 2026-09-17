@@ -73,6 +73,7 @@ import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
+import { mintMagicLinkPackage, buildMagicLinkUrl } from '@/services/auth/magicLink';
 import { isValidPin } from '@/services/auth/deviceUnlock';
 import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
@@ -88,6 +89,7 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { emitLinkMinted } from '@/services/telemetry/loginFlowEvents';
 import { logEvent } from '@/services/telemetry';
 import { confirm } from '@/composables/useConfirm';
 import { consumeResumeReason } from '@/components/login/resumePaths';
@@ -138,6 +140,10 @@ const password = ref('');
 // One-time recovery kit from `createNewFile` — the mandatory `recovery-kit`
 // phase displays it; the code leaves memory on confirmation.
 const kitCode = ref('');
+/** The owner's magic link for the combined save step. One-time, like the kit code. */
+const magicLink = ref('');
+/** A `uiStrings` key when the mint failed — the step degrades, it never blocks. */
+const magicLinkErrorKey = ref('');
 const kitId = ref('');
 // "How did you hear about us?" answer (a stable English Slack label or free text;
 // null = skipped). Captured in the `survey` phase, threaded into createNewFile.
@@ -695,6 +701,9 @@ async function finalizePod(): Promise<boolean> {
   // guard doesn't bounce /welcome → /nook out of the kit step.
   kitCode.value = result.kit.code;
   kitId.value = result.kit.kitId;
+  // Mint the owner's magic link for the SAME screen (Requirement 10). Best-effort by
+  // design: see `mintOwnerMagicLink`.
+  await mintOwnerMagicLink(user.memberId);
   // The owner's PIN device wrap (review R2-F8): the doc hash was set back in the
   // identity phase, but the pod/key only exist NOW — enrol this device's unlock
   // wrap so the owner's own PIN can open their pod cold. Degraded, not fatal, on
@@ -706,9 +715,88 @@ async function finalizePod(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Mint the owner's magic link for the combined save step.
+ *
+ * ⚠️ BEST-EFFORT, AND IT MUST STAY THAT WAY. This runs inside an UNCLOSABLE modal at the
+ * end of a create flow that already loses 47% of its starters. `setMemberLinkWrap`
+ * awaits a publish and returns false when offline, so on a flaky connection this WILL
+ * fail — and if that could wedge the final screen, we would have traded a whole family's
+ * signup for a convenience credential. The kit is the guaranteed artefact; the link
+ * degrades to a Settings pointer and the confirm button stays enabled.
+ *
+ * Silent is still forbidden: the failure is shown on the card and reported by the store.
+ */
+async function mintOwnerMagicLink(memberId: string): Promise<void> {
+  magicLink.value = '';
+  magicLinkErrorKey.value = '';
+  try {
+    const fk = syncStore.familyKey;
+    const envelope = syncStore.envelope;
+    if (!fk || !envelope) {
+      magicLinkErrorKey.value = 'magicLink.mintFailed';
+      emitLinkMinted({
+        kind: 'magic',
+        ok: false,
+        errorCode: 'no_family_key',
+        detail: 'origin=creation',
+      });
+      return;
+    }
+    const { token, pkg } = await mintMagicLinkPackage(
+      fk,
+      envelope.keyId,
+      syncStore.memberLinkCreatedAt(memberId)
+    );
+    if (!(await syncStore.setMemberLinkWrap(memberId, pkg))) {
+      magicLinkErrorKey.value = 'magicLink.mintFailed';
+      emitLinkMinted({
+        kind: 'magic',
+        ok: false,
+        errorCode: 'publish-failed',
+        detail: 'origin=creation',
+      });
+      reportError({
+        surface: 'login-flow',
+        message: 'owner magic link never reached the durable file',
+        severity: 'critical',
+        context: { action: 'publish_failed', kind: 'magic' },
+      });
+      return;
+    }
+    const provider = syncStore.storageProviderType;
+    magicLink.value = buildMagicLinkUrl({
+      familyId: envelope.familyId,
+      memberId,
+      provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
+      fileName: syncStore.fileName ?? undefined,
+      fileId: syncStore.driveFileId ?? undefined,
+      token,
+    });
+    emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=creation' });
+  } catch (e) {
+    magicLinkErrorKey.value = 'magicLink.mintFailed';
+    emitLinkMinted({
+      kind: 'magic',
+      ok: false,
+      errorCode: 'mint-threw',
+      detail: 'origin=creation',
+    });
+    reportError({
+      surface: 'login-flow',
+      message: 'owner magic link mint threw; kit-only save step',
+      severity: 'error',
+      error: e,
+      context: { action: 'mint_threw', kind: 'magic' },
+    });
+  }
+}
+
 /** The kit-step confirmation: stamp the doc-side signal, drop the code, advance. */
 async function handleKitStepStored() {
   kitCode.value = '';
+  // The link is one-time too — it must not outlive the modal any more than the kit code.
+  magicLink.value = '';
   try {
     await settingsStore.markRecoveryKitConfirmed();
   } catch (e) {
@@ -1072,6 +1160,8 @@ async function handleConnectLocal() {
         :open="phase === 'recovery-kit'"
         :kit-id="kitId"
         :code="kitCode"
+        :magic-link="magicLink || undefined"
+        :magic-link-error-key="magicLinkErrorKey || undefined"
         @stored="handleKitStepStored"
       />
     </div>

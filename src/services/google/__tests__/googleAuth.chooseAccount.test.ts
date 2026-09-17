@@ -124,4 +124,27 @@ describe('the account chooser is reachable at all', () => {
     // 'cached-token' and the chooser was never reached on any platform.
     await expect(googleAuth.requestAccessToken({ chooseAccount: true })).rejects.toThrow();
   });
+
+  it('offlineAccess KEEPS the cached token — it is a prompt change, not a fresh grant', async () => {
+    /**
+     * ⚠️ THE EXACT OPPOSITE OF THE TEST ABOVE, and that contrast is the point.
+     *
+     * `offlineAccess` exists because Google returns a `refresh_token` only when the prompt
+     * includes `consent`, and the join path's default prompt is `select_account` alone — so a
+     * joiner whose account had already granted these scopes elsewhere ended up with no offline
+     * access and Drive died about an hour after they joined.
+     *
+     * The prompt that fixes it is the same one `chooseAccount` produces. But `chooseAccount`
+     * also refuses every silent path (the test above proves that), and refusing the silent
+     * token is what forced a full-page redirect instead of the Picker and closed the iOS
+     * consent loop. So `offlineAccess` must change the prompt and NOTHING else.
+     *
+     * If this ever starts rejecting, the loop is back.
+     */
+    googleAuth.__setTokenForTesting?.('cached-token', Date.now() + 3_600_000);
+
+    await expect(googleAuth.requestAccessToken({ offlineAccess: true })).resolves.toBe(
+      'cached-token'
+    );
+  });
 });

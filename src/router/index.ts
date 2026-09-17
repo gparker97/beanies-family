@@ -65,6 +65,15 @@ const routes: RouteRecordRaw[] = [
           component: () => import('@/pages/dev/CalendarImportHarness.vue'),
           meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
         } as RouteRecordRaw,
+        {
+          // Magic-link + recovery-kit copy review. Both surfaces are behind real OAuth
+          // (pod creation / a genuine join), so this is the only way a browser run can
+          // check the reordered modal, the emphasised line and the copy button.
+          path: '/dev/magic-link-copy',
+          name: 'DevMagicLinkCopy',
+          component: () => import('@/pages/dev/MagicLinkCopyHarness.vue'),
+          meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
+        } as RouteRecordRaw,
       ]
     : []),
   {

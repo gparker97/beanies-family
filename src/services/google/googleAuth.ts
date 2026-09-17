@@ -883,6 +883,26 @@ export async function requestAccessToken(options?: {
    * different account" needs this one.
    */
   chooseAccount?: boolean;
+  /**
+   * Ask for OFFLINE ACCESS: add `consent` to the prompt so Google returns a refresh token.
+   *
+   * ⚠️ DELIBERATELY NOT PART OF `wantsFreshGrant`. It changes the prompt on a call that was
+   * ALREADY going interactive, and nothing else. Every silent path above still runs first.
+   * That distinction is the whole safety argument: the iOS closed consent loop was caused by
+   * skipping the silent token (which forces a full-page redirect instead of opening the
+   * Picker), not by the prompt value, and `useJoinFlow`'s own test pins `chooseAccount: false`
+   * on that path for exactly this reason.
+   *
+   * Why a joiner needs it: Google returns a `refresh_token` only when the prompt includes
+   * `consent`. A joiner whose account has already granted these scopes elsewhere — their
+   * phone, another browser — gets an access token and nothing to refresh it with, so Drive
+   * quietly stops working about an hour after they join. `auth-no-refresh-token` is the
+   * warning that fires when that happens today.
+   *
+   * Scoped to the join / first-grant path on purpose. Widening the app-wide default would
+   * re-prompt every ordinary token acquisition, which is a far bigger behaviour change.
+   */
+  offlineAccess?: boolean;
   loginHint?: string;
   // Optional OAuth scope string. Defaults to DRIVE_SCOPES (existing callers
   // unchanged). The unified reconnect (tracker #62, commit 5) passes the
@@ -1105,7 +1125,13 @@ async function attemptSilentAuthCode(clientId: string): Promise<string | null> {
 async function performPopupAuth(
   clientId: string,
   popup: Window,
-  options?: { forceConsent?: boolean; chooseAccount?: boolean; loginHint?: string; scope?: string }
+  options?: {
+    forceConsent?: boolean;
+    chooseAccount?: boolean;
+    offlineAccess?: boolean;
+    loginHint?: string;
+    scope?: string;
+  }
 ): Promise<string> {
   const epochAtStart = sessionEpoch;
   const codeVerifier = generateCodeVerifier();
@@ -1125,10 +1151,16 @@ async function performPopupAuth(
     ? 'select_account consent'
     : options?.forceConsent
       ? 'consent'
-      : // Unchanged default. Not widened to include `consent` here: that would re-prompt every
-        // ordinary token acquisition in the app, which is a far larger behaviour change than
-        // this fix, and nothing observed points at it.
-        'select_account';
+      : options?.offlineAccess
+        ? // Same pair as `chooseAccount`, for a caller that needs a REFRESH TOKEN but has no
+          // reason to think the signed-in account is wrong. The chooser still shows (this is
+          // a first grant on this device, so naming the account is useful), and `consent`
+          // is what makes Google hand back offline access. See `offlineAccess`.
+          'select_account consent'
+        : // Unchanged default. Not widened to include `consent` here: that would re-prompt
+          // every ordinary token acquisition in the app, which is a far larger behaviour
+          // change than this fix, and nothing observed points at it.
+          'select_account';
 
   // ⚠️ NO REVOKE-BEFORE-MINT HERE. Removed 2026-09-08; do not reinstate without
   // reading this comment and `docs/investigations/2026-09-08-compaction-fallout.md`.

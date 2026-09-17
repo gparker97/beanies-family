@@ -534,6 +534,41 @@ export const useFamilyStore = defineStore('family', () => {
 
   async function deleteMember(id: string): Promise<boolean> {
     const result = await wrapAsync(isLoading, error, async () => {
+      // ⚠️ REVOKE BEFORE THE ROW GOES. Removing a member is the product's primary
+      // "revoke access" action, and without this their saved magic link keeps unwrapping
+      // the FAMILY key for up to 7 days — full plaintext of the pod from any device.
+      // Worse, it becomes permanently unrevocable the moment the row disappears:
+      // `unclaimMember` early-returns `memberNotFound`, and `MagicLinkCard` only ever
+      // mints for the CURRENT user, so no code path can write the tombstone afterwards.
+      // Awaited: it merges before stamping so an unseen remote mint cannot out-date the
+      // tombstone, then publishes it. Failure never blocks the deletion (see the catch).
+      try {
+        const { useSyncStore } = await import('./syncStore');
+        const revoked = await useSyncStore().revokeMemberLink(id);
+        if (!revoked) {
+          // ⚠️ CHECK THE BOOLEAN. `revokeMemberLink` catches internally and returns false
+          // rather than throwing, so the catch below can no longer fire for the case that
+          // matters. False here is precisely the state where the member's 7-day wrap is
+          // still live AND is about to become unrevocable, because the row this code is
+          // about to delete is the only thing any later revoke could key on.
+          reportError({
+            surface: 'login-flow',
+            message: 'member removed while their magic link was still live — now unrevocable',
+            severity: 'critical',
+            context: { action: 'delete_member_link_not_revoked' },
+          });
+        }
+      } catch (e) {
+        // Never block the deletion on this — but never let it be silent either.
+        reportError({
+          surface: 'login-flow',
+          message: 'magic link revoke failed during member deletion',
+          severity: 'critical',
+          error: e,
+          context: { action: 'delete_member_link_revoke_failed' },
+        });
+      }
+
       const success = await familyRepo.deleteFamilyMember(id);
       if (success) {
         members.value = members.value.filter((m) => m.id !== id);

@@ -780,6 +780,13 @@ async function loadSavedFileViaPicker(opts?: { chooseAccount?: boolean }) {
       });
       return;
 
+    // Unreachable here: `'loaded'` is produced only when a caller passes
+    // `resolveWithoutPicker`, and this surface does not. Handled explicitly because
+    // `assertNever` makes a new result kind a COMPILE error rather than a silent
+    // fall-through — which is the whole point of the switch.
+    case 'loaded':
+      return;
+
     default:
       assertNever(picked, 'loadSavedFileViaPicker');
   }
@@ -1569,10 +1576,16 @@ async function handleDriveRefresh() {
            soft shadow + Sky Silk icon-circle) so it reads as part of the same
            visual system rather than a generic SaaS info notice. The key icon
            ties semantically to "no password = no key". -->
-      <!-- ⚠️ COLD ARRIVALS ONLY. This greets someone who opened a `.beanpod` that is not
-           theirs, so it must never render when the pod is already open — the recovery-kit
-           escape from the PIN challenge lands here, and a member of THIS family was being
-           told the file belongs to another family and to go ask for an invite. -->
+      <!-- ⚠️ COLD ARRIVALS ONLY, AND IT DOES NOT KNOW WHOSE FILE THIS IS. The gate is
+           `hasPendingEncryptedFile` — "a file is staged and not yet decrypted" — which is
+           equally true for a stranger AND for a member returning to their own family on a new
+           device. It must never render when the pod is already open (the recovery-kit escape
+           from the PIN challenge lands here), but even cold it cannot tell the two apart.
+           So the BODY asserts nothing about ownership and only names the ways in. An earlier
+           version claimed the file belonged to another family, which every returning member
+           read about their own pod. Do not reintroduce a guess here: a magic-link holder on a
+           cold device is precisely the case where the file IS theirs and the device knows
+           nothing. -->
       <div
         v-if="syncStore.hasPendingEncryptedFile"
         class="dark:bg-surface-overlay/50 mt-6 flex items-start gap-3 rounded-[18px] bg-white p-4 shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:shadow-none"

@@ -12,6 +12,7 @@ import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import { useAppUpdate } from '@/composables/useAppUpdate';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
+import { installInboundLinkListener } from '@/services/share/inboundLinkBridge';
 import { isSameOriginReturnPath } from '@/services/google/redirectState';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
@@ -1714,6 +1715,13 @@ installNativeAuthListener((returnPath) => {
   // not, and one shared predicate is the only shape where a future change cannot widen a door
   // nobody remembered. Falling back to '/' loses only the resume-setup continuation.
   void router.replace(isSameOriginReturnPath(returnPath) ? returnPath : '/');
+});
+
+// Shared links (invite + magic) tapped from WhatsApp/SMS. Installed AFTER the OAuth
+// listener and re-checks the OAuth shape itself, so the two cannot double-handle one
+// event. Without this the Universal Link / App Link opens the app and nothing happens.
+installInboundLinkListener((path) => {
+  void router.replace(isSameOriginReturnPath(path) ? path : '/');
 });
 
 // On-device reminders for today's briefing (native only). Schedules a local
