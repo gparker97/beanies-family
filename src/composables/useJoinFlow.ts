@@ -474,8 +474,13 @@ export function useJoinFlow() {
       severity: JOIN_ERRORS[code].severity,
       context: {
         error_code: code,
-        file_id_tail: targetFileId.value || undefined,
-        invite_token_tail: inviteToken.value || undefined,
+        // ⚠️ TAILED, NOT RAW. These two keys are on the telemetry allowlist, so whatever
+        // they hold reaches CloudWatch and (on a critical) Slack. Assigned raw they carried
+        // the FULL value despite the `_tail` names: a live 24h invite token, and a Drive file
+        // id. `buildDiagnosticReport` below has always tailed these; this path had not, so
+        // every join ERROR published a working invite token to the log firehose.
+        file_id_tail: tail(targetFileId.value) || undefined,
+        invite_token_tail: tail(inviteToken.value) || undefined,
         provider_type: targetProvider.value,
       },
     });
