@@ -17,6 +17,58 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.17',
+    date: '2026-09-17',
+    month: '17 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Your own magic link signs you in on any device.',
+      beanie: 'your own magic link signs you in on any device.',
+    },
+    features: [
+      {
+        icon: '\u{1F517}',
+        title: { en: 'Your beanies magic link', beanie: 'your beanies magic link' },
+        description: {
+          en: 'A personal link and QR code that signs you in on a new device and takes you straight to your PIN. Save it somewhere safe, and make a fresh one any time in Settings.',
+          beanie:
+            'a personal link and qr code that signs you in on a new device and takes you straight to your pin. save it somewhere safe, and make a fresh one any time in settings.',
+        },
+      },
+      {
+        title: {
+          en: 'Signing in and joining, smoothed out',
+          beanie: 'signing in and joining, smoothed out',
+        },
+        description: {
+          en: 'We fixed a run of problems that could leave you stuck joining a family or signing in on a second device, including being asked to go and find your own family file.',
+          beanie:
+            'we fixed a run of problems that could leave you stuck joining a family or signing in on a second device, including being asked to go and find your own family file.',
+        },
+      },
+      {
+        title: { en: 'Magic links by email, soon', beanie: 'magic links by email, soon' },
+        description: {
+          en: "Sending a sign-in link straight to a family member's email is next on the list.",
+          beanie: "sending a sign-in link straight to a family member's email is next on the list.",
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.15',
     date: '2026-09-15',
     month: '15 september 2026',
