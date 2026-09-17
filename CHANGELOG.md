@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-17
 
+### Fixed
+
+- **The pricing page's long note reads properly on a phone.** "Let's get down to brass tacks" was squeezed into a 24-character line by a doubled page gutter, which made a long piece of writing hard to follow. It now runs about 38 characters a line on a phone, with a little more space between the lines. The wider layouts are unchanged.
+- **A typo in the beanies basic plan.** "Every feature, every world" now reads "every feature, every bean".
+
 ### Added
 
 - **Your beanies magic link.** Everyone now gets a personal link and QR code that signs them in on another device and lands them straight on their own PIN. It is shown once when you create a pod and once when you join, alongside your recovery kit, and you can create a fresh one any time in Settings. Links last 7 days, and making a new one cancels the old one.
