@@ -17,6 +17,8 @@
     "build": "vue-tsc -b && vite build",
     "build:web": "npm --workspace=@beanies/web run build",
     "preview": "vite preview",
+    "pretest": "npm run sync-brand-assets",
+    "pretest:run": "npm run sync-brand-assets",
     "test": "vitest",
     "test:run": "vitest run",
     "check:log-retention": "node scripts/check-log-retention.mjs",
