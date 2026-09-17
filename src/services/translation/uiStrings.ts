@@ -272,35 +272,41 @@ const STRING_DEFS = {
     beanie:
       "{name} signs in with their 6-digit pin. if they've forgotten it (or never had one), set a new one here and share it.",
   },
+  // ⚠️ Deliberately plain. This copy used to explain the MECHANISM — "is marked as
+  // joined, so you cannot send them a new invite… if they never actually got in, or they
+  // lost the link part way through" — which is the internal state model, not a thing the
+  // reader needs or asked about. Someone on this screen has one question: how do I get
+  // them another invite. Answer that and stop. (greg, 2026-09-17.)
   'bean.unclaim.title': {
-    en: 'Let Them Join Again',
-    beanie: 'let them join again',
+    en: 'Resend Invite',
+    beanie: 'resend invite',
   },
   'bean.unclaim.description': {
-    en: '{name} is marked as joined, so you cannot send them a new invite. If they never actually got in, or they lost the link part way through, clear it and you can invite them again.',
-    beanie:
-      '{name} is marked as joined, so you cannot send them a new invite. if they never actually got in, or they lost the link part way through, clear it and you can invite them again.',
+    en: 'Clears the existing invite link for {name} and lets you send a new one.',
+    beanie: 'clears the existing invite link for {name} and lets you send a new one.',
   },
   'bean.unclaim.button': {
-    en: 'Let {name} Join Again',
-    beanie: 'let {name} join again',
+    en: 'Resend Invite',
+    beanie: 'resend invite',
   },
   'bean.unclaim.confirm.title': {
-    en: 'Let them join again?',
-    beanie: 'let them join again?',
+    en: 'Resend invite?',
+    beanie: 'resend invite?',
   },
+  // The one consequence worth keeping: their PIN stops working, and their data does not
+  // go anywhere. Everything else was mechanism.
   'bean.unclaim.confirm.message': {
-    en: 'This clears their PIN, so they will need a fresh invite to get back in. They keep everything in the pod: their beans, their photos, their history. You can send them a new invite straight away.',
+    en: 'This clears the existing invite link and their PIN, so you can send a new invite. They keep their beans, photos and history.',
     beanie:
-      'this clears their pin, so they will need a fresh invite to get back in. they keep everything in the pod: their beans, their photos, their history. you can send them a new invite straight away.',
+      'this clears the existing invite link and their pin, so you can send a new invite. they keep their beans, photos and history.',
   },
   'bean.unclaim.confirm.action': {
-    en: 'Let Them Join Again',
-    beanie: 'let them join again',
+    en: 'Resend Invite',
+    beanie: 'resend invite',
   },
   'bean.unclaim.done': {
-    en: 'Done. You can invite {name} again now.',
-    beanie: 'done. you can invite {name} again now.',
+    en: 'Done. You can send {name} a new invite now.',
+    beanie: 'done. you can send {name} a new invite now.',
   },
   'bean.unclaim.failed': {
     en: 'That did not work. Try again in a moment.',
@@ -4119,10 +4125,17 @@ const STRING_DEFS = {
     en: "Can't unlock this beanpod?",
     beanie: "can't unlock this beanpod?",
   },
+  // ⚠️ NEUTRAL ON AUDIENCE AS WELL AS CREDENTIAL. This card renders whenever a file is staged
+  // and undecrypted (`hasPendingEncryptedFile`), which is TRUE for a member returning to their
+  // OWN family on a new device — so it must not assert whose file it is. It previously said
+  // "This file contains another family's encrypted data", which was written for a stranger and
+  // read by everyone. The gate cannot tell the two apart; only the copy can stop claiming.
+  // Name the routes in, assert nothing else. Keep `beanie` semantically identical (important
+  // surface: the real nouns stay, only the case drops).
   'loginV6.unlockNoPasswordHint': {
-    en: 'This file contains another family’s encrypted data. To join, ask the family owner to send you an invite link. You’ll set up your own account through that flow.',
+    en: 'You’ll need one of these: a magic link, a recovery kit, or an invite link from someone in the family.',
     beanie:
-      'this file is another family’s encrypted data. to join, ask the family owner for an invite link. you’ll set up your own account through that flow.',
+      'you’ll need one of these: a magic link, a recovery kit, or an invite link from someone in the family.',
   },
   // Family picker view
   'familyPicker.title': { en: 'Which family?', beanie: 'which beanies?' },
@@ -5014,10 +5027,14 @@ const STRING_DEFS = {
   'recovery.kitModalTitle': { en: 'Your Recovery Kit', beanie: 'your recovery kit' },
   'recovery.kitCodeLabel': { en: 'Recovery Code', beanie: 'recovery code' },
   'recovery.kitIdLabel': { en: 'Kit ID', beanie: 'kit id' },
+  // Moved to the TOP of the kit modal and rewritten to say what the kit IS before
+  // telling anyone what to do with it. It used to sit under the card as a footnote, which
+  // put the instruction ahead of the explanation on the one screen where a person has to
+  // decide how carefully to treat something they have never seen before.
   'recovery.kitStoreWarning': {
-    en: "Save or print this now — it's shown only once. Keep it somewhere safe that you can reach if you ever lose your PIN.",
+    en: 'This is your recovery code and QR link. Copy the code or store this kit somewhere safe. This is the only way back into your family pod if you forget your PIN or passphrase.',
     beanie:
-      "save or print this now — it's shown only once. keep it somewhere safe you can reach if you ever lose your pin.",
+      'this is your recovery code and qr link. copy the code or store this kit somewhere safe. this is the only way back into your family pod if you forget your pin or passphrase.',
   },
   'recovery.kitDownloadPdf': { en: 'Save as PDF', beanie: 'save as pdf' },
   'recovery.kitShare': { en: 'Share', beanie: 'share' },
@@ -5558,6 +5575,129 @@ const STRING_DEFS = {
     en: 'This file belongs to a different family. Sign in with a different account or ask for a new invite.',
     beanie:
       'this file belongs to a different family. sign in with a different account or ask for a new invite.',
+  },
+  // ── Magic link ("your beanies magic link") ─────────────────────────────────
+  // IMPORTANT SURFACE. This is auth + potential data loss, so per CLAUDE.md's beanie-mode
+  // floor the `beanie` values keep the real nouns (device, family file, PIN, link) and
+  // only drop case. No bean euphemisms, no playfulness — a reader who misunderstands any
+  // of these can lock themselves out or leave a live credential somewhere careless.
+  //
+  // Every failure names the way OUT, and none of them says only "create a new one in
+  // Settings": a person holding a dead link is on a device that CANNOT self-serve, so the
+  // route is always "a device where you're already signed in" or "ask someone in your
+  // family".
+  'join.error.magicLinkNotFound': {
+    en: "We couldn't find this link. Ask a signed-in device in your family to create a new one.",
+    beanie:
+      "we couldn't find this link. ask a signed-in device in your family to create a new one.",
+  },
+  'join.error.magicLinkExpired': {
+    en: 'This link has expired. Create a new one in Settings on a device where you are already signed in.',
+    beanie:
+      'this link has expired. create a new one in settings on a device where you are already signed in.',
+  },
+  'join.error.magicLinkRevoked': {
+    en: 'This link has been cancelled. A newer one was created. Ask a signed-in device in your family for a new one.',
+    beanie:
+      'this link has been cancelled. a newer one was created. ask a signed-in device in your family for a new one.',
+  },
+  'join.error.magicLinkKeyRotated': {
+    en: 'This link is out of date. Ask a signed-in device in your family to create a new one.',
+    beanie: 'this link is out of date. ask a signed-in device in your family to create a new one.',
+  },
+  'join.error.linkUnparseable': {
+    en: 'This link could not be read — it may have been cut short when it was sent. Ask for a new one, or paste the whole link again.',
+    beanie:
+      'this link could not be read — it may have been cut short when it was sent. ask for a new one, or paste the whole link again.',
+  },
+  'join.error.magicLinkIncomplete': {
+    en: 'This link is incomplete — it may have been cut short when it was sent. Ask for a new one.',
+    beanie:
+      'this link is incomplete — it may have been cut short when it was sent. ask for a new one.',
+  },
+  'magicLink.title': {
+    en: 'Your beanies magic link',
+    beanie: 'your beanies magic link',
+  },
+  // States the risk AND the instruction in one line, because "keep it somewhere safe"
+  // without the reason reads as boilerplate and gets ignored.
+  // The CREATION surface's line about the link. Distinct from the join surface: here the
+  // link sits beneath a permanent recovery kit, so it has to say plainly that this one is
+  // the temporary artefact and where a replacement comes from.
+  'magicLink.creationLead': {
+    en: 'Use the below link to sign in on a new device. It is valid for 7 days. Create a new link anytime in Settings.',
+    beanie:
+      'use the below link to sign in on a new device. it is valid for 7 days. create a new link anytime in settings.',
+  },
+  // The JOIN surface's single line about the link. Replaces a stack of four that said the
+  // same thing three ways.
+  'magicLink.saveAndUse': {
+    en: 'Save and use this link to sign in on any device. It will automatically unlock your family data file.',
+    beanie:
+      'save and use this link to sign in on any device. it will automatically unlock your family data file.',
+  },
+  'magicLink.cancelsPrevious': {
+    en: 'Creating a new link cancels this one.',
+    beanie: 'creating a new link cancels this one.',
+  },
+  'magicLink.needNewOne': {
+    en: "Create a new beanies magic link anytime in Settings. If you've lost your link or forgotten your PIN, you will need the recovery kit to sign in.",
+    beanie:
+      "create a new beanies magic link anytime in settings. if you've lost your link or forgotten your pin, you will need the recovery kit to sign in.",
+  },
+  'magicLink.savedConfirm': {
+    en: "I've saved my link",
+    beanie: "i've saved my link",
+  },
+  'magicLink.settingsDesc': {
+    en: 'A link that unlocks your family file so you can sign in on a new device with your PIN. Lasts 7 days.',
+    beanie:
+      'a link that unlocks your family file so you can sign in on a new device with your pin. lasts 7 days.',
+  },
+  'magicLink.statusNone': { en: 'No active link.', beanie: 'no active link.' },
+  'magicLink.statusActive': {
+    en: 'One link active, expires {date}.',
+    beanie: 'one link active, expires {date}.',
+  },
+  'magicLink.statusExpired': {
+    en: 'Your last link expired {date}.',
+    beanie: 'your last link expired {date}.',
+  },
+  'magicLink.create': { en: 'Create a magic link', beanie: 'create a magic link' },
+  'magicLink.createWarning': {
+    en: 'Creating a new link cancels your current one.',
+    beanie: 'creating a new link cancels your current one.',
+  },
+  'magicLink.onlyTimeShown': {
+    en: 'This is the only time it will be shown.',
+    beanie: 'this is the only time it will be shown.',
+  },
+  'magicLink.mintFailed': {
+    en: "Your link wasn't saved. Check your connection and try again, or create one later in Settings.",
+    beanie:
+      "your link wasn't saved. check your connection and try again, or create one later in settings.",
+  },
+  // Paste fallback: the way in when a universal link fails to open the app (WhatsApp's
+  // in-app browser, a deliberate "open in browser", an unverified Android App Link).
+  'setup.saveBothTitle': { en: 'Save these two things', beanie: 'save these two things' },
+  'setup.saveBothConfirm': { en: "I've saved both", beanie: "i've saved both" },
+  'magicLink.qrUnavailable': {
+    en: "Couldn't draw the QR code — use the link instead.",
+    beanie: "couldn't draw the qr code — use the link instead.",
+  },
+  'magicLink.memberMissing': {
+    en: 'That link is for someone who is no longer in this family. Pick who you are below.',
+    beanie: 'that link is for someone who is no longer in this family. pick who you are below.',
+  },
+  'magicLink.pastePrompt': {
+    en: 'Have a link? Paste it here',
+    beanie: 'have a link? paste it here',
+  },
+  'magicLink.pasteLabel': { en: 'Your beanies link', beanie: 'your beanies link' },
+  'magicLink.pasteAction': { en: 'Open link', beanie: 'open link' },
+  'magicLink.pasteUnparseable': {
+    en: "That doesn't look like a complete beanies link — check it copied fully.",
+    beanie: "that doesn't look like a complete beanies link — check it copied fully.",
   },
   'join.error.tokenExpired': {
     en: 'This invite has expired. Ask the inviter for a new link.',

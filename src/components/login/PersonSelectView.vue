@@ -15,6 +15,13 @@ import type { PersonCard } from '@/services/auth/loginFlow';
 defineProps<{
   familyName: string;
   people: PersonCard[];
+  /**
+   * An explanation for WHY this picker is being shown when the person did not ask for it.
+   * Today: a magic link naming a member who is no longer in the roster. `proveError` was
+   * used first and is unreachable here — this view never receives it — so someone whose
+   * member had been deleted on another device landed on an unexplained picker.
+   */
+  notice?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -71,6 +78,17 @@ function roleLabel(person: PersonCard): string {
       <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ t('loginV6.pickBeanTitle') }}
       </h2>
+
+      <!-- Why this picker appeared when nobody asked for it. Rendered here rather than via
+         `proveError`, which this view never receives. -->
+      <p
+        v-if="notice"
+        role="status"
+        class="dark:bg-surface-overlay dark:text-ink-soft mb-4 rounded-xl bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
+        data-testid="picker-notice"
+      >
+        {{ notice }}
+      </p>
       <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
         {{ t('loginV6.pickBeanSubtitle') }}
       </p>

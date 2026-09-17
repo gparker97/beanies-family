@@ -136,6 +136,17 @@ function loadPickerLibrary(): Promise<void> {
 
 export type PickBeanpodFileResult =
   | { kind: 'picked'; fileId: string; fileName: string }
+  /**
+   * The file was loaded WITHOUT the Picker ever opening, because the app already held a
+   * `drive.file` grant for it under the account that just signed in — the ordinary case
+   * for the pod's owner arriving on a new device with a link that carries the `fileId`.
+   *
+   * Produced only by `usePickBeanpodFile`'s `resolveWithoutPicker` hook, never by
+   * `pickBeanpodFile` itself. It is a distinct kind rather than a `picked` with borrowed
+   * fields because the caller has ALREADY loaded the file at this point and must not
+   * re-load it.
+   */
+  | { kind: 'loaded' }
   | { kind: 'cancelled' }
   /**
    * A full-page redirect has been started; this page is going away.

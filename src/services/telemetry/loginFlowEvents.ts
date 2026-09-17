@@ -118,19 +118,64 @@ export function emitOpenFetchRecovery(payload: {
   emit('info', 'open_fetch_recovery', { action: 'recovery', kind: payload.reason });
 }
 
-/** Phase 4 device linking: a mint attempt — ok=false means the invite key never
- *  reached the durable file and the link was withheld (R2-F15). */
-export function emitDeviceLinkMinted(ok: boolean): void {
-  emit(ok ? 'info' : 'warn', 'device_link_minted', { action: ok ? 'minted' : 'publish_failed' });
-}
-
-/** Phase 4 device linking: a link was redeemed on the receiving device. */
-export function emitDeviceLinkRedeemed(ok: boolean, errorCode?: string): void {
-  emit(ok ? 'info' : 'warn', 'device_link_redeemed', {
-    action: ok ? 'ok' : 'failed',
-    ...(errorCode ? { error_code: errorCode } : {}),
+/**
+ * A link was minted. ONE emitter for both kinds — the 15-minute device link and the
+ * 7-day magic link — because they share a funnel and a second emitter is a second shape
+ * that can drift.
+ *
+ * `ok=false` means the wrap never reached the durable file and the link was WITHHELD
+ * (the R2-F15 rule: a QR whose key is not on Drive is a dead QR).
+ *
+ * ⚠️ RENAMED from `device_link_minted` to `link_minted`. A deliberate, one-time break in
+ * event continuity, safe only because the measured baseline was ZERO — the device-link
+ * path had never been used in production, not once, so nothing is lost. Any saved
+ * CloudWatch query or dashboard on `device_link_*` must move to `link_*`.
+ */
+export function emitLinkMinted(payload: {
+  kind: 'device' | 'magic';
+  ok: boolean;
+  errorCode?: string;
+  /** Magic links only: where the mint came from, plus whether it replaced one. */
+  detail?: string;
+}): void {
+  emit(payload.ok ? 'info' : 'warn', 'link_minted', {
+    action: payload.ok ? 'minted' : 'publish_failed',
+    kind: payload.kind,
+    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+    ...(payload.detail ? { detail: payload.detail } : {}),
   });
 }
+
+/**
+ * A link was redeemed — or refused — on the receiving device.
+ *
+ * ⚠️ `ok: true` fires from the login machine's single `done` branch, NOT from the
+ * redeem itself. `useJoinFlow`'s own comment explains why: `link-ready` hands off to the
+ * standard login machine, which still has to show a picker and prove a PIN, so counting
+ * a success there "would look healthy during exactly the failure it exists to surface".
+ * That is also what finally gives the DEVICE link a denominator, which it has never had.
+ */
+export function emitLinkRedeemed(payload: {
+  kind: 'device' | 'magic';
+  ok: boolean;
+  errorCode?: string;
+}): void {
+  emit(payload.ok ? 'info' : 'warn', 'link_redeemed', {
+    action: payload.ok ? 'ok' : 'failed',
+    kind: payload.kind,
+    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+  });
+}
+
+/**
+ * ⚠️ NO join-started / join-completed emitter here, deliberately. `joinStepEvents.ts`
+ * already owns the join funnel on the `join-flow` surface: `watchJoinSteps` emits EVERY
+ * step transition and `emitJoinCompleted` is already called at the end of a successful
+ * join. A CloudWatch sweep that looked only at `login-flow` concluded the join funnel
+ * was uninstrumented; it is not, it is on the other surface. Adding a parallel pair here
+ * would have been two shapes for one funnel — the exact drift this facade exists to stop.
+ * Magic-link vs device-link vs invite is distinguished by `kind` on `emitLinkRedeemed`.
+ */
 
 /** The person picker rendered from credential records because the roster was missing. */
 export function emitRosterFallbackUsed(): void {

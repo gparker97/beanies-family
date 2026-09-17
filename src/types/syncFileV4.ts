@@ -43,12 +43,56 @@ export interface RecoveryKeyPackage {
 }
 
 export interface InviteKeyPackage {
-  /** PBKDF2 salt (base64, 16 bytes) */
+  /** PBKDF2 salt (base64URL, 16 bytes — written by `bufferToBase64url`, NOT plain base64) */
   salt: string;
   /** AES-KW wrapped family key (base64) */
   wrapped: string;
-  /** ISO 8601 expiration timestamp (24h from creation) */
+  /**
+   * ISO 8601 expiration. `INVITE_EXPIRY_MS` (24h) for invites, `LINK_EXPIRY_MS` (15min)
+   * for device links, `MAGIC_LINK_EXPIRY_MS` (7d) for magic links — all in
+   * `inviteService.ts`. (This said "24h from creation" while `DeviceLinkCard` was
+   * already minting 15-minute packages.)
+   */
   expiresAt: ISODateString;
+}
+
+/**
+ * A member's saved sign-in link ("your beanies magic link"), Phase 5. `InviteKeyPackage`
+ * plus the three fields a REVOCABLE, rotation-aware credential needs — extended rather
+ * than restated so salt/wrapped/expiresAt have ONE definition, and so
+ * `createInvitePackage`'s output is structurally most of this already.
+ */
+export interface MemberLinkKeyPackage extends InviteKeyPackage {
+  /**
+   * SHA-256 of the LIVE token (base64url, `hashInviteToken`).
+   *
+   * ⚠️ LOAD-BEARING FOR REVOCATION, not an optimisation. The dict is keyed by memberId,
+   * so a link superseded by a newer mint leaves an entry that still EXISTS. Without this
+   * hash the redeem gets as far as `unwrapFamilyKey` and fails there, and the holder is
+   * shown a generic "something went wrong" instead of the honest "this link has been
+   * cancelled". Comparing the hash FIRST is what makes revocation reportable.
+   *
+   * No new attack surface: `inviteKeys` already stores the same hash, in the clear, as
+   * its dict KEY.
+   */
+  tokenHash: string;
+  /**
+   * Copy of `envelope.keyId` at mint. A mismatch means the family key was rotated, so
+   * the wrap would unwrap SUCCESSFULLY (the token-derived KEK is unchanged) and hand
+   * back a STALE key — a confusing decrypt failure instead of an honest "out of date".
+   * Fail closed on mismatch; do NOT delete (a cold device cannot write the envelope and
+   * a deletion would not propagate anyway).
+   */
+  keyId: string;
+  /**
+   * Merge arbitrator — newest wins. MONOTONIC at mint. REVOCATION DEPENDS ON THIS: the
+   * dict merges `newest-wins`, and without a strictly-increasing stamp a peer holding
+   * the pre-rotation entry wins and republishes the dead wrap.
+   *
+   * NOT the expiry clock. `expiresAt` comes from the real wall clock, so a `createdAt`
+   * bumped forward to win a merge can never extend a link's life.
+   */
+  createdAt: ISODateString;
 }
 
 /**
@@ -87,6 +131,13 @@ export interface BeanpodFileV4 {
    * semantics as every other envelope dict.
    */
   recoveryKeys?: Record<string, RecoveryKeyPackage>;
+  /**
+   * Per-member saved sign-in link wraps (ADDITIVE OPTIONAL, same rules as
+   * `recoveryKeys`). Keyed by **memberId**, deliberately NOT by token hash: an overwrite
+   * at the same key is the only shape revocation can take, because `envelopeMerge`
+   * cannot propagate a deletion. Merged `newest-wins` — see `ENVELOPE_KEY_DICTS`.
+   */
+  memberLinkKeys?: Record<string, MemberLinkKeyPackage>;
   /**
    * Optional family recovery passphrase wrap (ADDITIVE OPTIONAL). Its own field, NEVER
    * a reserved `wrappedKeys` entry — legacy clients enumerate wrappedKeys as

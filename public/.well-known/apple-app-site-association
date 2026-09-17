@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "V2CKCNM3S7.family.beanies.app"
+        ],
+        "components": [
+          {
+            "/": "/join"
+          },
+          {
+            "/": "/welcome"
+          }
+        ]
+      }
+    ]
+  }
+}

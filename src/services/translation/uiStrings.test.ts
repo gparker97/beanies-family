@@ -123,6 +123,13 @@ describe('uiStrings', () => {
       'loginV6.pickBeanInfoText',
       'loginV6.signInPasswordHint',
       'join.error.',
+      // A SAVED SIGN-IN CREDENTIAL is squarely inside this floor's named scope
+      // ("auth/sign-in/PIN/password/recovery"). A reader who thinks a magic link is a
+      // playful bean thing can leave one in a group chat.
+      'magicLink.',
+      // `deviceLink.` was missing from this list, which is the same surface and the same
+      // risk — a 15-minute full-family-key transport. Same fix, same reason.
+      'deviceLink.',
       // Clearing a member's claim is a credential action: it revokes a PIN and re-opens an
       // invite. The floor exists so a reader who does not know the joke cannot act wrongly, and
       // "bean" must never stand in for the member or their access here.

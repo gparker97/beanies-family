@@ -10,6 +10,8 @@ import PinInput from '@/components/ui/PinInput.vue';
 import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
+import { generateInviteQR } from '@/utils/qrCode';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { useClipboard } from '@/composables/useClipboard';
@@ -19,7 +21,6 @@ import { resolveErrorView } from '@/utils/structuredError';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { emitDeviceLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 import type { FamilyMember } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { AwaitingReason } from '@/composables/useJoinFlow';
@@ -65,8 +66,22 @@ const emit = defineEmits<{
   back: [];
   'signed-in': [destination: string];
   navigate: [view: LoginView];
-  /** Phase 4 device link redeemed: pod open — host enters the standard login machine. */
-  'link-ready': [familyId: string, familyName: string];
+  /**
+   * A link was redeemed and the pod is open — the host enters the standard login
+   * machine. ONE OBJECT, not positional args: a third positional argument is where this
+   * hand-off turns fragile, and a magic link needs to carry both the member it belongs
+   * to and which kind of link it was. One emit site, one handler, so the shape is cheap
+   * to change and additive from here.
+   */
+  'link-ready': [
+    payload: {
+      familyId: string;
+      familyName: string;
+      /** Magic links only — the member to pre-select. A UI hint, never authorization. */
+      preselectMemberId?: string;
+      linkKind: 'device' | 'magic';
+    },
+  ];
 }>();
 
 // Phase 4 device link: the flow lands on 'link-ready' once the linked file is
@@ -75,12 +90,12 @@ watch(
   () => flow.currentStep.value,
   (step) => {
     if (step === 'link-ready') {
-      emitDeviceLinkRedeemed(true);
-      emit(
-        'link-ready',
-        syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId ?? '',
-        syncStore.envelope?.familyName ?? familyContextStore.activeFamilyName ?? ''
-      );
+      emit('link-ready', {
+        familyId: syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId ?? '',
+        familyName: syncStore.envelope?.familyName ?? familyContextStore.activeFamilyName ?? '',
+        preselectMemberId: flow.magicLinkMemberId.value ?? undefined,
+        linkKind: flow.magicLinkMemberId.value ? 'magic' : 'device',
+      });
     }
   }
 );
@@ -242,8 +257,42 @@ const { isDragging, bindings: dropZoneBindings } = useFileDrop({
 async function handleCreatePin(): Promise<void> {
   if (!isValidPin(pin.value)) return;
   if (pin.value !== confirmPin.value) return;
-  const ok = await flow.handleSubmitPin(pin.value);
-  if (ok) emit('signed-in', '/nook');
+  // ⚠️ NO `signed-in` here any more. `handleSubmitPin` now lands on the `link-saved`
+  // step, which is the ONLY moment the joiner can ever see their magic link — the token
+  // is never persisted, so signing them straight through would mint it and destroy it in
+  // the same tick. `handleMagicLinkSavedAndContinue` below is the hand-off.
+  await flow.handleSubmitPin(pin.value);
+}
+
+/** The joiner confirmed they saved their link (or it could not be minted) — go. */
+const joinerQr = ref('');
+/**
+ * ⚠️ Distinct from `!joinerQr`. The QR resolves asynchronously, so treating "empty" as
+ * "failed" flashed "Couldn't draw the QR code" on every SUCCESSFUL join before it
+ * arrived. `MintedLinkPanel` takes `loading` for the in-between state.
+ */
+const joinerQrFailed = ref(false);
+watch(
+  () => flow.joinerMagicLink.value,
+  async (link) => {
+    joinerQr.value = '';
+    joinerQrFailed.value = false;
+    if (!link) return;
+    try {
+      joinerQr.value = await generateInviteQR(link);
+    } catch {
+      joinerQrFailed.value = true;
+      // Degraded, not fatal: `MintedLinkPanel` shows "couldn't draw the QR — use the
+      // link instead" and the copy button still works. Deliberately not reported —
+      // `useMintedLink` owns that warn for the Settings paths and a duplicate here
+      // would double-count.
+    }
+  }
+);
+
+function handleMagicLinkSavedAndContinue(): void {
+  flow.handleMagicLinkSaved();
+  emit('signed-in', '/nook');
 }
 
 const pinError = computed(() => {
@@ -257,6 +306,16 @@ const pinError = computed(() => {
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 function handleBack(): void {
+  // ⚠️ `link-saved` is PAST THE POINT OF NO RETURN. `joinFamily` has committed, the PIN
+  // hash has synced and the link has been published — so `emit('back')` here would map to
+  // the WelcomeGate and dump a genuine member on the sign-in screen with no explanation,
+  // their one-time link gone forever (it is never persisted) and a live envelope entry
+  // that Settings reports as active. Before this step existed, `signed-in` fired the
+  // instant the PIN succeeded, so the window did not exist. Back means "I'm done" here.
+  if (flow.currentStep.value === 'link-saved') {
+    handleMagicLinkSavedAndContinue();
+    return;
+  }
   if (flow.currentStep.value === 'set-pin') {
     flow.currentStep.value = 'pick-member';
     flow.selectedMember.value = null;
@@ -638,6 +697,46 @@ onMounted(() => {
     <!-- ============================================ -->
     <!-- STEP 3: Create Password                      -->
     <!-- ============================================ -->
+    <template v-else-if="flow.currentStep.value === 'link-saved'">
+      <div class="space-y-4">
+        <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
+          {{ t('magicLink.title') }}
+        </h2>
+
+        <template v-if="flow.joinerMagicLink.value">
+          <!-- ⚠️ `MintedLinkPanel`, not bare selectable text. This is the ONLY moment the
+               joiner can ever see this link — the token is never persisted — so the save
+               action has to be a BUTTON, not tap-to-select-then-long-press on a wrapped
+               monospace URL. The panel also brings the copy-FAILURE row, and that matters
+               here more than anywhere: `useClipboard` reports failures precisely because
+               copying IS the save action for a magic link, and that reporting is
+               unreachable from a screen with no copy call. -->
+          <MintedLinkPanel
+            :link="flow.joinerMagicLink.value"
+            :qr-url="joinerQr"
+            :qr-unavailable="joinerQrFailed"
+            :loading="!joinerQr && !joinerQrFailed"
+            :qr-alt="t('magicLink.title')"
+            :hint="t('magicLink.saveAndUse')"
+            surface="login-flow"
+          />
+          <p class="dark:text-ink-faint text-xs text-gray-500">{{ t('magicLink.needNewOne') }}</p>
+        </template>
+        <!-- Degraded, never blocking: the join already committed, so a failed mint must not
+           strand someone who IS now a member. They continue with their PIN as before. -->
+        <p v-else class="dark:text-ink-soft text-sm text-gray-600">
+          {{ t('magicLink.mintFailed') }}
+        </p>
+
+        <!-- ⚠️ The label follows what actually happened. On the degraded branch there is no
+             link and nothing was saved, and it still read "I've saved my link" — asking the
+             person to confirm an action they had just been told failed. -->
+        <BaseButton class="w-full" type="button" @click="handleMagicLinkSavedAndContinue">
+          {{ flow.joinerMagicLink.value ? t('magicLink.savedConfirm') : t('action.continue') }}
+        </BaseButton>
+      </div>
+    </template>
+
     <template
       v-else-if="flow.currentStep.value === 'set-pin' || flow.currentStep.value === 'joining'"
     >
