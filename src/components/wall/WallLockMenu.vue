@@ -200,6 +200,7 @@ useEscapeClose(open, () => (open.value = false));
       />
       <ReauthChallenge
         v-else-if="member"
+        :keypad="true"
         :member="member"
         :open="challengeOpen"
         @verified="onVerified"

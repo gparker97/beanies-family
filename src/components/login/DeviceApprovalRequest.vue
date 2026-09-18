@@ -35,7 +35,7 @@ import {
 } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
 
-const emit = defineEmits<{ approved: [] }>();
+const emit = defineEmits<{ approved: []; retry: [] }>();
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
@@ -259,7 +259,13 @@ onBeforeUnmount(stopWaiting);
 function retry(): void {
   // A fresh keypair rather than reviving the old one: the previous request may already
   // have an approval written against it, and reusing it would race that entry.
-  window.location.reload();
+  //
+  // ⚠️ AN EMIT, NOT `window.location.reload()`. A remount is what this always wanted; the
+  // reload was just a blunt way to get one. It became actively wrong once this component
+  // sits behind a disclosure on phones: reloading drops the person back on the collapsed
+  // push view with this section shut, so "show a new one" visibly does the opposite of what
+  // it says. The parent owns the key, because a component cannot remount itself.
+  emit('retry');
 }
 </script>
 

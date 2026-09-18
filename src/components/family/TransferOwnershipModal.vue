@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 /**
  * Transfer Pod Ownership flow — three-step BeanieFormModal:
  *   1. `pick`    — select an adult human (not the current owner)
@@ -17,6 +18,9 @@ import ReauthChallenge from '@/components/auth/ReauthChallenge.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
+
+/** The wall aside, a phone or tablet gets the on-screen pad rather than the OS keyboard. */
+const isTouchPrimary = useIsTouchPrimary();
 
 const props = defineProps<{
   open: boolean;
@@ -194,6 +198,7 @@ function handleClose() {
          action-neutral copy for the shared gate (#80). -->
     <ReauthChallenge
       v-else-if="step === 'reauth' && currentOwner"
+      :keypad="isTouchPrimary"
       description-key="transferOwnership.reauthDescription"
       no-credential-key="transferOwnership.reauthNoCredential"
       :member="currentOwner"
