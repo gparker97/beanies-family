@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-17",
-    "translationCount": 4778
+    "lastUpdated": "2026-09-18",
+    "translationCount": 4843
   },
   "translations": {
     "app.name": {
@@ -13157,9 +13157,9 @@
       "lastUpdated": "2026-05-06"
     },
     "loginV6.unlockNoPasswordHint": {
-      "translation": "此文件包含另一个家庭的加密数据。如需加入，请要求该家庭的所有者向您发送邀请链接。您将通过该流程创建自己的账号。",
-      "hash": "701h5j",
-      "lastUpdated": "2026-09-10"
+      "translation": "您需要以下其中一项：魔术链接、康复工具包或家人的邀请链接。",
+      "hash": "xre2pv",
+      "lastUpdated": "2026-09-18"
     },
     "error.refreshFailed": {
       "translation": "刷新失败",
@@ -20737,9 +20737,9 @@
       "lastUpdated": "2026-08-28"
     },
     "recovery.kitStoreWarning": {
-      "translation": "立即保存或打印，仅显示一次。请将行程码存放在安全的地方，以防丢失行程码。",
-      "hash": "2f6pwe",
-      "lastUpdated": "2026-08-28"
+      "translation": "这是您的恢复代码和二维码链接。复制密码或将此套件存放在安全的地方。如果您忘记了PIN码或密码，这是返回家庭舱的唯一方法。",
+      "hash": "xwfcfn",
+      "lastUpdated": "2026-09-18"
     },
     "recovery.kitDownloadPdf": {
       "translation": "另存为PDF",
@@ -23842,39 +23842,39 @@
       "lastUpdated": "2026-09-16"
     },
     "bean.unclaim.title": {
-      "translation": "让他们再次加入",
-      "hash": "3v0dux",
-      "lastUpdated": "2026-09-17"
+      "translation": "重新发送邀请",
+      "hash": "7p6q32",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.description": {
-      "translation": "{name}已标记为已加入，因此您无法向其发送新邀请。如果他们从未真正进入，或者中途丢失了链接，请清除链接，然后您可以再次邀请他们。",
-      "hash": "s1q3jz",
-      "lastUpdated": "2026-09-17"
+      "translation": "清除{name}的现有邀请链接，并允许您发送新的邀请链接。",
+      "hash": "nczmyy",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.button": {
-      "translation": "让{name}再次加入",
-      "hash": "jnrg8i",
-      "lastUpdated": "2026-09-17"
+      "translation": "重新发送邀请",
+      "hash": "7p6q32",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.confirm.title": {
-      "translation": "让他们再次加入？",
-      "hash": "kuovl6",
-      "lastUpdated": "2026-09-17"
+      "translation": "重新发送邀请",
+      "hash": "1xmzxr",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.confirm.message": {
-      "translation": "这会清除他们的PIN码，因此他们需要重新收到邀请才能重新加入。他们把所有东西都放在吊舱里：他们的豆子，他们的照片，他们的历史。您可以立即向他们发送新的邀请。",
-      "hash": "ep0mrm",
-      "lastUpdated": "2026-09-17"
+      "translation": "这将清除现有的邀请链接及其PIN码，以便您发送新的邀请。他们会保留他们的豆子、照片和历史。",
+      "hash": "5xmxji",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.confirm.action": {
-      "translation": "让他们再次加入",
-      "hash": "3v0dux",
-      "lastUpdated": "2026-09-17"
+      "translation": "重新发送邀请",
+      "hash": "7p6q32",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.done": {
-      "translation": "完成。您现在可以再次邀请{name}。",
-      "hash": "99yfcf",
-      "lastUpdated": "2026-09-17"
+      "translation": "完成。您现在可以向{name}发送新邀请。",
+      "hash": "xc5u2i",
+      "lastUpdated": "2026-09-18"
     },
     "bean.unclaim.failed": {
       "translation": "那行不通。请稍后重试。",
@@ -23895,6 +23895,331 @@
       "translation": "正在将您带到Google登录……如果没有出现任何问题，请轻触下方重试。",
       "hash": "cmegsf",
       "lastUpdated": "2026-09-17"
+    },
+    "join.error.magicLinkNotFound": {
+      "translation": "找不到此链接。要求您家庭中的登录设备创建一个新设备。",
+      "hash": "d82cjz",
+      "lastUpdated": "2026-09-18"
+    },
+    "join.error.magicLinkExpired": {
+      "translation": "此链接已过期。在已登录的设备上，在“设置”中新建一个。",
+      "hash": "ga5dzl",
+      "lastUpdated": "2026-09-18"
+    },
+    "join.error.magicLinkRevoked": {
+      "translation": "此链接已被取消。创建了一个新的。向家中已登录的设备索取新设备。",
+      "hash": "a0lulo",
+      "lastUpdated": "2026-09-18"
+    },
+    "join.error.magicLinkKeyRotated": {
+      "translation": "此链接已过期。要求您家庭中的登录设备创建一个新设备。",
+      "hash": "k2ga6d",
+      "lastUpdated": "2026-09-18"
+    },
+    "join.error.linkUnparseable": {
+      "translation": "此链接无法读取—发送时可能已被剪短。请求新链接，或重新粘贴整个链接。",
+      "hash": "osyt6i",
+      "lastUpdated": "2026-09-18"
+    },
+    "join.error.magicLinkIncomplete": {
+      "translation": "此链接不完整—发送时可能已被剪短。要求一个新的。",
+      "hash": "7fmtjt",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.title": {
+      "translation": "是否允许此设备进入？",
+      "hash": "9y5nql",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.prompt": {
+      "translation": "设备要求打开{family}。",
+      "hash": "naote5",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.yourFamily": {
+      "translation": "您家人的beanpod",
+      "hash": "8402hs",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.pinReason": {
+      "translation": "这可以让另一台设备打开您家庭的beanpod。",
+      "hash": "5soz31",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.compareOnBoth": {
+      "translation": "仅当其他设备显示这些相同的字符时才批准。",
+      "hash": "81oiai",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.compareHint": {
+      "translation": "请检查此代码是否与其他设备上的代码匹配。",
+      "hash": "tjq9vp",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.approve": {
+      "translation": "是的，让它进来",
+      "hash": "sytinu",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.reject": {
+      "translation": "不，那不是我",
+      "hash": "t98wcv",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.waiting": {
+      "translation": "等待批准",
+      "hash": "a09fzn",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.qrAlt": {
+      "translation": "要扫描的登录设备的代码",
+      "hash": "2o1357",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.qrUnavailable": {
+      "translation": "无法在此处绘制代码。您仍然可以在下面使用其他方式之一。",
+      "hash": "f70s7t",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.expired": {
+      "translation": "代码已过期",
+      "hash": "rhii3k",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.tryAgain": {
+      "translation": "显示一个新的",
+      "hash": "dz8dng",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.failed": {
+      "translation": "这行不通。您可以重试，或使用以下的其他方式之一。",
+      "hash": "xerz4e",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.badCode": {
+      "translation": "该代码不是Beanies登录代码。",
+      "hash": "9fzbbc",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.publishFailed": {
+      "translation": "我们无法将审批保存到您的家庭文件，因此其他设备无法看到。请检查您的网络连接，然后重试。",
+      "hash": "dcx7z0",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.signedOutTitle": {
+      "translation": "打开要审批的beanies",
+      "hash": "68udnb",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.signedOutBody": {
+      "translation": "此代码必须由已登录的设备批准。打开Beanies应用程序，然后尝试从那里再次扫描。",
+      "hash": "g3fyj5",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.doneTitle": {
+      "translation": "设备已批准！",
+      "hash": "a4gxq7",
+      "lastUpdated": "2026-09-18"
+    },
+    "deviceApproval.doneBody": {
+      "translation": "另一台设备现在应该正在登录。",
+      "hash": "b5x0zh",
+      "lastUpdated": "2026-09-18"
+    },
+    "coldEntry.or": {
+      "translation": "或者",
+      "hash": "2qr",
+      "lastUpdated": "2026-09-18"
+    },
+    "coldEntry.scanTitle": {
+      "translation": "使用您登录的设备",
+      "hash": "97izgp",
+      "lastUpdated": "2026-09-18"
+    },
+    "coldEntry.scanLead": {
+      "translation": "使用已登录的设备扫描此内容。",
+      "hash": "bwmias",
+      "lastUpdated": "2026-09-18"
+    },
+    "recovery.beforeYouGo": {
+      "translation": "取消之前",
+      "hash": "v4tbe",
+      "lastUpdated": "2026-09-18"
+    },
+    "recovery.kitAcknowledge": {
+      "translation": "我已经把我的恢复工具包保存在安全的地方。",
+      "hash": "89yjyx",
+      "lastUpdated": "2026-09-18"
+    },
+    "recovery.kitGateHint": {
+      "translation": "保存、打印或勾选方框以继续。",
+      "hash": "p9q50f",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.menuItem": {
+      "translation": "登录其他设备",
+      "hash": "e3rks5",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.title": {
+      "translation": "登录其他设备",
+      "hash": "e3rks5",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.lead": {
+      "translation": "显示您的其他设备可以扫描以登录的代码。",
+      "hash": "eujaga",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.minting": {
+      "translation": "数着豆子……",
+      "hash": "wg3bo8",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.mint": {
+      "translation": "显示代码",
+      "hash": "oi23un",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.pinReason": {
+      "translation": "此代码可打开您全家的beanpod ，因此值得快速检查一下是否是您本人。",
+      "hash": "gr6h5l",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.notProved": {
+      "translation": "未创建任何代码。您可以随时重试。",
+      "hash": "3lhwvv",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.scanLead": {
+      "translation": "将另一台设备的摄像头指向此代码。",
+      "hash": "clkvma",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.qrAlt": {
+      "translation": "要在其他设备上扫描的代码",
+      "hash": "xao8t",
+      "lastUpdated": "2026-09-18"
+    },
+    "signInCode.expiryNote": {
+      "translation": "可在接下来的15分钟内使用。",
+      "hash": "xvbs1u",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.title": {
+      "translation": "您的豆豆魔术链接",
+      "hash": "3mqscz",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.creationLead": {
+      "translation": "使用以下链接在新设备上登录。有效期为7天。随时在“设置”中创建新链接。",
+      "hash": "ego0hq",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.saveAndUse": {
+      "translation": "保存并使用此链接在任何设备上登录。它将自动解锁您的家庭数据文件。",
+      "hash": "9k8kco",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.cancelsPrevious": {
+      "translation": "创建新链接将取消此链接。",
+      "hash": "3k1tod",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.needNewOne": {
+      "translation": "随时在“设置”中创建新的BEANS魔术链接。如果您丢失了链接或忘记了PIN码，则需要恢复工具包才能登录。",
+      "hash": "qfnpg",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.savedConfirm": {
+      "translation": "我已保存链接",
+      "hash": "lw6xeq",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.settingsDesc": {
+      "translation": "用于解锁家庭文件的链接，以便您可以使用PIN码登录新设备。持续7天。",
+      "hash": "yvfny4",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.statusNone": {
+      "translation": "无活动链接。",
+      "hash": "8abjjt",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.statusActive": {
+      "translation": "一个链接已激活，有效期至{date}。",
+      "hash": "vazqbc",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.statusExpired": {
+      "translation": "您的上一个链接已于{date}过期。",
+      "hash": "396uza",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.create": {
+      "translation": "创建魔术链接",
+      "hash": "cj6q0g",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.createWarning": {
+      "translation": "创建新链接将取消当前链接。",
+      "hash": "x64tat",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.onlyTimeShown": {
+      "translation": "这是唯一一次显示。",
+      "hash": "hl41b5",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.mintFailed": {
+      "translation": "您的链接未保存。请检查您的连接并重试，或稍后在“设置”中创建一个连接。",
+      "hash": "31piey",
+      "lastUpdated": "2026-09-18"
+    },
+    "setup.saveBothTitle": {
+      "translation": "保存这两项内容",
+      "hash": "296ikn",
+      "lastUpdated": "2026-09-18"
+    },
+    "setup.saveBothConfirm": {
+      "translation": "我两者都保存了",
+      "hash": "2mc0qb",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.qrUnavailable": {
+      "translation": "无法绘制二维码，请改用链接。",
+      "hash": "b4vig5",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.memberMissing": {
+      "translation": "该链接适用于不再在这个家庭中的人。请在下方选择您是谁。",
+      "hash": "prjk4w",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.pastePrompt": {
+      "translation": "有魔术链接吗？粘贴到这里",
+      "hash": "cb8wtv",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.pasteLabel": {
+      "translation": "在此处粘贴您的帽子魔术链接",
+      "hash": "vht7sm",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.pastePlaceholder": {
+      "translation": "https://app.beanies.family/join?...",
+      "hash": "f225q7",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.pasteAction": {
+      "translation": "打开链接",
+      "hash": "da4snk",
+      "lastUpdated": "2026-09-18"
+    },
+    "magicLink.pasteUnparseable": {
+      "translation": "这看起来不像是一个完整的beanies链接—请检查它是否已完全复制。",
+      "hash": "y71tv1",
+      "lastUpdated": "2026-09-18"
     }
   }
 }
