@@ -9,7 +9,7 @@
  * behavior for free, no per-box focus juggling. Emits `complete` once six digits are in;
  * the parent clears via v-model.
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { PIN_LENGTH } from '@/services/auth/deviceUnlock';
 
 const props = defineProps<{
@@ -22,10 +22,22 @@ const props = defineProps<{
   /** Accessible label for the hidden input (applied as aria-label). */
   label: string;
   /**
-   * Render the boxes WITHOUT the hidden input, for surfaces that supply their
-   * own on-screen keypad (the beanie wall). A wall-mounted tablet has no
-   * keyboard to raise, and raising the OS one covers half the screen — so the
-   * caller drives `modelValue` and this stays a pure display.
+   * An on-screen keypad is supplying the digits, so do not raise the OS keyboard.
+   *
+   * ⚠️ THIS USED TO REMOVE THE HIDDEN INPUT ENTIRELY, and that cost more than it bought.
+   * With no focusable element there was no accessible name (hence a bolted-on sr-only live
+   * region), no blur (hence a permanently-on caret), and no way to focus (hence an early
+   * return in `focusInput`). It also stranded anyone on a touch device with a hardware
+   * keyboard attached — an iPad in a case reports `pointer: coarse`.
+   *
+   * The input now always exists and this switches `inputmode` to `none`, which is what
+   * actually keeps the OS keyboard down. Physical keyboards, paste and focus all keep
+   * working, and three special cases went away.
+   *
+   * ⚠️ NOT derived from `useIsTouchPrimary()` inside this component. There are sixteen
+   * `<PinInput>` instances across eight files, and deciding here would put a keypad in the
+   * Settings PIN form and the Reset-member-PIN modal, which nobody asked for. The three
+   * surfaces that want one pass it.
    */
   keypad?: boolean;
 }>();
@@ -65,37 +77,53 @@ watch(
 );
 
 function focusInput() {
-  if (props.keypad) return;
   inputEl.value?.focus();
 }
 
-/** With no hidden input there is no blur, so the caret is always live. */
+/**
+ * ⚠️ IMPERATIVE, BECAUSE THE NATIVE ATTRIBUTE DOES NOTHING HERE. `autofocus` only fires for
+ * elements present when the document is parsed; an element inserted into an already-loaded
+ * page — which is every modal in this app — is ignored by every browser. Nine call sites
+ * passed `autofocus` and not one of them focused anything, which is why "confirm your PIN"
+ * always needed a tap before you could type. `BaseModal` has no focus management, so
+ * nothing was stealing it; it was simply never being set.
+ */
+onMounted(async () => {
+  // ⚠️ NEVER ON A KEYPAD SURFACE. The wall exists because there is no keyboard and raising
+  // the OS one covers the digits; focusing a real input there is the thing `keypad` was
+  // invented to avoid, and `inputmode="none"` is only advisory.
+  if (!props.autofocus || props.disabled || props.keypad) return;
+  await nextTick();
+  focusInput();
+});
+
+/**
+ * ⚠️ `keypad ||` IS LOAD-BEARING. On a keypad surface the taps land on `PinKeypad`'s
+ * buttons, which BLURS the hidden input — so keying the caret on `focused` alone removed
+ * the next-box ring entirely on the beanie wall and made it vanish on the first press
+ * everywhere else. The pad is the input there; the caret should follow the value, not the
+ * focus.
+ */
 const caretActive = computed(() => props.keypad || focused.value);
 
 defineExpose({ focus: focusInput });
 </script>
 
 <template>
-  <div
-    class="relative"
-    :class="{ 'pin-shake': hasError }"
-    :role="keypad ? 'group' : undefined"
-    :aria-label="keypad ? label : undefined"
-    @click="focusInput"
-  >
-    <!--
-      With no hidden input there is no focusable element and no accessible name,
-      and the boxes are aria-hidden — a screen-reader user would get silence
-      while typing on the on-screen keypad. This announces progress instead.
-    -->
+  <!-- No wrapper `role="group"`/`aria-label` any more: the hidden input is unconditional
+       and carries its own `aria-label`, so a group with the same name announced it twice. -->
+  <div class="relative" :class="{ 'pin-shake': hasError }" @click="focusInput">
+    <!-- ⚠️ KEEP THIS. On a keypad surface focus sits on a `PinKeypad` button, not the hidden
+         input, and the digit boxes are `aria-hidden` — so without this a screen-reader user
+         on the wall or the phone reauth gate hears nothing at all as digits go in. It is
+         independent of the wrapper's removed `role="group"`, which was a duplicated NAME. -->
     <p v-if="keypad" class="sr-only" role="status" aria-live="polite">
       {{ modelValue.length }}/{{ PIN_LENGTH }}
     </p>
     <input
-      v-if="!keypad"
       ref="inputEl"
       type="password"
-      inputmode="numeric"
+      :inputmode="keypad ? 'none' : 'numeric'"
       autocomplete="one-time-code"
       :value="modelValue"
       :disabled="disabled"

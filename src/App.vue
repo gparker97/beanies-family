@@ -28,6 +28,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import ReauthGateModal from '@/components/auth/ReauthGateModal.vue';
 import DeviceApprovalSheet from '@/components/auth/DeviceApprovalSheet.vue';
 import { takeCapturedMarker, APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
+import { emitApprovalKeyDropped, emitMarkerConsumed } from '@/services/telemetry/deepLinkEvents';
 import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import { useShareTargets } from '@/composables/useShareTargets';
@@ -88,6 +89,7 @@ import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useDeviceApprovalDelivery } from '@/composables/useDeviceApprovalDelivery';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
@@ -175,15 +177,6 @@ const { isMobile, isDesktop } = useBreakpoint();
 useEnsurePhotosPublic();
 
 const isInitializing = ref(true);
-/**
- * A scanned device-approval code, if this load came from one.
- *
- * Consumed at the App level rather than on the login page because the person scanning is
- * SIGNED IN — they never pass through the login surfaces at all. `consumeHashMarker` reads
- * it and strips the fragment in the same call, so a family-wide request never lingers in
- * the address bar or in `history`.
- */
-const deviceApprovalKey = ref<string | null>(null);
 
 // Set true (in onMounted) when this load is the result of an applied PWA
 // update; the watcher below fires the confirmation toast once the init loader
@@ -227,6 +220,67 @@ const fatalErrorStore = useFatalErrorStore();
  * one action that destroys the local copy.
  */
 const initErrorClearHelps = ref(true);
+
+/**
+ * ─── Device-approval delivery ───────────────────────────────────────────────────────
+ *
+ * The buffering, TTL, session-reset and telemetry all live in `useDeviceApprovalDelivery`,
+ * which takes a single "can this key be acted on right now?" boolean and hands back a key.
+ * Two earlier versions of this lived inline here and were both wrong; the reasoning is in
+ * that composable's docblock and should be read before changing this.
+ *
+ * `isSurfaceUsable` means SETTLED AND HEALTHY, deliberately — not "can approve".
+ *
+ * ⚠️ IT MUST NOT MIRROR THE SHEET'S `canApprove`. A draft did, and that made the sheet's
+ * signed-out panel unreachable: `open` implied `canApprove`, so `v-else-if="!canApprove"`
+ * could never render. The case it exists for is real and documented on the sheet — an
+ * iPhone with the PWA installed, where the CAMERA APP opens the link in Safari, a separate
+ * storage partition. Those people would have waited out a 3-minute TTL staring at a blank
+ * welcome gate, never told to open the app on their home screen. At HEAD they at least got
+ * the explanation. That is a regression the gate must not reintroduce.
+ *
+ * So there are three states, not two: still loading (hold), settled-with-a-pod (approve),
+ * settled-without-one (release anyway, and let the sheet explain). `isLoadingData` is what
+ * separates the first two — `isInitializing` alone goes false BEFORE `loadFamilyData()`,
+ * which is the original bug this gate was written for.
+ *
+ * The fatal mirror below writes `fatalErrorStore.message` into `initError` on a DEFAULT
+ * flush while the delivery watch is `sync`, so the gate can observe a fatal a tick before
+ * `initError` catches up — hence both, not just one.
+ */
+const isSurfaceUsable = computed(
+  () =>
+    !isInitializing.value && !isLoadingData.value && !initError.value && !fatalErrorStore.message
+);
+
+/**
+ * Two transports deliver a key, and they are genuinely different rather than one pretending
+ * to be the other:
+ *   - WEB: `main.ts` captures it at module scope (only on `/welcome`) before the router can
+ *     eat the fragment, and the one-shot read below takes it once on mount.
+ *   - NATIVE: `installInboundLinkListener` calls `deliver` directly. No capture map is
+ *     involved, because the callback is bound before the launch URL is even read.
+ */
+const approvalDelivery = useDeviceApprovalDelivery({
+  isSurfaceUsable,
+  /**
+   * ⚠️ FAMILY **AND** MEMBER. `activeFamilyId` alone is not a session: nothing in sign-out or
+   * switch-person clears it (`clearSession` touches auth state only), so a key held on one
+   * person's screen survived Switch Person and landed the NEXT person straight on a live
+   * fingerprint panel for something they never scanned — and because neither `open` nor
+   * `publicKey` changed across that boundary, the sheet did not even re-arm its interstitial.
+   */
+  sessionKey: computed(
+    () =>
+      `${familyContextStore.activeFamilyId ?? 'none'}:${familyStore.currentMember?.id ?? 'none'}`
+  ),
+  // The sheet disappearing on its own is not self-explanatory, and the other device has
+  // stopped waiting by now — say so rather than leaving a hole where the panel was.
+  onShownExpired: () =>
+    showToast('info', t('deviceApproval.expiredToast'), undefined, { silent: true }),
+});
+const deviceApprovalKey = approvalDelivery.approvalKey;
+const deviceApprovalDeliveryKind = approvalDelivery.delivery;
 /**
  * The fatal's optional way out, read straight off the store.
  *
@@ -1028,17 +1082,29 @@ onMounted(async () => {
   // previously-hashed chunk) wedged the app on "counting beans..." with no overlay and no
   // telemetry. `deepLinks` has no dependencies of its own, so there is no bundle saving to
   // defend the round trip.
-  deviceApprovalKey.value = takeCapturedMarker(APPROVAL_LINK_HASH);
-  // A WARM open (the app already running, a scan handled by `inboundLinkBridge`) re-runs no
-  // lifecycle at all, so the cold-start read above would never fire for it. The bridge
-  // captures, the route change is the notification, and this picks it up.
-  watch(
-    () => route.fullPath,
-    () => {
-      const pending = takeCapturedMarker(APPROVAL_LINK_HASH);
-      if (pending) deviceApprovalKey.value = pending;
-    }
-  );
+  //
+  // WEB ONLY. On native this returns null — `window.location` is the bundled webview URL,
+  // never the deep link — and native delivery comes through `approvalDelivery.deliver`.
+  //
+  // ⚠️ THERE USED TO BE A `watch(() => route.fullPath, ...)` HERE as the warm-open path,
+  // and it was the whole 0.21.3 device-approval defect. The scanner is signed in, so
+  // `router.beforeEach` redirects `/welcome` to the Nook BY NAME; a phone already sitting
+  // on `/nook` saw the identical path on both sides, the watcher never fired, and the key
+  // was orphaned. Delivery is not something to infer from routing. Do not reintroduce it.
+  const capturedApprovalKey = takeCapturedMarker(APPROVAL_LINK_HASH);
+  if (capturedApprovalKey === '') {
+    // Marker present, value empty (a truncated link). Distinguished from "no marker" so it
+    // does not read as "nobody scanned anything".
+    emitApprovalKeyDropped({ delivery: 'web-load', errorCode: 'empty-key' });
+  }
+  if (capturedApprovalKey) {
+    approvalDelivery.deliver(capturedApprovalKey, 'web-load');
+    emitMarkerConsumed({
+      // `pathname`, NEVER `fullPath` — that is path + query + hash, and here the hash IS
+      // the key. `route_path` is an allowlisted telemetry field and must stay PII-free.
+      routePath: window.location.pathname,
+    });
+  }
 
   // Watchdog: if init never settles (a downstream await hangs before the
   // data-load timeout can fire), flip out of "counting beans" into the EXISTING
@@ -1752,9 +1818,14 @@ installNativeAuthListener((returnPath) => {
 // Shared links (invite + magic) tapped from WhatsApp/SMS. Installed AFTER the OAuth
 // listener and re-checks the OAuth shape itself, so the two cannot double-handle one
 // event. Without this the Universal Link / App Link opens the app and nothing happens.
-installInboundLinkListener((path) => {
-  void router.replace(isSameOriginReturnPath(path) ? path : '/');
-});
+installInboundLinkListener(
+  (path) => {
+    void router.replace(isSameOriginReturnPath(path) ? path : '/');
+  },
+  // Native device-approval delivery. Injected rather than inferred from a route change —
+  // see the warning on `installInboundLinkListener` and on the removed watcher above.
+  (key, delivery) => approvalDelivery.deliver(key, delivery)
+);
 
 // On-device reminders for today's briefing (native only). Schedules a local
 // notification for each timed pickup/dropoff/activity/due-to-do at its time —
@@ -2020,7 +2091,8 @@ watch(
     <DeviceApprovalSheet
       :open="deviceApprovalKey !== null"
       :public-key="deviceApprovalKey ?? ''"
-      @close="deviceApprovalKey = null"
+      :delivery="deviceApprovalDeliveryKind"
+      @close="approvalDelivery.dismiss()"
     />
     <DocumentExtractConsentModal />
     <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly
@@ -2316,7 +2388,10 @@ watch(
              they stack predictably rather than overlapping. -->
         <ReviewDemoBanner />
 
-        <AppHeader v-if="!headerReclaimed" />
+        <AppHeader
+          v-if="!headerReclaimed"
+          @approval-scanned="(key) => approvalDelivery.deliver(key, 'in-app-scan')"
+        />
 
         <main
           class="flex-1 overflow-auto overscroll-y-contain"

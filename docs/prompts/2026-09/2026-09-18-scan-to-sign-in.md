@@ -111,3 +111,56 @@ and waited forever. It now lives only on the decrypt surface, where a pod is in 
 A `/code-review max` pass returned 15 findings, of which the most serious was that the
 feature **could not work at all**: `loadFromFile()` only refreshes `syncStore.envelope`
 inside its `if (liveKey)` branch, and a cold device has no family key by definition.
+
+---
+
+## Session 2 — 2026-09-18 evening: the approval deep link was broken in 0.21.3
+
+**Category:** bug
+**Plan:** `docs/plans/2026-09-18-device-approval-deeplink-notification.md`
+
+### greg, on testing the shipped feature
+
+> regarding this method - i've just updated the app on my android and iphone to 0.21.3
+> (latest) and tried scanning a QR code on my chrome browser with the camera app on both
+> phoens. in both cases, the beanies app opens and nothing happens. i don't get any prompt
+> to "approve this login" or anything to that effect. It appears there may be a bug here -
+> can you check?
+
+Clarified: Chrome was **signed out, showing its own code** (the pull direction), phones
+signed in.
+
+### greg, on sequencing
+
+> let's investigate these bugs and questions before we start implementation
+
+### greg, on process
+
+> go, and fold 3 into 2 if that is your recommendation. should we implement directly, or go
+> through beanies-plan and beanies-build-auto? ... though either way, we should run it
+> through beanies-build-auto, ensure the impelemtnation is reviewed, and the proper tests
+> and created to pin the functionality that was broken
+
+### greg, on verification
+
+> for run A please go ahead to test yourself if possible using a link you build - given this
+> bug was cross device, as long as it works in a local browser we can take this as
+> validation for now
+
+Answered with a correction: the web path was never broken (`main.ts` captures at module
+scope before the router can eat the fragment), so a hand-built link in a desktop browser
+passes against the UNFIXED code and validates nothing. The local repro drives the native
+path with a stubbed Capacitor instead; final proof is on-device.
+
+### Outcome
+
+Root cause: delivery was inferred from a route change that cannot happen. The bridge
+captured the key and navigated to `/welcome`, but a signed-in scanner is redirected to the
+Nook by name, and a phone already on `/nook` sees an identical path on both sides, so the
+`route.fullPath` watcher never fired. Cold launch failed separately, because `getLaunchUrl`
+resolves after the one-shot read.
+
+Fixed by giving `installInboundLinkListener` a second injected callback that delivers the
+key directly, which removes the cold-launch race rather than repairing it. `/code-review
+max` then found that the first version of the init gate fixed only half the hazard, and
+that an approval marker was being honoured on `/join`; both are addressed.

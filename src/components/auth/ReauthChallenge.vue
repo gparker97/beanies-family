@@ -24,6 +24,8 @@ import {
   MEMBER_MISMATCH,
 } from '@/services/auth/passkeyService';
 import PinInput from '@/components/ui/PinInput.vue';
+import PinKeypad from '@/components/ui/PinKeypad.vue';
+import { usePinPad } from '@/composables/usePinPad';
 import { isNative } from '@/services/sync/capabilities';
 import { verifyPassword } from '@/services/auth/passwordService';
 import { usePinAttemptLimit, PIN_COOLDOWN_MS } from '@/composables/usePinAttemptLimit';
@@ -49,6 +51,15 @@ const props = defineProps<{
    */
   descriptionKey?: UIStringKey;
   noCredentialKey?: UIStringKey;
+  /**
+   * Draw an on-screen keypad instead of relying on the OS keyboard.
+   *
+   * ⚠️ A PROP, NOT `useIsTouchPrimary()` COMPUTED HERE. This component has three hosts and
+   * one of them is the beanie wall (`WallLockMenu`), where a docked tablet can report a
+   * fine pointer — exactly the case the pointer query gets wrong. The host knows; this
+   * component does not.
+   */
+  keypad?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -79,6 +90,9 @@ const hasPassword = computed(() => !!props.member.passwordHash && !props.member.
 // PIN step-up state
 const pinValue = ref('');
 const pinError = ref<string | null>(null);
+
+/** On-screen keypad wiring, shared with the wall and the login PIN entry. */
+const pad = usePinPad(pinValue, { onClearError: () => (pinError.value = null) });
 /**
  * Whether the PIN pad is on screen rather than behind the "Sign in with PIN" button.
  *
@@ -369,9 +383,16 @@ function cancel() {
           v-model="pinValue"
           :has-error="!!pinError"
           :disabled="isVerifying || pinLimit.inCooldown.value"
+          :keypad="keypad"
           autofocus
           :label="t('pin.enterPin')"
           @complete="handlePinComplete"
+        />
+        <PinKeypad
+          v-if="keypad"
+          :disabled="isVerifying || pinLimit.inCooldown.value"
+          @digit="pad.press"
+          @backspace="pad.backspace"
         />
         <p
           v-if="pinError"

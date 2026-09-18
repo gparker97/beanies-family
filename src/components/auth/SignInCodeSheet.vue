@@ -25,6 +25,7 @@
  */
 import { watch } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMintedLink } from '@/composables/useMintedLink';
@@ -71,8 +72,12 @@ watch(
       `AppHeader.openSignInCodeSheet`), and the explanatory sentence rides on the gate
       itself — so the only thing left to do here is show the code.
     -->
+    <!-- ⚠️ `BeanieSpinner label`, not a bare <p>. Minting takes several seconds (a key wrap
+         plus a Drive write), and the old text-only state gave no sign anything was
+         happening — it read as a frozen sheet. `label` also brings `role="status"`, which
+         the plain paragraph never had, so the wait is announced rather than silent. -->
     <div v-if="isMinting" class="py-8 text-center">
-      <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('signInCode.minting') }}</p>
+      <BeanieSpinner size="md" label />
     </div>
 
     <div v-else-if="link" class="space-y-3">

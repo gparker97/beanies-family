@@ -19,11 +19,16 @@ import { onScopeDispose, readonly, ref, type Ref } from 'vue';
  * "does this screen have room" wants `true` (assume capable, correct on the first
  * real measurement), "is this portrait" wants `false`.
  *
- * ⚠️ Deliberately NOT adopted by `usePWA`, `useReducedMotion`, `useIsTouchPrimary`
- * or `useBreakpoint`. Each of those is a module-scoped singleton whose listener is
- * meant to live for the life of the app; moving them onto a scope-disposing helper
- * would silently unregister them when whichever component happened to instantiate
- * them first went away. That is a separate, riskier change.
+ * ⚠️ Deliberately NOT adopted by `usePWA`, `useReducedMotion` or `useBreakpoint`. Each of
+ * those is a module-scoped singleton whose listener is meant to live for the life of the
+ * app; moving them onto a scope-disposing helper would silently unregister them when
+ * whichever component happened to instantiate them first went away. That is a separate,
+ * riskier change.
+ *
+ * `useIsTouchPrimary` WAS on that list and should not have been — it always created a fresh
+ * ref per call and used component lifecycle hooks, so it was never a singleton. It now uses
+ * this helper, which is what gives it a synchronous first read (the cold sign-in surface
+ * inverts its layout on that value, so a lagging read was a visible flash).
  */
 export function useMediaQuery(query: string, initial = false): Readonly<Ref<boolean>> {
   const list = typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query) : null;

@@ -23,7 +23,20 @@ bootstrapDocClient();
 // and the person scanning it is signed in — so `router.beforeEach` redirects them to the
 // Nook by name, which drops the fragment. This is the only point guaranteed to be ahead of
 // that. Synchronous and dependency-free, so it cannot wedge startup.
-captureHashMarkers([APPROVAL_LINK_HASH]);
+//
+// ⚠️⚠️ THE PATH CHECK IS A SECURITY BOUNDARY, NOT TIDINESS. Without it this captured an
+// approval marker from ANY url — `/nook#beanies-approve=<attacker key>` included. The
+// sheet then opened behind the opaque init overlay, and because `canApprove` is a computed
+// that re-evaluates when the family key lands, it silently became a LIVE
+// fingerprint-compare panel the moment the pod opened. That shipped in 0.21.3.
+//
+// Exact match, mirroring `inboundLinkBridge`'s allowlist. `/welcome` is the only path an
+// approval link is ever built for (`DeviceApprovalRequest`), so anything else is either a
+// mistake or an attack, and both should be dropped on the floor.
+const approvalPath = window.location.pathname.replace(/\/$/, '') || '/';
+if (approvalPath === '/welcome') {
+  captureHashMarkers([APPROVAL_LINK_HASH]);
+}
 
 const app = createApp(App);
 
