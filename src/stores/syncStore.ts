@@ -5665,6 +5665,26 @@ export const useSyncStore = defineStore('sync', () => {
     // Restoring a backup deliberately is a different flow with a different
     // question: Settings → Family Data Options → Load another family data
     // file, which confirms "this will replace all local data" first.
+    // ⚠️ AN UNKNOWN NAME IS A REFUSAL, NOT A PASS. `isSafetyCopyName('')` is false, so an empty
+    // name walks straight through the guard below and the ADR-033 fork it exists to prevent is
+    // reachable again. That is not hypothetical: the system-browser Picker returns file IDS ONLY
+    // (Google's `picked_file_ids`), so every pick on that path arrives here with `''` unless the
+    // caller resolved the real name first.
+    //
+    // FAIL CLOSED, IN THE OWNING LAYER. The guard is name-based; if the name is unknown the guard
+    // cannot be evaluated, so the only safe answer is no. Putting it here rather than at the
+    // picker call site means every present and future caller is covered, including one written
+    // years from now by someone who has never read ADR-033.
+    if (!fileName_param.trim()) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-access',
+        message: 'refused to rebind with no file name — the safety-copy guard cannot be evaluated',
+        context: { action: 'rebind-refused-no-name', file_id_tail: tail(fileId) },
+      });
+      return { ok: false, code: 'FILE_NOT_FOUND' };
+    }
+
     if (isSafetyCopyName(fileName_param)) {
       logEvent({
         level: 'warn',

@@ -177,6 +177,7 @@ const ALL_ERROR_CODES: JoinErrorCode[] = [
   'OAUTH_POPUP_BLOCKED',
   'PICKER_SCRIPT_LOAD_FAILED',
   'PICKER_FAILED',
+  'PICKER_IFRAME_BLOCKED',
   'PICKER_TIMEOUT',
   'PICKER_UNAVAILABLE',
   'PICKER_AUTH_FAILED',
@@ -677,14 +678,132 @@ describe('useJoinFlow', () => {
       expect(flow.currentError.value?.code).toBe('OAUTH_POPUP_BLOCKED');
     });
 
-    it("'iframe' reason → PICKER_FAILED", async () => {
+    /**
+     * ⚠️ SPLIT FROM `open` ON PURPOSE (2026-09-18, #98), AND THIS TEST IS WHAT KEEPS THEM SPLIT.
+     * `open` is a throw out of build()/setVisible: a genuine fault, still 'critical'. `iframe` is
+     * the frame never calling back, which on the installed iOS app happens BY CONSTRUCTION
+     * (the `capacitor://` document origin is not a validatable JavaScript origin). Since the
+     * bootstrap probe now detects that at 8s instead of 30s, strictly MORE of them reach the
+     * alert channel, so re-merging these two would page a developer for a platform condition on
+     * every failed join.
+     */
+    it("'iframe' reason → PICKER_IFRAME_BLOCKED, at 'warning' (not PICKER_FAILED)", async () => {
       const flow = await setupAndTap({ kind: 'failed', reason: 'iframe' });
+      expect(flow.currentError.value?.code).toBe('PICKER_IFRAME_BLOCKED');
+      const { JOIN_ERRORS } = await import('../useJoinFlow');
+      expect(JOIN_ERRORS.PICKER_IFRAME_BLOCKED.severity).toBe('warning');
+      // The genuine-fault sibling must stay critical.
+      expect(JOIN_ERRORS.PICKER_FAILED.severity).toBe('critical');
+    });
+
+    it("'open' reason still → PICKER_FAILED", async () => {
+      const flow = await setupAndTap({ kind: 'failed', reason: 'open' });
       expect(flow.currentError.value?.code).toBe('PICKER_FAILED');
     });
 
     it("'timeout' reason → PICKER_TIMEOUT", async () => {
       const flow = await setupAndTap({ kind: 'failed', reason: 'timeout' });
       expect(flow.currentError.value?.code).toBe('PICKER_TIMEOUT');
+    });
+
+    /**
+     * ⚠️ THE GAP THIS SUITE HAD. Every case above asserts `currentError.code` and none of them
+     * asserted `currentStep`, so nothing caught that a FAILED pick left the step at
+     * 'authenticating' forever. In `JoinPodView` the spinner renders on
+     * `isBusy && !currentErrorView` (false once an error exists) and the CTA renders only on
+     * 'awaiting-auth' (also false), so NEITHER rendered: the joiner lost the "Choose your data
+     * file" button at precisely the moment they needed it, and the only way on was a recovery
+     * button in the error banner.
+     *
+     * The reason must be 'failed', NOT 'cancelled': `AwaitingReason` drives user-facing copy, and
+     * telling someone who hit an error that they cancelled is simply untrue.
+     */
+    it.each<PickFailureReason>(['iframe', 'timeout', 'open', 'load', 'auth', 'config'])(
+      'a failed pick (%s) returns the step to awaiting-auth so the CTA survives',
+      async (reason) => {
+        const flow = await setupAndTap({ kind: 'failed', reason });
+        expect(flow.currentStep.value).toBe('awaiting-auth');
+        expect(flow.awaitingReason.value).toBe('failed');
+        // The banner is still there too: the step move must not clear the error.
+        expect(flow.currentError.value).not.toBeNull();
+      }
+    );
+  });
+
+  /**
+   * The redundant-read memo. The ordinary init-then-tap sequence used to issue up to THREE
+   * IDENTICAL Drive reads for the same file with the same token: `init()` → `runCloudFlow(false)`,
+   * the tap's `runCloudFlow(true)`, and `resolveWithoutPicker` inside `doPickAndLoad`. The second
+   * and third are deliberate (the pre-auth read runs before a token exists), so only a read that
+   * would REPLAY a known answer with the SAME token is skipped.
+   */
+  describe('tryAutoLoadByFileId — the redundant-read memo', () => {
+    async function setup404Join() {
+      const { buildInviteLink } = await import('@/services/crypto/inviteService');
+      setUrl(
+        buildInviteLink({
+          familyId: 'fam',
+          provider: 'google_drive',
+          fileId: 'drive-1',
+        }).replace('http://localhost:3000', '')
+      );
+      mockGoogleAuth.silent = vi.fn(async () => 'silent-token');
+      mockSyncStore.loadFromGoogleDrive = vi.fn(async () => ({ success: false, status: 404 }));
+      mockSyncStore.error = 'File not found: drive-1';
+    }
+
+    it('does not replay an identical read for the same (fileId, token)', async () => {
+      await setup404Join();
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      const afterInit = mockSyncStore.loadFromGoogleDrive.mock.calls.length;
+      await flow.handleAuthTap();
+
+      // The pre-auth read happened once; the tap's two further reads carry the SAME token and the
+      // same fileId, so they replay the remembered verdict instead of hitting Drive again.
+      expect(afterInit).toBe(1);
+      expect(mockSyncStore.loadFromGoogleDrive.mock.calls.length).toBe(1);
+      // And the verdict is preserved: it still routes to the Picker.
+      expect(mockPick).toHaveBeenCalled();
+    });
+
+    it('DOES read again when the token changed (a genuine account-switch recovery)', async () => {
+      await setup404Join();
+      mockPick.mockResolvedValueOnce({ kind: 'cancelled' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      // `usePickBeanpodFile` runs `tryReconnectSilently` before `tryGetSilentToken`, which can
+      // mint a token for a DIFFERENT account. That retry is a real recovery and must not be
+      // suppressed by a coarser "it already said needs-pick" rule.
+      mockGoogleAuth.silent = vi.fn(async () => 'a-different-account-token');
+      await flow.handleAuthTap();
+
+      expect(mockSyncStore.loadFromGoogleDrive.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    /**
+     * ⚠️ THE MODULE-SCOPE REGRESSION. `tryAutoLoadByFileId` takes no arguments and reads
+     * `targetFileId` from closure, so the memo MUST live inside `useJoinFlow()`. At module scope
+     * it would leak across join attempts and across tests, which is the failure mode this kind of
+     * optimisation usually ships with.
+     */
+    it('two useJoinFlow instances do not share a memo', async () => {
+      await setup404Join();
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const first = useJoinFlow();
+      await first.init();
+      expect(mockSyncStore.loadFromGoogleDrive.mock.calls.length).toBe(1);
+
+      const second = useJoinFlow();
+      await second.init();
+      // A fresh flow has no memory of the first one's verdict, so it reads for itself.
+      expect(mockSyncStore.loadFromGoogleDrive.mock.calls.length).toBe(2);
     });
   });
 
@@ -726,6 +845,36 @@ describe('useJoinFlow', () => {
       // forwards that severity so the join-fatal codes page under the gate.
       expect(call.severity).toBe('critical');
       expect(call.context).toMatchObject({ error_code: 'PICKER_FAILED' });
+    });
+
+    /**
+     * REQUIREMENT 1 OF THE PLAN, and the edit that satisfies it lives HERE rather than in
+     * `drivePicker.ts` (which emits no events from `pickBeanpodFile` at all). Without these two
+     * keys a `PICKER_TIMEOUT` in CloudWatch cannot be attributed to a platform: the UA that
+     * `enrichAndRedact` already stamps as `browser` cannot separate the native WKWebView from
+     * Mobile Safari, because Capacitor sets no `appendUserAgent` and the WKWebView UA IS a Safari
+     * UA. That distinction is the entire (a)-versus-(b) question this work exists to answer.
+     *
+     * Asserted on EVERY join error, not just the picker ones, because the spread is in
+     * `recordError` and that is deliberate: one edit, every code.
+     */
+    it('attaches the platform pair to every join error report', async () => {
+      await setupBasicGoogleDriveJoin();
+      mockPick.mockResolvedValueOnce({ kind: 'failed', reason: 'timeout', message: 'no callback' });
+
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      await flow.init();
+      await flow.handleAuthTap();
+
+      expect(flow.currentError.value?.code).toBe('PICKER_TIMEOUT');
+      const call = mockReportError.mock.calls[0]?.[0] as { context: Record<string, unknown> };
+      // Both keys are already on ALLOWED_CONTEXT_KEYS and already mirrored in the Lambda, so no
+      // allowlist edit and no store re-declaration was needed.
+      expect(call.context).toHaveProperty('os');
+      expect(call.context).toHaveProperty('detail');
+      expect(typeof call.context.os).toBe('string');
+      expect(typeof call.context.detail).toBe('string');
     });
 
     it('fires reportError on INVITE_TOKEN_INVALID (previously silent)', async () => {

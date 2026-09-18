@@ -15,6 +15,7 @@ import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import { generateInviteQR } from '@/utils/qrCode';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
+import { POD_FILE_ACCEPT } from '@/constants/beanpodFile';
 import { useClipboard } from '@/composables/useClipboard';
 import { isTemporaryEmail } from '@/utils/email';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -37,6 +38,11 @@ import type { AwaitingReason } from '@/composables/useJoinFlow';
 const AWAITING_COPY = {
   initial: 'join.pickerPrompt.description',
   'needs-pick': 'join.pickerPrompt.description',
+  // `failed` reuses the same sentence ON PURPOSE, and needs no string of its own: the error
+  // banner rendered directly above this card already says what went wrong and carries the
+  // recovery buttons, so a second message here would say it twice. What this state is for is
+  // getting the primary CTA back on screen after a failed pick, not explaining the failure.
+  failed: 'join.pickerPrompt.description',
   cancelled: 'join.awaiting.cancelled',
   redirecting: 'join.awaiting.redirecting',
 } as const satisfies Record<AwaitingReason, UIStringKey>;
@@ -242,7 +248,7 @@ function handleLocalLoadResult(result: {
 }
 
 const { isDragging, bindings: dropZoneBindings } = useFileDrop({
-  accept: ['.beanpod', '.json'],
+  accept: [...POD_FILE_ACCEPT],
   multiple: false,
   onReject: () => {
     localFormError.value = t('auth.fileLoadFailed');

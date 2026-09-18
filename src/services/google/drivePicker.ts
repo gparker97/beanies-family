@@ -8,6 +8,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fetchGoogleUserEmail, getEmailVerifiedForToken } from '@/services/google/googleAuth';
 import { withTimeout } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry';
+import { platformContext } from '@/utils/platformLabel';
 
 const PICKER_SCRIPT_URL = 'https://apis.google.com/js/api.js';
 
@@ -170,6 +171,44 @@ export type PickBeanpodFileResult =
 const PICKER_TIMEOUT_MS = 30_000;
 
 /**
+ * How long the Picker IFRAME gets to bootstrap before we call it dead.
+ *
+ * ⚠️ THE OLD 30s BUDGET WAS SPENT ON A FAILURE THAT IS KNOWN WITHIN SECONDS. The iframe either
+ * posts its `'loaded'` callback quickly or it never posts anything at all: on the installed iOS
+ * app the document origin is `capacitor://app.beanies.family`, which Google cannot validate as a
+ * JavaScript origin and which supplies no HTTP `Referer` for the developer-key check, so the frame
+ * never calls back. A joiner sat through half a minute of blank spinner to learn that.
+ *
+ * Accepted cost, stated rather than discovered: a genuinely slow connection can false-fail here.
+ * The user then sees the SAME copy they would have seen at 30s, 22 seconds earlier, and `settle`
+ * runs `disposePicker`, so there is no zombie iframe behind it. That trade is the point.
+ *
+ * This is NOT a second timer. The one handle is re-armed for the remainder once `'loaded'` has
+ * been seen, so `settle`'s single `clearTimeout` always holds the live handle.
+ */
+const PICKER_BOOTSTRAP_TIMEOUT_MS = 8_000;
+
+/**
+ * Is Google's chooser actually on screen?
+ *
+ * The second, INDEPENDENT bootstrap signal. Google's Picker renders a `.picker-dialog` wrapper
+ * containing an iframe pointed at `docs.google.com`; both are stable, observable facts about the
+ * page rather than an undocumented callback name. Used only to REFUSE a teardown, never to cause
+ * one, so a future markup change can at worst restore the previous (callback-only) behaviour
+ * rather than break a working picker.
+ *
+ * Never throws: a DOM query failing must not take down the flow it is trying to protect.
+ */
+function pickerFramePresent(): boolean {
+  try {
+    if (typeof document === 'undefined') return false;
+    return Boolean(document.querySelector('.picker-dialog, iframe[src*="docs.google.com/picker"]'));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Open the Google Picker to select a .beanpod file. Always resolves
  * (never throws) so callers can route to the structured registry of
  * join errors without wrapping in try/catch. See `PickBeanpodFileResult`.
@@ -204,7 +243,10 @@ const PICKER_TIMEOUT_MS = 30_000;
  *
  * Never throws: a userinfo blip must cost a joiner nothing worse than today's behaviour.
  */
-async function resolvePickerAccount(accessToken: string): Promise<string | null> {
+async function resolvePickerAccount(
+  accessToken: string,
+  platform: ReturnType<typeof platformContext>
+): Promise<string | null> {
   try {
     // ⚠️ TIMEBOXED, because this now sits in front of the Picker. `fetchGoogleUserEmail` is a
     // bare `fetch` with no `AbortSignal`, and this call happens BEFORE `new Promise` arms
@@ -235,7 +277,7 @@ async function resolvePickerAccount(accessToken: string): Promise<string | null>
         level: 'warn',
         surface: 'drive-picker',
         message: 'token account unverified; picker not pinned to an account',
-        context: { action: 'picker_authuser_unpinned' },
+        context: { ...platform, action: 'picker_authuser_unpinned' },
       });
     }
     return verified;
@@ -244,7 +286,7 @@ async function resolvePickerAccount(accessToken: string): Promise<string | null>
       level: 'warn',
       surface: 'drive-picker',
       message: 'resolving the token account failed; picker not pinned to an account',
-      context: { action: 'picker_authuser_unpinned' },
+      context: { ...platform, action: 'picker_authuser_unpinned' },
     });
     console.warn('[drivePicker] could not resolve the account to pin the Picker to', e);
     return null;
@@ -252,6 +294,9 @@ async function resolvePickerAccount(accessToken: string): Promise<string | null>
 }
 
 export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodFileResult> {
+  // Resolved ONCE per call and threaded down, never re-derived per event: three sites emit it and
+  // a fresh UA parse per site is how the three would drift apart.
+  const platform = platformContext();
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
   if (!apiKey) {
     console.error('[drivePicker] VITE_GOOGLE_API_KEY is not configured');
@@ -271,7 +316,7 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
     return { kind: 'failed', reason: 'load', message };
   }
 
-  const account = await resolvePickerAccount(accessToken);
+  const account = await resolvePickerAccount(accessToken, platform);
 
   return new Promise<PickBeanpodFileResult>((resolve) => {
     // Tracks whether the Picker iframe successfully bootstrapped. Used
@@ -283,6 +328,11 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
     /** Set once `build()` returns, so `settle` can always tear the UI down. */
     let built: BuiltPicker | null = null;
 
+    // `let`, not `const`: the bootstrap probe re-arms THIS handle rather than adding a second one,
+    // so `settle`'s single `clearTimeout` below always holds the live timer and there is nothing
+    // new to leak. Declared above `settle`, which closes over it.
+    let timeoutHandle: ReturnType<typeof setTimeout>;
+
     const settle = (result: PickBeanpodFileResult): void => {
       if (settled) return;
       settled = true;
@@ -292,14 +342,42 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
       resolve(result);
     };
 
-    const timeoutHandle = setTimeout(() => {
+    const onStall = (): void => {
       console.warn('[drivePicker] timed out waiting for Picker callback');
       settle({
         kind: 'failed',
         reason: 'timeout',
         message: `No Picker callback within ${PICKER_TIMEOUT_MS}ms`,
       });
-    }, PICKER_TIMEOUT_MS);
+    };
+
+    timeoutHandle = setTimeout(() => {
+      // ⚠️ TWO SIGNALS, NOT ONE, AND THE SECOND ONE IS WHY THIS IS SAFE. `hasLoaded` is set only
+      // by the `'loaded'` action, which is NOT in `@types/google.picker` and is compared as a raw
+      // string. Before the probe existed that was harmless: a missing `'loaded'` only mislabelled
+      // a CANCEL, and a PICK still resolved normally. Arming a teardown on it alone would promote
+      // an undocumented string into a single point of failure for the picker ITSELF, on every
+      // platform including the one where it demonstrably works today: if Google renamed or
+      // stopped emitting it, every user would lose the chooser 8 seconds after it appeared, and
+      // `PICKER_IFRAME_BLOCKED` is 'warning', so nothing would page.
+      //
+      // So we also ask the DOM whether Google's chooser is actually on screen. If the frame is
+      // there, it bootstrapped, whatever the callback did or did not say, and we re-arm instead.
+      if (!hasLoaded && !pickerFramePresent()) {
+        // Nothing called back AND nothing rendered: the frame never bootstrapped. Reuses the
+        // EXISTING `'iframe'` reason, which already has copy and an error code.
+        console.warn('[drivePicker] Picker iframe did not bootstrap');
+        settle({
+          kind: 'failed',
+          reason: 'iframe',
+          message: `Picker iframe did not bootstrap within ${PICKER_BOOTSTRAP_TIMEOUT_MS}ms`,
+        });
+        return;
+      }
+      // It loaded, or it is visibly on screen: the genuinely-stalled case. Re-arm the same handle
+      // for the remainder, preserving today's 30s total. Must happen before this callback returns.
+      timeoutHandle = setTimeout(onStall, PICKER_TIMEOUT_MS - PICKER_BOOTSTRAP_TIMEOUT_MS);
+    }, PICKER_BOOTSTRAP_TIMEOUT_MS);
 
     try {
       // "My Drive" view filtered to .beanpod files
@@ -374,6 +452,15 @@ export async function pickBeanpodFile(accessToken: string): Promise<PickBeanpodF
       // leaves `settle`'s teardown something to close.
       built = picker as unknown as BuiltPicker;
       picker.setVisible(true);
+      // ⚠️ EMITTED ON THE SUCCESS PATH TOO, so the failure RATE is measurable. An event that only
+      // fires on failure has no denominator and cannot answer "how often does this work?" — the
+      // gap STATUS.md records for the device-link join population.
+      logEvent({
+        level: 'info',
+        surface: 'drive-picker',
+        message: 'picker opened',
+        context: { ...platform, action: 'picker_opened' },
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       console.error('[drivePicker] picker open failed', e);

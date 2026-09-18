@@ -16,4 +16,5 @@ export const COMMITTED_FLAGS: Record<DevFlag, boolean> = {
   helpfulHints: true,
   mealPlanner: true,
   podCompaction: true,
+  systemBrowserPicker: true,
 };

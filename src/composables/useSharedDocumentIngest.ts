@@ -47,6 +47,8 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isBeanpodFileName } from '@/constants/beanpodFile';
+import { getPlatform } from '@/services/sync/capabilities';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { reportError } from '@/utils/errorReporter';
 import { toDateInputValue } from '@/utils/date';
@@ -681,6 +683,38 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
   // `isPdfFile` reads `file.type`, so a PDF declared `application/octet-stream` was accepted
   // and then compressed as an image.
   const stamped = await Promise.all(content.files.map((f) => withSniffedType(f)));
+
+  // ⚠️ A FAMILY FILE IS NOT A DOCUMENT TO READ, and saying so is the whole point of this arm.
+  // Selecting a `.beanpod` in the Drive iOS app and choosing beanies lands HERE, because the
+  // Share Extension claims files (and wins over the document-type declaration, which only lists
+  // images and PDFs). It then fails the image/PDF triage below and falls out as the generic
+  // "beanies can read photos, screenshots, PDFs and links" toast — the most natural thing a
+  // stuck person tries, answered with a sentence that is actively misleading about what beanies
+  // can do with their own family file.
+  //
+  // ⚠️ THIS IS NOT A JOIN ROUTE, and must not become one. The share sheet hands over file BYTES
+  // with no Drive grant, so opening them would fork the pod (ADR-033) and re-merging carries the
+  // compaction hazard. The message points at the routes that actually work.
+  //
+  // Placed before the triage so it precedes BOTH `shareTarget.unsupported` toast sites, and in
+  // `prepare` rather than in an adapter because every platform's adapter ends here — the
+  // deliberate no-platform-branch rule in `services/share/index.ts`.
+  //
+  // `isBeanpodFileName` is the STRICT predicate: a shared `.json` is not claimed away from the
+  // document reader.
+  if (stamped.some((f) => isBeanpodFileName(f.name))) {
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'beanpod offered on the share sheet',
+      // `detail` is the fixed enum here, matching the neighbouring `rejected_type` events, NOT a
+      // device label — so this site spells the context out instead of spreading platformContext().
+      context: { action: 'rejected_type', detail: 'beanpod', os: getPlatform() },
+    });
+    showToast('info', t('shareTarget.beanpod.title'), t('shareTarget.beanpod.message'));
+    return null;
+  }
+
   const verdicts = await Promise.all(stamped.map((f) => isAiPickerAcceptedFile(f)));
   const usable = stamped.filter((_, i) => verdicts[i]);
 

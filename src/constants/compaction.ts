@@ -14,9 +14,9 @@
  * (ADR-033), and a localized marker would be unmatchable the moment the reader's
  * language differed from the writer's — a filter that silently does nothing.
  */
-export const SAFETY_COPY_INFIX = ' (before compacting)';
 
-const BEANPOD_EXT = '.beanpod';
+import { BEANPOD_EXT } from '@/constants/beanpodFile';
+export const SAFETY_COPY_INFIX = ' (before compacting)';
 
 /**
  * `family.beanpod` → `family (before compacting).beanpod`.

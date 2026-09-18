@@ -61,6 +61,7 @@ import { reportError } from '@/utils/errorReporter';
 import { isConflictFilename } from '@/utils/beanpodFilename';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
+import { isPodFileName } from '@/constants/beanpodFile';
 
 // Result type for openAndLoadFile
 export interface OpenFileResult {
@@ -2400,7 +2401,7 @@ async function openAndLoadFileFallback(): Promise<OpenFileResult> {
       return { success: false, cancelled: true };
     }
 
-    if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+    if (!isPodFileName(file.name)) {
       updateState({ isSyncing: false, lastError: 'Please select a .beanpod or .json file' });
       return { success: false };
     }

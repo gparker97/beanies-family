@@ -38,8 +38,15 @@ describe('redirectState codec', () => {
     expect(decodeRedirectState(btoa('not json'))).toBeNull();
   });
 
-  it('rejects an unknown / future version (exact-match gate)', () => {
-    const future = btoa(JSON.stringify({ returnPath: '/x', mode: 'create', v: 2 }))
+  /**
+   * ⚠️ UPDATED 2026-09-18 (#98), DELIBERATELY. This used to assert that `v: 2` was rejected, back
+   * when 1 was the only accepted version. Picker states are now encoded at 2 as a capability gate
+   * (see the picker describe block below), so 2 is accepted by design and 3 is the first unknown.
+   * The gate itself is unchanged: an unrecognised version still decodes to `null` rather than
+   * being best-effort parsed.
+   */
+  it('rejects an unknown / future version (accept-set gate)', () => {
+    const future = btoa(JSON.stringify({ returnPath: '/x', mode: 'create', v: 3 }))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
@@ -161,5 +168,83 @@ describe('redirectState grant (P2)', () => {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
     expect(decodeRedirectState(weird)?.grant).toBe('drive');
+  });
+});
+
+/**
+ * ⚠️ THE `v: 2` GATE IS A CAPABILITY GATE, NOT A SCHEMA VERSION, and these tests are what stop it
+ * being "simplified" back to one version.
+ *
+ * `v` is an exact-match check in code that has ALREADY SHIPPED. Encoding picker states at 2 is the
+ * only lever we have over a stale service-worker-cached build: it decodes an unknown version as
+ * `null` and routes to the reported "state lost" path, instead of defaulting the unrecognised
+ * grant to `'drive'` and handing a `drive.file`-only code to the path that commits it over the
+ * app's main Drive token, silently stripping `userinfo.email`.
+ */
+describe('redirectState — the picker grant and the version gate', () => {
+  const b64 = (o: unknown): string =>
+    btoa(JSON.stringify(o)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const raw = (encoded: string): Record<string, unknown> =>
+    JSON.parse(atob(encoded.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+
+  it("round-trips grant: 'picker', and encodes it at v: 2", () => {
+    const encoded = encodeRedirectState({
+      returnPath: '/join?fam=1',
+      mode: 'join',
+      grant: 'picker',
+    });
+    expect(raw(encoded)).toMatchObject({ grant: 'picker', v: 2 });
+    expect(decodeRedirectState(encoded)).toEqual({
+      returnPath: '/join?fam=1',
+      mode: 'join',
+      grant: 'picker',
+      v: 2,
+    });
+  });
+
+  /**
+   * ⚠️ `decode` used to return a HARDCODED `REDIRECT_STATE_VERSION`. Under an accept-set that
+   * reports v1 for a v2 payload: a lie waiting for the first caller that trusts it.
+   */
+  it('reports the version it actually read, not the constant', () => {
+    const picker = encodeRedirectState({ returnPath: '/x', mode: 'join', grant: 'picker' });
+    const drive = encodeRedirectState({ returnPath: '/x', mode: 'join' });
+    expect(decodeRedirectState(picker)?.v).toBe(2);
+    expect(decodeRedirectState(drive)?.v).toBe(1);
+  });
+
+  /** The existing contract: a Drive state must stay byte-identical, so in-flight auths survive. */
+  it('leaves drive and calendar states at v: 1, with drive omitting the grant entirely', () => {
+    const drive = raw(encodeRedirectState({ returnPath: '/x', mode: 'create' }));
+    expect(drive).toEqual({ returnPath: '/x', mode: 'create', v: 1 });
+    expect(drive).not.toHaveProperty('grant');
+
+    const calendar = raw(
+      encodeRedirectState({ returnPath: '/x', mode: 'reconnect', grant: 'calendar' })
+    );
+    expect(calendar).toMatchObject({ grant: 'calendar', v: 1 });
+  });
+
+  /**
+   * The forward-compat contract, from the module's own header: an unknown version decodes to
+   * `null` rather than being best-effort parsed. This is the half that protects an OLD build, and
+   * it is asserted here from the perspective of a build that only accepts {1}.
+   */
+  it('a build that does not know v: 2 refuses the payload instead of misreading the grant', () => {
+    const v2 = b64({ returnPath: '/x', mode: 'join', grant: 'picker', v: 2 });
+    // Simulate the shipped v1-only decoder: exact-match on 1.
+    const v1OnlyDecode = (s: string): unknown => {
+      const obj = JSON.parse(atob(s.replace(/-/g, '+').replace(/_/g, '/'))) as { v: number };
+      return obj.v !== 1 ? null : obj;
+    };
+    expect(v1OnlyDecode(v2)).toBeNull();
+    // And a future v: 3 is refused by THIS build, for the same reason.
+    expect(decodeRedirectState(b64({ returnPath: '/x', mode: 'join', v: 3 }))).toBeNull();
+  });
+
+  it("still defaults an unrecognised grant to 'drive' at v: 1", () => {
+    expect(
+      decodeRedirectState(b64({ returnPath: '/x', mode: 'join', grant: 'onedrive', v: 1 }))?.grant
+    ).toBe('drive');
   });
 });

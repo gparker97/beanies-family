@@ -1,6 +1,7 @@
 /**
  * Human-readable platform / device labels for operational telemetry
- * (e.g. the new-joiner Slack pings). NOT user-facing UI — these strings go to
+ * (the new-joiner Slack pings, and — since #98 — the diagnostic firehose via
+ * `platformContext()` below). NOT user-facing UI — these strings go to
  * Slack/CloudWatch, so they are intentionally un-translated.
  *
  * Reuses the canonical platform seam in `services/sync/capabilities.ts`
@@ -93,4 +94,26 @@ export function getDeviceLabel(): string {
     // See getPlatformLabel: never throw into the pod-creation flow.
     return 'unknown';
   }
+}
+
+/**
+ * The platform pair that ships on telemetry: `os` is the analytics/registry
+ * vocabulary, `detail` is the device label. Together they are the only way to
+ * tell the installed app from Safari from an installed PWA.
+ *
+ * ⚠️ THE USER AGENT CANNOT ANSWER THIS, which is why the pair exists.
+ * `enrichAndRedact` already stamps `browser = navigator.userAgent` on every
+ * event, but `capacitor.config.ts` sets no `appendUserAgent`, so the WKWebView
+ * UA *is* a Safari UA, and an installed PWA's UA is a tab's. That distinction is
+ * exactly the one #98 needs: the native shell's document origin is
+ * `capacitor://app.beanies.family` (which the Google Picker iframe cannot
+ * validate) while Safari's is `https://`.
+ *
+ * Composes the two functions this module and `capabilities.ts` already own, so
+ * it is NOT a fourth detector. One doc home for the pair, because three call
+ * sites emit it (`recordError`, the drivePicker success event, and the
+ * `pickerRedirect` events).
+ */
+export function platformContext(): { os: ReturnType<typeof getPlatform>; detail: string } {
+  return { os: getPlatform(), detail: getDeviceLabel() };
 }
