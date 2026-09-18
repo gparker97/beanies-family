@@ -994,11 +994,13 @@
 
       <!-- ══════════════ SURFACE 4 — mint sheet ══════════════ -->
       <section class="surface-head">
-        <h2>4. Bringing a new device on <span class="tag">profile menu · PIN-gated</span></h2>
+        <h2>4. Bringing a new device on <span class="tag">profile menu · PIN-gated · 15 min</span></h2>
         <p>
           The other half of the story: you are signed in and want to add a device. Today this is four
           taps deep in Settings. It moves beside "Switch member", which is where device-mode actions
           already live — and the PIN comes first, because this code opens everything the family has.
+          The code itself is the existing 15-minute device link, which is the right one for a job
+          whose whole premise is that both devices are in your hands right now.
         </p>
       </section>
 
@@ -1066,9 +1068,7 @@
                   <button class="btn btn-quiet" type="button">Copy the link instead</button>
                 </div>
 
-                <p class="meta" style="margin-top: 0.9rem">
-                  Works for 7 days. Making a new code stops the last one working.
-                </p>
+                <p class="meta" style="margin-top: 0.9rem">Works for the next 15 minutes.</p>
               </div>
             </div>
           </div>
@@ -1076,10 +1076,15 @@
       </div>
 
       <div class="legend">
-        <strong>"Making a new code stops the last one working" is not optional copy.</strong> The
-        token is deliberately never stored, so the app cannot re-show a live code — a second tap
-        genuinely revokes the first. There is no way to make this idempotent, so the sentence is the
-        fix.
+        <strong>This is the 15-minute device link, not the 7-day one.</strong> Two link kinds already
+        ship. "Sign in another device" from the profile menu is the both-devices-in-hand case by
+        definition, so it uses the short one, and that choice removes a sentence rather than adding
+        one: a device-link mint is <em>additive</em>, so there is no "making a new code stops the last
+        one working" warning to explain. It also narrows a full-family-key transport from a week to
+        fifteen minutes, which is the same risk argument that justifies the PIN in front of
+        it.<br /><br />
+        The 7-day magic link still exists and is still what the creation screen hands you (surface 6),
+        because that one is meant to be saved and used when you get round to installing the app.
       </div>
 
       <!-- ══════════════ SURFACE 5 — the pull pair ══════════════ -->
