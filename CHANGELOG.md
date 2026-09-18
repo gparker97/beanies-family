@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-18
 
+### Changed
+
+- **greg's note on the pricing page says when the clock starts.** The "brass tacks" letter now spells out that the 90-day trial only begins when v1 lands, so "free while in beta" no longer sits awkwardly above the plans table. The note is also a little tighter, and signs off properly.
+
 ### Added
 
 - **New beanstalk post: "getting down to brass tacks".** The money conversation - what beanies costs, the 90-day trial, the early-bean rewards, and why you can always self-host it and pay nothing at all.
