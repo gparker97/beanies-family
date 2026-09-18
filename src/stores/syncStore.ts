@@ -3218,6 +3218,69 @@ export const useSyncStore = defineStore('sync', () => {
    * Decrypt a pending file using a pre-obtained family key (skips password derivation).
    * Used by passkey/biometric flows that already have the family key.
    */
+  /**
+   * "A family key is in hand — open the pod with it."
+   *
+   * The tail shared by every route that obtains a family key outside the normal password
+   * flow: the recovery kit today, device approval next. It decrypts the staged file,
+   * classifies what went wrong, and — crucially — EMITS ON EVERY BRANCH, including
+   * success.
+   *
+   * It exists because `LoadPodView.handleKitRedeem` had this sequence inline with two
+   * terminal branches that emitted nothing: a decrypt failure after a kit that unwrapped
+   * perfectly, and the handler's outer `catch`. Both are exactly the case worth seeing.
+   *
+   * ⚠️ TAKES THE FAMILY KEY AND NOTHING ELSE. An earlier draft threaded the login UI's
+   * `RecoveryOpener` through here so the store could pass it on. It must not: `opener` is
+   * consumed only by the VIEW's `finishLoaded`, which also calls `ensureDurableHome()` and
+   * emits a component event. Threading a login-UI enum into a store action that never
+   * reads it is the coupling that makes stores impossible to change later. The view keeps
+   * the `reason` → `uiStrings` mapping and its own `finishLoaded` call.
+   */
+  async function openPodWithFamilyKey(
+    familyKey: CryptoKey
+  ): Promise<
+    | { ok: true }
+    | { ok: false; reason: 'no-pending' | 'payload' | 'decrypt'; payloadError?: RemoteBlocker }
+  > {
+    if (!pendingEncryptedFile.value) {
+      // A race, not a normal state — callers check `hasPendingEncryptedFile` first when
+      // the pod being already open is a legitimate outcome for them.
+      reportError({
+        surface: 'login-flow',
+        message: 'openPodWithFamilyKey called with no staged file',
+        severity: 'warning',
+        context: { action: 'open_with_key', error_code: 'no-pending' },
+      });
+      return { ok: false, reason: 'no-pending' };
+    }
+
+    const dec = await decryptPendingFileWithKey(familyKey);
+    if (!dec.success) {
+      // A payload failure is NOT a wrong credential — the key unwrapped fine and it was
+      // the pod that would not fit. Saying "wrong code" there would be a lie, which is
+      // why the two are separate reasons rather than one.
+      const reason = dec.payloadError ? ('payload' as const) : ('decrypt' as const);
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'open_with_family_key',
+        context: { action: 'failed', error_code: reason },
+      });
+      return { ok: false, reason, ...(dec.payloadError ? { payloadError: dec.payloadError } : {}) };
+    }
+
+    // Emitted on the success path too, so an open *rate* is measurable rather than a
+    // failure count.
+    logEvent({
+      level: 'info',
+      surface: 'login-flow',
+      message: 'open_with_family_key',
+      context: { action: 'ok' },
+    });
+    return { ok: true };
+  }
+
   async function decryptPendingFileWithKey(
     fk: CryptoKey
   ): Promise<{ success: boolean; error?: string; payloadError?: RemoteBlocker }> {
@@ -6066,6 +6129,37 @@ export const useSyncStore = defineStore('sync', () => {
    * millisecond — or a first mint on a device whose clock is behind the one that wrote
    * the existing entry — can lose the merge and leave the OLD link alive.
    */
+  /**
+   * Publish a device-approval wrap for a member (W4, the approver's side).
+   *
+   * ⚠️ `putEnvelopeEntry`, NOT `setEnvelopeEntry`. This REPLACES the entry at an existing
+   * key on every approval after the first, and `keyDictSize`'s publish signal is a strict
+   * `>` on a COUNT — an in-place overwrite leaves it unchanged, so the write would sit in
+   * memory and never reach Drive. The cold device polls the FILE, so a wrap that does not
+   * land is a screen that waits forever.
+   *
+   * `rollbackOnFailure` stays at its default (true): this is a mint, not a tombstone. A
+   * wrap that never reached the file is a dead credential, and leaving it behind would make
+   * the approver's screen claim it let someone in when it did not.
+   */
+  async function setDeviceApprovalWrap(
+    memberId: string,
+    pkg: import('@/types/syncFileV4').DeviceApprovalPackage
+  ): Promise<boolean> {
+    return putEnvelopeEntry({ dict: 'deviceApprovalKeys', key: memberId, value: pkg });
+  }
+
+  /**
+   * The `createdAt` of the approval entry about to be replaced, if any.
+   *
+   * Same monotonic-stamp reason as `memberLinkCreatedAt`, and the same authority: read the
+   * merged envelope, not the pre-merge snapshot, or an approval written right after a sync
+   * can lose to what the merge just brought in.
+   */
+  function deviceApprovalCreatedAt(memberId: string): string | undefined {
+    return authoritativeEnvelope()?.deviceApprovalKeys?.[memberId]?.createdAt;
+  }
+
   function memberLinkCreatedAt(memberId: string): string | undefined {
     // Authoritative, not `envelope.value`: a mint right after a sync must stamp newer
     // than what the merge just brought in, not newer than our pre-merge snapshot.
@@ -6481,6 +6575,7 @@ export const useSyncStore = defineStore('sync', () => {
     clearSessionPassword,
     getExportedFamilyKey,
     decryptPendingFileWithKey,
+    openPodWithFamilyKey,
     wrapFamilyKeyForMember,
     addMemberWrappedKey,
     setMemberWrappedKey,
@@ -6519,6 +6614,8 @@ export const useSyncStore = defineStore('sync', () => {
     setRecoveryPassphraseWrap,
     retireMemberKeyMaterial,
     memberLinkCreatedAt,
+    setDeviceApprovalWrap,
+    deviceApprovalCreatedAt,
     setMemberLinkWrap,
     revokeMemberLink,
     removePasskeySecretsForCredential,

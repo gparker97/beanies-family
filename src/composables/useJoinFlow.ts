@@ -50,6 +50,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
 import { refuseMagicLink, type MagicLinkRefusal } from '@/services/auth/magicLink';
 import { emitLinkMinted, emitLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
+import { mintMagicLink } from '@/services/auth/linkMint';
 
 // ─── State machine + error registry ──────────────────────────────────────────
 
@@ -1343,62 +1344,33 @@ export function useJoinFlow() {
     joinerMagicLink.value = '';
     joinerMagicLinkErrorKey.value = '';
     try {
-      const fk = syncStore.familyKey;
-      const envelope = syncStore.envelope;
-      if (!fk || !envelope) {
-        joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
-        emitLinkMinted({
-          kind: 'magic',
-          ok: false,
-          errorCode: 'no_family_key',
-          detail: 'origin=join',
-        });
-        return false;
-      }
-      const { mintMagicLinkPackage, buildMagicLinkUrl } = await import('@/services/auth/magicLink');
-      const { token, pkg } = await mintMagicLinkPackage(
-        fk,
-        envelope.keyId,
-        syncStore.memberLinkCreatedAt(memberId)
-      );
       // ⚠️ The JOIN budget explicitly, not the default. This step's whole job is to hand
       // over the link and there is nothing behind it, so it can afford to wait; the
-      // creation and Settings mints deliberately cannot. See `setMemberLinkWrap`.
-      if (
-        !(await syncStore.setMemberLinkWrap(memberId, pkg, syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS))
-      ) {
+      // creation and Settings mints deliberately cannot. That is why `linkMint` takes
+      // the timeout as a parameter rather than owning a constant.
+      const result = await mintMagicLink({
+        memberId,
+        publishTimeoutMs: syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS,
+      });
+      if ('errorKey' in result) {
         joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
         emitLinkMinted({
           kind: 'magic',
           ok: false,
-          errorCode: 'publish-failed',
+          errorCode: result.errorCode,
           detail: 'origin=join',
         });
-        reportError({
-          surface: 'login-flow',
-          message: 'joiner magic link never reached the durable file',
-          severity: 'critical',
-          context: { action: 'publish_failed', kind: 'magic' },
-        });
+        if (result.errorCode === 'publish-failed') {
+          reportError({
+            surface: 'login-flow',
+            message: 'joiner magic link never reached the durable file',
+            severity: 'critical',
+            context: { action: 'publish_failed', kind: 'magic' },
+          });
+        }
         return false;
       }
-      joinerMagicLink.value = buildMagicLinkUrl({
-        familyId: envelope.familyId,
-        memberId,
-        // ⚠️ The STORE's provider, not `targetProvider`. The latter comes from the invite
-        // URL and `parseUrl` defaults it to 'local' when the link carries no `p=` — so a
-        // joiner could be handed a permanent `p=local` link that also carries a Drive
-        // `fileId`, which on redemption shows the local-file drop zone for a file that
-        // only exists in Drive. The other two mint sites already read the store.
-        provider:
-          syncStore.storageProviderType === 'google_drive' ||
-          syncStore.storageProviderType === 'local'
-            ? syncStore.storageProviderType
-            : undefined,
-        fileName: syncStore.fileName ?? undefined,
-        fileId: syncStore.driveFileId ?? undefined,
-        token,
-      });
+      joinerMagicLink.value = result.link;
       emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=join' });
       return true;
     } catch (e) {

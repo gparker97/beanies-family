@@ -130,6 +130,12 @@ describe('uiStrings', () => {
       // `deviceLink.` was missing from this list, which is the same surface and the same
       // risk — a 15-minute full-family-key transport. Same fix, same reason.
       'deviceLink.',
+      // The promoted mint and the device-approval flow are the same surface again: a
+      // family-wide credential and a sign-in. Same rule, same list.
+      'signInCode.',
+      // The cold-entry panel is the same surface again: getting back into a beanpod.
+      'coldEntry.',
+      'deviceApproval.',
       // Clearing a member's claim is a credential action: it revokes a PIN and re-opens an
       // invite. The floor exists so a reader who does not know the joke cannot act wrongly, and
       // "bean" must never stand in for the member or their access here.

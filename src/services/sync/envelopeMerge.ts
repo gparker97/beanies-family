@@ -126,6 +126,12 @@ export const ENVELOPE_KEY_DICTS: Record<
   // link" action becomes a no-op that looks like it worked. This is the whole of
   // revocation; see envelopeMerge.test.ts, which asserts the rule directly.
   memberLinkKeys: { rule: 'newest-wins', required: false },
+  // ⚠️ MUST be 'newest-wins' for the same reason as memberLinkKeys: entries are replaced
+  // in place at one key per member, so under 'local-wins' a peer holding a stale approval
+  // would win the merge and republish it. `required: false` because every dict added after
+  // the original three is optional — an envelope that gains `deviceApprovalKeys: {}` where
+  // it previously had no key at all serialises differently and is a different file on Drive.
+  deviceApprovalKeys: { rule: 'newest-wins', required: false },
 };
 
 /**

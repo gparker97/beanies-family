@@ -21,13 +21,13 @@
 import { computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
+import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMintedLink } from '@/composables/useMintedLink';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { mintMagicLinkPackage, buildMagicLinkUrl } from '@/services/auth/magicLink';
+import { mintMagicLink } from '@/services/auth/linkMint';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
@@ -62,46 +62,14 @@ const statusText = computed(() => {
 const { link, qr, isMinting, errorKey, qrUnavailable, run } = useMintedLink({
   kind: 'magic',
   surface: 'login-flow',
-  mint: async () => {
-    const fk = syncStore.familyKey;
-    const id = memberId.value;
-    if (!fk || !id) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_family_key' };
-
-    const envelope = syncStore.envelope;
-    if (!envelope) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_envelope' };
-
-    // Monotonic: stamp strictly newer than the entry being replaced, or a fast clock on
-    // the old one keeps the dead link alive through the merge.
-    const { token, pkg } = await mintMagicLinkPackage(
-      fk,
-      envelope.keyId,
-      syncStore.memberLinkCreatedAt(id)
-    );
-
-    // Awaited and CHECKED. A link whose wrap never reached the durable file is a dead
-    // link; withholding it is the whole point of the boolean.
-    const published = await syncStore.setMemberLinkWrap(id, pkg);
-    if (!published) return { errorKey: 'magicLink.mintFailed', errorCode: 'publish-failed' };
-
-    const provider = syncStore.storageProviderType;
-    return {
-      link: buildMagicLinkUrl({
-        // ⚠️ `envelope.familyId`, NOT `activeFamilyId`. `buildInviteLink` writes `fam=`
-        // unguarded and `parseInviteLink` returns null on an empty one — so an empty
-        // context (a family switch that cleared it, a restored session before rehydrate)
-        // would hand out a QR and "this is the only time it will be shown" for a URL that
-        // parses nowhere, AFTER the overwrite has already killed the working link. The
-        // envelope is non-null three lines up and is the authority; the other two mint
-        // sites already use it.
-        familyId: envelope.familyId,
-        memberId: id,
-        provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
-        fileName: syncStore.fileName ?? undefined,
-        fileId: syncStore.driveFileId ?? undefined,
-        token,
-      }),
-    };
-  },
+  detail: 'origin=settings',
+  // The crypto, the monotonic stamp, the durable publish and the URL all live in
+  // `linkMint` now — shared with the creation and join mints, which had the same body and
+  // had each independently grown (and had fixed) the same two bugs.
+  // `?? ''` rather than widening the service's signature: `mintMagicLink` already
+  // treats an empty id as 'the pod is not open' and returns that error key, so the one
+  // refusal lives in one place instead of being re-decided per caller.
+  mint: () => mintMagicLink({ memberId: memberId.value ?? '' }),
 });
 </script>
 

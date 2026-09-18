@@ -52,16 +52,18 @@ const cameraPicker = useFilePicker({
 });
 const filePicker = useFilePicker({ accept: AI_PICKER_ACCEPT, multiple: false, onPick });
 
-/** Open a picker, guarding the one new silent-failure surface (a null input ref). */
+/**
+ * Open a picker, surfacing the null-input-ref failure to the user.
+ *
+ * The detection and the developer-facing report now live in `useFilePicker.open()`, which
+ * returns `false` in that case — this is the second consumer, and per the DRY rule the
+ * guard moved into the composable rather than being copied here. All that is left is the
+ * user-facing message, which is this component's to word.
+ */
 function openPicker(picker: UseFilePickerReturn): void {
-  if (!picker.inputRef.value) {
-    console.error(
-      '[AiDocumentPicker] open() called before the file input mounted — ensure <AiDocumentPicker> is rendered'
-    );
+  if (!picker.open()) {
     showToast('error', t('ai.picker.openErrorTitle'), t('ai.picker.openErrorBody'));
-    return;
   }
-  picker.open();
 }
 
 /** Entry point — the page calls this AFTER its consent gate resolves. */

@@ -55,6 +55,7 @@ async function renderWithKitLink(env: BeanpodFileV4) {
     global: {
       stubs: {
         GoogleDriveFilePicker: true,
+        ColdSignInPanel: true,
         NoPodEmptyState: true,
         LoginChoiceCard: true,
         BeanieSpinner: true,
@@ -91,6 +92,7 @@ async function mountWith(env: BeanpodFileV4, beanie = true) {
     global: {
       stubs: {
         GoogleDriveFilePicker: true,
+        ColdSignInPanel: true,
         RecoveryKitLink: { template: '<a class="kit-link" />' },
         NoPodEmptyState: true,
         LoginChoiceCard: true,
@@ -266,6 +268,7 @@ describe('LoadPodView — the recovery-kit escape from an OPEN pod', () => {
       global: {
         stubs: {
           GoogleDriveFilePicker: true,
+          ColdSignInPanel: true,
           RecoveryKitLink: { template: '<a class="kit-link" />' },
           NoPodEmptyState: true,
           LoginChoiceCard: true,
@@ -334,6 +337,7 @@ describe('LoadPodView — the open-pod kit surface says nothing false', () => {
       global: {
         stubs: {
           GoogleDriveFilePicker: true,
+          ColdSignInPanel: true,
           RecoveryKitLink: { template: '<a class="kit-link" />' },
           NoPodEmptyState: true,
           LoginChoiceCard: true,

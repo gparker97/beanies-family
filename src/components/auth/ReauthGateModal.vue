@@ -24,11 +24,16 @@ const { state, handleVerified, handleCancelled } = useReauth();
   <BaseModal
     v-if="state.member"
     :open="state.open"
-    :title="t('transferOwnership.reauthTitle')"
+    :title="t((state.titleKey ?? 'transferOwnership.reauthTitle') as never)"
     size="sm"
     layer="overlay"
     @close="handleCancelled"
   >
+    <!-- The caller's reason, when it gave one. Keeps an explanatory modal from needing to
+         exist in front of this one just to say why the PIN is being asked for. -->
+    <p v-if="state.reasonKey" class="dark:text-ink-soft mb-4 text-sm text-gray-600">
+      {{ t(state.reasonKey as never) }}
+    </p>
     <ReauthChallenge
       :member="state.member"
       :open="state.open"

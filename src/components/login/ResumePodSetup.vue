@@ -73,7 +73,7 @@ import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
-import { mintMagicLinkPackage, buildMagicLinkUrl } from '@/services/auth/magicLink';
+import { mintMagicLink } from '@/services/auth/linkMint';
 import { isValidPin } from '@/services/auth/deviceUnlock';
 import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
@@ -731,48 +731,29 @@ async function mintOwnerMagicLink(memberId: string): Promise<void> {
   magicLink.value = '';
   magicLinkErrorKey.value = '';
   try {
-    const fk = syncStore.familyKey;
-    const envelope = syncStore.envelope;
-    if (!fk || !envelope) {
+    // The crypto/publish/URL body now lives in `linkMint`, shared with the Settings card
+    // and the join step. The telemetry and the never-wedge contract stay HERE, because
+    // they are this screen's, not the service's.
+    const result = await mintMagicLink({ memberId });
+    if ('errorKey' in result) {
       magicLinkErrorKey.value = 'magicLink.mintFailed';
       emitLinkMinted({
         kind: 'magic',
         ok: false,
-        errorCode: 'no_family_key',
+        errorCode: result.errorCode,
         detail: 'origin=creation',
       });
+      if (result.errorCode === 'publish-failed') {
+        reportError({
+          surface: 'login-flow',
+          message: 'owner magic link never reached the durable file',
+          severity: 'critical',
+          context: { action: 'publish_failed', kind: 'magic' },
+        });
+      }
       return;
     }
-    const { token, pkg } = await mintMagicLinkPackage(
-      fk,
-      envelope.keyId,
-      syncStore.memberLinkCreatedAt(memberId)
-    );
-    if (!(await syncStore.setMemberLinkWrap(memberId, pkg))) {
-      magicLinkErrorKey.value = 'magicLink.mintFailed';
-      emitLinkMinted({
-        kind: 'magic',
-        ok: false,
-        errorCode: 'publish-failed',
-        detail: 'origin=creation',
-      });
-      reportError({
-        surface: 'login-flow',
-        message: 'owner magic link never reached the durable file',
-        severity: 'critical',
-        context: { action: 'publish_failed', kind: 'magic' },
-      });
-      return;
-    }
-    const provider = syncStore.storageProviderType;
-    magicLink.value = buildMagicLinkUrl({
-      familyId: envelope.familyId,
-      memberId,
-      provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
-      fileName: syncStore.fileName ?? undefined,
-      fileId: syncStore.driveFileId ?? undefined,
-      token,
-    });
+    magicLink.value = result.link;
     emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=creation' });
   } catch (e) {
     magicLinkErrorKey.value = 'magicLink.mintFailed';

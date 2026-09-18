@@ -4,6 +4,7 @@
  */
 
 import QRCode from 'qrcode';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Logo path for center overlay (relative to public/) */
 const LOGO_PATH = '/brand/beanies_logo_transparent_logo_only_192x192.png';
@@ -81,4 +82,37 @@ export async function generateInviteQR(inviteUrl: string): Promise<string> {
 
   // In browser, composite the logo overlay
   return addLogoOverlay(qrDataUrl, size);
+}
+
+/**
+ * The ONE place a QR failure is handled.
+ *
+ * A QR is always an *extra* — every surface that draws one also shows the code or link it
+ * encodes, so a render failure degrades rather than breaks. What it must never do is
+ * degrade SILENTLY: `catch { qr = '' }` on a screen whose entire job is "scan this" leaves
+ * a blank space and no signal anywhere, and that exact `catch` had been written twice
+ * before this helper existed (`useMintedLink`, and `RecoveryKitDisplay`, which had no log
+ * at all).
+ *
+ * Returns a discriminated result rather than throwing, because every caller's correct
+ * response is the same: render the fallback and say the picture did not draw.
+ */
+export async function renderQr(
+  source: string,
+  ctx: { surface: string; kind: string }
+): Promise<{ dataUrl: string } | { unavailable: true }> {
+  try {
+    return { dataUrl: await generateInviteQR(source) };
+  } catch (e) {
+    logEvent({
+      level: 'warn',
+      surface: ctx.surface,
+      message: 'QR render failed; the code it encodes is still shown',
+      context: { action: 'qr_render_failed', kind: ctx.kind },
+      // Carry the cause. A "QR failed" line with no error is the same dead end as the
+      // silent catch this replaced, just one step further along.
+      error: e,
+    });
+    return { unavailable: true };
+  }
 }

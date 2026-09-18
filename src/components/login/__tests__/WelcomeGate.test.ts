@@ -1,6 +1,12 @@
-import { mount } from '@vue/test-utils';
+import { mount, config } from '@vue/test-utils';
 import { describe, it, expect, vi } from 'vitest';
 import WelcomeGate from '../WelcomeGate.vue';
+
+// This suite asserts WelcomeGate's OWN layout hierarchy with bare `mount()` calls and no
+// Pinia or router. `ColdSignInPanel` brings both (a store-backed approval pane and a
+// router-backed paste panel), so it is stubbed globally here rather than at each of the
+// dozen mount sites. What it renders is covered by its own tests.
+config.global.stubs = { ...config.global.stubs, ColdSignInPanel: true };
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

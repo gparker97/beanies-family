@@ -15,7 +15,7 @@
 import { ref } from 'vue';
 
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
-import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
+import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateInviteQR } from '@/utils/qrCode';

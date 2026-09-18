@@ -135,7 +135,14 @@ export function emitLinkMinted(payload: {
   kind: 'device' | 'magic';
   ok: boolean;
   errorCode?: string;
-  /** Magic links only: where the mint came from, plus whether it replaced one. */
+  /**
+   * Where the mint came from, as `origin=<where>` — `creation`, `join`, `settings`,
+   * `profile-menu`. For a magic link it may also record whether it replaced one.
+   *
+   * Applies to BOTH kinds. It said "magic links only" until the device link gained its
+   * own entry points; a device mint now carries an origin too, which is what makes
+   * "where do people actually add a device from" answerable.
+   */
   detail?: string;
 }): void {
   emit(payload.ok ? 'info' : 'warn', 'link_minted', {
@@ -205,5 +212,68 @@ export function emitRosterRefreshFailed(errorCode: string): void {
   emit('warn', 'roster_cache_refresh_failed', {
     action: 'refresh_failed',
     error_code: errorCode,
+  });
+}
+
+/**
+ * A recovery-kit redemption reached a terminal state.
+ *
+ * Moved onto the facade because it had been hand-typed at three `logEvent` call sites in
+ * `LoadPodView` — and, more to the point, TWO of its terminal branches emitted nothing at
+ * all: the decrypt failure after a kit that unwrapped fine, and the handler's outer
+ * `catch`, which was `console.error` only. So a kit that opened the envelope and then
+ * failed to open the pod was invisible in the firehose, which is precisely the case this
+ * issue exists to understand.
+ *
+ * Emitted on the SUCCESS path too, so a redemption *rate* is measurable rather than a
+ * failure count.
+ */
+export function emitKitRedeemed(payload: {
+  outcome: 'ok' | 'accepted-pod-open' | 'failed' | 'decrypt-failed' | 'redeem-threw';
+  errorCode?: string;
+}): void {
+  const ok = payload.outcome === 'ok' || payload.outcome === 'accepted-pod-open';
+  emit(ok ? 'info' : 'warn', 'kit_redeemed', {
+    action: payload.outcome,
+    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+  });
+}
+
+/**
+ * Someone arrived on a cold surface that asks them to get back into a beanpod.
+ *
+ * This is the DENOMINATOR the headline metric has never had. `magicLink.ts:5-9` records
+ * that 6 of 22 families redeemed a kit on a cold device — but with no count of how many
+ * families reached a cold surface at all, "27%" cannot be compared before and after this
+ * change. `kind` carries which surface, which is what separates the cold-phone case from
+ * the cold-laptop one.
+ */
+export function emitColdUnlockStarted(payload: { surface: string }): void {
+  emit('info', 'cold_unlock_started', { action: 'started', kind: payload.surface });
+}
+
+/** They left a cold surface without getting in. The other half of the denominator. */
+export function emitColdUnlockAbandoned(payload: { surface: string }): void {
+  emit('warn', 'cold_unlock_abandoned', { action: 'abandoned', kind: payload.surface });
+}
+
+/**
+ * A device-approval request was displayed by a cold device (W4 / pull mode).
+ *
+ * Paired with `emitDeviceApprovalOutcome` so the drop-off between "showed a code" and
+ * "was let in" is measurable — that gap is the whole question for this flow.
+ */
+export function emitDeviceApprovalRequested(): void {
+  emit('info', 'device_approval_requested', { action: 'requested' });
+}
+
+/** How a device-approval attempt ended. Emitted on success too, so rates are measurable. */
+export function emitDeviceApprovalOutcome(payload: {
+  outcome: 'ok' | 'rejected' | 'expired' | 'failed';
+  errorCode?: string;
+}): void {
+  emit(payload.outcome === 'ok' ? 'info' : 'warn', 'device_approval_outcome', {
+    action: payload.outcome,
+    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
   });
 }

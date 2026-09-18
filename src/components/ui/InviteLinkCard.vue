@@ -11,7 +11,6 @@ import { useTranslation } from '@/composables/useTranslation';
  */
 withDefaults(
   defineProps<{
-    link: string;
     qrUrl: string;
     loading?: boolean;
     /** Override the QR's alt text. */

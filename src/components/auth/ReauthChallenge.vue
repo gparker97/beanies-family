@@ -79,6 +79,16 @@ const hasPassword = computed(() => !!props.member.passwordHash && !props.member.
 // PIN step-up state
 const pinValue = ref('');
 const pinError = ref<string | null>(null);
+/**
+ * Whether the PIN pad is on screen rather than behind the "Sign in with PIN" button.
+ *
+ * ⚠️ That button is a METHOD CHOOSER, and it only earns its place when there is a choice.
+ * Biometric step-up is native-only (the web WebAuthn+PRF path is retired), so on web
+ * `passkeyAvailable` is always false and every caller of this gate — transfer ownership,
+ * remove a member, reset another member's credentials, clear all data — was asking the user
+ * to pick from a list of one before it would show them the pad. `openWhenSoleMethod()`
+ * below flips it as soon as detection settles and the PIN turns out to be the only way in.
+ */
 const showPinEntry = ref(false);
 
 /**
@@ -137,10 +147,24 @@ async function handlePinComplete(pin: string) {
 /** Final fallback: no biometric, no PIN, no password — user can't re-auth. */
 const noCredential = computed(() => !passkeyAvailable.value && !hasPin.value && !hasPassword.value);
 
+/**
+ * Show the pad immediately when the PIN is the only way to prove.
+ *
+ * Deliberately called only after `detectPasskey()` settles: flipping it eagerly would
+ * briefly show the pad and then have a biometric button appear above it on native, which
+ * reads as the screen changing its mind. `hasPassword` is `passwordHash && !pinHash`, so a
+ * member with a PIN never also has the password branch — the condition is genuinely
+ * "PIN, and nothing else".
+ */
+function openWhenSoleMethod(): void {
+  if (hasPin.value && !passkeyAvailable.value) showPinEntry.value = true;
+}
+
 async function detectPasskey() {
   // Phase 4: biometric step-up is NATIVE-only (the web WebAuthn+PRF path is retired).
   if (!isNative() || !authStore.currentUser?.familyId) {
     passkeyAvailable.value = false;
+    openWhenSoleMethod();
     return;
   }
   try {
@@ -150,9 +174,11 @@ async function detectPasskey() {
     // hiding the password guidance the user actually needs.
     const deviceKeys = await resolveDeviceKeys(authStore.currentUser.familyId);
     passkeyAvailable.value = deviceKeys.some((k) => k.memberId === props.member.id);
+    openWhenSoleMethod();
   } catch (e) {
     // Detection failure is non-fatal — fall back to password-only UX.
     passkeyAvailable.value = false;
+    openWhenSoleMethod();
     reportError({
       surface: 'reauthChallenge.detectPasskey',
       message: 'Failed to detect passkey availability — defaulting to password-only',
@@ -167,6 +193,7 @@ watch(
     if (open) {
       inlineError.value = null;
       passwordError.value = null;
+      showPinEntry.value = false;
       detectPasskey();
     }
   }

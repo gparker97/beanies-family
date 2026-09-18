@@ -16,6 +16,7 @@ import type { BeanpodFileV4, RecoveryKeyPackage } from '@/types/syncFileV4';
 import { unwrapFamilyKey, wrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
 import { toISODateString } from '@/utils/date';
 import { shareableOrigin } from '@/utils/shareableOrigin';
+import { KIT_LINK_HASH, readHashMarker } from '@/services/auth/deepLinks';
 
 /** Crockford base32 — no I, L, O, U; unambiguous to read back from paper. */
 // eslint-disable-next-line no-secrets/no-secrets -- a PUBLIC alphabet constant, not a secret
@@ -103,8 +104,10 @@ export async function generateRecoveryKit(familyKey: CryptoKey): Promise<Generat
   };
 }
 
-/** Hash marker for the kit deep link — the code rides the FRAGMENT (never sent to a server). */
-export const KIT_LINK_HASH = 'beanies-kit=';
+// The marker and the extraction now live in the deep-link registry, so the kit is not the
+// only thing that knows the shape of a beanies deep link. Re-exported because the constant
+// is part of this module's existing surface.
+export { KIT_LINK_HASH } from '@/services/auth/deepLinks';
 
 /**
  * The QR content: a deep link, so a phone camera pointed at the printed kit opens the
@@ -120,13 +123,14 @@ export function kitDeepLink(code: string): string {
   return `${shareableOrigin()}/welcome#${KIT_LINK_HASH}${encodeURIComponent(code)}`;
 }
 
-/** Accept a scanned QR payload OR a hand-typed code: extract the kit code either way. */
+/**
+ * Accept a scanned QR payload OR a hand-typed code: extract the kit code either way.
+ *
+ * `readHashMarker` returning `null` is what distinguishes the two — a string with no
+ * marker in it is a code the user typed, and is passed through untouched.
+ */
 export function parseKitInput(text: string): string {
-  const idx = text.indexOf(KIT_LINK_HASH);
-  if (idx >= 0) {
-    return decodeURIComponent(text.slice(idx + KIT_LINK_HASH.length).split(/[&?]/)[0] ?? '');
-  }
-  return text;
+  return readHashMarker(text, KIT_LINK_HASH) ?? text;
 }
 
 export type KitRedeemResult =

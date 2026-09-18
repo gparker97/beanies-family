@@ -1,0 +1,172 @@
+/**
+ * The crypto-and-URL half of minting a sign-in link, once.
+ *
+ * Four sites did this: the two Settings cards, the creation step's owner link, and the
+ * join step's joiner link. The bodies were the same ~40 lines of key wrapping, monotonic
+ * stamping, durable publishing and URL building — and the copies had already proved they
+ * drift, because the SAME two bugs were found and fixed three separate times:
+ *
+ *   1. `envelope.familyId`, not `activeFamilyId`. An empty family context hands out a QR
+ *      for a URL that parses nowhere, AFTER the overwrite has killed the working link.
+ *   2. The STORE's provider, not the invite's. `parseUrl` defaults a missing `p=` to
+ *      'local', so a joiner could get a permanent `p=local` link carrying a Drive fileId.
+ *
+ * Both are now impossible to fix in only two places.
+ *
+ * ⚠️ THIS SERVICE EMITS NOTHING. No `logEvent`, no `emitLinkMinted`, no `reportError`.
+ * Telemetry belongs to the hosts: `useMintedLink` already owns it for the two cards, and
+ * emitting from here as well would double-count the funnel. What callers get back is a
+ * discriminated result; what they do about it is theirs.
+ *
+ * The dynamic `import()`s stay inside, as all four sites had them — that is what keeps
+ * the crypto out of the login bundle.
+ */
+import { useSyncStore } from '@/stores/syncStore';
+import { requireReauth } from '@/composables/useReauth';
+
+/** What every mint returns: a usable link, or a reason it was withheld. */
+export type MintResult = { link: string } | { errorKey: string; errorCode: string };
+
+/**
+ * Narrow the store's provider to the two values a link may carry.
+ *
+ * Anything else (no provider yet, an unrecognised one) becomes `undefined` so
+ * `buildInviteLink` omits `p=` rather than writing a value the redeeming client cannot
+ * act on. All four original sites wrote this ternary out by hand.
+ */
+function linkProvider(): 'google_drive' | 'local' | undefined {
+  const provider = useSyncStore().storageProviderType;
+  return provider === 'google_drive' || provider === 'local' ? provider : undefined;
+}
+
+/**
+ * Mint a 15-minute DEVICE link: "both devices in hand, right now."
+ *
+ * The wrap goes into `inviteKeys` keyed by the token hash, so minting is ADDITIVE — it
+ * revokes nothing, and a second mint does not kill the first link.
+ */
+export async function mintDeviceLink(
+  opts: {
+    /**
+     * The CALLER already ran the step-up and it passed. Only `SignInCodeSheet` sets this,
+     * because its host gates before the sheet is even mounted — which is what keeps that
+     * flow at two taps instead of stacking a modal on a modal.
+     */
+    alreadyProved?: boolean;
+  } = {}
+): Promise<MintResult> {
+  const syncStore = useSyncStore();
+
+  // ⚠️ THE GATE LIVES HERE, AND ITS DEFAULT IS ON.
+  //
+  // It started in `SignInCodeSheet`, which meant `DeviceLinkCard` in Settings minted the
+  // BYTE-IDENTICAL 15-minute full-family-key link with one tap and no proof at all — so the
+  // gate only added friction to the honest path while the bypass sat two menus away. A
+  // per-host gate is a gate the next host forgets. Defaulting to `on` means forgetting it
+  // fails SAFE: a new caller gets the PIN prompt without knowing it asked for one.
+  if (!opts.alreadyProved) {
+    const proved = await requireReauth({
+      titleKey: 'signInCode.title',
+      reasonKey: 'signInCode.pinReason',
+    });
+    if (!proved) return { errorKey: 'signInCode.notProved', errorCode: 'gate_declined' };
+  }
+
+  const fk = syncStore.familyKey;
+  if (!fk) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_family_key' };
+
+  // ⚠️ `envelope.familyId`, NOT `activeFamilyId` — the bug named in this file's own header,
+  // which `mintMagicLink` avoided and this one did not. `buildInviteLink` writes `fam=`
+  // unguarded and `parseInviteLink` returns null on an empty one, so a cleared family
+  // context (a switch, or a restored session before rehydrate) produced a QR for a URL that
+  // parses nowhere — AFTER a live 15-minute family-key wrap was already on Drive.
+  const envelope = syncStore.envelope;
+  if (!envelope) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_envelope' };
+
+  const {
+    buildInviteLink,
+    generateInviteToken,
+    createInvitePackage,
+    hashInviteToken,
+    LINK_EXPIRY_MS,
+  } = await import('@/services/crypto/inviteService');
+
+  const token = generateInviteToken();
+  const pkg = await createInvitePackage(fk, token, LINK_EXPIRY_MS);
+
+  // R2-F15: a link whose key never reached the durable file cannot be redeemed inside its
+  // 15-minute window — refuse to hand out a dead QR.
+  const published = await syncStore.addInvitePackage(await hashInviteToken(token), pkg);
+  if (!published) return { errorKey: 'deviceLink.publishFailed', errorCode: 'publish-failed' };
+
+  return {
+    link: buildInviteLink({
+      familyId: envelope.familyId,
+      provider: linkProvider(),
+      fileName: syncStore.fileName ?? undefined,
+      fileId: syncStore.driveFileId ?? undefined,
+      token,
+      linkMode: true,
+    }),
+  };
+}
+
+/**
+ * Mint a 7-day MAGIC link for one member: the one you SAVE.
+ *
+ * The wrap goes into `memberLinkKeys` keyed by `memberId` under `newest-wins`, so minting
+ * REPLACES that member's previous link. Callers must say so in their copy; the token is
+ * deliberately never persisted, so a live link can never be re-shown and idempotence is
+ * not available.
+ *
+ * `publishTimeoutMs` is a parameter rather than a constant because the join step
+ * deliberately spends `CREDENTIAL_PUBLISH_TIMEOUT_MS` — its whole job is to hand over the
+ * link and nothing waits behind it — while the creation and Settings mints deliberately
+ * do not. Flattening that difference away would either stall an unclosable creation modal
+ * or make the join step give up too early.
+ */
+export async function mintMagicLink(opts: {
+  memberId: string;
+  publishTimeoutMs?: number;
+}): Promise<MintResult> {
+  const syncStore = useSyncStore();
+
+  const fk = syncStore.familyKey;
+  if (!fk || !opts.memberId) {
+    return { errorKey: 'recovery.podNotOpen', errorCode: 'no_family_key' };
+  }
+
+  // Kept distinct from the key check. Two of the four original sites collapsed both into
+  // `no_family_key`, which made "the pod is not open" and "the envelope has not staged"
+  // indistinguishable in the firehose — different causes with different fixes.
+  const envelope = syncStore.envelope;
+  if (!envelope) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_envelope' };
+
+  const { mintMagicLinkPackage, buildMagicLinkUrl } = await import('@/services/auth/magicLink');
+
+  // Monotonic: stamp strictly newer than the entry being replaced, or a fast clock on the
+  // old one keeps the dead link alive through the merge.
+  const { token, pkg } = await mintMagicLinkPackage(
+    fk,
+    envelope.keyId,
+    syncStore.memberLinkCreatedAt(opts.memberId)
+  );
+
+  // Awaited and CHECKED. A link whose wrap never reached the durable file is a dead link;
+  // withholding it is the whole point of the boolean.
+  const published = await syncStore.setMemberLinkWrap(opts.memberId, pkg, opts.publishTimeoutMs);
+  if (!published) return { errorKey: 'magicLink.mintFailed', errorCode: 'publish-failed' };
+
+  return {
+    link: buildMagicLinkUrl({
+      // ⚠️ `envelope.familyId`, NOT `activeFamilyId` — see the header. The envelope is
+      // non-null above and is the authority.
+      familyId: envelope.familyId,
+      memberId: opts.memberId,
+      provider: linkProvider(),
+      fileName: syncStore.fileName ?? undefined,
+      fileId: syncStore.driveFileId ?? undefined,
+      token,
+    }),
+  };
+}

@@ -17,6 +17,7 @@
  * centralizing the accept/multiple/reset logic.
  */
 import { ref, type Ref } from 'vue';
+import { reportError } from '@/utils/errorReporter';
 
 export interface UseFilePickerOptions {
   /**
@@ -54,8 +55,12 @@ export interface UseFilePickerReturn {
    * flag, a hidden style, and the change handler.
    */
   bindings: UseFilePickerBindings;
-  /** Trigger the file picker dialog. */
-  open: () => void;
+  /**
+   * Trigger the file picker dialog. Returns `false` — and reports — when the hidden
+   * input never mounted, because `inputRef.value?.click()` on a null ref is a tap that
+   * does nothing at all, with no error anywhere. Callers surface their own message.
+   */
+  open: () => boolean;
 }
 
 export function useFilePicker(options: UseFilePickerOptions): UseFilePickerReturn {
@@ -70,8 +75,24 @@ export function useFilePicker(options: UseFilePickerOptions): UseFilePickerRetur
     await options.onPick(files);
   }
 
-  function open(): void {
-    inputRef.value?.click();
+  function open(): boolean {
+    if (!inputRef.value) {
+      // The caller rendered the trigger but not the `<input ref="inputRef">`, or called
+      // before mount. Either way the user taps and nothing happens, which is the exact
+      // silent failure this return value exists to make impossible to ignore.
+      reportError({
+        surface: 'file-picker',
+        message: 'file picker opened before its input mounted — the trigger is a no-op',
+        severity: 'warning',
+        // `kind` is a SHARED, store-declared dimension that several features filter on as a
+        // small enum — a raw MIME string pollutes it. Which picker it was is already carried
+        // by the surface and the stack.
+        context: { action: 'picker_open_no_input' },
+      });
+      return false;
+    }
+    inputRef.value.click();
+    return true;
   }
 
   return {

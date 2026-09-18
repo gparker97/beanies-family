@@ -271,7 +271,14 @@ function promptParts() {
     <!-- Paste fallback: neutral on whether you are "joining" or "signing in", because
          someone whose link failed to open the app does not know which they are. Shared with
          the join screen, which is the other place people land holding a link that did not
-         work — see `PasteLinkPanel`. -->
+         work — see `PasteLinkPanel`.
+
+         ⚠️ A PASTE PANEL, NOT THE SCAN PANEL. A magic link works here because the link
+         itself carries the fileId. A pull-mode QR does NOT: it polls the staged `.beanpod`
+         for the approval the other device writes, and on this screen nothing is staged, so
+         the code would render and wait forever. The scan panel lives on the decrypt
+         surface, where a pod is actually in hand. Keeping this screen to the three-way
+         fork also keeps it clear for a new family heading to Create. -->
     <div class="mt-4">
       <PasteLinkPanel @submitted="emit('navigate', 'join')" />
     </div>
