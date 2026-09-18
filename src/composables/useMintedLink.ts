@@ -1,7 +1,6 @@
 import { ref } from 'vue';
-import { generateInviteQR } from '@/utils/qrCode';
+import { renderQr } from '@/utils/qrCode';
 import { reportError } from '@/utils/errorReporter';
-import { logEvent } from '@/services/telemetry/logEvent';
 import { emitLinkMinted } from '@/services/telemetry/loginFlowEvents';
 
 /**
@@ -29,6 +28,13 @@ export function useMintedLink(opts: {
   mint: () => Promise<{ link: string } | { errorKey: string; errorCode: string }>;
   /** Telemetry surface for unexpected throws. */
   surface: string;
+  /**
+   * Which entry point this mint came from, as `origin=<where>`. Rides the already
+   * allowlisted `detail` key, matching the `origin=creation` / `origin=join` convention
+   * the two non-composable mint sites already use — so every `link_minted` event in the
+   * product carries a queryable origin.
+   */
+  detail?: string;
 }) {
   const link = ref('');
   const qr = ref('');
@@ -49,35 +55,36 @@ export function useMintedLink(opts: {
       const result = await opts.mint();
       if ('errorKey' in result) {
         errorKey.value = result.errorKey;
-        emitLinkMinted({ kind: opts.kind, ok: false, errorCode: result.errorCode });
+        emitLinkMinted({
+          kind: opts.kind,
+          ok: false,
+          errorCode: result.errorCode,
+          ...(opts.detail ? { detail: opts.detail } : {}),
+        });
         return;
       }
       link.value = result.link;
-      emitLinkMinted({ kind: opts.kind, ok: true });
-      try {
-        qr.value = await generateInviteQR(result.link);
-      } catch (e) {
-        // ⚠️ DO NOT `catch { qr = '' }` AND MOVE ON. Both existing call sites did
-        // exactly that — no log, no on-screen note — which means a silently missing QR
-        // on the one screen whose entire job is "scan this". The link and its copy
-        // button still work, so this degrades rather than fails, but it says so.
-        qrUnavailable.value = true;
-        logEvent({
-          level: 'warn',
-          surface: opts.surface,
-          message: 'QR render failed; link shown without it',
-          context: { action: 'qr_render_failed', kind: opts.kind },
-          // Carry the cause. A "QR failed" line with no error is the same dead end as
-          // the silent `catch { qr = '' }` this replaced, just one step further along.
-          error: e,
-        });
-      }
+      emitLinkMinted({
+        kind: opts.kind,
+        ok: true,
+        ...(opts.detail ? { detail: opts.detail } : {}),
+      });
+      // The QR failure path lives in `renderQr` — one warn-log for every QR in the
+      // product, rather than a `catch` per call site (two of which had no log at all).
+      const drawn = await renderQr(result.link, { surface: opts.surface, kind: opts.kind });
+      if ('dataUrl' in drawn) qr.value = drawn.dataUrl;
+      else qrUnavailable.value = true;
     } catch (e) {
       // Keyed by kind: `deviceLink.mintFailed` existed and had no caller, so a device
       // link that threw told the user to "create one later in Settings" — while they
       // were already in Settings, looking at the card that creates them.
       errorKey.value = opts.kind === 'device' ? 'deviceLink.mintFailed' : 'magicLink.mintFailed';
-      emitLinkMinted({ kind: opts.kind, ok: false, errorCode: 'mint-threw' });
+      emitLinkMinted({
+        kind: opts.kind,
+        ok: false,
+        errorCode: 'mint-threw',
+        ...(opts.detail ? { detail: opts.detail } : {}),
+      });
       reportError({
         surface: opts.surface,
         message: 'link mint threw',

@@ -16,6 +16,7 @@
 import { App as CapacitorApp } from '@capacitor/app';
 import { isNative } from '@/services/sync/capabilities';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { captureHashMarkers, APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
 import { reportError } from '@/utils/errorReporter';
 import { nativeOAuthTransport } from '@/constants/nativeOAuth';
 
@@ -96,6 +97,13 @@ export function installInboundLinkListener(navigate: (path: string) => void): vo
         });
         return;
       }
+
+      // ⚠️ AFTER the origin and path checks, never before them. A warm open re-runs no
+      // lifecycle, so this is the only place a running app would notice the fragment — but
+      // capturing above the allowlist meant a URL the bridge then REJECTED as untrusted
+      // could still plant an approval key for the next in-app navigation to pick up. The
+      // whole point of those checks is that an untrusted URL drives no app state.
+      captureHashMarkers([APPROVAL_LINK_HASH], url);
 
       logEvent({
         level: 'info',

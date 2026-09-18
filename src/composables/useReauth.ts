@@ -25,6 +25,16 @@ interface ReauthState {
   open: boolean;
   member: FamilyMember | null;
   resolve: ((value: boolean) => void) | null;
+  /** Optional override for the gate's heading, as a `uiStrings` key. */
+  titleKey?: string;
+  /**
+   * Optional one-line explanation of WHY the PIN is being asked for, as a `uiStrings` key.
+   *
+   * Exists so a caller does not need an extra modal in front of the gate purely to explain
+   * itself — that is three taps to reach a PIN pad, two of them ceremony. The gate is the
+   * right place for the sentence, because it is the screen the question is being asked on.
+   */
+  reasonKey?: string;
 }
 
 // Module-level state — shared across all callers, exactly as useConfirm does it.
@@ -60,7 +70,9 @@ export function canStepUp(): boolean {
  * FAILS CLOSED AND NEVER HANGS: every path that cannot run the gate resolves `false` and
  * says why — to the user in a dialog, and to a developer through the firehose.
  */
-export function requireReauth(): Promise<boolean> {
+export function requireReauth(
+  opts: { titleKey?: string; reasonKey?: string } = {}
+): Promise<boolean> {
   const familyStore = useFamilyStore();
   const member = familyStore.currentMember;
 
@@ -90,7 +102,7 @@ export function requireReauth(): Promise<boolean> {
   }
 
   return new Promise<boolean>((resolve) => {
-    state.value = { open: true, member, resolve };
+    state.value = { open: true, member, resolve, ...opts };
   });
 }
 

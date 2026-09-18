@@ -18,50 +18,21 @@
  */
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
-import { useSyncStore } from '@/stores/syncStore';
-import { useFamilyContextStore } from '@/stores/familyContextStore';
+import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMintedLink } from '@/composables/useMintedLink';
+import { mintDeviceLink } from '@/services/auth/linkMint';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
-const syncStore = useSyncStore();
-const familyContextStore = useFamilyContextStore();
 
 const { link, qr, isMinting, errorKey, qrUnavailable, run } = useMintedLink({
   kind: 'device',
   surface: 'login-flow',
-  mint: async () => {
-    const fk = syncStore.familyKey;
-    if (!fk) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_family_key' };
-    const {
-      buildInviteLink,
-      generateInviteToken,
-      createInvitePackage,
-      hashInviteToken,
-      LINK_EXPIRY_MS,
-    } = await import('@/services/crypto/inviteService');
-
-    const token = generateInviteToken();
-    const pkg = await createInvitePackage(fk, token, LINK_EXPIRY_MS);
-    // R2-F15: a link whose key never reached the durable file cannot be redeemed inside
-    // its 15-minute window — refuse to hand out a dead QR.
-    const published = await syncStore.addInvitePackage(await hashInviteToken(token), pkg);
-    if (!published) return { errorKey: 'deviceLink.publishFailed', errorCode: 'publish-failed' };
-
-    const provider = syncStore.storageProviderType;
-    return {
-      link: buildInviteLink({
-        familyId: familyContextStore.activeFamilyId ?? '',
-        provider: provider === 'google_drive' || provider === 'local' ? provider : undefined,
-        fileName: syncStore.fileName ?? undefined,
-        fileId: syncStore.driveFileId ?? undefined,
-        token,
-        linkMode: true,
-      }),
-    };
-  },
+  // Which entry point this mint came from. Settings has never carried one; now every
+  // `link_minted` event in the product has a queryable origin.
+  detail: 'origin=settings',
+  mint: mintDeviceLink,
 });
 </script>
 

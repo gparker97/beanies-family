@@ -5615,6 +5615,128 @@ const STRING_DEFS = {
     beanie:
       'this link is incomplete — it may have been cut short when it was sent. ask for a new one.',
   },
+  // ── "Sign in another device": the promoted, PIN-gated device-link mint. ──────────
+  // Important surface (a family-wide credential + auth), so the `beanie` values keep the
+  // real nouns — device, family, sign in — and only drop case. A reader who does not know
+  // the joke must not be able to act wrongly here.
+  // ── Device approval (W4): the cold device asks, a signed-in device answers. ──────
+  // Important surface — a sign-in and a family-wide key. `beanie` keeps the real nouns
+  // (device, family, beanpod, sign in) and only drops case.
+  'deviceApproval.title': { en: 'Let This Device In?', beanie: 'let this device in?' },
+  'deviceApproval.prompt': {
+    en: 'A device is asking to open {family}.',
+    beanie: 'a device is asking to open {family}.',
+  },
+  // Substituted whole, so it must read correctly on its own — the previous pairing put a
+  // possessive after a definite article ("open the your family's beanpod") on the one
+  // sentence stating what is being consented to.
+  'deviceApproval.yourFamily': {
+    en: 'your family\u2019s beanpod',
+    beanie: 'your family\u2019s beanpod',
+  },
+  'deviceApproval.pinReason': {
+    en: 'This lets another device open your family’s beanpod.',
+    beanie: 'this lets another device open your family’s beanpod.',
+  },
+  'deviceApproval.compareOnBoth': {
+    en: 'Approve only if the other device shows these same characters.',
+    beanie: 'approve only if the other device shows these same characters.',
+  },
+  'deviceApproval.compareHint': {
+    en: 'Check this matches the code on the other device.',
+    beanie: 'check this matches the code on the other device.',
+  },
+  'deviceApproval.approve': { en: 'Yes, Let It In', beanie: 'yes, let it in' },
+  'deviceApproval.reject': { en: 'No, That\u2019s Not Me', beanie: 'no, that\u2019s not me' },
+  'deviceApproval.waiting': { en: 'Waiting for approval', beanie: 'waiting for approval' },
+  'deviceApproval.qrAlt': {
+    en: 'Code for a signed-in device to scan',
+    beanie: 'code for a signed-in device to scan',
+  },
+  'deviceApproval.qrUnavailable': {
+    en: 'The code couldn\u2019t be drawn here. You can still use one of the other ways in below.',
+    beanie:
+      'the code couldn\u2019t be drawn here. you can still use one of the other ways in below.',
+  },
+  'deviceApproval.expired': {
+    en: 'This code has expired.',
+    beanie: 'this code has expired.',
+  },
+  'deviceApproval.tryAgain': { en: 'Show a new one', beanie: 'show a new one' },
+  'deviceApproval.failed': {
+    en: 'That didn\u2019t work. You can try again, or use one of the other ways in below.',
+    beanie: 'that didn\u2019t work. you can try again, or use one of the other ways in below.',
+  },
+  'deviceApproval.badCode': {
+    en: 'That code wasn\u2019t a beanies sign-in code.',
+    beanie: 'that code wasn\u2019t a beanies sign-in code.',
+  },
+  'deviceApproval.publishFailed': {
+    en: 'We couldn\u2019t save the approval to your family file, so the other device won\u2019t see it. Check your connection and try again.',
+    beanie:
+      'we couldn\u2019t save the approval to your family file, so the other device won\u2019t see it. check your connection and try again.',
+  },
+  'deviceApproval.signedOutTitle': {
+    en: 'Open beanies to Approve',
+    beanie: 'open beanies to approve',
+  },
+  'deviceApproval.signedOutBody': {
+    en: 'This code has to be approved from a device that’s signed in. Open the beanies app and try scanning again from there.',
+    beanie:
+      'this code has to be approved from a device that’s signed in. open the beanies app and try scanning again from there.',
+  },
+  'deviceApproval.doneTitle': { en: 'Device Approved', beanie: 'device approved' },
+  'deviceApproval.doneBody': {
+    en: 'The other device should be signing in now.',
+    beanie: 'the other device should be signing in now.',
+  },
+  'coldEntry.or': { en: 'or', beanie: 'or' },
+  'coldEntry.scanTitle': {
+    en: 'Use a Device You\u2019re Signed In On',
+    beanie: 'use a device you\u2019re signed in on',
+  },
+  'coldEntry.scanLead': {
+    en: 'Scan this with a device that\u2019s already signed in.',
+    beanie: 'scan this with a device that\u2019s already signed in.',
+  },
+  'recovery.beforeYouGo': { en: 'Before You Go', beanie: 'before you go' },
+  'recovery.kitAcknowledge': {
+    en: 'I\u2019ve saved my recovery kit somewhere safe.',
+    beanie: 'i\u2019ve saved my recovery kit somewhere safe.',
+  },
+  'recovery.kitGateHint': {
+    en: 'Save, print, or tick the box to carry on.',
+    beanie: 'save, print, or tick the box to carry on.',
+  },
+  'signInCode.menuItem': { en: 'Sign In Another Device', beanie: 'sign in another device' },
+  'signInCode.title': { en: 'Sign In Another Device', beanie: 'sign in another device' },
+  'signInCode.lead': {
+    en: 'Show a code your other device can scan to sign in.',
+    beanie: 'show a code your other device can scan to sign in.',
+  },
+  'signInCode.minting': { en: 'counting beans...', beanie: 'counting beans...' },
+  'signInCode.mint': { en: 'Show the Code', beanie: 'show the code' },
+  'signInCode.pinReason': {
+    en: 'This code opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
+    beanie:
+      'this code opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
+  },
+  'signInCode.notProved': {
+    en: 'No code was created. You can try again whenever you\u2019re ready.',
+    beanie: 'no code was created. you can try again whenever you\u2019re ready.',
+  },
+  'signInCode.scanLead': {
+    en: 'Point the other device\u2019s camera at this code.',
+    beanie: 'point the other device\u2019s camera at this code.',
+  },
+  'signInCode.qrAlt': {
+    en: 'Code to scan on your other device',
+    beanie: 'code to scan on your other device',
+  },
+  'signInCode.expiryNote': {
+    en: 'Works for the next 15 minutes.',
+    beanie: 'works for the next 15 minutes.',
+  },
   'magicLink.title': {
     en: 'Your beanies magic link',
     beanie: 'your beanies magic link',

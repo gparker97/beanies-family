@@ -15,6 +15,7 @@ import NoPodEmptyState from './NoPodEmptyState.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
+import ColdSignInPanel from '@/components/login/ColdSignInPanel.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -31,7 +32,10 @@ import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { classifyDriveFailure } from '@/utils/podAccess';
 import { reportError } from '@/utils/errorReporter';
-import { emitEnvelopeCapabilitiesChanged } from '@/services/telemetry/loginFlowEvents';
+import {
+  emitEnvelopeCapabilitiesChanged,
+  emitKitRedeemed,
+} from '@/services/telemetry/loginFlowEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
@@ -132,10 +136,39 @@ async function handleKitPhotoPicked(event: Event) {
     }
     const { parseKitInput } = await import('@/services/auth/recoveryKit');
     kitCodeInput.value = parseKitInput(decoded);
+  } catch (e) {
+    // ⚠️ There was a `try`/`finally` here but no `catch`, so a rejected dynamic import —
+    // an offline first-load of the pdf.js or jsqr chunk is the realistic case — settled
+    // the spinner and left the screen looking idle, with nothing said and nothing logged.
+    // Promoting kit scanning to a primary path makes that the failure people actually hit.
+    formError.value = t('recovery.kitScanFailed');
+    reportError({
+      surface: 'login-flow',
+      message: 'kit QR decode failed',
+      severity: 'warning',
+      error: e,
+      context: { action: 'kit_scan_failed' },
+    });
   } finally {
     isScanningKit.value = false;
   }
 }
+/**
+ * Can a device approval actually complete here?
+ *
+ * Two conditions, both learned the hard way:
+ *
+ * 1. A file must be STAGED. `caps` is null in the "recovery-kit escape from an already-open
+ *    pod" state, so gating on `nothingCanOpenIt` mounted this over a live document.
+ * 2. The pod must live where BOTH devices can reach it. The approver writes their wrap into
+ *    the shared `.beanpod`; for a family on a LOCAL file there is no shared file by
+ *    definition, so the code would be the visually dominant action on the screen and could
+ *    never be approved — three minutes of waiting ending in "expired".
+ */
+const canUseDeviceApproval = computed(
+  () => syncStore.hasPendingEncryptedFile && syncStore.storageProviderType === 'google_drive'
+);
+
 const kitCodeInput = ref('');
 /**
  * What the pending envelope can actually be opened with. ONE derivation for this whole
@@ -864,56 +897,54 @@ async function handleKitRedeem() {
     if (!result.ok) {
       formError.value =
         result.reason === 'no-kits' ? t('recovery.kitNoKits') : t('recovery.kitWrongCode');
-      logEvent({
-        level: 'warn',
-        surface: 'login-flow',
-        message: 'kit_redeemed',
-        context: { action: 'failed', error_code: result.reason },
-      });
+      emitKitRedeemed({ outcome: 'failed', errorCode: result.reason });
       return;
     }
     // Pod already open: the kit is proving IDENTITY here, not decrypting anything. Hand
     // the opener straight to the flow, which re-enters the picker and — because the opener
     // is a kit — leads with set-a-new-PIN.
     if (!syncStore.hasPendingEncryptedFile) {
-      logEvent({
-        level: 'info',
-        surface: 'login-flow',
-        message: 'kit_redeemed',
-        context: { action: 'accepted-pod-open' },
-      });
+      emitKitRedeemed({ outcome: 'accepted-pod-open' });
       await finishLoaded('kit');
       return;
     }
-    const dec = await syncStore.decryptPendingFileWithKey(result.familyKey);
-    if (!dec.success) {
-      // 'wrong recovery code' would be a lie when the kit unwrapped fine and it
-      // was the pod that would not fit in memory.
-      if (dec.payloadError) {
+    // The decrypt tail lives in the store now, so it emits on every branch including the
+    // one this handler used to return from silently. The view keeps the reason → copy
+    // mapping, because that is a view concern.
+    const opened = await syncStore.openPodWithFamilyKey(result.familyKey);
+    if (!opened.ok) {
+      // 'wrong recovery code' would be a lie when the kit unwrapped fine and it was the
+      // pod that would not fit in memory.
+      if (opened.payloadError) {
         payloadExplanationShown.value = true;
         // Payload-specific question; every other blocker latches.
-        if (!(dec.payloadError instanceof PayloadLoadError && dec.payloadError.keyMayBeWrong))
+        if (!(opened.payloadError instanceof PayloadLoadError && opened.payloadError.keyMayBeWrong))
           podUnopenableHere.value = true;
       }
-      formError.value = dec.payloadError
-        ? t(dec.payloadError.inlineMessageKey)
+      formError.value = opened.payloadError
+        ? t(opened.payloadError.inlineMessageKey)
         : t('password.decryptionError');
+      emitKitRedeemed({ outcome: 'decrypt-failed', errorCode: opened.reason });
       return;
     }
-    logEvent({
-      level: 'info',
-      surface: 'login-flow',
-      message: 'kit_redeemed',
-      context: { action: 'ok' },
-    });
+    emitKitRedeemed({ outcome: 'ok' });
     showDecryptModal.value = false;
     kitCodeInput.value = '';
-    // 'recovery': a family-level secret opened the pod — the person picker's prove
-    // screen offers SET-A-NEW-PIN instead of demanding the forgotten credentials.
+    // 'kit': a family-level secret opened the pod — the person picker's prove screen
+    // offers SET-A-NEW-PIN instead of demanding the forgotten credentials.
     await finishLoaded('kit');
   } catch (e) {
-    console.error('[LoadPodView] kit redeem failed:', e);
+    // Was `console.error` only, so a throw here never reached the firehose at all — the
+    // fourth terminal branch of a flow this issue exists to measure.
     formError.value = t('password.decryptionError');
+    emitKitRedeemed({ outcome: 'redeem-threw' });
+    reportError({
+      surface: 'login-flow',
+      message: 'kit redeem threw',
+      severity: 'error',
+      error: e,
+      context: { action: 'kit_redeem_threw' },
+    });
   } finally {
     isLoadingFile.value = false;
   }
@@ -1447,6 +1478,44 @@ async function handleDriveRefresh() {
         </p>
       </div>
 
+      <!--
+        THE SCAN PATH, ON THE ONLY SCREEN WHERE IT CAN WORK.
+        A pod is staged by this point, which is what pull-mode approval polls: the other
+        device writes an approval into this file's envelope and this one picks it up. On
+        the welcome gate or the storage picker there is nothing staged, so the same panel
+        would render a code and wait forever.
+
+        Above the credential field deliberately — this is the measured problem. Six of
+        twenty-two families redeemed a recovery kit, every one on a cold device, and five
+        of those six then replaced a PIN that was working. They did not need recovery; the
+        screen just never offered them a way in.
+      -->
+      <!--
+        ⚠️ GATED ON A STAGED FILE, not on `nothingCanOpenIt`. `caps` is derived from
+        `pendingEncryptedFile?.envelope`, which is NULL in the "recovery-kit escape from an
+        ALREADY-OPEN pod" state — so `nothingCanOpenIt` was false there and this panel
+        mounted over a live document, driving `loadFromFile()`'s replace branch twenty times
+        a minute against unsaved edits. It also could not have succeeded:
+        `openPodWithFamilyKey` returns `no-pending` when nothing is staged.
+      -->
+      <div v-if="canUseDeviceApproval" class="mb-6">
+        <!--
+          ⚠️ `finishLoaded()` WITH NO OPENER, deliberately.
+
+          Opening a family is two steps: unlock the beanpod (family-wide) and then sign in
+          (per person, PIN). A `RecoveryOpener` says which family-wide RECOVERY credential
+          did step 1, and its only effect is to offer SET A NEW PIN on the prove screen —
+          i.e. to let a printed break-glass secret hand over a member's identity.
+
+          A device approval is a step-1 credential, not a step-2 one. It substitutes for the
+          passphrase or the kit, and the person then signs in as themselves with the PIN they
+          still have. Passing an opener here would let "another member tapped approve" become
+          "and now you may become anyone", which is a different and much larger permission
+          than the one that was granted.
+        -->
+        <ColdSignInPanel surface="load-pod-unlock" @approved="finishLoaded()" />
+      </div>
+
       <!-- Password form -->
       <!-- Nothing can open this file: the honest message, and no field to fill. -->
       <div
@@ -1538,6 +1607,20 @@ async function handleDriveRefresh() {
             <circle cx="12" cy="13" r="4" />
           </svg>
           {{ isScanningKit ? t('recovery.kitScanReading') : t('recovery.kitScanPhoto') }}
+          <!--
+            ⚠️ NO `capture` ATTRIBUTE, deliberately — it was added here and reverted.
+            With `capture` present, iOS Safari and Android Chrome open the viewfinder
+            DIRECTLY, with no "Photo Library" and no "Files" entry. That makes the saved kit
+            PDF — the artefact `RecoveryKitDisplay.exportKitPdf` exists to produce, and the
+            one this label offers first — impossible to select, and there is nothing
+            physical to photograph. `recovery.kitScanFailed` then tells the user to try the
+            saved PDF, which the attribute just made unreachable.
+
+            `PhotoAttachments` and `AiDocumentPicker` do set `capture`, but both keep TWO
+            pickers side by side (a camera one and a files one). A single capture input is
+            not that pattern; adding the second picker here is the right shape and is left
+            as follow-up rather than guessed at now.
+          -->
           <input
             type="file"
             accept="image/*,application/pdf,.pdf"
@@ -1634,6 +1717,23 @@ async function handleDriveRefresh() {
         <p class="dark:text-ink-soft mt-1 text-sm text-gray-500">
           {{ t('loginV6.loadPodSubtitle') }}
         </p>
+      </div>
+
+      <!--
+        ⚠️ ABOVE THE STORAGE CARDS, NOT BELOW THEM. This panel used to be the very last
+        thing on the page, under the Drive card, a divider, "open a saved file" and the
+        security blurbs — and this file's own comment admitted the consequence: a person
+        holding a link "lands on this page and finds storage-provider cards and no way to
+        use what they are holding".
+
+        ⚠️ PASTE ONLY, NOT THE SCAN PANEL. At this step no `.beanpod` is staged yet — the
+        person is still choosing where theirs lives — and a pull-mode QR polls the staged
+        file for its approval. It would render and wait forever here. A pasted magic link
+        works, because the link carries its own fileId. The scan panel lives on the decrypt
+        step below, where a pod is in hand.
+      -->
+      <div class="mb-6">
+        <PasteLinkPanel />
       </div>
 
       <!-- Error -->
@@ -2075,16 +2175,6 @@ async function handleDriveRefresh() {
           </div>
         </div>
       </template>
-
-      <!-- ⚠️ ALSO HERE, not only on the welcome gate and the join screen. "Welcome back" is
-           what someone taps when they think of themselves as signing in, which is exactly
-           what a magic link IS — so a person holding one lands on this page and finds
-           storage-provider cards and no way to use what they are holding. Same shared panel;
-           it routes to `/join`, which is where a link is redeemed regardless of which door
-           was used to get here. -->
-      <div class="mt-6">
-        <PasteLinkPanel />
-      </div>
     </template>
   </div>
 </template>

@@ -11,7 +11,7 @@ import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
-import MintedLinkPanel from '@/components/settings/MintedLinkPanel.vue';
+import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
 import { generateInviteQR } from '@/utils/qrCode';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';

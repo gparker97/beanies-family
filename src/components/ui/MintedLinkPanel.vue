@@ -39,7 +39,6 @@ const { copied, error, copy } = useClipboard({ surface: props.surface });
 <template>
   <div class="space-y-3">
     <InviteLinkCard
-      :link="link"
       :qr-url="qrUnavailable ? '' : qrUrl"
       :loading="loading"
       :qr-alt="qrAlt"

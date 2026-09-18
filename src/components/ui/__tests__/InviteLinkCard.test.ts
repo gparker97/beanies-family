@@ -10,7 +10,6 @@ vi.mock('@/composables/useTranslation', () => ({
 
 describe('InviteLinkCard', () => {
   const defaultProps = {
-    link: 'https://example.com/join?fam=123&t=abc',
     qrUrl: 'data:image/png;base64,fakeQrData',
   };
 
