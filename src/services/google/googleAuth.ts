@@ -15,6 +15,7 @@ import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
 import { isPermanentRefreshFailure, isRefreshRejection } from './refreshFailure';
 import { revokeGrant, logTokenLifecycle } from './googleRevoke';
 import { encodeRedirectState, type RedirectMode, type RedirectGrant } from './redirectState';
+import { stashPickerSelection, PICKER_REDIRECT_RESULT_KEY } from './pickerRedirect';
 import {
   storeGoogleRefreshToken,
   getGoogleRefreshToken,
@@ -39,7 +40,14 @@ import {
   nativeOAuthParams,
 } from '@/constants/nativeOAuth';
 
-const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+/**
+ * Exported because the system-browser Picker request must send THIS SCOPE ALONE. Google's onepick
+ * rule is explicit — "only the drive.file scope is permitted for these apps and it can't be
+ * combined with any other scope" — and a probe confirmed the return carries exactly it. Exporting
+ * the symbol is what stops the picker call site retyping the URL and drifting from this one.
+ * ⚠️ Never `DRIVE_SCOPES` for that request: it adds `userinfo.email` and Google would reject it.
+ */
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 // Default (Drive) scope set. buildAuthUrl uses this unless a caller passes an
 // explicit scope (the calendar grant passes its own — see startRedirectAuth).
@@ -75,6 +83,10 @@ export const REDIRECT_AUTH_CODE_KEY = 'beanies_redirect_auth_code';
 // `CALENDAR_REDIRECT_CODE_KEY`; the native deep-link handler writes it directly
 // (constructing it here avoids a googleAuth→calendarAuth import cycle).
 export const REDIRECT_AUTH_CODE_KEY_CALENDAR = `${REDIRECT_AUTH_CODE_KEY}:calendar`;
+
+// The THIRD redirect slot, `…:picker`, is declared in `services/google/pickerRedirect.ts` rather
+// than here, because it parks a picked FILE ID LIST, not a one-time code, and nothing in this
+// module reads it. Noted here so all three slots stay discoverable from one place.
 
 // In-memory token state
 let accessToken: string | null = null;
@@ -1582,14 +1594,49 @@ async function performSilentRefresh(): Promise<string | null> {
   // incrementing. We now warn + report and continue with no stored token
   // (the caller chain still gets a clean null/`TokenExpiredError` signal).
   if (!currentRefreshToken) {
+    // ⚠️ `__pending__` IS PART OF THE LOOKUP, NOT AN AFTERTHOUGHT. Before a family is adopted the
+    // refresh token is stored under `PENDING_FAMILY_KEY` (see `commitAcquiredToken`'s
+    // `currentFamilyId ?? PENDING_FAMILY_KEY`), and until now the only reader of that key was
+    // `migratePendingRefreshToken`, which runs from `initializeAuth(familyId)` and therefore
+    // NEVER during a join. So a joiner who came back from any full-page redirect had a perfectly
+    // good refresh token sitting in IndexedDB that nothing would look at, and
+    // `tryGetSilentToken()` returned null.
+    //
+    // That is invisible on the auth redirect, because `completeRedirectAuth` exchanges the code
+    // and mints a fresh token on arrival. It is fatal on the system-browser PICKER redirect, whose
+    // code is deliberately never exchanged (it is `drive.file`-only and would strip
+    // `userinfo.email` off the main token) — so the picker return had no way to read the file it
+    // had just been granted, and the joiner was bounced back to the start.
+    //
+    // NARROW BY CONSTRUCTION: the pending key is tried ONLY when no family id resolves, i.e. the
+    // pre-family login/join window, which today yields no token at all. It cannot shadow a
+    // family-scoped token, and `clearGoogleSessionState` already clears it on sign-out.
+    //
+    // ⚠️ KNOWN, ACCEPTED, AND WORTH RE-READING IF THIS AREA MISBEHAVES. This is the one place the
+    // "adopt only a refresh token Google has accepted" discipline (established for
+    // `tryReconnectSilently` and `reconcileDriveTokenWithDoc`) is EXTENDED rather than newly
+    // introduced. It was judged safe because the pending slot is written only from local commit
+    // chokepoints, never from the shared-document adoption paths, so it cannot carry another
+    // member's token. The residual case is narrow and local: start a join on Google account A,
+    // abandon it without signing out, then start a DIFFERENT join in the same session intending
+    // account B — the stale pending token could be picked up silently. "Use a different Google
+    // account" sets `chooseAccount`, which bypasses every silent path, so there is a way out.
     const familyId = currentFamilyId ?? getActiveFamilyId();
-    if (familyId) {
+    const lookupKey = familyId ?? PENDING_FAMILY_KEY;
+    {
       try {
-        const stored = await getGoogleRefreshToken(familyId);
+        const stored = await getGoogleRefreshToken(lookupKey);
         if (stored) {
           currentRefreshToken = stored;
-          currentFamilyId = familyId;
-          console.warn('[googleAuth] Recovered refresh token from IndexedDB during silent refresh');
+          // Only adopt a REAL family id into module state. `__pending__` is a storage slot, not a
+          // family, and writing it here would send later `storeGoogleRefreshToken` calls to a key
+          // that `migratePendingRefreshToken` would then refuse to migrate.
+          if (familyId) currentFamilyId = familyId;
+          console.warn(
+            `[googleAuth] Recovered refresh token from IndexedDB during silent refresh (${
+              familyId ? 'family-scoped' : 'pending'
+            })`
+          );
         }
       } catch (e) {
         console.error('[googleAuth] Failed to read refresh token from IndexedDB:', e);
@@ -1597,7 +1644,7 @@ async function performSilentRefresh(): Promise<string | null> {
           surface: 'silent-refresh-idb-read',
           message: 'Failed to read refresh token from IndexedDB',
           error: e instanceof Error ? e : new Error(String(e)),
-          context: { family_id: familyId },
+          context: { family_id: lookupKey },
         });
       }
     }
@@ -2243,6 +2290,15 @@ function clearTokenState(): void {
   }
 }
 
+/**
+ * The only parameters a caller may add to the authorization URL.
+ *
+ * These are Google's documented Picker ("onepick") extras. Deliberately a closed union: see the
+ * note at the `params.set` loop in `buildAuthUrl` for what an open record would allow.
+ */
+type PickerAuthParam =
+  'trigger_onepick' | 'mimetypes' | 'allow_multiple' | 'file_ids' | 'allow_folder_selection';
+
 function buildAuthUrl(
   clientId: string,
   codeChallenge: string | undefined,
@@ -2252,7 +2308,10 @@ function buildAuthUrl(
   // OAuth scope string. Defaults to the Drive set; the calendar grant passes its
   // own scopes in (kept as a param, not imported, so googleAuth never depends on
   // calendarAuth — no import cycle). Pure URL construction; Drive default unchanged.
-  scope: string = DRIVE_SCOPES
+  scope: string = DRIVE_SCOPES,
+  // Extra Google Picker ("onepick") parameters. See `PickerAuthParam` for why the key type is a
+  // closed union rather than Record<string, string>.
+  extraParams?: Partial<Record<PickerAuthParam, string>>
 ): string {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -2277,6 +2336,16 @@ function buildAuthUrl(
   // collide: native sets a CSRF nonce + writes its own sessionStorage stash;
   // web sets the routing payload + writes NO stash.
   if (state) params.set('state', state);
+  // ⚠️ APPLIED LAST, WHICH IS WHY THE KEY TYPE IS CLOSED. `params.set` overwrites, so an open
+  // `Record<string, string>` would let any future caller silently replace `redirect_uri`, `scope`,
+  // `client_id` or `response_type` — the four parameters this module has already had to defend
+  // twice (the PKCE invariant below, ADR-026 amendment). With the union, passing `scope` here is a
+  // compile error instead of a runtime hijack.
+  if (extraParams) {
+    for (const [key, value] of Object.entries(extraParams)) {
+      if (value !== undefined) params.set(key, value);
+    }
+  }
   return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
@@ -2513,6 +2582,10 @@ function clearRedirectIntent(): void {
   try {
     sessionStorage.removeItem(REDIRECT_AUTH_CODE_KEY);
     sessionStorage.removeItem(REDIRECT_AUTH_KEY);
+    // The third slot. The pointer comment beside the key declarations advertises all three as
+    // discoverable together, so they are torn down together too: a parked file selection
+    // outliving a sign-out in the same tab would be consumed by whoever picks next.
+    sessionStorage.removeItem(PICKER_REDIRECT_RESULT_KEY);
   } catch (e) {
     console.warn('[googleAuth] failed to clear redirect-auth intent on teardown', e);
     reportError({
@@ -2569,6 +2642,11 @@ export interface RedirectAuthOptions {
    * consent'` asks for both and is the only value that gets a chooser AND a refresh token.
    */
   prompt?: 'consent' | 'select_account' | 'select_account consent';
+  /**
+   * Extra Google Picker ("onepick") URL parameters, e.g. `{ trigger_onepick: 'true' }`.
+   * Key type is a closed union; see `buildAuthUrl`.
+   */
+  extraParams?: Partial<Record<PickerAuthParam, string>>;
 }
 
 /**
@@ -2646,20 +2724,30 @@ export async function startRedirectAuth(
         codeVerifier,
         returnPath,
         state,
-        // Omit for Drive so the stash stays byte-identical to pre-P2.
-        ...(grant === 'calendar' ? { grant } : {}),
+        // ⚠️ GRANT-GENERIC, NOT `=== 'calendar'`. The literal that used to be here would have
+        // silently dropped a picker grant from the stash, and the native handler reads the grant
+        // from THIS stash (not from the decoded `state`), so the picker return would have fallen
+        // through to the Drive arm and committed a scope-stripped token. Drive is still the one
+        // omitted, so its stash stays byte-identical to pre-P2.
+        ...(grant === 'drive' ? {} : { grant }),
       } satisfies RedirectAuthState)
     );
     // ⚠️ `opts.prompt`, not a hardcoded `'consent'`. The native WebView needs the account
     // chooser for exactly the same reason the web redirect does: "sign in with a different
     // account" is unreachable without it, and `prompt=consent` actively SUPPRESSES it.
+    // ⚠️ THE NATIVE BRANCH ALWAYS SENDS A PKCE `code_challenge`, which the verified onepick probe
+    // did not. It should be inert, because a picker code is never exchanged, but it is an
+    // unverified deviation from the one configuration observed to work; it is a named watch item
+    // on the TestFlight run rather than a `grant`-shaped exception here, which would cost more
+    // than it protects.
     const authUrl = buildAuthUrl(
       clientId,
       codeChallenge,
       opts.prompt ?? 'consent',
       loginHint,
       state,
-      scope
+      scope,
+      opts.extraParams
     );
     // Resolves immediately; the redirect returns via the appUrlOpen listener.
     await Browser.open({ url: authUrl });
@@ -2692,7 +2780,8 @@ export async function startRedirectAuth(
     opts.prompt ?? 'consent',
     loginHint,
     stateParam,
-    scope
+    scope,
+    opts.extraParams
   );
   window.location.href = authUrl;
 }
@@ -2937,19 +3026,6 @@ export async function handleNativeAuthRedirect(
     return;
   }
 
-  // OAuth error on the redirect (most commonly access_denied = user declined
-  // consent): benign — clear pending state, no reportError.
-  if (error) {
-    await clearGoogleSessionState();
-    logEvent({
-      level: 'info',
-      surface: 'native-oauth',
-      message: `oauth declined/error on deep link: ${error}`,
-      context: { action: 'declined' },
-    });
-    return;
-  }
-
   // The stash is attacker-reachable state now that a custom scheme can invoke
   // this handler, and an unparseable stash used to throw into the `void`-ed
   // promise at the listener call site (an unhandled rejection). Treat corrupt
@@ -2978,6 +3054,53 @@ export async function handleNativeAuthRedirect(
       surface: 'native-oauth-state-mismatch',
       severity: 'error',
       message: 'native OAuth deep-link state mismatch — code discarded',
+    });
+    return;
+  }
+
+  // PICKER grant: the system-browser Google Picker returning a file selection.
+  //
+  // ⚠️ THIS ARM IS FIRST AFTER THE CSRF CHECK, AND THAT ORDER IS LOAD-BEARING. Each of the three
+  // arms below would do something actively harmful to a picker return:
+  //   - `error` calls `clearGoogleSessionState()`, so a joiner who CLOSED the file chooser would
+  //     be signed out of Google for changing their mind;
+  //   - `!code` files a `reportError`, paging a developer for the same non-event;
+  //   - the Drive fallthrough runs `completeRedirectAuth()`, which would exchange the
+  //     `drive.file`-ONLY code and commit it over the app's main Drive token, silently stripping
+  //     `userinfo.email` and breaking account resolution — the one outcome this whole mechanism
+  //     must never produce.
+  //
+  // ⚠️ AND IT MUST NOT CALL `clearGoogleSessionState()`, which all three neighbouring arms do.
+  // That is a full Google teardown (in-memory tokens AND the persisted refresh token), and the
+  // picker's entire premise is that the app's EXISTING Drive token survives to read the picked
+  // file. Clear the stash only. Unlike calendar, nothing downstream needs this stash's PKCE
+  // verifier, because a picker code is never exchanged.
+  if (stored.grant === 'picker') {
+    sessionStorage.removeItem(REDIRECT_AUTH_KEY);
+    // `params` is a verbatim parse of the deep link and `nativeBridgeUrl` forwards the whole
+    // query string byte-identically, so `picked_file_ids` arrives intact. Logs its own failure.
+    stashPickerSelection(params.get('picked_file_ids'), 'native');
+    onComplete(stored.returnPath);
+    return;
+  }
+
+  // OAuth error on the redirect (most commonly access_denied = user declined
+  // consent): benign — clear pending state, no reportError.
+  //
+  // ⚠️ MOVED BELOW THE CSRF CHECK (was above it). Two reasons. It let any installed app invoke
+  // the custom scheme with `?error=x` during a live auth and force a session teardown without
+  // ever matching the nonce; and a picker decline answered with `error=access_denied` would have
+  // signed a joiner out for closing a file chooser. One rule now holds: nothing branches on the
+  // stash before the state check. DELIBERATE DELTA: an error return that FAILS the check now
+  // reports `native-oauth-state-mismatch` (severity 'error', which does not page) instead of
+  // silently clearing. Genuine declines echo our `state` per OAuth 2.0 and are unaffected.
+  if (error) {
+    await clearGoogleSessionState();
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: `oauth declined/error on deep link: ${error}`,
+      context: { action: 'declined' },
     });
     return;
   }

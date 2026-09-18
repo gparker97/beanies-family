@@ -223,20 +223,51 @@ describe('drivePicker', () => {
     expect(result).toMatchObject({ kind: 'failed', reason: 'open', message: 'builder boom' });
   });
 
-  it("no callback within 30s → { kind: 'failed', reason: 'timeout' }", async () => {
+  /**
+   * ⚠️ REWRITTEN 2026-09-18 (#98). This used to assert that NO callback for 30s gave
+   * `reason: 'timeout'`. A frame that never calls back at all is now caught by the 8s bootstrap
+   * probe and reported as `'iframe'`, because that is the iOS failure and a joiner should not sit
+   * through half a minute of blank spinner to be told. `'timeout'` now means only "it loaded and
+   * then stalled", which the next test covers.
+   */
+  it("no 'loaded' callback within 8s → { kind: 'failed', reason: 'iframe' }", async () => {
     vi.useFakeTimers();
     mockPickerNamespace(() => {
       // never invoke callback
     });
 
     const promise = drivePicker.pickBeanpodFile('test-token');
-    // Advance past 30 s. The library load (gapi.load) is sync (cb is invoked
-    // synchronously in the mock above), so the timeout starts almost
-    // immediately. We need to flush microtasks AND advance timers.
-    await vi.advanceTimersByTimeAsync(30_001);
+    await vi.advanceTimersByTimeAsync(8_001);
+    const result = await promise;
+    expect(result).toMatchObject({ kind: 'failed', reason: 'iframe' });
+    if (result.kind === 'failed') expect(result.message).toMatch(/8000ms/);
+    vi.useRealTimers();
+  });
+
+  it('does NOT fire the bootstrap probe once the iframe has loaded', async () => {
+    vi.useFakeTimers();
+    let fire: ((d: unknown) => void) | undefined;
+    mockPickerNamespace((cb: (d: unknown) => void) => {
+      fire = cb;
+    });
+
+    const promise = drivePicker.pickBeanpodFile('test-token');
+    await vi.advanceTimersByTimeAsync(0);
+    fire?.({ action: 'loaded' });
+
+    // Past the bootstrap budget, but the frame DID load: still pending, not settled as 'iframe'.
+    await vi.advanceTimersByTimeAsync(8_001);
+    let settled = false;
+    void promise.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false);
+
+    // ⚠️ THE RE-ARM: the total budget is still 30s, so the stall fires at 30s, not at 8+30.
+    await vi.advanceTimersByTimeAsync(22_001);
     const result = await promise;
     expect(result).toMatchObject({ kind: 'failed', reason: 'timeout' });
-    if (result.kind === 'failed') expect(result.message).toMatch(/30000ms/);
     vi.useRealTimers();
   });
 

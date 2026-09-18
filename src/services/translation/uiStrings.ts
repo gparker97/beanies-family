@@ -9967,6 +9967,20 @@ const STRING_DEFS = {
     en: 'beanies can read photos, screenshots, PDFs and links.',
     beanie: 'beanies can read photos, screenshots, pdfs and links.',
   },
+  // A `.beanpod` arriving on the share sheet. NOT the generic unsupported copy: telling someone
+  // their own family file is an unreadable document is both untrue and a dead end, and this is
+  // the most natural thing a person whose join is stuck will try. The message names the two
+  // routes that actually work. It is deliberately not a join route itself: the share sheet hands
+  // over bytes with no Drive access, so opening them would fork the family's file.
+  'shareTarget.beanpod.title': {
+    en: "That's Your Family File",
+    beanie: "that's your family file",
+  },
+  'shareTarget.beanpod.message': {
+    en: 'To open it, use your invite link, or choose "Load a saved family file" on the welcome screen.',
+    beanie:
+      'to open it, use your invite link, or choose "load a saved family file" on the welcome screen.',
+  },
   'shareTarget.unrecognised.title': {
     en: 'Not Sure What That Is',
     beanie: 'not sure what that is',

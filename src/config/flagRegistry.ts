@@ -72,6 +72,17 @@ export const FLAG_REGISTRY = [
     description: 'Auto-generated to-do reminders before upcoming birthdays, parties, and trips.',
   },
   {
+    // EXIT CONDITION (the thing `podCompaction` below lacks, at a cost of twenty lines): this
+    // flag answers ONE question — does Google's system-browser Picker complete a real join on a
+    // real iPhone, on the installed app and on Safari? When it does, the selection rule becomes
+    // a named `shouldUseSystemBrowserPicker()` predicate and this entry is DELETED. It is not a
+    // permanent switch between two pickers.
+    id: 'systemBrowserPicker',
+    label: 'System-browser file picker',
+    description:
+      "Join/load: pick the family file via Google's full-page picker instead of the in-page iframe, which never renders on iPhone.",
+  },
+  {
     id: 'mealPlanner',
     label: 'Meal Planner',
     description:

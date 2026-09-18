@@ -93,8 +93,9 @@ export type DevicePlatform = 'ios' | 'android' | 'other';
  * tablet or reading Settings on their phone.
  *
  * Not to be confused with `getPlatform()`, which answers "which Capacitor
- * shell", or `utils/platformLabel.ts`, which is a Slack-only telemetry
- * vocabulary that must not cross into UI.
+ * shell", or `utils/platformLabel.ts`, which is an operational telemetry
+ * vocabulary (Slack pings and, via `platformContext()`, the diagnostic
+ * firehose) that must not cross into UI.
  *
  * Safe at module/SSR time (returns 'other' when `navigator` is missing).
  */

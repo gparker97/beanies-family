@@ -6,7 +6,7 @@
  * its internals ran against a stub and could not fail. A test that mocks the thing under test
  * is shaped like whatever we believed on the day we wrote it.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 const tryReconnectSilentlyMock = vi.fn(async (_hint: string) => {});
 const tryGetSilentTokenMock = vi.fn(async () => 'silent-token' as string | null);
@@ -32,10 +32,28 @@ vi.mock('@/services/google/googleAuth', () => ({
   // mock that always says "not a cancellation" would hide the branch under test.
   isUserCancellation: (e: unknown) =>
     /cancel|dismiss|popup_closed|user_cancel/i.test(e instanceof Error ? e.message : String(e)),
+  // Used to pin the picker grant to the account this token belongs to.
+  getEmailVerifiedForToken: () => getEmailVerifiedForTokenMock(),
+  DRIVE_FILE_SCOPE: 'https://www.googleapis.com/auth/drive.file',
 }));
 vi.mock('@/services/google/drivePicker', () => ({
   pickBeanpodFile: (t: string) => pickBeanpodFileMock(t),
 }));
+
+/**
+ * ⚠️ DEFAULT OFF, DELIBERATELY. `isFlagEnabled` returns TRUE for every flag in dev and under test
+ * (`flags.ts`: "every flag is available while building on main"), so without this mock the whole
+ * suite below silently exercised the system-browser redirect instead of the iframe Picker it was
+ * written for. The flag-on path has its own describe block at the end.
+ */
+const getEmailVerifiedForTokenMock = vi.hoisted(() =>
+  vi.fn<() => string | null>(() => 'joiner@example.com')
+);
+const getFileMetadataMock = vi.hoisted(() => vi.fn(async () => ({ name: 'smith.beanpod' })));
+vi.mock('@/services/google/driveService', () => ({ getFileMetadata: getFileMetadataMock }));
+
+const isFlagEnabledMock = vi.hoisted(() => vi.fn(() => false));
+vi.mock('@/config/flags', () => ({ isFlagEnabled: isFlagEnabledMock }));
 
 import { usePickBeanpodFile } from '../usePickBeanpodFile';
 
@@ -272,5 +290,217 @@ describe('a joiner must come away with OFFLINE ACCESS', () => {
     expect(requestAccessTokenMock).not.toHaveBeenCalled();
     expect(startRedirectAuthMock).not.toHaveBeenCalled();
     expect(pickBeanpodFileMock).toHaveBeenCalledWith('silent-token');
+  });
+});
+
+/**
+ * The system-browser Picker branch. Google permits `drive.file` ALONE on a onepick request and
+ * forbids combining it with any other scope, so these assertions are the compile-time-adjacent
+ * guard on a rule that is otherwise only written in a comment.
+ */
+describe('usePickBeanpodFile — the system-browser picker (flag on)', () => {
+  beforeEach(() => {
+    // Clear BEFORE setting return values: these mocks are shared with the suites above, so their
+    // call counts would otherwise leak in and every `not.toHaveBeenCalled()` here would be a lie.
+    pickBeanpodFileMock.mockClear();
+    startRedirectAuthMock.mockClear();
+    tryGetSilentTokenMock.mockClear();
+    getFileMetadataMock.mockClear();
+    isFlagEnabledMock.mockReturnValue(true);
+    tryGetSilentTokenMock.mockResolvedValue('silent-token');
+    shouldUseRedirectAuthMock.mockReturnValue(false);
+    sessionStorage.clear();
+  });
+  afterEach(() => isFlagEnabledMock.mockReturnValue(false));
+
+  it('redirects to Google with trigger_onepick and EXACTLY the drive.file scope', async () => {
+    const { pick } = usePickBeanpodFile();
+    const result = await pick();
+
+    expect(result).toEqual({ kind: 'redirecting' });
+    // Never the iframe Picker on this branch.
+    expect(pickBeanpodFileMock).not.toHaveBeenCalled();
+
+    const [, loginHint, mode, opts] = startRedirectAuthMock.mock.calls[0] as [
+      string,
+      string | undefined,
+      string,
+      { grant: string; scope: string; extraParams: Record<string, string> },
+    ];
+    expect(mode).toBe('join');
+    expect(opts.grant).toBe('picker');
+    expect(opts.extraParams).toEqual({ trigger_onepick: 'true' });
+    // ⚠️ THE RULE: drive.file and nothing else. A future scope addition must fail HERE, loudly,
+    // rather than at Google with an opaque rejection in front of a joiner.
+    expect(opts.scope).toBe('https://www.googleapis.com/auth/drive.file');
+    expect(opts.scope).not.toContain('userinfo.email');
+    // Pinned to the account the app holds a token for.
+    expect(loginHint).toBe('joiner@example.com');
+  });
+
+  /**
+   * greg's two observations from the first real run, both fixed here and both pinned so they
+   * cannot silently regress:
+   *   1. the account chooser had no pre-selection, so he had to find his own address in a list;
+   *   2. the picker opened on his whole Drive and he had to hunt across tabs and folders for a
+   *      `.beanpod` he had never seen.
+   * CLAUDE.md's cloud-auth rule asks for (1) explicitly whenever the identity is known, and on a
+   * join it always is: the inviter typed it and it rides the invite link.
+   */
+  it('pre-selects the account and filters to the one file the joiner came for', async () => {
+    const { pick } = usePickBeanpodFile();
+    await pick({ loginHint: 'invitee@example.com', expectedFileId: 'THE_POD' });
+
+    const [, loginHint, , opts] = startRedirectAuthMock.mock.calls[0] as [
+      string,
+      string | undefined,
+      string,
+      { extraParams: Record<string, string> },
+    ];
+    expect(loginHint).toBe('joiner@example.com'); // verified account wins when it is known
+    expect(opts.extraParams.file_ids).toBe('THE_POD');
+    expect(opts.extraParams.trigger_onepick).toBe('true');
+  });
+
+  it('falls back to the invite hint when the token account is not verified', async () => {
+    getEmailVerifiedForTokenMock.mockReturnValueOnce(null);
+    const { pick } = usePickBeanpodFile();
+    await pick({ loginHint: 'invitee@example.com' });
+
+    const [, loginHint] = startRedirectAuthMock.mock.calls[0] as [string, string | undefined];
+    // Without this the chooser opens with nothing pre-selected, which is what greg hit.
+    expect(loginHint).toBe('invitee@example.com');
+  });
+
+  it('omits the file filter when the caller does not know the id (the recovery banners)', async () => {
+    const { pick } = usePickBeanpodFile();
+    await pick();
+
+    const [, , , opts] = startRedirectAuthMock.mock.calls[0] as [
+      string,
+      string | undefined,
+      string,
+      { extraParams: Record<string, string> },
+    ];
+    // There the user genuinely IS choosing, so an unfiltered picker is correct.
+    expect(opts.extraParams.file_ids).toBeUndefined();
+  });
+
+  it('consumes a parked selection FIRST, without the auth chain or the iframe picker', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: 'FILE_Z', ts: Date.now() })
+    );
+
+    const { pick } = usePickBeanpodFile();
+    const result = await pick();
+
+    expect(result).toMatchObject({ kind: 'picked', fileId: 'FILE_Z' });
+    expect(startRedirectAuthMock).not.toHaveBeenCalled();
+    expect(pickBeanpodFileMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⚠️ THIS IS A SAFETY GUARD, NOT COSMETICS. Google's onepick return carries ids only, so a
+   * picked file arrives with `fileName: ''`. The ONLY gate stopping a rebind onto a compaction
+   * safety copy is `isSafetyCopyName`, which is NAME-based, and `isSafetyCopyName('')` is false.
+   * Without this resolve, picking `family (before compacting).beanpod` would re-home the whole
+   * family onto its own backup: the ADR-033 fork that guard exists to prevent.
+   */
+  it('puts the real file NAME back on a picker return', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: 'FILE_Z', ts: Date.now() })
+    );
+    getFileMetadataMock.mockResolvedValueOnce({ name: 'family (before compacting).beanpod' });
+
+    const { pick } = usePickBeanpodFile();
+    const result = await pick();
+
+    expect(result).toMatchObject({
+      kind: 'picked',
+      fileId: 'FILE_Z',
+      fileName: 'family (before compacting).beanpod',
+    });
+  });
+
+  it('leaves the name blank when there is no token to ask Drive with', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: 'FILE_Z', ts: Date.now() })
+    );
+    tryGetSilentTokenMock.mockResolvedValueOnce(null);
+
+    const { pick } = usePickBeanpodFile();
+    expect(await pick()).toMatchObject({ kind: 'picked', fileId: 'FILE_Z', fileName: '' });
+    expect(getFileMetadataMock).not.toHaveBeenCalled();
+  });
+
+  it('leaves the name blank when Drive cannot answer, so the owning layer refuses safely', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: 'FILE_Z', ts: Date.now() })
+    );
+    getFileMetadataMock.mockRejectedValueOnce(new Error('drive down'));
+
+    const { pick } = usePickBeanpodFile();
+    // Resolves structured rather than throwing; `rebindPodFile` fails closed on the empty name.
+    expect(await pick()).toMatchObject({ kind: 'picked', fileId: 'FILE_Z', fileName: '' });
+  });
+
+  /**
+   * "Sign in with a different Google account" is reached only by someone already stuck. Consuming
+   * a parked result there answers a question they did not ask, and after a cancel it would tell
+   * them they cancelled instead of showing the chooser.
+   */
+  /**
+   * ⚠️ DISCARDED, NOT STEPPED OVER, and the difference is a cross-ACCOUNT bug. Leaving the stash
+   * parked keeps account A's file id alive for five minutes; the next ordinary pick then consumes
+   * it under account B's token and the join binds to a file the new account may not be able to
+   * read. Asserting the key is GONE catches that; asserting "some other path ran" does not.
+   */
+  it('DISCARDS a parked result when the user asked to switch accounts', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: 'FILE_FROM_ACCOUNT_A', ts: Date.now() })
+    );
+
+    const { pick } = usePickBeanpodFile();
+    const result = await pick({ chooseAccount: true });
+
+    expect(sessionStorage.getItem('beanies_redirect_auth_code:picker')).toBeNull();
+    expect(result).toEqual({ kind: 'redirecting' });
+  });
+
+  /**
+   * `pick()` promises to ALWAYS resolve structured, and none of its three callers wraps it.
+   * `startRedirectAuth` can genuinely throw (sessionStorage in iOS private browsing, Browser.open,
+   * the PKCE challenge). Unhandled it would reject out of a bare `@click` and strand the step at
+   * 'authenticating' with no error and no telemetry: the exact symptom Phase 1 removes.
+   */
+  it('returns a structured failure when the redirect cannot even start', async () => {
+    startRedirectAuthMock.mockRejectedValueOnce(new DOMException('QuotaExceededError'));
+    const { pick } = usePickBeanpodFile();
+    const result = await pick();
+    // `'iframe'` → PICKER_IFRAME_BLOCKED at 'warning', NOT `'open'` → PICKER_FAILED at 'critical'.
+    // The realistic cause is iOS private browsing refusing sessionStorage: a platform condition,
+    // not a fault, and paging a developer for it is the mis-set this change removed elsewhere.
+    expect(result).toMatchObject({ kind: 'failed', reason: 'iframe' });
+  });
+
+  it('reports a cancelled picker as cancelled, never as a silent no-op', async () => {
+    sessionStorage.setItem(
+      'beanies_redirect_auth_code:picker',
+      JSON.stringify({ ids: '', ts: Date.now() })
+    );
+    const { pick } = usePickBeanpodFile();
+    expect(await pick()).toEqual({ kind: 'cancelled' });
+  });
+
+  it('still prefers a direct read: resolveWithoutPicker wins over the redirect', async () => {
+    const { pick } = usePickBeanpodFile();
+    const result = await pick({ resolveWithoutPicker: async () => true });
+    expect(result).toEqual({ kind: 'loaded' });
+    expect(startRedirectAuthMock).not.toHaveBeenCalled();
   });
 });

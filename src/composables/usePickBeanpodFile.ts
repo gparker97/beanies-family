@@ -6,10 +6,20 @@ import {
   tryGetSilentToken,
   isPopupBlocked,
   isUserCancellation,
+  getEmailVerifiedForToken,
+  DRIVE_FILE_SCOPE,
 } from '@/services/google/googleAuth';
 import { pickBeanpodFile, type PickBeanpodFileResult } from '@/services/google/drivePicker';
+import { getFileMetadata } from '@/services/google/driveService';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { logEvent } from '@/services/telemetry/logEvent';
+import {
+  consumePickerRedirectResult,
+  discardPickerRedirectResult,
+  PICKER_EVENTS,
+} from '@/services/google/pickerRedirect';
+import { isFlagEnabled } from '@/config/flags';
+import { platformContext } from '@/utils/platformLabel';
 
 /**
  * Composable for re-picking a `.beanpod` file from Google Drive — used by
@@ -23,6 +33,79 @@ import { logEvent } from '@/services/telemetry/logEvent';
  * `window.open` either fails or can't bridge `postMessage` back to
  * the app window.
  */
+/**
+ * Put the real file NAME back on a system-browser picker result.
+ *
+ * ⚠️ THIS IS A SAFETY GUARD, NOT COSMETICS, and that is easy to miss. Google's onepick return
+ * carries `picked_file_ids` and nothing else, so a picked file arrives with `fileName: ''`. The
+ * only content gate stopping a rebind onto a compaction safety copy is `isSafetyCopyName`, which
+ * is NAME-based — and `isSafetyCopyName('')` is false. Without this resolve, selecting
+ * `family (before compacting).beanpod` from the picker would re-home the whole family onto its own
+ * backup, which is exactly the ADR-033 fork that guard exists to prevent. The iframe Picker never
+ * had this problem because it always carried `docs[0].name`.
+ *
+ * `rebindPodFile` also fails closed on an empty name, so this is belt AND braces: this restores
+ * the working path, that one keeps it safe if this fails.
+ *
+ * Never throws: a metadata blip must cost the caller nothing worse than an empty name, which the
+ * owning layer already refuses safely.
+ */
+async function resolvePickedName(result: PickBeanpodFileResult): Promise<PickBeanpodFileResult> {
+  if (result.kind !== 'picked' || result.fileName) return result;
+  try {
+    const token = await tryGetSilentToken();
+    if (!token) {
+      console.warn('[usePickBeanpodFile] no token to resolve the picked file name; leaving blank');
+      // ⚠️ THE MOST LIKELY OF THE THREE DEGRADED PATHS, so it is the one that most needs a rate.
+      // Its siblings below (`!name`, and the catch) already emit this; leaving the common case
+      // un-instrumented would make "how often does the safety-copy guard degrade to a blank
+      // name?" unanswerable from CloudWatch for exactly the reason that causes it most.
+      logEvent({
+        level: 'warn',
+        surface: PICKER_EVENTS.surface,
+        message: 'no token available to resolve the picked file name',
+        context: { ...platformContext(), action: PICKER_EVENTS.nameUnresolved },
+      });
+      return result;
+    }
+    const meta = await getFileMetadata(token, result.fileId, 'name');
+    const name = typeof meta.name === 'string' ? meta.name : '';
+    if (!name) {
+      console.warn('[usePickBeanpodFile] Drive returned no name for the picked file');
+      logEvent({
+        level: 'warn',
+        surface: PICKER_EVENTS.surface,
+        message: 'picked file has no resolvable name; safety-copy guard cannot be evaluated',
+        context: { ...platformContext(), action: PICKER_EVENTS.nameUnresolved },
+      });
+      return result;
+    }
+    return { ...result, fileName: name };
+  } catch (e) {
+    console.warn(
+      '[usePickBeanpodFile] could not resolve the picked file name; the caller will refuse a ' +
+        'rebind rather than risk binding onto a compaction safety copy',
+      e
+    );
+    logEvent({
+      level: 'warn',
+      surface: PICKER_EVENTS.surface,
+      message: 'picked file name lookup failed',
+      context: { ...platformContext(), action: PICKER_EVENTS.nameUnresolved },
+      error: e,
+    });
+    return result;
+  }
+}
+
+/**
+ * Where a full-page redirect should land the user again. Both "this page is going away" exits in
+ * `pick()` use it, so they cannot drift apart.
+ */
+function currentReturnPath(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 export function usePickBeanpodFile() {
   const isPicking = ref(false);
   const pickError = ref<string | null>(null);
@@ -96,8 +179,48 @@ export function usePickBeanpodFile() {
      * confusing step on the paths where it succeeds.
      */
     resolveWithoutPicker?: (token: string) => Promise<boolean>;
+    /**
+     * The Drive file id this pick is looking for, when the caller already knows it (a join link
+     * carries it as `fid=`). Used ONLY to filter the system-browser picker down to that one file,
+     * so the joiner is not made to hunt for a `.beanpod` they have never seen across someone
+     * else's Drive. Omitted by the recovery banners, where the user genuinely is choosing.
+     */
+    expectedFileId?: string;
   }): Promise<PickBeanpodFileResult> {
     const chooseAccount = opts?.chooseAccount ?? false;
+
+    // ⚠️ FIRST, BEFORE ANY AUTH WORK. If the system-browser Picker just sent us back, the
+    // selection is parked and this call IS the pick. Returning here is what closes the loop;
+    // without it the redirect would land, the value would sit unread, and the user would be
+    // looking at the same "Choose your data file" button that sent them to Google.
+    //
+    // ⚠️ EXCEPT WHEN THE USER ASKED TO SWITCH ACCOUNTS. `chooseAccount` comes from "Sign in with a
+    // different Google account", a control only reached by someone already stuck. Consuming a
+    // parked result there answers a question they did not ask — worst case they tapped it after
+    // cancelling in Google's UI and are told "you cancelled" instead of being shown the chooser.
+    if (chooseAccount) {
+      // ⚠️ DISCARD, DO NOT STEP OVER. Leaving it parked keeps account A's file id alive for five
+      // minutes; the next ordinary pick then consumes it under account B's token and the join
+      // binds to a file the new account may not be able to read. Asking for a different account
+      // means the previous account's selection is void, so say that.
+      discardPickerRedirectResult();
+    } else {
+      const fromRedirect = consumePickerRedirectResult();
+      if (fromRedirect) {
+        // ⚠️ THE BUSY FLAG COVERS THE NAME LOOKUP TOO. `resolvePickedName` makes a Drive round
+        // trip, and `SaveFailureBanner` disables its buttons on `isPicking` alone — without this,
+        // a second tap during that window finds the stash already cleared, falls through to the
+        // auth chain and navigates the page to Google mid-rebind.
+        isPicking.value = true;
+        pickError.value = null;
+        try {
+          return await resolvePickedName(fromRedirect);
+        } finally {
+          isPicking.value = false;
+        }
+      }
+    }
+
     const offlineAccess = opts?.offlineAccess ?? false;
     // Suppress the hint when the whole point is to pick a different account.
     const loginHint = chooseAccount ? undefined : opts?.loginHint;
@@ -143,7 +266,7 @@ export function usePickBeanpodFile() {
         }
         if (!token) {
           if (shouldUseRedirectAuth()) {
-            const returnPath = `${window.location.pathname}${window.location.search}`;
+            const returnPath = currentReturnPath();
             await startRedirectAuth(returnPath, loginHint, 'join', {
               // The redirect path hardcoded `prompt=consent`, so it could not show the chooser
               // either. Pass it through so "different account" means that on iOS too.
@@ -205,6 +328,101 @@ export function usePickBeanpodFile() {
             context: { action: 'direct_load_threw' },
           });
         }
+      }
+
+      // THE SYSTEM-BROWSER PICKER, when the flag is on.
+      //
+      // Placed here, at the one `pickBeanpodFile` call, so all three consumers (the join flow and
+      // both pod-recovery banners) get it with NO code of their own: each already switches on
+      // `PickBeanpodFileResult` with `assertNever` and already handles `'redirecting'`, so no new
+      // result kind is needed. Branching in the join path instead would duplicate this into both
+      // banners later and bypass the `isPicking` bookkeeping `useDriveFileReselect` exists to
+      // guarantee.
+      //
+      // ⚠️ AFTER `resolveWithoutPicker`, so a file the app can already read is still read
+      // directly and nobody is sent to Google for nothing.
+      //
+      // ⚠️ GATED ON THE FLAG ALONE, not `flag && shouldUseRedirectAuth()`, so this runs on EVERY
+      // platform including desktop Chrome, where the old iframe Picker works fine.
+      //
+      // ⚠️ AND THE FLAG IS COMMITTED `true` (0.21.3), so that is not a dev-only statement: every
+      // production join and every pod-recovery reselect takes this path. An earlier version of
+      // this comment said "production safety is the committed false" — true when written, false
+      // now. Do not reinstate that reasoning. The actual basis for shipping is that greg ran the
+      // full join end to end on desktop Chrome AND Firefox, where the iframe Picker was failing
+      // with the same symptoms as iOS Safari, and judged the chooser it replaces bad enough that
+      // a regression on an already-working browser is the better risk. The kill switch is a
+      // revert of `featureFlags.committed.ts` plus a deploy, not a runtime toggle.
+      //
+      // Native iOS is still UNVERIFIED. See the exit condition on the flagRegistry entry.
+      if (isFlagEnabled('systemBrowserPicker')) {
+        const returnPath = currentReturnPath();
+        logEvent({
+          level: 'info',
+          surface: PICKER_EVENTS.surface,
+          message: 'system-browser picker redirect starting',
+          context: { ...platformContext(), action: PICKER_EVENTS.start },
+        });
+        try {
+          await startRedirectAuth(
+            returnPath,
+            // Pin the grant to the account the app actually holds a token for. Verified against
+            // THIS token, never a cached best-guess: the same failure class `setAuthUser` was
+            // added to fix, where the chooser listed the wrong account's Drive.
+            // ⚠️ FALL BACK TO THE INVITE'S HINT. `getEmailVerifiedForToken` only answers when the
+            // email was verified against THIS exact token, which on a join it usually has not been
+            // — so passing it alone sent the joiner to an account chooser with no pre-selection and
+            // made them hunt for their own address. CLAUDE.md's cloud-auth rule is explicit:
+            // pre-populate the chooser whenever the expected identity is known, and on a join it is
+            // (the inviter typed it). Verified email first, because that is the account the grant
+            // will actually land on; the invite hint second, because it is better than nothing.
+            getEmailVerifiedForToken(token) ?? loginHint,
+            'join',
+            {
+              grant: 'picker',
+              // ⚠️ `drive.file` ALONE. Google forbids combining it on a onepick request, and a
+              // probe confirmed the return carries exactly this scope. Never `DRIVE_SCOPES`.
+              scope: DRIVE_FILE_SCOPE,
+              extraParams: {
+                trigger_onepick: 'true',
+                // ⚠️ SHOW ONLY THE FILE THEY CAME FOR. Unfiltered, the picker opens on the user's
+                // whole Drive and the joiner has to hunt across tabs and folders for a `.beanpod`
+                // they have never seen — the iframe Picker at least applied `setQuery('*.beanpod')`
+                // and a "Shared with me" view first. Google's onepick takes `file_ids` as a filter,
+                // and on a join we know the id exactly: it rides the invite link as `fid=`.
+                // Omitted when unknown (the recovery banners), where an unfiltered picker is right.
+                ...(opts?.expectedFileId ? { file_ids: opts.expectedFileId } : {}),
+              },
+            }
+          );
+        } catch (e) {
+          // ⚠️ `pick()` PROMISES TO ALWAYS RESOLVE STRUCTURED, and none of its three callers wraps
+          // it. `startRedirectAuth` can genuinely throw here — `sessionStorage.setItem` on the
+          // native branch, `generateCodeChallenge`, `Browser.open()` — and iOS Safari private
+          // browsing makes the storage write a real failure mode. Unhandled, it would reject out
+          // of a bare `@click`, leaving the step stuck at 'authenticating' with no error and no
+          // telemetry: exactly the stranded-step symptom Phase 1 exists to remove, reintroduced
+          // on the new path.
+          const message = e instanceof Error ? e.message : String(e);
+          console.error('[usePickBeanpodFile] system-browser picker redirect failed', e);
+          pickError.value = message;
+          logEvent({
+            level: 'error',
+            surface: PICKER_EVENTS.surface,
+            message: 'system-browser picker redirect could not start',
+            context: { ...platformContext(), action: PICKER_EVENTS.startFailed },
+            error: e,
+          });
+          // ⚠️ NOT `reason: 'open'`, which maps to PICKER_FAILED at 'critical'. The realistic
+          // causes here are `sessionStorage.setItem` in iOS private browsing, a blocked
+          // `Browser.open`, or the PKCE challenge: structural user/platform configuration, the
+          // same class this change deliberately moved OFF the pager for the iframe arm. Paging a
+          // developer because a joiner browses privately is the mis-set we just removed.
+          return { kind: 'failed', reason: 'iframe', message };
+        }
+        // Same contract as the auth redirect above: the page is going away, the user has done
+        // nothing, and this is emphatically not a cancel.
+        return { kind: 'redirecting' };
       }
 
       // pickBeanpodFile always resolves to a structured result by

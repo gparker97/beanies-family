@@ -44,6 +44,7 @@ import {
 } from '@/services/google/googleAuth';
 import { usePickBeanpodFile } from '@/composables/usePickBeanpodFile';
 import { getDeviceInfo, tail } from '@/utils/diagnostics';
+import { platformContext } from '@/utils/platformLabel';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -65,6 +66,11 @@ export type AwaitingReason =
   | 'initial' // first arrival, or a local-provider flow waiting on the drop zone
   | 'needs-pick' // consent is done; the file still has to be picked to grant access
   | 'cancelled' // the user dismissed the Picker
+  // The pick FAILED (not cancelled). Distinct from 'cancelled' because this reason drives
+  // user-facing copy, and telling someone who hit an error that they "cancelled" is untrue.
+  // The error banner above the step says what actually broke; this reason only gets the
+  // primary CTA back on screen.
+  | 'failed'
   | 'redirecting'; // we just navigated them to Google; this page is going away
 
 export type JoinStep =
@@ -84,6 +90,10 @@ export type JoinErrorCode =
   | 'OAUTH_POPUP_BLOCKED'
   | 'PICKER_SCRIPT_LOAD_FAILED'
   | 'PICKER_FAILED'
+  // The Picker iframe never bootstrapped (no 'loaded' callback). A STRUCTURAL PLATFORM
+  // condition, not a fault: see the registry entry for why it is 'warning' and PICKER_FAILED
+  // stays 'critical'.
+  | 'PICKER_IFRAME_BLOCKED'
   | 'PICKER_UNAVAILABLE'
   | 'PICKER_AUTH_FAILED'
   | 'PICKER_TIMEOUT'
@@ -247,6 +257,28 @@ export const JOIN_ERRORS = {
     severity: 'critical',
   },
   /**
+   * The Picker iframe was built and shown, and then never called back at all — no `'loaded'`,
+   * no `CANCEL`. On the installed iOS app that is the expected outcome BY CONSTRUCTION, because
+   * the document origin is `capacitor://app.beanies.family`, which Google cannot validate as a
+   * JavaScript origin; on iOS Safari it is ITP partitioning the `docs.google.com` frame's
+   * storage after the trip through `accounts.google.com`.
+   *
+   * ⚠️ 'warning', DELIBERATELY, AND THE REASON IS THE 8s BUDGET. Detecting this at 8s instead of
+   * 30s means strictly MORE occurrences reach the alert channel, because fewer users background
+   * away first. Paging a developer on a structural platform condition is a rate to watch in the
+   * firehose, not an incident — the same call the registry already makes at INVITE_TOKEN_EXPIRED
+   * and NO_UNCLAIMED_MEMBERS. All severities still reach CloudWatch, so no signal is lost.
+   * `PICKER_FAILED` (a genuine throw from `build()`/`setVisible`) stays 'critical'.
+   *
+   * Shares `join.error.pickerFailed`: the user-facing sentence is identical and a second string
+   * saying the same thing in other words is a translation cost for nothing.
+   */
+  PICKER_IFRAME_BLOCKED: {
+    messageKey: 'join.error.pickerFailed',
+    recoveries: ['retry', 'signInDifferentAccount', 'tryAnotherDevice'],
+    severity: 'warning',
+  },
+  /**
    * The Picker cannot run because THIS BUILD is misconfigured — `VITE_GOOGLE_API_KEY` is unset,
    * so `drivePicker` refuses before touching gapi.
    *
@@ -272,6 +304,21 @@ export const JOIN_ERRORS = {
     recoveries: ['signInDifferentAccount', 'retry', 'tryAnotherDevice'],
     severity: 'warning',
   },
+  /**
+   * The Picker iframe loaded and then went quiet for the rest of the 30s window.
+   *
+   * ⚠️ NARROWER THAN IT WAS, AND THAT IS WHY IT STAYS 'critical'. Before the 8s bootstrap probe
+   * this code absorbed the common iOS case (a frame that never called back at all), which is a
+   * structural platform condition and not worth paging on. That case is now
+   * `PICKER_IFRAME_BLOCKED` at 'warning'. What is left here is a frame that demonstrably
+   * bootstrapped and then stalled, which is rare and genuinely an incident.
+   *
+   * DECISION POINT, deliberately left open rather than guessed: `recordError` now ships `os` and
+   * `detail` on every join error, so once there is production data, check whether what remains
+   * here still clusters on one platform. If it does, it is structural too and belongs at
+   * 'warning' beside its sibling. Downgrading costs no diagnostic signal: `reportError` gates
+   * Slack on 'critical' alone, and every severity reaches CloudWatch regardless.
+   */
   PICKER_TIMEOUT: {
     messageKey: 'join.error.pickerTimeout',
     recoveries: ['retry', 'tryAnotherDevice'],
@@ -540,6 +587,13 @@ export function useJoinFlow() {
       severity: JOIN_ERRORS[code].severity,
       context: {
         error_code: code,
+        // ⚠️ WHICH PLATFORM THIS CAME FROM. Every join error code is reported from here, so
+        // one spread answers it for all of them rather than patching the picker codes alone.
+        // Without it a PICKER_TIMEOUT in CloudWatch cannot be attributed: the UA that
+        // `enrichAndRedact` already stamps cannot separate the native WKWebView from Mobile
+        // Safari, and that is precisely the distinction #98 turns on. Both keys are already
+        // allowlisted and already mirrored in the Lambda, so nothing else has to change.
+        ...platformContext(),
         // ⚠️ TAILED, NOT RAW. These two keys are on the telemetry allowlist, so whatever
         // they hold reaches CloudWatch and (on a critical) Slack. Assigned raw they carried
         // the FULL value despite the `_tail` names: a live 24h invite token, and a Drive file
@@ -756,12 +810,49 @@ export function useJoinFlow() {
    * path), or 'auth' if no silent token is available. Errors set
    * `FILE_READ_FAILED`.
    */
+  /**
+   * The last (fileId, token) pair observed to need the Picker.
+   *
+   * ⚠️ INSTANCE SCOPE, NOT MODULE SCOPE. `tryAutoLoadByFileId` takes no arguments and reads
+   * `targetFileId` from closure, so this lives inside `useJoinFlow()`. At module scope it would
+   * leak across join attempts and across unit tests, which is the failure mode this kind of
+   * optimisation usually ships with.
+   *
+   * WHY: the ordinary init-then-tap sequence issues up to THREE identical Drive reads — `init()`
+   * → `runCloudFlow(false)`, the tap's `runCloudFlow(true)`, and `resolveWithoutPicker`. The
+   * second and third are deliberate (see the comments on `resolveWithoutPicker`) and must not be
+   * deleted; only a read that would repeat a KNOWN answer with the SAME token is skipped.
+   *
+   * INVALIDATION: every exit BELOW the token check writes this (the 404/403 branch sets it, every
+   * other exit nulls it), and `doPickAndLoad`'s `'picked'` arm nulls it because a successful pick
+   * creates the grant. The two early returns ABOVE the token check (no provider/fileId, and no
+   * silent token) deliberately leave it untouched: they never reached Drive, so they have no
+   * verdict to record, and a stale entry cannot mislead because the memo is keyed on
+   * `(fileId, token)` and can only ever replay the same answer for the same pair.
+   */
+  let lastNeedsPick: { fileId: string; token: string } | null = null;
+
   async function tryAutoLoadByFileId(): Promise<'loaded' | 'needs-pick' | 'auth' | 'error'> {
     if (targetProvider.value !== 'google_drive' || !targetFileId.value) {
       return 'auth';
     }
     const silent = await tryGetSilentToken();
     if (!silent) return 'auth';
+
+    // ⚠️ SHORT-CIRCUITS ONLY 'needs-pick', which is the one outcome decided by the HTTP status
+    // alone and so is exact to replay. Every other exit consults `syncStore.error` /
+    // `result.payloadError`, where a skipped call could report a stale error.
+    //
+    // ⚠️ KEYED ON THE TOKEN AS WELL AS THE FILE. `usePickBeanpodFile` runs
+    // `tryReconnectSilently(loginHint)` before `tryGetSilentToken()`, which can mint a token for a
+    // DIFFERENT account — that retry is a genuine recovery and must not be suppressed. A coarser
+    // "skip if the last call said needs-pick" rule would wrongly kill it.
+    if (lastNeedsPick?.fileId === targetFileId.value && lastNeedsPick.token === silent) {
+      return 'needs-pick';
+    }
+    // Fail open: from here every exit rewrites the memo, so an unexpected path costs a repeated
+    // read (today's behaviour) and never a wrong answer.
+    lastNeedsPick = null;
 
     const fileName = expectedFileName.value || 'family.beanpod';
     const result = await syncStore.loadFromGoogleDrive(targetFileId.value, fileName);
@@ -780,7 +871,10 @@ export function useJoinFlow() {
     // means the `drive.file` scope hasn't granted API-level access yet → the
     // Picker is the recovery path. Locale-independent: the old substring match
     // silently failed for non-English Drive messages, dead-ending the iOS join.
-    if (result.status === 404 || result.status === 403) return 'needs-pick';
+    if (result.status === 404 || result.status === 403) {
+      lastNeedsPick = { fileId: targetFileId.value, token: silent };
+      return 'needs-pick';
+    }
 
     // A classified blocker (a file from a newer beanies, a torn or oversized
     // one) gets its own code through the ONE mapper; `FILE_READ_FAILED` is the
@@ -814,8 +908,10 @@ export function useJoinFlow() {
    *   - `failed/config` or `failed/load` → `PICKER_SCRIPT_LOAD_FAILED`
    *     (true script/config issues)
    *   - `failed/timeout` → `PICKER_TIMEOUT`
-   *   - `failed/open` or `failed/auth` or `failed/iframe` →
-   *     `PICKER_FAILED` (picker reachable but wouldn't render)
+   *   - `failed/open` or `failed/auth` → `PICKER_FAILED` (a genuine throw out of
+   *     build()/setVisible — still 'critical')
+   *   - `failed/iframe` → `PICKER_IFRAME_BLOCKED` (the frame never called back, which on iOS
+   *     happens by construction — 'warning', deliberately off the pager)
    *
    * The underlying Error message rides in `currentError.context.message`
    * so the diagnostic blob — and the Slack alert via `recordError` —
@@ -842,7 +938,10 @@ export function useJoinFlow() {
     load: 'PICKER_SCRIPT_LOAD_FAILED',
     timeout: 'PICKER_TIMEOUT',
     open: 'PICKER_FAILED',
-    iframe: 'PICKER_FAILED',
+    // Split from `open` deliberately. `open` is a THROW out of build()/setVisible (a genuine
+    // fault, still 'critical'); `iframe` is the frame never calling back, which on iOS is a
+    // structural platform condition. See the PICKER_IFRAME_BLOCKED registry entry.
+    iframe: 'PICKER_IFRAME_BLOCKED',
   } as const satisfies Record<PickFailureReason, JoinErrorCode>;
 
   async function doPickAndLoad(chooseAccount = false): Promise<boolean> {
@@ -861,6 +960,9 @@ export function useJoinFlow() {
       // `offlineAccess` changes the prompt and nothing else.
       offlineAccess: true,
       loginHint: inviteEmailHint.value ?? undefined,
+      // The invite link carries the pod's file id, so the system-browser picker can show that
+      // ONE file instead of opening on the joiner's whole Drive.
+      expectedFileId: targetFileId.value ?? undefined,
       // ⚠️ RETRY THE DIRECT READ FIRST. The silent attempt in `runCloudFlow` runs BEFORE
       // authentication, so on a fresh browser it returns 'auth' without ever trying the
       // `fileId` — and nothing retried it once a token existed. Anyone whose app already
@@ -879,6 +981,10 @@ export function useJoinFlow() {
         return direct === 'loaded' || direct === 'error';
       },
     });
+
+    // A successful pick CREATES the grant, so any remembered "this needs the Picker" verdict is
+    // now stale and a later probe with the same token must be allowed to succeed.
+    if (picked.kind === 'picked') lastNeedsPick = null;
 
     // ⚠️ A `switch` with `assertNever`, NOT an `if` chain. A fifth `kind` must be a compile error
     // rather than another silent fall-through — which is precisely how `redirecting` spent its
@@ -901,6 +1007,14 @@ export function useJoinFlow() {
           reason: picked.reason,
           message: picked.message,
         });
+        // ⚠️ MOVE THE STEP, or the joiner is left with no button at all. `recordError` only sets
+        // `currentError`; it never touches `currentStep`, so without this the step stays at
+        // 'authenticating'. In `JoinPodView` the spinner renders on `isBusy && !currentErrorView`
+        // (now false, an error exists) and the CTA renders only on 'awaiting-auth' (also false),
+        // so NEITHER renders and the primary "Choose your data file" button disappears at exactly
+        // the moment it is needed. The error banner sits outside the step template, so moving the
+        // step shows the CTA *and* keeps the banner.
+        enterAwaiting('failed');
         return false;
 
       case 'loaded':
@@ -923,7 +1037,14 @@ export function useJoinFlow() {
     }
 
     targetFileId.value = picked.fileId;
-    targetFileName.value = picked.fileName;
+    // ⚠️ ONLY WHEN THE PICK ACTUALLY CARRIED A NAME. This was unconditional, which was harmless
+    // while every pick came from the iframe Picker (it always supplies `docs[0].name`). The
+    // system-browser Picker returns file IDS ONLY, so an unconditional assignment writes `''`
+    // here and DESTROYS the `fn=` value parsed from the invite link one line before it is used:
+    // `expectedFileName` reads `registryEntry?.displayPath ?? targetFileName.value`, so on any
+    // join where the registry lookup produced no displayPath (offline, registry miss) the
+    // fallback below would collapse to an empty name and the pod would bind with no name at all.
+    if (picked.fileName) targetFileName.value = picked.fileName;
 
     const fileName = expectedFileName.value || picked.fileName;
     const result = await syncStore.loadFromGoogleDrive(picked.fileId, fileName);

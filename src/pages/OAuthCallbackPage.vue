@@ -12,6 +12,7 @@ import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 import { CALENDAR_REDIRECT_CODE_KEY } from '@/services/calendar/calendarAuth';
 import { decodeRedirectState, isSameOriginReturnPath } from '@/services/google/redirectState';
+import { stashPickerSelection } from '@/services/google/pickerRedirect';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -58,6 +59,32 @@ onMounted(() => {
   // pre-bounce sessionStorage. `decodeRedirectState` validates the same-origin
   // returnPath (open-redirect guard) and returns null on anything malformed.
   const decoded = decodeRedirectState(stateParam);
+
+  // PICKER grant: the system-browser Google Picker returning a file selection.
+  //
+  // ⚠️ ABOVE THE CODE ARM ON PURPOSE, so ONE arm owns every picker outcome. Traced against the
+  // ladder below, both alternatives are actively wrong:
+  //   - a cancel returns neither `code` nor `error`, so it would fall past `if (code)` and
+  //     `if (error)` to the terminal `window.location.href = '/'`, DISCARDING THE INVITE URL and
+  //     dead-ending the joiner silently — the exact class of bug the comment block down there was
+  //     written to fix;
+  //   - a decline that DOES return `error=access_denied` would take the join arm and append
+  //     `?authError=access_denied`, which renders as a sign-in failure. True for a declined
+  //     consent, false for "I closed a file chooser".
+  // So every picker outcome, including cancel and decline, returns to `returnPath` (never `/`,
+  // never with `?authError`). The picked ids are parked for the next `pick()`.
+  if (decoded?.grant === 'picker') {
+    if (!stashPickerSelection(params.get('picked_file_ids'), 'web')) {
+      reportError({
+        surface: 'oauth.redirectStateLost',
+        severity: 'critical',
+        message: 'picker redirect returned but the selection could not be stashed',
+      });
+    }
+    window.location.href = decoded.returnPath;
+    return;
+  }
+
   if (decoded && code) {
     // Route the code to the grant's own key so a calendar code can never collide
     // with (or be consumed as) a Drive code. A full-page redirect makes only one

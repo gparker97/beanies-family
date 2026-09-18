@@ -40,6 +40,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH } from './resumePaths';
 import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
 import type { RecoveryOpener } from '@/composables/useLoginFlow';
+import { isPodFileName } from '@/constants/beanpodFile';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -1074,7 +1075,7 @@ async function handleDrop(e: DragEvent) {
   }
 
   // Validate file extension
-  if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+  if (!isPodFileName(file.name)) {
     formError.value = t('auth.fileLoadFailed');
     return;
   }
