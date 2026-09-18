@@ -42,16 +42,52 @@ export type RedirectMode = 'create' | 'join' | 'reconnect';
  * calendar state still parses returnPath/mode (and does drive-only, all it
  * supports), and a P2 build reading a pre-P2 state defaults to drive correctly.
  */
-export type RedirectGrant = 'drive' | 'calendar';
+export type RedirectGrant = 'drive' | 'calendar' | 'picker';
+
+/**
+ * ⚠️ `'picker'` IS NOT A GRANT THIS APP COMPLETES, and the name is otherwise actively
+ * misleading. No code is ever exchanged for it and no token is ever committed from it. It rides
+ * the auth `state` channel only because that is the channel which survives a cross-site redirect
+ * (see the header). Its ONLY payload of interest is the `picked_file_ids` Google appends to the
+ * return, which grants `drive.file` on the chosen file server-side, per (app, account, file).
+ *
+ * That matters because Google permits `drive.file` ALONE on a onepick request and forbids
+ * combining it with any other scope, so the returned code is scope-limited: committing it over
+ * the app's Drive token would silently strip `userinfo.email` and break account resolution. Three
+ * code paths could do that by accident, which is why this sentence lives on the type once instead
+ * of being restated at each return site.
+ */
 
 export const REDIRECT_STATE_VERSION = 1 as const;
+
+/**
+ * The state versions this build will DECODE. See `stateVersionForGrant` for why there are two.
+ */
+export const ACCEPTED_STATE_VERSIONS = [1, 2] as const;
+
+/**
+ * Which version a state is ENCODED at, by grant.
+ *
+ * ⚠️ THIS IS A CAPABILITY GATE, NOT A SCHEMA VERSION, and the distinction is the whole point.
+ * `v` is an exact-match gate in code that has ALREADY SHIPPED, so bumping it for picker states is
+ * the only lever we have over an older build: a stale service-worker-cached client decodes an
+ * unknown version as `null` and routes to the existing, reported, actionable "state lost" path,
+ * instead of defaulting the unknown grant to `'drive'` and committing a scope-stripped token.
+ * Drive and calendar stay at 1 so an auth already in flight across a deploy still completes.
+ *
+ * REMOVAL CONDITION, recorded so this does not become a permanent two-version decoder: once no
+ * v1-only build can still be served (the service-worker cache horizon plus the native build
+ * drain), collapse to a single version and delete this function.
+ */
+const stateVersionForGrant = (grant: RedirectGrant): (typeof ACCEPTED_STATE_VERSIONS)[number] =>
+  grant === 'picker' ? 2 : 1;
 
 export interface RedirectStatePayload {
   returnPath: string;
   mode: RedirectMode;
   /** Always resolved (absent on the wire ⇒ `'drive'`). */
   grant: RedirectGrant;
-  v: typeof REDIRECT_STATE_VERSION;
+  v: (typeof ACCEPTED_STATE_VERSIONS)[number];
 }
 
 const MODES: readonly RedirectMode[] = ['create', 'join', 'reconnect'];
@@ -63,12 +99,16 @@ export function encodeRedirectState(payload: {
   grant?: RedirectGrant;
 }): string {
   // Omit `grant` for Drive so the encoded state stays byte-identical to pre-P2.
+  const grant: RedirectGrant = payload.grant ?? 'drive';
   const full: Record<string, unknown> = {
     returnPath: payload.returnPath,
     mode: payload.mode,
-    v: REDIRECT_STATE_VERSION,
+    v: stateVersionForGrant(grant),
   };
-  if (payload.grant === 'calendar') full.grant = 'calendar';
+  // ⚠️ GRANT-GENERIC, NOT `=== 'calendar'`. The literal that used to be here silently dropped any
+  // third grant on the wire, so a picker state would have decoded as `'drive'` and been handed to
+  // the token-committing path. Drive is still the one omitted, so its state stays byte-identical.
+  if (grant !== 'drive') full.grant = grant;
   // btoa → URL-safe (canonical pattern, encoding.ts:31)
   return btoa(JSON.stringify(full)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -126,7 +166,9 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
     const parsed: unknown = JSON.parse(atob(b64));
     if (typeof parsed !== 'object' || parsed === null) return null;
     const obj = parsed as Record<string, unknown>;
-    if (obj.v !== REDIRECT_STATE_VERSION) return null;
+    if (!ACCEPTED_STATE_VERSIONS.includes(obj.v as (typeof ACCEPTED_STATE_VERSIONS)[number])) {
+      return null;
+    }
     if (typeof obj.mode !== 'string' || !MODES.includes(obj.mode as RedirectMode)) return null;
     const returnPath = obj.returnPath;
     // Same-origin relative path only. One implementation, shared by all three sinks.
@@ -144,10 +186,31 @@ export function decodeRedirectState(raw: string | null | undefined): RedirectSta
     // the whole class — backslashes, embedded tabs and newlines (which `new URL` strips),
     // anything else a hand-written prefix test will not think of — rather than one spelling.
     if (!isSameOriginReturnPath(returnPath)) return null;
-    // `grant` is optional on the wire; anything other than an explicit
-    // 'calendar' (absent, unknown, malformed) resolves to the 'drive' default.
-    const grant: RedirectGrant = obj.grant === 'calendar' ? 'calendar' : 'drive';
-    return { returnPath, mode: obj.mode as RedirectMode, grant, v: REDIRECT_STATE_VERSION };
+    // `grant` is optional on the wire; anything unrecognised (absent, unknown, malformed)
+    // resolves to the 'drive' default, which is the conservative reading for an old payload.
+    // ⚠️ `'picker'` IS ONLY HONOURED AT ITS OWN VERSION. `state` is unsigned, non-secret base64
+    // that anyone can craft, and unlike the auth grants the picker's payload is a bare file id
+    // straight off the query string rather than a Google-issued code. Pinning the grant to the
+    // version it is always encoded at keeps the two facts consistent and refuses a `v: 1` payload
+    // claiming to be a picker return, which nothing this app writes ever produces. (Impact was
+    // already bounded — `drive.file` 403s on a foreign id and `rebindPodFile` enforces the family
+    // id — but a narrower door is still the right door.)
+    const grant: RedirectGrant =
+      obj.grant === 'calendar'
+        ? 'calendar'
+        : obj.grant === 'picker' && obj.v === stateVersionForGrant('picker')
+          ? 'picker'
+          : 'drive';
+    // ⚠️ RETURN THE VERSION WE READ, not the constant. This used to hardcode
+    // `REDIRECT_STATE_VERSION`, which under an accept-set would report v1 for a v2 payload: a lie
+    // waiting for the first caller that trusts it. Nothing outside this module reads `v` today,
+    // which is exactly why it is cheap to get right now and expensive to get wrong later.
+    return {
+      returnPath,
+      mode: obj.mode as RedirectMode,
+      grant,
+      v: obj.v as (typeof ACCEPTED_STATE_VERSIONS)[number],
+    };
   } catch {
     return null;
   }

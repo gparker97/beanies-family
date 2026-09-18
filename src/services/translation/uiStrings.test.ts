@@ -140,6 +140,11 @@ describe('uiStrings', () => {
       // invite. The floor exists so a reader who does not know the joke cannot act wrongly, and
       // "bean" must never stand in for the member or their access here.
       'bean.unclaim.',
+      // #98 — a `.beanpod` offered on the share sheet. This names the FAMILY FILE and tells a
+      // stuck person how to actually get in, so "bean" must never stand in for the file or the
+      // invite link here. The rest of `shareTarget.*` is the cosmetic document-reader copy and
+      // is deliberately NOT covered.
+      'shareTarget.beanpod.',
       // The awaiting-auth card carries the sign-in and account-switch copy a stuck joiner reads.
       'join.awaiting.',
       // #88 — the three refusal surfaces in RecipeListSheet. A reader who does

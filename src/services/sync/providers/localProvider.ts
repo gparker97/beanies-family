@@ -12,6 +12,7 @@ import {
   verifyPermission,
 } from '../fileHandleStore';
 import { reportError } from '@/utils/errorReporter';
+import { POD_FILE_ACCEPT } from '@/constants/beanpodFile';
 
 /**
  * Classify a raw error from the File System Access API into a structured
@@ -298,7 +299,7 @@ export class LocalStorageProvider implements StorageProvider {
         types: [
           {
             description: 'beanies.family Data File',
-            accept: { 'application/json': ['.beanpod', '.json'] },
+            accept: { 'application/json': [...POD_FILE_ACCEPT] },
           },
         ],
       });

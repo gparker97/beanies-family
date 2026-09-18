@@ -342,6 +342,47 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  /**
+   * #98 — a joiner's refresh token lives under `__pending__` until a family is adopted, and until
+   * this fix the ONLY reader of that key was `migratePendingRefreshToken`, which runs from
+   * `initializeAuth(familyId)` and therefore never during a join.
+   *
+   * ⚠️ WHY THIS MATTERED ENOUGH TO TOUCH THE MOST INCIDENT-PRONE MODULE IN THE APP. It is
+   * invisible on the auth redirect, because `completeRedirectAuth` exchanges the code and mints a
+   * fresh token on arrival. It is FATAL on the system-browser picker redirect, whose code is
+   * deliberately never exchanged (it is `drive.file`-only and would strip `userinfo.email` off the
+   * main token). So the joiner came back from Google holding a grant to the family file, with a
+   * perfectly good refresh token sitting in IndexedDB that nothing would look at, and was bounced
+   * to the start of the join. greg reproduced exactly that in a browser.
+   */
+  describe('silent refresh recovers the PENDING refresh token (pre-family join)', () => {
+    it('looks under __pending__ when no family id has been adopted yet', async () => {
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        token: 'pending-refresh-token',
+        issuedAt: null,
+      });
+
+      await googleAuth.attemptSilentRefresh();
+
+      expect(getGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+    });
+
+    it('still prefers the family-scoped key once a family IS adopted', async () => {
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: 'family-refresh-token',
+        issuedAt: null,
+      });
+
+      await googleAuth.initializeAuth('family-123');
+      await googleAuth.attemptSilentRefresh();
+
+      // The pending key must never shadow a real family's token.
+      expect(getGoogleRefreshToken).toHaveBeenCalledWith('family-123');
+    });
+  });
+
   // Regression suite for the 2026-07-09 telemetry blindness. `hadRefreshToken`
   // alone cannot distinguish "user never connected Drive" from "Google revoked
   // the grant a moment ago", because the permanent branch clears the stored

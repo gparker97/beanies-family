@@ -10,9 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-18
 
-### Changed
+### Fixed
 
-- **greg's note on the pricing page says when the clock starts.** The "brass tacks" letter now spells out that the 90-day trial only begins when v1 lands, so "free while in beta" no longer sits awkwardly above the plans table. The note is also a little tighter, and signs off properly.
+- **Joining a family now works on the browsers where it did not.** Choosing your family file used
+  to open a chooser that, on iPhone and in Firefox, often never appeared at all: you waited, got an
+  unhelpful message, and ended up back where you started. It now opens in your browser rather than
+  inside the app, already pointed at your account, and shows the one file you were invited to
+  instead of your whole Drive.
+- **A file chooser that fails no longer takes the button with it.** If picking your family file went
+  wrong, the "Choose your data file" button disappeared, leaving nothing to try again with.
+- **A chooser that cannot open now says so in a few seconds** rather than after half a minute of
+  waiting.
+- **Sharing your family file into beanies says something true.** Sending a `.beanpod` to beanies
+  from your files or from Google Drive used to answer "beanies can read photos, screenshots, PDFs
+  and links", which was both wrong and a dead end. It now tells you what the file is and how to
+  actually open it.
 
 ### Added
 
@@ -22,6 +34,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **greg's note on the pricing page says when the clock starts.** The "brass tacks" letter now spells out that the 90-day trial only begins when v1 lands, so "free while in beta" no longer sits awkwardly above the plans table. The note is also a little tighter, and signs off properly.
 - **Asking for your PIN goes straight to the keypad.** Confirming your identity for things like transferring ownership or clearing data used to make you tap "Sign in with PIN" first, even when a PIN was the only option.
 - **Saving your recovery kit is a deliberate step.** Save it, print it, or tick to say you have it somewhere safe - then carry on.
 

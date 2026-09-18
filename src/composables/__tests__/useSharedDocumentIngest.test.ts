@@ -565,6 +565,55 @@ describe('share ingest — what it will and will not read', () => {
     expect(actions()).toEqual(['received', 'rejected_type']);
   });
 
+  /**
+   * #98 — the family file's own extension, arriving at the document reader.
+   *
+   * On iPhone, "Open with → beanies" from the Drive app routes through the Share Extension and
+   * lands here, where a `.beanpod` fails the image/PDF triage and used to get the generic
+   * "beanies can read photos, screenshots, PDFs and links" toast. That is the most natural thing
+   * a person whose join is stuck will try, answered with a sentence that is actively misleading
+   * about what beanies can do with their own family file.
+   *
+   * ⚠️ IT IS NOT A JOIN ROUTE, and must not become one: the share sheet hands over BYTES with no
+   * Drive grant, so opening them would fork the pod (ADR-033). This arm is honest messaging only.
+   */
+  it('recognises a .beanpod and says something true about it', async () => {
+    await ingestSharedContent(
+      { files: [new File(['{}'], 'smith-family.beanpod', { type: '' })] },
+      meta
+    );
+
+    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.beanpod.title', expect.anything());
+    // Never the generic unreadable-document message.
+    expect(showToast).not.toHaveBeenCalledWith(
+      'info',
+      'shareTarget.unsupported.title',
+      expect.anything()
+    );
+    expect(extractShareFromDocuments).not.toHaveBeenCalled();
+  });
+
+  it('claims a .beanpod even when it arrives alongside a caption', async () => {
+    await ingestSharedContent(
+      { files: [new File(['{}'], 'smith.beanpod', { type: '' })], text: 'here you go' },
+      meta
+    );
+    expect(showToast).toHaveBeenCalledWith('info', 'shareTarget.beanpod.title', expect.anything());
+  });
+
+  it('does NOT claim a shared .json away from the document reader', async () => {
+    // `isBeanpodFileName` is the STRICT predicate for exactly this reason.
+    await ingestSharedContent(
+      { files: [new File(['{}'], 'notes.json', { type: 'application/json' })] },
+      meta
+    );
+    expect(showToast).not.toHaveBeenCalledWith(
+      'info',
+      'shareTarget.beanpod.title',
+      expect.anything()
+    );
+  });
+
   it('reads a shared .txt as TEXT rather than calling it unreadable', async () => {
     // iOS hands a shared URL over as a .txt in the app group, so this normalisation exists
     // for that — but doing it in the orchestrator means a .txt from ANY platform works.
