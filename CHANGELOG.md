@@ -12,6 +12,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- - **Scanning a sign-in code from another device now actually does something.** On a phone
+    that was already signed in, scanning the code shown by a signed-out computer opened
+    beanies and then sat there, with no prompt to approve anything. It now brings up the
+    approval request, whether beanies was already open or had to start up.
+- **An approval request can no longer arrive from a link you were sent.** beanies used to
+  accept a sign-in approval code from any page address. If someone sent you such a link, you
+  would have seen a genuine-looking "let this device in?" prompt. beanies now only accepts
+  one on the page it is actually meant for, and if a request did not come from a code you
+  scanned yourself, it asks you about that first.
+- **Approving a device can no longer let in the wrong one.** If a second request arrived
+  while you were entering your PIN, beanies could let in the earlier device while showing
+  you the newer one's code. It now stops and tells you the request was replaced.
+
 - **Joining a family now works on the browsers where it did not.** Choosing your family file used
   to open a chooser that, on iPhone and in Firefox, often never appeared at all: you waited, got an
   unhelpful message, and ended up back where you started. It now opens in your browser rather than
@@ -28,11 +41,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- - **Scan a code from inside beanies.** "Scan a Code" now sits in your profile menu, and the
+    sign-in screen has an "Open Camera" button, so you no longer have to know to use your
+    phone's own camera app.
+- **The sign-in screen leads with whichever direction works on the device you are holding.**
+  On a phone it shows you how to scan a code from a device you are already signed in on; on
+  a laptop it keeps showing a code for your phone to scan. Either way you can switch.
+
 - **New beanstalk post: "getting down to brass tacks".** The money conversation - what beanies costs, the 90-day trial, the early-bean rewards, and why you can always self-host it and pay nothing at all.
 - **Scan a code to sign in on a new device.** Getting beanies onto a second phone, tablet or laptop is now a scan rather than a hunt for your recovery kit. "Sign in another device" sits in your profile menu and shows a code after your PIN; a device that is signed in nowhere can show its own code for one of your signed-in devices to approve. Your recovery kit is still there, now as the last resort rather than the front door.
 - **Your sign-in code is on the screen when your family is created**, beside the recovery kit rather than buried under it - so getting the app on your phone is the obvious next step.
 
 ### Changed
+
+- - **A number pad on phones and tablets.** Entering your PIN on a touch device now uses an
+    on-screen pad instead of the keyboard, which used to cover the digits you were typing.
+    Keyboards still work everywhere, including on a tablet with one attached.
+- **The PIN box is ready to type into.** Confirming your identity used to need a tap on the
+  boxes first.
+- **"Sign In Another Device" shows a spinner** while your code is being made, instead of
+  several silent seconds.
 
 - **greg's note on the pricing page says when the clock starts.** The "brass tacks" letter now spells out that the 90-day trial only begins when v1 lands, so "free while in beta" no longer sits awkwardly above the plans table. The note is also a little tighter, and signs off properly.
 - **Asking for your PIN goes straight to the keypad.** Confirming your identity for things like transferring ownership or clearing data used to make you tap "Sign in with PIN" first, even when a PIN was the only option.

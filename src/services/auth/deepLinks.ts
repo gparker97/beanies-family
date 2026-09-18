@@ -80,9 +80,20 @@ export function consumeHashMarker(marker: string): string | null {
 const captured = new Map<string, string>();
 
 /**
- * Read the given markers out of a URL and remember them. Called from `main.ts` before the
- * app mounts, and again from the inbound-link bridge for a WARM open — where no component
- * lifecycle re-runs at all, so nothing else would notice the URL.
+ * Read the given markers out of a URL and remember them.
+ *
+ * ⚠️ ONE CALLER: `main.ts`, before the app mounts. The inbound-link bridge used to call this
+ * too, for warm native opens, and does NOT any more — native delivery now goes through an
+ * injected callback rather than this map, because inferring delivery from the route change
+ * that followed a capture is precisely what shipped broken in 0.21.3.
+ *
+ * Do not "restore" a capture call in the bridge on the strength of the `href` parameter
+ * still existing. Capturing there once meant a URL the bridge then REJECTED as untrusted
+ * could still plant an approval key for the next navigation to pick up, which is the hazard
+ * the bridge's allowlist exists to prevent.
+ *
+ * `href` is therefore currently always undefined in production; it is kept because the
+ * parameter is what makes this function testable without touching `window.location`.
  */
 export function captureHashMarkers(markers: string[], href?: string): void {
   if (typeof window === 'undefined') return;

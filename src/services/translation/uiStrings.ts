@@ -5663,6 +5663,115 @@ const STRING_DEFS = {
     beanie: 'this code has expired.',
   },
   'deviceApproval.tryAgain': { en: 'Show a new one', beanie: 'show a new one' },
+  'coldEntry.pushTitle': {
+    en: 'Scan a beanies QR Code',
+    beanie: 'scan a beanies qr code',
+  },
+  'coldEntry.pushLead': {
+    en: 'This device has a camera, so the quickest way in is to scan a code from a device that\u2019s already signed in.',
+    beanie:
+      'this device has a camera, so the quickest way in is to scan a code from a device that\u2019s already signed in.',
+  },
+  'coldEntry.pushStep1': {
+    en: 'On a device you\u2019re already signed in on, open beanies and tap your profile.',
+    beanie: 'on a device you\u2019re already signed in on, open beanies and tap your profile.',
+  },
+  'coldEntry.pushStep2': {
+    en: 'Choose Sign In Another Device, then scan the code it shows.',
+    beanie: 'choose sign in another device, then scan the code it shows.',
+  },
+  'coldEntry.openCamera': {
+    en: 'Open Camera',
+    beanie: 'open camera',
+  },
+  'coldEntry.scanning': {
+    en: 'counting beans...',
+    beanie: 'counting beans...',
+  },
+  'coldEntry.showMyCode': {
+    en: 'Show my code instead',
+    beanie: 'show my code instead',
+  },
+  'coldEntry.scanInstead': {
+    en: 'Scan a code with this device instead',
+    beanie: 'scan a code with this device instead',
+  },
+  'qrScan.menuItem': {
+    en: 'Scan a Code',
+    beanie: 'scan a code',
+  },
+  'deviceApproval.expiredToast': {
+    en: 'That sign-in code expired. Ask the other device for a new one.',
+    beanie: 'that sign-in code expired. ask the other device for a new one.',
+  },
+  'qrScan.stillReading': {
+    en: 'Still reading the last photo, one moment.',
+    beanie: 'still reading the last photo, one moment.',
+  },
+  'qrScan.noCode': {
+    en: 'We Couldn\u2019t Find a Code in That Photo',
+    beanie: 'we couldn\u2019t find a code in that photo',
+  },
+  'qrScan.unsupportedDevice': {
+    en: 'This Device Can\u2019t Read Photos Right Now',
+    beanie: 'this device can\u2019t read photos right now',
+  },
+  'qrScan.decoderUnavailable': {
+    en: 'We couldn\u2019t load the scanner. Check your connection and try again.',
+    beanie: 'we couldn\u2019t load the scanner. check your connection and try again.',
+  },
+  'qrScan.unreadableImage': {
+    en: 'We Couldn\u2019t Read That Image',
+    beanie: 'we couldn\u2019t read that image',
+  },
+  'qrScan.pickerUnavailable': {
+    en: 'The camera wouldn\u2019t open. You can paste the link instead.',
+    beanie: 'the camera wouldn\u2019t open. you can paste the link instead.',
+  },
+  'qrScan.wrongCodeApproval': {
+    en: 'That\u2019s the code a signed-out device shows. You need the code from a device that\u2019s already signed in.',
+    beanie:
+      'that\u2019s the code a signed-out device shows. you need the code from a device that\u2019s already signed in.',
+  },
+  'qrScan.wrongCodeInvite': {
+    en: 'That\u2019s an invite link, not a sign-in code.',
+    beanie: 'that\u2019s an invite link, not a sign-in code.',
+  },
+  'qrScan.wrongCodeKit': {
+    en: 'That\u2019s your recovery kit code. You can use it, but on the \u201cuse my recovery kit\u201d screen.',
+    beanie:
+      'that\u2019s your recovery kit code. you can use it, but on the \u201cuse my recovery kit\u201d screen.',
+  },
+  'qrScan.wrongCodeUnknown': {
+    en: 'That\u2019s a beanies code, but not one this screen can use.',
+    beanie: 'that\u2019s a beanies code, but not one this screen can use.',
+  },
+  'qrScan.notBeanies': {
+    en: 'That Doesn\u2019t Look Like a beanies Code',
+    beanie: 'that doesn\u2019t look like a beanies code',
+  },
+  'deviceApproval.provenanceTitle': {
+    en: 'Did You Just Scan This?',
+    beanie: 'did you just scan this?',
+  },
+  'deviceApproval.provenanceBody': {
+    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, close this; approving it would let their device into your family.',
+    beanie:
+      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, close this; approving it would let their device into your family.',
+  },
+  'deviceApproval.provenanceClose': {
+    en: 'Close, I Didn\u2019t Scan This',
+    beanie: 'close, i didn\u2019t scan this',
+  },
+  'deviceApproval.provenanceContinue': {
+    en: 'Yes, I Scanned It',
+    beanie: 'yes, i scanned it',
+  },
+  'deviceApproval.supersededRetry': {
+    en: 'That request was replaced by a newer one. Check the code on your other device and approve again.',
+    beanie:
+      'that request was replaced by a newer one. check the code on your other device and approve again.',
+  },
   'deviceApproval.failed': {
     en: 'That didn\u2019t work. You can try again, or use one of the other ways in below.',
     beanie: 'that didn\u2019t work. you can try again, or use one of the other ways in below.',
@@ -5714,7 +5823,6 @@ const STRING_DEFS = {
     en: 'Show a code your other device can scan to sign in.',
     beanie: 'show a code your other device can scan to sign in.',
   },
-  'signInCode.minting': { en: 'counting beans...', beanie: 'counting beans...' },
   'signInCode.mint': { en: 'Show the Code', beanie: 'show the code' },
   'signInCode.pinReason': {
     en: 'This code opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',

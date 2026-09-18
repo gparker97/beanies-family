@@ -19,10 +19,10 @@
  * matched.
  */
 import { computed, ref, watch } from 'vue';
+import { usePinPad } from '@/composables/usePinPad';
 import PinInput from '@/components/ui/PinInput.vue';
 import PinKeypad from '@/components/ui/PinKeypad.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import { usePinAttemptLimit, PIN_COOLDOWN_MS } from '@/composables/usePinAttemptLimit';
 import { verifyPassword } from '@/services/auth/passwordService';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -77,16 +77,20 @@ watch(
   }
 );
 
+/**
+ * Shared with the reauth gate and the login PIN entry, which now draw the same pad on
+ * phones. The `disabled` guard stays here because it is this surface's own lockout state.
+ */
+const pad = usePinPad(pin, { onClearError: () => (error.value = null) });
+
 function press(digit: string) {
-  if (disabled.value || pin.value.length >= PIN_LENGTH) return;
-  error.value = null;
-  pin.value += digit;
+  if (disabled.value) return;
+  pad.press(digit);
 }
 
 function backspace() {
   if (disabled.value) return;
-  error.value = null;
-  pin.value = pin.value.slice(0, -1);
+  pad.backspace();
 }
 
 async function verify(entered: string) {

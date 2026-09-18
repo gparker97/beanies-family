@@ -13,6 +13,9 @@ import { ref, computed, watch, nextTick } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PinInput from '@/components/ui/PinInput.vue';
+import PinKeypad from '@/components/ui/PinKeypad.vue';
+import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
+import { usePinPad } from '@/composables/usePinPad';
 import RecoveryKitLink from '@/components/login/RecoveryKitLink.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -158,15 +161,40 @@ const passphrase = ref('');
 const pinValue = ref('');
 const localError = ref<string | null>(null);
 const pinInputRef = ref<InstanceType<typeof PinInput> | null>(null);
+
+/** Phones and tablets get the on-screen pad; the OS keyboard covers the digits. */
+const isTouchPrimary = useIsTouchPrimary();
+// ⚠️ A REAL handler, not a no-op. The wall and the reauth gate both clear on the first
+// keystroke; shipping a no-op here meant a member who fat-fingered their PIN on a phone
+// watched the boxes stay red through all six digits of the retry, reading as though the pad
+// were rejecting every press. Extracting `usePinPad` was meant to stop the three surfaces
+// drifting — this one shipped already drifted.
+/**
+ * ⚠️ A WRONG PIN ARRIVES VIA `props.error`, NOT `localError`, so clearing the local ref is
+ * not enough — a first attempt at this fix nulled a ref that was already null and changed
+ * nothing on screen. `errorDismissed` is what actually takes the red off the boxes when the
+ * person starts retyping; it re-arms whenever the parent sends a NEW error.
+ */
+const errorDismissed = ref(false);
+const pad = usePinPad(pinValue, {
+  onClearError: () => {
+    localError.value = null;
+    errorDismissed.value = true;
+  },
+});
 /** One telemetry ping per screen, however many times the user switches down. */
 let fellBackOnce = false;
 
-const shownError = computed(() => localError.value ?? props.error);
+const shownError = computed(() =>
+  errorDismissed.value ? null : (localError.value ?? props.error)
+);
 
 /** A wrong PIN comes back via the error prop — clear the boxes and refocus in one motion. */
 watch(
   () => props.error,
   async (e) => {
+    // A new error from the parent must be shown even if the last one was dismissed.
+    if (e) errorDismissed.value = false;
     if (e && activeMethod.value === 'pin') {
       pinValue.value = '';
       await nextTick();
@@ -175,17 +203,12 @@ watch(
   }
 );
 
-/** Focus follows the active method (greg: the PIN boxes must be ready to type into). */
-watch(
-  activeMethod,
-  async (method) => {
-    if (method === 'pin') {
-      await nextTick();
-      pinInputRef.value?.focus();
-    }
-  },
-  { immediate: true }
-);
+/**
+ * ⚠️ The `activeMethod` focus watcher that used to sit here is GONE — switching to PIN
+ * MOUNTS the input, and `PinInput` now focuses itself on mount. The `props.error` watcher
+ * above is NOT redundant and must stay: a wrong PIN arrives with no remount, and it clears
+ * the boxes as well as refocusing.
+ */
 
 function switchTo(method: ActiveKind) {
   localError.value = null;
@@ -433,9 +456,16 @@ function handlePassphraseSubmit() {
           v-model="pinValue"
           :has-error="!!shownError"
           :disabled="isBusy"
+          :keypad="isTouchPrimary"
           autofocus
           :label="t('pin.enterPin')"
           @complete="(pin) => emit('pin', pin)"
+        />
+        <PinKeypad
+          v-if="isTouchPrimary"
+          :disabled="isBusy"
+          @digit="pad.press"
+          @backspace="pad.backspace"
         />
       </div>
 

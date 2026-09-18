@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 /**
  * The single host for the step-up gate (#80).
  *
@@ -15,6 +16,9 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import ReauthChallenge from '@/components/auth/ReauthChallenge.vue';
 import { useReauth } from '@/composables/useReauth';
 import { useTranslation } from '@/composables/useTranslation';
+
+/** The wall aside, a phone or tablet gets the on-screen pad rather than the OS keyboard. */
+const isTouchPrimary = useIsTouchPrimary();
 
 const { t } = useTranslation();
 const { state, handleVerified, handleCancelled } = useReauth();
@@ -35,6 +39,7 @@ const { state, handleVerified, handleCancelled } = useReauth();
       {{ t(state.reasonKey as never) }}
     </p>
     <ReauthChallenge
+      :keypad="isTouchPrimary"
       :member="state.member"
       :open="state.open"
       @verified="handleVerified"

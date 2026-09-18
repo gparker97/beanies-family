@@ -131,12 +131,32 @@ async function handleKitPhotoPicked(event: Event) {
   try {
     const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
     const decoded = await decodeQrFromImageFile(file);
-    if (!decoded) {
-      formError.value = t('recovery.kitScanFailed');
+    if (!decoded.ok) {
+      // Four reasons, four messages. "We couldn't find a code in that photo" is only honest
+      // for `no-code`; saying it when the decoder chunk failed to load sends someone to
+      // re-photograph a perfectly good kit.
+      formError.value = t(
+        decoded.reason === 'no-code'
+          ? 'recovery.kitScanFailed'
+          : decoded.reason === 'unsupported-device'
+            ? 'qrScan.unsupportedDevice'
+            : decoded.reason === 'decoder-unavailable'
+              ? 'qrScan.decoderUnavailable'
+              : 'qrScan.unreadableImage'
+      );
+      if (decoded.reason !== 'no-code') {
+        reportError({
+          surface: 'login-flow',
+          message: 'kit QR decode failed',
+          severity: 'warning',
+          error: decoded.cause,
+          context: { action: 'kit_scan_failed', error_code: decoded.reason },
+        });
+      }
       return;
     }
     const { parseKitInput } = await import('@/services/auth/recoveryKit');
-    kitCodeInput.value = parseKitInput(decoded);
+    kitCodeInput.value = parseKitInput(decoded.data);
   } catch (e) {
     // ⚠️ There was a `try`/`finally` here but no `catch`, so a rejected dynamic import —
     // an offline first-load of the pdf.js or jsqr chunk is the realistic case — settled
@@ -1514,6 +1534,12 @@ async function handleDriveRefresh() {
           "and now you may become anyone", which is a different and much larger permission
           than the one that was granted.
         -->
+        <!-- ⚠️ `@paste-submitted` is deliberately NOT wired here, and that is safe only because
+             this screen is not `/join`. The emit exists because pasting the SAME link while
+             already at `/join` is a duplicate navigation that fires no route watcher; from
+             here the router push does the work. If this panel is ever routed onto `/join`,
+             wire it — see `PasteLinkPanel`'s docblock. (`pasteTarget` on this panel is
+             likewise unused and is the other half of that unbuilt intent.) -->
         <ColdSignInPanel surface="load-pod-unlock" @approved="finishLoaded()" />
       </div>
 
