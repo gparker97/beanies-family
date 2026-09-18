@@ -4,6 +4,39 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A pending item phrased as an intention still has a fingerprint
+
+**Date:** 2026-09-18
+**Context:** The session-start validator re-checked the STATUS pending block and reported it clean.
+It was not. Two of the seven items I handed greg were already done, and he had to correct both.
+
+The two I got wrong were the two phrased as narrative intent rather than as code:
+"greg's words: will push pricing manifesto copy in next session", and "greg has not yet decided,
+five open questions are on #97". Everything code-shaped got checked properly (three issue numbers
+by `gh`, the PR backlog, the branch list, the update floor by `curl`), because the validator's
+list of fingerprints is all code-shaped: a symbol, a file path, an issue, a draft flag. Prose about
+what a person plans to do next matches none of those patterns, so it sailed through unexamined and
+I read it back to greg as work owed.
+
+Both had perfectly good fingerprints. "Will push the copy" is a commit plus a green `deploy-web.yml`
+run on that SHA, confirmable in two commands, and confirmable a third way by curling the live page
+for the corrected wording. "Has not yet decided" is answered by a plan file dated the following day
+whose prompt log contains the answers and whose first paragraph says the research was reshaped;
+the research doc and the plan sat in the same directory listing I had already read.
+
+**Rule:** when a pending item describes what a PERSON will do or decide, do not treat it as
+unverifiable. Convert the intention into the artefact it would leave behind and look for that
+artefact: a decision leaves a plan, an ADR, or a tracker row that supersedes the research; a push
+leaves a commit and a deploy run; copy leaves bytes on the live URL. Check the live surface rather
+than the repo, because a staged commit and a deployed page are different claims.
+
+**The compounding lesson:** a research document is not superseded quietly. When `docs/research/X.md`
+and a later `docs/plans/Y.md` cover the same question, the plan is the current state and the
+research is history. I listed both in the same `ls -t` output and still quoted the older one.
+Sort by date and read the newest artefact on a topic first.
+
+---
+
 ## Fixing a bound by moving it can leave the bug and lose the guard
 
 **Date:** 2026-09-17
