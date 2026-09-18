@@ -13,6 +13,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - **New beanstalk post: "getting down to brass tacks".** The money conversation - what beanies costs, the 90-day trial, the early-bean rewards, and why you can always self-host it and pay nothing at all.
+- **Scan a code to sign in on a new device.** Getting beanies onto a second phone, tablet or laptop is now a scan rather than a hunt for your recovery kit. "Sign in another device" sits in your profile menu and shows a code after your PIN; a device that is signed in nowhere can show its own code for one of your signed-in devices to approve. Your recovery kit is still there, now as the last resort rather than the front door.
+- **Your sign-in code is on the screen when your family is created**, beside the recovery kit rather than buried under it - so getting the app on your phone is the obvious next step.
+
+### Changed
+
+- **Asking for your PIN goes straight to the keypad.** Confirming your identity for things like transferring ownership or clearing data used to make you tap "Sign in with PIN" first, even when a PIN was the only option.
+- **Saving your recovery kit is a deliberate step.** Save it, print it, or tick to say you have it somewhere safe - then carry on.
 
 ## 2026-09-17
 

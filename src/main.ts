@@ -1,5 +1,6 @@
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
+import { captureHashMarkers, APPROVAL_LINK_HASH } from './services/auth/deepLinks';
 import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
@@ -17,6 +18,12 @@ initAnalytics();
 // data layer (docClient lazily spawns the worker on first use, or runs inline
 // when the docWorker flag is off / the worker can't spawn).
 bootstrapDocClient();
+
+// ⚠️ BEFORE `app.mount()` AND BEFORE THE ROUTER RUNS. An approval link targets `/welcome`,
+// and the person scanning it is signed in — so `router.beforeEach` redirects them to the
+// Nook by name, which drops the fragment. This is the only point guaranteed to be ahead of
+// that. Synchronous and dependency-free, so it cannot wedge startup.
+captureHashMarkers([APPROVAL_LINK_HASH]);
 
 const app = createApp(App);
 

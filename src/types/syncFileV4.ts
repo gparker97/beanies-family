@@ -104,6 +104,41 @@ export interface MemberLinkKeyPackage extends InviteKeyPackage {
  * MODEL, which does not change; a 5.0 file is a V4-format envelope carrying a
  * compacted payload.
  */
+/**
+ * A device-approval wrap (W4): the family key, wrapped to a cold device's ephemeral
+ * public key by an already-signed-in device.
+ *
+ * ADDITIVE OPTIONAL on '4.0' — never a version bump, per the convention below.
+ *
+ * ⚠️ KEYED BY memberId, deliberately, and NOT by the public-key hash. Envelope dicts merge
+ * by union and cannot express a deletion, so keying by something per-request would grow an
+ * entry per attempt forever. memberId bounds it at one live request per member — which is
+ * also the correct product constraint, since a person signs one new device in at a time —
+ * and lets `newest-wins` arbitrate, exactly as `memberLinkKeys` does.
+ *
+ * ⚠️ NOT reused from `memberLinkKeys`, though that is the other revocable dict. It is keyed
+ * by memberId under newest-wins too, so writing an approval there would silently REVOKE
+ * that member's magic link — the very credential this work promotes.
+ *
+ * Contains no secret the requester does not already hold: `approverPublicKey` is public,
+ * and `wrapped` can only be opened with a non-extractable private key that never left the
+ * requesting device's memory.
+ */
+export interface DeviceApprovalPackage {
+  /** HKDF salt (base64url), chosen by the approver. */
+  salt: string;
+  /** AES-KW wrapped family key (base64) — `wrapFamilyKey` returns base64, not base64url. */
+  wrapped: string;
+  /** The approver's ephemeral P-256 public key (base64url SPKI). */
+  approverPublicKey: string;
+  /** SHA-256 hex of the REQUESTER's public key — proves the entry is for this request. */
+  publicKeyHash: string;
+  /** Merge arbitrator — newest wins. Monotonic at write. */
+  createdAt: ISODateString;
+  /** Client-side policy only; the AES-KW wrap has no time binding. */
+  expiresAt: ISODateString;
+}
+
 export type BeanpodVersion = '4.0' | '5.0';
 
 /** Beanpod file format v4.0 (envelope), at either `BeanpodVersion`. */
@@ -138,6 +173,8 @@ export interface BeanpodFileV4 {
    * cannot propagate a deletion. Merged `newest-wins` — see `ENVELOPE_KEY_DICTS`.
    */
   memberLinkKeys?: Record<string, MemberLinkKeyPackage>;
+  /** Device-approval wraps, keyed by memberId. Additive optional; see the type. */
+  deviceApprovalKeys?: Record<string, DeviceApprovalPackage>;
   /**
    * Optional family recovery passphrase wrap (ADDITIVE OPTIONAL). Its own field, NEVER
    * a reserved `wrappedKeys` entry — legacy clients enumerate wrappedKeys as

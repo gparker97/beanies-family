@@ -66,6 +66,14 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
     .or(page.getByRole('button', { name: ui('setup.saveBothConfirm') }))
     .first();
   await kitStored.waitFor({ state: 'visible', timeout: 15000 });
+
+  // ⚠️ The confirm is GATED now (#97): it releases on save, share, or this acknowledgement.
+  // A real PDF export is not something a spec should depend on, and the tick is the arm
+  // that cannot fail — the same reason it exists for users. Without this the button stays
+  // `disabled`, Playwright's actionability check blocks until timeout, and every spec that
+  // calls `createPod()` (6 of 7) goes red.
+  await page.getByTestId('kit-acknowledged').check();
+
   await kitStored.click();
 
   // Members phase — the Finish button is the marker we leave visible.

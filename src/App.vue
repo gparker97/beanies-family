@@ -26,6 +26,8 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import ReauthGateModal from '@/components/auth/ReauthGateModal.vue';
+import DeviceApprovalSheet from '@/components/auth/DeviceApprovalSheet.vue';
+import { takeCapturedMarker, APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
 import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 import DocumentExtractConsentModal from '@/components/ai/DocumentExtractConsentModal.vue';
 import { useShareTargets } from '@/composables/useShareTargets';
@@ -173,6 +175,16 @@ const { isMobile, isDesktop } = useBreakpoint();
 useEnsurePhotosPublic();
 
 const isInitializing = ref(true);
+/**
+ * A scanned device-approval code, if this load came from one.
+ *
+ * Consumed at the App level rather than on the login page because the person scanning is
+ * SIGNED IN — they never pass through the login surfaces at all. `consumeHashMarker` reads
+ * it and strips the fragment in the same call, so a family-wide request never lingers in
+ * the address bar or in `history`.
+ */
+const deviceApprovalKey = ref<string | null>(null);
+
 // Set true (in onMounted) when this load is the result of an applied PWA
 // update; the watcher below fires the confirmation toast once the init loader
 // has cleared. Declared here so the onMounted closure can reference it.
@@ -1008,6 +1020,26 @@ const INIT_TIMEOUTS = {
 } as const;
 
 onMounted(async () => {
+  // Read + strip first: any later navigation would carry the fragment along.
+  //
+  // ⚠️ A STATIC import, deliberately. This was an `await import()` as the first statement of
+  // the root `onMounted` — above the init watchdog and outside the try/finally — so a
+  // rejected chunk fetch (offline cold start, or the first load after a deploy purged the
+  // previously-hashed chunk) wedged the app on "counting beans..." with no overlay and no
+  // telemetry. `deepLinks` has no dependencies of its own, so there is no bundle saving to
+  // defend the round trip.
+  deviceApprovalKey.value = takeCapturedMarker(APPROVAL_LINK_HASH);
+  // A WARM open (the app already running, a scan handled by `inboundLinkBridge`) re-runs no
+  // lifecycle at all, so the cold-start read above would never fire for it. The bridge
+  // captures, the route change is the notification, and this picks it up.
+  watch(
+    () => route.fullPath,
+    () => {
+      const pending = takeCapturedMarker(APPROVAL_LINK_HASH);
+      if (pending) deviceApprovalKey.value = pending;
+    }
+  );
+
   // Watchdog: if init never settles (a downstream await hangs before the
   // data-load timeout can fire), flip out of "counting beans" into the EXISTING
   // recovery overlay rather than freezing forever. Cleared in the finally on any
@@ -1979,6 +2011,17 @@ watch(
     <CelebrationOverlay />
     <ConfirmModal />
     <ReauthGateModal />
+    <!--
+      Device approval lands HERE rather than on the login page, because the person who
+      scans the code is SIGNED IN — they never pass through the login surfaces. Mounted
+      beside the other global gates for the same reason they are: one instance, reachable
+      from whatever route the scan happened to open.
+    -->
+    <DeviceApprovalSheet
+      :open="deviceApprovalKey !== null"
+      :public-key="deviceApprovalKey ?? ''"
+      @close="deviceApprovalKey = null"
+    />
     <DocumentExtractConsentModal />
     <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly
          one mount after unification. A binding here would fall through as a stray attribute and

@@ -251,12 +251,23 @@ describe('ENVELOPE_KEY_DICTS — the registry guard', () => {
   it('does not include the scalar passphrase — it is a wrap, not a map of wraps', () => {
     expect(Object.keys(ENVELOPE_KEY_DICTS)).not.toContain('recoveryPassphrase');
     expect(Object.keys(ENVELOPE_KEY_DICTS).sort()).toEqual([
+      'deviceApprovalKeys',
       'inviteKeys',
       'memberLinkKeys',
       'passkeyWrappedKeys',
       'recoveryKeys',
       'wrappedKeys',
     ]);
+  });
+
+  it('deviceApprovalKeys is newest-wins — a stale approval must not win the merge', () => {
+    // Asserted DIRECTLY for the same reason as memberLinkKeys below: the entry is replaced
+    // in place at one key per member, so under 'local-wins' a peer still holding an earlier
+    // approval would republish it and the fresh one would silently lose.
+    expect(ENVELOPE_KEY_DICTS.deviceApprovalKeys.rule).toBe('newest-wins');
+    // Optional, not required: an envelope that has never seen a device approval must not
+    // gain `deviceApprovalKeys: {}`, which serialises differently and is a different file.
+    expect(ENVELOPE_KEY_DICTS.deviceApprovalKeys.required).toBe(false);
   });
 
   it('memberLinkKeys is newest-wins — the whole of revocation', () => {

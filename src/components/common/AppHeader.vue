@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import ProfileMenu from '@/components/common/ProfileMenu.vue';
+import SignInCodeSheet from '@/components/auth/SignInCodeSheet.vue';
+import { requireReauth } from '@/composables/useReauth';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
@@ -16,12 +19,10 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
-import { isFlagEnabled } from '@/config/flags';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -31,10 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import { showToast } from '@/composables/useToast';
 import { presentRefreshOutcome } from '@/components/common/refreshOutcome';
-import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull } from '@/utils/date';
-import { MARKETING_URL } from '@/utils/marketing';
-import { openExternal } from '@/utils/openExternal';
 import { safeServiceWorkerUpdate } from '@/utils/safeServiceWorkerUpdate';
 import { hardReload } from '@/utils/hardReload';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -49,7 +47,6 @@ const router = useRouter();
 const { isDesktop } = useBreakpoint();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
-const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 
@@ -149,45 +146,35 @@ function closeLanguageDropdown() {
   showLanguageDropdown.value = false;
 }
 
+/**
+ * ⚠️ MOUNTED ONCE, HERE — never inside `ProfileMenu`.
+ *
+ * ProfileMenu renders twice (the mobile header row and the desktop one). Hosting the sheet
+ * inside it would create TWO sheet instances with independent mint state, so a code minted
+ * from one could be replaced by the other's idle state, and closing one would leave the
+ * other mounted. One opener, one instance.
+ */
+const showSignInCodeSheet = ref(false);
+
+async function openSignInCodeSheet() {
+  showProfileDropdown.value = false;
+  // ⚠️ PIN FIRST, THEN THE SHEET — two taps to a PIN pad, not four.
+  //
+  // This used to open an explanatory sheet whose only content was a sentence and a button
+  // that opened the gate. The gate now carries the sentence itself, so the sheet exists
+  // only to show the code. That also removes an ordering hazard: the PIN is proven before
+  // the minting component exists at all, so there is no path where a code minted during a
+  // gated open can surface in a later un-gated one.
+  const proved = await requireReauth({
+    titleKey: 'signInCode.title',
+    reasonKey: 'signInCode.pinReason',
+  });
+  if (!proved) return;
+  showSignInCodeSheet.value = true;
+}
+
 function closeProfileDropdown() {
   showProfileDropdown.value = false;
-}
-
-function handleEditProfile() {
-  showProfileDropdown.value = false;
-  if (currentMember.value) {
-    router.push({ path: '/family', query: { edit: currentMember.value.id } });
-  }
-}
-
-function handleOpenSettings() {
-  showProfileDropdown.value = false;
-  router.push('/settings');
-}
-
-/**
- * The wall lives beside "Switch member" rather than in the header proper: both
- * change what THIS DEVICE is doing, not what the family's data says, and the
- * wall is a set-it-once mode that does not deserve permanent header real
- * estate. Settings keeps the full card — that is where the mode is explained
- * and where the PIN prerequisite is surfaced — and this is the shortcut for
- * anyone already set up, so the item is hidden rather than dead-ending someone
- * who has no credential to leave the wall with.
- */
-const canStartWall = computed(
-  () =>
-    isFlagEnabled('beanieWall') &&
-    !!(currentMember.value?.pinHash || currentMember.value?.passwordHash)
-);
-
-function handleStartWall() {
-  showProfileDropdown.value = false;
-  router.push('/wall');
-}
-
-function handleOpenHelp() {
-  showProfileDropdown.value = false;
-  openExternal(`${MARKETING_URL}/help`);
 }
 
 const isRefreshing = ref(false);
@@ -331,190 +318,15 @@ async function confirmSignOutAndClearData() {
           </button>
 
           <!-- Profile dropdown menu (shared styling) -->
-          <div
+          <ProfileMenu
             v-if="showProfileDropdown"
-            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
-          >
-            <!-- Profile header -->
-            <div
-              class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
-            >
-              <div class="flex items-center gap-2">
-                <BeanieAvatar
-                  :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
-                  :color="currentMember?.color || '#3b82f6'"
-                  :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
-                  size="md"
-                  @photo-error="currentMember && markMemberAvatarError(currentMember)"
-                />
-                <div class="min-w-0 flex-1">
-                  <p class="font-outfit truncate text-sm font-semibold text-white">
-                    {{
-                      currentMember?.name ||
-                      authStore.currentUser?.email ||
-                      t('header.profileFallbackName')
-                    }}
-                  </p>
-                  <p
-                    v-if="familyContextStore.activeFamilyName"
-                    class="truncate text-xs text-white/60"
-                  >
-                    {{ familyContextStore.activeFamilyName }}
-                  </p>
-                  <p
-                    v-if="
-                      authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
-                    "
-                    class="truncate text-xs text-white/50"
-                  >
-                    {{ authStore.currentUser.email }}
-                  </p>
-                </div>
-                <!-- Refresh all data -->
-                <button
-                  type="button"
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/30"
-                  :title="t('header.refreshAll')"
-                  :disabled="isRefreshing"
-                  @mousedown.prevent="handleRefreshAll"
-                >
-                  <svg
-                    class="h-4 w-4 text-white"
-                    :class="{ 'animate-spin': isRefreshing }"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Menu items -->
-            <div class="py-1.5">
-              <!-- Edit Profile -->
-              <button
-                v-if="currentMember"
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleEditProfile"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                {{ t('header.editProfile') }}
-              </button>
-
-              <!-- Settings -->
-              <button
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleOpenSettings"
-              >
-                <BeanieIcon name="settings" size="sm" class="opacity-50" />
-                {{ t('header.settings') }}
-              </button>
-
-              <!-- Help -->
-              <button
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleOpenHelp"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                {{ t('nav.help') }}
-              </button>
-
-              <!-- Divider -->
-              <div class="dark:border-line my-1.5 border-t border-gray-100" />
-
-              <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
-              <button
-                v-if="canStartWall"
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleStartWall"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <path d="M8 21h8" />
-                  <path d="M12 17v4" />
-                </svg>
-                {{ t('wall.setup.start') }}
-              </button>
-
-              <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
-              <button
-                type="button"
-                class="dark:text-ink dark:hover:bg-surface-hover/50 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                :title="t('auth.switchMemberHint')"
-                @mousedown.prevent="confirmSwitchMember"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 11h-6" />
-                  <path d="M20 8l3 3-3 3" />
-                </svg>
-                {{ t('auth.switchMember') }}
-              </button>
-
-              <!-- Sign out -->
-              <button
-                type="button"
-                class="dark:text-danger-lift flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/10"
-                @mousedown.prevent="promptSignOut"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                {{ t('auth.signOut') }}
-              </button>
-            </div>
-          </div>
+            :is-refreshing="isRefreshing"
+            @close="closeProfileDropdown"
+            @refresh-all="handleRefreshAll"
+            @switch-member="confirmSwitchMember"
+            @sign-out="promptSignOut"
+            @sign-in-device="openSignInCodeSheet"
+          />
         </div>
       </div>
     </template>
@@ -728,190 +540,15 @@ async function confirmSignOutAndClearData() {
           </button>
 
           <!-- Profile dropdown menu -->
-          <div
+          <ProfileMenu
             v-if="showProfileDropdown"
-            class="dark:border-line dark:bg-surface-raised absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
-          >
-            <!-- Profile header with Deep Slate gradient -->
-            <div
-              class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
-            >
-              <div class="flex items-center gap-2">
-                <BeanieAvatar
-                  :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
-                  :color="currentMember?.color || '#3b82f6'"
-                  :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
-                  size="md"
-                  @photo-error="currentMember && markMemberAvatarError(currentMember)"
-                />
-                <div class="min-w-0 flex-1">
-                  <p class="font-outfit truncate text-sm font-semibold text-white">
-                    {{
-                      currentMember?.name ||
-                      authStore.currentUser?.email ||
-                      t('header.profileFallbackName')
-                    }}
-                  </p>
-                  <p
-                    v-if="familyContextStore.activeFamilyName"
-                    class="truncate text-xs text-white/60"
-                  >
-                    {{ familyContextStore.activeFamilyName }}
-                  </p>
-                  <p
-                    v-if="
-                      authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
-                    "
-                    class="truncate text-xs text-white/50"
-                  >
-                    {{ authStore.currentUser.email }}
-                  </p>
-                </div>
-                <!-- Refresh all data -->
-                <button
-                  type="button"
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/30"
-                  :title="t('header.refreshAll')"
-                  :disabled="isRefreshing"
-                  @mousedown.prevent="handleRefreshAll"
-                >
-                  <svg
-                    class="h-4 w-4 text-white"
-                    :class="{ 'animate-spin': isRefreshing }"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- Menu items -->
-            <div class="py-1.5">
-              <!-- Edit Profile -->
-              <button
-                v-if="currentMember"
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleEditProfile"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                {{ t('header.editProfile') }}
-              </button>
-
-              <!-- Settings -->
-              <button
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleOpenSettings"
-              >
-                <BeanieIcon name="settings" size="sm" class="opacity-50" />
-                {{ t('header.settings') }}
-              </button>
-
-              <!-- Help -->
-              <button
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleOpenHelp"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                {{ t('nav.help') }}
-              </button>
-
-              <!-- Divider -->
-              <div class="dark:border-line my-1.5 border-t border-gray-100" />
-
-              <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
-              <button
-                v-if="canStartWall"
-                type="button"
-                class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-                @mousedown.prevent="handleStartWall"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="2" y="3" width="20" height="14" rx="2" />
-                  <path d="M8 21h8" />
-                  <path d="M12 17v4" />
-                </svg>
-                {{ t('wall.setup.start') }}
-              </button>
-
-              <!-- Switch member: tier 1 — pod stays open, next screen is the person picker -->
-              <button
-                type="button"
-                class="dark:text-ink dark:hover:bg-surface-hover/50 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
-                :title="t('auth.switchMemberHint')"
-                @mousedown.prevent="confirmSwitchMember"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0 opacity-50"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 11h-6" />
-                  <path d="M20 8l3 3-3 3" />
-                </svg>
-                {{ t('auth.switchMember') }}
-              </button>
-
-              <!-- Sign out -->
-              <button
-                type="button"
-                class="dark:text-danger-lift flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-900/10"
-                @mousedown.prevent="promptSignOut"
-              >
-                <svg
-                  class="h-4 w-4 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                {{ t('auth.signOut') }}
-              </button>
-            </div>
-          </div>
+            :is-refreshing="isRefreshing"
+            @close="closeProfileDropdown"
+            @refresh-all="handleRefreshAll"
+            @switch-member="confirmSwitchMember"
+            @sign-out="promptSignOut"
+            @sign-in-device="openSignInCodeSheet"
+          />
         </div>
       </div>
     </template>
@@ -998,6 +635,12 @@ async function confirmSignOutAndClearData() {
           </div>
         </template>
       </BaseModal>
+
+      <!--
+        One instance, mounted beside the sign-out modal rather than inside `ProfileMenu`
+        (which renders twice). See `openSignInCodeSheet` for why that matters.
+      -->
+      <SignInCodeSheet :open="showSignInCodeSheet" @close="showSignInCodeSheet = false" />
     </Teleport>
   </header>
 </template>

@@ -366,11 +366,12 @@ onMounted(async () => {
     // with the code in the URL FRAGMENT (never sent to a server). Strip it immediately
     // (history hygiene) and open the bootstrap surface straight in kit entry, code
     // pre-filled.
-    const kitHashMatch = window.location.hash.match(/beanies-kit=([^&]+)/);
-    if (kitHashMatch?.[1]) {
-      const { parseKitInput } = await import('@/services/auth/recoveryKit');
-      kitPrefillCode.value = parseKitInput(decodeURIComponent(kitHashMatch[1]));
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+    const { consumeHashMarker, KIT_LINK_HASH } = await import('@/services/auth/deepLinks');
+    const kitCode = consumeHashMarker(KIT_LINK_HASH);
+    if (kitCode) {
+      // `consumeHashMarker` already decoded the value and stripped the fragment, so there
+      // is no second decode and no `history.replaceState` to remember here.
+      kitPrefillCode.value = kitCode;
       enterGenericLoadFallback(undefined, { autoLoad: true, withError: false });
       kitEntryRequested.value = true; // after the reset inside enterGenericLoadFallback
       isInitializing.value = false;
