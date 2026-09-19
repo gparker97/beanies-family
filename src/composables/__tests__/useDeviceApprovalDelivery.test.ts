@@ -31,6 +31,8 @@ function session(familyId: string, memberId: string) {
   return {
     familyId: ref<string | null | undefined>(familyId),
     memberId: ref<string | null | undefined>(memberId),
+    // Signed in here, which is what every test below except the handover ones assumes.
+    hasPersistedSession: () => true,
   };
 }
 
@@ -98,7 +100,12 @@ describe('useDeviceApprovalDelivery', () => {
     const familyId = ref<string | null | undefined>('fam-1');
     const memberId = ref<string | null | undefined>('mem-1');
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => true,
+      })
     );
     result.deliver('KEY-A', 'warm');
 
@@ -117,13 +124,18 @@ describe('useDeviceApprovalDelivery', () => {
   });
 
   it('REGRESSION: discards a held key on SIGN-OUT, which clears the member but not the family', async () => {
-    // `clearSession` touches auth state only, so `activeFamilyId` SURVIVES a sign-out. A gate
-    // keyed on the family alone would hand the key to whoever signs in next.
+    // A gate keyed on the family alone would hand the key to whoever signs in next. (Sign-out
+    // in the real app clears the member via `resetAllAppStores()`; this drives that shape.)
     const usable = ref(false);
     const familyId = ref<string | null | undefined>('fam-1');
     const memberId = ref<string | null | undefined>('mem-1');
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => true,
+      })
     );
     result.deliver('KEY-A', 'warm');
 
@@ -201,31 +213,37 @@ describe('useDeviceApprovalDelivery', () => {
     );
   });
 
-  it('REGRESSION: a key buffered while SIGNED OUT is not released to whoever signs in next', async () => {
-    // ⚠️ BOTH REFS START null, BECAUSE THAT IS WHAT PRODUCTION DOES. `currentMemberId` is
-    // `ref(null)`, `activeFamilyId` is a computed over a `ref(null)`, and there is no Pinia
-    // persistence — so at App.vue setup neither is populated, on every single page load.
-    // The previous version of this test seeded `memberId = ref('mem-1')` BEFORE the
-    // composable was created, which only ever exercised the warm SPA sign-out variant. It
-    // passed against a guard that was provably inert in production: a `seenSession` latch
-    // read at setup time, when the answer is always false.
+  it('REGRESSION: a key delivered on a device with NO SESSION is not released to whoever signs in', async () => {
+    // ⚠️ DELIVERED WHILE STILL BOOTING, BECAUSE THAT IS WHAT THE WEB TRANSPORT DOES.
+    // `App.vue` calls `deliver(key, 'web-load')` on the FIRST line of `onMounted`, where
+    // `isInitializing` and `isLoadingData` are both still true — so `isSurfaceUsable` is
+    // false there, always. Two earlier versions of this test seeded `usable = ref(true)`
+    // before delivering, which is a state the web path cannot produce, and both passed
+    // against guards that were provably inert in production.
     //
-    // The scenario: a `/welcome#beanies-approve=` link is messaged to a shared or
-    // never-signed-in phone. It opens, the surface settles (`isSurfaceUsable` needs no
-    // member), the key is released onto the "open beanies to approve" panel. Somebody then
-    // signs in — and must NOT be handed a live fingerprint with an armed Approve for a code
-    // they never scanned.
-    const usable = ref(true);
+    // The scenario: a `/welcome#beanies-approve=` link is messaged to a phone where nobody
+    // has signed in. It cold-loads, the key is held, the surface settles on the "open
+    // beanies to approve" panel. Somebody then signs in — by typing a PIN, or via a trusted
+    // auto-open that materialises a session on its own — and must NOT be handed a live
+    // fingerprint with an armed Approve for a code they never scanned.
+    const usable = ref(false);
     const familyId = ref<string | null | undefined>(null);
     const memberId = ref<string | null | undefined>(null);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => false, // nobody has ever signed in here
+      })
     );
 
     result.deliver('KEY-PHISH', 'web-load');
+    usable.value = true; // the surface settles, signed out
+    await nextTick();
     familyId.value = 'fam-1';
     await nextTick();
-    memberId.value = 'mem-1';
+    memberId.value = 'mem-1'; // somebody signs in
     await nextTick();
 
     expect(result.approvalKey.value).toBeNull();
@@ -237,24 +255,30 @@ describe('useDeviceApprovalDelivery', () => {
     );
   });
 
-  it('REGRESSION: the SAME null-at-setup start on a COLD LAUNCH keeps the key', async () => {
-    // The twin of the test above, and the reason neither can be judged alone: the two
-    // journeys produce an identical `null -> null -> 'fam:mem'` sequence, and every attempt
-    // to tell them apart from transition history failed. The only difference is whether the
-    // surface was READY when the key arrived — booting here, settled above.
+  it('REGRESSION: the IDENTICAL sequence on a signed-in device KEEPS the key', async () => {
+    // The twin of the test above, and the reason neither can be judged alone: a cold launch
+    // on a signed-in device and a handover on a signed-out one produce an identical
+    // `null -> null -> 'fam:mem'` with `isSurfaceUsable` starting false. Every attempt to
+    // tell them apart from reactive state failed, three times. The only thing that differs
+    // at the moment the key arrives is whether this device HAS a session at all.
     const usable = ref(false);
     const familyId = ref<string | null | undefined>(null);
     const memberId = ref<string | null | undefined>(null);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => true, // signed in here; the app is just starting
+      })
     );
 
-    result.deliver('KEY-MINE', 'cold-launch');
+    result.deliver('KEY-MINE', 'web-load');
+    usable.value = true;
+    await nextTick();
     familyId.value = 'fam-1';
     await nextTick();
     memberId.value = 'mem-1';
-    await nextTick();
-    usable.value = true;
     await nextTick();
 
     expect(result.approvalKey.value).toBe('KEY-MINE');
@@ -274,7 +298,12 @@ describe('useDeviceApprovalDelivery', () => {
     const familyId = ref<string | null | undefined>(undefined);
     const memberId = ref<string | null | undefined>(undefined);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => true,
+      })
     );
 
     result.deliver('KEY-A', 'cold-launch');

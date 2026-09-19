@@ -57,30 +57,31 @@ export type QrDecodeResult = {
    * then failed, which is otherwise indistinguishable from a device that has none. On a
    * failure this is also the only way to say how far the ladder got.
    */
-  attempts: readonly QrRung[];
+  attempts: readonly QrAttempt[];
 } & (
   | { ok: true; data: string; rung: QrRung }
   | { ok: false; reason: QrDecodeFailure; rung?: undefined; cause?: unknown }
 );
 
 /** Which attempt produced the answer. Reported by the caller so decode quality is measurable. */
-export type QrRung =
-  | 'native'
-  /**
-   * The platform decoder constructed and then THREW.
-   *
-   * ⚠️ A DISTINCT VALUE, because `'native'` alone could not carry the signal. `attempts`
-   * recorded `'native'` whenever a detector was merely SUPPLIED, so a decoder that ran
-   * cleanly and found nothing — overwhelmingly the common case on a Heritage Orange photo —
-   * was byte-identical to one that throws on every call. A whole OEM's decoder could be
-   * 100% broken and the surface would look healthy. The type must not advertise a signal it
-   * cannot carry, so the failing case gets its own rung.
-   */
-  | 'native-threw'
-  | 'full-luma'
-  | 'full-blue'
-  | 'crop-blue'
-  | 'large-blue';
+/**
+ * An attempt that can WIN. This is the closed enum declared to Apple and Google as the
+ * `kind` field of the `qr-decode` surface, so it must not gain a member that cannot be a
+ * winning rung.
+ */
+export type QrRung = 'native' | 'full-luma' | 'full-blue' | 'crop-blue' | 'large-blue';
+
+/**
+ * Anything that can appear in the trail, which is a superset.
+ *
+ * ⚠️ `'native-threw'` IS SEPARATE FROM `QrRung` ON PURPOSE. It needs to exist at all because
+ * `attempts` recorded a bare `'native'` whenever a detector was merely SUPPLIED — so one
+ * that ran cleanly and found nothing (the common case on a Heritage Orange photo) was
+ * byte-identical to one that throws on every call, and a whole OEM's decoder could be 100%
+ * broken while the surface looked healthy. But it can never be the winner, and folding it
+ * into `QrRung` would let it type-check into `kind` and break the enum the runbook declares.
+ */
+export type QrAttempt = QrRung | 'native-threw';
 
 interface ImageDataLike {
   data: Uint8ClampedArray;
@@ -204,8 +205,8 @@ function toBlueChannel(src: Uint8ClampedArray): Uint8ClampedArray {
 }
 
 export type LadderOutcome =
-  | { ok: true; data: string; rung: QrRung; attempts: readonly QrRung[] }
-  | { ok: false; reason: 'no-code' | 'unsupported-device'; attempts: readonly QrRung[] };
+  | { ok: true; data: string; rung: QrRung; attempts: readonly QrAttempt[] }
+  | { ok: false; reason: 'no-code' | 'unsupported-device'; attempts: readonly QrAttempt[] };
 
 /**
  * Every decision, and no browser API. See the file header for why this seam exists.
@@ -225,7 +226,7 @@ export async function runQrLadder(deps: {
    * rejection unwinds past this function's local array, so the shell reported `tried=none`
    * on the one path where "did the platform decoder run?" is the actual question.
    */
-  trail?: QrRung[];
+  trail?: QrAttempt[];
   /** null => this render could not be produced (no 2D context, or out of memory). */
   render: (spec: RenderSpec) => ImageDataLike | null;
   /** A rejection propagates; the shell classifies it. */
@@ -235,7 +236,7 @@ export async function runQrLadder(deps: {
   /** Awaited BETWEEN ATTEMPTS so the browser can paint. Tests pass nothing. */
   yieldToUi?: () => Promise<void>;
 }): Promise<LadderOutcome> {
-  const attempts: QrRung[] = deps.trail ?? [];
+  const attempts: QrAttempt[] = deps.trail ?? [];
   /**
    * ⚠️ TRACKS WHETHER ANYTHING ACTUALLY LOOKED AT THE IMAGE, which is what separates the two
    * failure reasons once there is more than one render. With a single render, "the render
@@ -257,7 +258,12 @@ export async function runQrLadder(deps: {
       // a whole OEM's platform decoder could be 100% broken while the surface looked
       // healthy. This is the classification the CLAUDE.md rule asks for — the catch is not
       // bare, it records which of the two things happened.
+      //
+      // ⚠️ AND IT COUNTS AS HAVING LOOKED. A decoder that constructed proves the device is
+      // capable; telling that person "your device cannot do this" because every render then
+      // failed would be the exact wrong message the reason union exists to prevent.
       attempts.push('native-threw');
+      examined = true;
     }
   }
 
@@ -292,11 +298,16 @@ export async function runQrLadder(deps: {
       first = false;
 
       seen.add(tupleFor(rendered, step.render.crop, attempt.channel));
-      examined = true;
-      attempts.push(attempt.rung);
 
       const pixels = attempt.channel === 'blue' ? toBlueChannel(rendered.data) : rendered.data;
       const data = await deps.decode(pixels, rendered.width, rendered.height);
+      // ⚠️ RECORDED AFTER THE AWAIT, like the native attempt above. Pushing first meant a
+      // `decode` that REJECTED — an offline first-load failing on `import('jsqr')` — left a
+      // trail claiming the blue pass had run and found nothing on a device where jsQR never
+      // loaded and no pixel was examined. Same for a jsQR throw mid-pass, which inflated the
+      // very counts the Heritage Orange fix is judged by.
+      examined = true;
+      attempts.push(attempt.rung);
       if (data) return { ok: true, data, rung: attempt.rung, attempts };
     }
   }
@@ -332,7 +343,7 @@ async function renderPdfFirstPage(file: File): Promise<Blob> {
  */
 function report(
   origin: string,
-  attempts: readonly QrRung[],
+  attempts: readonly QrAttempt[],
   rung: QrRung | null,
   reason: QrDecodeFailure | null
 ): void {
@@ -380,7 +391,7 @@ export async function decodeQrFromImageFile(
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   let bitmap: ImageBitmap | null = null;
   // Declared OUT here so the catch below can still report what ran; see `runQrLadder.trail`.
-  const trail: QrRung[] = [];
+  const trail: QrAttempt[] = [];
   try {
     const source = isPdf ? await renderPdfFirstPage(file) : file;
     bitmap = await createImageBitmap(source);

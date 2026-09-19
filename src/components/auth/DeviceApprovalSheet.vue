@@ -93,25 +93,18 @@ const props = defineProps<{
  * dismissal from a completed approval. Without it every successful approval also counted as
  * a dropped key.
  */
-/**
- * `close` carries how the key ended, so the delivery gate can tell an abandoned key from an
- * approved one from an unconfirmed one. Without it every successful approval also counted as
- * a dropped key, and the drop rate read ~100% on healthy traffic.
- */
-type CloseOutcome = 'approved' | 'unconfirmed' | undefined;
-const emit = defineEmits<{ close: [outcome?: CloseOutcome] }>();
+const emit = defineEmits<{
+  close: [];
+  /**
+   * The approval was acted on. Emitted the MOMENT the publish resolves, not when the sheet
+   * closes — the TTL has to stop while the "Device Approved" panel is still on screen, which
+   * is precisely when nobody is tapping anything.
+   */
+  settled: [outcome: 'approved' | 'unconfirmed'];
+}>();
 
-/**
- * ⚠️ EVERY CLOSE PATH GOES THROUGH HERE. `BaseModal` re-emits a bare `close` from the
- * backdrop, the header X and Escape, so forwarding the outcome from the Done button alone
- * left three of the four ways to dismiss a SUCCESSFUL approval still logging a drop — the
- * exact false signal the outcome was added to remove.
- */
 function closeSheet(): void {
-  emit(
-    'close',
-    settled.value === 'done' ? 'approved' : settled.value === 'pending' ? 'unconfirmed' : undefined
-  );
+  emit('close');
 }
 
 const { t } = useTranslation();
@@ -167,10 +160,20 @@ const familyContextStore = useFamilyContextStore();
 const canApprove = computed(() => !!syncStore.familyKey && !!familyStore.currentMemberId);
 
 /**
- * Can a PIN gate even run for this member? `false` means no PIN and no password, so
- * `requireReauth` will resolve false forever and "try again" would be a loop.
+ * Can a step-up gate run for this member at all?
+ *
+ * ⚠️ DELIBERATELY CONSERVATIVE, because `canStepUp()` answers a NARROWER question than the
+ * copy needs. It tests `pinHash || passwordHash` only — `ReauthChallenge` additionally
+ * offers a passkey, derived from device-local biometric material that this predicate cannot
+ * see. So a passkey-only member reads as "no credential", and telling them "set a PIN in
+ * Settings" would be false AND would remove the one thing that works for them.
+ *
+ * The dead-end copy is therefore shown only when the member is ALSO not the current one —
+ * i.e. the roster genuinely has nobody to gate — and everyone else gets the retryable
+ * message. A wrong "try again" costs a tap; a wrong "you have no credential" sends someone
+ * to change settings they did not need to change.
  */
-const canStepUpHere = computed(() => canStepUp());
+const canStepUpHere = computed(() => canStepUp() || !!familyStore.currentMemberId);
 
 /** Messages that are information, not failure — see the template comment on the alert. */
 const ROUTINE_NOTICES: readonly UIStringKey[] = [
@@ -205,7 +208,25 @@ const readGenerationRef = ref(0);
  * request busy?" — and both failures become unrepresentable.
  */
 const approvingGeneration = ref<number | null>(null);
+/**
+ * Is THIS screen's request busy? Drives the spinner and the buttons.
+ *
+ * ⚠️ GENERATION-SCOPED, so a new key gets a live panel instead of inheriting the previous
+ * one's frozen buttons. That is the display question, and it is NOT the same as the safety
+ * question — see `isPublishing`.
+ */
 const isApproving = computed(() => approvingGeneration.value === readGenerationRef.value);
+/**
+ * Is ANY approval in flight, whatever screen it belongs to?
+ *
+ * ⚠️ THE SAFETY QUESTION, AND IT IS DELIBERATELY DIFFERENT. Deriving the entry guard from
+ * `isApproving` meant a supersession re-enabled Approve while the previous publish was still
+ * uploading, so two approvals could sit inside `publishEnvelopeEntry` on the SAME
+ * `deviceApprovalKeys[memberId]` slot — and the older call's rollback would then delete the
+ * newer device's already-published wrap, admitting nobody while reporting two successes.
+ * The 5s -> 20s budget widened that window fourfold.
+ */
+const isPublishing = computed(() => approvingGeneration.value !== null);
 const errorKey = ref<UIStringKey | null>(null);
 
 /**
@@ -316,7 +337,9 @@ async function approve(): Promise<void> {
   const req = scanned.value;
   const familyKey = syncStore.familyKey;
   const memberId = familyStore.currentMemberId;
-  if (!req || isApproving.value) return;
+  // ⚠️ `isPublishing`, NOT `isApproving`. See their docblocks: the second would let a
+  // superseded-but-still-uploading call be joined by a new one on the same envelope key.
+  if (!req || isPublishing.value) return;
 
   if (!familyKey || !memberId) {
     errorKey.value = 'recovery.podNotOpen';
@@ -374,6 +397,13 @@ async function approve(): Promise<void> {
     // THE one write of each piece of state, behind THE one guard. A verdict that belongs to
     // a request no longer on screen is reported to CloudWatch (it happened, and on the
     // `saved` path a real wrap really did publish) but never painted.
+    // ⚠️ OUTSIDE the `stillOurs` check. The wrap really did publish, so the key is spent
+    // whether or not this screen is still showing it — and leaving the TTL armed on a spent
+    // key is what produced an `expired` drop and an "it expired" toast for an approval that
+    // had worked.
+    if (verdict.paint === 'settled') {
+      emit('settled', verdict.value === 'done' ? 'approved' : 'unconfirmed');
+    }
     if (stillOurs()) {
       if (verdict.paint === 'settled') settled.value = verdict.value;
       else if (verdict.paint === 'error') errorKey.value = verdict.key;
@@ -526,11 +556,20 @@ function reject(): void {
     NOT z-[55]: already claimed by `BaseSidePanel`'s `raised` and `MagicBeansSheet`'s
     backdrop, so a new tier there would create a tie rather than remove one.
   -->
+  <!--
+    ⚠️ NOT CLOSABLE WHILE A PUBLISH IS IN FLIGHT. The X, the backdrop and Escape stayed live
+    through the whole uncancellable publish — a window this work widened from 5s to 20s — and
+    dismissing there destroyed the key record while the upload carried on and admitted the
+    device anyway. The approver got no feedback at all, and telemetry carried both a
+    `published` and a `dismissed` drop for one key. Reject is already disabled; this closes
+    the other three doors.
+  -->
   <BaseModal
     :open="open"
     :title="t('deviceApproval.title')"
     size="md"
     layer="overlay"
+    :closable="!isPublishing"
     @close="closeSheet"
   >
     <!-- One panel for all three end states: approved, still saving, and signed out here.

@@ -53,6 +53,7 @@ import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from
 import { APPROVAL_EXPIRY_MS } from '@/services/crypto/deviceApproval';
 import {
   emitApprovalKeyDelivered,
+  emitApprovalKeySettled,
   emitApprovalKeyDropped,
   emitApprovalKeyHeld,
   type DeliveryKind,
@@ -69,24 +70,40 @@ interface Pending {
   /** For the TTL. A request the other device has already abandoned must not be approved. */
   arrivedAt: number;
   /**
-   * It landed on a surface that was READY and had NOBODY SIGNED IN.
+   * The approval has been acted on; only the panel saying so is still on screen.
    *
-   * ⚠️ THIS IS PER-KEY ON PURPOSE, AND THE THING IT REPLACED WAS NOT. The question "may this
-   * key be handed to the member who signs in next?" is a fact about the key's ARRIVAL, not
-   * about the history of session transitions — and every attempt to infer it from transitions
-   * failed. `prev != null` could not tell a cold launch from a handover. A `seenSession`
-   * latch seeded at setup was worse: both store refs are null at App.vue setup time on every
-   * single page load, so it was ALWAYS false in production and the guard it gated never ran
-   * once. Its test passed only because the fixture seeded a state that never occurs.
+   * ⚠️ A FLAG RATHER THAN CLEARING `pending`, because the sheet's visibility is DERIVED from
+   * the held key — clearing it would yank the "Device Approved" panel off screen the instant
+   * it appeared. What has to stop is the TTL, not the panel.
+   */
+  settled: boolean;
+  /**
+   * Nobody was signed in ON THIS DEVICE when the key arrived.
    *
-   * Recorded here, it is simply true or false per key, checked once, and cannot be defeated
-   * by the order anything hydrates in:
-   *   - COLD LAUNCH: `isSurfaceUsable` is still false while the app boots, so this is false
-   *     and the key survives into the session that is about to appear. That is the whole
-   *     0.21.3/0.21.4 bug and it stays fixed.
-   *   - SIGNED OUT, SETTLED: `isSurfaceUsable` is true (the sheet's "open beanies to approve"
-   *     panel exists for exactly this state) and there is no session, so this is true and the
-   *     key is destroyed the moment anyone signs in.
+   * ⚠️ READ FROM DURABLE STORAGE, NOT FROM REACTIVE STATE, AND THAT IS THE ENTIRE POINT.
+   * The question — "may this key be handed to whoever signs in next?" — has now been got
+   * wrong three times, every time by trying to infer it from state that has not hydrated
+   * yet at the moment a key arrives:
+   *
+   *   1. `prev != null` on the session key could not tell a cold launch from a handover;
+   *      both produce `null -> 'fam:mem'`.
+   *   2. A `seenSession` latch seeded at setup was always false, because both store refs
+   *      are `null` at App.vue setup on every page load.
+   *   3. `isSurfaceUsable && sessionKey === null` was always FALSE on web, because the
+   *      web transport delivers at the top of `onMounted` where `isInitializing` and
+   *      `isLoadingData` are both still true.
+   *
+   * Each of those had a passing test, and each test passed only by seeding an initial state
+   * production cannot produce. The persisted auth session has none of that problem: it is
+   * written by `persistSession`, removed by `clearSession`, and readable synchronously and
+   * correctly at any moment, including the first line of `onMounted`.
+   *
+   *   - SIGNED IN (or previously signed in and returning): a session record exists, this is
+   *     false, and a key arriving during a cold launch survives into the session about to
+   *     rehydrate. That is the 0.21.3/0.21.4 bug and it stays fixed.
+   *   - NOBODY SIGNED IN: no record, this is true, and the key is destroyed the moment
+   *     anyone signs in — including via a trusted auto-open, which would otherwise
+   *     materialise a session with nobody having typed anything.
    */
   arrivedSignedOut: boolean;
 }
@@ -98,10 +115,10 @@ export interface DeviceApprovalDelivery {
   delivery: ComputedRef<DeliveryKind | null>;
   /** A key arrived, from any transport. */
   deliver: (key: string, delivery: DeliveryKind) => void;
-  /** The approval landed. Stops the TTL without counting a loss. */
-  settle: () => void;
-  /** The sheet closed. `outcome` says whether the key had already done its job. */
-  dismiss: (how?: { outcome?: 'approved' | 'unconfirmed' }) => void;
+  /** The approval was acted on. Stops the TTL and books the key out of the funnel. */
+  settle: (outcome: 'approved' | 'unconfirmed') => void;
+  /** The sheet closed. Counts a loss only if the key had not already been settled. */
+  dismiss: () => void;
 }
 
 export function useDeviceApprovalDelivery(opts: {
@@ -121,6 +138,14 @@ export function useDeviceApprovalDelivery(opts: {
    * fingerprint panel for something they never scanned.
    */
   memberId: Ref<string | null | undefined>;
+  /**
+   * Is there a persisted auth session on this device, right now?
+   *
+   * Injected rather than imported so the gate stays free of store singletons and so a test
+   * can drive both answers from the initial state production actually has. App.vue supplies
+   * the real read.
+   */
+  hasPersistedSession: () => boolean;
   /**
    * Called when a key that was ON SCREEN expires.
    *
@@ -208,11 +233,12 @@ export function useDeviceApprovalDelivery(opts: {
    * null at App.vue setup on every page load. The answer is recorded per key at arrival
    * instead, as `arrivedSignedOut`. See `Pending`.
    *
-   * ⚠️ AN ORDINARY SIGN-OUT DOES NOT NULL `currentMemberId` — `resetState()` is reachable
-   * only from the signup/rehydrate path, and `clearSession()` touches auth state alone. So
-   * the sign-out guarantee does NOT rest on reaching the `next === null` branch; it rests on
-   * the id CHANGING when a different person signs in, which `next !== prev` catches. A key
-   * surviving the same member signing straight back in is that member's own key.
+   * ⚠️ SIGN-OUT DOES NULL `currentMemberId`, VIA `resetAllAppStores()`. An earlier version of
+   * this comment claimed otherwise; every sign-out control (`AppHeader`,
+   * `MobileHamburgerMenu`, `SettingsPage`) calls it, and `resetStores.ts` calls
+   * `familyStore.resetState()`. So the `next === null` branch IS the sign-out path, and a key
+   * held across one is discarded there. The `next !== prev` branch covers switch-person and a
+   * family switch on top of that.
    */
   watch(sessionKey, (next, prev) => {
     if (next === null) {
@@ -239,6 +265,11 @@ export function useDeviceApprovalDelivery(opts: {
         // A re-scan of the SAME code — which is exactly what someone does when the first
         // attempt appeared to do nothing. Not a supersession; counting it as one would make
         // the failure metric consist mostly of people retrying.
+        //
+        // ⚠️ BUT RE-SAMPLE THE PROVENANCE. Someone may have signed out between the two
+        // arrivals, and freezing the first answer would keep a key marked "this device had
+        // a session" after it stopped having one. Narrowing only: it can go false -> true.
+        existing.arrivedSignedOut ||= !opts.hasPersistedSession();
         return;
       }
       // Tagged with the HELD key's transport, not the incoming one: the entry being thrown
@@ -252,9 +283,9 @@ export function useDeviceApprovalDelivery(opts: {
       key,
       delivery: kind,
       arrivedAt: Date.now(),
-      // Both read at ARRIVAL. A settled surface with nobody signed in is a device someone
-      // else may be about to use; a booting one is this person's own launch.
-      arrivedSignedOut: opts.isSurfaceUsable.value && sessionKey.value === null,
+      // Read at ARRIVAL, from storage rather than from stores that have not hydrated.
+      arrivedSignedOut: !opts.hasPersistedSession(),
+      settled: false,
     };
 
     // Armed for EVERY key, shown or held, and measured from arrival — the other device's
@@ -287,31 +318,39 @@ export function useDeviceApprovalDelivery(opts: {
    * A Reject tap produces both `device_approval_outcome: rejected` and
    * `approval_key_dropped: dismissed`. The former is the authoritative one.
    */
-  function dismiss(how?: { outcome?: 'approved' | 'unconfirmed' }): void {
-    // ⚠️ THREE ENDINGS, NOT TWO. A boolean `consumed` folded "the wrap definitely landed"
-    // together with "the publish timed out and may never have landed" — and the second is
-    // precisely the case the three-state publish outcome exists to measure, so silencing it
-    // re-opened the under-count that routing `dismiss` through `discard` was meant to close.
-    if (how?.outcome === 'approved') return settle();
-    if (how?.outcome === 'unconfirmed') return discard('unconfirmed');
+  function dismiss(): void {
+    // A key that already did its job was booked out by `settle()`; counting it again here is
+    // what made the drop rate read ~100% on healthy traffic.
+    if (pending.value?.settled) {
+      clearTimer();
+      pending.value = null;
+      announced = false;
+      return;
+    }
     discard('dismissed');
   }
 
   /**
-   * Stop holding a key that has done its job, WITHOUT counting it as a loss.
+   * The approval has been acted on. Stops the TTL and books the key out of the funnel.
    *
-   * ⚠️ ALSO DISARMS THE TTL, and that was a live bug rather than tidiness. On a successful
-   * approval the sheet set its panel and nothing touched this gate — so `pending` stayed
-   * populated with the timer still armed from `arrivedAt`. A person who approved and put the
-   * phone down (the entire point being that the OTHER device is now signing in) hit the
-   * expiry, which emitted an `expired` drop for a healthy approval and toasted "that sign-in
-   * code expired, ask for a new one" over the panel saying it had worked.
+   * ⚠️ CALLED THE MOMENT THE PUBLISH RESOLVES, NOT WHEN THE SHEET CLOSES. Hanging this off
+   * the close handler meant it never ran for the case it was written for: approve, then put
+   * the phone down — the entire point being that the OTHER device is now signing in. The
+   * timer armed at arrival then fired under the "Device Approved" panel, logged an `expired`
+   * drop for a healthy approval, pulled the panel off screen and toasted "that sign-in code
+   * expired, ask for a new one".
+   *
+   * ⚠️ `'unconfirmed'` IS NOT SILENT. Folding it in with `'approved'` lost the terminal entry
+   * for the one outcome the three-state publish exists to measure — a wrap that may never
+   * have landed. It is not a `dropped` either: nothing was lost and the write may well
+   * arrive. It gets its own level and its own code.
    */
-  function settle(): void {
-    if (!pending.value) return;
+  function settle(outcome: 'approved' | 'unconfirmed'): void {
+    const p = pending.value;
+    if (!p || p.settled) return;
     clearTimer();
-    pending.value = null;
-    announced = false;
+    p.settled = true;
+    emitApprovalKeySettled({ delivery: p.delivery, outcome });
   }
 
   onScopeDispose(clearTimer);

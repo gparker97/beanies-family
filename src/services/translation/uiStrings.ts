@@ -5759,11 +5759,6 @@ const STRING_DEFS = {
     beanie:
       'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, tap \u201c{reject}\u201d: approving it would let their device into your family.',
   },
-  'deviceApproval.supersededRetry': {
-    en: 'That request was replaced by a newer one. Check the code on your other device and approve again.',
-    beanie:
-      'that request was replaced by a newer one. check the code on your other device and approve again.',
-  },
   'deviceApproval.failed': {
     en: 'That didn\u2019t work. You can try again, or use one of the other ways in below.',
     beanie: 'that didn\u2019t work. you can try again, or use one of the other ways in below.',
