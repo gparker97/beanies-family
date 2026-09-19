@@ -29,7 +29,8 @@
     used decoratively.
   - The beanies hold hands and are never separated; never rotate the arrow.
   - Headline: Outfit 800, all-lowercase, keyword wrapped in <em> to paint it orange
-    (or cream, on the dark/warm grounds - handled automatically below).
+    (cream on the dark grounds, deep slate on the orange grounds - all handled
+    automatically below; never override --accent by hand).
   - Eyebrow: UPPERCASE, letter-spaced.
   - Footer lockup: single-bean favicon + "beanies.family" wordmark. Never a bare
     app screenshot as the pin.
@@ -163,6 +164,16 @@
       .headline em {
         font-style: normal;
         color: var(--accent);
+      }
+      /* On the two ORANGE grounds the accent is cream, which is the right colour
+         for the eyebrow but is ~indistinguishable from the white ink in the
+         headline - the keyword stops reading as a keyword and the headline
+         flattens into one block. Deep Slate is the high-contrast partner to
+         Heritage Orange and is the brand's foundation colour, so the keyword
+         goes slate here instead. */
+      body[data-ground='ember'] .headline em,
+      body[data-ground='terracotta'] .headline em {
+        color: var(--slate);
       }
       .subtitle {
         font-family: var(--inter);

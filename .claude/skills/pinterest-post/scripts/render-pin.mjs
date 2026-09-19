@@ -25,7 +25,8 @@
 import process from 'node:process';
 import { chromium } from 'playwright';
 import { readFile, writeFile, unlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
+import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
@@ -44,6 +45,42 @@ if (!existsSync(assetRoot)) {
 }
 const assetBase = pathToFileURL(assetRoot).href;
 
+/**
+ * Playwright pins an exact Chromium revision and refuses to download a new one on an
+ * OS it no longer supports (this host is ubuntu20.04-x64: `playwright install` fails
+ * with "does not support chromium on ubuntu20.04-x64"). A dependency bump therefore
+ * breaks pin rendering even though a perfectly good Chromium is already cached. Fall
+ * back to the newest build in the Playwright cache rather than failing the render.
+ */
+function cachedChromium() {
+  const cache =
+    process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(os.homedir(), '.cache/ms-playwright');
+  if (!existsSync(cache)) return undefined;
+  const candidates = readdirSync(cache)
+    .map((dir) => {
+      const m = /^chromium(?:_headless_shell)?-(\d+)$/.exec(dir);
+      if (!m) return null;
+      const exe = dir.startsWith('chromium_headless_shell')
+        ? path.join(cache, dir, 'chrome-headless-shell-linux64', 'chrome-headless-shell')
+        : path.join(cache, dir, 'chrome-linux64', 'chrome');
+      return existsSync(exe) ? { rev: Number(m[1]), exe } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.rev - a.rev);
+  return candidates[0]?.exe;
+}
+
+async function launchChromium() {
+  try {
+    return await chromium.launch();
+  } catch (err) {
+    const exe = cachedChromium();
+    if (!exe) throw err;
+    console.warn(`Pinned Chromium missing; falling back to cached build:\n  ${exe}`);
+    return await chromium.launch({ executablePath: exe });
+  }
+}
+
 let html = await readFile(inPath, 'utf8');
 html = html.replaceAll('{{ASSET_BASE}}', assetBase);
 
@@ -52,7 +89,7 @@ html = html.replaceAll('{{ASSET_BASE}}', assetBase);
 const tmpPath = path.resolve(inPath).replace(/\.html?$/i, '') + '.rendered.html';
 await writeFile(tmpPath, html, 'utf8');
 
-const browser = await chromium.launch();
+const browser = await launchChromium();
 try {
   const page = await browser.newPage({
     viewport: { width: 1000, height: 1500 },
