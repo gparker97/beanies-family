@@ -3,6 +3,7 @@ import { useFilePicker, type UseFilePickerBindings } from '@/composables/useFile
 import { classifyBeaniesQr, wrongCodeMessageKey, type BeaniesQr } from '@/utils/beaniesQr';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /**
  * "Point the camera at a beanies code" — take one photo, decode it, say what it was.
@@ -12,6 +13,13 @@ import { reportError } from '@/utils/errorReporter';
  * declare `CAMERA`; that position is unchanged and is worth keeping, because a live
  * viewfinder is a permission prompt, a permission-denied state and a preview surface, none
  * of which this feature needs.
+ *
+ * What DID change: the decoder behind it is now a ladder (`runQrLadder`), because a single
+ * luma pass failed on roughly nine photos in ten — every code this app mints is Heritage
+ * Orange, which halves the contrast jsQR thresholds on. `qrDecode.ts` explains that in full.
+ * A continuous viewfinder would still read better than one photo, and if the ladder's
+ * telemetry says it is not enough, THAT is the evidence to revisit the position above — not
+ * a hunch.
  *
  * ⚠️ TWO CALL SITES ONLY — the cold surface's "Open Camera" and the signed-in profile
  * menu's "Scan a Code". Kit entry deliberately does NOT use this: it is a `<label>`-wrapped
@@ -43,9 +51,28 @@ export interface QrCapture {
   error: Ref<string | null>;
 }
 
+/**
+ * ⚠️ ONE SURFACE FOR THE WHOLE SUBSYSTEM, AND IT IS NOT THE CALLER'S.
+ *
+ * This used to take a `surface` option, so the same decode reported as `login-flow` from the
+ * cold panel and `deep-link` from the sign-in sheet. Rung ids cannot ride `kind` on
+ * `deep-link`: that surface documents, in capitals, that `kind` carries ONE vocabulary (the
+ * `DeliveryKind` values), after mixing marker constants onto it once already produced alerts
+ * that silently blended transport buckets with marker buckets. Nor can the rung ride `detail`
+ * on `login-flow`, where `detail` already carries `origin=`.
+ *
+ * A surface of its own gives the rung vocabulary a field to itself and makes one CloudWatch
+ * filter isolate every decode in the app.
+ */
+const SURFACE = 'qr-decode';
+
 export function useQrCapture(opts: {
-  /** Telemetry surface for decode failures. */
-  surface: string;
+  /**
+   * Where the scan was started from, e.g. `profile-menu` or `cold-entry`. Rides `detail` as
+   * `origin=<value>` so the two flows stay separable on one surface — the same idiom
+   * `useMintedLink` uses. NOT a telemetry surface; see SURFACE above.
+   */
+  origin: string;
   /** What this caller can act on. Anything else gets a "that's the wrong code" message. */
   expect: BeaniesQr['kind'];
   /** Called with a classification this caller asked for. */
@@ -73,19 +100,55 @@ export function useQrCapture(opts: {
                 ? 'qrScan.decoderUnavailable'
                 : 'qrScan.unreadableImage'
         );
+        // ⚠️ EMITTED EVEN FOR `no-code`, WHICH IS NEW AND IS THE POINT. `no-code` was
+        // deliberately silent because it is "the photo's fault" — but it is also the single
+        // most common outcome and the exact one this work is trying to move, so with no event
+        // the ladder's effect on it would be unmeasurable.
+        logEvent({
+          level: 'warn',
+          surface: SURFACE,
+          message: 'qr decode exhausted',
+          context: {
+            action: 'qr_decode_exhausted',
+            kind: 'exhausted',
+            error_code: decoded.reason,
+            detail: `origin=${opts.origin}`,
+          },
+        });
         // `no-code` is the one reason that is the photo's fault rather than ours, so it is
-        // not worth a report. The other three are device or delivery problems.
+        // not worth a REPORT on top of the counter. The other three are device or delivery
+        // problems and carry a cause.
         if (decoded.reason !== 'no-code') {
           reportError({
-            surface: opts.surface,
+            surface: SURFACE,
             message: 'qr decode failed',
             severity: 'warning',
             error: decoded.cause,
-            context: { action: 'qr_decode_failed', error_code: decoded.reason },
+            context: {
+              action: 'qr_decode_failed',
+              error_code: decoded.reason,
+              detail: `origin=${opts.origin}`,
+            },
           });
         }
         return;
       }
+
+      // ⚠️ THE SUCCESS COUNTER, AND THE RUNG IS THE WHOLE VALUE OF IT. Without a denominator
+      // the exhaustion rate above means nothing; and `kind` naming which attempt read the
+      // code is what makes the Heritage-Orange diagnosis FALSIFIABLE. If `full-blue` and
+      // `crop-blue` carry most successes, the contrast explanation was right. If everything
+      // still lands on `full-luma`, it was not, and this is the evidence to say so.
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'qr decoded',
+        context: {
+          action: 'qr_decoded',
+          kind: decoded.rung,
+          detail: `origin=${opts.origin}`,
+        },
+      });
 
       const classified = classifyBeaniesQr(decoded.data);
       if (classified.kind !== opts.expect) {
@@ -101,7 +164,7 @@ export function useQrCapture(opts: {
       // but a bare catch here would be the silent dead end this whole composable is about.
       error.value = translation.t('qrScan.unreadableImage');
       reportError({
-        surface: opts.surface,
+        surface: SURFACE,
         message: 'qr capture threw',
         severity: 'warning',
         error: e,
