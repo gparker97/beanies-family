@@ -211,16 +211,26 @@ describe('LoadPodView — the unlock screen describes step 1, not step 2', () =>
     expect(text).not.toContain('sign in to beans');
   });
 
-  it.each(shapes)('%s: the subtitle names the family and the next step', async (_n, env) => {
+  /**
+   * ⚠️ THE SUBTITLE DELIBERATELY NO LONGER NAMES THE FAMILY, and that is a copy decision
+   * rather than a regression. It used to read "This decrypts {family}'s family data. Next,
+   * you'll sign in as a member." — a sentence explaining the two-step model at the top of a
+   * screen greg described as a wall of text. The heading directly above already says Unlock
+   * My Beanpod. What survives is the ONE thing the subtitle is for: saying what happens next.
+   */
+  it.each(shapes)('%s: the subtitle says what happens next, briefly', async (_n, env) => {
     const w = await renderColdSurface(env);
     const text = w.text().toLowerCase();
-    expect(text).toContain("this decrypts beans's family data");
-    expect(text).toContain("you'll sign in as a member");
+    expect(text).toContain('next step: decrypt my beanpod');
   });
 
   it('the degenerate envelope promises no next step it cannot keep', async () => {
     const w = await renderColdSurface(envelope({}));
-    expect(w.text().toLowerCase()).not.toContain("you'll sign in as a member");
+    // ⚠️ ASSERT THE STRING THAT IS ACTUALLY RENDERED NOW. This used to check the absence of
+    // "you'll sign in as a member", which the copy pass DELETED from uiStrings entirely — so
+    // the assertion became a tautology that passes even if the null return it guards is
+    // removed and the screen promises a decryption that is not happening.
+    expect(w.text().toLowerCase()).not.toContain('next step: decrypt');
   });
 });
 
@@ -359,6 +369,10 @@ describe('LoadPodView — the open-pod kit surface says nothing false', () => {
 
   it('does not promise a decryption that is not happening', async () => {
     const w = await openPodKitSurface();
-    expect(w.text().toLowerCase()).not.toContain("you'll sign in as a member");
+    // ⚠️ ASSERT THE STRING THAT IS ACTUALLY RENDERED NOW. This used to check the absence of
+    // "you'll sign in as a member", which the copy pass DELETED from uiStrings entirely — so
+    // the assertion became a tautology that passes even if the null return it guards is
+    // removed and the screen promises a decryption that is not happening.
+    expect(w.text().toLowerCase()).not.toContain('next step: decrypt');
   });
 });

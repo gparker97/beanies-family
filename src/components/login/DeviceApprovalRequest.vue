@@ -37,7 +37,21 @@ import {
 } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
 
-const emit = defineEmits<{ approved: []; retry: [] }>();
+const emit = defineEmits<{ retry: [] }>();
+
+const props = defineProps<{
+  /**
+   * ⚠️ A CALLBACK PROP, NOT AN EMIT, BECAUSE THIS COMPONENT IS DESTROYED BY ITS OWN SUCCESS.
+   *
+   * `openPodWithFamilyKey` clears the staged file partway through and then keeps awaiting, so
+   * Vue flushes, `LoadPodView`'s `canUseDeviceApproval` goes false, and the `v-if` unmounts
+   * this whole subtree BEFORE the approval resolves. `emit()` early-returns on an unmounted
+   * instance — so the announcement went nowhere, `finishLoaded()` never ran, and the person
+   * was shown a password form over a pod that was already open. A closure captured at setup
+   * does not care that its component is gone.
+   */
+  onApproved?: () => void;
+}>();
 
 const { t } = useTranslation();
 const syncStore = useSyncStore();
@@ -215,7 +229,7 @@ async function checkForApproval(): Promise<void> {
       // precise defect the comment further down records having been fixed once already.
       approved.value = true;
       emitDeviceApprovalOutcome({ side: 'requester', outcome: 'ok' });
-      emit('approved');
+      props.onApproved?.();
       return;
     }
   } catch (e) {

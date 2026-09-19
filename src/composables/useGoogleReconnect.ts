@@ -55,7 +55,27 @@ export function useGoogleReconnect() {
    *   Pass the user's expected Google account so they're nudged toward
    *   the correct one when multiple accounts are signed in.
    */
-  async function reconnect(loginHint?: string): Promise<ReconnectOutcome> {
+  async function reconnect(
+    loginHint?: string,
+    opts?: {
+      /**
+       * Where the OAuth redirect should land. Pass a path that DIFFERS from the current one
+       * whenever the caller's UI has to re-evaluate on return: on Capacitor the WebView is
+       * not unloaded, so returning to the same path is a no-op navigation and nothing
+       * remounts. Omitted, it falls back to the current path (correct for web, where the
+       * return is a full page load, and for callers with nothing to re-evaluate).
+       */
+      returnPath?: string;
+      /**
+       * Refuse to start a NEW redirect; report `'failed'` instead.
+       *
+       * ⚠️ FOR RESUME CALLERS ONLY. A caller re-entering on the return from consent has no
+       * user gesture behind it, so redirecting again on a still-invalid token is a loop the
+       * person cannot break out of except by editing the URL.
+       */
+      noRedirect?: boolean;
+    }
+  ): Promise<ReconnectOutcome> {
     isReconnecting.value = true;
     reconnectError.value = null;
     // ⚠️ EMITTED HERE, IN THE OWNING LAYER, NOT AT THE CALL SITES. Six surfaces
@@ -116,7 +136,23 @@ export function useGoogleReconnect() {
       // returns to the same path, and App.vue's onMounted consumes the
       // pending OAuth code via completeRedirectAuth().
       if (shouldUseRedirectAuth()) {
-        const returnPath = `${window.location.pathname}${window.location.search}`;
+        if (opts?.noRedirect) {
+          reconnectError.value = 'googleDrive.reconnectFailed';
+          logEvent({
+            level: 'warn',
+            surface: 'login-flow',
+            message: 'reconnect resume found the token still invalid',
+            context: { action: 'reconnect_resume_invalid' },
+          });
+          return 'failed';
+        }
+        // ⚠️ `opts.returnPath` FIRST, and a caller that cares MUST pass one. The fallback
+        // below is the current path, which on Capacitor makes the return a
+        // `router.replace(samePath)` — a redundant navigation that does not remount anything,
+        // so whatever raised this button is still raising it and the person taps twice. See
+        // `RECONNECT_LOAD_PATH`.
+        const returnPath =
+          opts?.returnPath ?? `${window.location.pathname}${window.location.search}`;
         await startRedirectAuth(returnPath, loginHint, 'reconnect');
         // Page is navigating away and NOTHING has been acquired yet. This is not
         // success: a caller that treats it as such will clear the reconnect

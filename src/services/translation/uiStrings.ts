@@ -4085,13 +4085,13 @@ const STRING_DEFS = {
   // ⚠️ Deliberately names NO credential. The field label directly below already does, and
   // a subtitle that named one needed a variant per capability — which is the drift class
   // that produced the original "use password instead" bug on a kit-born family.
+  // ⚠️ ONE SHORT LINE, AND NO LONGER PER-FAMILY. It used to spend a whole sentence
+  // explaining the two-step model ("this decrypts X's family data, next you'll sign in as a
+  // member") at the top of a screen greg described as a wall of text. The heading above it
+  // already says Unlock My Beanpod; this says what happens next and stops.
   'loginV6.unlockSubtitle': {
-    en: "This decrypts your family's data. Next, you'll sign in as a member.",
-    beanie: "this decrypts your family's data. next, you'll sign in as a member.",
-  },
-  'loginV6.unlockSubtitleWithFamily': {
-    en: "This decrypts {familyName}'s family data. Next, you'll sign in as a member.",
-    beanie: "this decrypts {familyName}'s family data. next, you'll sign in as a member.",
+    en: 'Next step: decrypt my beanpod',
+    beanie: 'next step: decrypt my beanpod',
   },
   'loginV6.unlockButton': { en: 'Unlock My Beanpod', beanie: 'unlock my beanpod' },
   'loginV6.unlockMemberCount': {
@@ -5622,7 +5622,7 @@ const STRING_DEFS = {
   // ── Device approval (W4): the cold device asks, a signed-in device answers. ──────
   // Important surface — a sign-in and a family-wide key. `beanie` keeps the real nouns
   // (device, family, beanpod, sign in) and only drops case.
-  'deviceApproval.title': { en: 'Let This Device In?', beanie: 'let this device in?' },
+  'deviceApproval.title': { en: 'Approve Login', beanie: 'approve login' },
   'deviceApproval.prompt': {
     en: 'A device is asking to open {family}.',
     beanie: 'a device is asking to open {family}.',
@@ -5667,31 +5667,24 @@ const STRING_DEFS = {
     en: 'Scan a beanies QR Code',
     beanie: 'scan a beanies qr code',
   },
-  'coldEntry.pushLead': {
-    en: 'This device has a camera, so the quickest way in is to scan a code from a device that\u2019s already signed in.',
-    beanie:
-      'this device has a camera, so the quickest way in is to scan a code from a device that\u2019s already signed in.',
-  },
+  // ⚠️ THREE STEPS, AND THE THIRD IS THE ONE ABOUT *THIS* DEVICE. greg asked for the camera
+  // instruction as a separate line; it became step 3 instead, because steps 1 and 2 are about
+  // the OTHER device and a loose line after them reads like a caption belonging to nothing.
   'coldEntry.pushStep1': {
-    en: 'On a device you\u2019re already signed in on, open beanies and tap your profile.',
-    beanie: 'on a device you\u2019re already signed in on, open beanies and tap your profile.',
+    en: 'On a signed-in device, open the app and tap your profile.',
+    beanie: 'on a signed-in device, open the app and tap your profile.',
   },
   'coldEntry.pushStep2': {
-    en: 'Choose Sign In Another Device, then the option about pointing a camera at that screen.',
-    beanie:
-      'choose sign in another device, then the option about pointing a camera at that screen.',
+    en: 'Choose Sign In Another Device and create a magic link.',
+    beanie: 'choose sign in another device and create a magic link.',
   },
-  'coldEntry.openCamera': {
-    en: 'Open Camera',
-    beanie: 'open camera',
-  },
-  'coldEntry.scanning': {
-    en: 'counting beans...',
-    beanie: 'counting beans...',
+  'coldEntry.pushStep3': {
+    en: 'Open your camera and scan the QR code.',
+    beanie: 'open your camera and scan the qr code.',
   },
   'coldEntry.showMyCode': {
-    en: 'Show my code instead',
-    beanie: 'show my code instead',
+    en: 'Show my QR code instead',
+    beanie: 'show my qr code instead',
   },
   'coldEntry.scanInstead': {
     en: 'Scan a code with this device instead',
@@ -5747,17 +5740,13 @@ const STRING_DEFS = {
     en: 'That Doesn\u2019t Look Like a beanies Code',
     beanie: 'that doesn\u2019t look like a beanies code',
   },
-  // ⚠️ THE SECOND SENTENCE NAMES THE BUTTON, THROUGH `fillTemplate`. It said "close this"
-  // when this was a blocking step with a Close button, then "reject it" when no control had
-  // that name — the control reads "No, That's Not Me". An instruction naming a button nobody
-  // can find is worse than no instruction, on the one screen where backing out is the safe
-  // outcome. The placeholder is what keeps it honest under translation: hardcoding the label
-  // here would have zh render two unrelated versions of one button name, on the
-  // anti-phishing callout of all places.
+  // ⚠️ NO BUTTON NAME, AND NO PLACEHOLDER. Earlier versions named a control ("close this",
+  // then "reject it", then the Reject label through `fillTemplate`) and each was either wrong
+  // or a translation hazard. greg's wording asks the person to make a judgement instead of
+  // pointing at a button, which is both shorter and always accurate.
   'deviceApproval.provenanceBody': {
-    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, tap \u201c{reject}\u201d: approving it would let their device into your family.',
-    beanie:
-      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, tap \u201c{reject}\u201d: approving it would let their device into your family.',
+    en: 'Confirm that you know the person asking to access your family pod.',
+    beanie: 'confirm that you know the person asking to access your family pod.',
   },
   'deviceApproval.failed': {
     en: 'That didn\u2019t work. You can try again, or use one of the other ways in below.',
@@ -5835,17 +5824,11 @@ const STRING_DEFS = {
     beanie: 'save, print, or tick the box to carry on.',
   },
   'signInCode.menuItem': { en: 'Sign In Another Device', beanie: 'sign in another device' },
-  'signInCode.optionShowTitle': {
-    en: 'Create a Magic Link',
-    beanie: 'create a magic link',
-  },
-  'signInCode.optionReadTitle': {
-    en: 'Scan a QR Code',
-    beanie: 'scan a qr code',
-  },
+  // "Back to the Other Options" was true when this sheet opened on a two-card chooser. It
+  // opens on the mint now, so the only thing behind this button is the mint's own gate step.
   'signInCode.back': {
-    en: 'Back to the Other Options',
-    beanie: 'back to the other options',
+    en: 'Back',
+    beanie: 'back',
   },
   'signInCode.title': { en: 'Sign In Another Device', beanie: 'sign in another device' },
   'signInCode.lead': {
@@ -5862,9 +5845,24 @@ const STRING_DEFS = {
     en: 'No code was created. You can try again whenever you\u2019re ready.',
     beanie: 'no code was created. you can try again whenever you\u2019re ready.',
   },
+  // Rendered ONCE, below the code. It used to be printed twice — as a bare <p> above the panel
+  // and again as the panel's own `hint` — which is the same duplication being removed here.
+  'signInCode.gateLead': {
+    en: 'Create a magic link for the other device to scan.',
+    beanie: 'create a magic link for the other device to scan.',
+  },
+  'signInCode.createLink': {
+    en: 'Create a Magic Link',
+    beanie: 'create a magic link',
+  },
+  'signInCode.orScanHint': {
+    en: 'Already showing a code on the other device? Point this device\u2019s camera at it instead.',
+    beanie:
+      'already showing a code on the other device? point this device\u2019s camera at it instead.',
+  },
   'signInCode.scanLead': {
-    en: 'Point the other device\u2019s camera at this code.',
-    beanie: 'point the other device\u2019s camera at this code.',
+    en: 'Scan this code with your other device to log in',
+    beanie: 'scan this code with your other device to log in',
   },
   'signInCode.qrAlt': {
     en: 'Code to scan on your other device',
@@ -5948,13 +5946,27 @@ const STRING_DEFS = {
     en: 'That link is for someone who is no longer in this family. Pick who you are below.',
     beanie: 'that link is for someone who is no longer in this family. pick who you are below.',
   },
+  // ⚠️ NEITHER STRING MAY SAY "MAGIC LINK" ALONE. This field takes a JOINING link as well as a
+  // sign-in one — `useBeaniesLinkSubmit` calls `parseInviteLink`, and the placeholder below is
+  // a `/join?...` URL. The old copy said "Have a magic link?" directly above a placeholder
+  // showing the very link it was telling invitees they did not have.
+  //
+  // greg's terms, fixed: a MAGIC LINK signs you in; a JOINING LINK joins you to a family.
   'magicLink.pastePrompt': {
-    en: 'Have a magic link? Paste it here',
-    beanie: 'have a magic link? paste it here',
+    en: 'Have a link? Paste it here',
+    beanie: 'have a link? paste it here',
   },
   'magicLink.pasteLabel': {
-    en: 'Paste your beanies magic link here',
-    beanie: 'paste your beanies magic link here',
+    en: 'Paste a beanies link',
+    beanie: 'paste a beanies link',
+  },
+  // Covers BOTH of greg's asks in one line: which link kinds this field takes, and that a
+  // camera works too. It lives on `PasteLinkPanel`, so the welcome gate, the load-pod screen
+  // and the join view all get it without three copies.
+  'magicLink.pasteHelp': {
+    en: 'A magic link or a joining link both work \u2014 you can also scan one with your camera.',
+    beanie:
+      'a magic link or a joining link both work \u2014 you can also scan one with your camera.',
   },
   'magicLink.pastePlaceholder': {
     en: 'https://app.beanies.family/join?...',
@@ -6100,9 +6112,15 @@ const STRING_DEFS = {
     beanie:
       "one last step to join: open your family's data file from google drive so you have access.",
   },
+  // ⚠️ NAMES GOOGLE'S OWN BUTTON, WHICH WE DO NOT CONTROL. The picker's CTA reads "Insert",
+  // which greg found confusing next to a screen about opening a family file — it sounds like
+  // it belongs to a document editor. We cannot relabel it, so we tell the person what to look
+  // for. It is quoted and qualified ("the blue button") rather than stated flatly, because
+  // Google localises that label and a hard promise would then be wrong.
   'join.pickerPrompt.fileHint': {
-    en: 'After you tap, pick this file:',
-    beanie: 'after you tap, pick this file:',
+    en: 'After you tap, choose this file and then tap the blue \u201cInsert\u201d button at the bottom of Google\u2019s screen:',
+    beanie:
+      'after you tap, choose this file and then tap the blue \u201cinsert\u201d button at the bottom of google\u2019s screen:',
   },
   'join.pickerPrompt.button': {
     en: 'Open Your Family File',
