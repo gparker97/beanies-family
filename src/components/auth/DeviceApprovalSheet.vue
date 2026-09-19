@@ -100,7 +100,7 @@ const emit = defineEmits<{
    * closes — the TTL has to stop while the "Device Approved" panel is still on screen, which
    * is precisely when nobody is tapping anything.
    */
-  settled: [outcome: 'approved' | 'unconfirmed'];
+  settled: [key: string, outcome: 'approved' | 'unconfirmed'];
 }>();
 
 function closeSheet(): void {
@@ -367,6 +367,7 @@ async function approve(): Promise<void> {
    * `request_dismissed` and the per-transport dismissal rate could never be computed.
    */
   const deliveryAtStart = props.delivery;
+  const publicKeyAtStart = props.publicKey;
   const report = (
     outcome: 'published' | 'unconfirmed' | 'rejected' | 'abandoned' | 'failed',
     errorCode?: ApproverErrorCode
@@ -402,7 +403,10 @@ async function approve(): Promise<void> {
     // key is what produced an `expired` drop and an "it expired" toast for an approval that
     // had worked.
     if (verdict.paint === 'settled') {
-      emit('settled', verdict.value === 'done' ? 'approved' : 'unconfirmed');
+      // ⚠️ THE KEY THIS CALL STARTED WITH, not whatever is on screen now. The gate no-ops if
+      // they differ; without it a publish that finished after a second link arrived would
+      // disarm the SUCCESSOR's expiry and book the successor out of the funnel.
+      emit('settled', publicKeyAtStart, verdict.value === 'done' ? 'approved' : 'unconfirmed');
     }
     if (stillOurs()) {
       if (verdict.paint === 'settled') settled.value = verdict.value;
@@ -635,6 +639,7 @@ function reject(): void {
           variant="primary"
           type="button"
           :loading="isApproving"
+          :disabled="isPublishing"
           data-testid="approval-approve"
           @click="approve"
         >
@@ -649,7 +654,7 @@ function reject(): void {
           class="w-full"
           variant="outline"
           type="button"
-          :disabled="isApproving"
+          :disabled="isApproving || isPublishing"
           data-testid="approval-reject"
           @click="reject"
         >

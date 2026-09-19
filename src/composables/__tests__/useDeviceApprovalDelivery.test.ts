@@ -337,6 +337,80 @@ describe('useDeviceApprovalDelivery', () => {
     expect(result.approvalKey.value).toBeNull();
   });
 
+  it('REGRESSION: settle() disarms the TTL, so an approved key cannot expire under its own panel', () => {
+    // The bug this exists for: approve, then put the phone down — the whole point being that
+    // the OTHER device is now signing in. The timer armed at arrival then fired under the
+    // "Device Approved" panel, logged an `expired` drop for a healthy approval, pulled the
+    // panel off screen and toasted "that code expired, ask for a new one".
+    vi.useFakeTimers();
+    const usable = ref(true);
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
+    );
+    result.deliver('KEY-A', 'warm');
+
+    result.settle('KEY-A', 'approved');
+    vi.advanceTimersByTime(APPROVAL_EXPIRY_MS + 1);
+
+    // The panel is still on screen: settling flags the key, it does not clear it.
+    expect(result.approvalKey.value).toBe('KEY-A');
+    expect(messages()).not.toContain('approval_key_dropped');
+    expect(messages()).toContain('approval_key_settled');
+  });
+
+  it('REGRESSION: settle() ignores a key that is no longer the pending one', () => {
+    // A publish can be in flight for the whole credential budget, and a second link arriving
+    // inside it replaces `pending`. An unscoped settle would disarm the SUCCESSOR's expiry
+    // and book the successor out of the funnel — letting it be approved past its window.
+    vi.useFakeTimers();
+    const usable = ref(true);
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
+    );
+    result.deliver('KEY-A', 'warm');
+    result.deliver('KEY-B', 'warm'); // supersedes A
+
+    result.settle('KEY-A', 'approved'); // A's publish finally resolves
+
+    // B is untouched: still expirable, still countable.
+    vi.advanceTimersByTime(APPROVAL_EXPIRY_MS + 1);
+    expect(result.approvalKey.value).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'approval_key_dropped',
+        context: expect.objectContaining({ error_code: 'expired' }),
+      })
+    );
+  });
+
+  it('REGRESSION: a settled key is not ALSO counted as dropped', async () => {
+    // One key, one terminal event. A sign-out while the "Device Approved" panel is up used to
+    // add a `dropped` on top of the `settled`, re-inflating the ratio this work exists to
+    // make meaningful.
+    const usable = ref(true);
+    const familyId = ref<string | null | undefined>('fam-1');
+    const memberId = ref<string | null | undefined>('mem-1');
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({
+        isSurfaceUsable: usable,
+        familyId,
+        memberId,
+        hasPersistedSession: () => true,
+      })
+    );
+    result.deliver('KEY-A', 'warm');
+    result.settle('KEY-A', 'approved');
+
+    // ⚠️ `await nextTick()` IS THE TEST. The session watcher is async, so without it the
+    // sign-out never reaches `discard()` and this passes against the very bug it names —
+    // which it did, until a probe caught it.
+    memberId.value = undefined; // sign out with the "Device Approved" panel still up
+    await nextTick();
+
+    expect(messages()).not.toContain('approval_key_dropped');
+    expect(messages().filter((m) => m === 'approval_key_settled')).toHaveLength(1);
+  });
+
   it('dismiss clears the key AND reports it, so the funnel closes', () => {
     // It used to clear silently — a copy of `discard`'s body minus the emit — so a key
     // abandoned at the backdrop left `approval_key_held` with no terminal entry and the drop
