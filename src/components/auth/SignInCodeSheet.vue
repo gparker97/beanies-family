@@ -74,7 +74,7 @@ const { link, qr, isMinting, errorKey, qrUnavailable, run } = useMintedLink({
 });
 
 const capture = useQrCapture({
-  surface: 'deep-link',
+  origin: 'profile-menu',
   expect: 'approval',
   onScanned: (result) => {
     if (result.kind !== 'approval') return;
