@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-19
+
+### Fixed
+
+- **Marketing screenshots of the beanie wall no longer show an empty chore board.** The
+  screenshot harness was writing each chore's tick to the wrong field, so every board it
+  captured read "0 of 22 done today" with nothing checked off. Internal tooling only, but
+  it is why the chore board looked unused in the blog post's images.
+- **Pinterest pin rendering works again**, and the keyword in a pin's headline is now
+  readable on the orange backgrounds (it was being painted cream on white). Internal
+  tooling only.
+
+---
+
 ## 2026-09-18
 
 ### Fixed
