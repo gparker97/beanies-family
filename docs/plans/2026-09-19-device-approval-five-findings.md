@@ -1134,3 +1134,16 @@ dish-image-`detail` precedent. One line is added to the runbook's diagnostics ro
   codes and the three pass-through `openPodWithFamilyKey` reasons added to the snake_case
   normalisation, enforced by string-literal unions; and the pre-existing "Escape closes every open
   modal" behaviour recorded as out of scope, since it falsifies one clause of §3's argument.
+
+## Outcome
+
+✅ **SHIPPED as 0.21.5** (`2d1aa8b6`) — web, iOS TestFlight, and Android `beta` (open testing).
+Verified by reading the version out of the live bundle at `app.beanies.family`, not assumed.
+
+Every acceptance criterion above was met except the ones recorded as deliberately deferred in
+`docs/STATUS.md` (the Drive picker's extra tap, three sibling reconnect surfaces, and the
+second Google consent prompt). The on-device checks this plan could not reach are listed
+there too.
+
+⚠️ This plan is DONE. Do not re-implement it. Where the shipped code disagrees with a design
+decision written above, the code won a review round and the reasoning is in its comments.

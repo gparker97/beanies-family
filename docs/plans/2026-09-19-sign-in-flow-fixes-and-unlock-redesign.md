@@ -205,3 +205,16 @@ being deleted from the magic-link sheet.
 
 - **Pass 1 (Initial draft)**: drafted from four root-caused bugs plus three reported this
   session; records the native `router.replace` no-op as the shared cause of B2/B3.
+
+## Outcome
+
+✅ **SHIPPED as 0.21.6** (`669d38b9`) — web, iOS TestFlight, and Android `beta` (open testing).
+Verified by reading the version out of the live bundle at `app.beanies.family`, not assumed.
+
+Every acceptance criterion above was met except the ones recorded as deliberately deferred in
+`docs/STATUS.md` (the Drive picker's extra tap, three sibling reconnect surfaces, and the
+second Google consent prompt). The on-device checks this plan could not reach are listed
+there too.
+
+⚠️ This plan is DONE. Do not re-implement it. Where the shipped code disagrees with a design
+decision written above, the code won a review round and the reasoning is in its comments.
