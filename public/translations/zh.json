@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-19",
-    "translationCount": 4872
+    "translationCount": 4875
   },
   "translations": {
     "app.name": {
@@ -24316,29 +24316,9 @@
       "hash": "x14kgm",
       "lastUpdated": "2026-09-19"
     },
-    "deviceApproval.provenanceTitle": {
-      "translation": "您刚刚扫描了这个吗？",
-      "hash": "9z8sls",
-      "lastUpdated": "2026-09-19"
-    },
     "deviceApproval.provenanceBody": {
-      "translation": "仅当您将此设备的摄像头对准Beanies代码时，才可继续操作。如果有人向您发送此链接，请关闭此链接；批准此链接将允许他们的设备进入您的家庭。",
-      "hash": "5xz9lx",
-      "lastUpdated": "2026-09-19"
-    },
-    "deviceApproval.provenanceClose": {
-      "translation": "关闭，我没有扫描此",
-      "hash": "riui4y",
-      "lastUpdated": "2026-09-19"
-    },
-    "deviceApproval.provenanceContinue": {
-      "translation": "是的，我扫描了它",
-      "hash": "gc5m8d",
-      "lastUpdated": "2026-09-19"
-    },
-    "deviceApproval.supersededRetry": {
-      "translation": "该请求已被更新的请求替换。请检查其他设备上的验证码，然后重新批准。",
-      "hash": "xkmxmw",
+      "translation": "仅当您将此设备的摄像头对准Beanies代码时，才可继续操作。如果有人向您发送此链接，请轻触“{reject}” ：批准此链接将允许他们的设备进入您的家庭。",
+      "hash": "voxe1d",
       "lastUpdated": "2026-09-19"
     },
     "signInCode.optionShowTitle": {
@@ -24364,6 +24344,41 @@
     "shareTarget.beanpod.message": {
       "translation": "如需打开，请使用邀请链接，或在欢迎屏幕上选择“加载已保存的家庭文件”。",
       "hash": "s34mx9",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.pinRequired": {
+      "translation": "在允许设备进入之前，需要输入您的PIN码。准备就绪后，请重试。",
+      "hash": "68m59r",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.noCredential": {
+      "translation": "此成员未设置PIN或密码，因此无法从此处批准设备。在“设置”中设置PIN ，或从其他登录设备进行审批。",
+      "hash": "9uymin",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.approvedTitle": {
+      "translation": "已批准",
+      "hash": "ko5gif",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.approvedBody": {
+      "translation": "正在此设备上打开您的家庭数据…",
+      "hash": "4mlo9c",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.pendingTitle": {
+      "translation": "设备已批准！",
+      "hash": "a4gxq7",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.pendingBody": {
+      "translation": "审批仍在保存到您的家庭文件中。其他设备将在它着陆后立即拾取—您可以关闭它。",
+      "hash": "dt86f9",
+      "lastUpdated": "2026-09-19"
+    },
+    "deviceApproval.approveChecked": {
+      "translation": "是的，我扫描了这个，代码匹配",
+      "hash": "jqfpal",
       "lastUpdated": "2026-09-19"
     }
   }
