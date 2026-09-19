@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-19
 
+_Released as 0.21.5._
+
 ### Fixed
 
 - **Marketing screenshots of the beanie wall no longer show an empty chore board.** The
