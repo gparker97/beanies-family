@@ -2104,7 +2104,7 @@ watch(
       :public-key="deviceApprovalKey ?? ''"
       :delivery="deviceApprovalDeliveryKind"
       @close="approvalDelivery.dismiss()"
-      @settled="(outcome) => approvalDelivery.settle(outcome)"
+      @settled="(key, outcome) => approvalDelivery.settle(key, outcome)"
     />
     <DocumentExtractConsentModal />
     <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly

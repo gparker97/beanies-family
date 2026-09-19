@@ -115,8 +115,8 @@ export interface DeviceApprovalDelivery {
   delivery: ComputedRef<DeliveryKind | null>;
   /** A key arrived, from any transport. */
   deliver: (key: string, delivery: DeliveryKind) => void;
-  /** The approval was acted on. Stops the TTL and books the key out of the funnel. */
-  settle: (outcome: 'approved' | 'unconfirmed') => void;
+  /** The approval was acted on. Stops that key's TTL and books it out of the funnel. */
+  settle: (key: string, outcome: 'approved' | 'unconfirmed') => void;
   /** The sheet closed. Counts a loss only if the key had not already been settled. */
   dismiss: () => void;
 }
@@ -172,6 +172,11 @@ export function useDeviceApprovalDelivery(opts: {
     clearTimer();
     pending.value = null;
     announced = false;
+    // ⚠️ A SETTLED KEY IS ALREADY BOOKED OUT. It has an `approval_key_settled` entry, so
+    // emitting a drop here too would give one key two terminal events and re-inflate the
+    // exact ratio this work set out to make meaningful. Reached by a sign-out, a session
+    // rejection, or a new key arriving while the "Device Approved" panel is still up.
+    if (p.settled) return;
     emitApprovalKeyDropped({ delivery: p.delivery, errorCode });
   }
 
@@ -275,7 +280,10 @@ export function useDeviceApprovalDelivery(opts: {
       // Tagged with the HELD key's transport, not the incoming one: the entry being thrown
       // away is the old one, and mis-attributing it makes a transport that is silently
       // losing keys read as the healthy one.
-      emitApprovalKeyDropped({ delivery: existing.delivery, errorCode: 'superseded' });
+      // Not a loss if it already did its job — see `discard`.
+      if (!existing.settled) {
+        emitApprovalKeyDropped({ delivery: existing.delivery, errorCode: 'superseded' });
+      }
     }
     clearTimer();
     announced = false;
@@ -345,9 +353,15 @@ export function useDeviceApprovalDelivery(opts: {
    * have landed. It is not a `dropped` either: nothing was lost and the write may well
    * arrive. It gets its own level and its own code.
    */
-  function settle(outcome: 'approved' | 'unconfirmed'): void {
+  function settle(key: string, outcome: 'approved' | 'unconfirmed'): void {
     const p = pending.value;
-    if (!p || p.settled) return;
+    // ⚠️ KEY-SCOPED, BECAUSE THE CALLER CAN BE A GENERATION BEHIND. A publish may be in
+    // flight for up to the credential budget, and a second approval link arriving inside it
+    // replaces `pending`. An unscoped settle would then disarm the SUCCESSOR's TTL and book
+    // the successor out of the funnel — letting it be approved long after its window closed,
+    // which is the very hazard the expiry exists to prevent, and losing its abandonment
+    // count. Same cross-generation mix-up the sheet's own generation guard exists to stop.
+    if (!p || p.key !== key || p.settled) return;
     clearTimer();
     p.settled = true;
     emitApprovalKeySettled({ delivery: p.delivery, outcome });
