@@ -171,6 +171,19 @@ export function useMintedLink(opts: {
    * actually makes the old run harmless.
    */
   function cancel(): void {
+    // ⚠️ SETTLE THE FUNNEL. A superseded run returns before any `emitLinkMinted`, and its own
+    // watchdog can no longer fire either (its generation is stale by then) — so without this
+    // the abandoned `link_mint_started` never gets a partner and books permanently as +1 on
+    // `started - minted`. greg's exact sequence (hang, close, reopen, tap) would then be
+    // indistinguishable from the hang that alarm exists to catch.
+    if (isMinting.value) {
+      emitLinkMinted({
+        kind: opts.kind,
+        ok: false,
+        errorCode: 'mint-cancelled',
+        detail: opts.detail,
+      });
+    }
     mintGeneration += 1;
     isMinting.value = false;
   }

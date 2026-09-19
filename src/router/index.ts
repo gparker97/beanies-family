@@ -468,17 +468,19 @@ router.beforeEach((to) => {
   // "podCreated owner routed to resume-setup recovery" would be false twice over (nothing is
   // unconfigured, nothing is routed to resume-setup) and would put a steady warn stream on
   // the firehose for working behaviour.
-  if (
-    authStore.podCreated &&
-    isPodlessRecoveryQuery(to.query.resume) &&
-    to.query.resume !== RESUME_RECONNECT_LOAD
-  ) {
-    logEvent({
-      level: 'warn',
-      surface: 'app-podcreated-unconfigured',
-      message: 'podCreated owner routed to resume-setup recovery',
-      context: { route_path: to.path },
-    });
+  if (authStore.podCreated && isPodlessRecoveryQuery(to.query.resume)) {
+    // ⚠️ THE EXCLUSION IS ON THE LOG, NOT ON THE BRANCH — and an earlier version of this had
+    // it on the branch, which sent the reconnect return to Nook: the exact outcome the
+    // comment above says must not happen. The `return` below is what ALLOWS the navigation,
+    // so anything excluded from this `if` is excluded from being allowed.
+    if (to.query.resume !== RESUME_RECONNECT_LOAD) {
+      logEvent({
+        level: 'warn',
+        surface: 'app-podcreated-unconfigured',
+        message: 'podCreated owner routed to resume-setup recovery',
+        context: { route_path: to.path },
+      });
+    }
     return;
   }
   return { name: 'Nook' };

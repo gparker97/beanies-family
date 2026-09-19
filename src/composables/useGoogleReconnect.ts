@@ -137,7 +137,11 @@ export function useGoogleReconnect() {
       // pending OAuth code via completeRedirectAuth().
       if (shouldUseRedirectAuth()) {
         if (opts?.noRedirect) {
-          reconnectError.value = 'googleDrive.reconnectFailed';
+          // ⚠️ LEFT NULL ON PURPOSE. `reconnectError` is rendered VERBATIM by four call
+          // sites, and every one of them already falls back to `t('googleDrive.reconnectFailed')`
+          // when it is empty. Writing the key here would put the literal string
+          // "googleDrive.reconnectFailed" on the screen — and defeat the `||` fallback,
+          // because a key is truthy.
           logEvent({
             level: 'warn',
             surface: 'login-flow',
