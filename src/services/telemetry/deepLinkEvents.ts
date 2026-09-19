@@ -78,21 +78,6 @@ export function emitApprovalKeyHeld(payload: { delivery: DeliveryKind }): void {
 }
 
 /**
- * The user closed the "did you actually scan this?" interstitial.
- *
- * ⚠️ THE ONLY SIGNAL THAT COULD EVER REVEAL A LIVE PHISHING ATTEMPT. A legitimate approval
- * is almost never abandoned at this step, so a rise here is the observable the interstitial
- * exists to produce. It is also the number that decides whether the interstitial earns its
- * place: if in-app scans dominate and this stays at zero, it is friction to delete.
- */
-export function emitApprovalInterstitialDismissed(payload: { delivery: DeliveryKind }): void {
-  emit('warn', 'approval_interstitial_dismissed', {
-    action: 'approval_interstitial_dismissed',
-    kind: payload.delivery,
-  });
-}
-
-/**
  * The URL passed the allowlist and carried an approval marker, but delivery failed.
  *
  * `warn`, not `critical`: the person is looking at a device that visibly did nothing and

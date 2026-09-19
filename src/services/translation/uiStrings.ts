@@ -5747,22 +5747,10 @@ const STRING_DEFS = {
     en: 'That Doesn\u2019t Look Like a beanies Code',
     beanie: 'that doesn\u2019t look like a beanies code',
   },
-  'deviceApproval.provenanceTitle': {
-    en: 'Did You Just Scan This?',
-    beanie: 'did you just scan this?',
-  },
   'deviceApproval.provenanceBody': {
-    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, close this; approving it would let their device into your family.',
+    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, reject it; approving it would let their device into your family.',
     beanie:
-      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, close this; approving it would let their device into your family.',
-  },
-  'deviceApproval.provenanceClose': {
-    en: 'Close, I Didn\u2019t Scan This',
-    beanie: 'close, i didn\u2019t scan this',
-  },
-  'deviceApproval.provenanceContinue': {
-    en: 'Yes, I Scanned It',
-    beanie: 'yes, i scanned it',
+      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, reject it; approving it would let their device into your family.',
   },
   'deviceApproval.supersededRetry': {
     en: 'That request was replaced by a newer one. Check the code on your other device and approve again.',
@@ -5795,6 +5783,21 @@ const STRING_DEFS = {
   'deviceApproval.doneBody': {
     en: 'The other device should be signing in now.',
     beanie: 'the other device should be signing in now.',
+  },
+  'deviceApproval.approvedTitle': { en: 'Approved', beanie: 'approved' },
+  'deviceApproval.approvedBody': {
+    en: 'Opening your family data on this device\u2026',
+    beanie: 'opening your family data on this device\u2026',
+  },
+  'deviceApproval.pendingTitle': { en: 'Device Approved', beanie: 'device approved' },
+  'deviceApproval.pendingBody': {
+    en: 'The approval is still saving to your family file. The other device will pick it up as soon as it lands \u2014 you can close this.',
+    beanie:
+      'the approval is still saving to your family file. the other device will pick it up as soon as it lands \u2014 you can close this.',
+  },
+  'deviceApproval.approveChecked': {
+    en: 'Yes, I Scanned This and the Codes Match',
+    beanie: 'yes, i scanned this and the codes match',
   },
   'coldEntry.or': { en: 'or', beanie: 'or' },
   'coldEntry.scanTitle': {

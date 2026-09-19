@@ -151,6 +151,24 @@ export type MigrateStorageResult =
  * Presentation status for the sidebar SaveStatusIndicator. Distinct from the
  * store's `syncStatus` (see the `saveStatus` computed for the rationale).
  */
+/**
+ * What a durable save actually did. FOUR answers, and the difference between two of them is
+ * load-bearing.
+ *
+ * ⚠️ `'timeout'` IS NOT `'failed'`. On a timeout the upload may still be in flight and may
+ * well land; on `'failed'` it definitively did not. Callers that flatten the two tell people
+ * their write was lost when it was merely slow — which is exactly what the device-approval
+ * sheet did until 0.21.5, reporting "could not be saved" about ten seconds before the other
+ * device got in.
+ *
+ * ⚠️ NEVER TEST THIS FOR TRUTHINESS. Every member is a non-empty string, so `if (!outcome)`
+ * is always false and TypeScript will not warn you. Compare against `'saved'` explicitly, or
+ * `switch` with `assertNever`. This is why `putEnvelopeEntry` was RENAMED when its return
+ * type widened from `boolean`: the rename forces each call site to be rewritten rather than
+ * silently mis-reading a truthy `'failed'`.
+ */
+export type DurableSaveOutcome = 'saved' | 'failed' | 'timeout' | 'unknown';
+
 export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'saved' | 'hidden';
 
 /** Classified cause of a failed background/manual Drive read. */
@@ -441,7 +459,7 @@ export const useSyncStore = defineStore('sync', () => {
    *
    * Correct when the artefact is also on screen — a recovery kit whose code the user is
    * reading — so a deferred publish costs nothing. When the user is being handed a
-   * credential as their only way back in, use `putEnvelopeEntry` instead: a wrap that
+   * credential as their only way back in, use `publishEnvelopeEntry` instead: a wrap that
    * never reached the file is a dead credential.
    */
   function setEnvelopeEntry<F extends EnvelopeKeyDictField>(
@@ -475,7 +493,7 @@ export const useSyncStore = defineStore('sync', () => {
    * merge brought in (another member's passkey, say). That was a real defect; this is
    * the shape that makes it unrepresentable.
    */
-  async function putEnvelopeEntry<F extends EnvelopeKeyDictField>(opts: {
+  async function publishEnvelopeEntry<F extends EnvelopeKeyDictField>(opts: {
     dict: F;
     key: string;
     value: EnvelopeEntryOf<F> | null;
@@ -492,12 +510,12 @@ export const useSyncStore = defineStore('sync', () => {
      * the next save whatever the publish did.
      */
     rollbackOnFailure?: boolean;
-  }): Promise<boolean> {
+  }): Promise<DurableSaveOutcome> {
     const { committed, previous } = setEnvelopeEntry(opts.dict, opts.key, opts.value);
     if (!committed) throw new Error('No envelope loaded');
 
     const outcome = await syncNowDurable(opts.timeoutMs ?? POST_AUTH_SAVE_TIMEOUT_MS);
-    if (outcome === 'saved') return true;
+    if (outcome === 'saved') return outcome;
 
     // ⚠️ 'timeout' IS NOT 'failed'. On a timeout the upload may still be in flight and may
     // well land, so we neither roll back (that could revert a write that succeeded) nor
@@ -527,7 +545,7 @@ export const useSyncStore = defineStore('sync', () => {
       const after = authoritativeEnvelope();
       if (after) commitEnvelope(withEntry(after, opts.dict, opts.key, previous ?? null).next);
     }
-    return false;
+    return outcome;
   }
 
   // Pending encrypted file — V4 envelope that needs password to unlock
@@ -1171,9 +1189,7 @@ export const useSyncStore = defineStore('sync', () => {
    * must treat `'unknown'` like `'timeout'`: the write may be out there, so
    * converge.
    */
-  async function syncNowDurable(
-    timeoutMs: number
-  ): Promise<'saved' | 'failed' | 'timeout' | 'unknown'> {
+  async function syncNowDurable(timeoutMs: number): Promise<DurableSaveOutcome> {
     try {
       const r = await raceTimeout(syncNow(true), timeoutMs);
       if (r === undefined) return 'timeout';
@@ -6152,7 +6168,7 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Publish a device-approval wrap for a member (W4, the approver's side).
    *
-   * ⚠️ `putEnvelopeEntry`, NOT `setEnvelopeEntry`. This REPLACES the entry at an existing
+   * ⚠️ `publishEnvelopeEntry`, NOT `setEnvelopeEntry`. This REPLACES the entry at an existing
    * key on every approval after the first, and `keyDictSize`'s publish signal is a strict
    * `>` on a COUNT — an in-place overwrite leaves it unchanged, so the write would sit in
    * memory and never reach Drive. The cold device polls the FILE, so a wrap that does not
@@ -6162,11 +6178,11 @@ export const useSyncStore = defineStore('sync', () => {
    * wrap that never reached the file is a dead credential, and leaving it behind would make
    * the approver's screen claim it let someone in when it did not.
    */
-  async function setDeviceApprovalWrap(
+  async function publishDeviceApprovalWrap(
     memberId: string,
     pkg: import('@/types/syncFileV4').DeviceApprovalPackage
-  ): Promise<boolean> {
-    return putEnvelopeEntry({ dict: 'deviceApprovalKeys', key: memberId, value: pkg });
+  ): Promise<DurableSaveOutcome> {
+    return publishEnvelopeEntry({ dict: 'deviceApprovalKeys', key: memberId, value: pkg });
   }
 
   /**
@@ -6216,12 +6232,17 @@ export const useSyncStore = defineStore('sync', () => {
      */
     timeoutMs: number = DURABLE_ROTATION_SAVE_TIMEOUT_MS
   ): Promise<boolean> {
-    const saved = await putEnvelopeEntry({
-      dict: 'memberLinkKeys',
-      key: memberId,
-      value: pkg,
-      timeoutMs,
-    });
+    // ⚠️ `=== 'saved'` PRESERVES THIS CALLER'S EXACT PRIOR BEHAVIOUR. `publishEnvelopeEntry`
+    // now returns the outcome rather than a boolean, and every non-empty string is truthy —
+    // so `if (!outcome)` would silently never fire. The magic-link KNOWN GAP above is
+    // untouched by this change; only the approval path acts on the distinction.
+    const saved =
+      (await publishEnvelopeEntry({
+        dict: 'memberLinkKeys',
+        key: memberId,
+        value: pkg,
+        timeoutMs,
+      })) === 'saved';
     if (!saved) {
       console.error(
         '[syncStore] setMemberLinkWrap: publish failed/timed out — link is NOT on Drive'
@@ -6286,24 +6307,26 @@ export const useSyncStore = defineStore('sync', () => {
     // `inviteService` → `familyKeyService` into the eager boot graph and silently no-ops
     // the deliberate `await import(...)` sites elsewhere. It is a pure 6-line value —
     // a package nothing can unwrap.
-    const published = await putEnvelopeEntry({
-      dict: 'memberLinkKeys',
-      key: memberId,
-      value: {
-        salt: '',
-        wrapped: '',
-        tokenHash: '',
-        keyId: base.keyId,
-        createdAt: new Date(
-          Math.max(Date.now(), (Date.parse(existing?.createdAt ?? '') || 0) + 1)
-        ).toISOString(),
-        expiresAt: new Date(0).toISOString(),
-      },
-      // ⚠️ NEVER roll this back. See the option's own docstring: the default would restore
-      // the live wrap this tombstone exists to kill, and `doSave` reports a merely QUEUED
-      // write as a failure — so revoking while offline would reinstate the credential.
-      rollbackOnFailure: false,
-    });
+    // Same `=== 'saved'` note as `setMemberLinkWrap`: behaviour preserved exactly.
+    const published =
+      (await publishEnvelopeEntry({
+        dict: 'memberLinkKeys',
+        key: memberId,
+        value: {
+          salt: '',
+          wrapped: '',
+          tokenHash: '',
+          keyId: base.keyId,
+          createdAt: new Date(
+            Math.max(Date.now(), (Date.parse(existing?.createdAt ?? '') || 0) + 1)
+          ).toISOString(),
+          expiresAt: new Date(0).toISOString(),
+        },
+        // ⚠️ NEVER roll this back. See the option's own docstring: the default would restore
+        // the live wrap this tombstone exists to kill, and `doSave` reports a merely QUEUED
+        // write as a failure — so revoking while offline would reinstate the credential.
+        rollbackOnFailure: false,
+      })) === 'saved';
 
     // Never silent. These two failure shapes are the difference between "revoked" and
     // "we think we revoked", and only the firehose can tell anyone which happened.
@@ -6634,7 +6657,7 @@ export const useSyncStore = defineStore('sync', () => {
     setRecoveryPassphraseWrap,
     retireMemberKeyMaterial,
     memberLinkCreatedAt,
-    setDeviceApprovalWrap,
+    publishDeviceApprovalWrap,
     deviceApprovalCreatedAt,
     setMemberLinkWrap,
     revokeMemberLink,

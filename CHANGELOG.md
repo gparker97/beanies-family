@@ -24,6 +24,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
   finished opening, so the approval prompt never appeared on a cold start. It appears again.
 - **The approval prompt now sits in front of the "sign in another device" window** instead of
   behind it, so a scan made while that window is open is no longer invisible.
+- **Approving a device no longer claims it failed when it actually worked.** A save that was
+  merely slow was reported as an outright failure, moments before the other device got in.
+  It now says the approval is still saving, and only reports a failure when there is one.
+- **The device you are signing in now says so.** It shows an "Approved" step while your
+  family data opens, instead of jumping with nothing said, and its code disappears at the
+  same moment so there is no longer a live code sitting under a success message.
+
+### Changed
+
+- **Approving a device is one approve plus your PIN.** The separate "did you just scan
+  this?" screen is gone; its warning now appears in the approval itself, above the codes you
+  compare, where it is actually read.
 
 ---
 

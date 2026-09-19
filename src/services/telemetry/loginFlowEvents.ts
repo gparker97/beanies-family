@@ -13,6 +13,7 @@
  */
 
 import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
+import type { DeliveryKind } from '@/services/telemetry/deepLinkEvents';
 
 const SURFACE = 'login-flow';
 
@@ -267,13 +268,72 @@ export function emitDeviceApprovalRequested(): void {
   emit('info', 'device_approval_requested', { action: 'requested' });
 }
 
+/**
+ * Every way a device approval can end, from BOTH sides of it.
+ *
+ * ⚠️ TWO ACTORS, ONE EVENT, AND THE TYPE IS WHAT KEEPS THEM STRAIGHT. The cold device that
+ * ASKED and the signed-in device that ANSWERED both end up here, and their vocabularies do
+ * not overlap: only a requester can be `expired` (its own window ran out), only an approver
+ * can be `published`. Splitting into two event names was considered and rejected — the
+ * approver's five failure codes already live on this event, so a split would either strand
+ * them or force a migration for no operational gain.
+ *
+ * `side` is a COMPILE-TIME DISCRIMINANT ONLY and is never emitted, so no new context key
+ * ships and no store data-collection declaration changes. Its whole job is that an approver
+ * emission does not compile without `delivery`, and a requester emission does not compile
+ * with it.
+ */
+export type RequesterErrorCode =
+  | 'no_pending'
+  | 'payload'
+  | 'decrypt'
+  | 'poll_failed'
+  | 'qr_unavailable'
+  | 'request_failed'
+  | 'open_failed';
+
+export type ApproverErrorCode =
+  | 'no_family_key'
+  | 'request_dismissed'
+  | 'request_superseded'
+  | 'gate_declined'
+  | 'publish_failed'
+  | 'approve_threw'
+  | 'timeout'
+  | 'unknown';
+
+export type DeviceApprovalOutcomeEvent =
+  | { side: 'requester'; outcome: 'ok' | 'expired' | 'failed'; errorCode?: RequesterErrorCode }
+  | {
+      side: 'approver';
+      outcome: 'published' | 'unconfirmed' | 'rejected' | 'failed';
+      /**
+       * How the key reached the approver.
+       *
+       * ⚠️ THIS FIELD REPLACED `approval_interstitial_dismissed`, WHICH WAS THE ONLY SIGNAL
+       * THAT COULD EVER REVEAL A LIVE PHISHING ATTEMPT. That event counted people backing
+       * out of a blocking "did you actually scan this?" step; the step is now a warning
+       * callout inside the compare panel, so there is nothing left to back out OF.
+       *
+       * It is replaced by two things that are strictly more informative. First, this field:
+       * because it rides on EVERY approver outcome, per-transport rejection AND success
+       * rates are now computable, which the old event could never do — it had no
+       * denominator. Second, `outcome: 'rejected'` with `kind` anything other than
+       * `in-app-scan` is the direct successor signal: someone was handed a link they did not
+       * scan and declined it. A rise there means the same thing a rise in the old event
+       * meant. If deep links dominate legitimate approvals and rejections stay at zero, the
+       * warning is friction and should be deleted rather than left to be tapped through.
+       */
+      delivery: DeliveryKind | null;
+      errorCode?: ApproverErrorCode;
+    };
+
 /** How a device-approval attempt ended. Emitted on success too, so rates are measurable. */
-export function emitDeviceApprovalOutcome(payload: {
-  outcome: 'ok' | 'rejected' | 'expired' | 'failed';
-  errorCode?: string;
-}): void {
-  emit(payload.outcome === 'ok' ? 'info' : 'warn', 'device_approval_outcome', {
-    action: payload.outcome,
-    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+export function emitDeviceApprovalOutcome(event: DeviceApprovalOutcomeEvent): void {
+  const isSuccess = event.outcome === 'ok' || event.outcome === 'published';
+  emit(isSuccess ? 'info' : 'warn', 'device_approval_outcome', {
+    action: event.outcome,
+    ...(event.errorCode ? { error_code: event.errorCode } : {}),
+    ...(event.side === 'approver' && event.delivery ? { kind: event.delivery } : {}),
   });
 }

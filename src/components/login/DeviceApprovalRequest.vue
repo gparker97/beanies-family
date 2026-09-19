@@ -20,6 +20,7 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { renderQr } from '@/utils/qrCode';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
@@ -32,6 +33,7 @@ import {
 import {
   emitDeviceApprovalRequested,
   emitDeviceApprovalOutcome,
+  type RequesterErrorCode,
 } from '@/services/telemetry/loginFlowEvents';
 import { reportError } from '@/utils/errorReporter';
 
@@ -45,6 +47,20 @@ const qr = ref('');
 const qrUnavailable = ref(false);
 const expired = ref(false);
 const failed = ref(false);
+/**
+ * The approval landed and the pod is opening.
+ *
+ * ⚠️ IT HIDES THE CODE, WHICH IS THE POINT. This state is not decoration: the QR and the
+ * fingerprint gate on `!approved` alongside `!expired && !failed` for the same reason the
+ * comment on those gates gives — a still-scannable code beneath a success message is a
+ * screen indistinguishable from a working one, and a wrap published against it would have
+ * nothing listening.
+ *
+ * No timer. The parent chain does real work (`finishLoaded()` awaits `ensureDurableHome()`)
+ * before the view swaps, so this is visible for the true duration of that work rather than
+ * an invented one.
+ */
+const approved = ref(false);
 
 /**
  * 3 seconds, not the 10–15s the file pollers use.
@@ -176,10 +192,29 @@ async function checkForApproval(): Promise<void> {
       const opened = await syncStore.openPodWithFamilyKey(familyKey);
       if (!opened.ok) {
         failed.value = true;
-        emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: opened.reason });
+        // ⚠️ MAPPED, NOT PASSED THROUGH. `opened.reason` is `syncStore`'s vocabulary, in
+        // kebab-case, and letting it escape straight onto the event is how this one field
+        // ended up carrying two casings at once. The map keeps the telemetry union closed,
+        // so a new reason upstream is a compile error here rather than a silent third
+        // spelling in CloudWatch.
+        const REASON_TO_CODE = {
+          'no-pending': 'no_pending',
+          payload: 'payload',
+          decrypt: 'decrypt',
+        } as const satisfies Record<typeof opened.reason, RequesterErrorCode>;
+        emitDeviceApprovalOutcome({
+          side: 'requester',
+          outcome: 'failed',
+          errorCode: REASON_TO_CODE[opened.reason],
+        });
         return;
       }
-      emitDeviceApprovalOutcome({ outcome: 'ok' });
+      // ⚠️ SET BEFORE THE EMIT, AND THE QR HIDES WITH IT. Without an explicit success state
+      // the screen jumped straight from a live, still-scannable code to the next view with
+      // nothing said — and a success message rendered BELOW a code that still works is the
+      // precise defect the comment further down records having been fixed once already.
+      approved.value = true;
+      emitDeviceApprovalOutcome({ side: 'requester', outcome: 'ok' });
       emit('approved');
       return;
     }
@@ -191,7 +226,7 @@ async function checkForApproval(): Promise<void> {
     // events this whole feature was added to measure. One report, then stop.
     stopWaiting();
     failed.value = true;
-    emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'poll-failed' });
+    emitDeviceApprovalOutcome({ side: 'requester', outcome: 'failed', errorCode: 'poll_failed' });
     reportError({
       surface: 'login-flow',
       message: 'device approval poll could not read the family file',
@@ -221,7 +256,11 @@ onMounted(async () => {
       // `.beanpod` download, then report `expired`, which in CloudWatch is indistinguishable
       // from a person declining.
       qrUnavailable.value = true;
-      emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'qr-unavailable' });
+      emitDeviceApprovalOutcome({
+        side: 'requester',
+        outcome: 'failed',
+        errorCode: 'qr_unavailable',
+      });
       return;
     }
 
@@ -232,7 +271,7 @@ onMounted(async () => {
     expiryTimer = setTimeout(() => {
       expired.value = true;
       stopWaiting();
-      emitDeviceApprovalOutcome({ outcome: 'expired' });
+      emitDeviceApprovalOutcome({ side: 'requester', outcome: 'expired' });
     }, APPROVAL_EXPIRY_MS);
 
     // Torn down while we were awaiting — install nothing.
@@ -243,7 +282,11 @@ onMounted(async () => {
     // stuck — every other way in is still on the screen below — but this must not be a
     // blank square with no explanation.
     failed.value = true;
-    emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'request-failed' });
+    emitDeviceApprovalOutcome({
+      side: 'requester',
+      outcome: 'failed',
+      errorCode: 'request_failed',
+    });
     reportError({
       surface: 'login-flow',
       message: 'device approval request could not be created',
@@ -276,7 +319,7 @@ function retry(): void {
       `failed`, so the approver could still scan it and publish a wrap that nothing was
       listening for — a screen indistinguishable from a working one.
     -->
-    <div v-if="qr && !expired && !failed" class="flex justify-center">
+    <div v-if="qr && !expired && !failed && !approved" class="flex justify-center">
       <div
         class="dark:border-line dark:bg-surface-raised rounded-3xl border border-gray-200 bg-white p-3 shadow-[var(--card-shadow)]"
       >
@@ -291,7 +334,19 @@ function retry(): void {
       {{ t('deviceApproval.qrUnavailable') }}
     </p>
 
-    <template v-if="fingerprint && !expired && !failed">
+    <!-- Approved, and the pod is opening. `BeanieSpinner` is the app's canonical
+         in-progress visual (same one the mint step uses) rather than a bespoke one. -->
+    <div v-if="approved" class="space-y-3 py-2" data-testid="approval-approved">
+      <BeanieSpinner size="md" />
+      <p class="dark:text-ink text-base font-semibold text-gray-900">
+        {{ t('deviceApproval.approvedTitle') }}
+      </p>
+      <p class="dark:text-ink-soft text-sm text-gray-600">
+        {{ t('deviceApproval.approvedBody') }}
+      </p>
+    </div>
+
+    <template v-if="fingerprint && !expired && !failed && !approved">
       <p
         class="font-outfit dark:text-ink dark:bg-surface-overlay mt-3 inline-block rounded-xl bg-gray-50 px-3 py-1.5 text-lg font-bold tracking-[0.22em] text-gray-900"
         data-testid="approval-fingerprint"
