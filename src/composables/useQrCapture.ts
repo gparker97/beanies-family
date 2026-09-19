@@ -3,7 +3,6 @@ import { useFilePicker, type UseFilePickerBindings } from '@/composables/useFile
 import { classifyBeaniesQr, wrongCodeMessageKey, type BeaniesQr } from '@/utils/beaniesQr';
 import { useTranslationStore } from '@/stores/translationStore';
 import { reportError } from '@/utils/errorReporter';
-import { logEvent } from '@/services/telemetry/logEvent';
 
 /**
  * "Point the camera at a beanies code" — take one photo, decode it, say what it was.
@@ -52,6 +51,13 @@ export interface QrCapture {
 }
 
 /**
+ * ⚠️ THE OUTCOME COUNTERS LIVE IN `qrDecode.ts`, NOT HERE, because there is a THIRD caller
+ * of the decoder (`LoadPodView`'s recovery-kit scan) that does not go through this
+ * composable. Emitting from here covered two of three and left the printed-kit path — the
+ * one where a Heritage Orange code is most likely to be photographed — silent on both
+ * success and `no-code`. What stays here is the REPORT, because only this layer knows the
+ * user-facing message it accompanies.
+ *
  * ⚠️ ONE SURFACE FOR THE WHOLE SUBSYSTEM, AND IT IS NOT THE CALLER'S.
  *
  * This used to take a `surface` option, so the same decode reported as `login-flow` from the
@@ -89,7 +95,7 @@ export function useQrCapture(opts: {
     isBusy.value = true;
     try {
       const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
-      const decoded = await decodeQrFromImageFile(file);
+      const decoded = await decodeQrFromImageFile(file, opts.origin);
       if (!decoded.ok) {
         error.value = translation.t(
           decoded.reason === 'no-code'
@@ -100,21 +106,6 @@ export function useQrCapture(opts: {
                 ? 'qrScan.decoderUnavailable'
                 : 'qrScan.unreadableImage'
         );
-        // ⚠️ EMITTED EVEN FOR `no-code`, WHICH IS NEW AND IS THE POINT. `no-code` was
-        // deliberately silent because it is "the photo's fault" — but it is also the single
-        // most common outcome and the exact one this work is trying to move, so with no event
-        // the ladder's effect on it would be unmeasurable.
-        logEvent({
-          level: 'warn',
-          surface: SURFACE,
-          message: 'qr decode exhausted',
-          context: {
-            action: 'qr_decode_exhausted',
-            kind: 'exhausted',
-            error_code: decoded.reason,
-            detail: `origin=${opts.origin}`,
-          },
-        });
         // `no-code` is the one reason that is the photo's fault rather than ours, so it is
         // not worth a REPORT on top of the counter. The other three are device or delivery
         // problems and carry a cause.
@@ -127,28 +118,12 @@ export function useQrCapture(opts: {
             context: {
               action: 'qr_decode_failed',
               error_code: decoded.reason,
-              detail: `origin=${opts.origin}`,
+              detail: `origin=${opts.origin};tried=${decoded.attempts.join(',') || 'none'}`,
             },
           });
         }
         return;
       }
-
-      // ⚠️ THE SUCCESS COUNTER, AND THE RUNG IS THE WHOLE VALUE OF IT. Without a denominator
-      // the exhaustion rate above means nothing; and `kind` naming which attempt read the
-      // code is what makes the Heritage-Orange diagnosis FALSIFIABLE. If `full-blue` and
-      // `crop-blue` carry most successes, the contrast explanation was right. If everything
-      // still lands on `full-luma`, it was not, and this is the evidence to say so.
-      logEvent({
-        level: 'info',
-        surface: SURFACE,
-        message: 'qr decoded',
-        context: {
-          action: 'qr_decoded',
-          kind: decoded.rung,
-          detail: `origin=${opts.origin}`,
-        },
-      });
 
       const classified = classifyBeaniesQr(decoded.data);
       if (classified.kind !== opts.expect) {

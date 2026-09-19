@@ -86,7 +86,7 @@ const capture = useQrCapture({
       // ⚠️ The guard is right; the SILENCE was not. A fully decoded approval key used to be
       // dropped here with no event anywhere, so this path was invisible in CloudWatch and
       // indistinguishable from a decode that never happened.
-      emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet_dismissed' });
+      emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet-dismissed' });
       return;
     }
     // Hand the key up and get out of the way. The approval sheet now sits a layer above this

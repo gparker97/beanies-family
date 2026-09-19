@@ -67,7 +67,7 @@ export function classifyBeaniesQr(text: string): BeaniesQr {
    * host, and `readHashMarker` is a bare `indexOf`. So `https://evil.example/x?y=beanies-
    * approve=KEY` — or the bare string `beanies-approve=KEY` — classified as an approval.
    * That mattered more here than anywhere else: a key from this classifier is delivered as
-   * `in-app-scan`, which is the ONE transport the provenance interstitial skips. A QR on a
+   * `in-app-scan`, which is the ONE transport the provenance warning skips. A QR on a
    * poster or in an email would have landed the victim straight on a live fingerprint panel
    * with no warning, while `main.ts` and `inboundLinkBridge` were both being hardened to
    * require exactly this. The promoted route must not be the weak one.

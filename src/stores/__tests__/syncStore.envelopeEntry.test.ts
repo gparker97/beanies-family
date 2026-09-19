@@ -208,10 +208,7 @@ describe('publishEnvelopeEntry — the rollback must not clobber a concurrent me
   });
 
   // ── publishDeviceApprovalWrap: a timeout is not a failure ──
-  beforeEach(() => {
-    setActivePinia(createPinia());
-    vi.clearAllMocks();
-  });
+  // (no second `beforeEach` — the describe's own already resets pinia and the mocks.)
 
   it('REGRESSION: reports a timed-out publish as "timeout", not as a failure', async () => {
     // ⚠️ THE WHOLE POINT OF THE RETURN-TYPE WIDENING. This used to come back as `false`,

@@ -484,8 +484,9 @@ export const useSyncStore = defineStore('sync', () => {
    *
    * ⚠️ BOUNDED. This is awaited on the pod-creation critical path and again right after
    * a join commits. An unbounded sync there means a stalled Drive does not merely fail
-   * the write, it holds up the whole flow behind it. On timeout this returns false, the
-   * caller degrades, and the family gets on with creating their pod.
+   * the write, it holds up the whole flow behind it. On timeout this returns `'timeout'`
+   * — NOT `'failed'` and NOT a falsy value, see the return type's warning — and the caller
+   * degrades while the family gets on with creating their pod.
    *
    * ⚠️ Rollback re-reads the authoritative envelope. A merge may have run during the
    * publish attempt, so the undo is applied to what is current, touching ONLY our key —
@@ -6182,7 +6183,30 @@ export const useSyncStore = defineStore('sync', () => {
     memberId: string,
     pkg: import('@/types/syncFileV4').DeviceApprovalPackage
   ): Promise<DurableSaveOutcome> {
-    return publishEnvelopeEntry({ dict: 'deviceApprovalKeys', key: memberId, value: pkg });
+    return publishEnvelopeEntry({
+      dict: 'deviceApprovalKeys',
+      key: memberId,
+      value: pkg,
+      /**
+       * ⚠️ 20s, NOT THE 5s DEFAULT, AND THIS IS THE ROOT CAUSE OF THE REPORTED BUG rather
+       * than a tuning preference. A device-approval wrap is exactly the animal
+       * `CREDENTIAL_PUBLISH_TIMEOUT_MS` was introduced for: a credential someone is
+       * WAITING to be handed, published as a full re-export, re-encrypt and upload of the
+       * entire multi-MB envelope. Its docblock already says five seconds "routinely expires
+       * before the upload has even started", and that is precisely what greg saw — "could
+       * not be saved", then the other device decrypting the file about ten seconds later.
+       *
+       * The three-state outcome above is still right and still needed, but on the 5s budget
+       * `'saved'` would have been the RARE branch on any phone, so `action: 'published'` —
+       * the new success metric, and the denominator `unconfirmed` is measured against —
+       * would have systematically undercounted, and `publishEnvelopeEntry`'s KNOWN GAP
+       * would have applied to `deviceApprovalKeys` routinely rather than rarely.
+       *
+       * `linkMint` and `useJoinFlow`, the other two credential hand-offs in this product,
+       * both already spend this budget. This one was the odd one out.
+       */
+      timeoutMs: CREDENTIAL_PUBLISH_TIMEOUT_MS,
+    });
   }
 
   /**
@@ -6244,8 +6268,13 @@ export const useSyncStore = defineStore('sync', () => {
         timeoutMs,
       })) === 'saved';
     if (!saved) {
+      // ⚠️ "MAY NOT BE", not "is NOT". This line used to assert the link was not on Drive,
+      // which is false on a `'timeout'` — the upload may still be in flight and may well
+      // land. Same false-failure the device-approval sheet was fixed for; the console is a
+      // developer surface but it is still a claim, and this one sent someone looking for a
+      // bug that had not happened.
       console.error(
-        '[syncStore] setMemberLinkWrap: publish failed/timed out — link is NOT on Drive'
+        '[syncStore] setMemberLinkWrap: publish not confirmed — link may not be on Drive'
       );
       logEvent({
         level: 'warn',

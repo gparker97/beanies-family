@@ -130,7 +130,7 @@ async function handleKitPhotoPicked(event: Event) {
   isScanningKit.value = true;
   try {
     const { decodeQrFromImageFile } = await import('@/utils/qrDecode');
-    const decoded = await decodeQrFromImageFile(file);
+    const decoded = await decodeQrFromImageFile(file, 'recovery-kit');
     if (!decoded.ok) {
       // Four reasons, four messages. "We couldn't find a code in that photo" is only honest
       // for `no-code`; saying it when the decoder chunk failed to load sends someone to
@@ -150,7 +150,14 @@ async function handleKitPhotoPicked(event: Event) {
           message: 'kit QR decode failed',
           severity: 'warning',
           error: decoded.cause,
-          context: { action: 'kit_scan_failed', error_code: decoded.reason },
+          // The outcome counter (success AND `no-code`) is emitted by the decoder itself on
+          // the `qr-decode` surface, for every caller. This stays `login-flow`: it is the
+          // kit-redemption flow's own failure report, and it carries the cause.
+          context: {
+            action: 'kit_scan_failed',
+            error_code: decoded.reason,
+            detail: `tried=${decoded.attempts.join(',') || 'none'}`,
+          },
         });
       }
       return;
