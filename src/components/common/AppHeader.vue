@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import ProfileMenu from '@/components/common/ProfileMenu.vue';
 import SignInCodeSheet from '@/components/auth/SignInCodeSheet.vue';
-import { useQrCapture } from '@/composables/useQrCapture';
-import { requireReauth } from '@/composables/useReauth';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
@@ -174,55 +172,14 @@ const showSignInCodeSheet = ref(false);
  * delivery gate, and putting this in a store would reintroduce the module-level state that
  * gate exists to avoid.
  */
-const scanCapture = useQrCapture({
-  // ⚠️ `deep-link`, NOT `login-flow`. This is reached only by a signed-in person tapping the
-  // profile menu; there is no login in progress. Filing it under `login-flow` would put
-  // scanner failures in the same bucket as cold-unlock and device-approval events, so one
-  // filter could not tell "the scanner is broken" from "logins are broken" — and it would
-  // eat the 50/surface/min rate limit those events were hardened against starving.
-  surface: 'deep-link',
-  expect: 'approval',
-  onScanned: (result) => {
-    if (result.kind === 'approval') emit('approval-scanned', result.key);
-  },
-});
 
-/** Close the menu first — every sibling action does, and the camera covers it otherwise. */
-function openScanner(): void {
-  // Open BEFORE closing the menu: `open()` must run inside the click's user-activation
-  // window, and anything that re-renders first is a chance to lose it.
-  scanCapture.open();
+function openSignInCodeSheet() {
   showProfileDropdown.value = false;
-}
-
-/**
- * ⚠️ THE SCANNER'S FAILURES HAVE TO BE SEEN. A header has nowhere to put inline error text,
- * so they go through the toast system — computing a message and never rendering it is the
- * exact silent dead end `useQrCapture` exists to prevent, and it shipped that way once.
- */
-watch(
-  () => scanCapture.error.value,
-  (message) => {
-    // `silent`: `useQrCapture` already reported the underlying failure with a real stack,
-    // and letting the toast report too would write two records for one event.
-    if (message) showToast('error', message, undefined, { silent: true });
-  }
-);
-
-async function openSignInCodeSheet() {
-  showProfileDropdown.value = false;
-  // ⚠️ PIN FIRST, THEN THE SHEET — two taps to a PIN pad, not four.
-  //
-  // This used to open an explanatory sheet whose only content was a sentence and a button
-  // that opened the gate. The gate now carries the sentence itself, so the sheet exists
-  // only to show the code. That also removes an ordering hazard: the PIN is proven before
-  // the minting component exists at all, so there is no path where a code minted during a
-  // gated open can surface in a later un-gated one.
-  const proved = await requireReauth({
-    titleKey: 'signInCode.title',
-    reasonKey: 'signInCode.pinReason',
-  });
-  if (!proved) return;
+  // ⚠️ NO PIN GATE HERE ANY MORE. The sheet now offers two directions, and only one of them
+  // (minting a code) hands over the family key. Gating the entry point would demand a PIN
+  // from someone who only wants to SCAN a code, which gives away nothing — and `useReauth`'s
+  // own docblock calls a routine action asking for a PIN a defect. The gate moved to
+  // `SignInCodeSheet.showCode()`, immediately before the mint.
   showSignInCodeSheet.value = true;
 }
 
@@ -379,7 +336,6 @@ async function confirmSignOutAndClearData() {
             @switch-member="confirmSwitchMember"
             @sign-out="promptSignOut"
             @sign-in-device="openSignInCodeSheet"
-            @scan-code="openScanner"
           />
         </div>
       </div>
@@ -602,7 +558,6 @@ async function confirmSignOutAndClearData() {
             @switch-member="confirmSwitchMember"
             @sign-out="promptSignOut"
             @sign-in-device="openSignInCodeSheet"
-            @scan-code="openScanner"
           />
         </div>
       </div>
@@ -695,17 +650,11 @@ async function confirmSignOutAndClearData() {
         One instance, mounted beside the sign-out modal rather than inside `ProfileMenu`
         (which renders twice). See `openSignInCodeSheet` for why that matters.
       -->
-      <SignInCodeSheet :open="showSignInCodeSheet" @close="showSignInCodeSheet = false" />
+      <SignInCodeSheet
+        :open="showSignInCodeSheet"
+        @close="showSignInCodeSheet = false"
+        @approval-scanned="(key) => emit('approval-scanned', key)"
+      />
     </Teleport>
-    <!-- Hidden picker for "Scan a Code". `useFilePicker` clicks this; without it `open()`
-         returns false and the menu item is a tap that does nothing.
-
-         ⚠️ INSIDE `<header>`, not beside it. Sitting after the closing tag made this a
-         multi-root component, which changes how Vue handles attribute fallthrough. Every
-         other picker in the app keeps its input inside the single root. -->
-    <input
-      :ref="(el) => (scanCapture.inputRef.value = el as HTMLInputElement)"
-      v-bind="scanCapture.bindings"
-    />
   </header>
 </template>

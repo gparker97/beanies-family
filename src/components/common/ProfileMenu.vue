@@ -52,7 +52,6 @@ const emit = defineEmits<{
   'switch-member': [];
   'sign-out': [];
   'sign-in-device': [];
-  'scan-code': [];
 }>();
 
 const router = useRouter();
@@ -242,32 +241,6 @@ function handleOpenHelp(): void {
           <line x1="12" y1="18" x2="12.01" y2="18" />
         </svg>
         {{ t('signInCode.menuItem') }}
-      </button>
-
-      <!-- ⚠️ THE PROVENANCE ROUTE, not a convenience. A code scanned HERE is the only kind
-           the approval sheet can tell was deliberately scanned: `/welcome` is a verified App
-           Link, so a link someone sent in a message opens the app identically to a camera
-           scan and the OS gives us nothing to distinguish them. Everything arriving any other
-           way gets asked "did you actually scan this?" first. Promoting this is what keeps
-           that question from becoming a warning people tap through. -->
-      <button
-        type="button"
-        class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-        @mousedown.prevent="emit('scan-code')"
-      >
-        <svg
-          class="h-4 w-4 shrink-0 opacity-50"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-        >
-          <path
-            d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"
-          />
-          <line x1="3" y1="12" x2="21" y2="12" />
-        </svg>
-        {{ t('qrScan.menuItem') }}
       </button>
 
       <!-- Beanie wall: a device-mode action, so it sits with Switch member -->
