@@ -202,27 +202,30 @@ describe('useDeviceApprovalDelivery', () => {
   });
 
   it('REGRESSION: a key buffered while SIGNED OUT is not released to whoever signs in next', async () => {
-    // `isSurfaceUsable` is true on a settled, signed-out surface — that is what the sheet's
-    // "open beanies to approve" panel is for. A link arriving there belongs to nobody, and
-    // `prev != null` alone could not tell that apart from a cold launch, so it was handed to
-    // the next member to sign in: a live fingerprint and an Approve button for a code they
-    // never scanned.
+    // ⚠️ BOTH REFS START null, BECAUSE THAT IS WHAT PRODUCTION DOES. `currentMemberId` is
+    // `ref(null)`, `activeFamilyId` is a computed over a `ref(null)`, and there is no Pinia
+    // persistence — so at App.vue setup neither is populated, on every single page load.
+    // The previous version of this test seeded `memberId = ref('mem-1')` BEFORE the
+    // composable was created, which only ever exercised the warm SPA sign-out variant. It
+    // passed against a guard that was provably inert in production: a `seenSession` latch
+    // read at setup time, when the answer is always false.
+    //
+    // The scenario: a `/welcome#beanies-approve=` link is messaged to a shared or
+    // never-signed-in phone. It opens, the surface settles (`isSurfaceUsable` needs no
+    // member), the key is released onto the "open beanies to approve" panel. Somebody then
+    // signs in — and must NOT be handed a live fingerprint with an armed Approve for a code
+    // they never scanned.
     const usable = ref(true);
-    const familyId = ref<string | null | undefined>('fam-1');
-    const memberId = ref<string | null | undefined>('mem-1');
+    const familyId = ref<string | null | undefined>(null);
+    const memberId = ref<string | null | undefined>(null);
     const { result } = withSetup(() =>
       useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
     );
 
-    // Sign out: family survives, member does not.
-    memberId.value = undefined;
+    result.deliver('KEY-PHISH', 'web-load');
+    familyId.value = 'fam-1';
     await nextTick();
-
-    // A link arrives on the signed-out-but-usable surface.
-    result.deliver('KEY-A', 'warm');
-
-    // Someone else signs in.
-    memberId.value = 'mem-2';
+    memberId.value = 'mem-1';
     await nextTick();
 
     expect(result.approvalKey.value).toBeNull();
@@ -232,6 +235,31 @@ describe('useDeviceApprovalDelivery', () => {
         context: expect.objectContaining({ error_code: 'session-changed' }),
       })
     );
+  });
+
+  it('REGRESSION: the SAME null-at-setup start on a COLD LAUNCH keeps the key', async () => {
+    // The twin of the test above, and the reason neither can be judged alone: the two
+    // journeys produce an identical `null -> null -> 'fam:mem'` sequence, and every attempt
+    // to tell them apart from transition history failed. The only difference is whether the
+    // surface was READY when the key arrived — booting here, settled above.
+    const usable = ref(false);
+    const familyId = ref<string | null | undefined>(null);
+    const memberId = ref<string | null | undefined>(null);
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+    );
+
+    result.deliver('KEY-MINE', 'cold-launch');
+    familyId.value = 'fam-1';
+    await nextTick();
+    memberId.value = 'mem-1';
+    await nextTick();
+    usable.value = true;
+    await nextTick();
+
+    expect(result.approvalKey.value).toBe('KEY-MINE');
+    expect(messages()).toContain('approval_key_delivered');
+    expect(messages()).not.toContain('approval_key_dropped');
   });
 
   it('REGRESSION: the THREE-STEP hydration App.vue actually produces does not discard a held key', async () => {

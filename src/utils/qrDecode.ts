@@ -53,10 +53,9 @@ export type QrDecodeResult = {
    * Which attempts actually ran, in order.
    *
    * ⚠️ IT LEAVES THIS FILE, and that is what makes the `catch` around the platform decoder
-   * legitimate rather than a swallow. `'native'` present with no winning `rung` means a
-   * `BarcodeDetector` constructed and then threw — otherwise indistinguishable from a device
-   * that has none, which would let a whole OEM's decoder be 100% broken while the telemetry
-   * looked healthy. On a failure it is also the only way to say how far the ladder got.
+   * legitimate rather than a swallow: `'native-threw'` names a decoder that constructed and
+   * then failed, which is otherwise indistinguishable from a device that has none. On a
+   * failure this is also the only way to say how far the ladder got.
    */
   attempts: readonly QrRung[];
 } & (
@@ -65,7 +64,23 @@ export type QrDecodeResult = {
 );
 
 /** Which attempt produced the answer. Reported by the caller so decode quality is measurable. */
-export type QrRung = 'native' | 'full-luma' | 'full-blue' | 'crop-blue' | 'large-blue';
+export type QrRung =
+  | 'native'
+  /**
+   * The platform decoder constructed and then THREW.
+   *
+   * ⚠️ A DISTINCT VALUE, because `'native'` alone could not carry the signal. `attempts`
+   * recorded `'native'` whenever a detector was merely SUPPLIED, so a decoder that ran
+   * cleanly and found nothing — overwhelmingly the common case on a Heritage Orange photo —
+   * was byte-identical to one that throws on every call. A whole OEM's decoder could be
+   * 100% broken and the surface would look healthy. The type must not advertise a signal it
+   * cannot carry, so the failing case gets its own rung.
+   */
+  | 'native-threw'
+  | 'full-luma'
+  | 'full-blue'
+  | 'crop-blue'
+  | 'large-blue';
 
 interface ImageDataLike {
   data: Uint8ClampedArray;
@@ -81,13 +96,19 @@ type LadderStep = {
 };
 
 /**
+ * ⚠️ ORDER IS A COST PREFERENCE, NOT A CORRECTNESS ONE — BUT BLUE GOES FIRST, AND THAT IS
+ * NOT ARBITRARY. "Try the cheap one first" was the original instinct and it was wrong: the
+ * luma pass is a whole jsQR pass (234ms measured at 1600x1200), not a free one, against
+ * 8.7ms for the copy blue needs. On a Heritage Orange code — which is every code this app
+ * mints — luma is the rung this file's own thesis says will fail, so putting it first made
+ * the median SUCCESSFUL scan pay for it. Do not "restore" it to the front.
+ *
  * ⚠️ ONE RENDER PER STEP, AND NOTHING IS SHARED BETWEEN STEPS. An earlier design cached a
  * single rendered buffer across rungs and mutated it in place to derive the blue channel,
  * which made the array's ORDER load-bearing: move the blue rung above the luma one and the
  * luma rung silently reads blue-channel pixels. `toBlueChannel` returns a copy instead, so
- * the attempts inside a step are order-independent and the order here is purely a cost
- * preference — try the free one first. Getting it "wrong" costs milliseconds, not
- * correctness.
+ * the attempts inside a step are order-independent. Reordering them costs milliseconds, not
+ * correctness — but see the blue-first note above for why the current order is deliberate.
  *
  * Adding a rung is one line of data, and that line cannot break another.
  */
@@ -196,29 +217,36 @@ export type LadderOutcome =
  */
 export async function runQrLadder(deps: {
   source: { width: number; height: number };
+  /**
+   * Filled in as the ladder goes, so a THROW does not erase the trail.
+   *
+   * ⚠️ `decode` rejects from INSIDE the loop — an offline first-load fails on
+   * `import('jsqr')` after the native attempt and at least one render have already run. That
+   * rejection unwinds past this function's local array, so the shell reported `tried=none`
+   * on the one path where "did the platform decoder run?" is the actual question.
+   */
+  trail?: QrRung[];
   /** null => this render could not be produced (no 2D context, or out of memory). */
   render: (spec: RenderSpec) => ImageDataLike | null;
   /** A rejection propagates; the shell classifies it. */
   decode: (data: Uint8ClampedArray, width: number, height: number) => Promise<string | null>;
   /** Supplied only when the platform has BarcodeDetector. May throw; caught here. */
   native?: () => Promise<string | null>;
-  /** Awaited BETWEEN STEPS so the browser can paint. Tests pass nothing. */
+  /** Awaited BETWEEN ATTEMPTS so the browser can paint. Tests pass nothing. */
   yieldToUi?: () => Promise<void>;
 }): Promise<LadderOutcome> {
-  const attempts: QrRung[] = [];
+  const attempts: QrRung[] = deps.trail ?? [];
   /**
    * ⚠️ TRACKS WHETHER ANYTHING ACTUALLY LOOKED AT THE IMAGE, which is what separates the two
    * failure reasons once there is more than one render. With a single render, "the render
    * failed" and "we never saw a pixel" were the same statement; they are not any more.
    */
   let examined = false;
-  /** A platform decoder that constructed and then threw. Reported via `attempts`. */
-  let nativeThrew = false;
 
   if (deps.native) {
-    attempts.push('native');
     try {
       const data = await deps.native();
+      attempts.push('native');
       if (data) return { ok: true, data, rung: 'native', attempts };
       // It ran and found nothing. Something DID look at the image.
       examined = true;
@@ -227,8 +255,9 @@ export async function runQrLadder(deps: {
       // record it, because a decoder that constructs and then throws on every detect()
       // otherwise emits an event byte-identical to a device that has no decoder at all, and
       // a whole OEM's platform decoder could be 100% broken while the surface looked
-      // healthy. `attempts` carries 'native' with no matching `rung`, which is the signal.
-      nativeThrew = true;
+      // healthy. This is the classification the CLAUDE.md rule asks for — the catch is not
+      // bare, it records which of the two things happened.
+      attempts.push('native-threw');
     }
   }
 
@@ -275,7 +304,6 @@ export async function runQrLadder(deps: {
   // ⚠️ `unsupported-device` ONLY when nothing looked at the image. Telling an Android user
   // their device is unsupported when its platform decoder just examined their photo would
   // be exactly the class of wrong message this reason union exists to prevent.
-  void nativeThrew; // surfaced to the caller as 'native' in `attempts` with no winning rung
   return { ok: false, reason: examined ? 'no-code' : 'unsupported-device', attempts };
 }
 
@@ -351,6 +379,8 @@ export async function decodeQrFromImageFile(
 ): Promise<QrDecodeResult> {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   let bitmap: ImageBitmap | null = null;
+  // Declared OUT here so the catch below can still report what ran; see `runQrLadder.trail`.
+  const trail: QrRung[] = [];
   try {
     const source = isPdf ? await renderPdfFirstPage(file) : file;
     bitmap = await createImageBitmap(source);
@@ -360,6 +390,7 @@ export async function decodeQrFromImageFile(
     let jsQR: typeof import('jsqr').default | null = null;
 
     const outcome = await runQrLadder({
+      trail,
       source: { width: frame.width, height: frame.height },
       render: (spec) => {
         const crop = spec.crop ?? 1;
@@ -388,6 +419,10 @@ export async function decodeQrFromImageFile(
           ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, width, height);
           return ctx.getImageData(0, 0, width, height);
         } catch {
+          // OOM, a taint, or a device canvas cap. NOT a bare swallow: returning null is the
+          // documented "this render could not be produced" answer, the ladder degrades to
+          // the next step, and if NO render ever succeeds the caller is told
+          // `unsupported-device` with the trail showing what was tried.
           return null;
         }
       },
@@ -414,14 +449,15 @@ export async function decodeQrFromImageFile(
     const isChunkFailure =
       cause instanceof Error && /import|chunk|dynamically imported module/i.test(cause.message);
     const reason: QrDecodeFailure = isChunkFailure ? 'decoder-unavailable' : 'unreadable-image';
-    report(origin, [], null, reason);
+    report(origin, trail, null, reason);
     return {
       ok: false,
       reason,
       cause,
-      // Nothing in the ladder ran, or it was unwound past. Empty is the honest answer, and
-      // it is what separates "never opened the file" from "tried four rungs on real pixels".
-      attempts: [],
+      // Whatever actually ran before the throw. Reporting `[]` here asserted the ladder never
+      // started, which is false for a `decoder-unavailable` — that rejection comes from
+      // inside the first decode, after native and one render have already been recorded.
+      attempts: trail,
     };
   } finally {
     // Never closed before this, so every scan leaked a full decoded frame until GC.

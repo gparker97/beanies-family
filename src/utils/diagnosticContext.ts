@@ -196,9 +196,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'has_prf_output',
   'credential_source',
   'unwrap_ok',
-  // Also carries `origin=<entry point>` on the `qr-decode` surface (2026-09), where `kind`
-  // names which rung of the decode ladder read the code. Both are closed enums; no photo,
-  // no payload, no dimensions.
+  // Also carries `origin=<entry point>;tried=<rung list>` on the `qr-decode` surface
+  // (2026-09), where `kind` names the WINNING rung and is absent when none read the code.
+  // Entry points and rungs are both closed enums; no photo, no payload, no dimensions.
   'detail',
   // Share target (surface `share-target-ingest`, #64). `file_count` is how many documents
   // another app handed over (a small integer) and `cold_start` is whether the share LAUNCHED
