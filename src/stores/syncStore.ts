@@ -498,6 +498,11 @@ export const useSyncStore = defineStore('sync', () => {
     dict: F;
     key: string;
     value: EnvelopeEntryOf<F> | null;
+    /**
+     * Defaults to `CREDENTIAL_PUBLISH_TIMEOUT_MS` (20s), NOT the 5s bookkeeping budget.
+     * Override only when the SCREEN cannot afford to wait — the budget is a property of what
+     * is behind the spinner, not of the write.
+     */
     timeoutMs?: number;
     /**
      * ⚠️ MUST be false for a REVOCATION, and the default is wrong for one.
@@ -515,7 +520,16 @@ export const useSyncStore = defineStore('sync', () => {
     const { committed, previous } = setEnvelopeEntry(opts.dict, opts.key, opts.value);
     if (!committed) throw new Error('No envelope loaded');
 
-    const outcome = await syncNowDurable(opts.timeoutMs ?? POST_AUTH_SAVE_TIMEOUT_MS);
+    // ⚠️ THE DEFAULT IS THE CREDENTIAL BUDGET, NOT THE BOOKKEEPING ONE. Publishing an entry
+    // into an envelope KEY DICT is by definition a credential write — a full re-export,
+    // re-encrypt and upload of the entire multi-MB envelope, with somebody waiting on it.
+    // The 5s default was inherited from post-auth bookkeeping and produced the same false
+    // failure on every caller that forgot to override it: the device-approval sheet said
+    // "couldn't be saved" seconds before the other device got in, and `revokeMemberLink`
+    // still fires a `severity: 'critical'` Slack page ("magic link now unrevocable") on a
+    // tombstone that is probably in flight. Fixing the one caller that was noticed would
+    // have left the one that pages on-call.
+    const outcome = await syncNowDurable(opts.timeoutMs ?? CREDENTIAL_PUBLISH_TIMEOUT_MS);
     if (outcome === 'saved') return outcome;
 
     // ⚠️ 'timeout' IS NOT 'failed'. On a timeout the upload may still be in flight and may
@@ -6187,25 +6201,6 @@ export const useSyncStore = defineStore('sync', () => {
       dict: 'deviceApprovalKeys',
       key: memberId,
       value: pkg,
-      /**
-       * ⚠️ 20s, NOT THE 5s DEFAULT, AND THIS IS THE ROOT CAUSE OF THE REPORTED BUG rather
-       * than a tuning preference. A device-approval wrap is exactly the animal
-       * `CREDENTIAL_PUBLISH_TIMEOUT_MS` was introduced for: a credential someone is
-       * WAITING to be handed, published as a full re-export, re-encrypt and upload of the
-       * entire multi-MB envelope. Its docblock already says five seconds "routinely expires
-       * before the upload has even started", and that is precisely what greg saw — "could
-       * not be saved", then the other device decrypting the file about ten seconds later.
-       *
-       * The three-state outcome above is still right and still needed, but on the 5s budget
-       * `'saved'` would have been the RARE branch on any phone, so `action: 'published'` —
-       * the new success metric, and the denominator `unconfirmed` is measured against —
-       * would have systematically undercounted, and `publishEnvelopeEntry`'s KNOWN GAP
-       * would have applied to `deviceApprovalKeys` routinely rather than rarely.
-       *
-       * `linkMint` and `useJoinFlow`, the other two credential hand-offs in this product,
-       * both already spend this budget. This one was the odd one out.
-       */
-      timeoutMs: CREDENTIAL_PUBLISH_TIMEOUT_MS,
     });
   }
 
@@ -6320,7 +6315,9 @@ export const useSyncStore = defineStore('sync', () => {
     // No try/catch: `syncNowDurable` classifies and logs internally and never rejects, so a
     // wrapper here would be the same dead `catch {}` this file already removed once from
     // `unclaimMember`. Any outcome other than 'saved' simply means we did not observe.
-    const observed = (await syncNowDurable(POST_AUTH_SAVE_TIMEOUT_MS)) === 'saved';
+    // Same budget as the write it precedes: this is the observe half of a credential
+    // revocation, and 5s routinely expires before a multi-MB upload has started.
+    const observed = (await syncNowDurable(CREDENTIAL_PUBLISH_TIMEOUT_MS)) === 'saved';
 
     const base = authoritativeEnvelope();
     if (!base) return false;

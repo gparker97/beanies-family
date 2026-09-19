@@ -102,6 +102,18 @@ describe('runQrLadder', () => {
     expect(out.attempts).toEqual<QrRung[]>(['full-blue', 'full-luma', 'crop-blue', 'large-blue']);
   });
 
+  it('records a CLEAN native miss as `native`, distinct from one that threw', async () => {
+    const out = await runQrLadder({
+      source: BIG,
+      render: renderer(BIG),
+      decode: async () => 'JSQR',
+      native: async () => null, // ran, found nothing
+    });
+
+    expect(out.attempts[0]).toBe('native');
+    expect(out.attempts).not.toContain('native-threw');
+  });
+
   it('tries the platform decoder FIRST and skips jsQR entirely when it reads', async () => {
     const decode = vi.fn(async () => 'JSQR');
     const out = await runQrLadder({
@@ -128,7 +140,11 @@ describe('runQrLadder', () => {
     });
 
     expect(out).toMatchObject({ ok: true, data: 'JSQR', rung: 'full-blue' });
-    expect(out.attempts[0]).toBe('native');
+    // ⚠️ `native-threw`, NOT `native`. A decoder that ran cleanly and found nothing also
+    // records `native`, so the two were byte-identical and a wholly broken platform decoder
+    // was invisible. The distinct rung is what makes the catch a classification rather than
+    // a swallow.
+    expect(out.attempts[0]).toBe('native-threw');
   });
 
   it('says unsupported-device ONLY when nothing looked at the image', async () => {
@@ -154,7 +170,7 @@ describe('runQrLadder', () => {
     expect(out).toMatchObject({ ok: false, reason: 'no-code' });
   });
 
-  it('yields to the UI between steps so a four-pass ladder cannot freeze the phone', async () => {
+  it('yields to the UI between ATTEMPTS so a four-pass ladder cannot freeze the phone', async () => {
     // jsQR is synchronous and O(pixels); the full ladder is ~12MP. Run back-to-back with no
     // break that is a multi-second freeze in which the busy label cannot even paint.
     const yieldToUi = vi.fn(async () => {});

@@ -519,7 +519,7 @@ replaces, and the change is not done.
 
 - **Close the silent drop in the same file, whichever route is taken.** `SignInCodeSheet.vue:85` has
   `if (!props.open) return;` — a fully decoded approval key thrown on the floor with no event
-  anywhere. Emit `emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet_dismissed' })`
+  anywhere. Emit `emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet-dismissed' })`
   before returning. (`emitApprovalKeyDropped` already exists in `deepLinkEvents.ts`, so this compiles
   in Commit A with no telemetry change.) The guard is correct — provenance must not survive a
   dismissal; the silence is not.
@@ -728,6 +728,17 @@ so the existing copy (`qrScan.noCode` / `.unsupportedDevice` / `.decoderUnavaila
 reason in a discriminated result, so the shared mutable has no job, and the
 two-instances-of-`useQrCapture` cross-contamination hazard goes with it.
 
+**REVERSED IN REVIEW — telemetry lives in `qrDecode.ts`'s SHELL after all.** This section
+originally said no telemetry inside the file, to keep the ladder's tests mock-free. The ladder
+IS still mock-free (`runQrLadder` is pure), but emitting from `useQrCapture` covered only two
+of the decoder's three callers and left the recovery-kit scan — the path most likely to
+photograph a printed Heritage Orange code — silent on both success and `no-code`. The emission
+moved into `decodeQrFromImageFile(file, origin)`, which no unit test can reach anyway. Two other
+designs here were also reversed with reason: `kind: 'exhausted'` (it would put a non-rung value
+in the field the surface exists to reserve for rungs, so how far the ladder got rides `detail`
+instead), and yielding "between steps" (step 1 holds the two most expensive passes, so the yield
+is between ATTEMPTS). The original text follows for the record.
+
 **No telemetry inside `qrDecode.ts`.** The result carries `rung` (on success) and `attempts`
 (always); `useQrCapture` is the one place that calls `logEvent`/`reportError`, exactly as it is
 today. This keeps the ladder's tests free of telemetry mocks and keeps one reporting site per decode.
@@ -881,7 +892,7 @@ outcome, per `loginFlowEvents.ts:276`):
   and now correlates with the sheet-level event above.
 - `approval_key_dropped` (surface `deep-link`) gains two new `error_code` values, both closing
   existing silences: `dismissed` (the person closed the sheet — previously emitted nothing, so the
-  held/delivered funnel had no terminal entry) and `sheet_dismissed` (a key decoded in-app after the
+  held/delivered funnel had no terminal entry) and `sheet-dismissed` (a key decoded in-app after the
   sheet was closed — previously an unlogged `return`).
 - F2 is already instrumented: `approval_key_held` / `approval_key_delivered` / `approval_key_dropped`
   with `error_code: session-changed | superseded | expired`. The fix is verifiable in CloudWatch by
@@ -919,7 +930,7 @@ outcome, per `loginFlowEvents.ts:276`):
 | Key never reaches the sheet              | `approval_key_held` with no matching `approval_key_delivered`                                                   |
 | Key discarded by a session transition    | `approval_key_dropped` + `error_code: session-changed`                                                          |
 | Key abandoned by the user                | `approval_key_dropped` + `error_code: dismissed`                                                                |
-| Key decoded after the sheet closed       | `approval_key_dropped` + `error_code: sheet_dismissed`                                                          |
+| Key decoded after the sheet closed       | `approval_key_dropped` + `error_code: sheet-dismissed`                                                          |
 | Wrap published and confirmed             | `device_approval_outcome` + `action: published` + `kind: <delivery>`                                            |
 | Wrap published but unconfirmed           | `device_approval_outcome` + `action: unconfirmed` + `error_code: timeout\|unknown`                              |
 | Wrap genuinely failed                    | `device_approval_outcome` + `action: failed` + `error_code: publish_failed` (plus a `reportError` with a cause) |
@@ -960,7 +971,7 @@ dish-image-`detail` precedent. One line is added to the runbook's diagnostics ro
 - [ ] Exactly one component closes `SignInCodeSheet` after an in-app scan, and it is
       `SignInCodeSheet` itself — no `approval-pending` prop and no watcher was added (unless the
       browser check demanded the documented declarative fallback, in which case the commit says why)
-- [ ] A key decoded after the sheet was dismissed emits `error_code: sheet_dismissed` rather than
+- [ ] A key decoded after the sheet was dismissed emits `error_code: sheet-dismissed` rather than
       returning silently
 
 **Commit B**
