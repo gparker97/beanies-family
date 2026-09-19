@@ -90,6 +90,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useDeviceApprovalDelivery } from '@/composables/useDeviceApprovalDelivery';
+import { hasPersistedSession } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
@@ -283,6 +284,7 @@ const approvalDelivery = useDeviceApprovalDelivery({
    * sign-out guarantee is unchanged.
    */
   memberId: computed(() => familyStore.currentMemberId),
+  hasPersistedSession,
   // The sheet disappearing on its own is not self-explanatory, and the other device has
   // stopped waiting by now — say so rather than leaving a hole where the panel was.
   onShownExpired: () =>
@@ -2101,7 +2103,8 @@ watch(
       :open="deviceApprovalKey !== null"
       :public-key="deviceApprovalKey ?? ''"
       :delivery="deviceApprovalDeliveryKind"
-      @close="(outcome) => approvalDelivery.dismiss({ outcome })"
+      @close="approvalDelivery.dismiss()"
+      @settled="(outcome) => approvalDelivery.settle(outcome)"
     />
     <DocumentExtractConsentModal />
     <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly

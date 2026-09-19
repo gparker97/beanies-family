@@ -78,6 +78,26 @@ export function emitApprovalKeyHeld(payload: { delivery: DeliveryKind }): void {
 }
 
 /**
+ * A held key reached a terminal state that is NOT a loss.
+ *
+ * ⚠️ THE SUCCESS HALF OF THE `approval_key_held` FUNNEL, without which the drop RATE is not
+ * computable. `approval_key_dropped` covers abandonment, expiry and session changes; this
+ * covers the two endings where the key did its job. `'unconfirmed'` is deliberately separate
+ * from `'approved'` and deliberately `warn`: the wrap may never have landed, and that is the
+ * exact case the three-state publish outcome exists to measure.
+ */
+export function emitApprovalKeySettled(payload: {
+  delivery: DeliveryKind;
+  outcome: 'approved' | 'unconfirmed';
+}): void {
+  emit(payload.outcome === 'approved' ? 'info' : 'warn', 'approval_key_settled', {
+    action: 'approval_key_settled',
+    kind: payload.delivery,
+    ...(payload.outcome === 'unconfirmed' ? { error_code: 'unconfirmed' } : {}),
+  });
+}
+
+/**
  * The URL passed the allowlist and carried an approval marker, but delivery failed.
  *
  * `warn`, not `critical`: the person is looking at a device that visibly did nothing and

@@ -31,6 +31,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
   family data opens, instead of jumping with nothing said, and its code disappears at the
   same moment so there is no longer a live code sitting under a success message.
 
+- **Approving a device no longer leaves the approval prompt able to expire on top of you.**
+  Approve and put the phone down, and the screen saying it worked used to be replaced a
+  couple of minutes later by a message saying the code had expired.
 - **Approving a device now waits long enough for the save to land.** The approval was given
   five seconds to reach your family file, which on a phone often expires before the upload
   has even started — so a perfectly good approval was reported as a failure. It now gets the

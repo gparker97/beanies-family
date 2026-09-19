@@ -111,7 +111,13 @@ export function useQrCapture(opts: {
         // problems and carry a cause.
         if (decoded.reason !== 'no-code') {
           reportError({
-            surface: SURFACE,
+            // ⚠️ `login-flow`, NOT the decode surface. `decodeQrFromImageFile` already emits
+            // exactly one `qr-decode` record per decode; adding a second here with a
+            // byte-identical `detail` double-counted two of the three origins' failures on
+            // the surface whose whole justification is one-filter greppability. This is the
+            // FLOW's report — it carries the cause and accompanies a user-facing message —
+            // so it belongs on the flow's surface, beside the other login reports.
+            surface: 'login-flow',
             message: 'qr decode failed',
             severity: 'warning',
             error: decoded.cause,
