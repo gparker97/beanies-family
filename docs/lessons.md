@@ -4,6 +4,48 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A component cannot announce an event whose cause destroys it
+
+**Date:** 2026-09-19
+**Context:** "Approve a device on your phone, and the new device shows a password prompt over
+an already-decrypted pod." `DeviceApprovalRequest` ended with `emit('approved')` — but
+`openPodWithFamilyKey` clears the staged file partway through and keeps awaiting, Vue flushes,
+the parent's `v-if` (derived from that same staged file) tears the panel down, and Vue's
+`emit()` begins with `if (instance.isUnmounted) return;`. The announcement went nowhere.
+
+The first fix was to have the parent WATCH for the state change instead. That was wrong twice:
+the watcher had no `{immediate: true}` and the view normally MOUNTS with a file already staged,
+so the latch never armed; and it rewired the previously-working `@approved` through the same
+dead guard, making it a regression rather than a non-fix. A second version scoped the guard
+better and still over-fired, because "a staged Drive file went away" is not "an approval
+happened" — it is also every password, passphrase, kit and auto-decrypt unlock, plus two
+decrypt FAILURE paths.
+
+The fix that works removes the race instead of guarding it: pass a **function prop** and call
+it. `@approved` compiles to an `onApproved` vnode prop, so it is the identical closure minus
+the `isUnmounted` gate, and `unmountComponent` never touches `instance.props`.
+
+**Rule:** when a component's success is what destroys it, do not announce with `emit` and do
+not try to observe the destruction from the parent. Take a callback prop. And when you catch
+yourself writing a second guard for a guard, stop — the shape is wrong, not the scoping.
+
+---
+
+## An exclusion belongs on the side of the branch you meant to exclude from
+
+**Date:** 2026-09-19
+**Context:** A router guard whose `logEvent` and whose `return` (which ALLOWS the navigation)
+sat inside one `if`. Excluding a new resume value from the condition — with a comment saying
+"excluded from the warn, not from the branch" — excluded it from being ALLOWED, dropping it
+through to `return { name: 'Nook' }`: the exact outcome the comment two lines above said must
+not happen. It was latent, saved by a higher guard, and review caught it.
+
+**Rule:** before narrowing an `if`, read what else is inside it. If the block both logs and
+returns, narrowing the condition changes the return too — put the exclusion on the statement
+you actually meant, not on the condition.
+
+---
+
 ## A test that seeds an impossible initial state proves nothing
 
 **Date:** 2026-09-19

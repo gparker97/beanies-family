@@ -236,11 +236,11 @@ stopResumeWatch = watchEffect(() => {
     activeView.value = 'load-pod';
     autoReconnectLoad.value = true;
     isInitializing.value = false;
-    // ⚠️ NO `stopResumeWatch()`. This watch is a ONE-SHOT and it is also the only handler for
-    // `?resume=load-drive` — and the reconnect's own fallback (a 404 on the reconnected file
-    // sends us to `beginDriveAuthRedirect(LOAD_DRIVE_PATH)`) returns on exactly that marker.
-    // Consuming the dispatcher here meant the picker silently never re-opened on native,
-    // where nothing remounts to re-arm it.
+    // ⚠️ NO `stopResumeWatch()`. This watch is a ONE-SHOT and it is also the only handler
+    // for `?resume=load-drive` — and the reconnect's own fallback, where a 404 on the
+    // reconnected file sends us back through the Drive auth redirect, returns on exactly
+    // that marker. Consuming the dispatcher here meant the picker silently never re-opened
+    // on native, where nothing remounts to re-arm it.
     return;
   }
 
