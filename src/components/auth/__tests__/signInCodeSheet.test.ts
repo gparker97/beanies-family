@@ -60,13 +60,13 @@ describe('SignInCodeSheet — the chooser', () => {
 
   it('offers both directions', () => {
     const wrapper = mountSheet();
-    expect(cardWith(wrapper, /point a camera at this screen/i)).toBeTruthy();
-    expect(cardWith(wrapper, /already showing a code/i)).toBeTruthy();
+    expect(cardWith(wrapper, /create a magic link/i)).toBeTruthy();
+    expect(cardWith(wrapper, /scan a qr code/i)).toBeTruthy();
   });
 
   it('does NOT ask for a PIN to scan a code', async () => {
     const wrapper = mountSheet();
-    await cardWith(wrapper, /already showing a code/i)!.trigger('click');
+    await cardWith(wrapper, /scan a qr code/i)!.trigger('click');
 
     // Scanning hands over nothing; its gate is at the approve step, not here.
     expect(requireReauth).not.toHaveBeenCalled();
@@ -75,7 +75,7 @@ describe('SignInCodeSheet — the chooser', () => {
 
   it('asks for a PIN BEFORE minting, not alongside it', async () => {
     const wrapper = mountSheet();
-    await cardWith(wrapper, /point a camera at this screen/i)!.trigger('click');
+    await cardWith(wrapper, /create a magic link/i)!.trigger('click');
     await wrapper.vm.$nextTick();
 
     // The link transports the family key and is not single-use. Asserting only that the
@@ -91,7 +91,7 @@ describe('SignInCodeSheet — the chooser', () => {
   it('does NOT mint when the PIN is declined', async () => {
     requireReauth.mockResolvedValueOnce(false);
     const wrapper = mountSheet();
-    await cardWith(wrapper, /point a camera at this screen/i)!.trigger('click');
+    await cardWith(wrapper, /create a magic link/i)!.trigger('click');
     await wrapper.vm.$nextTick();
 
     expect(mintRun).not.toHaveBeenCalled();
@@ -100,11 +100,11 @@ describe('SignInCodeSheet — the chooser', () => {
   it('returns to the chooser when the PIN is declined, rather than closing', async () => {
     requireReauth.mockResolvedValueOnce(false);
     const wrapper = mountSheet();
-    await cardWith(wrapper, /point a camera at this screen/i)!.trigger('click');
+    await cardWith(wrapper, /create a magic link/i)!.trigger('click');
     await wrapper.vm.$nextTick();
 
     // Closing here would make scanning unreachable to anyone who changed their mind.
-    expect(cardWith(wrapper, /already showing a code/i)).toBeTruthy();
+    expect(cardWith(wrapper, /scan a qr code/i)).toBeTruthy();
     expect(wrapper.emitted('close')).toBeFalsy();
   });
 });

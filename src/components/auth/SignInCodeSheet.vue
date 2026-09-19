@@ -14,6 +14,14 @@
  * sentence that is either true or false right now, and its sub-line says what this device
  * will do about it. Do not "simplify" these labels back into verbs.
  *
+ * ⚠️ "MAGIC LINK" IS THE USER-FACING NAME FOR EVERY SIGN-IN LINK, WHATEVER ITS LIFETIME.
+ * greg's rule, and it is a product decision rather than a technical one: a person does not
+ * need two names for "a link that signs me in", so the expiry is stated next to the link
+ * instead of encoded in what it is called. Internally this still mints the FIFTEEN-MINUTE
+ * device link, not the seven-day one handed out at family creation, and that distinction
+ * still matters to the code (different lifetime, different revocation). Do not "correct"
+ * the copy to match the internal name.
+ *
  * ⚠️ THE PIN GATES THE MINT AND ONLY THE MINT. The link transports the FAMILY key
  * (`magicLink.ts:11-14`: "whoever holds it can open everything the family has") and is not
  * single-use, so it stays live for its whole window for anyone holding it. Scanning hands
@@ -92,16 +100,8 @@ const capture = useQrCapture({
  * exactly the keyboard and screen-reader users it is meant to help (WCAG 2.4.3, 1.3.2).
  */
 const options = computed(() => {
-  const show = {
-    id: 'show' as const,
-    title: t('signInCode.optionShowTitle'),
-    body: t('signInCode.optionShowBody'),
-  };
-  const read = {
-    id: 'read' as const,
-    title: t('signInCode.optionReadTitle'),
-    body: t('signInCode.optionReadBody'),
-  };
+  const show = { id: 'show' as const, title: t('signInCode.optionShowTitle') };
+  const read = { id: 'read' as const, title: t('signInCode.optionReadTitle') };
   return isTouchPrimary.value ? [read, show] : [show, read];
 });
 
@@ -155,24 +155,73 @@ watch(
 <template>
   <BaseModal :open="open" :title="t('signInCode.title')" size="md" @close="emit('close')">
     <div v-if="step === 'choose'" class="space-y-3">
-      <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('signInCode.chooseLead') }}</p>
-
-      <div class="flex flex-col gap-3">
+      <!--
+        No lead sentence. An earlier version asked "which of these is true of the other
+        device?", which was a careful way to stop "show" and "scan" being got backwards when
+        you are holding two phones. The icons do that job better and faster: a QR glyph means
+        we make one, a camera glyph means we read one. A sub-line explaining what a QR code
+        is would be noise under an icon that already says it, so there is none. If the icons
+        ever need a sentence to work, the icons are wrong.
+      -->
+      <div class="grid grid-cols-2 gap-3">
         <LoginChoiceCard
           v-for="option in options"
           :key="option.id"
-          class="dark:border-line dark:bg-surface-overlay rounded-2xl border border-gray-200 bg-white p-4 text-left"
+          class="dark:border-line dark:bg-surface-overlay dark:hover:bg-surface-hover items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-5 hover:bg-gray-50"
           :disabled="option.id === 'read' && capture.isBusy.value"
+          :testid="`signin-option-${option.id}`"
           @click="option.id === 'show' ? showCode() : readCode()"
         >
-          <p class="font-outfit dark:text-ink text-sm font-semibold text-gray-900">
-            {{ option.title }}
-          </p>
-          <p class="dark:text-ink-soft mt-1 text-sm text-gray-600">
-            {{
-              option.id === 'read' && capture.isBusy.value ? t('coldEntry.scanning') : option.body
-            }}
-          </p>
+          <span
+            class="dark:bg-surface-raised mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FDF1EB]"
+          >
+            <!-- Heritage Orange needs its lift on dark: 3.85 on `surface-overlay` is below
+                 AA, and this glyph is the whole point of the card, not decoration. -->
+            <svg
+              v-if="option.id === 'show'"
+              class="dark:text-accent-lift h-9 w-9 text-[#C24A16]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <path d="M14 14h3v3h-3zM20.5 14v3M17 20.5h3.5M14 20.5h0" />
+            </svg>
+            <svg
+              v-else
+              class="dark:text-accent-lift h-9 w-9 text-[#C24A16]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path
+                d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"
+              />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+          </span>
+          <!-- Centred in the remaining height rather than sitting straight under the icon:
+               at 390px one label wraps to two lines and the other does not, and top-aligning
+               them left the two cards visibly lopsided. -->
+          <span class="mt-3 flex flex-1 items-center justify-center">
+            <p class="font-outfit dark:text-ink text-center text-sm font-semibold text-gray-900">
+              {{
+                option.id === 'read' && capture.isBusy.value
+                  ? t('coldEntry.scanning')
+                  : option.title
+              }}
+            </p>
+          </span>
         </LoginChoiceCard>
       </div>
 

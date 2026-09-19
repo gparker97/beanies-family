@@ -5815,25 +5815,13 @@ const STRING_DEFS = {
     beanie: 'save, print, or tick the box to carry on.',
   },
   'signInCode.menuItem': { en: 'Sign In Another Device', beanie: 'sign in another device' },
-  'signInCode.chooseLead': {
-    en: 'Which of these is true of the other device?',
-    beanie: 'which of these is true of the other device?',
-  },
   'signInCode.optionShowTitle': {
-    en: 'It can point a camera at this screen',
-    beanie: 'it can point a camera at this screen',
-  },
-  'signInCode.optionShowBody': {
-    en: 'We\u2019ll show a code here for it to read.',
-    beanie: 'we\u2019ll show a code here for it to read.',
+    en: 'Create a Magic Link',
+    beanie: 'create a magic link',
   },
   'signInCode.optionReadTitle': {
-    en: 'It\u2019s already showing a code',
-    beanie: 'it\u2019s already showing a code',
-  },
-  'signInCode.optionReadBody': {
-    en: 'We\u2019ll use this device\u2019s camera to read it.',
-    beanie: 'we\u2019ll use this device\u2019s camera to read it.',
+    en: 'Scan a QR Code',
+    beanie: 'scan a qr code',
   },
   'signInCode.back': {
     en: 'Back to the Other Options',
