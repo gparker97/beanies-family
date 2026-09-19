@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-19",
-    "translationCount": 4875
+    "translationCount": 4874
   },
   "translations": {
     "app.name": {
@@ -2602,9 +2602,9 @@
       "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockSubtitle": {
-      "translation": "这会解密您的家庭数据。接下来，您将以家庭成员身份登录。",
-      "hash": "h3cnc7",
-      "lastUpdated": "2026-09-10"
+      "translation": "下一步：解密我的beanpod",
+      "hash": "z5p3f1",
+      "lastUpdated": "2026-09-19"
     },
     "loginV6.unlockButton": {
       "translation": "解锁我的Beanpod",
@@ -15927,9 +15927,9 @@
       "lastUpdated": "2026-06-14"
     },
     "join.pickerPrompt.fileHint": {
-      "translation": "轻触后，选择此文件：",
-      "hash": "wb4biv",
-      "lastUpdated": "2026-06-14"
+      "translation": "轻触后，选择此文件，然后轻触谷歌屏幕底部的蓝色“插入”按钮：",
+      "hash": "vwdj3y",
+      "lastUpdated": "2026-09-19"
     },
     "inviteWizard.step1.nextHint": {
       "translation": "接下来，您将收到发送给他们的链接和二维码，这是他们加入的方式。",
@@ -23151,11 +23151,6 @@
       "hash": "slldf1",
       "lastUpdated": "2026-09-10"
     },
-    "loginV6.unlockSubtitleWithFamily": {
-      "translation": "这会解密{familyName}的家庭数据。接下来，您将以家庭成员身份登录。",
-      "hash": "sx9agx",
-      "lastUpdated": "2026-09-10"
-    },
     "recovery.forgotPin": {
       "translation": "忘记PIN码？",
       "hash": "t4z6g6",
@@ -23927,9 +23922,9 @@
       "lastUpdated": "2026-09-18"
     },
     "deviceApproval.title": {
-      "translation": "是否允许此设备进入？",
-      "hash": "9y5nql",
-      "lastUpdated": "2026-09-18"
+      "translation": "批准登录",
+      "hash": "8m18ra",
+      "lastUpdated": "2026-09-19"
     },
     "deviceApproval.prompt": {
       "translation": "设备要求打开{family}。",
@@ -24087,9 +24082,9 @@
       "lastUpdated": "2026-09-18"
     },
     "signInCode.scanLead": {
-      "translation": "将另一台设备的摄像头指向此代码。",
-      "hash": "clkvma",
-      "lastUpdated": "2026-09-18"
+      "translation": "使用其他设备扫描此代码以登录",
+      "hash": "qtvvgt",
+      "lastUpdated": "2026-09-19"
     },
     "signInCode.qrAlt": {
       "translation": "要在其他设备上扫描的代码",
@@ -24192,14 +24187,14 @@
       "lastUpdated": "2026-09-18"
     },
     "magicLink.pastePrompt": {
-      "translation": "有魔术链接吗？粘贴到这里",
-      "hash": "cb8wtv",
-      "lastUpdated": "2026-09-18"
+      "translation": "有链接吗？粘贴到这里",
+      "hash": "het0bq",
+      "lastUpdated": "2026-09-19"
     },
     "magicLink.pasteLabel": {
-      "translation": "在此处粘贴您的帽子魔术链接",
-      "hash": "vht7sm",
-      "lastUpdated": "2026-09-18"
+      "translation": "粘贴Beanies链接",
+      "hash": "15o1t",
+      "lastUpdated": "2026-09-19"
     },
     "magicLink.pastePlaceholder": {
       "translation": "https://app.beanies.family/join?...",
@@ -24221,34 +24216,19 @@
       "hash": "xre3w1",
       "lastUpdated": "2026-09-19"
     },
-    "coldEntry.pushLead": {
-      "translation": "此设备有摄像头，因此最快的方法是从已登录的设备扫描代码。",
-      "hash": "x7ksh3",
-      "lastUpdated": "2026-09-19"
-    },
     "coldEntry.pushStep1": {
-      "translation": "在您已登录的设备上，打开Beanies并轻触您的个人资料。",
-      "hash": "zftv8o",
+      "translation": "在已登录的设备上，打开应用并轻触您的个人资料。",
+      "hash": "bvlk04",
       "lastUpdated": "2026-09-19"
     },
     "coldEntry.pushStep2": {
-      "translation": "选择登录其他设备，然后选择有关将摄像头指向该屏幕的选项。",
-      "hash": "ibdyno",
-      "lastUpdated": "2026-09-19"
-    },
-    "coldEntry.openCamera": {
-      "translation": "打开摄像头",
-      "hash": "2izf7f",
-      "lastUpdated": "2026-09-19"
-    },
-    "coldEntry.scanning": {
-      "translation": "数着豆子……",
-      "hash": "wg3bo8",
+      "translation": "选择登录其他设备并创建一个魔术链接。",
+      "hash": "bc0wer",
       "lastUpdated": "2026-09-19"
     },
     "coldEntry.showMyCode": {
-      "translation": "改为显示我的验证码",
-      "hash": "lekf0g",
+      "translation": "改为显示我的二维码",
+      "hash": "3wz38d",
       "lastUpdated": "2026-09-19"
     },
     "coldEntry.scanInstead": {
@@ -24317,23 +24297,13 @@
       "lastUpdated": "2026-09-19"
     },
     "deviceApproval.provenanceBody": {
-      "translation": "仅当您将此设备的摄像头对准Beanies代码时，才可继续操作。如果有人向您发送此链接，请轻触“{reject}” ：批准此链接将允许他们的设备进入您的家庭。",
-      "hash": "voxe1d",
-      "lastUpdated": "2026-09-19"
-    },
-    "signInCode.optionShowTitle": {
-      "translation": "创建魔术链接",
-      "hash": "pjmw7k",
-      "lastUpdated": "2026-09-19"
-    },
-    "signInCode.optionReadTitle": {
-      "translation": "扫描 QR 码",
-      "hash": "ozqnu2",
+      "translation": "确认您认识要求访问您家庭舱的人。",
+      "hash": "hmackb",
       "lastUpdated": "2026-09-19"
     },
     "signInCode.back": {
-      "translation": "返回其他选项",
-      "hash": "l9b66l",
+      "translation": "回到",
+      "hash": "187if",
       "lastUpdated": "2026-09-19"
     },
     "shareTarget.beanpod.title": {
@@ -24379,6 +24349,31 @@
     "deviceApproval.approveChecked": {
       "translation": "是的，我扫描了这个，代码匹配",
       "hash": "jqfpal",
+      "lastUpdated": "2026-09-19"
+    },
+    "coldEntry.pushStep3": {
+      "translation": "打开相机并扫描二维码。",
+      "hash": "o9plzb",
+      "lastUpdated": "2026-09-19"
+    },
+    "signInCode.gateLead": {
+      "translation": "创建一个魔术链接，供其他设备扫描。",
+      "hash": "3czvgw",
+      "lastUpdated": "2026-09-19"
+    },
+    "signInCode.createLink": {
+      "translation": "创建魔术链接",
+      "hash": "pjmw7k",
+      "lastUpdated": "2026-09-19"
+    },
+    "signInCode.orScanHint": {
+      "translation": "已在另一台设备上显示代码？将此设备的摄像头对准它。",
+      "hash": "11iqt1",
+      "lastUpdated": "2026-09-19"
+    },
+    "magicLink.pasteHelp": {
+      "translation": "魔术链接或加入链接都可以使用，您也可以使用相机扫描一个。",
+      "hash": "3d3sb5",
       "lastUpdated": "2026-09-19"
     }
   }

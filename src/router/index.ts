@@ -17,7 +17,7 @@ import { logEvent } from '@/services/telemetry';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { isFlagEnabled, type DevFlag } from '@/config/flags';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
-import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
+import { isPodlessRecoveryQuery, RESUME_RECONNECT_LOAD } from '@/components/login/resumePaths';
 
 // First `RouteMeta` augmentation in the repo. Intentionally PARTIAL — it types
 // only `noChrome` (consumed by `shouldShowAppLayout` + App.vue's boot block).
@@ -461,7 +461,18 @@ router.beforeEach((to) => {
   // silent heal completes; branching on it would cause intermittent mis-routing).
   // A configured owner who reaches this URL just harmlessly re-loads their pod;
   // one on bare `/welcome` still falls through to /nook below.
-  if (authStore.podCreated && isPodlessRecoveryQuery(to.query.resume)) {
+  // ⚠️ `reconnect-load` IS EXCLUDED FROM THE WARN, not from the branch. It has to pass
+  // `isPodlessRecoveryQuery` or this guard sends it to Nook and the reconnect return never
+  // reaches LoginPage — but for an ESTABLISHED owner it is the HAPPY PATH of a Drive
+  // reconnect, which is every successful redirect-surface reconnect there is. Logging that as
+  // "podCreated owner routed to resume-setup recovery" would be false twice over (nothing is
+  // unconfigured, nothing is routed to resume-setup) and would put a steady warn stream on
+  // the firehose for working behaviour.
+  if (
+    authStore.podCreated &&
+    isPodlessRecoveryQuery(to.query.resume) &&
+    to.query.resume !== RESUME_RECONNECT_LOAD
+  ) {
     logEvent({
       level: 'warn',
       surface: 'app-podcreated-unconfigured',

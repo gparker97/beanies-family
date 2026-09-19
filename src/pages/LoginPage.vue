@@ -33,6 +33,7 @@ import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import {
   RESUME_LOAD_DRIVE,
+  RESUME_RECONNECT_LOAD,
   isPodlessRecoveryQuery,
   RESUME_SETUP_PATH,
 } from '@/components/login/resumePaths';
@@ -109,6 +110,8 @@ const autoLoadPod = ref(false);
  * file picker with the now-cached token. See ADR-029.
  */
 const autoOpenDrivePicker = ref(false);
+/** Set by the `?resume=reconnect-load` return; LoadPodView re-enters the reconnect. */
+const autoReconnectLoad = ref(false);
 const isInitializing = ref(true);
 const forceNewGoogleAccount = ref(false);
 /** The prove screen's "use a recovery kit" escape — opens LoadPodView in kit entry. */
@@ -221,6 +224,26 @@ stopResumeWatch = watchEffect(() => {
     return;
   }
 
+  // Returning from a RECONNECT redirect (`?resume=reconnect-load`). The token is already
+  // committed by the time we get here, so re-entering the reconnect is a short-circuit
+  // through `tryReconnectSilently`'s `isTokenValid()` early return — no second consent, no
+  // second round trip. What it buys is that the panel advances instead of sitting there
+  // asking again, which on native it did because a same-path `router.replace` remounts
+  // nothing. ⚠️ Deliberately does NOT touch `reconnectDriveFile`: that ref is what tells
+  // LoadPodView WHICH file to load, and it is only ever written on the boot auth-failure
+  // branch, which does not re-run on a native return.
+  if (route.query.resume === RESUME_RECONNECT_LOAD) {
+    activeView.value = 'load-pod';
+    autoReconnectLoad.value = true;
+    isInitializing.value = false;
+    // ⚠️ NO `stopResumeWatch()`. This watch is a ONE-SHOT and it is also the only handler for
+    // `?resume=load-drive` — and the reconnect's own fallback (a 404 on the reconnected file
+    // sends us to `beginDriveAuthRedirect(LOAD_DRIVE_PATH)`) returns on exactly that marker.
+    // Consuming the dispatcher here meant the picker silently never re-opened on native,
+    // where nothing remounts to re-arm it.
+    return;
+  }
+
   if (!authStore.isAuthenticated) return;
   if (route.query.resume !== 'setup') return;
   activeView.value = 'resume-setup';
@@ -309,6 +332,32 @@ onMounted(async () => {
         { immediate: true }
       );
     });
+  }
+
+  /**
+   * ⚠️ A LINK ARRIVAL OWNS THIS SCREEN. BAIL OUT BEFORE ANY OF THE BOOT LOGIC BELOW.
+   *
+   * `/join` is DELIBERATELY excluded from `ALREADY_AUTH_REDIRECT_FROM` (`router/index.ts:414`)
+   * and the comment there says why in as many words: "an authenticated user may legitimately
+   * be accepting an invite to a different pod". The router was built to let this through —
+   * and then this function hijacked it anyway, because nothing below reads
+   * `props.initialView` and everything below reads the ACTIVE family.
+   *
+   * What greg hit: signed in to pod A, scanned a joining link for pod B, and landed on pod
+   * A's member list. Two branches do it, and neither consults `route.query.fam`:
+   *   - `:422` — the "members already loaded" else branch calls `enterFlow(activeFamilyId)`
+   *   - `:412` — the single-family fast login calls `handleFamilySelected(singleFamily)`
+   * Either flips `activeView` off `'join'` before `isInitializing` clears, so `JoinPodView`
+   * never mounts, `useJoinFlow.init()` never runs, and the family id sitting in the URL the
+   * whole time is never read. `useLoginFlow` then calls `switchFamily(A)`, so the app does
+   * not merely fail to open B — it actively re-commits to A.
+   *
+   * Gated on `props.initialView`, NOT on the presence of `fam`: a bare `/join` visit should
+   * still reach `JoinPodView`'s "how to join" card, which is what it already does.
+   */
+  if (props.initialView === 'join') {
+    isInitializing.value = false;
+    return;
   }
 
   // Resume-setup recovery screen: an authenticated session exists but no
@@ -456,6 +505,12 @@ function resetLoadPodFlags() {
   loadError.value = undefined;
   loadErrorProviderHint.value = undefined;
   reconnectDriveFile.value = undefined;
+  // ⚠️ RESET HERE OR IT LATCHES FOR THE LIFE OF THE PAGE. Nothing else clears it, and this
+  // helper's docblock promises it clears the whole LoadPodView intent group "so no stale mode
+  // leaks across a navigation". Left out, a later "Load a different file" remounts LoadPodView
+  // whose `{immediate:true}` watcher re-reads a still-true flag and re-enters a Google consent
+  // redirect nobody asked for.
+  autoReconnectLoad.value = false;
 }
 
 /**
@@ -853,6 +908,7 @@ async function handleStartOver() {
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
         :auto-open-drive-picker="autoOpenDrivePicker"
+        :auto-reconnect-load="autoReconnectLoad"
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"

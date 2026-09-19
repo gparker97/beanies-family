@@ -3529,32 +3529,49 @@ export const useSyncStore = defineStore('sync', () => {
     tokenHash: string,
     pkg: { salt: string; wrapped: string; expiresAt: string }
   ): Promise<boolean> {
-    if (!envelope.value) throw new Error('No envelope loaded');
-    const env = { ...envelope.value };
-    env.inviteKeys = {
-      ...env.inviteKeys,
-      [tokenHash]: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
-    };
-    envelope.value = env;
-    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
-
-    console.warn(
-      '[syncStore] addInvitePackage: added key',
-      tokenHash.slice(0, 8) + '...',
-      'inviteKeys count:',
-      Object.keys(env.inviteKeys).length
-    );
-
-    const saved = await syncNow(true);
+    // ⚠️ STAGING IS THE HELPER'S JOB TOO. This used to hand-roll the spread, assign
+    // `envelope.value` and call `setEnvelope` itself, immediately before a raw publish —
+    // which is `publishEnvelopeEntry`'s entire body, minus its rollback.
+    //
+    // ⚠️ BOUNDED, VIA THE SAME HELPER AS EVERY OTHER CREDENTIAL PUBLISH. This was a raw
+    // `await syncNow(true)` with NO timeout — the one credential write in the app that never
+    // got the memo, while `setMemberLinkWrap`, `publishDeviceApprovalWrap` and
+    // `revokeMemberLink` all run through `publishEnvelopeEntry`. `publishEnvelopeEntry`'s own
+    // docblock says an unbounded sync here "holds up the whole flow behind it", and it did:
+    // greg watched a magic-link spinner run for 45 seconds with nothing logged and no way out
+    // but a page reload.
+    const outcome = await publishEnvelopeEntry({
+      dict: 'inviteKeys',
+      key: tokenHash,
+      value: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
+      /**
+       * ⚠️ NEVER ROLL BACK AN INVITE KEY, and the DEFAULT here is wrong for one.
+       *
+       * Rolling back is right for a mint whose caller WITHHOLDS the credential on failure —
+       * a dead wrap in the envelope would make the UI claim a live link. `mintDeviceLink`
+       * does check. But `useInviteFlow.generateFreshInviteLink` does NOT: it discards this
+       * return value and renders the link and its QR regardless. With rollback on, an
+       * offline publish (`doSave` reports a merely QUEUED write as failed) would strip the
+       * wrap locally as well as never sending it — so the key would exist NOWHERE while the
+       * owner shared a URL that can never be redeemed, and `regenerateLinkForEmail`
+       * short-circuits on the cached token and re-serves the same dead one.
+       *
+       * Left staged, it rides the next successful save. That self-heal is what the raw
+       * `syncNow` this replaced happened to give for free, and it must not be lost along
+       * with the unbounded wait that came with it.
+       */
+      rollbackOnFailure: false,
+    });
+    const saved = outcome === 'saved';
     if (!saved) {
       console.error(
-        '[syncStore] addInvitePackage: syncNow failed — invite key may not be on Drive'
+        '[syncStore] addInvitePackage: publish not confirmed — invite key may not be on Drive'
       );
       logEvent({
         level: 'warn',
         surface: 'login-flow',
         message: 'invite key publish deferred — not yet on the durable file',
-        context: { action: 'invite_key_publish_deferred' },
+        context: { action: 'invite_key_publish_deferred', error_code: outcome },
       });
     }
     return saved;

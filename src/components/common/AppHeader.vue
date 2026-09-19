@@ -157,7 +157,6 @@ function closeLanguageDropdown() {
  * The only thing this header hands upward: a device-approval key the person just scanned
  * in-app. `App.vue` owns the delivery gate and the approval sheet.
  */
-const emit = defineEmits<{ 'approval-scanned': [key: string] }>();
 
 const showSignInCodeSheet = ref(false);
 
@@ -650,11 +649,7 @@ async function confirmSignOutAndClearData() {
         One instance, mounted beside the sign-out modal rather than inside `ProfileMenu`
         (which renders twice). See `openSignInCodeSheet` for why that matters.
       -->
-      <SignInCodeSheet
-        :open="showSignInCodeSheet"
-        @close="showSignInCodeSheet = false"
-        @approval-scanned="(key) => emit('approval-scanned', key)"
-      />
+      <SignInCodeSheet :open="showSignInCodeSheet" @close="showSignInCodeSheet = false" />
     </Teleport>
   </header>
 </template>

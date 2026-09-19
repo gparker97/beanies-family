@@ -8,6 +8,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-20
+
+### Fixed
+
+- **A joining link now always opens the family it is for.** Scanning an invite for one family
+  while signed in to another could land you on the family you were already in.
+- **Approving a device leaves the new device signed in.** It reached the "unlock" screen and
+  asked for a password even though your family file had already been decrypted.
+- **Reconnecting to Google takes one tap on the installed app**, not two.
+- **Creating a magic link can no longer spin forever.** It now gives up and says so, and
+  trying again works without reloading the page.
+
+### Changed
+
+- **The sign-in screen lost about half its words and a box.** The panel explaining how to sign
+  in from another device was inside a second card, which squeezed everything on a phone; it is
+  now part of the page, with shorter steps.
+- **Scanning is done with your phone's own camera.** The in-app "Open Camera" button took a
+  single photo and often could not read the code, so it has been removed and the steps tell you
+  to use the camera app instead, which is reliable.
+- **"Let this device in?" is now "Approve Login"**, and the paste field says that both a magic
+  link and a joining link work, and that you can scan one with your camera.
+
+---
+
 ## 2026-09-19
 
 _Released as 0.21.5._

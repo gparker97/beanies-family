@@ -90,9 +90,18 @@ function openPastedLink(): void {
       <label for="pasted-link" class="dark:text-ink block text-sm font-semibold text-gray-900">
         {{ t('magicLink.pasteLabel') }}
       </label>
+      <!-- ⚠️ NAMES BOTH LINK KINDS, AND THE CAMERA. This field takes a JOINING link as well as
+           a magic one, and the label used to say "magic link" directly above a placeholder
+           showing a `/join?...` URL — telling invitees the thing in their hand was not it. The
+           camera half matters more now that the in-app scanner is gone: pointing a phone at
+           the code is the promoted route and this is the surface people land on holding one. -->
+      <p id="paste-help" class="dark:text-ink-faint -mt-1 text-xs text-gray-500">
+        {{ t('magicLink.pasteHelp') }}
+      </p>
       <input
         id="pasted-link"
         v-model="pastedLink"
+        aria-describedby="paste-help"
         type="url"
         inputmode="url"
         autocomplete="off"

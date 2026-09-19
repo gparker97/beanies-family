@@ -613,9 +613,7 @@ function reject(): void {
              all on dark. Nothing lints for a token that does not exist, so check the scale
              in `packages/brand/theme.css` before reaching for a shade. -->
         <p class="dark:text-accent-lift text-primary-700 text-sm">
-          {{
-            fillTemplate(t('deviceApproval.provenanceBody'), { reject: t('deviceApproval.reject') })
-          }}
+          {{ t('deviceApproval.provenanceBody') }}
         </p>
       </div>
 
