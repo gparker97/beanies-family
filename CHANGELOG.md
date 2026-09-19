@@ -10,6 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-20
 
+_Released as 0.21.6._
+
 ### Fixed
 
 - **A joining link now always opens the family it is for.** Scanning an invite for one family
