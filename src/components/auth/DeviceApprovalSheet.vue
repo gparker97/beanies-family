@@ -8,13 +8,38 @@
  * declare `android.permission.CAMERA` so Capacitor can skip the runtime prompt. Reusing the
  * OS camera keeps all of that true.
  *
- * ⚠️ APPROVE AND REJECT ARE EQUALLY WEIGHTED. A one-sided approval sheet trains people to
- * tap the bright button, which is precisely the habit an attacker needs. Both actions are
- * full-width and equally reachable.
+ * ⚠️ APPROVE IS PRIMARY; REJECT IS OUTLINE, FULL WIDTH, DIRECTLY BELOW IT. An earlier
+ * version of this comment claimed the two were "equally weighted"; the markup never matched
+ * it. The weighting that IS here is deliberate: Approve carries the action the person came
+ * to perform, and Reject stays a full-width bordered button — not a `ghost` text link —
+ * because declining must remain easy to find on the one screen where declining is the safe
+ * outcome.
  *
  * ⚠️ REJECT IS NOT RED. Under the CIG red is for destructive confirmations — deleting,
  * leaving — not for declining. Declining is the safe outcome here, and colouring it as
  * danger would teach exactly the wrong reflex.
+ *
+ * ⚠️ THE PROVENANCE CHECK IS A CALLOUT, NOT A STEP, AND THAT WAS A TRADE. It used to be a
+ * blocking screen shown before any fingerprint: "did someone send you this?". greg found
+ * the flow had too many confirmations for what should be one approve plus a PIN, and he is
+ * right — but the risk the step addressed is real and unchanged. `/welcome` is a VERIFIED
+ * App Link and Universal Link, and on iOS a camera scan opens a URL through the SAME
+ * mechanism as a tapped one, so the OS gives us no provenance: a link someone sent in
+ * WhatsApp is byte-identical here to a code the person deliberately scanned.
+ *
+ * So the step folded into the compare panel with TWO compensations, and neither is copy
+ * polish:
+ *   1. A warning CALLOUT above the fingerprint, rendered whenever the key did NOT arrive
+ *      through the in-app scanner. It fails SAFE — a null delivery shows it.
+ *   2. An INTENT-BINDING Approve label. When the callout is showing, the button states what
+ *      the person is asserting ("Yes, I Scanned This") rather than a generic "Approve". The
+ *      assertion the blocking step used to extract is now extracted by the button they are
+ *      already reaching for.
+ *
+ * The signal that decides whether this was the right trade is `device_approval_outcome` with
+ * `outcome: 'rejected'` and a `kind` other than `in-app-scan` — someone handed a link they
+ * did not scan, declining it. If deep links dominate legitimate approvals and that stays at
+ * zero, this warning is friction being tapped through and should be deleted, not left.
  */
 import { computed, ref, watch } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -31,11 +56,13 @@ import {
   APPROVAL_EXPIRY_MS,
   type ScannedApproval,
 } from '@/services/crypto/deviceApproval';
-import { emitDeviceApprovalOutcome } from '@/services/telemetry/loginFlowEvents';
 import {
-  emitApprovalInterstitialDismissed,
-  type DeliveryKind,
-} from '@/services/telemetry/deepLinkEvents';
+  emitDeviceApprovalOutcome,
+  type ApproverErrorCode,
+} from '@/services/telemetry/loginFlowEvents';
+import type { DeliveryKind } from '@/services/telemetry/deepLinkEvents';
+import { assertNever } from '@/utils/assertNever';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { requireReauth } from '@/composables/useReauth';
 import { reportError } from '@/utils/errorReporter';
 
@@ -44,7 +71,7 @@ const props = defineProps<{
   /** base64url SPKI from the scanned deep link. */
   publicKey: string;
   /**
-   * How the key reached this device. Drives the provenance interstitial.
+   * How the key reached this device. Drives the provenance warning callout.
    *
    * ⚠️ Carried on the SAME value as the transport rather than as a separate "was this
    * scanned in-app?" flag, so a buffered deep-link key can never be released while a
@@ -58,37 +85,31 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useTranslation();
 
 /**
- * ⚠️ THE PROVENANCE INTERSTITIAL, AND WHY IT IS NOT THEATRE.
+ * Show the provenance warning unless the person demonstrably started the scan themselves.
  *
- * `/welcome` is a VERIFIED App Link and Universal Link, and on iOS a camera scan opens a
- * URL through the SAME mechanism as a tapped one. The OS gives us no provenance at all: a
- * link someone sent in WhatsApp is byte-identical here to a code the person deliberately
- * scanned. The fingerprint comparison is the only real defence, and somebody who did not
- * start a scan has no reason to perform it.
- *
- * So the one binding available is the ENTRY POINT: a key that came through the in-app
- * scanner means the person chose to point a camera at something. Everything else is asked
- * first. Close is weighted equally with Continue, deliberately — this is the step that is
- * supposed to be easy to back out of.
- *
- * This only stays honest while the in-app scanner is the PROMOTED route. If most legitimate
- * approvals keep arriving as deep links, this trains people to tap through warnings, and
- * `approval_interstitial_dismissed` staying at zero is the signal to delete it rather than
- * leave it to be ignored.
+ * ⚠️ FAILS SAFE, AND THE `!==` IS WHY. A key that came through the in-app scanner is the one
+ * case where intent is proven: the person chose to point a camera at something. EVERYTHING
+ * else warns, including a `null` delivery. The previous, blocking version tested
+ * `delivery !== null && delivery !== 'in-app-scan'`, so an unknown transport suppressed the
+ * check. Unknown provenance is the case that most deserves a warning, not least.
  */
-const provenanceAcknowledged = ref(false);
-const needsInterstitial = computed(
-  () => props.delivery !== null && props.delivery !== 'in-app-scan' && !provenanceAcknowledged.value
-);
+const showProvenanceWarning = computed(() => props.delivery !== 'in-app-scan');
 
-function acknowledgeProvenance(): void {
-  provenanceAcknowledged.value = true;
+/**
+ * Every terminal outcome this component reports.
+ *
+ * ⚠️ ONE EMITTER, because `side` and `delivery` are invariants of this FILE, not of each call
+ * site. Spelling them out at all seven call sites was seven chances to pass the wrong side or
+ * forget the transport — and `delivery` is what makes the phishing observable a rate rather
+ * than a raw count, so forgetting it quietly costs the signal.
+ */
+function reportOutcome(
+  outcome: 'published' | 'unconfirmed' | 'rejected' | 'failed',
+  errorCode?: ApproverErrorCode
+): void {
+  emitDeviceApprovalOutcome({ side: 'approver', outcome, delivery: props.delivery, errorCode });
 }
 
-function dismissAtInterstitial(): void {
-  if (props.delivery) emitApprovalInterstitialDismissed({ delivery: props.delivery });
-  emit('close');
-}
 const syncStore = useSyncStore();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
@@ -119,8 +140,47 @@ const scanned = ref<ScannedApproval | null>(null);
  */
 let readGeneration = 0;
 const isApproving = ref(false);
-const errorKey = ref<string | null>(null);
-const done = ref(false);
+const errorKey = ref<UIStringKey | null>(null);
+
+/**
+ * The three end-of-flow panels, as data.
+ *
+ * ⚠️ A MAP, NOT A THIRD AND FOURTH COPY OF THE SAME MARKUP. `done`, `pending` and
+ * `signed-out` are one panel — semibold title, soft body, one full-width dismiss button —
+ * and they were written out longhand twice before `pending` needed a third. Same shape
+ * `SAVE_STATUS_PRESENTATION` uses: a flat, exhaustively-typed map instead of nested template
+ * ternaries. It lives here rather than in its own file because it has exactly one consumer.
+ *
+ * Typing the keys as `UIStringKey` is what lets the template drop its `t(x as never)` casts.
+ */
+type TerminalState = 'done' | 'pending' | 'signed-out';
+const TERMINAL_PANEL: Record<
+  TerminalState,
+  { titleKey: UIStringKey; bodyKey: UIStringKey; testid: string }
+> = {
+  done: {
+    titleKey: 'deviceApproval.doneTitle',
+    bodyKey: 'deviceApproval.doneBody',
+    testid: 'approval-done',
+  },
+  pending: {
+    titleKey: 'deviceApproval.pendingTitle',
+    bodyKey: 'deviceApproval.pendingBody',
+    testid: 'approval-pending',
+  },
+  'signed-out': {
+    titleKey: 'deviceApproval.signedOutTitle',
+    bodyKey: 'deviceApproval.signedOutBody',
+    testid: 'approval-signed-out',
+  },
+};
+
+/** Set once the approval has been acted on; `null` while the flow is still live. */
+const settled = ref<Exclude<TerminalState, 'signed-out'> | null>(null);
+
+const terminal = computed<TerminalState | null>(() =>
+  settled.value ? settled.value : canApprove.value ? null : 'signed-out'
+);
 
 const prompt = () =>
   fillTemplate(t('deviceApproval.prompt'), {
@@ -135,13 +195,11 @@ watch(
   async ([open, publicKey]) => {
     scanned.value = null;
     errorKey.value = null;
-    done.value = false;
-    // ⚠️ RE-ARM THE INTERSTITIAL FOR EVERY KEY. Acknowledging once used to latch for the life
-    // of the tab, and this component is mounted unconditionally in `App.vue` — so a person who
-    // legitimately approved one device would never be asked again, and an attacker's link
-    // arriving later opened straight onto a live fingerprint panel. It also silenced
-    // `approval_interstitial_dismissed`, which is the only detector we have.
-    provenanceAcknowledged.value = false;
+    // ⚠️ RESET FOR EVERY KEY. This component is mounted unconditionally in `App.vue` and
+    // never unmounts, so a terminal state left set would greet the NEXT scanned code with
+    // the previous one's outcome panel. (The provenance warning needs no equivalent reset:
+    // it is derived from `props.delivery`, so it cannot latch.)
+    settled.value = null;
     if (!open || !publicKey) return;
     const generation = ++readGeneration;
     try {
@@ -172,7 +230,7 @@ async function approve(): Promise<void> {
 
   if (!familyKey || !memberId) {
     errorKey.value = 'recovery.podNotOpen';
-    emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'no_family_key' });
+    reportOutcome('failed', 'no_family_key');
     return;
   }
 
@@ -206,18 +264,18 @@ async function approve(): Promise<void> {
       // The sheet was closed while the PIN prompt was up. No message: there is nothing left
       // on screen to show it on. But it must not silently publish a wrap for a request the
       // person explicitly dismissed.
-      emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'request_dismissed' });
+      reportOutcome('failed', 'request_dismissed');
       return;
     }
     if (generationAtStart !== readGeneration) {
       // A different device's request is on screen now. An unqualified failure here would
       // read as though the NEW code failed, so say what actually happened.
       errorKey.value = 'deviceApproval.supersededRetry';
-      emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'request_superseded' });
+      reportOutcome('failed', 'request_superseded');
       return;
     }
     if (!proved) {
-      emitDeviceApprovalOutcome({ outcome: 'rejected', errorCode: 'gate_declined' });
+      reportOutcome('rejected', 'gate_declined');
       emit('close');
       return;
     }
@@ -232,7 +290,7 @@ async function approve(): Promise<void> {
     // published and the abort is still free.
     if (!props.open || generationAtStart !== readGeneration) {
       errorKey.value = 'deviceApproval.supersededRetry';
-      emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'request_superseded' });
+      reportOutcome('failed', 'request_superseded');
       return;
     }
 
@@ -245,24 +303,54 @@ async function approve(): Promise<void> {
       new Date(Number.isFinite(prevMs) ? Math.max(Date.now(), prevMs + 1) : Date.now())
     );
 
-    const published = await syncStore.setDeviceApprovalWrap(memberId, {
+    const outcome = await syncStore.publishDeviceApprovalWrap(memberId, {
       ...wrap,
       createdAt,
       expiresAt: toISODateString(new Date(Date.now() + APPROVAL_EXPIRY_MS)),
     });
-    if (!published) {
-      // The other device polls the FILE. A wrap that never landed is a screen that waits
-      // out its whole window for nothing, so this must never be reported as success.
-      errorKey.value = 'deviceApproval.publishFailed';
-      emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'publish-failed' });
-      return;
+
+    // ⚠️ THREE ANSWERS, NOT TWO, AND CONFLATING THEM IS THE DEFECT THIS FIXES. This used to
+    // read `if (!published)` against a boolean that flattened all four outcomes, so a publish
+    // that TIMED OUT — and which, per `syncNowDurable`'s own comment, may well still land —
+    // was reported to the approver as an outright failure. greg hit exactly that: told the
+    // approval could not be saved, then watched the other device get in about ten seconds
+    // later. A `switch` closed with `assertNever` so a fifth outcome fails the build.
+    switch (outcome) {
+      case 'saved':
+        settled.value = 'done';
+        // The cold device emits the `ok` outcome when it actually gets in; this side only
+        // knows the wrap was published, which is not the same event.
+        reportOutcome('published');
+        return;
+      case 'timeout':
+      case 'unknown':
+        // Not an error and not styled as one: nothing has gone wrong, the upload is simply
+        // still in flight. Saying "failed" here is what sent greg looking for a bug that
+        // did not exist.
+        settled.value = 'pending';
+        reportOutcome('unconfirmed', outcome);
+        return;
+      case 'failed':
+        // The other device polls the FILE. A wrap that never landed is a screen that waits
+        // out its whole window for nothing, so this must never be reported as success.
+        errorKey.value = 'deviceApproval.publishFailed';
+        reportOutcome('failed', 'publish_failed');
+        // ⚠️ A REPORT, NOT ONLY A COUNTER. The telemetry line above says a publish failed;
+        // it does not put anything on the console for whoever is looking at this next, and
+        // carries no cause. A genuine failure to hand over the family key deserves both.
+        reportError({
+          surface: 'login-flow',
+          message: 'device approval wrap could not be published',
+          severity: 'warning',
+          context: { action: 'device_approval_publish_failed', error_code: outcome },
+        });
+        return;
+      default:
+        assertNever(outcome, 'device approval publish outcome');
     }
-    done.value = true;
-    // The cold device emits the `ok` outcome when it actually gets in; this side only
-    // knows the wrap was published, which is not the same event.
   } catch (e) {
     errorKey.value = 'deviceApproval.failed';
-    emitDeviceApprovalOutcome({ outcome: 'failed', errorCode: 'approve-threw' });
+    reportOutcome('failed', 'approve_threw');
     reportError({
       surface: 'login-flow',
       message: 'device approval wrap failed',
@@ -276,7 +364,7 @@ async function approve(): Promise<void> {
 }
 
 function reject(): void {
-  emitDeviceApprovalOutcome({ outcome: 'rejected' });
+  reportOutcome('rejected');
   emit('close');
 }
 </script>
@@ -306,55 +394,39 @@ function reject(): void {
     layer="overlay"
     @close="emit('close')"
   >
-    <div v-if="done" class="space-y-3 text-center" data-testid="approval-done">
-      <p class="dark:text-ink text-base font-semibold text-gray-900">
-        {{ t('deviceApproval.doneTitle') }}
-      </p>
-      <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('deviceApproval.doneBody') }}</p>
-      <BaseButton class="w-full" variant="secondary" type="button" @click="emit('close')">
-        {{ t('action.done') }}
-      </BaseButton>
-    </div>
-
-    <!-- Provenance check. A link someone SENT looks identical to a code you scanned, so
-         ask before any fingerprint is shown. Close is the equal-weight option on purpose. -->
+    <!-- One panel for all three end states: approved, still saving, and signed out here.
+         Driven by TERMINAL_PANEL rather than written out three times. -->
     <div
-      v-else-if="needsInterstitial"
-      class="space-y-4 text-center"
-      data-testid="approval-interstitial"
+      v-if="terminal"
+      class="space-y-3 text-center"
+      :data-testid="TERMINAL_PANEL[terminal].testid"
     >
       <p class="dark:text-ink text-base font-semibold text-gray-900">
-        {{ t('deviceApproval.provenanceTitle') }}
+        {{ t(TERMINAL_PANEL[terminal].titleKey) }}
       </p>
       <p class="dark:text-ink-soft text-sm text-gray-600">
-        {{ t('deviceApproval.provenanceBody') }}
-      </p>
-      <div class="flex flex-col gap-2">
-        <BaseButton class="w-full" variant="secondary" type="button" @click="dismissAtInterstitial">
-          {{ t('deviceApproval.provenanceClose') }}
-        </BaseButton>
-        <BaseButton class="w-full" variant="secondary" type="button" @click="acknowledgeProvenance">
-          {{ t('deviceApproval.provenanceContinue') }}
-        </BaseButton>
-      </div>
-    </div>
-
-    <!-- Signed out here (typically Safari, opened by the camera, beside an installed PWA
-         that holds the actual session). Say so before any fingerprint is compared. -->
-    <div v-else-if="!canApprove" class="space-y-3 text-center" data-testid="approval-signed-out">
-      <p class="dark:text-ink text-base font-semibold text-gray-900">
-        {{ t('deviceApproval.signedOutTitle') }}
-      </p>
-      <p class="dark:text-ink-soft text-sm text-gray-600">
-        {{ t('deviceApproval.signedOutBody') }}
+        {{ t(TERMINAL_PANEL[terminal].bodyKey) }}
       </p>
       <BaseButton class="w-full" variant="secondary" type="button" @click="emit('close')">
-        {{ t('action.close') }}
+        {{ terminal === 'signed-out' ? t('action.close') : t('action.done') }}
       </BaseButton>
     </div>
 
     <div v-else-if="scanned" class="space-y-4 text-center">
       <p class="dark:text-ink-soft text-sm text-gray-600">{{ prompt() }}</p>
+
+      <!-- The provenance check, folded from a blocking step into a callout read in context.
+           Heritage Orange, not red: under the CIG red is for destructive confirmations and
+           hard validation errors, and this is neither. -->
+      <div
+        v-if="showProvenanceWarning"
+        class="dark:border-primary-400/60 dark:bg-surface-overlay border-primary-300 bg-primary-50 rounded-xl border px-3 py-2.5 text-left"
+        data-testid="approval-provenance-warning"
+      >
+        <p class="dark:text-primary-lift text-primary-800 text-sm">
+          {{ t('deviceApproval.provenanceBody') }}
+        </p>
+      </div>
 
       <div>
         <p
@@ -368,7 +440,8 @@ function reject(): void {
         </p>
       </div>
 
-      <!-- Equal weight, both full width. See the header comment. -->
+      <!-- Approve is primary; Reject is a full-width bordered button directly below it, NOT
+           a ghost text link. See the header comment. -->
       <div class="space-y-2">
         <BaseButton
           class="w-full"
@@ -378,7 +451,12 @@ function reject(): void {
           data-testid="approval-approve"
           @click="approve"
         >
-          {{ t('deviceApproval.approve') }}
+          <!-- Intent-binding label: when the person did not demonstrably start the scan, the
+               button states what they are asserting rather than a generic "Approve". This is
+               one of the two compensations for folding the blocking step. -->
+          {{
+            showProvenanceWarning ? t('deviceApproval.approveChecked') : t('deviceApproval.approve')
+          }}
         </BaseButton>
         <BaseButton
           class="w-full"
@@ -394,7 +472,7 @@ function reject(): void {
     </div>
 
     <p v-if="errorKey" role="alert" class="dark:text-danger-lift mt-3 text-sm text-red-600">
-      {{ t(errorKey as never) }}
+      {{ t(errorKey) }}
     </p>
   </BaseModal>
 </template>
