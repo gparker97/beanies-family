@@ -129,6 +129,12 @@ describe('useDeviceApprovalDelivery', () => {
 
     memberId.value = undefined;
     await nextTick();
+    // ⚠️ FLIP `usable` BEFORE ASSERTING. `approvalKey` is gated on `isSurfaceUsable`, so with
+    // it false the assertion below holds by construction and the test passes against code
+    // that emitted the drop event but left `pending` populated — releasing the key to the
+    // next member on the next flip, which is the exact scenario this test is named for.
+    usable.value = true;
+    await nextTick();
 
     expect(result.approvalKey.value).toBeNull();
     expect(logEvent).toHaveBeenCalledWith(
@@ -191,6 +197,39 @@ describe('useDeviceApprovalDelivery', () => {
       expect.objectContaining({
         message: 'approval_key_dropped',
         context: expect.objectContaining({ error_code: 'expired' }),
+      })
+    );
+  });
+
+  it('REGRESSION: a key buffered while SIGNED OUT is not released to whoever signs in next', async () => {
+    // `isSurfaceUsable` is true on a settled, signed-out surface — that is what the sheet's
+    // "open beanies to approve" panel is for. A link arriving there belongs to nobody, and
+    // `prev != null` alone could not tell that apart from a cold launch, so it was handed to
+    // the next member to sign in: a live fingerprint and an Approve button for a code they
+    // never scanned.
+    const usable = ref(true);
+    const familyId = ref<string | null | undefined>('fam-1');
+    const memberId = ref<string | null | undefined>('mem-1');
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+    );
+
+    // Sign out: family survives, member does not.
+    memberId.value = undefined;
+    await nextTick();
+
+    // A link arrives on the signed-out-but-usable surface.
+    result.deliver('KEY-A', 'warm');
+
+    // Someone else signs in.
+    memberId.value = 'mem-2';
+    await nextTick();
+
+    expect(result.approvalKey.value).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'approval_key_dropped',
+        context: expect.objectContaining({ error_code: 'session-changed' }),
       })
     );
   });

@@ -272,7 +272,17 @@ const approvalDelivery = useDeviceApprovalDelivery({
    * substitute a placeholder for a missing id.
    */
   familyId: computed(() => familyContextStore.activeFamilyId),
-  memberId: computed(() => familyStore.currentMember?.id),
+  /**
+   * ⚠️ `currentMemberId`, NOT `currentMember?.id`. The latter is derived through
+   * `members.value.find(...)`, so it is `undefined` whenever the roster is momentarily empty
+   * — which `loadMembers` deliberately allows, holding the id because "an EMPTY roster is
+   * 'the doc did not load', not 'your member was removed'". A background Drive merge calls
+   * `loadMembers()`, so keying on the derived object let a routine merge read as a session
+   * change and discard a key mid-comparison, with no message (only the TTL path explains
+   * itself). The raw id is nulled by `resetState()` and the rejection paths, so the
+   * sign-out guarantee is unchanged.
+   */
+  memberId: computed(() => familyStore.currentMemberId),
   // The sheet disappearing on its own is not self-explanatory, and the other device has
   // stopped waiting by now — say so rather than leaving a hole where the panel was.
   onShownExpired: () =>
@@ -2091,7 +2101,7 @@ watch(
       :open="deviceApprovalKey !== null"
       :public-key="deviceApprovalKey ?? ''"
       :delivery="deviceApprovalDeliveryKind"
-      @close="approvalDelivery.dismiss()"
+      @close="(consumed) => approvalDelivery.dismiss({ consumed })"
     />
     <DocumentExtractConsentModal />
     <!-- No `:open` — the overlay reads the spine's ingest state itself, because it has exactly

@@ -5747,10 +5747,15 @@ const STRING_DEFS = {
     en: 'That Doesn\u2019t Look Like a beanies Code',
     beanie: 'that doesn\u2019t look like a beanies code',
   },
+  // ⚠️ THE SECOND SENTENCE NAMES THE BUTTON, not an action. It said "close this" when this
+  // was a blocking step with a Close button, and "reject it" when there is no control by
+  // that name — the control reads "No, That's Not Me". An instruction that names a button
+  // nobody can find is worse than no instruction on the one screen where backing out is the
+  // safe outcome. If the Reject label changes, change this with it.
   'deviceApproval.provenanceBody': {
-    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, reject it; approving it would let their device into your family.',
+    en: 'Only carry on if you just pointed this device\u2019s camera at a beanies code. If someone sent you this link, tap \u201cNo, That\u2019s Not Me\u201d \u2014 approving it would let their device into your family.',
     beanie:
-      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, reject it; approving it would let their device into your family.',
+      'only carry on if you just pointed this device\u2019s camera at a beanies code. if someone sent you this link, tap \u201cno, that\u2019s not me\u201d \u2014 approving it would let their device into your family.',
   },
   'deviceApproval.supersededRetry': {
     en: 'That request was replaced by a newer one. Check the code on your other device and approve again.',
@@ -5783,6 +5788,10 @@ const STRING_DEFS = {
   'deviceApproval.doneBody': {
     en: 'The other device should be signing in now.',
     beanie: 'the other device should be signing in now.',
+  },
+  'deviceApproval.pinRequired': {
+    en: 'Your PIN is needed to approve a device. Tap Approve to try again.',
+    beanie: 'your pin is needed to approve a device. tap approve to try again.',
   },
   'deviceApproval.approvedTitle': { en: 'Approved', beanie: 'approved' },
   'deviceApproval.approvedBody': {

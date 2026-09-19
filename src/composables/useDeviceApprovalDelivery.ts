@@ -63,7 +63,7 @@ interface Pending {
   /**
    * How it arrived. Carried on the SAME object as the key, never as a parallel ref — a
    * buffered deep-link key released while a separate flag read `in-app-scan` would skip the
-   * interstitial for exactly the key that interstitial exists to gate.
+   * provenance warning for exactly the key that warning exists to gate.
    */
   delivery: DeliveryKind;
   /** For the TTL. A request the other device has already abandoned must not be approved. */
@@ -73,12 +73,12 @@ interface Pending {
 export interface DeviceApprovalDelivery {
   /** The key to show, or null. Null whenever the surface cannot act on it. */
   approvalKey: ComputedRef<string | null>;
-  /** How the visible key arrived. Drives the interstitial; null when nothing is shown. */
+  /** How the visible key arrived. Drives the provenance warning; null when nothing shown. */
   delivery: ComputedRef<DeliveryKind | null>;
   /** A key arrived, from any transport. */
   deliver: (key: string, delivery: DeliveryKind) => void;
-  /** The user closed the sheet. */
-  dismiss: () => void;
+  /** The user closed the sheet. `consumed` = the approval already succeeded. */
+  dismiss: (opts?: { consumed?: boolean }) => void;
 }
 
 export function useDeviceApprovalDelivery(opts: {
@@ -180,8 +180,34 @@ export function useDeviceApprovalDelivery(opts: {
    * both cold paths and produced the exact 0.21.3 signature: a `held` event, a `dropped`
    * event, and no `delivered` event ever.
    */
+  /**
+   * ⚠️ `seenSession` IS WHY `prev != null` IS NOT ENOUGH ON ITS OWN. Two different journeys
+   * produce the identical `null -> 'fam:mem'` transition:
+   *
+   *   1. COLD LAUNCH — the app is starting, the stores have not hydrated, and the key that
+   *      arrived belongs to the person about to appear. It must SURVIVE.
+   *   2. SIGNED OUT BUT SETTLED — `isSurfaceUsable` is true (that is what the sheet's own
+   *      "open beanies to approve" panel is for), a key arrives, and then somebody signs
+   *      in. That key belongs to nobody here and must be DISCARDED.
+   *
+   * Only (2) has ever observed a real session in this scope, so that is the distinguishing
+   * signal. Without it a link sent to a shared or handed-over device was released into
+   * whichever member signed in next, showing them a live fingerprint and an Approve button
+   * for a code they never scanned. The other defences all still fire — the provenance
+   * callout, the PIN gate, the intent-binding label, the 3-minute TTL — but this is the one
+   * path where a held key could reach a different member's session at all.
+   */
+  let seenSession = sessionKey.value !== null;
   watch(sessionKey, (next, prev) => {
-    if (prev != null && next !== prev) discard('session-changed');
+    if (next !== null) {
+      // Arriving at a session we have already left is a switch; arriving at the first one
+      // after having been signed out here is someone else taking over the device.
+      if (seenSession && next !== prev) discard('session-changed');
+      seenSession = true;
+      return;
+    }
+    // Leaving a known session: sign-out, or switch-person's intermediate step.
+    if (prev != null) discard('session-changed');
   });
 
   function deliver(key: string, kind: DeliveryKind): void {
@@ -218,15 +244,28 @@ export function useDeviceApprovalDelivery(opts: {
   }
 
   /**
-   * ⚠️ ROUTES THROUGH `discard`, AND THAT IS THE FIX, NOT A TIDY-UP. This was a copy of
-   * `discard`'s body minus the emit, so a key abandoned by tapping the backdrop or the X
-   * vanished with NO terminal event at all — `approval_key_held` and `approval_key_delivered`
-   * had no closing entry and the funnel did not add up.
+   * The sheet closed. `consumed` says whether the key had already done its job.
+   *
+   * ⚠️ THE FLAG IS THE WHOLE POINT, AND ITS ABSENCE MADE THE METRIC WORSE THAN THE SILENCE
+   * IT REPLACED. `dismiss()` originally cleared the key with no event at all, so
+   * `approval_key_held` had no terminal entry. Routing it through `discard('dismissed')`
+   * closed that — and opened a worse one: the sheet's ONE close handler is also how a
+   * SUCCESSFUL approval is dismissed ("Done" on the approved panel emits the same `close`),
+   * so every healthy approval also logged a WARN-level drop. `dropped / held` then reads
+   * ~100% on perfectly healthy traffic and cannot distinguish abandonment from success,
+   * which is exactly the question it exists to answer.
    *
    * A Reject tap produces both `device_approval_outcome: rejected` and
    * `approval_key_dropped: dismissed`. The former is the authoritative one.
    */
-  function dismiss(): void {
+  function dismiss(opts?: { consumed?: boolean }): void {
+    if (opts?.consumed) {
+      // It was acted on. Clear it like a drop, but do not COUNT it as one.
+      clearTimer();
+      pending.value = null;
+      announced = false;
+      return;
+    }
     discard('dismissed');
   }
 

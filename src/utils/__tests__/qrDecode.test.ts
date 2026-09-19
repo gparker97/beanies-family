@@ -38,7 +38,7 @@ describe('runQrLadder', () => {
       decode: async () => 'PAYLOAD',
     });
 
-    expect(out).toMatchObject({ ok: true, data: 'PAYLOAD', rung: 'full-luma' });
+    expect(out).toMatchObject({ ok: true, data: 'PAYLOAD', rung: 'full-blue' });
     expect(render).toHaveBeenCalledTimes(1);
   });
 
@@ -64,30 +64,28 @@ describe('runQrLadder', () => {
     expect(out).toMatchObject({ ok: true, rung: 'full-blue' });
   });
 
-  it('does not mutate the buffer the luma attempt was given', async () => {
-    // If toBlueChannel wrote through the caller's array, the order of the attempts inside a
-    // step would become load-bearing and a one-line reorder would silently corrupt the luma
-    // pass. Copying is what makes the ladder safe to extend.
+  it("REGRESSION: toBlueChannel does not write through the caller's buffer", async () => {
+    // ⚠️ THE ASSERTION IS ON THE RENDERED BUFFER AFTER THE RUN, not on what each attempt
+    // saw. An earlier version of this test compared the two attempts' first bytes in
+    // sequence — which an in-place mutation satisfies just as well, because the luma attempt
+    // reads BEFORE the blue one writes. It could not fail, while claiming to pin the
+    // property the whole LADDER design rests on: that attempts inside a step are
+    // order-independent, so reordering them is a cost decision and never a correctness one.
+    let captured: { data: Uint8ClampedArray } | null = null;
     const render = (spec: { maxDim: number; crop?: number }) => {
       const base = renderer(BIG)(spec);
-      base.data[0] = 111;
-      base.data[2] = 222;
+      base.data[0] = 111; // r
+      base.data[2] = 222; // b
+      captured ??= base;
       return base;
     };
-    const seen: number[] = [];
-    await runQrLadder({
-      source: BIG,
-      render,
-      decode: async (data) => {
-        seen.push(data[0]!);
-        return null;
-      },
-    });
 
-    // First attempt saw the original red byte; the blue attempt saw the blue one; and the
-    // original was still intact when the second attempt read it.
-    expect(seen[0]).toBe(111);
-    expect(seen[1]).toBe(222);
+    await runQrLadder({ source: BIG, render, decode: async () => null });
+
+    // The blue attempt ran against this buffer. If it had written through it, r would now
+    // hold the blue value and the luma attempt of any later step would read blue pixels.
+    expect(captured!.data[0]).toBe(111);
+    expect(captured!.data[2]).toBe(222);
   });
 
   it('walks the whole ladder and reports every attempt when nothing reads', async () => {
@@ -99,7 +97,9 @@ describe('runQrLadder', () => {
 
     expect(out.ok).toBe(false);
     expect(out).toMatchObject({ reason: 'no-code' });
-    expect(out.attempts).toEqual<QrRung[]>(['full-luma', 'full-blue', 'crop-blue', 'large-blue']);
+    // Blue first: it is the rung that actually reads a Heritage Orange code, and luma is a
+    // whole jsQR pass rather than a free one.
+    expect(out.attempts).toEqual<QrRung[]>(['full-blue', 'full-luma', 'crop-blue', 'large-blue']);
   });
 
   it('tries the platform decoder FIRST and skips jsQR entirely when it reads', async () => {
@@ -127,7 +127,7 @@ describe('runQrLadder', () => {
       },
     });
 
-    expect(out).toMatchObject({ ok: true, data: 'JSQR', rung: 'full-luma' });
+    expect(out).toMatchObject({ ok: true, data: 'JSQR', rung: 'full-blue' });
     expect(out.attempts[0]).toBe('native');
   });
 
@@ -165,8 +165,11 @@ describe('runQrLadder', () => {
       yieldToUi,
     });
 
-    // Three steps => two boundaries between them.
-    expect(yieldToUi).toHaveBeenCalledTimes(2);
+    // ⚠️ BETWEEN EVERY ATTEMPT, not every step. Step 1 holds the two most expensive passes,
+    // so yielding only at step boundaries left them running back-to-back — ~474ms on
+    // desktop, 1.4-2.8s on a mid-range phone, with no frame painted, immediately after the
+    // file picker closes. Four attempts => three boundaries.
+    expect(yieldToUi).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -179,7 +182,22 @@ describe('plannedAttempts', () => {
     // Covers every PDF: decodeQrFromPdf renders at MAX_DIM, so the 2600 step clamps to 1 and
     // reproduces exactly what full-blue already tried.
     const planned = plannedAttempts({ width: 1200, height: 900 });
-    expect(planned).toEqual<QrRung[]>(['full-luma', 'full-blue', 'crop-blue']);
+    expect(planned).toEqual<QrRung[]>(['full-blue', 'full-luma', 'crop-blue']);
+  });
+
+  it('REGRESSION: a fully-duplicate step is never rendered, not merely skipped after', async () => {
+    // Rule 3 of the plan: plan before rendering. The dedup check used to run AFTER
+    // `deps.render(...)`, so every recovery-kit PDF (rendered at exactly MAX_DIM, so the
+    // large step clamps to scale 1) paid a full canvas allocation, drawImage and
+    // getImageData that was then thrown away. `plannedAttempts` got this right, so the two
+    // agreed on attempt COUNT while disagreeing on COST — and asserting on `attempts` alone
+    // could not see it.
+    const small = { width: 1200, height: 900 };
+    const render = vi.fn(renderer(small));
+    await runQrLadder({ source: small, render, decode: async () => null });
+
+    // Two distinct renders: the full frame and the centre crop. NOT three.
+    expect(render).toHaveBeenCalledTimes(2);
   });
 
   it('agrees with what the ladder actually attempts', async () => {

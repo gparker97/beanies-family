@@ -41,7 +41,7 @@ export type DeliveryKind = 'warm' | 'cold-launch' | 'web-load' | 'in-app-scan';
  * with marker buckets, and a filter written from the type excluded every web event.
  *
  * `in-app-scan` belongs in that vocabulary rather than in a second field: it IS how the key
- * arrived, and it is also the thing the approval interstitial keys on. Keeping provenance on
+ * arrived, and it is also the thing the approval provenance warning keys on. Keeping it on
  * the same value as the transport is what makes it impossible for a buffered deep-link key
  * to be released while a parallel flag claims it was scanned in-app.
  */

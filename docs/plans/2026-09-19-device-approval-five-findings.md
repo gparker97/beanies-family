@@ -195,13 +195,15 @@ state, so the requesting device just jumps.
   _silently_ — an invisible modal and a dead flow, exactly what `BaseModal`'s `gate` docblock
   describes. If it fails, the deterministic fallback is to promote `ReauthGateModal` to a new tier
   ABOVE `overlay`, never to hand-patch a z-index at a call site.
-- **Pre-existing and explicitly out of scope: Escape closes BOTH stacked modals at once.**
-  `BaseModal` calls `useFullscreenOverlay(toRef(props,'open'), close)`, which registers an
-  unconditional `useEscapeClose` per open modal — there is no overlay stack. So with the approval
-  sheet over `SignInCodeSheet`, one Escape dismisses both. This is app-wide today (it already
-  applies to the reauth gate over any `base` modal), this work neither causes nor fixes it, and it
-  is the reason §3's "the person is returned to the sheet below" claim is true for the backdrop/X
-  path and not for the Escape path. Record it; do not fix it here.
+- **CORRECTED AFTER REVIEW — Escape does NOT close both stacked modals.** This caveat
+  originally claimed `BaseModal` registers an unconditional `useEscapeClose` per open modal with
+  "no overlay stack", so one Escape would dismiss the approval sheet and `SignInCodeSheet`
+  together. That is false: `useEscapeClose.ts:25-38` keeps a module-level `escapeStack` and a
+  single shared window listener, and its own comment states it closes "only the TOP-MOST one...
+  rather than collapsing every layer at once". Escape therefore returns the person to the sheet
+  below, exactly as the backdrop and X paths do. §3's argument is unaffected and in fact
+  stronger. **Do not "fix" the behaviour described in the original caveat — there is nothing
+  wrong with it.**
 - **Widening `putEnvelopeEntry`'s return from `boolean` to a string union is a silent-regression
   trap.** `if (!published)` where `published` is `'failed'` does NOT enter the branch, and
   TypeScript will not flag it, because every non-empty string is truthy. The mitigation is to
@@ -491,8 +493,8 @@ replaces, and the change is not done.
      Two stacked modals is then a cosmetic fact, not a broken flow. For the **deep-link** path the
      person is returned, on dismissal, to the sheet they themselves opened and never left — which is
      the correct place to be. (For the **in-app-scan** path there is nothing below, because
-     `SignInCodeSheet.vue:88` closed itself; and for the Escape path both close together, per the
-     pre-existing behaviour in Caveats. All three are acceptable; none is a dead end.)
+     `SignInCodeSheet.vue:88` closed itself; and Escape closes only the top-most modal, so it
+     lands in the same place as the backdrop path. All three are acceptable; none is a dead end.)
   2. **The proposed mechanism was an edge-triggered watcher, and edges are the thing that breaks.**
      `watch(approvalPending, v => { if (v) showSignInCodeSheet = false })` does nothing if the key
      is already pending when the sheet is opened, and nothing on a re-scan of the same key (the
@@ -789,9 +791,9 @@ pixels.** A native build in CI for one test file is a poor trade; the injected-r
 1. gets the same coverage of the logic, and the real-pixel claim is covered by the browser and
    device checks in §Testing.
 
-Also out of scope: the magic-link KNOWN GAP at `syncStore.ts:500`; `SignInCodeSheet`'s
-`t(errorKey as UIStringKey)` cast; and the app-wide "Escape closes every open modal" behaviour
-(Caveats) — real, pre-existing, and not this work's to change.
+Also out of scope: the magic-link KNOWN GAP at `syncStore.ts:500` and `SignInCodeSheet`'s
+`t(errorKey as UIStringKey)` cast — both real, pre-existing, and not this work's to change. (The
+third item listed here originally, "Escape closes every open modal", was not real; see Caveats.)
 
 ## Files Affected
 
