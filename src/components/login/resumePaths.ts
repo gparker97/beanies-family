@@ -22,6 +22,25 @@ export const RESUME_LOAD_DRIVE = 'load-drive';
 export const LOAD_DRIVE_PATH = `/welcome?resume=${RESUME_LOAD_DRIVE}`;
 
 /**
+ * `route.query.resume` value that resumes a Google RECONNECT for a Drive load.
+ *
+ * ⚠️ IT EXISTS PURELY SO THE RETURN IS A REAL NAVIGATION ON NATIVE. `useGoogleReconnect`
+ * used to send the CURRENT `pathname + search` as its return path, and on Capacitor the
+ * OAuth trip does not unload the WebView — so `router.replace(samePath)` is a redundant
+ * navigation. No remount, no watcher, and the page-local ref gating the reconnect button
+ * (`LoginPage.reconnectDriveFile`, written only on the boot auth-failure branch) stayed
+ * exactly as it was. The button came back and a SECOND tap was needed, which then
+ * short-circuited on the token the FIRST tap had already obtained.
+ *
+ * Same fix, same reasoning, same shape as `RESUME_LOAD_DRIVE` above — whose watcher comment
+ * in `LoadPodView` spells out that an `onMounted` "would never re-fire on native".
+ */
+export const RESUME_RECONNECT_LOAD = 'reconnect-load';
+
+/** Full return path for a reconnect-then-load redirect. */
+export const RECONNECT_LOAD_PATH = `/welcome?resume=${RESUME_RECONNECT_LOAD}`;
+
+/**
  * `route.query.resume` value for the create / resume-setup continuation — the
  * bare query token so the magic string `'setup'` is named once across the app
  * (App.vue boot, the router guard, and LoginPage).
@@ -48,7 +67,9 @@ export const RESUME_SETUP_PATH = `/welcome?resume=${RESUME_SETUP}`;
  * false for the null/array cases.
  */
 export function isPodlessRecoveryQuery(resume: unknown): boolean {
-  return resume === RESUME_SETUP || resume === RESUME_LOAD_DRIVE;
+  return (
+    resume === RESUME_SETUP || resume === RESUME_LOAD_DRIVE || resume === RESUME_RECONNECT_LOAD
+  );
 }
 
 /**

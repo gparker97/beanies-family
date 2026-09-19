@@ -155,6 +155,41 @@ export function emitLinkMinted(payload: {
 }
 
 /**
+ * A mint STARTED. The denominator for `link_minted`.
+ *
+ * ⚠️ WITHOUT THIS, A HANG IS INVISIBLE. `link_minted` fires only on settle, so a mint that
+ * never returns emits nothing at all and looks identical in CloudWatch to one nobody
+ * attempted. greg's 45-second spinner produced zero events; his stopwatch was the only
+ * instrument that could see it.
+ */
+export function emitLinkMintStarted(payload: { kind: 'device' | 'magic'; detail?: string }): void {
+  emit('info', 'link_mint_started', {
+    action: 'started',
+    kind: payload.kind,
+    ...(payload.detail ? { detail: payload.detail } : {}),
+  });
+}
+
+/**
+ * A mint was tapped while one was already running.
+ *
+ * ⚠️ DELIBERATELY NOT A `link_minted` SETTLE. The mint alarm is
+ * `count(link_mint_started) - count(link_minted)`, so a settle with no matching start makes
+ * that expression negative — and a second tap is exactly what someone does to a mint that
+ * appears hung, i.e. it would break the alarm in the one case it exists for.
+ */
+export function emitLinkMintReentered(payload: {
+  kind: 'device' | 'magic';
+  detail?: string;
+}): void {
+  emit('warn', 'link_mint_reentered', {
+    action: 'reentered',
+    kind: payload.kind,
+    ...(payload.detail ? { detail: payload.detail } : {}),
+  });
+}
+
+/**
  * A link was redeemed — or refused — on the receiving device.
  *
  * ⚠️ `ok: true` fires from the login machine's single `done` branch, NOT from the

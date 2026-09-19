@@ -2400,10 +2400,15 @@ watch(
              they stack predictably rather than overlapping. -->
         <ReviewDemoBanner />
 
-        <AppHeader
-          v-if="!headerReclaimed"
-          @approval-scanned="(key) => approvalDelivery.deliver(key, 'in-app-scan')"
-        />
+        <!--
+          ⚠️ NO `@approval-scanned` ANY MORE. The in-app scanner was removed, and it was the
+          ONLY producer of the `in-app-scan` delivery kind — the one transport that proved the
+          person chose to scan something, and therefore the one that let `DeviceApprovalSheet`
+          skip its provenance warning. Every approval now arrives as a deep link, so that
+          warning shows on all of them. The kind stays in `DeliveryKind` because historical
+          CloudWatch data carries it.
+        -->
+        <AppHeader v-if="!headerReclaimed" />
 
         <main
           class="flex-1 overflow-auto overscroll-y-contain"

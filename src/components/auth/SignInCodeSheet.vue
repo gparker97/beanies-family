@@ -37,17 +37,14 @@
  * ⚠️ MOUNTED ONCE, BY `AppHeader`. `ProfileMenu` renders twice, so hosting this inside it
  * would give two instances with independent mint state.
  */
-import { ref, computed, watch } from 'vue';
+import { ref, watch } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
-import LoginChoiceCard from '@/components/login/LoginChoiceCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMintedLink } from '@/composables/useMintedLink';
-import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
-import { useQrCapture } from '@/composables/useQrCapture';
 import { requireReauth } from '@/composables/useReauth';
-import { emitApprovalKeyDropped } from '@/services/telemetry/deepLinkEvents';
 import { mintDeviceLink } from '@/services/auth/linkMint';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -55,62 +52,32 @@ const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{
   close: [];
   /** A code this device just read in-app. Provenance the deep-link path cannot establish. */
-  'approval-scanned': [key: string];
 }>();
 
 const { t } = useTranslation();
-const isTouchPrimary = useIsTouchPrimary();
 
-/** `choose` is always the entry; `code` is only reachable through a proven PIN. */
-const step = ref<'choose' | 'code'>('choose');
+/**
+ * ⚠️ THERE IS NO CHOOSER ANY MORE, AND THE PIN IS WHY THIS IS STILL A STEP.
+ *
+ * The sheet used to open on two cards: "create a QR code" and "scan a QR code". The second
+ * WAS the in-app scanner, which has been removed — it photographed one frame and decoded the
+ * file, and greg confirmed on a production iPhone that it still failed where the phone's own
+ * camera app succeeded instantly. A chooser with one option is not a choice, so the sheet now
+ * goes straight to the mint.
+ *
+ * The pull direction did not go away with it: the other device shows a code and this one
+ * reads it with the NATIVE camera, which deep-links straight into the approval sheet. That is
+ * the transport greg confirmed works, and the copy below says so.
+ */
+const step = ref<'gate' | 'code'>('gate');
 
-const { link, qr, isMinting, errorKey, qrUnavailable, run } = useMintedLink({
+const { link, qr, isMinting, errorKey, qrUnavailable, run, cancel } = useMintedLink({
   kind: 'device',
   surface: 'login-flow',
   // The entry point, so "where do people actually add a device from" is answerable.
   detail: 'origin=profile-menu',
   // The gate runs in `showCode()` below, one step in, rather than before this sheet exists.
   mint: () => mintDeviceLink({ alreadyProved: true }),
-});
-
-const capture = useQrCapture({
-  origin: 'profile-menu',
-  expect: 'approval',
-  onScanned: (result) => {
-    if (result.kind !== 'approval') return;
-    // ⚠️ The decode takes a second or two, and the person may have given up and dismissed
-    // this sheet in the meantime. Delivering anyway would pop the approval sheet over
-    // whatever they moved on to — carrying `in-app-scan`, the one provenance that SKIPS the
-    // "did someone send you this?" check.
-    if (!props.open) {
-      // ⚠️ The guard is right; the SILENCE was not. A fully decoded approval key used to be
-      // dropped here with no event anywhere, so this path was invisible in CloudWatch and
-      // indistinguishable from a decode that never happened.
-      emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet-dismissed' });
-      return;
-    }
-    // Hand the key up and get out of the way. The approval sheet now sits a layer above this
-    // one, so this is no longer what prevents a buried modal — but returning the person to a
-    // sheet they have finished with is still the wrong place to leave them.
-    emit('approval-scanned', result.key);
-    emit('close');
-  },
-});
-
-/**
- * Lead with whichever option puts the scanning job on a device that has a camera, the same
- * rule the cold sign-in surface uses, so the two screens agree. Both options are always
- * present; only the order changes.
- *
- * ⚠️ THE DOM ORDER CHANGES, NOT JUST THE PAINT ORDER. A `flex-col-reverse` would leave tab
- * order and screen-reader reading order matching the source while the visual order was
- * reversed — and since the ORDER IS THE SIGNAL here, that would invert the signal for
- * exactly the keyboard and screen-reader users it is meant to help (WCAG 2.4.3, 1.3.2).
- */
-const options = computed(() => {
-  const show = { id: 'show' as const, title: t('signInCode.optionShowTitle') };
-  const read = { id: 'read' as const, title: t('signInCode.optionReadTitle') };
-  return isTouchPrimary.value ? [read, show] : [show, read];
 });
 
 const isGating = ref(false);
@@ -137,11 +104,6 @@ async function showCode(): Promise<void> {
   }
 }
 
-/** Synchronous by necessity — see the user-activation warning in the docblock. */
-function readCode(): void {
-  capture.open();
-}
-
 // Reset on every open, so a sheet reopened later never shows a stale code or a stale step.
 // The token is deliberately never persisted, so a previously minted link cannot be re-shown
 // anyway — showing one from component state would be showing something the app can no
@@ -150,96 +112,36 @@ watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
-    step.value = 'choose';
+    step.value = 'gate';
     link.value = '';
     qr.value = '';
     errorKey.value = null;
     qrUnavailable.value = false;
-    capture.error.value = null;
+    // ⚠️ `cancel()`, NOT `isMinting.value = false`. Without any reset a mint that hung left
+    // the spinner up across a close and reopen, and the re-entrancy guard then made every
+    // retry tap a silent no-op — a reload was the only way out, which is what greg had to do.
+    // But clearing the flag from out here only unlocked the door; the abandoned run was still
+    // live and would later write its verdict over the retry's. `cancel()` bumps the
+    // generation as well, which is what actually makes it harmless.
+    cancel();
   }
 );
 </script>
 
 <template>
   <BaseModal :open="open" :title="t('signInCode.title')" size="md" @close="emit('close')">
-    <div v-if="step === 'choose'" class="space-y-3">
-      <!--
-        No lead sentence. An earlier version asked "which of these is true of the other
-        device?", which was a careful way to stop "show" and "scan" being got backwards when
-        you are holding two phones. The icons do that job better and faster: a QR glyph means
-        we make one, a camera glyph means we read one. A sub-line explaining what a QR code
-        is would be noise under an icon that already says it, so there is none. If the icons
-        ever need a sentence to work, the icons are wrong.
-      -->
-      <div class="grid grid-cols-2 gap-3">
-        <LoginChoiceCard
-          v-for="option in options"
-          :key="option.id"
-          class="dark:border-line dark:bg-surface-overlay dark:hover:bg-surface-hover items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-5 hover:bg-gray-50"
-          :disabled="option.id === 'read' && capture.isBusy.value"
-          :testid="`signin-option-${option.id}`"
-          @click="option.id === 'show' ? showCode() : readCode()"
-        >
-          <span
-            class="dark:bg-surface-raised mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FDF1EB]"
-          >
-            <!-- Heritage Orange needs its lift on dark: 3.85 on `surface-overlay` is below
-                 AA, and this glyph is the whole point of the card, not decoration. -->
-            <svg
-              v-if="option.id === 'show'"
-              class="dark:text-accent-lift h-9 w-9 text-[#C24A16]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <path d="M14 14h3v3h-3zM20.5 14v3M17 20.5h3.5M14 20.5h0" />
-            </svg>
-            <svg
-              v-else
-              class="dark:text-accent-lift h-9 w-9 text-[#C24A16]"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.75"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path
-                d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"
-              />
-              <circle cx="12" cy="13" r="3.5" />
-            </svg>
-          </span>
-          <!-- Centred in the remaining height rather than sitting straight under the icon:
-               at 390px one label wraps to two lines and the other does not, and top-aligning
-               them left the two cards visibly lopsided. -->
-          <span class="mt-3 flex flex-1 items-center justify-center">
-            <p class="font-outfit dark:text-ink text-center text-sm font-semibold text-gray-900">
-              {{
-                option.id === 'read' && capture.isBusy.value
-                  ? t('coldEntry.scanning')
-                  : option.title
-              }}
-            </p>
-          </span>
-        </LoginChoiceCard>
-      </div>
-
-      <input
-        :ref="(el) => (capture.inputRef.value = el as HTMLInputElement)"
-        v-bind="capture.bindings"
-      />
-      <p v-if="capture.error.value" role="alert" class="dark:text-danger-lift text-sm text-red-600">
-        {{ capture.error.value }}
-      </p>
+    <!--
+      The sheet opens straight on the mint. There is no chooser: its second card WAS the
+      in-app scanner, and a chooser with one option is not a choice. See `step`.
+    -->
+    <div v-if="step === 'gate'" class="space-y-4">
+      <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('signInCode.gateLead') }}</p>
+      <BaseButton class="w-full" variant="primary" type="button" @click="showCode">
+        {{ t('signInCode.createLink') }}
+      </BaseButton>
+      <!-- The pull direction, which did not leave with the scanner: the other device shows a
+           code and this one reads it with the camera it already has. -->
+      <p class="dark:text-ink-faint text-xs text-gray-500">{{ t('signInCode.orScanHint') }}</p>
     </div>
 
     <template v-else>
@@ -251,7 +153,6 @@ watch(
       </div>
 
       <div v-else-if="link" class="space-y-3">
-        <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('signInCode.scanLead') }}</p>
         <MintedLinkPanel
           :link="link"
           :qr-url="qr"
@@ -275,7 +176,7 @@ watch(
         v-if="!isMinting"
         type="button"
         class="dark:text-ink-soft mt-3 w-full text-center text-sm text-gray-600 underline"
-        @click="step = 'choose'"
+        @click="step = 'gate'"
       >
         {{ t('signInCode.back') }}
       </button>
