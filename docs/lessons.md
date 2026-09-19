@@ -4,6 +4,59 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A test that seeds an impossible initial state proves nothing
+
+**Date:** 2026-09-19
+**Context:** One guard in `useDeviceApprovalDelivery` — "may this held approval key be handed to
+whoever signs in next?" — was got wrong THREE times across three `/code-review max` rounds. Each
+attempt shipped with a passing regression test. Each test passed only because its fixture seeded a
+state the app cannot produce.
+
+- Attempt 1 keyed on `prev != null`. Cold launch and a phished handover both produce
+  `null -> 'fam:mem'`, so it could not tell them apart.
+- Attempt 2 added a `seenSession` latch read at setup. Both store refs are `ref(null)` at App.vue
+  setup on EVERY page load, so it was always false and the discard it gated never ran once. Its
+  test seeded `memberId = ref('mem-1')` before creating the composable.
+- Attempt 3 used `isSurfaceUsable && sessionKey === null`. The web transport calls `deliver()` on
+  the FIRST line of `onMounted`, where `isInitializing` and `isLoadingData` are both still true —
+  so it was always false on web. Its test seeded `usable = ref(true)` before delivering.
+
+Every one of those fixtures looks reasonable in isolation. The bug is that the test author
+(me) chose the starting state to make the scenario expressible, instead of copying the starting
+state the call site actually produces.
+
+**Rule:** when a composable's behaviour depends on WHEN something hydrates, the test must start
+from the same initial values the real call site starts from — for this repo, that means `null`,
+not a convenient seed. And prove the test is load-bearing: revert the fix, watch it fail, restore
+it. A test that passes against the bug it names is worse than no test, because it retires the
+question.
+
+**Corollary, which is what finally worked:** if a guard's question is "has this hydrated yet",
+stop inferring it from reactive state and read something durable. The shipped version reads the
+persisted auth session from `localStorage` synchronously at arrival, which is correct at any
+moment including the first line of `onMounted`.
+
+---
+
+## Re-run the gate after a rebase; two green branches do not compose
+
+**Date:** 2026-09-19
+**Context:** A parallel session pushed four commits mid-deploy. The rebase applied cleanly with one
+trivial CHANGELOG conflict, and both branches had been green on their own. The gate then FAILED on
+the rebased tree: their i18n auto-translate run had produced a Chinese `deviceApproval.provenanceBody`
+translated from the OLD English, while my commit had changed that string to carry a `{reject}`
+placeholder. The repo's `zhBundleIntegrity` test caught the placeholder being lost — a Chinese
+reader would have got the anti-phishing warning without the button name in it.
+
+Neither side could have caught it alone; the defect exists only in the combination.
+
+**Rule:** after a rebase or merge onto someone else's work, re-run `npm run validate` before
+pushing, even when the rebase was clean and both sides were green. And verify the other session's
+commits survived by content — `git merge-base --is-ancestor` for each, plus a `git diff --stat`
+over their files — not by commit count.
+
+---
+
 ## A pending item phrased as an intention still has a fingerprint
 
 **Date:** 2026-09-18
