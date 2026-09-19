@@ -253,7 +253,7 @@ function handleOpenHelp(): void {
       <button
         type="button"
         class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
-        @click="emit('scan-code')"
+        @mousedown.prevent="emit('scan-code')"
       >
         <svg
           class="h-4 w-4 shrink-0 opacity-50"

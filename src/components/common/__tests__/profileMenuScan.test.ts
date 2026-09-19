@@ -37,7 +37,11 @@ describe('ProfileMenu — Scan a Code', () => {
     const wrapper = mountMenu();
     const btn = wrapper.findAll('button').find((b) => /scan a code/i.test(b.text()))!;
 
-    await btn.trigger('click');
+    // ⚠️ `mousedown`, NOT `click`. This menu closes on mousedown, so a `@click` handler is
+    // unmounted before the click can ever fire — every other item uses `@mousedown.prevent`
+    // for exactly that reason, and the one item that did not was a tap that did nothing on
+    // every device. Triggering `click` here would pass while the real button stayed dead.
+    await btn.trigger('mousedown');
 
     // The header listens for exactly this and calls `useQrCapture().open()`. If the emit
     // name ever drifts, the menu item becomes a tap that does nothing — which is precisely
