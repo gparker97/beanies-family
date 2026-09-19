@@ -24,7 +24,30 @@
  * setup scope removes the cross-TEST leak, not the cross-SESSION one. Sign-out is an SPA
  * transition, not a reload, so without an explicit reset a key held before sign-out would be
  * released into the NEXT member's session and wrap THAT family's key for a device that
- * never scanned anything. `sessionKey` is what closes that, and it is load-bearing.
+ * never scanned anything. The session identity below is what closes that, and it is
+ * load-bearing.
+ *
+ * ⚠️ THE SESSION IDENTITY IS DERIVED HERE, NOT PASSED IN, AND THAT IS THE WHOLE POINT.
+ * This gate previously took a ready-made `sessionKey: Ref<string | null>` where `null` meant
+ * "not hydrated yet". `App.vue` then composed it as
+ * `` `${familyId ?? 'none'}:${memberId ?? 'none'}` `` — a string that is NEVER null. Every
+ * hydration step ('none:none' -> 'fam:none' -> 'fam:mem') therefore read as a session change,
+ * and the discard below threw the key away at the exact moment the pod finished opening. That
+ * shipped in 0.21.4 and reproduced the original 0.21.3 signature exactly: held, dropped,
+ * never delivered.
+ *
+ * The contract now lives with the guard that depends on it, so a call site cannot break it:
+ * the two ids go in, and `null` means exactly one thing — NO IDENTIFIABLE SESSION HERE.
+ *
+ * | transition                                   | derived key                    | behaviour        |
+ * | -------------------------------------------- | ------------------------------ | ---------------- |
+ * | cold launch (∅,∅) -> (fam,∅) -> (fam,mem)    | null -> null -> 'fam:mem'      | key SURVIVES     |
+ * | sign-out (fam,mem) -> (fam,∅)                | 'fam:mem' -> null              | discard          |
+ * | switch person (fam,m1) -> (fam,∅) -> (fam,m2)| 'fam:m1' -> null -> 'fam:m2'   | discard on step 1|
+ *
+ * A *momentary* loss of either id (a member re-read, say) is deliberately treated as a
+ * session exit and discards the key. That is the conservative direction, and it is the only
+ * one that keeps the sign-out guarantee intact.
  */
 import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue';
 import { APPROVAL_EXPIRY_MS } from '@/services/crypto/deviceApproval';
@@ -61,8 +84,20 @@ export interface DeviceApprovalDelivery {
 export function useDeviceApprovalDelivery(opts: {
   /** True only when a key could be acted on right now: pod open, member known, no fatal. */
   isSurfaceUsable: Ref<boolean>;
-  /** Identifies the signed-in session. Any change discards a held key. */
-  sessionKey: Ref<string | null>;
+  /**
+   * The open family, straight from the store. Pass the raw value — do NOT pre-compose it
+   * with `memberId`, and do NOT substitute a placeholder for a missing one. See the header.
+   */
+  familyId: Ref<string | null | undefined>;
+  /**
+   * The signed-in member, straight from the store.
+   *
+   * ⚠️ FAMILY **AND** MEMBER. `activeFamilyId` alone is not a session: nothing in sign-out or
+   * switch-person clears it (`clearSession` touches auth state only), so a key held on one
+   * person's screen survived Switch Person and landed the NEXT person straight on a live
+   * fingerprint panel for something they never scanned.
+   */
+  memberId: Ref<string | null | undefined>;
   /**
    * Called when a key that was ON SCREEN expires.
    *
@@ -125,16 +160,27 @@ export function useDeviceApprovalDelivery(opts: {
   );
 
   /**
+   * Who this key belongs to. `null` until BOTH ids are known — see the header for why that
+   * nullability is derived here rather than accepted from a caller.
+   */
+  const sessionKey = computed(() => {
+    const family = opts.familyId.value;
+    const member = opts.memberId.value;
+    return family && member ? `${family}:${member}` : null;
+  });
+
+  /**
    * A key held across sign-out or a family switch belongs to nobody here.
    *
-   * ⚠️ `prev != null` IS LOAD-BEARING. `activeFamilyId` starts null and is only assigned by
+   * ⚠️ `prev != null` IS LOAD-BEARING, and it only means what it says because `sessionKey` is
+   * genuinely null before hydration. `activeFamilyId` starts null and is only assigned by
    * `familyContextStore.initialize()`, which runs LONG after a deep link is delivered — so
-   * without this guard the very first hydration (null -> 'fam-x') reads as a session change
-   * and discards the key at precisely the moment the pod finishes opening. That killed both
-   * cold paths and produced the exact 0.21.3 signature: a `held` event, a `dropped` event,
-   * and no `delivered` event ever.
+   * without this guard the very first hydration (null -> 'fam-x:mem-y') reads as a session
+   * change and discards the key at precisely the moment the pod finishes opening. That killed
+   * both cold paths and produced the exact 0.21.3 signature: a `held` event, a `dropped`
+   * event, and no `delivered` event ever.
    */
-  watch(opts.sessionKey, (next, prev) => {
+  watch(sessionKey, (next, prev) => {
     if (prev != null && next !== prev) discard('session-changed');
   });
 
@@ -171,10 +217,17 @@ export function useDeviceApprovalDelivery(opts: {
     }
   }
 
+  /**
+   * ⚠️ ROUTES THROUGH `discard`, AND THAT IS THE FIX, NOT A TIDY-UP. This was a copy of
+   * `discard`'s body minus the emit, so a key abandoned by tapping the backdrop or the X
+   * vanished with NO terminal event at all — `approval_key_held` and `approval_key_delivered`
+   * had no closing entry and the funnel did not add up.
+   *
+   * A Reject tap produces both `device_approval_outcome: rejected` and
+   * `approval_key_dropped: dismissed`. The former is the authoritative one.
+   */
   function dismiss(): void {
-    clearTimer();
-    pending.value = null;
-    announced = false;
+    discard('dismissed');
   }
 
   onScopeDispose(clearTimer);
