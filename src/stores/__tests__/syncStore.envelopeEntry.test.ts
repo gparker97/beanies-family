@@ -109,7 +109,7 @@ vi.mock('@/services/google/googleAuth', async (importOriginal) => ({
   isTokenValid: vi.fn(() => true),
 }));
 
-describe('putEnvelopeEntry — the rollback must not clobber a concurrent merge', () => {
+describe('publishEnvelopeEntry — the rollback must not clobber a concurrent merge', () => {
   /**
    * The defect this pins, in one sentence: a merge updates syncService's envelope and NOT
    * `syncStore.envelope.value` (`syncService.ts` calls `setEnvelope(preserveLocalKeyDicts(...))`
@@ -205,5 +205,51 @@ describe('putEnvelopeEntry — the rollback must not clobber a concurrent merge'
     expect(saved).toBe(false);
     expect(committed).toHaveLength(1); // the stage only — no second, undoing commit
     expect(committed[0]!.memberLinkKeys).toEqual({ m1: PKG });
+  });
+
+  // ── publishDeviceApprovalWrap: a timeout is not a failure ──
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('REGRESSION: reports a timed-out publish as "timeout", not as a failure', async () => {
+    // ⚠️ THE WHOLE POINT OF THE RETURN-TYPE WIDENING. This used to come back as `false`,
+    // identical to a clean failure, and the approval sheet rendered any `false` as "we
+    // couldn't save the approval". greg hit exactly that on a real device: told it had
+    // failed, then watched the other device get in about ten seconds later.
+    vi.mocked(syncService.setEnvelope).mockImplementation(() => {});
+    vi.mocked(syncService.getEnvelope).mockReturnValue({ ...BASE } as never);
+    vi.mocked(syncService.save).mockImplementation(() => new Promise<boolean>(() => {}));
+
+    vi.useFakeTimers();
+    const store = useSyncStore();
+    const pending = store.publishDeviceApprovalWrap('m1', PKG as never);
+    await vi.advanceTimersByTimeAsync(31_000);
+    const outcome = await pending;
+    vi.useRealTimers();
+
+    expect(outcome).toBe('timeout');
+    // And the guard that makes the widening safe: the value is TRUTHY, so any surviving
+    // `if (!outcome)` call site would silently treat this as success.
+    expect(Boolean(outcome)).toBe(true);
+  });
+
+  it('reports a clean failure as "failed", which IS an error the user must see', async () => {
+    vi.mocked(syncService.setEnvelope).mockImplementation(() => {});
+    vi.mocked(syncService.getEnvelope).mockReturnValue({ ...BASE } as never);
+    vi.mocked(syncService.save).mockResolvedValue(false);
+
+    const store = useSyncStore();
+    expect(await store.publishDeviceApprovalWrap('m1', PKG as never)).toBe('failed');
+  });
+
+  it('reports a confirmed publish as "saved"', async () => {
+    vi.mocked(syncService.setEnvelope).mockImplementation(() => {});
+    vi.mocked(syncService.getEnvelope).mockReturnValue({ ...BASE } as never);
+    vi.mocked(syncService.save).mockResolvedValue(true);
+
+    const store = useSyncStore();
+    expect(await store.publishDeviceApprovalWrap('m1', PKG as never)).toBe('saved');
   });
 });
