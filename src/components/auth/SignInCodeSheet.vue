@@ -47,6 +47,7 @@ import { useMintedLink } from '@/composables/useMintedLink';
 import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 import { useQrCapture } from '@/composables/useQrCapture';
 import { requireReauth } from '@/composables/useReauth';
+import { emitApprovalKeyDropped } from '@/services/telemetry/deepLinkEvents';
 import { mintDeviceLink } from '@/services/auth/linkMint';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -81,9 +82,16 @@ const capture = useQrCapture({
     // this sheet in the meantime. Delivering anyway would pop the approval sheet over
     // whatever they moved on to — carrying `in-app-scan`, the one provenance that SKIPS the
     // "did someone send you this?" check.
-    if (!props.open) return;
-    // Hand the key up and get out of the way: the approval sheet is also a `BaseModal` at
-    // the same layer, so leaving this one open would stack two modals.
+    if (!props.open) {
+      // ⚠️ The guard is right; the SILENCE was not. A fully decoded approval key used to be
+      // dropped here with no event anywhere, so this path was invisible in CloudWatch and
+      // indistinguishable from a decode that never happened.
+      emitApprovalKeyDropped({ delivery: 'in-app-scan', errorCode: 'sheet_dismissed' });
+      return;
+    }
+    // Hand the key up and get out of the way. The approval sheet now sits a layer above this
+    // one, so this is no longer what prevents a buried modal — but returning the person to a
+    // sheet they have finished with is still the wrong place to leave them.
     emit('approval-scanned', result.key);
     emit('close');
   },

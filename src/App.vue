@@ -264,16 +264,15 @@ const isSurfaceUsable = computed(
 const approvalDelivery = useDeviceApprovalDelivery({
   isSurfaceUsable,
   /**
-   * ⚠️ FAMILY **AND** MEMBER. `activeFamilyId` alone is not a session: nothing in sign-out or
-   * switch-person clears it (`clearSession` touches auth state only), so a key held on one
-   * person's screen survived Switch Person and landed the NEXT person straight on a live
-   * fingerprint panel for something they never scanned — and because neither `open` nor
-   * `publicKey` changed across that boundary, the sheet did not even re-arm its interstitial.
+   * ⚠️ THE RAW IDS, NOT A COMPOSED KEY. The gate derives the session identity itself, and its
+   * `null` (= no identifiable session) is what the discard guard is written against. A
+   * previous version of this call site composed
+   * `` `${familyId ?? 'none'}:${memberId ?? 'none'}` `` here — never null, so every hydration
+   * step read as a session change and the held key was destroyed on cold launch. Do not
+   * substitute a placeholder for a missing id.
    */
-  sessionKey: computed(
-    () =>
-      `${familyContextStore.activeFamilyId ?? 'none'}:${familyStore.currentMember?.id ?? 'none'}`
-  ),
+  familyId: computed(() => familyContextStore.activeFamilyId),
+  memberId: computed(() => familyStore.currentMember?.id),
   // The sheet disappearing on its own is not self-explanatory, and the other device has
   // stopped waiting by now — say so rather than leaving a hole where the panel was.
   onShownExpired: () =>

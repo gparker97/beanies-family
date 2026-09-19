@@ -26,6 +26,14 @@ function messages(): string[] {
   return logEvent.mock.calls.map((c) => (c[0] as { message: string }).message);
 }
 
+/** The two refs the gate now takes, for the common "already signed in" case. */
+function session(familyId: string, memberId: string) {
+  return {
+    familyId: ref<string | null | undefined>(familyId),
+    memberId: ref<string | null | undefined>(memberId),
+  };
+}
+
 describe('useDeviceApprovalDelivery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,7 +43,7 @@ describe('useDeviceApprovalDelivery', () => {
   it('shows a key immediately when the surface is already usable', () => {
     const usable = ref(true);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'warm');
@@ -51,7 +59,7 @@ describe('useDeviceApprovalDelivery', () => {
     // beanies app, and every way out of that panel destroyed the key.
     const usable = ref(false);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'cold-launch');
@@ -71,7 +79,7 @@ describe('useDeviceApprovalDelivery', () => {
     // held the only copy of the key. Expressing the key as a computed makes that impossible.
     const usable = ref(true);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
     result.deliver('KEY-A', 'warm');
     expect(result.approvalKey.value).toBe('KEY-A');
@@ -82,20 +90,44 @@ describe('useDeviceApprovalDelivery', () => {
     expect(result.approvalKey.value).toBeNull();
   });
 
-  it('REGRESSION: discards a held key when the session changes', async () => {
+  it('REGRESSION: discards a held key when the family changes', async () => {
     // Sign-out is an SPA transition, so a key held before it would otherwise be released
     // into the NEXT member's session and wrap THAT family's key for a device that never
     // scanned anything.
     const usable = ref(false);
-    const session = ref<string | null>('fam-1');
+    const familyId = ref<string | null | undefined>('fam-1');
+    const memberId = ref<string | null | undefined>('mem-1');
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: session })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
     );
     result.deliver('KEY-A', 'warm');
 
-    session.value = 'fam-2';
+    familyId.value = 'fam-2';
     await nextTick();
     usable.value = true;
+    await nextTick();
+
+    expect(result.approvalKey.value).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'approval_key_dropped',
+        context: expect.objectContaining({ error_code: 'session-changed' }),
+      })
+    );
+  });
+
+  it('REGRESSION: discards a held key on SIGN-OUT, which clears the member but not the family', async () => {
+    // `clearSession` touches auth state only, so `activeFamilyId` SURVIVES a sign-out. A gate
+    // keyed on the family alone would hand the key to whoever signs in next.
+    const usable = ref(false);
+    const familyId = ref<string | null | undefined>('fam-1');
+    const memberId = ref<string | null | undefined>('mem-1');
+    const { result } = withSetup(() =>
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
+    );
+    result.deliver('KEY-A', 'warm');
+
+    memberId.value = undefined;
     await nextTick();
 
     expect(result.approvalKey.value).toBeNull();
@@ -113,7 +145,7 @@ describe('useDeviceApprovalDelivery', () => {
     // make the failure metric consist mostly of people retrying.
     const usable = ref(false);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'cold-launch');
@@ -128,7 +160,7 @@ describe('useDeviceApprovalDelivery', () => {
   it('tags a supersession with the HELD key’s transport, not the incoming one', () => {
     const usable = ref(false);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'cold-launch');
@@ -148,7 +180,7 @@ describe('useDeviceApprovalDelivery', () => {
     vi.useFakeTimers();
     const usable = ref(false);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'warm');
@@ -163,25 +195,34 @@ describe('useDeviceApprovalDelivery', () => {
     );
   });
 
-  it('REGRESSION: the very first session hydration does not discard a held key', async () => {
-    // `activeFamilyId` starts null and is only assigned when the family store initialises,
-    // which happens LONG after a deep link is delivered. Treating that null -> id as a
-    // session change discarded the key at the exact moment the pod finished opening, and
-    // produced the 0.21.3 signature: held, dropped, never delivered.
+  it('REGRESSION: the THREE-STEP hydration App.vue actually produces does not discard a held key', async () => {
+    // ⚠️ THE STEP COUNT IS THE WHOLE TEST. The previous version of this went from `null`
+    // straight to a populated session in ONE step and passed against code that was broken in
+    // production: 0.21.4 composed the session key as `${family ?? 'none'}:${member ?? 'none'}`,
+    // which is never null, so hydration read as TWO session changes and the key was thrown
+    // away at the exact moment the pod finished opening. The stores populate independently —
+    // family first, member later — so anything that cannot survive an intermediate state has
+    // not been tested.
     const usable = ref(false);
-    const session = ref<string | null>(null);
+    const familyId = ref<string | null | undefined>(undefined);
+    const memberId = ref<string | null | undefined>(undefined);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: session })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, familyId, memberId })
     );
 
     result.deliver('KEY-A', 'cold-launch');
-    session.value = 'fam-1';
+    expect(messages()).toContain('approval_key_held');
+
+    familyId.value = 'fam-1'; // step 1: family store initialises
     await nextTick();
-    usable.value = true;
+    memberId.value = 'mem-1'; // step 2: member resolves, LATER
+    await nextTick();
+    usable.value = true; // step 3: the pod finishes opening
     await nextTick();
 
     expect(result.approvalKey.value).toBe('KEY-A');
     expect(messages()).toContain('approval_key_delivered');
+    expect(messages()).not.toContain('approval_key_dropped');
   });
 
   it('expires a key that is on screen, not just one being held', () => {
@@ -190,7 +231,7 @@ describe('useDeviceApprovalDelivery', () => {
     vi.useFakeTimers();
     const usable = ref(true);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
 
     result.deliver('KEY-A', 'warm');
@@ -200,16 +241,24 @@ describe('useDeviceApprovalDelivery', () => {
     expect(result.approvalKey.value).toBeNull();
   });
 
-  it('dismiss clears the key without reporting a loss', () => {
+  it('dismiss clears the key AND reports it, so the funnel closes', () => {
+    // It used to clear silently — a copy of `discard`'s body minus the emit — so a key
+    // abandoned at the backdrop left `approval_key_held` with no terminal entry and the drop
+    // rate could not be computed.
     const usable = ref(true);
     const { result } = withSetup(() =>
-      useDeviceApprovalDelivery({ isSurfaceUsable: usable, sessionKey: ref('fam-1') })
+      useDeviceApprovalDelivery({ isSurfaceUsable: usable, ...session('fam-1', 'mem-1') })
     );
     result.deliver('KEY-A', 'warm');
 
     result.dismiss();
 
     expect(result.approvalKey.value).toBeNull();
-    expect(messages()).not.toContain('approval_key_dropped');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'approval_key_dropped',
+        context: expect.objectContaining({ error_code: 'dismissed' }),
+      })
+    );
   });
 });

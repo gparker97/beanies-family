@@ -282,7 +282,30 @@ function reject(): void {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="t('deviceApproval.title')" size="md" @close="emit('close')">
+  <!--
+    ⚠️ `overlay`, AND NEITHER OF THE TWO VALUES YOU ARE ABOUT TO REACH FOR.
+
+    This sheet is raised from ANY route, including on top of `SignInCodeSheet`, which
+    `AppHeader` owns. Both sat at the default `base` (z-50), and `BaseModal` teleports on
+    mount — so with this component mounted earlier in `App.vue` than `<AppHeader>`, its node
+    landed EARLIER in `<body>` and the equal-z tie broke against it. A device-approval
+    decision rendered UNDERNEATH another modal is what greg hit on a real device.
+
+    NOT `top` (z-[250]): `ReauthGateModal` is `overlay` and its docblock says `top` buries it.
+    Approving raises that PIN gate, so `top` here would make the prompt invisible and the
+    approve flow dead — silently. The gate still wins at equal z because its `BaseModal` is
+    `v-if`-guarded and therefore teleports LATER, when the gate is actually raised.
+
+    NOT z-[55]: already claimed by `BaseSidePanel`'s `raised` and `MagicBeansSheet`'s
+    backdrop, so a new tier there would create a tie rather than remove one.
+  -->
+  <BaseModal
+    :open="open"
+    :title="t('deviceApproval.title')"
+    size="md"
+    layer="overlay"
+    @close="emit('close')"
+  >
     <div v-if="done" class="space-y-3 text-center" data-testid="approval-done">
       <p class="dark:text-ink text-base font-semibold text-gray-900">
         {{ t('deviceApproval.doneTitle') }}

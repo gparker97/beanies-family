@@ -19,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **Pinterest pin rendering works again**, and the keyword in a pin's headline is now
   readable on the orange backgrounds (it was being painted cream on white). Internal
   tooling only.
+- **Scanning a sign-in code no longer does nothing when beanies has to start up.** A fix in
+  the last release accidentally threw the scanned code away at the moment your family file
+  finished opening, so the approval prompt never appeared on a cold start. It appears again.
+- **The approval prompt now sits in front of the "sign in another device" window** instead of
+  behind it, so a scan made while that window is open is no longer invisible.
 
 ---
 
