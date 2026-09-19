@@ -5677,8 +5677,9 @@ const STRING_DEFS = {
     beanie: 'on a device you\u2019re already signed in on, open beanies and tap your profile.',
   },
   'coldEntry.pushStep2': {
-    en: 'Choose Sign In Another Device, then scan the code it shows.',
-    beanie: 'choose sign in another device, then scan the code it shows.',
+    en: 'Choose Sign In Another Device, then the option about pointing a camera at that screen.',
+    beanie:
+      'choose sign in another device, then the option about pointing a camera at that screen.',
   },
   'coldEntry.openCamera': {
     en: 'Open Camera',
@@ -5695,10 +5696,6 @@ const STRING_DEFS = {
   'coldEntry.scanInstead': {
     en: 'Scan a code with this device instead',
     beanie: 'scan a code with this device instead',
-  },
-  'qrScan.menuItem': {
-    en: 'Scan a Code',
-    beanie: 'scan a code',
   },
   'deviceApproval.expiredToast': {
     en: 'That sign-in code expired. Ask the other device for a new one.',
@@ -5818,6 +5815,30 @@ const STRING_DEFS = {
     beanie: 'save, print, or tick the box to carry on.',
   },
   'signInCode.menuItem': { en: 'Sign In Another Device', beanie: 'sign in another device' },
+  'signInCode.chooseLead': {
+    en: 'Which of these is true of the other device?',
+    beanie: 'which of these is true of the other device?',
+  },
+  'signInCode.optionShowTitle': {
+    en: 'It can point a camera at this screen',
+    beanie: 'it can point a camera at this screen',
+  },
+  'signInCode.optionShowBody': {
+    en: 'We\u2019ll show a code here for it to read.',
+    beanie: 'we\u2019ll show a code here for it to read.',
+  },
+  'signInCode.optionReadTitle': {
+    en: 'It\u2019s already showing a code',
+    beanie: 'it\u2019s already showing a code',
+  },
+  'signInCode.optionReadBody': {
+    en: 'We\u2019ll use this device\u2019s camera to read it.',
+    beanie: 'we\u2019ll use this device\u2019s camera to read it.',
+  },
+  'signInCode.back': {
+    en: 'Back to the Other Options',
+    beanie: 'back to the other options',
+  },
   'signInCode.title': { en: 'Sign In Another Device', beanie: 'sign in another device' },
   'signInCode.lead': {
     en: 'Show a code your other device can scan to sign in.',

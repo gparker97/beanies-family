@@ -10,7 +10,7 @@
  * `requireReauth()` for callers, a `useReauth()` for the single host component mounted in
  * App.vue. One gate, one shape, one place to reason about.
  *
- * SCOPE IS THE FEATURE. This is wired to four once-a-year actions only — transfer
+ * SCOPE IS THE FEATURE. This is wired to a handful of once-a-year actions only — transfer
  * ownership, remove a member, reset another member's credentials, clear all data. If a
  * routine action ever starts asking for a PIN, that is a defect, not a hardening.
  */
