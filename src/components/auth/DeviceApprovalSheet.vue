@@ -420,10 +420,16 @@ function reject(): void {
            hard validation errors, and this is neither. -->
       <div
         v-if="showProvenanceWarning"
-        class="dark:border-primary-400/60 dark:bg-surface-overlay border-primary-300 bg-primary-50 rounded-xl border px-3 py-2.5 text-left"
+        class="dark:border-accent-lift/40 dark:bg-surface-overlay border-primary-200 bg-primary-50 rounded-xl border px-3 py-2.5 text-left"
         data-testid="approval-provenance-warning"
       >
-        <p class="dark:text-primary-lift text-primary-800 text-sm">
+        <!-- ⚠️ `accent-lift`, NOT `primary-lift` — the latter does not exist, and neither do
+             `primary-300` or `primary-800`; the Heritage Orange scale skips both. All three
+             were in the first draft of this callout, where they silently emitted nothing:
+             the warning text fell back to inherited colour in light mode and had no lift at
+             all on dark. Nothing lints for a token that does not exist, so check the scale
+             in `packages/brand/theme.css` before reaching for a shade. -->
+        <p class="dark:text-accent-lift text-primary-700 text-sm">
           {{ t('deviceApproval.provenanceBody') }}
         </p>
       </div>
