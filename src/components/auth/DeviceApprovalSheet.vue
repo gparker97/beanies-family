@@ -2,11 +2,19 @@
 /**
  * The approver's half: "a device is asking to open your beanpod — is that you?"
  *
- * Reached by scanning the cold device's code with the phone's own camera app, which opens
- * the deep link and lands here. There is no in-app scanner anywhere in this flow, which is
- * deliberate: the repo has no `getUserMedia` at all, and Android intentionally does not
- * declare `android.permission.CAMERA` so Capacitor can skip the runtime prompt. Reusing the
- * OS camera keeps all of that true.
+ * Reached TWO ways, and the difference between them is load-bearing here:
+ *   - the phone's own camera app opens the deep link (`delivery` is `cold-launch`, `warm`
+ *     or `web-load`) — no provenance, because the OS cannot tell a scan from a tapped link;
+ *   - the IN-APP scanner in `SignInCodeSheet` (`delivery` is `in-app-scan`) — provenance,
+ *     because the person chose to point a camera at something.
+ *
+ * `showProvenanceWarning` is defined entirely against that distinction, so do not treat
+ * `in-app-scan` as dead state: an earlier version of this comment claimed there was no
+ * in-app scanner in the flow, which would make the callout look like a constant.
+ *
+ * Still true, and worth keeping true: the repo has no `getUserMedia` at all, and Android
+ * intentionally does not declare `android.permission.CAMERA` so Capacitor can skip the
+ * runtime prompt. Both scan paths photograph through the OS camera.
  *
  * ⚠️ APPROVE IS PRIMARY; REJECT IS OUTLINE, FULL WIDTH, DIRECTLY BELOW IT. An earlier
  * version of this comment claimed the two were "equally weighted"; the markup never matched
@@ -80,7 +88,12 @@ const props = defineProps<{
    */
   delivery: DeliveryKind | null;
 }>();
-const emit = defineEmits<{ close: [] }>();
+/**
+ * `close` carries whether the key had already done its job, so the delivery gate can tell a
+ * dismissal from a completed approval. Without it every successful approval also counted as
+ * a dropped key.
+ */
+const emit = defineEmits<{ close: [consumed?: boolean] }>();
 
 const { t } = useTranslation();
 
@@ -104,7 +117,7 @@ const showProvenanceWarning = computed(() => props.delivery !== 'in-app-scan');
  * than a raw count, so forgetting it quietly costs the signal.
  */
 function reportOutcome(
-  outcome: 'published' | 'unconfirmed' | 'rejected' | 'failed',
+  outcome: 'published' | 'unconfirmed' | 'rejected' | 'abandoned' | 'failed',
   errorCode?: ApproverErrorCode
 ): void {
   emitDeviceApprovalOutcome({ side: 'approver', outcome, delivery: props.delivery, errorCode });
@@ -200,6 +213,14 @@ watch(
     // the previous one's outcome panel. (The provenance warning needs no equivalent reset:
     // it is derived from `props.delivery`, so it cannot latch.)
     settled.value = null;
+    // ⚠️ `isApproving` TOO, AND IT USED TO BE THE DELIBERATE EXCEPTION. The reasoning was
+    // that an in-flight approval must not be forgotten — but the generation guard already
+    // makes abandoning it safe, and leaving the flag set handed the NEXT key a panel whose
+    // Approve was permanently `:loading` and whose Reject was `:disabled`: a live, valid
+    // request the person could neither act on nor decline. The abandoned call still resumes
+    // and still reports `request_superseded`; it simply no longer paints its verdict, or its
+    // spinner, onto a screen that belongs to a different device.
+    isApproving.value = false;
     if (!open || !publicKey) return;
     const generation = ++readGeneration;
     try {
@@ -245,6 +266,26 @@ async function approve(): Promise<void> {
   // admitted; B never gets in and A did. That defeats the fingerprint comparison this
   // component's docblock calls the only defence, which is the one thing it must never do.
   const generationAtStart = readGeneration;
+  /**
+   * ⚠️ SNAPSHOT, NOT `props.delivery` AT EMIT TIME. Every report below fires AFTER at least
+   * one await, and by then the prop may describe a DIFFERENT key: on the superseded path it
+   * names the incoming transport while reporting the outgoing key's failure (the exact
+   * mis-attribution `deliver()` guards against), and on the dismissed path `delivery` is
+   * already null, because App.vue derives `open` and `delivery` from the same `pending`
+   * object — so `kind` was structurally absent from every `request_dismissed` and the
+   * per-transport dismissal rate could never be computed.
+   */
+  const deliveryAtStart = props.delivery;
+  const report = (
+    outcome: 'published' | 'unconfirmed' | 'rejected' | 'abandoned' | 'failed',
+    errorCode?: ApproverErrorCode
+  ): void =>
+    emitDeviceApprovalOutcome({
+      side: 'approver',
+      outcome,
+      delivery: deliveryAtStart,
+      errorCode,
+    });
   try {
     // ⚠️ SAME BAR AS MINTING A CODE. "Sign in another device" asks for the PIN before it
     // will show one; approving a device hands over the identical thing — the family key,
@@ -264,33 +305,45 @@ async function approve(): Promise<void> {
       // The sheet was closed while the PIN prompt was up. No message: there is nothing left
       // on screen to show it on. But it must not silently publish a wrap for a request the
       // person explicitly dismissed.
-      reportOutcome('failed', 'request_dismissed');
+      report('failed', 'request_dismissed');
       return;
     }
     if (generationAtStart !== readGeneration) {
-      // A different device's request is on screen now. An unqualified failure here would
-      // read as though the NEW code failed, so say what actually happened.
-      errorKey.value = 'deviceApproval.supersededRetry';
-      reportOutcome('failed', 'request_superseded');
+      // ⚠️ REPORTED, BUT NOT PAINTED. A different device's request is on screen now, and it
+      // is untouched — writing "that request was replaced, scan again" onto it would accuse
+      // a brand-new request of a failure that belongs to its predecessor, in red, over its
+      // own live fingerprint. The copy still exists for the case below, where the sheet IS
+      // still showing the key that was superseded mid-wrap.
+      report('failed', 'request_superseded');
       return;
     }
     if (!proved) {
-      reportOutcome('rejected', 'gate_declined');
-      emit('close');
+      // ⚠️ THE SHEET STAYS OPEN, AND THAT IS THE FIX. This used to `emit('close')`, which
+      // App.vue routes to `dismiss()` -> `discard()` — permanently destroying the only copy
+      // of the key, with nothing said. Three different things land here and none of them is
+      // "this person decided not to approve": a mis-tapped backdrop or Cancel on the PIN
+      // pad; a member with no PIN, password or passkey, for whom `ReauthChallenge` emits
+      // `no-credential`; and `useReauth` resolving false immediately when another gate is
+      // already open — newly more reachable now that this sheet sits at `overlay` and can be
+      // raised over another flow. In all three the person is left with a dead 3-minute
+      // window and no idea why. Declining is `reject()`, which is a button they can still
+      // press; this says what happened and leaves it pressable.
+      errorKey.value = 'deviceApproval.pinRequired';
+      report('abandoned', 'gate_declined');
       return;
     }
 
     const wrap = await wrapForApproval(familyKey, req);
 
     // ⚠️ RE-CHECK AFTER THE WRAP, BEFORE THE PUBLISH. `wrapForApproval` is what binds the
-    // family key to THIS request, and `setDeviceApprovalWrap` below is a Drive round trip —
+    // family key to THIS request, and `publishDeviceApprovalWrap` below is a Drive round trip —
     // a far longer window than the PIN prompt. A code swapped in between would otherwise be
     // shown "Device Approved" while the wrap that actually published belongs to the code
     // that is no longer on screen. This is the last point at which nothing has been
     // published and the abort is still free.
     if (!props.open || generationAtStart !== readGeneration) {
       errorKey.value = 'deviceApproval.supersededRetry';
-      reportOutcome('failed', 'request_superseded');
+      report('failed', 'request_superseded');
       return;
     }
 
@@ -315,42 +368,64 @@ async function approve(): Promise<void> {
     // was reported to the approver as an outright failure. greg hit exactly that: told the
     // approval could not be saved, then watched the other device get in about ten seconds
     // later. A `switch` closed with `assertNever` so a fifth outcome fails the build.
+    /**
+     * ⚠️ THE PUBLISH RESOLVED; THE SCREEN MAY NOT BE THE ONE THAT STARTED IT. Every guard
+     * above runs BEFORE `publishDeviceApprovalWrap`, and that call is a Drive round trip
+     * bounded by `POST_AUTH_SAVE_TIMEOUT_MS` — seconds, far longer than the PIN window the
+     * generation guard was originally written for. A second code arriving inside it is not
+     * exotic: the far device's "show a new one" mints a fresh keypair, so `deliver()` does
+     * not take its same-key early return, the watcher repaints this sheet with B's
+     * fingerprint, and an unconditional `settled = 'done'` then paints "Device Approved"
+     * over B's live compare panel. The person closes it believing B got in. B never was;
+     * A was. That is precisely the harm the pre-publish guard's comment describes, and it
+     * was reachable through the one window that guard does not cover.
+     *
+     * The wrap for A HAS published and is legitimately A's, so this is not an error — the
+     * outcome is still reported, truthfully, against A's transport. What must not happen is
+     * painting A's result onto B's screen.
+     */
+    const stillOurs = props.open && generationAtStart === readGeneration;
+
     switch (outcome) {
       case 'saved':
-        settled.value = 'done';
         // The cold device emits the `ok` outcome when it actually gets in; this side only
         // knows the wrap was published, which is not the same event.
-        reportOutcome('published');
+        report('published');
+        if (stillOurs) settled.value = 'done';
         return;
       case 'timeout':
       case 'unknown':
         // Not an error and not styled as one: nothing has gone wrong, the upload is simply
         // still in flight. Saying "failed" here is what sent greg looking for a bug that
         // did not exist.
-        settled.value = 'pending';
-        reportOutcome('unconfirmed', outcome);
+        report('unconfirmed', outcome);
+        if (stillOurs) settled.value = 'pending';
         return;
       case 'failed':
         // The other device polls the FILE. A wrap that never landed is a screen that waits
         // out its whole window for nothing, so this must never be reported as success.
-        errorKey.value = 'deviceApproval.publishFailed';
-        reportOutcome('failed', 'publish_failed');
+        report('failed', 'publish_failed');
         // ⚠️ A REPORT, NOT ONLY A COUNTER. The telemetry line above says a publish failed;
-        // it does not put anything on the console for whoever is looking at this next, and
-        // carries no cause. A genuine failure to hand over the family key deserves both.
+        // it does not put anything on the console for whoever is looking at this next.
+        // `severity: 'error'` rather than 'warning': this is a DEFINITE failure to hand over
+        // the family key, so it must not rank below the generic throw handler below it.
         reportError({
           surface: 'login-flow',
           message: 'device approval wrap could not be published',
-          severity: 'warning',
-          context: { action: 'device_approval_publish_failed', error_code: outcome },
+          severity: 'error',
+          // NOT `error_code: outcome` — inside this branch `outcome` is narrowed to the
+          // literal 'failed', which would ship a third spelling of one condition that
+          // cannot be joined to the paired `publish_failed` event above.
+          context: { action: 'device_approval_publish_failed', error_code: 'publish_failed' },
         });
+        if (stillOurs) errorKey.value = 'deviceApproval.publishFailed';
         return;
       default:
         assertNever(outcome, 'device approval publish outcome');
     }
   } catch (e) {
     errorKey.value = 'deviceApproval.failed';
-    reportOutcome('failed', 'approve_threw');
+    report('failed', 'approve_threw');
     reportError({
       surface: 'login-flow',
       message: 'device approval wrap failed',
@@ -407,7 +482,12 @@ function reject(): void {
       <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t(TERMINAL_PANEL[terminal].bodyKey) }}
       </p>
-      <BaseButton class="w-full" variant="secondary" type="button" @click="emit('close')">
+      <BaseButton
+        class="w-full"
+        variant="secondary"
+        type="button"
+        @click="emit('close', terminal !== 'signed-out')"
+      >
         {{ terminal === 'signed-out' ? t('action.close') : t('action.done') }}
       </BaseButton>
     </div>
@@ -422,6 +502,7 @@ function reject(): void {
         v-if="showProvenanceWarning"
         class="dark:border-accent-lift/40 dark:bg-surface-overlay border-primary-200 bg-primary-50 rounded-xl border px-3 py-2.5 text-left"
         data-testid="approval-provenance-warning"
+        role="note"
       >
         <!-- ⚠️ `accent-lift`, NOT `primary-lift` — the latter does not exist, and neither do
              `primary-300` or `primary-800`; the Heritage Orange scale skips both. All three

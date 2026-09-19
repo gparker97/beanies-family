@@ -284,13 +284,7 @@ export function emitDeviceApprovalRequested(): void {
  * with it.
  */
 export type RequesterErrorCode =
-  | 'no_pending'
-  | 'payload'
-  | 'decrypt'
-  | 'poll_failed'
-  | 'qr_unavailable'
-  | 'request_failed'
-  | 'open_failed';
+  'no_pending' | 'payload' | 'decrypt' | 'poll_failed' | 'qr_unavailable' | 'request_failed';
 
 export type ApproverErrorCode =
   | 'no_family_key'
@@ -306,7 +300,7 @@ export type DeviceApprovalOutcomeEvent =
   | { side: 'requester'; outcome: 'ok' | 'expired' | 'failed'; errorCode?: RequesterErrorCode }
   | {
       side: 'approver';
-      outcome: 'published' | 'unconfirmed' | 'rejected' | 'failed';
+      outcome: 'published' | 'unconfirmed' | 'rejected' | 'abandoned' | 'failed';
       /**
        * How the key reached the approver.
        *
@@ -320,9 +314,17 @@ export type DeviceApprovalOutcomeEvent =
        * rates are now computable, which the old event could never do — it had no
        * denominator. Second, `outcome: 'rejected'` with `kind` anything other than
        * `in-app-scan` is the direct successor signal: someone was handed a link they did not
-       * scan and declined it. A rise there means the same thing a rise in the old event
-       * meant. If deep links dominate legitimate approvals and rejections stay at zero, the
-       * warning is friction and should be deleted rather than left to be tapped through.
+       * scan and DELIBERATELY DECLINED IT. A rise there means the same thing a rise in the
+       * old event meant. If deep links dominate legitimate approvals and rejections stay at
+       * zero, the warning is friction and should be deleted rather than left to be tapped
+       * through.
+       *
+       * ⚠️ `'rejected'` MEANS THE REJECT BUTTON, AND ONLY THAT — which is why `'abandoned'`
+       * exists beside it. Backing out of the PIN pad, mistyping it, being interrupted, or
+       * hitting a gate that could not run are all common and none of them is a judgement
+       * about the request; they used to land on `'rejected'` and would have swamped the one
+       * number this trade is supposed to be decided by. Do not merge them back, and do not
+       * write the phishing query as `action = 'rejected'` without meaning the button.
        */
       delivery: DeliveryKind | null;
       errorCode?: ApproverErrorCode;

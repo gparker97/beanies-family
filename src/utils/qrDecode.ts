@@ -30,6 +30,7 @@
  */
 
 import { loadPdfjs, renderPdfPageToBlob } from '@/utils/pdfRender';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Downscale target for the ordinary passes. jsQR is O(pixels) and phone photos are huge. */
 const MAX_DIM = 1600;
@@ -47,9 +48,21 @@ const LARGE_DIM = 2600;
 export type QrDecodeFailure =
   'no-code' | 'unreadable-image' | 'unsupported-device' | 'decoder-unavailable';
 
-export type QrDecodeResult =
+export type QrDecodeResult = {
+  /**
+   * Which attempts actually ran, in order.
+   *
+   * ⚠️ IT LEAVES THIS FILE, and that is what makes the `catch` around the platform decoder
+   * legitimate rather than a swallow. `'native'` present with no winning `rung` means a
+   * `BarcodeDetector` constructed and then threw — otherwise indistinguishable from a device
+   * that has none, which would let a whole OEM's decoder be 100% broken while the telemetry
+   * looked healthy. On a failure it is also the only way to say how far the ladder got.
+   */
+  attempts: readonly QrRung[];
+} & (
   | { ok: true; data: string; rung: QrRung }
-  | { ok: false; reason: QrDecodeFailure; rung?: undefined; cause?: unknown };
+  | { ok: false; reason: QrDecodeFailure; rung?: undefined; cause?: unknown }
+);
 
 /** Which attempt produced the answer. Reported by the caller so decode quality is measurable. */
 export type QrRung = 'native' | 'full-luma' | 'full-blue' | 'crop-blue' | 'large-blue';
@@ -82,8 +95,15 @@ const LADDER: readonly LadderStep[] = [
   {
     render: { maxDim: MAX_DIM },
     attempts: [
-      { rung: 'full-luma', channel: 'luma' }, // what shipped before; cheapest
-      { rung: 'full-blue', channel: 'blue' }, // the Heritage Orange fix
+      // ⚠️ BLUE FIRST, AND "TRY THE CHEAP ONE FIRST" WAS THE WRONG INSTINCT. The luma pass
+      // is not cheap — it is a whole jsQR pass, measured at 234ms on a 1600x1200 frame
+      // against 8.7ms for the buffer copy the blue pass needs. Ordering luma first made the
+      // MEDIAN SUCCESSFUL scan pay 234ms for a rung this file's entire thesis says will
+      // fail on a Heritage Orange code, which is 61% of the total on the happy path and
+      // roughly 0.7-1.4s wasted on a mid-range phone. Attempts within a step are
+      // order-independent by construction (`toBlueChannel` copies), so this is a pure win.
+      { rung: 'full-blue', channel: 'blue' }, // the Heritage Orange fix; what usually reads
+      { rung: 'full-luma', channel: 'luma' }, // a black-on-white code, or someone else's QR
     ],
   },
   {
@@ -95,6 +115,22 @@ const LADDER: readonly LadderStep[] = [
     attempts: [{ rung: 'large-blue', channel: 'blue' }], // last resort, most expensive
   },
 ];
+
+/**
+ * The identity of one attempt: the pixels it will see, and the channel it reads them in.
+ *
+ * ⚠️ ONE DEFINITION, used by both `plannedAttempts` and the runner, because they MUST agree
+ * — and `crop` is part of it. A 0.5 crop of a 4032x3024 photo lands on the same 1600x1200
+ * as the uncropped render while containing completely different pixels, so a key without it
+ * silently skipped the centre-crop pass as a duplicate. That shipped once.
+ */
+function tupleFor(
+  size: { width: number; height: number },
+  crop: number | undefined,
+  channel: 'luma' | 'blue'
+): string {
+  return `${size.width}x${size.height}:${crop ?? 1}:${channel}`;
+}
 
 /** Output dimensions a spec produces for a source of this size. Pure; never upscales. */
 function outputSize(
@@ -120,13 +156,9 @@ export function plannedAttempts(source: { width: number; height: number }): read
   const seen = new Set<string>();
   const planned: QrRung[] = [];
   for (const step of LADDER) {
-    const { width, height } = outputSize(source, step.render);
+    const size = outputSize(source, step.render);
     for (const attempt of step.attempts) {
-      // ⚠️ `crop` IS PART OF THE IDENTITY, not just the size. A centre crop of a 4032x3024
-      // photo lands at the same 1600x1200 as the uncropped render but contains COMPLETELY
-      // DIFFERENT PIXELS. Keying on dimensions alone silently skipped the crop pass — the
-      // one added because people aim at the middle.
-      const tuple = `${width}x${height}:${step.render.crop ?? 1}:${attempt.channel}`;
+      const tuple = tupleFor(size, step.render.crop, attempt.channel);
       if (seen.has(tuple)) continue;
       seen.add(tuple);
       planned.push(attempt.rung);
@@ -180,6 +212,8 @@ export async function runQrLadder(deps: {
    * failed" and "we never saw a pixel" were the same statement; they are not any more.
    */
   let examined = false;
+  /** A platform decoder that constructed and then threw. Reported via `attempts`. */
+  let nativeThrew = false;
 
   if (deps.native) {
     attempts.push('native');
@@ -189,25 +223,46 @@ export async function runQrLadder(deps: {
       // It ran and found nothing. Something DID look at the image.
       examined = true;
     } catch {
-      // A present-but-broken platform decoder. Fall through to jsQR rather than fail; the
-      // caller reports the fall-through via `attempts`, so this is not a silent swallow.
+      // A present-but-broken platform decoder. Fall through to jsQR rather than fail — but
+      // record it, because a decoder that constructs and then throws on every detect()
+      // otherwise emits an event byte-identical to a device that has no decoder at all, and
+      // a whole OEM's platform decoder could be 100% broken while the surface looked
+      // healthy. `attempts` carries 'native' with no matching `rung`, which is the signal.
+      nativeThrew = true;
     }
   }
 
   const seen = new Set<string>();
-  let stepIndex = 0;
+  let first = true;
   for (const step of LADDER) {
-    if (stepIndex++ > 0) await deps.yieldToUi?.();
+    // ⚠️ PLAN BEFORE RENDERING. The dedup check used to run AFTER `deps.render(...)`, so a
+    // step whose every attempt was already tried still paid a full canvas allocation,
+    // drawImage and getImageData — and then threw the result away. That is every recovery
+    // kit PDF (rendered at exactly MAX_DIM, so the LARGE_DIM step clamps to scale 1 and
+    // reproduces identical pixels) and most screenshots. `outputSize` is pure, so the
+    // decision costs nothing. It also keeps this in step with `plannedAttempts`, which got
+    // it right — the two agreed on attempt COUNT while disagreeing on COST, and the test
+    // asserting they agree could not see the difference.
+    const planned = outputSize(deps.source, step.render);
+    const todo = step.attempts.filter(
+      (a) => !seen.has(tupleFor(planned, step.render.crop, a.channel))
+    );
+    if (todo.length === 0) continue;
 
     let rendered: ImageDataLike | null | undefined;
-    for (const attempt of step.attempts) {
+    for (const attempt of todo) {
       if (rendered === undefined) rendered = deps.render(step.render);
       if (rendered === null) break; // this render is unavailable; try the next step
-      // Same identity rule as `plannedAttempts`, and it must stay the same or the two
-      // disagree — which a test asserts directly.
-      const tuple = `${rendered.width}x${rendered.height}:${step.render.crop ?? 1}:${attempt.channel}`;
-      if (seen.has(tuple)) continue;
-      seen.add(tuple);
+
+      // ⚠️ BETWEEN EVERY ATTEMPT, not only between steps. jsQR is synchronous and O(pixels),
+      // and step 1 holds the two most expensive passes — so yielding only at step
+      // boundaries left ~474ms (1.4-2.8s on a mid-range phone) of unbroken main-thread work
+      // immediately after the file picker closes, with no frame painted and the busy label
+      // unable to render. `decode` memoises its import, so awaiting it is not a yield.
+      if (!first) await deps.yieldToUi?.();
+      first = false;
+
+      seen.add(tupleFor(rendered, step.render.crop, attempt.channel));
       examined = true;
       attempts.push(attempt.rung);
 
@@ -220,6 +275,7 @@ export async function runQrLadder(deps: {
   // ⚠️ `unsupported-device` ONLY when nothing looked at the image. Telling an Android user
   // their device is unsupported when its platform decoder just examined their photo would
   // be exactly the class of wrong message this reason union exists to prevent.
+  void nativeThrew; // surfaced to the caller as 'native' in `attempts` with no winning rung
   return { ok: false, reason: examined ? 'no-code' : 'unsupported-device', attempts };
 }
 
@@ -234,6 +290,37 @@ async function renderPdfFirstPage(file: File): Promise<Blob> {
   }
 }
 
+/**
+ * One event per completed decode, success or miss.
+ *
+ * ⚠️ `no-code` IS EMITTED, WHICH IT NEVER USED TO BE. It was treated as "the photo's fault"
+ * and left silent — but it is the single most common outcome and the exact one this work
+ * exists to move, so without it the whole change is unmeasurable.
+ *
+ * ⚠️ `kind` CARRIES THE WINNING RUNG AND NOTHING ELSE. That is the only reason this surface
+ * exists; putting a sentinel like 'exhausted' on it would make the dominant bucket a value
+ * that is not a rung, which is the two-vocabularies-on-one-field defect `deepLinkEvents.ts`
+ * records having made once already. How far the ladder got rides `detail`.
+ */
+function report(
+  origin: string,
+  attempts: readonly QrRung[],
+  rung: QrRung | null,
+  reason: QrDecodeFailure | null
+): void {
+  logEvent({
+    level: rung ? 'info' : 'warn',
+    surface: 'qr-decode',
+    message: rung ? 'qr decoded' : 'qr decode exhausted',
+    context: {
+      action: rung ? 'qr_decoded' : 'qr_decode_exhausted',
+      ...(rung ? { kind: rung } : {}),
+      ...(reason ? { error_code: reason } : {}),
+      detail: `origin=${origin};tried=${attempts.join(',') || 'none'}`,
+    },
+  });
+}
+
 /** A macrotask, not a microtask: only this actually releases the frame so the UI can paint. */
 function yieldToUi(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -246,7 +333,22 @@ function yieldToUi(): Promise<void> {
  * that reports can attach a real stack. Callers that re-report a bare reason string produce
  * a CloudWatch entry with nothing behind it.
  */
-export async function decodeQrFromImageFile(file: File): Promise<QrDecodeResult> {
+export async function decodeQrFromImageFile(
+  file: File,
+  /**
+   * Where the scan was started from — `profile-menu`, `cold-entry`, `recovery-kit`.
+   *
+   * ⚠️ THE EMISSION LIVES HERE, IN THE SHELL, SO EVERY CALLER IS COVERED BY CONSTRUCTION.
+   * It sat in `useQrCapture` first, which left the recovery-kit scanner — the path most
+   * likely to photograph a PRINTED Heritage Orange code, i.e. where the contrast fix matters
+   * most — emitting nothing on success and nothing on `no-code`. Three callers, two
+   * different reporting habits, one of them the blind spot the surface was created to close.
+   *
+   * `runQrLadder` stays pure and mock-free; only this shell, which no unit test can reach
+   * anyway (happy-dom has no 2D context), knows about telemetry.
+   */
+  origin: string
+): Promise<QrDecodeResult> {
   const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
   let bitmap: ImageBitmap | null = null;
   try {
@@ -267,15 +369,27 @@ export async function decodeQrFromImageFile(file: File): Promise<QrDecodeResult>
         const sy = Math.round((frame.height - sh) / 2);
         const { width, height } = outputSize({ width: frame.width, height: frame.height }, spec);
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        // Memory pressure or a hardened browser. NOT "no code in this photo" — nothing was
-        // looked at, and the runner distinguishes the two.
-        if (!ctx) return null;
-        ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, width, height);
-        return ctx.getImageData(0, 0, width, height);
+        // ⚠️ THE WHOLE BODY IS GUARDED, because the contract above promises `null` for
+        // "out of memory" and only `getContext` was honouring it. OOM and taint arrive as
+        // THROWS from `canvas.width =`, `drawImage` or `getImageData` — and a throw unwinds
+        // straight past the ladder, discarding the attempts that already succeeded in
+        // looking at the image. On a memory-tight phone the 2600px step is exactly where
+        // that happens, and the person was then told their perfectly good photo could not
+        // be read, with a spurious error report attached. Returning null degrades to the
+        // next step instead, which is what the contract always said.
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          // Memory pressure or a hardened browser. NOT "no code in this photo" — nothing
+          // was looked at, and the runner distinguishes the two.
+          if (!ctx) return null;
+          ctx.drawImage(frame, sx, sy, sw, sh, 0, 0, width, height);
+          return ctx.getImageData(0, 0, width, height);
+        } catch {
+          return null;
+        }
       },
       decode: async (data, width, height) => {
         jsQR ??= (await import('jsqr')).default;
@@ -285,18 +399,29 @@ export async function decodeQrFromImageFile(file: File): Promise<QrDecodeResult>
       yieldToUi,
     });
 
+    report(
+      origin,
+      outcome.attempts,
+      outcome.ok ? outcome.rung : null,
+      outcome.ok ? null : outcome.reason
+    );
     return outcome.ok
-      ? { ok: true, data: outcome.data, rung: outcome.rung }
-      : { ok: false, reason: outcome.reason };
+      ? { ok: true, data: outcome.data, rung: outcome.rung, attempts: outcome.attempts }
+      : { ok: false, reason: outcome.reason, attempts: outcome.attempts };
   } catch (cause) {
     // A rejected `import('jsqr')` / `loadPdfjs()` is an offline first-load, which retries
     // fine once the chunk is cached. Anything else is the file itself.
     const isChunkFailure =
       cause instanceof Error && /import|chunk|dynamically imported module/i.test(cause.message);
+    const reason: QrDecodeFailure = isChunkFailure ? 'decoder-unavailable' : 'unreadable-image';
+    report(origin, [], null, reason);
     return {
       ok: false,
-      reason: isChunkFailure ? 'decoder-unavailable' : 'unreadable-image',
+      reason,
       cause,
+      // Nothing in the ladder ran, or it was unwound past. Empty is the honest answer, and
+      // it is what separates "never opened the file" from "tried four rungs on real pixels".
+      attempts: [],
     };
   } finally {
     // Never closed before this, so every scan leaked a full decoded frame until GC.
