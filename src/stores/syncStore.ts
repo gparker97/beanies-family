@@ -6251,10 +6251,16 @@ export const useSyncStore = defineStore('sync', () => {
      */
     timeoutMs: number = DURABLE_ROTATION_SAVE_TIMEOUT_MS
   ): Promise<boolean> {
-    // ⚠️ `=== 'saved'` PRESERVES THIS CALLER'S EXACT PRIOR BEHAVIOUR. `publishEnvelopeEntry`
-    // now returns the outcome rather than a boolean, and every non-empty string is truthy —
-    // so `if (!outcome)` would silently never fire. The magic-link KNOWN GAP above is
-    // untouched by this change; only the approval path acts on the distinction.
+    // ⚠️ `=== 'saved'` PRESERVES THIS CALLER'S EXACT PRIOR BEHAVIOUR, DELIBERATELY.
+    // `publishEnvelopeEntry` now returns the outcome rather than a boolean, and every
+    // non-empty string is truthy — so `if (!outcome)` would silently never fire.
+    //
+    // Unlike the approval and revoke paths, a magic-link mint treats an unconfirmed publish
+    // as a failure ON PURPOSE: the caller WITHHOLDS the link, because a QR whose key is not
+    // on Drive is a dead QR handed to someone who will try to use it. Withholding is the
+    // conservative answer here; the KNOWN GAP above records the cost. Do not "unify" this
+    // with the other two — it was changed to `!== 'failed'` by a careless edit once, and the
+    // test at `syncStore.envelopeEntry.test.ts` caught it.
     const saved =
       (await publishEnvelopeEntry({
         dict: 'memberLinkKeys',
@@ -6333,7 +6339,12 @@ export const useSyncStore = defineStore('sync', () => {
     // `inviteService` → `familyKeyService` into the eager boot graph and silently no-ops
     // the deliberate `await import(...)` sites elsewhere. It is a pure 6-line value —
     // a package nothing can unwrap.
-    // Same `=== 'saved'` note as `setMemberLinkWrap`: behaviour preserved exactly.
+    // ⚠️ NOT `=== 'saved'`. A `'timeout'` here is NOT a failed revocation: `rollbackOnFailure`
+    // is false, so the tombstone stays staged and rides the next save — the revocation WILL
+    // land. Collapsing it to a boolean made familyStore fire a `severity: 'critical'` Slack
+    // page ("member removed while their magic link was still live — now unrevocable") for a
+    // revocation that succeeded, paging on-call on a slow connection. This is the same
+    // boolean-flattening defect that was fixed in the approval sheet; it lived on here.
     const published =
       (await publishEnvelopeEntry({
         dict: 'memberLinkKeys',
@@ -6352,7 +6363,7 @@ export const useSyncStore = defineStore('sync', () => {
         // the live wrap this tombstone exists to kill, and `doSave` reports a merely QUEUED
         // write as a failure — so revoking while offline would reinstate the credential.
         rollbackOnFailure: false,
-      })) === 'saved';
+      })) !== 'failed';
 
     // Never silent. These two failure shapes are the difference between "revoked" and
     // "we think we revoked", and only the firehose can tell anyone which happened.

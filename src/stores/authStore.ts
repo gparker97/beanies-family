@@ -450,6 +450,24 @@ export interface AuthUser {
 
 const SESSION_KEY = 'beanies_auth_session';
 
+/**
+ * Is a session persisted on this device right now?
+ *
+ * Synchronous and store-free on purpose: the device-approval gate has to answer "was anyone
+ * signed in here when this link arrived?" at the very first line of `onMounted`, long before
+ * any Pinia state has hydrated. Three previous attempts to infer that from reactive refs
+ * were all silently false in production because of exactly that ordering.
+ */
+export function hasPersistedSession(): boolean {
+  try {
+    return localStorage.getItem(SESSION_KEY) !== null;
+  } catch {
+    // Private mode, blocked storage, or a hardened browser. FAIL SAFE: "no session here"
+    // makes a held key MORE likely to be discarded, never more likely to be handed over.
+    return false;
+  }
+}
+
 // Whether the authenticated user's `.beanpod` file actually exists yet.
 // `signUp()` creates the session *before* storage is chosen (step 2 of the
 // create-pod wizard), so "authenticated" alone doesn't mean "has a pod" — a
