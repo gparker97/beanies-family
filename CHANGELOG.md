@@ -31,6 +31,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
   family data opens, instead of jumping with nothing said, and its code disappears at the
   same moment so there is no longer a live code sitting under a success message.
 
+- **Scanning a code with the in-app camera now works from a normal distance.** Photos of a
+  beanies code very often came back as "no code found", because the codes are printed in
+  Heritage Orange and the reader was looking at brightness, where orange and white are much
+  closer together than black and white. It now reads the colour the code is actually in, and
+  falls back through several other passes before giving up.
+
 ### Changed
 
 - **Approving a device is one approve plus your PIN.** The separate "did you just scan

@@ -71,7 +71,7 @@ const showCode = ref(!isTouchPrimary.value);
 const codeGeneration = ref(0);
 
 const capture = useQrCapture({
-  surface: 'login-flow',
+  origin: 'cold-entry',
   expect: 'invite',
   onScanned: (result) => {
     if (result.kind !== 'invite') return;
