@@ -4,6 +4,78 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A regex that deletes one entry can swallow the next one
+
+**Date:** 2026-09-20
+**Context:** Collapsing two Settings cards orphaned `deviceLink.mint`, so a cleanup pass removed it
+with `re.compile(r"\n  '" + key + r"': \{.*?\n  \},", re.S)`. But that key was a SINGLE-LINE
+entry, so the non-greedy `.*?` started at its `{` and ran on across lines to the first `\n  },` it
+found — the end of `deviceLink.mintFailed`'s block. Both were deleted. `mintFailed` is live: it is
+what `useMintedLink` renders on both its watchdog and its throw paths.
+
+Worse, nothing caught it. `vue-tsc` passed, 8391 tests passed, lint passed. **`errorKey` is a plain
+`string` rendered via `t(errorKey as UIStringKey)`, and that cast bypasses the exhaustiveness every
+other `t()` call gets** — so deleting a key that only those paths use is invisible to the compiler.
+It would have shipped as a raw key on screen at the exact moment a mint failed.
+
+**Rule:** never bulk-delete `uiStrings` entries with a multiline regex. Delete ONE key at a time
+with an exact-match assertion on the full block, and afterwards grep every `errorKey.value = '...'`
+literal in the repo against the file, because the type system does not cover those. An unused key
+is harmless; a deleted live one is a raw key in front of a user mid-failure.
+
+---
+
+## Verifying the surface that changed is not verifying the path you added
+
+**Date:** 2026-09-20
+**Context:** The magic-link work added `router.push({ path: '/meet-the-beans', ... })` in three
+places. That route does not exist — the page is registered at `/pod` — so every unjoined-member
+handoff hit the catch-all 404, and the `?invite=` handler written in the same change was unreachable
+dead code. Browser verification had been done and passed: block renders, exactly one paste panel,
+both themes, zero console errors. It checked the surface that changed VISUALLY and never clicked the
+navigation the change INTRODUCED. A code review found it instead.
+
+**Rule:** a new `router.push` target is a thing to click, not a thing to read. When a change adds
+navigation, the verification list gets one line per new destination, walked. "The screen renders"
+and "the buttons on it go somewhere" are different claims, and the second is the one a reviewer
+should not have to make for you.
+
+---
+
+## A full validate needs the machine to itself
+
+**Date:** 2026-09-20
+**Context:** A `npm run validate` run launched in the background while type-checks, vitest runs and
+prettier ran alongside it came back with 17 failures across five files — `useBeanTips`, `useToday`,
+`useWallOrientation`, `reviewDemo`, `TravelPlansPage.smoke` — every one a `Hook timed out in
+10000ms` at 20-49 seconds per file. All of them passed in isolation. The run was wasted, and for
+several minutes it looked like the changeset had broken five unrelated areas.
+
+**Rule:** `docs/lessons.md` already carries "run expensive commands once". The sharper form is _do
+not run it while doing anything else_. A contended gate manufactures timeout failures that are
+indistinguishable from real ones, which costs more than the run it saved. Start it, then stop
+working until it lands.
+
+---
+
+## A cut abstraction was cut for a specific reason, not as a general rule
+
+**Date:** 2026-09-20
+**Context:** Plan review pass 3 removed a proposed shared minter component, correctly: the Settings
+card derived a status dot, an expiry and a replace-warning from the mint target, so hiding the
+target inside a child made the card describe YOUR link while acting on your spouse's. That was read
+as "do not share components here", and ~35 lines of picker markup were pasted into three hosts
+instead. Every defect in it then shipped three times — a wrong route literal, a wrong empty-state
+key, and a missing permission check, each in three files. The reviewer's own words were the fix:
+"sharing the MARKUP is orthogonal to owning the STATE."
+
+**Rule:** when a review rejects an abstraction, record WHICH property made it wrong. "Too coupled"
+generalises into duplication; "the host needed this state" does not. Re-read the objection before
+applying it a second time, and check whether the property still holds — when the 7-day link was
+later removed there was no status to derive, and the shared component became correct.
+
+---
+
 ## A component cannot announce an event whose cause destroys it
 
 **Date:** 2026-09-19
