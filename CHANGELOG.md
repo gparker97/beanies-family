@@ -10,6 +10,57 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-20
 
+_Released as 0.21.7._
+
+### Added
+
+- **Signing in on a new device now starts by scanning a magic link.** The screen you reach
+  after tapping Sign In leads with it, above Google Drive, with the steps spelled out. On a
+  computer it leads with pasting instead, since there is no camera to point.
+- **A magic link now takes you to the right Google account.** The account chooser used to
+  come up empty and you had to find your own account; the link now carries it, so consent
+  arrives pre-filled and no password or recovery code is asked for.
+- **Creating a magic link now asks who is signing in.** Pick yourself or a family member
+  from the beanie picker; a member who has not joined yet is offered a joining link instead,
+  which is the one that also gives them access to the family file.
+- **The "sign out and clear data" option explains itself.** It now reads "Sign Out & Clear
+  All Data From This Browser", with an info button saying what it clears and that your
+  family data itself is untouched. The explanation was previously missing entirely on
+  mobile.
+
+### Changed
+
+- **Every sign-in link and QR code is now called a "magic link"**, whatever its duration.
+  "Link a Device" and "sign-in code" are gone as separate ideas.
+- **Two magic-link cards in Settings became one.** They were the same thing described two
+  ways, one lasting 7 days and one 15 minutes. There is now a single "Magic Links" card,
+  and it behaves identically to the profile-menu option, because both use the same flow.
+- **Setting up a pod or joining one no longer asks you to save two things.** It asks for the
+  recovery kit, which is the one that cannot be replaced, and then offers to show you a
+  magic link if you also want beanies on your phone. Nothing to store, nothing expiring in
+  a week.
+- **Magic links now last 15 minutes everywhere.** They are created when you need one rather
+  than saved in advance.
+
+### Fixed
+
+- **Creating a magic link for a family member no longer shows your own link's status.** It
+  previously described yours while acting on theirs, and the older 7-day link would cancel
+  theirs without saying so.
+- **The picker's Back button did something.** It appeared under the beanie picker and was
+  wired to nothing; the picker now opens below the button and closes properly.
+- **A joining link now opens the right page** instead of a "not found" screen.
+
+### Security
+
+- **Creating a magic link now asks for your PIN.** The saved variant previously did not, and
+  it was the longer-lived of the two.
+- **Only members who can manage the pod may create a link for someone else.** Anyone signed
+  in could previously create one for any member, which also cancelled the link that member
+  was holding.
+
+## 2026-09-20
+
 _Released as 0.21.6._
 
 ### Changed

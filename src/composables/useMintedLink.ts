@@ -5,7 +5,10 @@ import {
   emitLinkMinted,
   emitLinkMintStarted,
   emitLinkMintReentered,
+  mintDetail,
+  type MintFacts,
 } from '@/services/telemetry/loginFlowEvents';
+import type { HintReason } from '@/services/auth/linkMint';
 import { raceTimeout } from '@/utils/timing';
 import { measureAsync } from '@/utils/perfTiming';
 
@@ -43,16 +46,38 @@ export function useMintedLink(opts: {
    * Returns the shareable URL, or a `uiStrings` key explaining why it could not plus the
    * `error_code` for the firehose. The caller does the crypto; it does not do telemetry.
    */
-  mint: () => Promise<{ link: string } | { errorKey: string; errorCode: string }>;
+  mint: () => Promise<
+    { link: string; hint?: HintReason } | { errorKey: string; errorCode: string }
+  >;
   /** Telemetry surface for unexpected throws. */
   surface: string;
   /**
-   * Which entry point this mint came from, as `origin=<where>`. Rides the already
-   * allowlisted `detail` key, matching the `origin=creation` / `origin=join` convention
-   * the two non-composable mint sites already use — so every `link_minted` event in the
-   * product carries a queryable origin.
+   * The facts describing this mint, read at EACH emit rather than captured once at setup.
+   *
+   * ⚠️ A GETTER, NOT A STRING, AND THAT IS THE FIX FOR A REAL BUG. `target` changes at runtime
+   * when the user picks a different member, so a value captured when the host mounted would
+   * label every later event with the first target. Rides the already-allowlisted `detail` key.
    */
-  detail?: string;
+  facts: () => MintFacts;
+  /**
+   * A step-up to run BEFORE the watchdog starts. Return false to abandon without minting.
+   *
+   * ⚠️ THIS EXISTS BECAUSE A PIN PAD MUST NEVER BE INSIDE `raceTimeout`. When `mintMagicLink`
+   * gained a default-on gate, the gate ran inside `opts.mint()` — which is raced against
+   * `MINT_TIMEOUT_MS`. `raceTimeout` does NOT abort the underlying work (its own docblock says
+   * so), so a person taking longer than 30 seconds to recall a 6-digit PIN got
+   * "Couldn't create the magic link" AND an `error_code=mint-timeout`, while the real mint
+   * carried on, accepted the PIN, and published a newest-wins wrap that REVOKED the link they
+   * were already holding — the freshly minted token discarded, because nothing reads the late
+   * resolution. Net: a false failure that destroys a working credential.
+   *
+   * Running it out here also keeps human typing latency out of `measureAsync('link.mint')`,
+   * which otherwise reports every gated mint as a multi-second main-thread stall.
+   *
+   * `SignInCodeSheet` already used this shape by hand (gate in `showCode()`, then
+   * `gate: 'already-proved'`); this makes it available to every host instead of one.
+   */
+  preflight?: () => Promise<boolean>;
 }) {
   let mintGeneration = 0;
   const link = ref('');
@@ -72,7 +97,7 @@ export function useMintedLink(opts: {
       // `started - minted`, and a settle with no matching start drives that negative in
       // precisely the scenario the instrumentation exists to catch, since double-tapping is
       // what people do to a hung mint.
-      emitLinkMintReentered({ kind: opts.kind, detail: opts.detail });
+      emitLinkMintReentered({ kind: opts.kind, detail: mintDetail(opts.facts()) });
       return;
     }
     /**
@@ -85,16 +110,35 @@ export function useMintedLink(opts: {
     const generation = ++mintGeneration;
     const isCurrent = () => generation === mintGeneration;
 
+    /**
+     * ⚠️ RUN-LOCAL, AND THAT IS THE WHOLE POINT. Whether a `login_hint` was attached is only
+     * known once `opts.mint()` has returned, but `link_mint_started` fires BEFORE it. Holding
+     * the hint anywhere the host could see it (a ref, or a field on `facts`) means the start
+     * event reads the PREVIOUS mint's value — a stale field that looks real in CloudWatch.
+     * Scoped here, the six emits that cannot know it simply omit it.
+     */
+    let hint: HintReason | undefined;
+
     isMinting.value = true;
     errorKey.value = null;
     qrUnavailable.value = false;
     link.value = '';
     qr.value = '';
     try {
+      // ⚠️ BEFORE the started-event and before the race. A declined step-up is not a mint
+      // attempt, so it must not enter the `started - minted` funnel either.
+      if (opts.preflight) {
+        const proceed = await opts.preflight();
+        if (!isCurrent()) return;
+        if (!proceed) {
+          errorKey.value = 'signInCode.notProved';
+          return;
+        }
+      }
       // The denominator this funnel has never had: `link_minted` only ever fired on SETTLE,
       // so a mint that hung emitted literally nothing and was indistinguishable from one
       // nobody started.
-      emitLinkMintStarted({ kind: opts.kind, detail: opts.detail });
+      emitLinkMintStarted({ kind: opts.kind, detail: mintDetail(opts.facts()) });
       const result = await measureAsync('link.mint', () =>
         raceTimeout(opts.mint(), MINT_TIMEOUT_MS)
       );
@@ -110,7 +154,7 @@ export function useMintedLink(opts: {
           kind: opts.kind,
           ok: false,
           errorCode: 'mint-timeout',
-          detail: opts.detail,
+          detail: mintDetail(opts.facts()),
         });
         return;
       }
@@ -120,15 +164,17 @@ export function useMintedLink(opts: {
           kind: opts.kind,
           ok: false,
           errorCode: result.errorCode,
-          ...(opts.detail ? { detail: opts.detail } : {}),
+          detail: mintDetail(opts.facts()),
         });
         return;
       }
       link.value = result.link;
+      // The ONE emit that can know the hint, because the mint has settled.
+      hint = result.hint;
       emitLinkMinted({
         kind: opts.kind,
         ok: true,
-        ...(opts.detail ? { detail: opts.detail } : {}),
+        detail: mintDetail(opts.facts(), hint),
       });
       // The QR failure path lives in `renderQr` — one warn-log for every QR in the
       // product, rather than a `catch` per call site (two of which had no log at all).
@@ -146,7 +192,7 @@ export function useMintedLink(opts: {
         kind: opts.kind,
         ok: false,
         errorCode: 'mint-threw',
-        ...(opts.detail ? { detail: opts.detail } : {}),
+        detail: mintDetail(opts.facts()),
       });
       reportError({
         surface: opts.surface,
@@ -181,7 +227,10 @@ export function useMintedLink(opts: {
         kind: opts.kind,
         ok: false,
         errorCode: 'mint-cancelled',
-        detail: opts.detail,
+        // No hint here, and it is not an omission: `cancel()` lives outside `run()`, so the
+        // run-local hint is out of scope by construction. A cancelled mint never settled, so
+        // there is nothing to report.
+        detail: mintDetail(opts.facts()),
       });
     }
     mintGeneration += 1;

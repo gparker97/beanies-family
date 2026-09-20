@@ -15,6 +15,7 @@ import NoPodEmptyState from './NoPodEmptyState.vue';
 import { features } from '@/config/features';
 import { useTranslation } from '@/composables/useTranslation';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
+import ScanFirstBlock from '@/components/login/ScanFirstBlock.vue';
 import ColdSignInPanel from '@/components/login/ColdSignInPanel.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -116,10 +117,30 @@ const showKitEntry = ref(false);
 watch(
   () => showDecryptModal.value,
   (open) => {
-    if (open && props.startInKitEntry) {
-      showKitEntry.value = true;
-      if (props.prefillKitCode) kitCodeInput.value = props.prefillKitCode;
+    if (!open || !props.startInKitEntry) return;
+    // ⚠️ FAIL OPEN, and the shape matters. A legacy password-only family tapping "use a
+    // recovery kit" used to land on a Recovery Code field over an envelope with no kit wraps.
+    // But gating on `caps.kit` being TRUE would break the open-pod escape path: `caps` derives
+    // from `pendingEncryptedFile?.envelope`, and on that path nothing is staged, so `caps` is
+    // null and a truthy check would suppress the panel greg reported as missing. Only a
+    // KNOWN-kitless envelope suppresses it — the same `!!caps.value && !caps.value.kit` shape
+    // this file already uses elsewhere.
+    if (!!caps.value && !caps.value.kit) {
+      // ⚠️ NOT A SILENT RETURN. This suppresses the kit panel for a provably kitless envelope,
+      // which is correct — but it also discards a `prefillKitCode` the user or a deep link
+      // actually supplied, so the report is "my recovery link does nothing". Without an event
+      // there is no way to tell that apart from "caps was null so we failed open" or "they
+      // never tapped it", which are three different bugs.
+      logEvent({
+        level: 'info',
+        surface: 'login-flow',
+        message: 'kit entry suppressed: envelope has no kit wraps',
+        context: { kind: props.prefillKitCode ? 'kit-prefill-discarded' : 'kit-entry-requested' },
+      });
+      return;
     }
+    showKitEntry.value = true;
+    if (props.prefillKitCode) kitCodeInput.value = props.prefillKitCode;
   }
 );
 
@@ -1165,6 +1186,26 @@ const viewState = computed<
   return 'cards';
 });
 
+/**
+ * The promoted magic-link block, on the two states that have NOTHING STAGED.
+ *
+ * ⚠️ THIS ALSO SWITCHES OFF THE HOISTED `PasteLinkPanel` BELOW, and the pairing is the point.
+ * That panel is the first thing in the `v-else` branch covering `cards`, `reconnect`,
+ * `auto-loading`, `permission-grant` and `empty`. `ScanFirstBlock` owns a paste panel of its
+ * own, so rendering both would show two, one above the other, with two "or" dividers; and
+ * putting the block anywhere below the hoisted one would ship paste-first and defeat the
+ * promotion. One `v-if` pair means exactly one paste panel renders on every state, by
+ * construction rather than by careful ordering.
+ */
+const showScanFirst = computed(
+  () => viewState.value === 'cards' || viewState.value === 'reconnect'
+);
+
+/** One mount, one surface value, derived — not one mount per state. */
+const coldSurface = computed(() =>
+  viewState.value === 'reconnect' ? 'load-pod-reconnect' : 'load-pod-cards'
+);
+
 // LoginPage always supplies the picked family's name; `?? ''` is a defensive
 // floor that never triggers in practice.
 const reconnectHeadline = computed(() =>
@@ -1849,7 +1890,11 @@ async function handleDriveRefresh() {
         works, because the link carries its own fileId. The scan panel lives on the decrypt
         step below, where a pod is in hand.
       -->
-      <div class="mb-6">
+      <!-- The promoted route, above everything, on the two unstaged states. It carries its
+           own paste panel, which is why the hoisted one below is switched off when it shows. -->
+      <ScanFirstBlock v-if="showScanFirst" :surface="coldSurface" />
+
+      <div v-else class="mb-6">
         <PasteLinkPanel />
       </div>
 
@@ -1980,12 +2025,11 @@ async function handleDriveRefresh() {
             >
               {{ t('loginV6.checkedNothingFound') }}
             </span>
-            <span
-              v-else
-              class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
-            >
-              {{ t('loginV6.recommended') }}
-            </span>
+            <!-- ⚠️ NO "RECOMMENDED" BADGE ANY MORE. It cannot stand while a different route on
+                 the same screen is flagged "fastest" — two competing recommendations is worse
+                 than none. The two branches above stay: "not configured" and "checked, nothing
+                 found" are states, not endorsements. This collapsed a three-way chain, so
+                 `loginV6.recommended` is now dead and has been removed from `uiStrings`. -->
             <div
               class="bg-primary-500/10 dark:bg-primary-500/20 mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
             >

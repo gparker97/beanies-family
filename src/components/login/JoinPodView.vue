@@ -4,6 +4,7 @@ import type { RemoteBlocker } from '@/types/sync';
 import { ref, computed, onMounted, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import MagicLinkFlow from '@/components/auth/MagicLinkFlow.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import PinInput from '@/components/ui/PinInput.vue';
@@ -11,8 +12,6 @@ import { isValidPin, PIN_LENGTH } from '@/services/auth/deviceUnlock';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
-import MintedLinkPanel from '@/components/ui/MintedLinkPanel.vue';
-import { generateInviteQR } from '@/utils/qrCode';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { POD_FILE_ACCEPT } from '@/constants/beanpodFile';
@@ -270,32 +269,6 @@ async function handleCreatePin(): Promise<void> {
   // the same tick. `handleMagicLinkSavedAndContinue` below is the hand-off.
   await flow.handleSubmitPin(pin.value);
 }
-
-/** The joiner confirmed they saved their link (or it could not be minted) — go. */
-const joinerQr = ref('');
-/**
- * ⚠️ Distinct from `!joinerQr`. The QR resolves asynchronously, so treating "empty" as
- * "failed" flashed "Couldn't draw the QR code" on every SUCCESSFUL join before it
- * arrived. `MintedLinkPanel` takes `loading` for the in-between state.
- */
-const joinerQrFailed = ref(false);
-watch(
-  () => flow.joinerMagicLink.value,
-  async (link) => {
-    joinerQr.value = '';
-    joinerQrFailed.value = false;
-    if (!link) return;
-    try {
-      joinerQr.value = await generateInviteQR(link);
-    } catch {
-      joinerQrFailed.value = true;
-      // Degraded, not fatal: `MintedLinkPanel` shows "couldn't draw the QR — use the
-      // link instead" and the copy button still works. Deliberately not reported —
-      // `useMintedLink` owns that warn for the Settings paths and a duplicate here
-      // would double-count.
-    }
-  }
-);
 
 function handleMagicLinkSavedAndContinue(): void {
   flow.handleMagicLinkSaved();
@@ -732,39 +705,31 @@ onMounted(() => {
     <template v-else-if="flow.currentStep.value === 'link-saved'">
       <div class="space-y-4">
         <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
-          {{ t('magicLink.title') }}
+          {{ t('join.success') }}
         </h2>
 
-        <template v-if="flow.joinerMagicLink.value">
-          <!-- ⚠️ `MintedLinkPanel`, not bare selectable text. This is the ONLY moment the
-               joiner can ever see this link — the token is never persisted — so the save
-               action has to be a BUTTON, not tap-to-select-then-long-press on a wrapped
-               monospace URL. The panel also brings the copy-FAILURE row, and that matters
-               here more than anywhere: `useClipboard` reports failures precisely because
-               copying IS the save action for a magic link, and that reporting is
-               unreachable from a screen with no copy call. -->
-          <MintedLinkPanel
-            :link="flow.joinerMagicLink.value"
-            :qr-url="joinerQr"
-            :qr-unavailable="joinerQrFailed"
-            :loading="!joinerQr && !joinerQrFailed"
-            :qr-alt="t('magicLink.title')"
-            :hint="t('magicLink.saveAndUse')"
-            surface="login-flow"
-          />
-          <p class="dark:text-ink-faint text-xs text-gray-500">{{ t('magicLink.needNewOne') }}</p>
-        </template>
-        <!-- Degraded, never blocking: the join already committed, so a failed mint must not
-           strand someone who IS now a member. They continue with their PIN as before. -->
-        <p v-else class="dark:text-ink-soft text-sm text-gray-600">
-          {{ t('magicLink.mintFailed') }}
-        </p>
+        <!-- ⚠️ THIS STEP NO LONGER HANDS OVER A LINK TO SAVE. It used to show a one-time 7-day
+             magic link and ask the joiner to store it, alongside the recovery kit prompt they
+             already get — two things to save, presented as equals, when only one of them cannot
+             be regenerated. A magic link takes seconds to mint from Settings; the kit is the
+             root of trust. So the link became an OFFER, minting on demand at fifteen minutes,
+             with nothing to keep.
+             ⚠️ The claim's push is no longer tied to this step either — it is now an explicit
+             publish in `useJoinFlow`, because it used to ride along with the mint that is gone. -->
+        <div class="dark:border-line rounded-2xl border border-gray-200 p-4 text-left">
+          <p class="font-outfit dark:text-ink text-sm font-bold text-gray-900">
+            {{ t('setup.alsoOnPhone') }}
+          </p>
+          <p class="dark:text-ink-soft mt-1 mb-3 text-sm text-gray-600">
+            {{ t('setup.alsoOnPhoneBody') }}
+          </p>
+          <!-- ⚠️ `gate: 'not-applicable'`. The joiner set their PIN moments ago in this same
+               flow; re-asking for it here is friction for no security. -->
+          <MagicLinkFlow origin="join" cta-label-key="setup.scanWithPhone" gate="not-applicable" />
+        </div>
 
-        <!-- ⚠️ The label follows what actually happened. On the degraded branch there is no
-             link and nothing was saved, and it still read "I've saved my link" — asking the
-             person to confirm an action they had just been told failed. -->
         <BaseButton class="w-full" type="button" @click="handleMagicLinkSavedAndContinue">
-          {{ flow.joinerMagicLink.value ? t('magicLink.savedConfirm') : t('action.continue') }}
+          {{ t('action.continue') }}
         </BaseButton>
       </div>
     </template>

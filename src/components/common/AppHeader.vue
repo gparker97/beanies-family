@@ -8,6 +8,7 @@ import ProfileMenu from '@/components/common/ProfileMenu.vue';
 import SignInCodeSheet from '@/components/auth/SignInCodeSheet.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import { isNative } from '@/services/sync/capabilities';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import SearchButton from '@/components/common/SearchButton.vue';
@@ -277,6 +278,18 @@ async function confirmSignOutAndClearData() {
     showSignOutModal.value = false;
   }
 }
+/**
+ * "Browser" on web and PWA, "device" inside the native shell.
+ *
+ * ⚠️ greg asked for "from this browser", which is the wording that makes the LOCAL-ONLY scope
+ * unmistakable — the whole point of the rename is that this clears traces from THIS machine and
+ * never touches the family registry. But the same menu renders inside the iOS and Android
+ * shells, where there is no browser to point at, so a native reader would be told to clear
+ * something they cannot see. Same action, same scope, a noun each audience recognises.
+ */
+const clearDataLabel = computed(() =>
+  isNative() ? t('auth.signOutClearDataNative') : t('auth.signOutClearData')
+);
 </script>
 
 <template>
@@ -621,7 +634,7 @@ async function confirmSignOutAndClearData() {
               :disabled="isSigningOut"
               @click="confirmSignOutAndClearData"
             >
-              🗑️ {{ t('auth.signOutClearData') }}
+              🗑️ {{ clearDataLabel }}
             </button>
             <div class="flex justify-end">
               <span class="flex items-center gap-1">

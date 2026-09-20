@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-20",
-    "translationCount": 4874
+    "translationCount": 4890
   },
   "translations": {
     "app.name": {
@@ -2427,9 +2427,9 @@
       "lastUpdated": "2026-02-24"
     },
     "auth.signOutClearData": {
-      "translation": "注销并清除数据",
-      "hash": "i2sq7g",
-      "lastUpdated": "2026-03-03"
+      "translation": "注销并清除此浏览器的所有数据",
+      "hash": "6xvqyv",
+      "lastUpdated": "2026-09-20"
     },
     "auth.selectMember": {
       "translation": "选择你的资料",
@@ -3510,11 +3510,6 @@
       "translation": "已接收",
       "hash": "cb04jj",
       "lastUpdated": "2026-03-03"
-    },
-    "loginV6.recommended": {
-      "translation": "推荐",
-      "hash": "jo0amd",
-      "lastUpdated": "2026-09-05"
     },
     "loginV6.googleDriveCardDesc": {
       "translation": "从云存储加载",
@@ -5292,9 +5287,9 @@
       "lastUpdated": "2026-03-05"
     },
     "app.initError.clearData": {
-      "translation": "注销并清除数据",
-      "hash": "i2sq7g",
-      "lastUpdated": "2026-03-05"
+      "translation": "注销并清除所有本地数据",
+      "hash": "5k5hb4",
+      "lastUpdated": "2026-09-20"
     },
     "app.initError.details": {
       "translation": "技术细节",
@@ -6397,9 +6392,9 @@
       "lastUpdated": "2026-03-09"
     },
     "auth.signOutClearDataHint": {
-      "translation": "注销并删除此设备的所有本地数据。在共享或公共设备上使用此功能。",
-      "hash": "higzxu",
-      "lastUpdated": "2026-03-09"
+      "translation": "清除此计算机上的所有数据痕迹。如果您使用的是共享设备，则非常有用。您的家庭数据本身不受影响，因此您可以在此处或其他任何地方重新登录。",
+      "hash": "r6y9dv",
+      "lastUpdated": "2026-09-20"
     },
     "transactions.editingProjected": {
       "translation": "编辑{date}的预计交易",
@@ -21057,29 +21052,24 @@
       "lastUpdated": "2026-08-28"
     },
     "deviceLink.title": {
-      "translation": "连接设备",
-      "hash": "1zu89n",
-      "lastUpdated": "2026-08-28"
+      "translation": "快速魔术链接",
+      "hash": "2txczk",
+      "lastUpdated": "2026-09-20"
     },
     "deviceLink.description": {
-      "translation": "在新手机或电脑上登录？向其出示此二维码（或发送链接） ，然后使用PIN登录。其他设备需要0.14或更高版本的beanies。",
-      "hash": "9l54cb",
-      "lastUpdated": "2026-08-28"
-    },
-    "deviceLink.mint": {
-      "translation": "创建链接",
-      "hash": "ifsmn2",
-      "lastUpdated": "2026-08-28"
+      "translation": "现在在新手机或电脑上登录？创建一个魔术链接，使用该设备的摄像头扫描，然后使用您的PIN登录。",
+      "hash": "it2u7q",
+      "lastUpdated": "2026-09-20"
     },
     "deviceLink.mintFailed": {
-      "translation": "无法创建设备链接。请检查您的网络连接，然后重试。",
-      "hash": "19kfpq",
-      "lastUpdated": "2026-08-28"
+      "translation": "无法创建魔术链接。请检查您的网络连接，然后重试。",
+      "hash": "s2ieet",
+      "lastUpdated": "2026-09-20"
     },
     "deviceLink.expiryNote": {
-      "translation": "此链接有效期为15分钟，只能与家庭PIN码一起使用。",
-      "hash": "ni3i8p",
-      "lastUpdated": "2026-08-28"
+      "translation": "此魔术链接有效期为15分钟，只能与家庭密码一起使用。",
+      "hash": "z5c9nq",
+      "lastUpdated": "2026-09-20"
     },
     "setup.choosePinLabel": {
       "translation": "选择",
@@ -21107,9 +21097,9 @@
       "lastUpdated": "2026-09-09"
     },
     "loginFlow.recoveryOnlyBody": {
-      "translation": "此设备上的任何内容都无法打开此Beanpod —请使用您的恢复工具包、家庭密码或其他家庭设备的设备链接。",
-      "hash": "10xcay",
-      "lastUpdated": "2026-09-10"
+      "translation": "此设备上尚无任何内容可以打开此Beanpod。使用您的恢复工具包、家庭密码或来自其他家庭设备的神奇链接。",
+      "hash": "3l75it",
+      "lastUpdated": "2026-09-20"
     },
     "join.choosePinLabel": {
       "translation": "您的PIN码",
@@ -21117,9 +21107,9 @@
       "lastUpdated": "2026-08-28"
     },
     "join.pinHint": {
-      "translation": "要稍后在全新设备上登录，请使用设备链接或恢复工具包。此设备需要 beanies 0.14 或更高版本。",
-      "hash": "ns7m1q",
-      "lastUpdated": "2026-09-10"
+      "translation": "要稍后登录全新设备，请使用魔术链接或恢复工具包。",
+      "hash": "5bj793",
+      "lastUpdated": "2026-09-20"
     },
     "passkey.webRetired": {
       "translation": "在适用于iPhone和Android的beanies应用程序中，人脸识别和指纹会实时解锁。在浏览器中，您可以快速输入6位数PIN码，无需在此处进行设置。",
@@ -21132,9 +21122,9 @@
       "lastUpdated": "2026-08-28"
     },
     "deviceLink.publishFailed": {
-      "translation": "链接无法发布到您的家庭文件—请检查您的连接，然后重试。",
-      "hash": "dl2izp",
-      "lastUpdated": "2026-08-28"
+      "translation": "无法将魔术链接保存到您的家庭文件。请检查您的网络连接，然后重试。",
+      "hash": "u6lc2f",
+      "lastUpdated": "2026-09-20"
     },
     "bean.hero.invite": {
       "translation": "邀请{name}",
@@ -23992,9 +23982,9 @@
       "lastUpdated": "2026-09-18"
     },
     "deviceApproval.badCode": {
-      "translation": "该代码不是Beanies登录代码。",
-      "hash": "9fzbbc",
-      "lastUpdated": "2026-09-18"
+      "translation": "这不是Beanies批准代码。",
+      "hash": "rikx9f",
+      "lastUpdated": "2026-09-20"
     },
     "deviceApproval.publishFailed": {
       "translation": "我们无法将审批保存到您的家庭文件，因此其他设备无法看到。请检查您的网络连接，然后重试。",
@@ -24061,35 +24051,25 @@
       "hash": "e3rks5",
       "lastUpdated": "2026-09-18"
     },
-    "signInCode.lead": {
-      "translation": "显示您的其他设备可以扫描以登录的代码。",
-      "hash": "eujaga",
-      "lastUpdated": "2026-09-18"
-    },
-    "signInCode.mint": {
-      "translation": "显示代码",
-      "hash": "oi23un",
-      "lastUpdated": "2026-09-18"
-    },
     "signInCode.pinReason": {
-      "translation": "此代码可打开您全家的beanpod ，因此值得快速检查一下是否是您本人。",
-      "hash": "gr6h5l",
-      "lastUpdated": "2026-09-18"
+      "translation": "这个神奇的链接打开了您全家的豆荚，所以值得快速检查一下是否是您。",
+      "hash": "jh5r47",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.notProved": {
-      "translation": "未创建任何代码。您可以随时重试。",
-      "hash": "3lhwvv",
-      "lastUpdated": "2026-09-18"
+      "translation": "未创建任何魔术链接。您可以随时重试。",
+      "hash": "19cwkl",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.scanLead": {
-      "translation": "使用其他设备扫描此代码以登录",
-      "hash": "qtvvgt",
-      "lastUpdated": "2026-09-19"
+      "translation": "使用家庭成员设备上的摄像头扫描此链接，以便他们登录。",
+      "hash": "nyq2fm",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.qrAlt": {
-      "translation": "要在其他设备上扫描的代码",
-      "hash": "xao8t",
-      "lastUpdated": "2026-09-18"
+      "translation": "在其他设备上扫描的魔术链接",
+      "hash": "8cbacj",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.expiryNote": {
       "translation": "可在接下来的15分钟内使用。",
@@ -24097,9 +24077,9 @@
       "lastUpdated": "2026-09-18"
     },
     "magicLink.title": {
-      "translation": "您的豆豆魔术链接",
-      "hash": "3mqscz",
-      "lastUpdated": "2026-09-18"
+      "translation": "魔术链接",
+      "hash": "kyduti",
+      "lastUpdated": "2026-09-20"
     },
     "magicLink.creationLead": {
       "translation": "使用以下链接在新设备上登录。有效期为7天。随时在“设置”中创建新链接。",
@@ -24127,9 +24107,9 @@
       "lastUpdated": "2026-09-18"
     },
     "magicLink.settingsDesc": {
-      "translation": "用于解锁家庭文件的链接，以便您可以使用PIN码登录新设备。持续7天。",
-      "hash": "yvfny4",
-      "lastUpdated": "2026-09-18"
+      "translation": "创建在另一台设备上为家庭成员登录的链接。他们用自己的大头针完成。每个链接持续15分钟。",
+      "hash": "hknmad",
+      "lastUpdated": "2026-09-20"
     },
     "magicLink.statusNone": {
       "translation": "无活动链接。",
@@ -24142,9 +24122,9 @@
       "lastUpdated": "2026-09-18"
     },
     "magicLink.statusExpired": {
-      "translation": "您的上一个链接已于{date}过期。",
-      "hash": "396uza",
-      "lastUpdated": "2026-09-18"
+      "translation": "最后一个链接已于{date}过期。",
+      "hash": "vagth9",
+      "lastUpdated": "2026-09-20"
     },
     "magicLink.create": {
       "translation": "创建魔术链接",
@@ -24212,9 +24192,9 @@
       "lastUpdated": "2026-09-18"
     },
     "coldEntry.pushTitle": {
-      "translation": "扫描Beanies二维码",
-      "hash": "xre3w1",
-      "lastUpdated": "2026-09-19"
+      "translation": "扫描魔术链接",
+      "hash": "pi41o1",
+      "lastUpdated": "2026-09-20"
     },
     "coldEntry.pushStep1": {
       "translation": "在已登录的设备上，打开应用并轻触您的个人资料。",
@@ -24227,19 +24207,19 @@
       "lastUpdated": "2026-09-19"
     },
     "coldEntry.showMyCode": {
-      "translation": "改为显示我的二维码",
-      "hash": "3wz38d",
-      "lastUpdated": "2026-09-19"
+      "translation": "改为显示我的审批代码",
+      "hash": "ipwhrv",
+      "lastUpdated": "2026-09-20"
     },
     "coldEntry.scanInstead": {
-      "translation": "改用此设备扫描验证码",
-      "hash": "t6ys35",
-      "lastUpdated": "2026-09-19"
+      "translation": "改用此设备扫描魔术链接",
+      "hash": "m3g3u7",
+      "lastUpdated": "2026-09-20"
     },
     "deviceApproval.expiredToast": {
-      "translation": "该登录码已过期。向另一台设备索取新设备。",
-      "hash": "mdhzd2",
-      "lastUpdated": "2026-09-19"
+      "translation": "该审批代码已过期。出示一个新的，然后再次扫描。",
+      "hash": "9pfzqb",
+      "lastUpdated": "2026-09-20"
     },
     "qrScan.stillReading": {
       "translation": "还在看最后一张照片，请稍等。",
@@ -24277,9 +24257,9 @@
       "lastUpdated": "2026-09-19"
     },
     "qrScan.wrongCodeInvite": {
-      "translation": "这是邀请链接，不是登录代码。",
-      "hash": "oftzqf",
-      "lastUpdated": "2026-09-19"
+      "translation": "这是一个加入的链接，而不是一个神奇的链接。",
+      "hash": "xsao01",
+      "lastUpdated": "2026-09-20"
     },
     "qrScan.wrongCodeKit": {
       "translation": "这是您的恢复工具包代码。您可以使用它，但在“使用我的恢复工具包”屏幕上。",
@@ -24352,13 +24332,13 @@
       "lastUpdated": "2026-09-19"
     },
     "coldEntry.pushStep3": {
-      "translation": "打开相机并扫描二维码。",
-      "hash": "o9plzb",
-      "lastUpdated": "2026-09-19"
+      "translation": "打开相机并扫描魔术链接。",
+      "hash": "cqptx8",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.gateLead": {
-      "translation": "创建一个魔术链接，以便使用其他设备的摄像头进行扫描",
-      "hash": "313qys",
+      "translation": "为自己或家人创建一个神奇的链接，以便登录Bean。",
+      "hash": "htymhx",
       "lastUpdated": "2026-09-20"
     },
     "signInCode.createLink": {
@@ -24367,14 +24347,114 @@
       "lastUpdated": "2026-09-19"
     },
     "signInCode.orScanHint": {
-      "translation": "已在其他设备上看到二维码？使用此设备的摄像头扫描以登录。",
-      "hash": "e81efs",
+      "translation": "已经在您的其他设备上看到了魔术链接？使用此设备的摄像头扫描以登录。",
+      "hash": "jknfmp",
       "lastUpdated": "2026-09-20"
     },
     "magicLink.pasteHelp": {
       "translation": "魔术链接或加入链接都可以使用，您也可以使用相机扫描一个。",
       "hash": "3d3sb5",
       "lastUpdated": "2026-09-19"
+    },
+    "auth.signOutClearDataNative": {
+      "translation": "注销并清除此设备的所有数据",
+      "hash": "xe6z6x",
+      "lastUpdated": "2026-09-20"
+    },
+    "deviceLink.mintedHint": {
+      "translation": "将另一台设备的摄像头对准此处，然后使用您的PIN登录。该设备需要0.14或更高版本的beanies。",
+      "hash": "gttek1",
+      "lastUpdated": "2026-09-20"
+    },
+    "coldEntry.fastestFlag": {
+      "translation": "极快",
+      "hash": "9psyoa",
+      "lastUpdated": "2026-09-20"
+    },
+    "coldEntry.scanFirstTitle": {
+      "translation": "扫描魔术链接",
+      "hash": "pi41o1",
+      "lastUpdated": "2026-09-20"
+    },
+    "coldEntry.scanFirstWhy": {
+      "translation": "已在其他设备上登录？它可以让这个直接进入，没有密码和恢复代码。",
+      "hash": "irobr7",
+      "lastUpdated": "2026-09-20"
+    },
+    "setup.alsoOnPhone": {
+      "translation": "还在手机上戴着便帽？",
+      "hash": "t2aj9",
+      "lastUpdated": "2026-09-20"
+    },
+    "setup.alsoOnPhoneBody": {
+      "translation": "安装应用，然后扫描魔术链接即可登录。您可以随时从“设置”中执行此操作，因此现在没有任何内容可以保存。",
+      "hash": "g4hirb",
+      "lastUpdated": "2026-09-20"
+    },
+    "setup.scanWithPhone": {
+      "translation": "使用手机扫描魔术链接",
+      "hash": "hge87e",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.whichBeanieLoggingIn": {
+      "translation": "哪个豆豆正在登录？",
+      "hash": "b1a8ac",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.pickToContinue": {
+      "translation": "选择此链接的用户。他们将使用自己的PIN码登录。",
+      "hash": "cggh8i",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.pickSomeoneElse": {
+      "translation": "为其他人创建一个",
+      "hash": "r3gzvg",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.createFor": {
+      "translation": "为{name}创建神奇链接",
+      "hash": "de5ijm",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.createWarningFor": {
+      "translation": "这取消了{name}现在持有的魔术链接。",
+      "hash": "xfrgkd",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.statusForMember": {
+      "translation": "显示{name}的魔术链接。",
+      "hash": "kfzn83",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.notJoinedBadge": {
+      "translation": "未加入",
+      "hash": "nisczu",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.pickerEmpty": {
+      "translation": "家里还没有其他人可以挑。",
+      "hash": "h6f1cw",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.routeToInvite": {
+      "translation": "{name}尚未加入，因此他们需要一个加入链接。他们还可以访问您的家庭文件。",
+      "hash": "vvp40m",
+      "lastUpdated": "2026-09-20"
+    },
+    "magicLink.routeToInviteAction": {
+      "translation": "向{name}发送加入链接",
+      "hash": "ma9wk2",
+      "lastUpdated": "2026-09-20"
+    },
+    "coldEntry.pushStep3Desktop": {
+      "translation": "将链接发送给自己，然后将其粘贴到下方。",
+      "hash": "90qibf",
+      "lastUpdated": "2026-09-20"
+    },
+    "coldEntry.haveLinkInstead": {
+      "translation": "我有一个神奇的链接",
+      "hash": "dch5ld",
+      "lastUpdated": "2026-09-20"
     }
   }
 }

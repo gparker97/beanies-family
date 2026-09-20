@@ -256,6 +256,42 @@ watch(
 // Open a member's edit modal from a deep link (?edit=<id> — from Family Nook or
 // global search). Robust to cold-start: only clears the param once the member is
 // found, and retries when the family store hydrates.
+// Open a member's INVITE wizard from a deep link (?invite=<id>). This is how the magic-link
+// mint surfaces route a member who has not joined yet: a magic link would hand them a wrap
+// sitting in an envelope their Google account has no permission to read, whereas the invite
+// flow is the only path that performs the Drive permission share.
+//
+// ⚠️ A ROUTE, NOT A NESTED MODAL. `SignInCodeSheet` is itself a `BaseModal` with no focus trap
+// and a documented re-entrancy hazard, so mounting `InviteWizardModal` from inside it would
+// have made a three-deep dialog stack. Navigating here reuses the wizard that already exists,
+// on the page that already hosts it, and makes invites deep-linkable as a side effect.
+//
+// Same cold-start guarantee as `?edit=` below: the param survives until the member is actually
+// found, so arriving before the roster hydrates retries rather than silently dropping it.
+useDeepLinkParam({
+  param: 'invite',
+  open: (id) => {
+    const member = familyStore.members.find((m) => m.id === id);
+    if (!member) return false;
+    // ⚠️ THE SAME THREE GUARDS THE BUTTON CARRIES. `BeanCard`'s invite control is
+    // `v-if="member.requiresPassword && !member.isPet && canManage"` with
+    // `:disabled="!inviteAvailable"`. A URL is a control too: without these, any signed-in
+    // member could hand-craft, bookmark or share `/pod?invite=<any-member-id>` and run a wizard
+    // that performs two Drive permission writes and an `inviteKeys` write — for a member they
+    // may not invite, and (with `requiresPassword` unchecked) for an ALREADY-JOINED member whose
+    // classic invite can never be claimed, since that flow serves unclaimed members only.
+    //
+    // Returning FALSE rather than clearing the param is deliberate: `useDeepLinkParam` only
+    // clears on a successful open, so a link that arrives before the roster hydrates is retried
+    // rather than silently dropped. An unauthorised link simply never opens anything.
+    if (!member.requiresPassword || member.isPet) return false;
+    if (!canManagePod.value || !inviteAvailable.value) return false;
+    openShareModal(member);
+    return true;
+  },
+  ready: () => familyStore.members.length,
+});
+
 useDeepLinkParam({
   param: 'edit',
   open: (id) => {

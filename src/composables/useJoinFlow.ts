@@ -50,8 +50,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
 import { refuseMagicLink, type MagicLinkRefusal } from '@/services/auth/magicLink';
-import { emitLinkMinted, emitLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
-import { mintMagicLink } from '@/services/auth/linkMint';
+import { emitLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 
 // ─── State machine + error registry ──────────────────────────────────────────
 
@@ -1404,9 +1403,10 @@ export function useJoinFlow() {
       // is how a 5s link-publish budget expired before its upload had even started, and why
       // a joiner on a perfectly good connection was told "your link wasn't saved".
       //
-      // The mint below stages its wrap in the envelope and then runs ONE publish that
-      // carries both. The fallback after `mintJoinerMagicLink` covers the case where that
-      // publish never happens, so the claim is never left to the autosave timer alone.
+      // The claim's push is therefore its own explicit step below, AFTER this transaction
+      // returns — one push, on purpose. It used to ride along with the joiner's magic-link
+      // mint; that link is gone (setup asks nobody to save one now), so the push that carries
+      // this hash to the family file had to stop being a side effect of something else.
       return true;
     });
     if (!ok) {
@@ -1422,96 +1422,46 @@ export function useJoinFlow() {
     // The denominator. Without it the firehose can count failed joins but never the rate.
     emitJoinCompleted();
 
-    // ⚠️ THE ONE MOMENT THE JOINER CAN EVER SEE THEIR LINK. The token is never persisted,
-    // so if it is not shown now it is gone — minted and destroyed in the same tick, a dead
-    // entry in the envelope and a member with no saved way back in. Hence a step rather
-    // than a toast.
-    const published = await mintJoinerMagicLink(selectedMember.value.id);
-    if (!published) {
-      // The mint's publish is what carries the PIN hash to the file as well. If it never
-      // ran (the mint threw before staging) or did not confirm, push once more rather than
-      // leaving the claim to the autosave timer. Best-effort by design: the person is
-      // already a member on this device either way, so this must not block the step.
-      // Outcome recorded, not discarded: this is the write that carries the joiner's PIN
-      // hash to the family file. If it fails the claim is local-only, the inviter still
-      // sees the bean unclaimed, and without this event the firehose cannot tell us how
-      // often that happens. Emitted on BOTH arms so the rate is measurable, per the
-      // observability rule.
-      void syncStore.syncNowBounded().then((ok) =>
-        logEvent({
-          level: ok ? 'info' : 'warn',
-          surface: 'join-flow',
-          message: 'join claim fallback publish',
-          context: { action: 'join_claim_fallback', error_code: ok ? undefined : 'not-saved' },
-        })
-      );
-    }
+    // ⚠️ PUBLISH THE CLAIM ON PURPOSE. THIS IS NOT BOOKKEEPING.
+    //
+    // `joinFamily` wrote the joiner's PIN hash locally and deliberately did NOT publish (see
+    // the comment above it: two pushes queued behind each other on the save mutex, which is how
+    // a 5s budget expired before its upload had even started). The push that carried the hash to
+    // the family file used to be a SIDE EFFECT of minting the joiner's magic link — the link
+    // publish took both up together, with a fallback for when it did not run.
+    //
+    // That magic link is gone (setup no longer asks anyone to save one; it is an offer now), so
+    // the claim needs its own push or it would be left to the autosave timer. The failure this
+    // prevents is invisible from the joiner's side: they are in the pod on this device either
+    // way, and the only place it shows is the INVITER's family view, where the bean still reads
+    // "not joined".
+    //
+    // Still best-effort and non-blocking by design: this person really is a member on this
+    // device, and a failed push converges on the next save. The outcome is RECORDED on both
+    // arms so the rate is measurable, per the observability rule — an event that only fires on
+    // failure cannot tell you the failure rate. Uses the credential budget, which is what the
+    // link publish it replaces used.
+    void syncStore.syncNowBounded(syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS).then((ok) =>
+      logEvent({
+        level: ok ? 'info' : 'warn',
+        surface: 'join-flow',
+        message: 'join claim publish',
+        context: { action: 'join_claim_publish', error_code: ok ? undefined : 'not-saved' },
+      })
+    );
+
     currentStep.value = 'link-saved';
     return true;
   }
 
-  /** The joiner's magic link, shown once on the `link-saved` step. */
-  const joinerMagicLink = ref('');
-  /** A `uiStrings` key when the mint failed. The step degrades; it never blocks. */
-  const joinerMagicLinkErrorKey = ref('');
-
   /**
-   * Mint the joiner's link. BEST-EFFORT, for the same reason the creation step is: this
-   * runs AFTER `joinFamily` has already committed, so a failure here must not strand
-   * someone who is, at this point, genuinely a member of the family. They reach the app
-   * with their PIN exactly as before, plus a pointer to Settings.
+   * The joiner confirmed the hand-off step and is moving on.
+   *
+   * ⚠️ THERE IS NOTHING TO DROP ANY MORE. This used to clear a one-time magic link the step had
+   * shown. Setup no longer hands anyone a link to save — the kit is the only thing worth saving,
+   * and a magic link is an offer that mints on demand — so this is now just the advance.
    */
-  async function mintJoinerMagicLink(memberId: string): Promise<boolean> {
-    joinerMagicLink.value = '';
-    joinerMagicLinkErrorKey.value = '';
-    try {
-      // ⚠️ The JOIN budget explicitly, not the default. This step's whole job is to hand
-      // over the link and there is nothing behind it, so it can afford to wait; the
-      // creation and Settings mints deliberately cannot. That is why `linkMint` takes
-      // the timeout as a parameter rather than owning a constant.
-      const result = await mintMagicLink({
-        memberId,
-        publishTimeoutMs: syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS,
-      });
-      if ('errorKey' in result) {
-        joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
-        emitLinkMinted({
-          kind: 'magic',
-          ok: false,
-          errorCode: result.errorCode,
-          detail: 'origin=join',
-        });
-        if (result.errorCode === 'publish-failed') {
-          reportError({
-            surface: 'login-flow',
-            message: 'joiner magic link never reached the durable file',
-            severity: 'critical',
-            context: { action: 'publish_failed', kind: 'magic' },
-          });
-        }
-        return false;
-      }
-      joinerMagicLink.value = result.link;
-      emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=join' });
-      return true;
-    } catch (e) {
-      joinerMagicLinkErrorKey.value = 'magicLink.mintFailed';
-      emitLinkMinted({ kind: 'magic', ok: false, errorCode: 'mint-threw', detail: 'origin=join' });
-      reportError({
-        surface: 'login-flow',
-        message: 'joiner magic link mint threw; continuing without it',
-        severity: 'error',
-        error: e,
-        context: { action: 'mint_threw', kind: 'magic' },
-      });
-      return false;
-    }
-  }
-
-  /** The joiner confirmed they saved it — drop the link and hand off. */
-  function handleMagicLinkSaved(): void {
-    joinerMagicLink.value = '';
-  }
+  function handleMagicLinkSaved(): void {}
 
   // ─── View-side modal toggle for the "Continue on another device" recovery ──
   const showShareFallback = ref(false);
@@ -1657,8 +1607,6 @@ export function useJoinFlow() {
     handleSubmitPin,
     linkMode,
     magicLinkMemberId,
-    joinerMagicLink,
-    joinerMagicLinkErrorKey,
     handleMagicLinkSaved,
     handleTryAnotherDevice,
     clearError,

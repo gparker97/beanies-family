@@ -20,6 +20,10 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/services/telemetry/loginFlowEvents', () => ({
   emitEnvelopeCapabilitiesChanged: vi.fn(),
   emitProveMethodsResolved: vi.fn(),
+  // Added when `ScanFirstBlock` started mounting on the `cards` and `reconnect` states: it
+  // emits the cold-surface denominator on mount, and a partial module mock makes that a hard
+  // error rather than a no-op. Listing it here keeps this spec about the credential surface.
+  emitColdUnlockStarted: vi.fn(),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 

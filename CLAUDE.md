@@ -299,6 +299,18 @@ series that each answer one, and never re-run a search to re-read output already
 | Last Saved          | Last Sync                                                              |
 | Saving...           | Syncing...                                                             |
 | counting beans...   | Loading...                                                             |
+| magic link          | device link, sign-in code, QR code (as a sign-in noun)                 |
+| joining link        | invite link (for a member who has not joined yet)                      |
+
+> **Every link or QR code that facilitates sign-in is a "magic link", whatever its duration**
+> (15 minutes, 7 days, anything else). Decided 2026-09-20. The duration split had leaked into
+> the UI and produced two names for one idea, so there is now exactly one user-facing noun.
+> A **joining link** remains the correct name for a member who has not yet joined, because
+> that path also grants Drive access and is genuinely a different thing.
+>
+> This governs user-facing copy, `uiStrings.ts` values, and docs. It does **not** rename the
+> persisted envelope dicts (`memberLinkKeys`, `inviteKeys`) or internal identifiers, which are
+> data format: renaming those is a migration, not a rename.
 
 ## Code Conventions
 

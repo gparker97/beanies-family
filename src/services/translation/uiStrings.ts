@@ -3686,9 +3686,9 @@ const STRING_DEFS = {
     beanie: 'your data is saved and will be here when you come back.',
   },
   'auth.signOutClearDataHint': {
-    en: 'Signs out and removes all local data from this device. Use this on shared or public devices.',
+    en: 'Clears all traces of your data from this computer. Useful if you\u2019re on a shared device. Your family data itself is untouched, so you can sign back in here or anywhere else.',
     beanie:
-      "use this on shared or public devices - signs out and removes all local data from this device. don't worry - your data is safe with you and we'll find it again when you come back.",
+      'clears all traces of your data from this computer. useful if you\u2019re on a shared device. your family data itself is untouched, so you can sign back in here or anywhere else.',
   },
   'settings.familyData.signedInAs': {
     en: 'Signed in with',
@@ -3971,7 +3971,19 @@ const STRING_DEFS = {
     en: 'Keep data cached locally (unecrypted) between sign-ins for faster access',
     beanie: 'keep data cached locally (unecrypted) between sign-ins for faster access',
   },
-  'auth.signOutClearData': { en: 'Sign Out & Clear Data', beanie: 'sign out & clear data' },
+  // ⚠️ TWO LABELS, BECAUSE "BROWSER" IS A LIE INSIDE THE NATIVE APP. greg asked for "from this
+  // browser", which is right on web and PWA and is the wording that makes the LOCAL-ONLY scope
+  // unmistakable. But the same menu renders inside the iOS and Android shells, where there is no
+  // browser the person can point at, so the native build says "device" instead. Same action,
+  // same scope, a noun each audience recognises.
+  'auth.signOutClearData': {
+    en: 'Sign Out & Clear All Data From This Browser',
+    beanie: 'sign out & clear all data from this browser',
+  },
+  'auth.signOutClearDataNative': {
+    en: 'Sign Out & Clear All Data From This Device',
+    beanie: 'sign out & clear all data from this device',
+  },
 
   // File-based auth
   'auth.selectMember': { en: 'Select your profile', beanie: 'select your profile' },
@@ -4944,7 +4956,6 @@ const STRING_DEFS = {
     en: 'Reconnect to Google to load {familyName}',
     beanie: 'reconnect to google to load {familyName}',
   },
-  'loginV6.recommended': { en: 'Recommended', beanie: 'recommended' },
   // ── Login-flow recovery panel (2026-08-28 login rethink) ──
   'loginFlow.recoveryTitle': { en: "You're Verified", beanie: "you're in — almost!" },
   'loginFlow.recoveryAuthBody': {
@@ -4994,25 +5005,45 @@ const STRING_DEFS = {
       'every device and member using this google account with beanies will lose access until they reconnect. continue?',
   },
   // ── Recovery kit + passphrase (login rethink Phase 3) ──
-  'deviceLink.title': { en: 'Link a Device', beanie: 'link a device' },
+  'deviceLink.title': { en: 'Quick Magic Link', beanie: 'quick magic link' },
   'deviceLink.description': {
-    en: 'Signing in on a new phone or computer? Show this QR code to it (or send the link) — then sign in there with your PIN. The other device needs beanies 0.14 or later.',
+    en: 'Signing in on a new phone or computer right now? Create a magic link, scan it with that device’s camera, then sign in there with your PIN.',
     beanie:
-      'signing in on a new phone or computer? show this qr code to it (or send the link) — then sign in there with your pin.',
+      'signing in on a new phone or computer right now? create a magic link, scan it with that device’s camera, then sign in there with your pin.',
   },
-  'deviceLink.mint': { en: 'Create Link', beanie: 'create link' },
+  // ⚠️ RESTORED AFTER AN ACCIDENTAL DELETION. A regex meant to remove the orphaned
+  // `deviceLink.mint` label was non-greedy across lines, so starting at a SINGLE-LINE entry it
+  // ran on to the next `\n  },` and swallowed this block too. `useMintedLink` reads this key on
+  // both the watchdog and the throw paths, so losing it would have rendered a raw key to the
+  // user at exactly the moment a mint failed.
   'deviceLink.mintFailed': {
-    en: "Couldn't create the device link. Check your connection and try again.",
-    beanie: "couldn't create the device link. check your connection and try again.",
+    en: "Couldn't create the magic link. Check your connection and try again.",
+    beanie: "couldn't create the magic link. check your connection and try again.",
   },
   'deviceLink.publishFailed': {
-    en: "The link couldn't be published to your family file — check your connection and try again.",
+    en: "The magic link couldn't be saved to your family file. Check your connection and try again.",
     beanie:
-      "the link couldn't be published to your family file — check your connection and try again.",
+      "the magic link couldn't be saved to your family file. check your connection and try again.",
+  },
+  // ⚠️ A SEPARATE KEY FROM `deviceLink.description`, AND NOT INTERCHANGEABLE. That one is the
+  // pre-mint instruction on the card; this is the caption under the finished QR. Binding the
+  // pre-mint copy here told the person to "create a magic link" while looking at the one they
+  // had just created, and the likely recovery — tap back and mint again — destroys the first on
+  // the sibling card's newest-wins path.
+  //
+  // It also carries the wire-compat warning the rewrite dropped:
+  // `inviteService.ts:157-158` still states of `lk=1` that "the mint card's copy says the other
+  // device needs 0.14+", and there is no version check anywhere, so a `lk=1` QR shown to a
+  // pre-0.14 client falls through to the unclaimed-only claim flow and fails with a message
+  // about invites.
+  'deviceLink.mintedHint': {
+    en: 'Point the other device\u2019s camera at this, then sign in there with your PIN. That device needs beanies 0.14 or later.',
+    beanie:
+      'point the other device\u2019s camera at this, then sign in there with your pin. that device needs beanies 0.14 or later.',
   },
   'deviceLink.expiryNote': {
-    en: 'This link works for 15 minutes and can only be used with a family PIN.',
-    beanie: 'this link works for 15 minutes and can only be used with a family pin.',
+    en: 'This magic link works for 15 minutes and can only be used with a family PIN.',
+    beanie: 'this magic link works for 15 minutes and can only be used with a family pin.',
   },
   'recovery.podNotOpen': {
     en: 'Your family data must be open to do this.',
@@ -5269,9 +5300,9 @@ const STRING_DEFS = {
       'sign in with a quick 6-digit pin instead of your password. set one up now or later in settings.',
   },
   'loginFlow.recoveryOnlyBody': {
-    en: 'Nothing on this device can open this beanpod yet — use your recovery kit, your family passphrase, or a device link from another family device.',
+    en: 'Nothing on this device can open this beanpod yet. Use your recovery kit, your family passphrase, or a magic link from another family device.',
     beanie:
-      'nothing on this device can open this beanpod yet — use your recovery kit, your family passphrase, or a device link from another family device.',
+      'nothing on this device can open this beanpod yet. use your recovery kit, your family passphrase, or a magic link from another family device.',
   },
   'loginFlow.inviteNeededBody': {
     en: "This grown-up bean needs its own invite before it can be opened. Ask someone in your family to invite you from The Pod, and they'll send you a link that lets you set your own PIN.",
@@ -5497,8 +5528,8 @@ const STRING_DEFS = {
   'join.createPinAndSignIn': { en: 'Create PIN & Sign In', beanie: 'create pin & sign in' },
   'join.choosePinLabel': { en: 'Your PIN', beanie: 'your pin' },
   'join.pinHint': {
-    en: 'To sign in on a brand-new device later, use a device link or your recovery kit — this device needs beanies 0.14 or later.',
-    beanie: 'to sign in on a brand-new device later, use a device link or your recovery kit.',
+    en: 'To sign in on a brand-new device later, use a magic link or your recovery kit.',
+    beanie: 'to sign in on a brand-new device later, use a magic link or your recovery kit.',
   },
   'join.completing': { en: 'Joining your family...', beanie: 'joining your family...' },
   'join.success': { en: 'Welcome to the family!', beanie: 'welcome to your pod!' },
@@ -5672,8 +5703,8 @@ const STRING_DEFS = {
   },
   'deviceApproval.tryAgain': { en: 'Show a new one', beanie: 'show a new one' },
   'coldEntry.pushTitle': {
-    en: 'Scan a beanies QR Code',
-    beanie: 'scan a beanies qr code',
+    en: 'Scan a Magic Link',
+    beanie: 'scan a magic link',
   },
   // ⚠️ THREE STEPS, AND THE THIRD IS THE ONE ABOUT *THIS* DEVICE. greg asked for the camera
   // instruction as a separate line; it became step 3 instead, because steps 1 and 2 are about
@@ -5687,20 +5718,20 @@ const STRING_DEFS = {
     beanie: 'choose sign in another device and create a magic link.',
   },
   'coldEntry.pushStep3': {
-    en: 'Open your camera and scan the QR code.',
-    beanie: 'open your camera and scan the qr code.',
+    en: 'Open your camera and scan the magic link.',
+    beanie: 'open your camera and scan the magic link.',
   },
   'coldEntry.showMyCode': {
-    en: 'Show my QR code instead',
-    beanie: 'show my qr code instead',
+    en: 'Show my approval code instead',
+    beanie: 'show my approval code instead',
   },
   'coldEntry.scanInstead': {
-    en: 'Scan a code with this device instead',
-    beanie: 'scan a code with this device instead',
+    en: 'Scan a magic link with this device instead',
+    beanie: 'scan a magic link with this device instead',
   },
   'deviceApproval.expiredToast': {
-    en: 'That sign-in code expired. Ask the other device for a new one.',
-    beanie: 'that sign-in code expired. ask the other device for a new one.',
+    en: 'That approval code expired. Show a new one and scan it again.',
+    beanie: 'that approval code expired. show a new one and scan it again.',
   },
   'qrScan.stillReading': {
     en: 'Still reading the last photo, one moment.',
@@ -5732,8 +5763,8 @@ const STRING_DEFS = {
       'that\u2019s the code a signed-out device shows. you need the code from a device that\u2019s already signed in.',
   },
   'qrScan.wrongCodeInvite': {
-    en: 'That\u2019s an invite link, not a sign-in code.',
-    beanie: 'that\u2019s an invite link, not a sign-in code.',
+    en: 'That\u2019s a joining link, not a magic link.',
+    beanie: 'that\u2019s a joining link, not a magic link.',
   },
   'qrScan.wrongCodeKit': {
     en: 'That\u2019s your recovery kit code. You can use it, but on the \u201cuse my recovery kit\u201d screen.',
@@ -5761,8 +5792,8 @@ const STRING_DEFS = {
     beanie: 'that didn\u2019t work. you can try again, or use one of the other ways in below.',
   },
   'deviceApproval.badCode': {
-    en: 'That code wasn\u2019t a beanies sign-in code.',
-    beanie: 'that code wasn\u2019t a beanies sign-in code.',
+    en: 'That wasn\u2019t a beanies approval code.',
+    beanie: 'that wasn\u2019t a beanies approval code.',
   },
   'deviceApproval.publishFailed': {
     en: 'We couldn\u2019t save the approval to your family file, so the other device won\u2019t see it. Check your connection and try again.',
@@ -5813,6 +5844,20 @@ const STRING_DEFS = {
     en: 'Yes, I Scanned This and the Codes Match',
     beanie: 'yes, i scanned this and the codes match',
   },
+  // The promoted block on the unstaged cold surfaces (`cards`, `reconnect`). `coldEntry.` is an
+  // important prefix in `uiStrings.test.ts`, so these `beanie` values keep the real nouns
+  // (magic link, password, recovery code) and only drop case. A reader who does not know the
+  // joke must still be able to act correctly on a sign-in screen.
+  'coldEntry.fastestFlag': { en: 'Fastest', beanie: 'fastest' },
+  'coldEntry.scanFirstTitle': {
+    en: 'Scan a Magic Link',
+    beanie: 'scan a magic link',
+  },
+  'coldEntry.scanFirstWhy': {
+    en: 'Already signed in on another device? It can let this one straight in, with no password and no recovery code.',
+    beanie:
+      'already signed in on another device? it can let this one straight in, with no password and no recovery code.',
+  },
   'coldEntry.or': { en: 'or', beanie: 'or' },
   'coldEntry.scanTitle': {
     en: 'Use a Device You\u2019re Signed In On',
@@ -5839,50 +5884,46 @@ const STRING_DEFS = {
     beanie: 'back',
   },
   'signInCode.title': { en: 'Sign In Another Device', beanie: 'sign in another device' },
-  'signInCode.lead': {
-    en: 'Show a code your other device can scan to sign in.',
-    beanie: 'show a code your other device can scan to sign in.',
-  },
-  'signInCode.mint': { en: 'Show the Code', beanie: 'show the code' },
   'signInCode.pinReason': {
-    en: 'This code opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
+    en: 'This magic link opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
     beanie:
-      'this code opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
+      'this magic link opens your whole family\u2019s beanpod, so it\u2019s worth a quick check that it\u2019s you.',
   },
   'signInCode.notProved': {
-    en: 'No code was created. You can try again whenever you\u2019re ready.',
-    beanie: 'no code was created. you can try again whenever you\u2019re ready.',
+    en: 'No magic link was created. You can try again whenever you\u2019re ready.',
+    beanie: 'no magic link was created. you can try again whenever you\u2019re ready.',
   },
   // Rendered ONCE, below the code. It used to be printed twice — as a bare <p> above the panel
   // and again as the panel's own `hint` — which is the same duplication being removed here.
   'signInCode.gateLead': {
-    en: 'Create a magic link to scan with your other device\u2019s camera',
-    beanie: 'create a magic link to scan with your other device\u2019s camera',
+    en: 'Create a magic link for yourself or a family member to sign in to beanies.',
+    beanie: 'create a magic link for yourself or a family member to sign in to beanies.',
   },
   'signInCode.createLink': {
     en: 'Create a Magic Link',
     beanie: 'create a magic link',
   },
   'signInCode.orScanHint': {
-    en: 'Already see a QR code on your other device? Scan it with this device\u2019s camera to log in.',
+    en: 'Already see a magic link on your other device? Scan it with this device\u2019s camera to log in.',
     beanie:
-      'already see a qr code on your other device? scan it with this device\u2019s camera to log in.',
+      'already see a magic link on your other device? scan it with this device\u2019s camera to log in.',
   },
   'signInCode.scanLead': {
-    en: 'Scan this code with your other device to log in',
-    beanie: 'scan this code with your other device to log in',
+    en: 'Scan this link with the camera on your family member\u2019s device to allow them to sign in.',
+    beanie:
+      'scan this link with the camera on your family member\u2019s device to allow them to sign in.',
   },
   'signInCode.qrAlt': {
-    en: 'Code to scan on your other device',
-    beanie: 'code to scan on your other device',
+    en: 'Magic link to scan on your other device',
+    beanie: 'magic link to scan on your other device',
   },
   'signInCode.expiryNote': {
     en: 'Works for the next 15 minutes.',
     beanie: 'works for the next 15 minutes.',
   },
   'magicLink.title': {
-    en: 'Your beanies magic link',
-    beanie: 'your beanies magic link',
+    en: 'Magic Links',
+    beanie: 'magic links',
   },
   // States the risk AND the instruction in one line, because "keep it somewhere safe"
   // without the reason reads as boilerplate and gets ignored.
@@ -5915,9 +5956,9 @@ const STRING_DEFS = {
     beanie: "i've saved my link",
   },
   'magicLink.settingsDesc': {
-    en: 'A link that unlocks your family file so you can sign in on a new device with your PIN. Lasts 7 days.',
+    en: 'Create a link that signs a family member in on another device. They finish with their own PIN. Each link lasts 15 minutes.',
     beanie:
-      'a link that unlocks your family file so you can sign in on a new device with your pin. lasts 7 days.',
+      'create a link that signs a family member in on another device. they finish with their own pin. each link lasts 15 minutes.',
   },
   'magicLink.statusNone': { en: 'No active link.', beanie: 'no active link.' },
   'magicLink.statusActive': {
@@ -5925,10 +5966,94 @@ const STRING_DEFS = {
     beanie: 'one link active, expires {date}.',
   },
   'magicLink.statusExpired': {
-    en: 'Your last link expired {date}.',
-    beanie: 'your last link expired {date}.',
+    en: 'Last link expired {date}.',
+    beanie: 'last link expired {date}.',
   },
   'magicLink.create': { en: 'Create a magic link', beanie: 'create a magic link' },
+  // ── "Who's signing in?" at mint time ──────────────────────────────────────────────────────
+  // ⚠️ TARGET-AWARE COPY IS A REQUIREMENT, NOT POLISH. A magic link is newest-wins, so minting
+  // one for another member DESTROYS the link they already hold. Saying "this cancels the old
+  // one" without naming whose is how someone silently locks out their spouse.
+  // `magicLink.` is an important prefix in `uiStrings.test.ts`, so these `beanie` values keep
+  // the real nouns (magic link, joining link, member names) and only drop case.
+  // ⚠️ ITS OWN KEY, NOT `loginV6.pickBeanTitle`. That one is shared with `PersonSelectView`,
+  // the sign-in person picker, where "which beanie are you?" is the RIGHT question because you
+  // are identifying yourself. Here you are choosing a RECIPIENT, and getting it wrong destroys
+  // the link that person is currently holding, so the question has to name the other party.
+  // ── The setup-time OFFER, not a task ─────────────────────────────────────────────────────
+  // ⚠️ THE RECOVERY KIT IS THE ONLY THING SETUP ASKS YOU TO SAVE. It used to ask for the kit
+  // AND a 7-day magic link side by side, which told the reader they were equally important.
+  // They are not: the kit is the root of trust and cannot be regenerated, while a magic link
+  // takes fifteen seconds to mint from Settings whenever you want one. Two urgent things means
+  // neither reads as urgent, so the link became an offer you can take or ignore.
+  //
+  // ⚠️ THE CTA NAMES WHAT THE PERSON DOES, NOT WHAT THE BUTTON MAKES. greg's point: "create a
+  // magic link" describes the machine's job; "scan a magic link with your phone" describes
+  // theirs, which is the activity they are deciding whether to start.
+  'setup.alsoOnPhone': {
+    en: 'Also using beanies on your phone?',
+    beanie: 'also using beanies on your phone?',
+  },
+  'setup.alsoOnPhoneBody': {
+    en: 'Install the app, then scan a magic link to sign in there. You can do this any time from Settings, so there is nothing to save now.',
+    beanie:
+      'install the app, then scan a magic link to sign in there. you can do this any time from settings, so there is nothing to save now.',
+  },
+  'setup.scanWithPhone': {
+    en: 'Scan a magic link with your phone',
+    beanie: 'scan a magic link with your phone',
+  },
+  'magicLink.whichBeanieLoggingIn': {
+    en: 'Which beanie is logging in?',
+    beanie: 'which beanie is logging in?',
+  },
+  'magicLink.pickToContinue': {
+    en: 'Pick who this link is for. They\u2019ll sign in with their own PIN.',
+    beanie: 'pick who this link is for. they\u2019ll sign in with their own pin.',
+  },
+  'magicLink.pickSomeoneElse': {
+    en: 'Create one for someone else',
+    beanie: 'create one for someone else',
+  },
+  'magicLink.createFor': {
+    en: 'Create a magic link for {name}',
+    beanie: 'create a magic link for {name}',
+  },
+  'magicLink.createWarningFor': {
+    en: 'This cancels the magic link {name} is holding now.',
+    beanie: 'this cancels the magic link {name} is holding now.',
+  },
+  'magicLink.statusForMember': {
+    en: 'Showing {name}\u2019s magic link.',
+    beanie: 'showing {name}\u2019s magic link.',
+  },
+  'magicLink.notJoinedBadge': { en: 'not joined', beanie: 'not joined' },
+  // ⚠️ ITS OWN KEY, NOT `magicLink.memberMissing`. That one is REDEMPTION-time copy ("That link
+  // is for someone who is no longer in this family"), shown by `useLoginFlow` after an inbound
+  // link resolved to a departed member. On a MINT surface there is no inbound link at all, so
+  // reusing it told a signed-in owner their own link had been revoked, over a blank panel.
+  'magicLink.pickerEmpty': {
+    en: 'No one else in the family to pick yet.',
+    beanie: 'no one else in the family to pick yet.',
+  },
+  'magicLink.routeToInvite': {
+    en: '{name} hasn\u2019t joined yet, so they need a joining link instead. It also gives them access to your family file.',
+    beanie:
+      '{name} hasn\u2019t joined yet, so they need a joining link instead. it also gives them access to your family file.',
+  },
+  'magicLink.routeToInviteAction': {
+    en: 'Send {name} a joining link',
+    beanie: 'send {name} a joining link',
+  },
+  // Desktop replaces the camera step: a laptop pointed at a phone screen is absurd.
+  'coldEntry.pushStep3Desktop': {
+    en: 'Send the link to yourself, then paste it below.',
+    beanie: 'send the link to yourself, then paste it below.',
+  },
+  'coldEntry.haveLinkInstead': {
+    en: 'I have a magic link instead',
+    beanie: 'i have a magic link instead',
+  },
   'magicLink.createWarning': {
     en: 'Creating a new link cancels your current one.',
     beanie: 'creating a new link cancels your current one.',
@@ -8685,7 +8810,12 @@ const STRING_DEFS = {
     beanie: 'setup is taking longer than expected. reload to try again.',
   },
   'app.initError.reload': { en: 'Reload', beanie: 'reload' },
-  'app.initError.clearData': { en: 'Sign Out & Clear Data', beanie: 'sign out & clear data' },
+  // Same action as `auth.signOutClearData`, on the fatal-error screen. Kept device-neutral
+  // because that screen can render before the native shell is known.
+  'app.initError.clearData': {
+    en: 'Sign Out & Clear All Local Data',
+    beanie: 'sign out & clear all local data',
+  },
   'app.initError.details': { en: 'Technical Details', beanie: 'technical details' },
   'app.initError.diagnostics': { en: 'Device Info', beanie: 'device info' },
   'app.initError.clearConfirm': {

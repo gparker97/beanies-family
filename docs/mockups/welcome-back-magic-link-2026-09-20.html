@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      APPROVED BY GREG 2026-09-20, reviewed as a published Claude artifact.
+      This file is the repo's copy of that approved design and must stay in sync with it:
+      an earlier draft here led the desktop specimen with three numbered steps, which a plan
+      review then read as the approved behaviour. The approved desktop variant leads with a
+      PASTE CTA and no numbered steps, because pointing a laptop at a phone screen is absurd.
+      Plan: docs/plans/2026-09-20-magic-link-first-sign-in.md
+    -->
+    <title>Magic Link Sign-In</title>
+  </head>
+  <body>
+
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+/>
+<style>
+  /* ═══════════════════════════════════════════════════════════════════════════
+     TWO TOKEN SETS, ON PURPOSE.
+
+     1. CHROME (--c-*) follows the viewer's theme. Defined complete on bare
+        :root, then redefined for dark twice: once behind prefers-color-scheme
+        guarded so an explicit light choice wins, once behind [data-theme].
+     2. SPECIMENS (--s-*) are FIXED. A specimen is artwork, not UI: one exists
+        to show beanies in light mode and one to show it in dark, so neither
+        may follow the reader's own theme. Scoped to .frame / .frame.is-dark.
+     Values come from docs/brand/beanies-cig-v2.html slides 8 and 9.
+     ═══════════════════════════════════════════════════════════════════════ */
+  :root {
+    --c-bg: #f4f2f0; /* warm neutral, biased toward the orange accent */
+    --c-panel: #ffffff;
+    --c-panel-sunk: #edeae7;
+    --c-ink: #2c3e50;
+    --c-ink-soft: #5c6b78;
+    --c-ink-faint: #8794a0;
+    --c-rule: #dfdad5;
+    --c-accent: #d14d1a;
+    --c-accent-bg: rgb(241 93 34 / 10%);
+    --c-shell: #cfc8c1;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --c-bg: #141a20;
+      --c-panel: #1c242c;
+      --c-panel-sunk: #11171c;
+      --c-ink: #f2f5f7;
+      --c-ink-soft: #c3ced6;
+      --c-ink-faint: #9aa9b4;
+      --c-rule: #38434d;
+      --c-accent: #ff8b5e;
+      --c-accent-bg: rgb(255 139 94 / 12%);
+      --c-shell: #2b353e;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --c-bg: #141a20;
+    --c-panel: #1c242c;
+    --c-panel-sunk: #11171c;
+    --c-ink: #f2f5f7;
+    --c-ink-soft: #c3ced6;
+    --c-ink-faint: #9aa9b4;
+    --c-rule: #38434d;
+    --c-accent: #ff8b5e;
+    --c-accent-bg: rgb(255 139 94 / 12%);
+    --c-shell: #2b353e;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: var(--c-bg);
+    color: var(--c-ink);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  .wrap {
+    margin-inline: auto;
+    max-width: 1180px;
+    padding-block: 30px 60px;
+    padding-inline: 16px;
+  }
+
+  /* ── page header ──────────────────────────────────────────────────────── */
+  .masthead {
+    border-bottom: 1px solid var(--c-rule);
+    padding-bottom: 22px;
+  }
+
+  .eyebrow {
+    color: var(--c-accent);
+    font-family: Outfit, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: Outfit, sans-serif;
+    font-size: clamp(1.5rem, 5vw, 2.125rem);
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    color: var(--c-ink-soft);
+    margin: 0;
+    max-width: 66ch;
+  }
+
+  .standfirst strong {
+    color: var(--c-ink);
+    font-weight: 600;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+
+  .tag {
+    background: var(--c-panel);
+    border: 1px solid var(--c-rule);
+    border-radius: 999px;
+    color: var(--c-ink-soft);
+    font-family: Outfit, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 5px 12px;
+  }
+
+  .tag.hot {
+    background: var(--c-accent-bg);
+    border-color: transparent;
+    color: var(--c-accent);
+  }
+
+  /* ── a rail of specimens ──────────────────────────────────────────────── */
+  .rail {
+    margin-top: 44px;
+  }
+
+  .rail-head {
+    align-items: baseline;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin-bottom: 4px;
+  }
+
+  .rail-n {
+    color: var(--c-accent);
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+  }
+
+  .rail h2 {
+    font-family: Outfit, sans-serif;
+    font-size: 1.1875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .rail-note {
+    color: var(--c-ink-soft);
+    font-size: 0.875rem;
+    margin: 0 0 20px;
+    max-width: 64ch;
+  }
+
+  .specimens {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+  }
+
+  /* ── the device shell (chrome-themed) ─────────────────────────────────── */
+  .frame {
+    --s-page: #f8f9fa;
+    --s-card: #ffffff;
+    --s-txt: #2c3e50;
+    --s-txt-soft: rgb(44 62 80 / 72%);
+    --s-txt-faint: rgb(44 62 80 / 55%);
+    --s-line: rgb(44 62 80 / 12%);
+    --s-accent: #f15d22;
+    --s-accent-txt: #f15d22;
+    --s-icon-bg: rgb(174 214 241 / 34%);
+    --s-shadow: 0 4px 20px rgb(44 62 80 / 6%);
+
+    background: var(--s-page);
+    border: 1px solid var(--c-shell);
+    border-radius: 26px;
+    box-shadow: 0 12px 30px rgb(20 26 32 / 10%);
+    max-width: 100%;
+    overflow: hidden;
+    width: 390px;
+  }
+
+  .frame.is-dark {
+    --s-page: #151e27;
+    --s-card: #1e2a36;
+    --s-txt: #f2f5f7;
+    --s-txt-soft: #c3ced6;
+    --s-txt-faint: #9aa9b4;
+    --s-line: #4a5b69;
+    --s-accent: #f15d22;
+    --s-accent-txt: #ff8b5e; /* accent-lift: accents get LIGHTER on dark */
+    --s-icon-bg: rgb(143 199 232 / 18%);
+    --s-shadow: 0 4px 20px rgb(0 0 0 / 38%);
+  }
+
+  .frame.is-wide {
+    width: 660px;
+  }
+
+  .frame-tab {
+    align-items: center;
+    background: var(--c-panel-sunk);
+    border-bottom: 1px solid var(--c-shell);
+    color: var(--c-ink-faint);
+    display: flex;
+    font-family: Outfit, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    gap: 7px;
+    letter-spacing: 0.1em;
+    padding: 9px 15px;
+    text-transform: uppercase;
+  }
+
+  .swatch {
+    border: 1px solid var(--c-shell);
+    border-radius: 50%;
+    height: 9px;
+    width: 9px;
+  }
+
+  .swatch.lite {
+    background: #f8f9fa;
+  }
+
+  .swatch.drk {
+    background: #151e27;
+  }
+
+  .screen {
+    background: var(--s-page);
+    color: var(--s-txt);
+    padding: 20px 18px 26px;
+  }
+
+  .is-wide .screen {
+    padding: 26px 38px 32px;
+  }
+
+  /* ── in-screen UI ─────────────────────────────────────────────────────── */
+  .nav-back {
+    color: var(--s-txt-faint);
+    font-family: Outfit, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  .screen h3 {
+    color: var(--s-txt);
+    font-family: Outfit, sans-serif;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 4px;
+  }
+
+  .screen .lede {
+    color: var(--s-txt-soft);
+    font-size: 0.8125rem;
+    margin: 0 0 18px;
+  }
+
+  .slab {
+    background: var(--s-card);
+    border: 1px solid var(--s-line);
+    border-radius: 24px;
+    box-shadow: var(--s-shadow);
+    margin-bottom: 12px;
+    padding: 16px;
+  }
+
+  /* the promoted route: the one place boldness is spent */
+  .slab.promoted {
+    background:
+      linear-gradient(135deg, rgb(241 93 34 / 9%) 0%, rgb(230 126 34 / 5%) 100%),
+      var(--s-card);
+    border: 1.5px solid rgb(241 93 34 / 34%);
+    padding: 18px;
+  }
+
+  .flag {
+    background: var(--s-accent);
+    border-radius: 999px;
+    color: #fff;
+    display: inline-block;
+    font-family: Outfit, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+    padding: 4px 11px;
+    text-transform: uppercase;
+  }
+
+  .slab h4 {
+    color: var(--s-txt);
+    font-family: Outfit, sans-serif;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    margin: 0 0 5px;
+  }
+
+  .slab p.why {
+    color: var(--s-txt-soft);
+    font-size: 0.8125rem;
+    margin: 0 0 14px;
+  }
+
+  /* Numbered because it genuinely IS a sequence the reader performs in order. */
+  ol.steps {
+    display: grid;
+    gap: 9px;
+    list-style: none;
+    margin: 0 0 15px;
+    padding: 0;
+  }
+
+  ol.steps li {
+    align-items: flex-start;
+    color: var(--s-txt-soft);
+    display: flex;
+    font-size: 0.8125rem;
+    gap: 10px;
+    line-height: 1.45;
+  }
+
+  ol.steps b {
+    color: var(--s-txt);
+    font-weight: 600;
+  }
+
+  .step-n {
+    background: var(--s-accent);
+    border-radius: 999px;
+    color: #fff;
+    display: grid;
+    flex: 0 0 20px;
+    font-family: Outfit, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    height: 20px;
+    margin-top: 2px;
+    place-items: center;
+  }
+
+  .cta {
+    border-radius: 16px;
+    display: block;
+    font-family: Outfit, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    padding: 12px 16px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .cta.filled {
+    background: var(--s-accent);
+    color: #fff;
+  }
+
+  .cta.outline {
+    border: 1.5px solid rgb(241 93 34 / 40%);
+    color: var(--s-accent-txt);
+  }
+
+  .textlink {
+    color: var(--s-accent-txt);
+    display: block;
+    font-family: Outfit, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 10px 0 2px;
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .rule-or {
+    align-items: center;
+    color: var(--s-txt-faint);
+    display: flex;
+    font-family: Outfit, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    gap: 12px;
+    letter-spacing: 0.12em;
+    margin: 16px 0;
+  }
+
+  .rule-or::before,
+  .rule-or::after {
+    background: var(--s-line);
+    content: '';
+    flex: 1;
+    height: 1px;
+  }
+
+  .opt {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+  }
+
+  .opt-ic {
+    background: var(--s-icon-bg);
+    border-radius: 14px;
+    display: grid;
+    flex: 0 0 40px;
+    font-size: 1.05rem;
+    height: 40px;
+    place-items: center;
+  }
+
+  .opt-t {
+    color: var(--s-txt);
+    font-family: Outfit, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+
+  .opt-s {
+    color: var(--s-txt-faint);
+    font-size: 0.75rem;
+  }
+
+  .fineprint {
+    color: var(--s-txt-faint);
+    font-size: 0.75rem;
+    margin: 13px 0 0;
+    text-align: center;
+  }
+
+  .fineprint.left {
+    text-align: left;
+  }
+
+  /* ── annotations ──────────────────────────────────────────────────────── */
+  .notes {
+    background: var(--c-panel);
+    border: 1px solid var(--c-rule);
+    border-radius: 20px;
+    margin-top: 46px;
+    padding: 24px;
+  }
+
+  .notes h2 {
+    font-family: Outfit, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 16px;
+  }
+
+  .notes dl {
+    display: grid;
+    gap: 16px;
+    margin: 0;
+  }
+
+  .notes dt {
+    color: var(--c-ink);
+    font-family: Outfit, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .notes dd {
+    color: var(--c-ink-soft);
+    font-size: 0.875rem;
+    margin: 0;
+    max-width: 78ch;
+  }
+
+  .notes code {
+    background: var(--c-panel-sunk);
+    border-radius: 5px;
+    font-size: 0.8125rem;
+    padding: 1px 5px;
+  }
+
+  .ask {
+    background: var(--c-accent-bg);
+    border-left: 3px solid var(--c-accent);
+    border-radius: 0 14px 14px 0;
+    margin-top: 22px;
+    padding: 14px 18px;
+  }
+
+  .ask p {
+    color: var(--c-ink-soft);
+    font-size: 0.875rem;
+    margin: 0;
+    max-width: 74ch;
+  }
+
+  .ask strong {
+    color: var(--c-accent);
+    font-family: Outfit, sans-serif;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">beanies.family · sign-in mockup</p>
+    <h1>Scan a magic link, before anything else</h1>
+    <p class="standfirst">
+      The surface reached <strong>after</strong> tapping Sign In. The welcome gate home screen does
+      not change, and nothing here is removed, only reordered. Today these two states lead with
+      Google Drive against an empty account chooser; once a magic link carries the
+      <code>googleAccountEmail</code> hint, consent arrives pre-filled and no password, passphrase
+      or recovery code is asked for at all.
+    </p>
+    <div class="tags">
+      <span class="tag hot">orange outline = promoted</span>
+      <span class="tag">push mode only, no polling</span>
+      <span class="tag">light and dark are fixed specimens</span>
+    </div>
+  </header>
+
+  <!-- ── State 1 ─────────────────────────────────────────────────────────── -->
+  <section class="rail">
+    <div class="rail-head">
+      <span class="rail-n">STATE 1</span>
+      <h2>Load your pod</h2>
+    </div>
+    <p class="rail-note">
+      Where Sign In lands. The paste-a-link panel already sits above the storage cards here by
+      deliberate choice, so leading with a link is an existing instinct rather than a new one. This
+      promotes it into a full block with the steps spelled out.
+    </p>
+
+    <div class="specimens">
+      <article class="frame">
+        <div class="frame-tab"><span class="swatch lite"></span>Phone 390 · light</div>
+        <div class="screen">
+          <div class="nav-back">&larr; back</div>
+          <h3>welcome back</h3>
+          <p class="lede">the fastest way in is the pod you&rsquo;re already signed in to.</p>
+
+          <div class="slab promoted">
+            <span class="flag">fastest</span>
+            <h4>scan a magic link</h4>
+            <p class="why">
+              Already signed in on another device? It can let this one straight in, with no password
+              and no recovery code.
+            </p>
+            <ol class="steps">
+              <li>
+                <span class="step-n">1</span
+                ><span>On that device, open beanies, your profile, then <b>show a magic link</b>.</span>
+              </li>
+              <li><span class="step-n">2</span><span>Open the <b>camera app</b> on this device.</span></li>
+              <li><span class="step-n">3</span><span>Point it at the code and tap the link it offers.</span></li>
+            </ol>
+            <div class="cta outline">i have a link instead</div>
+          </div>
+
+          <div class="rule-or">or</div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">🗂️</span>
+              <div>
+                <div class="opt-t">Google Drive</div>
+                <div class="opt-s">find the pod in your Drive</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">💾</span>
+              <div>
+                <div class="opt-t">open a saved family file</div>
+                <div class="opt-s">a .beanpod on this device</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="textlink">use a different Google account</div>
+          <p class="fineprint">your pod is encrypted. beanies never sees inside it.</p>
+        </div>
+      </article>
+
+      <article class="frame is-dark">
+        <div class="frame-tab"><span class="swatch drk"></span>Phone 390 · dark</div>
+        <div class="screen">
+          <div class="nav-back">&larr; back</div>
+          <h3>welcome back</h3>
+          <p class="lede">the fastest way in is the pod you&rsquo;re already signed in to.</p>
+
+          <div class="slab promoted">
+            <span class="flag">fastest</span>
+            <h4>scan a magic link</h4>
+            <p class="why">
+              Already signed in on another device? It can let this one straight in, with no password
+              and no recovery code.
+            </p>
+            <ol class="steps">
+              <li>
+                <span class="step-n">1</span
+                ><span>On that device, open beanies, your profile, then <b>show a magic link</b>.</span>
+              </li>
+              <li><span class="step-n">2</span><span>Open the <b>camera app</b> on this device.</span></li>
+              <li><span class="step-n">3</span><span>Point it at the code and tap the link it offers.</span></li>
+            </ol>
+            <div class="cta outline">i have a link instead</div>
+          </div>
+
+          <div class="rule-or">or</div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">🗂️</span>
+              <div>
+                <div class="opt-t">Google Drive</div>
+                <div class="opt-s">find the pod in your Drive</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">💾</span>
+              <div>
+                <div class="opt-t">open a saved family file</div>
+                <div class="opt-s">a .beanpod on this device</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="textlink">use a different Google account</div>
+          <p class="fineprint">your pod is encrypted. beanies never sees inside it.</p>
+        </div>
+      </article>
+
+      <article class="frame is-wide">
+        <div class="frame-tab"><span class="swatch lite"></span>Desktop 660 · light</div>
+        <div class="screen">
+          <div class="nav-back">&larr; back</div>
+          <h3>welcome back</h3>
+          <p class="lede">the fastest way in is the pod you&rsquo;re already signed in to.</p>
+
+          <div class="slab promoted">
+            <span class="flag">fastest</span>
+            <h4>paste a magic link</h4>
+            <p class="why">
+              Signed in on your phone? Show a magic link there and send it to yourself. It opens this
+              computer straight into your pod.
+            </p>
+            <div class="cta filled">paste a magic link</div>
+            <div class="textlink">or scan it with your phone&rsquo;s camera</div>
+          </div>
+
+          <div class="rule-or">or</div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">🗂️</span>
+              <div>
+                <div class="opt-t">Google Drive</div>
+                <div class="opt-s">find the pod in your Drive</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">💾</span>
+              <div>
+                <div class="opt-t">open a saved family file</div>
+                <div class="opt-s">a .beanpod on this computer</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="textlink">use a different Google account</div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── State 2 ─────────────────────────────────────────────────────────── -->
+  <section class="rail">
+    <div class="rail-head">
+      <span class="rail-n">STATE 2</span>
+      <h2>Reconnect</h2>
+    </div>
+    <p class="rail-note">
+      Where &ldquo;sign out and clear data&rdquo; actually lands you, and the case that started this.
+      The device still holds a registry row for the family but no credentials, so today it goes
+      straight to a Google prompt. The magic-link route goes above it.
+    </p>
+
+    <div class="specimens">
+      <article class="frame">
+        <div class="frame-tab"><span class="swatch lite"></span>Phone 390 · light</div>
+        <div class="screen">
+          <div class="nav-back">&larr; back</div>
+          <h3>welcome back, Parker pod</h3>
+          <p class="lede">this device knows your pod, but needs a way back into it.</p>
+
+          <div class="slab promoted">
+            <span class="flag">fastest</span>
+            <h4>scan a magic link</h4>
+            <p class="why">Signed in elsewhere? Let that device wave this one through.</p>
+            <ol class="steps">
+              <li><span class="step-n">1</span><span>On that device: profile, then <b>show a magic link</b>.</span></li>
+              <li>
+                <span class="step-n">2</span
+                ><span>Open the <b>camera app</b> here and point it at the code.</span>
+              </li>
+            </ol>
+            <div class="cta outline">i have a link instead</div>
+          </div>
+
+          <div class="rule-or">or</div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">🔌</span>
+              <div>
+                <div class="opt-t">reconnect to Google</div>
+                <div class="opt-s">greg@example.com</div>
+              </div>
+            </div>
+            <p class="fineprint left">we&rsquo;ll take you straight to the right account.</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="frame is-dark">
+        <div class="frame-tab"><span class="swatch drk"></span>Phone 390 · dark</div>
+        <div class="screen">
+          <div class="nav-back">&larr; back</div>
+          <h3>welcome back, Parker pod</h3>
+          <p class="lede">this device knows your pod, but needs a way back into it.</p>
+
+          <div class="slab promoted">
+            <span class="flag">fastest</span>
+            <h4>scan a magic link</h4>
+            <p class="why">Signed in elsewhere? Let that device wave this one through.</p>
+            <ol class="steps">
+              <li><span class="step-n">1</span><span>On that device: profile, then <b>show a magic link</b>.</span></li>
+              <li>
+                <span class="step-n">2</span
+                ><span>Open the <b>camera app</b> here and point it at the code.</span>
+              </li>
+            </ol>
+            <div class="cta outline">i have a link instead</div>
+          </div>
+
+          <div class="rule-or">or</div>
+
+          <div class="slab">
+            <div class="opt">
+              <span class="opt-ic" aria-hidden="true">🔌</span>
+              <div>
+                <div class="opt-t">reconnect to Google</div>
+                <div class="opt-s">greg@example.com</div>
+              </div>
+            </div>
+            <p class="fineprint left">we&rsquo;ll take you straight to the right account.</p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── annotations ─────────────────────────────────────────────────────── -->
+  <section class="notes">
+    <h2>What this asserts, and what it deliberately does not</h2>
+    <dl>
+      <div>
+        <dt>Push mode only</dt>
+        <dd>
+          Neither state offers &ldquo;show my code here&rdquo;, because nothing is staged yet. A
+          pull-mode code polls Drive for an approval wrap that nobody will write, and spins forever.
+          That is the same reason the panel is excluded from the welcome gate today. Pull mode stays
+          on the <code>decrypt</code> state, where a file genuinely is staged.
+        </dd>
+      </div>
+      <div>
+        <dt>Scanning is an instruction, not a button</dt>
+        <dd>
+          The app has no <code>getUserMedia</code> and no viewfinder, which is why the unreliable
+          Open Camera button came out in 0.21.6. The steps send the reader to their own camera app,
+          which returns through the deep link.
+        </dd>
+      </div>
+      <div>
+        <dt>Desktop leads with paste, not scan</dt>
+        <dd>
+          Pointing a laptop at a phone screen is absurd, so the same block reorders itself by form
+          factor. <code>useIsTouchPrimary()</code> already exists and already does exactly this
+          inside <code>ColdSignInPanel</code>.
+        </dd>
+      </div>
+      <div>
+        <dt>Nothing was removed</dt>
+        <dd>
+          Drive, saved file, different-account and the encryption note all survive, one position
+          lower. Drive loses only its Recommended badge, which cannot stand while a different route
+          is flagged fastest. The providers-coming-soon disclosure and the three security cards are
+          left out of the mockup for length, not off the screen.
+        </dd>
+      </div>
+      <div>
+        <dt>Colour</dt>
+        <dd>
+          Heritage Orange carries the promoted block, never Alert Red, since this is a routine
+          signal. The dark specimens use <code>surface-raised</code> for cards, the ink scale for
+          copy, and <code>accent-lift #FF8B5E</code> for accent text, because accents get lighter on
+          dark and never darker.
+        </dd>
+      </div>
+    </dl>
+
+    <div class="ask">
+      <p>
+        <strong>One open question.</strong> The desktop variant here leads with paste and drops the
+        numbered steps, which is my own call rather than something you asked for. The alternative is
+        to keep all three steps everywhere and accept that step 2 reads awkwardly on a computer. Say
+        which you prefer and I will build that one.
+      </p>
+    </div>
+  </section>
+</div>
+
+  </body>
+</html>

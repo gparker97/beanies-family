@@ -73,7 +73,7 @@ import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
-import { mintMagicLink } from '@/services/auth/linkMint';
+import MagicLinkFlow from '@/components/auth/MagicLinkFlow.vue';
 import { isValidPin } from '@/services/auth/deviceUnlock';
 import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
@@ -89,7 +89,6 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
-import { emitLinkMinted } from '@/services/telemetry/loginFlowEvents';
 import { logEvent } from '@/services/telemetry';
 import { confirm } from '@/composables/useConfirm';
 import { consumeResumeReason } from '@/components/login/resumePaths';
@@ -141,9 +140,7 @@ const password = ref('');
 // phase displays it; the code leaves memory on confirmation.
 const kitCode = ref('');
 /** The owner's magic link for the combined save step. One-time, like the kit code. */
-const magicLink = ref('');
 /** A `uiStrings` key when the mint failed — the step degrades, it never blocks. */
-const magicLinkErrorKey = ref('');
 const kitId = ref('');
 // "How did you hear about us?" answer (a stable English Slack label or free text;
 // null = skipped). Captured in the `survey` phase, threaded into createNewFile.
@@ -702,8 +699,21 @@ async function finalizePod(): Promise<boolean> {
   kitCode.value = result.kit.code;
   kitId.value = result.kit.kitId;
   // Mint the owner's magic link for the SAME screen (Requirement 10). Best-effort by
-  // design: see `mintOwnerMagicLink`.
-  await mintOwnerMagicLink(user.memberId);
+  // ⚠️ NO MAGIC-LINK MINT HERE ANY MORE, AND THAT IS THE POINT.
+  //
+  // Setup used to hand the new owner a 7-day magic link alongside the recovery kit, as a second
+  // thing to save. greg's call, 2026-09-20: that is backwards. The kit is the ROOT OF TRUST and
+  // cannot be regenerated — lose it and every device and the data is gone permanently. A magic
+  // link takes fifteen seconds to mint from Settings whenever it is wanted. Presenting them side
+  // by side said they were equally important and drained the urgency from the one that is.
+  //
+  // What the link was actually for at this moment ("I am on the desktop, I want the app on my
+  // phone") is now an OFFER below the kit, minting on demand at fifteen minutes. Nothing to
+  // save, nothing expiring in a week in someone's notes app.
+  //
+  // ⚠️ AND IT CLOSES A HOLE: the 7-day link wrote `memberLinkKeys`, and the Settings card that
+  // was the only UI able to read or replace that dict is gone. A link issued here would have
+  // lived its full week with nothing able to revoke it.
   // The owner's PIN device wrap (review R2-F8): the doc hash was set back in the
   // identity phase, but the pod/key only exist NOW — enrol this device's unlock
   // wrap so the owner's own PIN can open their pod cold. Degraded, not fatal, on
@@ -727,57 +737,12 @@ async function finalizePod(): Promise<boolean> {
  *
  * Silent is still forbidden: the failure is shown on the card and reported by the store.
  */
-async function mintOwnerMagicLink(memberId: string): Promise<void> {
-  magicLink.value = '';
-  magicLinkErrorKey.value = '';
-  try {
-    // The crypto/publish/URL body now lives in `linkMint`, shared with the Settings card
-    // and the join step. The telemetry and the never-wedge contract stay HERE, because
-    // they are this screen's, not the service's.
-    const result = await mintMagicLink({ memberId });
-    if ('errorKey' in result) {
-      magicLinkErrorKey.value = 'magicLink.mintFailed';
-      emitLinkMinted({
-        kind: 'magic',
-        ok: false,
-        errorCode: result.errorCode,
-        detail: 'origin=creation',
-      });
-      if (result.errorCode === 'publish-failed') {
-        reportError({
-          surface: 'login-flow',
-          message: 'owner magic link never reached the durable file',
-          severity: 'critical',
-          context: { action: 'publish_failed', kind: 'magic' },
-        });
-      }
-      return;
-    }
-    magicLink.value = result.link;
-    emitLinkMinted({ kind: 'magic', ok: true, detail: 'origin=creation' });
-  } catch (e) {
-    magicLinkErrorKey.value = 'magicLink.mintFailed';
-    emitLinkMinted({
-      kind: 'magic',
-      ok: false,
-      errorCode: 'mint-threw',
-      detail: 'origin=creation',
-    });
-    reportError({
-      surface: 'login-flow',
-      message: 'owner magic link mint threw; kit-only save step',
-      severity: 'error',
-      error: e,
-      context: { action: 'mint_threw', kind: 'magic' },
-    });
-  }
-}
 
 /** The kit-step confirmation: stamp the doc-side signal, drop the code, advance. */
 async function handleKitStepStored() {
   kitCode.value = '';
-  // The link is one-time too — it must not outlive the modal any more than the kit code.
-  magicLink.value = '';
+  // The magic link is no longer minted here, so there is nothing of its to clear: the offer
+  // below the kit mints on demand and `MagicLinkFlow` owns resetting its own state.
   try {
     await settingsStore.markRecoveryKitConfirmed();
   } catch (e) {
@@ -1141,10 +1106,25 @@ async function handleConnectLocal() {
         :open="phase === 'recovery-kit'"
         :kit-id="kitId"
         :code="kitCode"
-        :magic-link="magicLink || undefined"
-        :magic-link-error-key="magicLinkErrorKey || undefined"
         @stored="handleKitStepStored"
       />
+
+      <!-- The offer, deliberately NOT a task: no "save this too", and it can be ignored. -->
+      <div class="dark:border-line mt-4 rounded-2xl border border-gray-200 p-4 text-left">
+        <p class="font-outfit dark:text-ink text-sm font-bold text-gray-900">
+          {{ t('setup.alsoOnPhone') }}
+        </p>
+        <p class="dark:text-ink-soft mt-1 mb-3 text-sm text-gray-600">
+          {{ t('setup.alsoOnPhoneBody') }}
+        </p>
+        <!-- ⚠️ `gate: 'not-applicable'`. The owner set their PIN seconds ago in this same
+             uninterruptible step; re-asking for it is friction for no security. -->
+        <MagicLinkFlow
+          origin="creation"
+          cta-label-key="setup.scanWithPhone"
+          gate="not-applicable"
+        />
+      </div>
     </div>
 
     <!-- Storage (fallback for scenario (a)) -->
