@@ -2726,17 +2726,25 @@ const STRING_DEFS = {
   },
   'settings.reconnectDrive': { en: 'Reconnect', beanie: 'reconnect' },
   'settings.forceSave': { en: 'Force Save', beanie: 'force save' },
+  // ⚠️ "OFTEN", NOT "THIS MEANS". The durability signal has FOUR raise sites and only the
+  // two `open` ones are the multi-tab story — the other two are genuine WRITE failures
+  // (`base` / `increment`: storage quota, private browsing, disk pressure), where closing
+  // tabs achieves nothing. Until the failure `kind` is plumbed through to the UI (it
+  // currently stops at telemetry — `onCacheFailureChange` hands subscribers a bare boolean),
+  // this copy must SUGGEST the common cause without promising it is the cause.
   'settings.cachePersistWarning': {
-    en: 'Local cache is not updating — your data may not survive a page refresh',
-    beanie: "local cache isn't saving — your data might not survive a refresh",
+    en: 'Local cache is not updating — your data may not survive a page refresh. This often happens when beanies is open in more than one tab. Close the others, then refresh this one. If it keeps happening, your browser may be low on storage or in private mode.',
+    beanie:
+      "local cache isn't saving — your data might not survive a refresh. this often happens when beanies is open in more than one tab. close the others, then refresh this one. if it keeps happening, your browser may be low on storage or in private mode.",
   },
   'sync.durabilityBannerTitle': {
     en: "This device can't save locally right now",
     beanie: "this device can't save locally right now",
   },
   'sync.durabilityBanner': {
-    en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe.',
-    beanie: 'recent changes might not survive a refresh on this device. your saved copy is safe.',
+    en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe. This often happens when beanies is open in more than one tab — close the others, then refresh.',
+    beanie:
+      'recent changes might not survive a refresh on this device. your saved copy is safe. this often happens when beanies is open in more than one tab — close the others, then refresh.',
   },
   'sync.durabilityBannerCta': {
     en: "What's This?",
@@ -5848,17 +5856,17 @@ const STRING_DEFS = {
   // Rendered ONCE, below the code. It used to be printed twice — as a bare <p> above the panel
   // and again as the panel's own `hint` — which is the same duplication being removed here.
   'signInCode.gateLead': {
-    en: 'Create a magic link for the other device to scan.',
-    beanie: 'create a magic link for the other device to scan.',
+    en: 'Create a magic link to scan with your other device\u2019s camera',
+    beanie: 'create a magic link to scan with your other device\u2019s camera',
   },
   'signInCode.createLink': {
     en: 'Create a Magic Link',
     beanie: 'create a magic link',
   },
   'signInCode.orScanHint': {
-    en: 'Already showing a code on the other device? Point this device\u2019s camera at it instead.',
+    en: 'Already see a QR code on your other device? Scan it with this device\u2019s camera to log in.',
     beanie:
-      'already showing a code on the other device? point this device\u2019s camera at it instead.',
+      'already see a qr code on your other device? scan it with this device\u2019s camera to log in.',
   },
   'signInCode.scanLead': {
     en: 'Scan this code with your other device to log in',
