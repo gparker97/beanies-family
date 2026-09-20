@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-19",
+    "lastUpdated": "2026-09-20",
     "translationCount": 4874
   },
   "translations": {
@@ -5827,9 +5827,9 @@
       "lastUpdated": "2026-03-08"
     },
     "settings.cachePersistWarning": {
-      "translation": "本地缓存未更新—您的数据可能无法在页面刷新后存活",
-      "hash": "r1rzc2",
-      "lastUpdated": "2026-03-08"
+      "translation": "本地缓存未更新—您的数据可能无法在页面刷新后存活。当Beanies在多个选项卡中打开时，通常会发生这种情况。关闭其他选项，然后刷新此选项。如果这种情况持续下去，您的浏览器可能存储空间不足或处于隐私模式。",
+      "hash": "6xxtkl",
+      "lastUpdated": "2026-09-20"
     },
     "settings.noRatesWarning": {
       "translation": "汇率尚未加载。没有它们，货币转换将无法正常工作。",
@@ -18362,9 +18362,9 @@
       "lastUpdated": "2026-07-13"
     },
     "sync.durabilityBanner": {
-      "translation": "最近的更改可能无法在此设备上的刷新中存活。您保存的副本是安全的。",
-      "hash": "ediwl9",
-      "lastUpdated": "2026-07-13"
+      "translation": "最近的更改可能无法在此设备上的刷新中存活。您保存的副本是安全的。当在多个选项卡中打开Beanies时，通常会发生这种情况—关闭其他选项卡，然后刷新。",
+      "hash": "c0bx3t",
+      "lastUpdated": "2026-09-20"
     },
     "sync.durabilityBannerCta": {
       "translation": "这是什么？",
@@ -24357,9 +24357,9 @@
       "lastUpdated": "2026-09-19"
     },
     "signInCode.gateLead": {
-      "translation": "创建一个魔术链接，供其他设备扫描。",
-      "hash": "3czvgw",
-      "lastUpdated": "2026-09-19"
+      "translation": "创建一个魔术链接，以便使用其他设备的摄像头进行扫描",
+      "hash": "313qys",
+      "lastUpdated": "2026-09-20"
     },
     "signInCode.createLink": {
       "translation": "创建魔术链接",
@@ -24367,9 +24367,9 @@
       "lastUpdated": "2026-09-19"
     },
     "signInCode.orScanHint": {
-      "translation": "已在另一台设备上显示代码？将此设备的摄像头对准它。",
-      "hash": "11iqt1",
-      "lastUpdated": "2026-09-19"
+      "translation": "已在其他设备上看到二维码？使用此设备的摄像头扫描以登录。",
+      "hash": "e81efs",
+      "lastUpdated": "2026-09-20"
     },
     "magicLink.pasteHelp": {
       "translation": "魔术链接或加入链接都可以使用，您也可以使用相机扫描一个。",

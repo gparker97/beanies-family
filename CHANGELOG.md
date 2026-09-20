@@ -12,6 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 _Released as 0.21.6._
 
+### Changed
+
+- **"Sign in another device" says what the button will do.** The magic-link button carries a
+  QR icon, and the wording now says the code is for your other device's camera.
+- **The "can't save locally" banner explains itself.** It now names the usual cause — beanies
+  open in more than one tab — and tells you to close the others and refresh.
+
 ### Fixed
 
 - **A joining link now always opens the family it is for.** Scanning an invite for one family

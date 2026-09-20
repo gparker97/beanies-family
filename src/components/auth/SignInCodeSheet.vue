@@ -135,9 +135,33 @@ watch(
       in-app scanner, and a chooser with one option is not a choice. See `step`.
     -->
     <div v-if="step === 'gate'" class="space-y-4">
-      <p class="dark:text-ink-soft text-sm text-gray-600">{{ t('signInCode.gateLead') }}</p>
+      <!-- The lead, not a caption: this sentence IS the instruction for the primary action
+           below it, so it takes body weight and ink rather than the muted small type it had. -->
+      <p class="dark:text-ink text-base font-medium text-gray-900">
+        {{ t('signInCode.gateLead') }}
+      </p>
       <BaseButton class="w-full" variant="primary" type="button" @click="showCode">
-        {{ t('signInCode.createLink') }}
+        <span class="inline-flex items-center justify-center gap-2">
+          <!-- A QR glyph, so the button says what it PRODUCES before it is tapped. Inline
+               stroke SVG per the theme skill: no emoji, no icon font. `aria-hidden` because
+               the label beside it already names the action. -->
+          <svg
+            class="h-5 w-5 shrink-0"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <path d="M14 14h3v3h-3zM20 14v.01M14 20v.01M17 20h3v-3" />
+          </svg>
+          {{ t('signInCode.createLink') }}
+        </span>
       </BaseButton>
       <!-- The pull direction, which did not leave with the scanner: the other device shows a
            code and this one reads it with the camera it already has. -->
