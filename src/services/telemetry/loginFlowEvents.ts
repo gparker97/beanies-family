@@ -14,6 +14,10 @@
 
 import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
 import type { DeliveryKind } from '@/services/telemetry/deepLinkEvents';
+// Type-only, mirroring the `DeliveryKind` import above. `linkMint` decides the hint reason and
+// emits nothing itself; importing the type rather than re-declaring it keeps the two in step
+// while leaving that file's no-telemetry contract visibly intact.
+import type { HintReason } from '@/services/auth/linkMint';
 
 const SURFACE = 'login-flow';
 
@@ -132,6 +136,41 @@ export function emitOpenFetchRecovery(payload: {
  * path had never been used in production, not once, so nothing is lost. Any saved
  * CloudWatch query or dashboard on `device_link_*` must move to `link_*`.
  */
+/**
+ * The facts a mint knows BEFORE it runs.
+ *
+ * ⚠️ NO `hint` FIELD, AND ITS ABSENCE IS THE DESIGN. Whether a `login_hint` was attached is only
+ * known once the mint has returned, while `link_mint_started` fires before it. Putting `hint` in
+ * here would mean the start event either carried nothing useful or carried the PREVIOUS mint's
+ * value — a stale field that reads as real. So the hint is passed separately, by the one emit
+ * that can actually know it. See `mintDetail`.
+ */
+export interface MintFacts {
+  /** Which entry point. `settings` | `profile-menu` | `creation` | `join`. */
+  origin: string;
+  /** Whether the person minted for themselves or for another member. */
+  target: 'self' | 'other';
+}
+
+/**
+ * The ONE encoder for the mint funnel's `detail` string.
+ *
+ * Four sites emit this funnel and two of them already hand-built their `detail` inline, so a
+ * fifth field would have had to be added in four places and would have drifted the first time
+ * one was missed. `detail` is already allowlisted, which is why the new facts ride here instead
+ * of becoming context keys: a new key would mean updating `ALLOWED_CONTEXT_KEYS`,
+ * `PrivacyInfo.xcprivacy`, the store Data-Safety answers and `privacy.astro`. Avoiding that gate
+ * is deliberate.
+ *
+ * ⚠️ NO EMAIL, NO MEMBER ID, NO NAME, NO TOKEN. Only the enum and the boolean below. This
+ * surface fires pre-auth and `detail` is unstructured.
+ */
+export function mintDetail(facts: MintFacts, hint?: HintReason): string {
+  const parts = [`origin=${facts.origin}`, `target=${facts.target}`];
+  if (hint) parts.push(`hint=${hint === 'ok' ? 1 : 0}`, `hintreason=${hint}`);
+  return parts.join(';');
+}
+
 export function emitLinkMinted(payload: {
   kind: 'device' | 'magic';
   ok: boolean;

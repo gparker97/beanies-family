@@ -22,10 +22,29 @@
  * the crypto out of the login bundle.
  */
 import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { requireReauth } from '@/composables/useReauth';
 
+/**
+ * Why a link did or did not get a `login_hint`.
+ *
+ * Declared here rather than in the telemetry module because THIS file decides it;
+ * `loginFlowEvents` type-imports it, which keeps the no-telemetry contract below visibly intact.
+ */
+export type HintReason = 'ok' | 'no-account' | 'unknown-member';
+
+/**
+ * Whether this mint must step up first.
+ *
+ * Three values for two behaviours, deliberately: the third value IS the documentation. A boolean
+ * `alreadyProved: false` at the creation and join sites would be a lie — nothing was proved
+ * there because there is nothing yet to prove against.
+ */
+export type GateMode = 'require' | 'already-proved' | 'not-applicable';
+
 /** What every mint returns: a usable link, or a reason it was withheld. */
-export type MintResult = { link: string } | { errorKey: string; errorCode: string };
+export type MintResult =
+  { link: string; hint: HintReason } | { errorKey: string; errorCode: string };
 
 /**
  * Narrow the store's provider to the two values a link may carry.
@@ -40,37 +59,78 @@ function linkProvider(): 'google_drive' | 'local' | undefined {
 }
 
 /**
+ * THE ONLY SOURCE OF A `login_hint`, for every kind of link this file mints.
+ *
+ * ⚠️ `googleAccountEmail`, NEVER `email`. `FamilyMember.email` is documented as a user-editable
+ * contact address "not required to match any specific external account" — it is whatever the
+ * family typed for display. `googleAccountEmail` is the OAuth-bound identity, written only on
+ * that member's own first successful consent and never overwritten silently. Hinting the wrong
+ * address is worse than hinting none: Google pre-selects an account that cannot read the file,
+ * which is the multi-account Picker confusion that took a day to diagnose in September.
+ *
+ * ⚠️ NEVER THROWS, AND NEVER REFUSES A MINT. A link with no `hint=` still works; the person just
+ * gets the account chooser they get today. So a roster that has not hydrated, or an id that
+ * matches nobody, degrades to a reason code rather than failing the mint.
+ */
+function resolveHint(memberId: string): { email?: string; reason: HintReason } {
+  try {
+    const member = useFamilyStore().members.find((m) => m.id === memberId);
+    if (!member) return { reason: 'unknown-member' };
+    const email = member.googleAccountEmail?.trim();
+    return email ? { email, reason: 'ok' } : { reason: 'no-account' };
+  } catch {
+    // Pinia not active yet, or the roster mid-load. Not a failure worth surfacing to the user.
+    return { reason: 'unknown-member' };
+  }
+}
+
+/**
+ * The step-up, shared by both mints.
+ *
+ * ⚠️ THE GATE LIVES HERE AND ITS DEFAULT IS ON, which is why `GateMode` has no default of its
+ * own at the call sites. It started in `SignInCodeSheet`, which meant `DeviceLinkCard` in
+ * Settings minted the BYTE-IDENTICAL full-family-key link with one tap and no proof at all — so
+ * the gate only added friction to the honest path while the bypass sat two menus away. A
+ * per-host gate is a gate the next host forgets. Defaulting to `'require'` means forgetting it
+ * fails SAFE: a new caller gets the PIN prompt without knowing it asked for one.
+ *
+ * ⚠️ TWO SITES MUST OPT OUT, and they are not laziness. `ResumePodSetup` mints inside the
+ * unclosable create-pod save step and `useJoinFlow` mints on the one screen a joiner ever sees
+ * their link. At both, `requireReauth` would stack a PIN pad over a modal the user cannot close,
+ * and where the member is unresolved it fails closed — so the link would be WITHHELD from
+ * exactly the two flows whose whole job is to hand one over. They pass `'not-applicable'`.
+ */
+async function runGate(mode: GateMode): Promise<boolean> {
+  if (mode !== 'require') return true;
+  return requireReauth({
+    titleKey: 'signInCode.title',
+    reasonKey: 'signInCode.pinReason',
+  });
+}
+
+/**
  * Mint a 15-minute DEVICE link: "both devices in hand, right now."
  *
  * The wrap goes into `inviteKeys` keyed by the token hash, so minting is ADDITIVE — it
  * revokes nothing, and a second mint does not kill the first link.
  */
-export async function mintDeviceLink(
-  opts: {
-    /**
-     * The CALLER already ran the step-up and it passed. Only `SignInCodeSheet` sets this,
-     * because its host gates before the sheet is even mounted — which is what keeps that
-     * flow at two taps instead of stacking a modal on a modal.
-     */
-    alreadyProved?: boolean;
-  } = {}
-): Promise<MintResult> {
+export async function mintDeviceLink(opts: {
+  /**
+   * Whose Google account should the redeeming device be pointed at.
+   *
+   * ⚠️ NAMED `hintMemberId`, NOT `memberId`, AND THAT NAMING IS LOAD-BEARING. This link is
+   * family-scoped: its wrap lands in `inviteKeys` under the token hash and identity comes from
+   * whichever PIN is entered on arrival. The member is here ONLY to derive a `login_hint`.
+   * Calling it `memberId` would invite a future reader to "fix" the deliberate `m=` suppression
+   * below by forwarding it to `buildInviteLink`.
+   *
+   * Required rather than optional on purpose: making it mandatory is compiler-enforced coverage
+   * that every mint site names a member, which is the precondition for the hint invariant.
+   */
+  hintMemberId: string;
+  gate?: GateMode;
+}): Promise<MintResult> {
   const syncStore = useSyncStore();
-
-  // ⚠️ THE GATE LIVES HERE, AND ITS DEFAULT IS ON.
-  //
-  // It started in `SignInCodeSheet`, which meant `DeviceLinkCard` in Settings minted the
-  // BYTE-IDENTICAL 15-minute full-family-key link with one tap and no proof at all — so the
-  // gate only added friction to the honest path while the bypass sat two menus away. A
-  // per-host gate is a gate the next host forgets. Defaulting to `on` means forgetting it
-  // fails SAFE: a new caller gets the PIN prompt without knowing it asked for one.
-  if (!opts.alreadyProved) {
-    const proved = await requireReauth({
-      titleKey: 'signInCode.title',
-      reasonKey: 'signInCode.pinReason',
-    });
-    if (!proved) return { errorKey: 'signInCode.notProved', errorCode: 'gate_declined' };
-  }
 
   const fk = syncStore.familyKey;
   if (!fk) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_family_key' };
@@ -82,6 +142,14 @@ export async function mintDeviceLink(
   // parses nowhere — AFTER a live 15-minute family-key wrap was already on Drive.
   const envelope = syncStore.envelope;
   if (!envelope) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_envelope' };
+
+  // ⚠️ GATE AFTER THE GUARDS, NOT BEFORE. Prompting for a PIN and then refusing because the pod
+  // was never open makes the person prove themselves for nothing.
+  if (!(await runGate(opts.gate ?? 'require'))) {
+    return { errorKey: 'signInCode.notProved', errorCode: 'gate_declined' };
+  }
+
+  const hint = resolveHint(opts.hintMemberId);
 
   const {
     buildInviteLink,
@@ -107,7 +175,13 @@ export async function mintDeviceLink(
       fileId: syncStore.driveFileId ?? undefined,
       token,
       linkMode: true,
+      // ⚠️ `inviteeEmail` ONLY. NO `memberId` — see the prop's docblock. `buildInviteLink` writes
+      // `m=` for ANY `memberId` it is given, but `parseInviteLink` reads `m=` only under `ml=1`.
+      // A device link is `lk=1`, so a member id here would be a param nothing ever reads, while
+      // still shipping an internal identifier in a URL people paste into chat.
+      inviteeEmail: hint.email,
     }),
+    hint: hint.reason,
   };
 }
 
@@ -128,6 +202,14 @@ export async function mintDeviceLink(
 export async function mintMagicLink(opts: {
   memberId: string;
   publishTimeoutMs?: number;
+  /**
+   * Defaults to `'require'` like the device mint, which is a CHANGE: this mint used to have no
+   * gate at all while the shorter-lived one defaulted its gate on. That asymmetry was backwards
+   * — this is the SEVEN-DAY credential — and it matters more now that a picker lets you mint one
+   * for somebody else. `ResumePodSetup` and `useJoinFlow` must pass `'not-applicable'`; see
+   * `runGate`.
+   */
+  gate?: GateMode;
 }): Promise<MintResult> {
   const syncStore = useSyncStore();
 
@@ -141,6 +223,13 @@ export async function mintMagicLink(opts: {
   // indistinguishable in the firehose — different causes with different fixes.
   const envelope = syncStore.envelope;
   if (!envelope) return { errorKey: 'recovery.podNotOpen', errorCode: 'no_envelope' };
+
+  // Gate after the guards, for the reason given on the device mint.
+  if (!(await runGate(opts.gate ?? 'require'))) {
+    return { errorKey: 'signInCode.notProved', errorCode: 'gate_declined' };
+  }
+
+  const hint = resolveHint(opts.memberId);
 
   const { mintMagicLinkPackage, buildMagicLinkUrl } = await import('@/services/auth/magicLink');
 
@@ -162,11 +251,15 @@ export async function mintMagicLink(opts: {
       // ⚠️ `envelope.familyId`, NOT `activeFamilyId` — see the header. The envelope is
       // non-null above and is the authority.
       familyId: envelope.familyId,
+      // Unlike the device link, `m=` BELONGS here: `ml=1` is unusable without it, and
+      // `parseInviteLink` reads it only under that flag.
       memberId: opts.memberId,
       provider: linkProvider(),
       fileName: syncStore.fileName ?? undefined,
       fileId: syncStore.driveFileId ?? undefined,
       token,
+      inviteeEmail: hint.email,
     }),
+    hint: hint.reason,
   };
 }
