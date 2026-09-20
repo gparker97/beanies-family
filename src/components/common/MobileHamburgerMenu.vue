@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from 'vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import { isNative } from '@/services/sync/capabilities';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
@@ -196,6 +198,18 @@ const encryptionLabel = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFile');
   return t('sidebar.dataEncrypted');
 });
+/**
+ * "Browser" on web and PWA, "device" inside the native shell.
+ *
+ * ⚠️ greg asked for "from this browser", which is the wording that makes the LOCAL-ONLY scope
+ * unmistakable — the whole point of the rename is that this clears traces from THIS machine and
+ * never touches the family registry. But the same menu renders inside the iOS and Android
+ * shells, where there is no browser to point at, so a native reader would be told to clear
+ * something they cannot see. Same action, same scope, a noun each audience recognises.
+ */
+const clearDataLabel = computed(() =>
+  isNative() ? t('auth.signOutClearDataNative') : t('auth.signOutClearData')
+);
 </script>
 
 <template>
@@ -600,14 +614,19 @@ const encryptionLabel = computed(() => {
                 >
                   {{ t('auth.signOut') }}
                 </button>
-                <button
-                  v-if="settingsStore.isTrustedDevice"
-                  type="button"
-                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-xs text-white/40 transition-colors hover:bg-white/[0.05]"
-                  @click="handleSignOutAndClearData"
-                >
-                  {{ t('auth.signOutClearData') }}
-                </button>
+                <!-- ⚠️ THE (i) WAS ONLY ON THE DESKTOP HEADER. The same irreversible action sat
+                     here with no explanation at all, which is the surface most likely to be used
+                     in a hurry on a borrowed phone. -->
+                <div v-if="settingsStore.isTrustedDevice" class="flex items-center gap-1.5 px-2">
+                  <button
+                    type="button"
+                    class="flex flex-1 cursor-pointer items-center gap-2 rounded-xl py-2 text-left text-xs text-white/40 transition-colors hover:bg-white/[0.05]"
+                    @click="handleSignOutAndClearData"
+                  >
+                    {{ clearDataLabel }}
+                  </button>
+                  <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
+                </div>
               </div>
 
               <!-- Version -->

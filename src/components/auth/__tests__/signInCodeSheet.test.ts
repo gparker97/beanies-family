@@ -12,6 +12,16 @@
  * ⚠️ WHAT IS STILL WORTH PINNING, because it has gone wrong before: the PIN is demanded
  * BEFORE the mint and not alongside it, and a declined PIN leaves the sheet open rather than
  * closing it.
+ *
+ * ⚠️ THE FLOW IS NOW THREE STEPS, AND THE PIN MOVED. It used to be CTA -> PIN -> mint, with the
+ * recipient defaulted to you and a small "create one for someone else" link that was easy to
+ * miss. It is now CTA -> MANDATORY pick -> PIN -> mint, because picking the wrong person
+ * DESTROYS the magic link they are holding (`memberLinkKeys` is newest-wins), so a defaulted
+ * target made a mis-tap invisible. The PIN comes after the pick so nobody proves themselves for
+ * an action they then abandon at the picker.
+ *
+ * ⚠️ SELECTORS ARE TESTIDS, NOT `button.w-full`. That class now matches the CTA and controls
+ * inside the picker step, so a positional selector silently picks the wrong one.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -20,6 +30,11 @@ import { createPinia, setActivePinia } from 'pinia';
 const requireReauth = vi.fn().mockResolvedValue(true);
 // Hoisted so the test can assert the mint ORDER, not merely that the gate was called.
 const mintRun = vi.fn();
+
+const MEMBERS = [
+  { id: 'me', name: 'Greg', requiresPassword: false, color: '#F15D22' },
+  { id: 'sp', name: 'Mary', requiresPassword: false, color: '#AED6F1' },
+];
 
 vi.mock('@/composables/useReauth', () => ({
   requireReauth: (...a: unknown[]) => requireReauth(...a),
@@ -36,6 +51,20 @@ vi.mock('@/composables/useMintedLink', () => ({
   }),
 }));
 vi.mock('@/services/auth/linkMint', () => ({ mintDeviceLink: vi.fn() }));
+// The pick step needs a roster and the permission that lets you mint for someone else.
+vi.mock('@/stores/familyStore', () => ({
+  useFamilyStore: () => ({
+    members: [MEMBERS[0], MEMBERS[1]],
+    sortedHumans: [MEMBERS[0], MEMBERS[1]],
+  }),
+}));
+vi.mock('@/composables/usePermissions', async () => {
+  const { computed } = await import('vue');
+  return { usePermissions: () => ({ canManagePod: computed(() => true) }) };
+});
+vi.mock('@/stores/authStore', () => ({
+  useAuthStore: () => ({ currentUser: { memberId: 'me' } }),
+}));
 
 import SignInCodeSheet from '../SignInCodeSheet.vue';
 
@@ -62,9 +91,24 @@ describe('SignInCodeSheet — straight to the mint', () => {
     expect(wrapper.text().toLowerCase()).toContain('camera');
   });
 
-  it('asks for a PIN BEFORE minting, not alongside it', async () => {
+  it('does NOT ask for a PIN until a recipient has been chosen', async () => {
     const wrapper = mountSheet();
-    await wrapper.find('button.w-full').trigger('click');
+    await wrapper.find('[data-testid="magic-link-create"]').trigger('click');
+    await wrapper.vm.$nextTick();
+
+    // The CTA opens the pick step and nothing else. Prompting here would be asking someone to
+    // prove themselves for an action they have not described yet.
+    expect(requireReauth).not.toHaveBeenCalled();
+    expect(mintRun).not.toHaveBeenCalled();
+    expect(wrapper.text().toLowerCase()).toContain('which beanie is logging in');
+  });
+
+  it('asks for a PIN BEFORE minting, once a recipient is chosen', async () => {
+    const wrapper = mountSheet();
+    await wrapper.find('[data-testid="magic-link-create"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="magic-link-tile-sp"]').trigger('click');
+    await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
     // The link transports the family key and is not single-use. Asserting only that the
@@ -80,21 +124,28 @@ describe('SignInCodeSheet — straight to the mint', () => {
   it('does NOT mint when the PIN is declined', async () => {
     requireReauth.mockResolvedValueOnce(false);
     const wrapper = mountSheet();
-    await wrapper.find('button.w-full').trigger('click');
+    await wrapper.find('[data-testid="magic-link-create"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="magic-link-tile-sp"]').trigger('click');
+    await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
     expect(mintRun).not.toHaveBeenCalled();
   });
 
-  it('stays open when the PIN is declined, rather than closing', async () => {
+  it('stays open on the PICK step when the PIN is declined, rather than closing', async () => {
     requireReauth.mockResolvedValueOnce(false);
     const wrapper = mountSheet();
-    await wrapper.find('button.w-full').trigger('click');
+    await wrapper.find('[data-testid="magic-link-create"]').trigger('click');
+    await wrapper.vm.$nextTick();
+    await wrapper.find('[data-testid="magic-link-tile-sp"]').trigger('click');
+    await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
 
-    // Closing on a declined gate would punish someone for changing their mind, and would
-    // take the camera hint away with it.
+    // Closing on a declined gate would punish someone for changing their mind. Landing back on
+    // the PICK step rather than the CTA is also deliberate: the recipient they already chose is
+    // still on screen, so retrying is one tap instead of starting the flow over.
     expect(wrapper.emitted('close')).toBeFalsy();
-    expect(wrapper.text().toLowerCase()).toContain('create a magic link');
+    expect(wrapper.text().toLowerCase()).toContain('which beanie is logging in');
   });
 });

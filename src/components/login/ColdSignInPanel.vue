@@ -43,6 +43,7 @@
 import DeviceApprovalRequest from '@/components/login/DeviceApprovalRequest.vue';
 import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 import PasteLinkPanel from '@/components/login/PasteLinkPanel.vue';
+import ColdEntrySteps from '@/components/login/ColdEntrySteps.vue';
 import { onMounted, ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { emitColdUnlockStarted } from '@/services/telemetry/loginFlowEvents';
@@ -127,20 +128,12 @@ const pushSteps = computed(() => [
          that camera, because the in-app scanner is gone and the phone's own camera app is now
          the only scan route — see this file's header for why, and for what it cost. -->
     <div v-if="isTouchPrimary && !showCode" class="space-y-3">
-      <ol class="space-y-2">
-        <li
-          v-for="(step, i) in pushSteps"
-          :key="step"
-          class="dark:text-ink flex gap-3 text-sm text-gray-900"
-        >
-          <span
-            class="dark:bg-surface-overlay dark:text-ink flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#AED6F1] text-xs font-bold text-[#234A63]"
-            aria-hidden="true"
-            >{{ i + 1 }}</span
-          >
-          <span>{{ step }}</span>
-        </li>
-      </ol>
+      <!-- ⚠️ SHARED WITH `ScanFirstBlock` VIA `ColdEntrySteps`. This markup used to be inline
+           here AND duplicated there, which meant two live copies of what this file's own header
+           calls the only instructions a locked-out person has. A wording, numbering or dark-mode
+           edit would land in one and drift the other across the `decrypt` and `cards` surfaces
+           that same person compares. -->
+      <ColdEntrySteps :steps="pushSteps" />
 
       <button
         type="button"
