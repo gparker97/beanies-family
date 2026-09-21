@@ -24,9 +24,11 @@ const {
   replaceMock,
   confirmMock,
   isNativeMock,
+  requireReauthMock,
 } = vi.hoisted(() => ({
   confirmMock: vi.fn(async () => true),
   isNativeMock: vi.fn(() => false),
+  requireReauthMock: vi.fn(async () => true),
   deliverFileMock: vi.fn(
     async (_opts: import('@/utils/deliverFile').DeliverFileOptions) =>
       ({
@@ -68,17 +70,29 @@ vi.mock('@/services/sync/capabilities', async (importOriginal) => ({
   isNative: () => isNativeMock(),
 }));
 vi.mock('@/composables/useReauth', () => ({
-  requireReauth: vi.fn(async () => true),
+  requireReauth: requireReauthMock,
+  // ⚠️ `false` ON PURPOSE, and it must stay irrelevant to delete-family. The gate here is
+  // HARD: unlike `handleClearData`, which skips the step-up when `canStepUp()` is false
+  // because clearing LOCAL data is the recovery escape hatch, deleting the family
+  // destroys the Drive file, the registry row and every member's copy. If a future change
+  // makes deletion depend on this value, these tests go green while the gate goes away.
   canStepUp: () => false,
 }));
-vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
-  // The version DERIVATION is real even where the writers are mocked: a
-  // test-local `'4.0'` here would hide the one regression the derivation
-  // exists to prevent (a compacted pod written as 4.0).
-  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
-    .beanpodVersionFor,
-  tryUnwrapFamilyKey: vi.fn(async () => {}),
-}));
+vi.mock('@/services/sync/fileSync', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/sync/fileSync')>();
+  return {
+    // The version DERIVATION is real even where the writers are mocked: a
+    // test-local `'4.0'` here would hide the one regression the derivation
+    // exists to prevent (a compacted pod written as 4.0).
+    beanpodVersionFor: actual.beanpodVersionFor,
+    // Pure, envelope-shape-only decisions. Real for the same reason: stubbing them would
+    // hide the defect they exist to prevent, which is a surface offering a credential the
+    // envelope cannot accept.
+    envelopeCapabilities: actual.envelopeCapabilities,
+    secretFieldFor: actual.secretFieldFor,
+    tryUnwrapFamilyKey: vi.fn(async () => {}),
+  };
+});
 vi.mock('@/services/indexeddb/database', () => ({ deleteFamilyDatabase: vi.fn(async () => {}) }));
 vi.mock('@/services/sync/fileHandleStore', () => ({ getProviderConfig: vi.fn(async () => null) }));
 vi.mock('@/services/automerge/projection', () => ({
@@ -130,7 +144,16 @@ async function mountPage() {
   return wrapper;
 }
 
-/** Tick "export my data first", type the confirmation, and submit the password. */
+/**
+ * Tick "export my data first", type the confirmation, and press Delete.
+ *
+ * ⚠️ NO PASSWORD MODAL ANY MORE. This used to submit a bespoke `PasswordModal` that
+ * verified with `tryUnwrapFamilyKey`, which a PIN-led family could never satisfy (a PIN
+ * is never an envelope wrap) and which skipped itself entirely when the envelope was
+ * null. Identity now goes through the canonical step-up, `requireReauth`, mocked at the
+ * top of this file. What remains on screen is the typed confirmation, which proves
+ * INTENT; the gate proves IDENTITY, and they are deliberately different questions.
+ */
 async function runDeleteWithExport(wrapper: Awaited<ReturnType<typeof mountPage>>) {
   const label = wrapper
     .findAll('label')
@@ -138,11 +161,36 @@ async function runDeleteWithExport(wrapper: Awaited<ReturnType<typeof mountPage>
   expect(label, 'export checkbox not found').toBeTruthy();
   await label!.find('input[type="checkbox"]').setValue(true);
 
-  const gate = wrapper
-    .findAllComponents({ name: 'PasswordModal' })
-    .find((m) => m.props('title') === 'settings.deleteFamily');
-  expect(gate, 'delete-family password gate not found').toBeTruthy();
-  gate!.vm.$emit('confirm', 'pw');
+  await typeConfirmationAndPressDelete(wrapper);
+}
+
+/**
+ * The confirmation field plus the danger button, which is the whole surface now.
+ *
+ * ⚠️ THE BUTTON IS IDENTIFIED BY ITS INTENT GATE, not by its label. The page is mounted
+ * `shallow`, so `BaseButton` is a stub: its slot text is not rendered and a real DOM
+ * click never reaches the handler. Four danger buttons exist on this page, and the only
+ * one that starts DISABLED is this one, because it waits for the typed confirmation. That
+ * makes the gate itself the selector, so a change that dropped the typed confirmation
+ * would fail here rather than silently select a different button.
+ */
+async function typeConfirmationAndPressDelete(wrapper: Awaited<ReturnType<typeof mountPage>>) {
+  const button = wrapper
+    .findAllComponents({ name: 'BaseButton' })
+    .find((b) => b.props('variant') === 'danger' && b.props('disabled') === true);
+  expect(button, 'delete button (disabled until confirmed) not found').toBeTruthy();
+
+  const input = wrapper
+    .findAllComponents({ name: 'BaseInput' })
+    .find((c) => c.props('label') === 'settings.deleteFamilyTypeConfirm');
+  expect(input, 'delete confirmation field not found').toBeTruthy();
+  input!.vm.$emit('update:modelValue', 'delete');
+  await flushPromises();
+
+  // Typing the word is what arms it. If this ever reads `true`, the intent gate is gone.
+  expect(button!.props('disabled')).toBe(false);
+
+  button!.vm.$emit('click');
   await flushPromises();
 }
 
@@ -152,7 +200,49 @@ describe('SettingsPage — delete family export gate', () => {
     deliverFileMock.mockResolvedValue({ outcome: 'downloaded', delivered: true });
     confirmMock.mockResolvedValue(true);
     isNativeMock.mockReturnValue(false);
+    requireReauthMock.mockResolvedValue(true);
     setActivePinia(createPinia());
+  });
+
+  it('destroys nothing when the step-up gate refuses', async () => {
+    // The whole point of the change. A cancel, a PIN run out of attempts, and a member
+    // with no credential at all arrive here identically: `requireReauth` resolves false,
+    // and nothing irreversible may follow. The export is included in the assertion
+    // because it runs FIRST in the delete sequence, so a gate placed one step too late
+    // would still have shipped the family's data to disk.
+    requireReauthMock.mockResolvedValue(false);
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(requireReauthMock).toHaveBeenCalledTimes(1);
+    expect(deliverFileMock).not.toHaveBeenCalled();
+    expect(deleteLocalFamilyMock).not.toHaveBeenCalled();
+    expect(removeFamilyMock).not.toHaveBeenCalled();
+    expect(deleteDriveFileMock).not.toHaveBeenCalled();
+  });
+
+  it('asks for the step-up BEFORE it destroys anything', async () => {
+    // Ordering, not merely presence. Asserting only that the gate was called would pass
+    // a version that deleted first and asked afterwards.
+    const calls: string[] = [];
+    requireReauthMock.mockImplementation(async () => {
+      calls.push('reauth');
+      return true;
+    });
+    deliverFileMock.mockImplementation(async () => {
+      calls.push('export');
+      return { outcome: 'downloaded', delivered: true };
+    });
+    deleteLocalFamilyMock.mockImplementation(async () => {
+      calls.push('delete');
+      return true;
+    });
+
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(calls[0]).toBe('reauth');
+    expect(calls).toContain('delete');
   });
 
   it('deletes when the export actually landed', async () => {

@@ -11,6 +11,39 @@ interface Props {
   requireConfirmation?: boolean;
   closable?: boolean;
   externalError?: string | null;
+  /**
+   * What to CALL the secret this modal is asking for.
+   *
+   * `tryUnwrapFamilyKey` accepts a member password OR the family recovery passphrase, so
+   * a caller decrypting a `.beanpod` must name whichever the envelope can actually take
+   * (via `secretFieldFor`). Left unset, the wording stays "Password", which is correct
+   * for the step-up caller and was the only behaviour before.
+   */
+  secretLabel?: string;
+  secretPlaceholder?: string;
+  /**
+   * The empty-field error. Must travel WITH `secretLabel`: a field labelled "Family
+   * Passphrase" that answers "Password is required" on an empty submit is the exact
+   * label/validation disagreement the shared `secretFieldFor` set exists to prevent.
+   */
+  secretRequired?: string;
+  /**
+   * The input's `autocomplete`, decided by `secretFieldFor` rather than here.
+   *
+   * ⚠️ NOT INFERRED FROM `secretLabel` BEING SET. That was tried and it silently broke
+   * autofill for the password-only case: Settings passes `secretLabel` unconditionally,
+   * including on the branch where the label IS "Password", so keying off prop presence
+   * turned autofill off for exactly the legacy family that depends on it.
+   *
+   * The rule `secretFieldFor` applies is "autofill only when a password is the ONLY thing
+   * this box takes". A family holding both a member password and a recovery passphrase
+   * therefore gets `off` and loses autofill, which is a deliberate trade rather than an
+   * oversight: either secret is valid in the one field, so a manager that fills the saved
+   * password would also offer to OVERWRITE it the moment the passphrase is typed
+   * instead. Losing autofill is recoverable; a clobbered sign-in credential, on the
+   * screen someone reached because they were locked out, is not.
+   */
+  secretAutocomplete?: 'current-password' | 'off';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -20,6 +53,10 @@ const props = withDefaults(defineProps<Props>(), {
   requireConfirmation: false,
   closable: true,
   externalError: null,
+  secretLabel: undefined,
+  secretPlaceholder: undefined,
+  secretRequired: undefined,
+  secretAutocomplete: 'current-password',
 });
 
 const emit = defineEmits<{
@@ -34,6 +71,11 @@ const resolvedDescription = computed(
   () => props.description ?? t('password.enterPasswordDescription')
 );
 const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t('action.confirm'));
+const resolvedSecretLabel = computed(() => props.secretLabel ?? t('password.password'));
+const resolvedSecretPlaceholder = computed(
+  () => props.secretPlaceholder ?? t('password.enterPasswordPlaceholder')
+);
+const resolvedSecretRequired = computed(() => props.secretRequired ?? t('password.required'));
 
 const password = ref('');
 const confirmPassword = ref('');
@@ -55,7 +97,7 @@ function handleSubmit() {
   error.value = null;
 
   if (!password.value) {
-    error.value = t('password.required');
+    error.value = resolvedSecretRequired.value;
     return;
   }
 
@@ -98,9 +140,9 @@ function resetForm() {
         <BaseInput
           v-model="password"
           :type="showPassword ? 'text' : 'password'"
-          :label="t('password.password')"
-          :placeholder="t('password.enterPasswordPlaceholder')"
-          autocomplete="current-password"
+          :label="resolvedSecretLabel"
+          :placeholder="resolvedSecretPlaceholder"
+          :autocomplete="secretAutocomplete"
         />
         <button
           type="button"
