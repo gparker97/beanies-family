@@ -9,6 +9,7 @@ import {
   envelopeNeedsRecovery,
   envelopeCapabilities,
   coldCredentialSurface,
+  secretFieldFor,
   UnlockFailedError,
   type EnvelopeCapabilities,
 } from '@/services/sync/fileSync';
@@ -172,5 +173,66 @@ describe('coldCredentialSurface', () => {
           if (surface === 'secret') expect(c.password || c.passphrase).toBe(true);
           if (surface === 'none') expect(c.password || c.passphrase || c.kit).toBe(false);
         }
+  });
+});
+
+/**
+ * `secretFieldFor` — which credential a decrypt surface may offer, and whether it may
+ * offer a typed one at all.
+ *
+ * ⚠️ THESE EXIST BECAUSE `canType` WAS ONCE DERIVED FROM `coldCredentialSurface`, AND
+ * THAT IS A DIFFERENT QUESTION. `coldCredentialSurface` prefers the kit when a family
+ * holds both a kit and a passphrase, because LoadPodView's kit form links back to the
+ * secret field. A caller without that back-link (Settings) read `!== 'secret'` as
+ * "nothing typeable opens this" and refused a passphrase-only-plus-kit family the box
+ * their passphrase would have opened — a restore that worked before. The two questions
+ * now have two answers, and the passphrase+kit row below is the one that caught it.
+ */
+describe('secretFieldFor', () => {
+  const caps = (o: Partial<EnvelopeCapabilities> = {}): EnvelopeCapabilities => ({
+    password: false,
+    passphrase: false,
+    kit: false,
+    ...o,
+  });
+
+  it('offers the password wording, with autofill, for a password-era envelope', () => {
+    const f = secretFieldFor(caps({ password: true }));
+    expect(f.label).toBe('password.password');
+    expect(f.canType).toBe(true);
+    // Autofill must SURVIVE here: this is the one box a legacy family relies on it for.
+    expect(f.autocomplete).toBe('current-password');
+  });
+
+  it('offers passphrase wording, without autofill, when only a passphrase can open it', () => {
+    const f = secretFieldFor(caps({ passphrase: true }));
+    expect(f.label).toBe('recovery.passphraseLabel');
+    expect(f.canType).toBe(true);
+    // A password manager must not fill (or later overwrite) a saved password here.
+    expect(f.autocomplete).toBe('off');
+  });
+
+  it('still allows typing when a passphrase and a kit BOTH exist', () => {
+    const both = caps({ passphrase: true, kit: true });
+    // The cold screen routes these to the kit form...
+    expect(coldCredentialSurface(both)).toBe('kit');
+    // ...but the passphrase genuinely unwraps, so a surface with no kit form must not
+    // refuse. This is the regression the whole block exists for.
+    expect(secretFieldFor(both).canType).toBe(true);
+    expect(secretFieldFor(both).label).toBe('recovery.passphraseLabel');
+  });
+
+  it('refuses a typed secret for a kit-only envelope', () => {
+    const f = secretFieldFor(caps({ kit: true }));
+    // Nothing typed opens this; the caller must send them to the kit form instead.
+    expect(f.canType).toBe(false);
+  });
+
+  it('refuses a typed secret when the envelope carries nothing at all', () => {
+    expect(secretFieldFor(caps()).canType).toBe(false);
+  });
+
+  it('assumes typeable while the envelope is unknown, so nothing refuses prematurely', () => {
+    expect(secretFieldFor(null).canType).toBe(true);
   });
 });

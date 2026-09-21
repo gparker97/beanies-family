@@ -63,7 +63,7 @@ const stepTitle = computed(() => {
     case 'pick':
       return t('transferOwnership.pickTitle');
     case 'reauth':
-      return t('transferOwnership.reauthTitle');
+      return t('reauth.title');
     case 'confirm':
       return t('transferOwnership.confirmTitle');
   }

@@ -39,7 +39,11 @@ import {
 } from '@/services/telemetry/loginFlowEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { LOAD_DRIVE_PATH, RECONNECT_LOAD_PATH } from './resumePaths';
-import { envelopeCapabilities, coldCredentialSurface } from '@/services/sync/fileSync';
+import {
+  envelopeCapabilities,
+  coldCredentialSurface,
+  secretFieldFor,
+} from '@/services/sync/fileSync';
 import type { RecoveryOpener } from '@/composables/useLoginFlow';
 import { isPodFileName } from '@/constants/beanpodFile';
 
@@ -236,67 +240,18 @@ const caps = computed(() => {
 /** Whether the pending envelope carries any recovery-kit wraps at all. */
 const hasRecoveryKits = computed(() => !!caps.value?.kit);
 /**
- * The secret field on this screen feeds `tryUnwrapFamilyKey`, which tries the member
- * password wraps and THEN the recovery passphrase — so one field serves both, and the
- * label must name whichever this envelope can actually accept.
- *
- * ⚠️ This is why the kit form's back button may not be gated on `caps.password` alone.
- * A passphrase-only family is routed to the kit form, and that button is its only way to
- * a field it can type into; hiding it left such a family unable to open its file at all.
- */
-const secretIsPassphrase = computed(
-  () => !!caps.value && !caps.value.password && caps.value.passphrase
-);
-/**
  * Every string that names the secret this screen is asking for, chosen ONCE.
  *
- * `tryUnwrapFamilyKey` (`fileSync.ts:320-343`) tries the member password wraps and THEN
- * the recovery passphrase, so a family that has both can type EITHER into this one box.
- * Labelling it "Password" was accurate but not generous: it made the passphrase a secret
- * feature on the one surface where it silently works.
+ * ⚠️ THE MAPPING NOW LIVES IN `fileSync.secretFieldFor`, beside `coldCredentialSurface`,
+ * because Settings' own `.beanpod` decrypt modal asks the identical question. It used to
+ * be inline here while Settings hard-coded password wording, so a kit-born family
+ * restoring from Settings was offered a credential that cannot exist for them. Keep the
+ * decision in one place; this computed is only the reactive wrapper.
  *
- * ⚠️ Derived as a set rather than branched per render site. The label, placeholder,
- * reassurance, empty-field error, kit prompt and the kit form's way back all have to agree about which
- * credential is on offer, and they previously disagreed — the footer still said "this
- * password" under a field labelled as a passphrase, and submitting an empty passphrase
- * field answered "Password is required". One source, five consumers.
- *
- * The heading and subtitle are deliberately NOT members here: they describe the STEP
- * (decrypt this beanpod), not the credential, so they are constant across all three cases.
+ * The heading and subtitle are deliberately NOT members of the set: they describe the
+ * STEP (decrypt this beanpod), not the credential, so they are constant across all cases.
  */
-const secretField = computed(() => {
-  const c = caps.value;
-  if (c?.password && c.passphrase) {
-    return {
-      label: 'recovery.secretEitherLabel',
-      placeholder: 'recovery.secretEitherPlaceholder',
-      footer: 'loginV6.unlockFooterEither',
-      switchLabel: 'recovery.useSecretEitherLink',
-      required: 'recovery.secretEitherRequired',
-      forgot: 'secret',
-    } as const;
-  }
-  if (secretIsPassphrase.value) {
-    return {
-      label: 'recovery.passphraseLabel',
-      placeholder: 'recovery.passphrasePlaceholder',
-      footer: 'loginV6.unlockFooterPassphrase',
-      switchLabel: 'recovery.usePassphraseLink',
-      required: 'recovery.passphraseRequired',
-      forgot: 'passphrase',
-    } as const;
-  }
-  // Password-only, and the fallback when capabilities are unknown: the wording this
-  // screen has always used.
-  return {
-    label: 'password.password',
-    placeholder: 'password.enterPasswordPlaceholder',
-    footer: 'loginV6.unlockFooter',
-    switchLabel: 'passkey.usePassword',
-    required: 'password.required',
-    forgot: 'password',
-  } as const;
-});
+const secretField = computed(() => secretFieldFor(caps.value));
 /**
  * True when nothing in this envelope can open it — no password wrap, no kit, no
  * passphrase. Only reachable from a hand-edited or truncated file, since a family always
@@ -576,7 +531,7 @@ async function handlePendingPassword(
       showKitEntry.value = true;
     } else if (surface === 'secret') {
       // A passphrase-only family lands here: the kit form would ask for a code they do
-      // not have. `secretIsPassphrase` labels the field for them.
+      // not have. `secretFieldFor` labels the field for them.
       showKitEntry.value = false;
     } else {
       // No password, no kit, no passphrase: nothing can open this file. Say so rather
@@ -1691,11 +1646,19 @@ async function handleDriveRefresh() {
           {{ formError }}
         </div>
 
+        <!-- ⚠️ `autocomplete` COMES FROM `secretField` TOO, not just the label. This box is
+             `type="password"`, so with no attribute the browser applies its password
+             heuristic regardless of what the label says — and a passphrase-only family
+             signing in cold types their FAMILY PASSPHRASE into a field the manager treats
+             as the saved site password, which it then offers to overwrite. That is the
+             exact harm `SecretFieldCopy.autocomplete` was added for, and this is the
+             higher-traffic of its two surfaces: the screen a locked-out person reaches. -->
         <BaseInput
           v-model="decryptPassword"
           :label="t(secretField.label)"
           type="password"
           :placeholder="t(secretField.placeholder)"
+          :autocomplete="secretField.autocomplete"
           required
         />
 
@@ -1798,7 +1761,12 @@ async function handleDriveRefresh() {
              "Use password instead" over an envelope with NO password wrap — the reported
              bug. It is the way BACK to a password form, so it may only appear when a
              password can actually open this envelope. Nobody is stranded without it: the
-             screen-level Back above the decrypt block is always present. -->
+             screen-level Back above the decrypt block is always present.
+
+             ⚠️ AND IT MAY NOT BE GATED ON `caps.password` ALONE. A passphrase-only family
+             is routed to the kit form, and this button is its ONLY way to a field it can
+             type into; gating it on the password wrap left such a family unable to open
+             its file at all. Hence the `|| caps?.passphrase`. -->
         <button
           v-if="caps?.password || caps?.passphrase"
           type="button"
