@@ -8,6 +8,35 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-21
+
+_On `main`, not yet released._
+
+### Fixed
+
+- **Deleting your family asked for a password that most families do not have.** Families
+  set up since the PIN change have no password at all, so the box could never be filled
+  and deleting was impossible. It now asks for your PIN, the same way transferring
+  ownership and removing a member already did.
+- **Restoring a family file from Settings now asks for the right thing.** It always said
+  "password", even for families who use a recovery passphrase. It now names whichever one
+  opens your file, and when only a recovery kit can open it, it says so up front instead
+  of showing a box that cannot work.
+- **A wrong PIN no longer says biometrics failed.** The message appeared directly under
+  the PIN pad you had just used, and suggested using your PIN.
+- **The step-up screen no longer says "confirm the transfer"** when you are deleting a
+  family, removing a member or approving a device.
+- **"Set your password to finish" no longer appears above a PIN pad** when you finish
+  setting up a pod.
+- **On the beanie wall, a child can no longer unlock edits** by holding an older password.
+  The padlock now applies the same grown-ups-only rule however the family signs in.
+
+### Security
+
+- **Deleting a family now always proves who you are.** The old check was skipped entirely
+  when the family file was not loaded, so any text would do on an action that removes your
+  data from this device, your cloud storage and every member's copy.
+
 ## 2026-09-20
 
 _Released as 0.21.7._

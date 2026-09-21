@@ -4,6 +4,66 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## A subagent sweep's findings are hypotheses, not conclusions
+
+**Date:** 2026-09-21
+**Context:** Two Explore agents swept the codebase for surfaces still demanding a password
+after the move to PIN-led auth. Six findings came back. **Two were wrong**, and both were
+acted on before being checked against the code's own stated reasoning.
+
+The worse one: the sweep said `hasKitConfirmedSignal` (`authPrompts.ts:65`) tested
+`owner.passwordHash` with "no `pinHash` fallback" and should be broadened. It should not.
+That disjunct is a deliberate **legacy-0.13 carve-out** — its own docblock says those kits
+"went through the unclosable Settings confirm" — and `settingsStore.ts:711` calls the
+re-firing kit nag **"the designed safety net"** for a failed stamp write. Broadening it
+would have permanently silenced the kit prompt for a PIN-led family whose
+`recoveryKitConfirmedAt` write failed: precisely the family the nag protects. A code
+review caught it; the change was reverted.
+
+The second: the sweep asserted the new `secretFieldFor` fixed the kit-born case. It did
+not — it names a TYPED secret, and a kit is redeemed, not typed. That claim was written
+into two docblocks before anyone checked it.
+
+**Rule:** a finding that says code is wrong must be read against that code's OWN comment
+or ADR before it is acted on. This repo documents its non-obvious decisions in place, so
+"this looks like a stale oversight" is a question to answer from the docblock above it,
+not a conclusion. Where the reasoning is absent, verify the behaviour; where it is
+present and contradicts the finding, the finding is wrong until proven otherwise.
+
+---
+
+## A renamed uiStrings key can silently drop its Chinese translation
+
+**Date:** 2026-09-21
+**Context:** Renaming ten `transferOwnership.reauth*` keys to `reauth.*` carried nine
+translations across intact. The tenth, `reauth.wrongPassword`, landed in
+`public/translations/zh.json` as `{"translation": "Incorrect password. Try again.",
+"hash": ""}` — English text, empty hash. A zh user mistyping their PIN at the delete-family
+gate would have read English.
+
+It could not self-heal. `npm run translate` retries empty-hash entries, but the API
+returns `密码不正确。<x id="1"/>请再试一次。` for that exact string every time, the script
+correctly rejects it as injected markup, and it re-files it as English. Three consecutive
+runs produced the identical rejection. Nothing in the summary line flags it beyond one
+`⚠ 1 key(s) fell back to English`, which is easy to read past.
+
+The fix is cheap once you know the shape: **the hash is derived from the ENGLISH SOURCE,
+not the key** (`hashString(text)` in `scripts/updateTranslations.mjs`), so a pure rename
+leaves the hash unchanged and the old entry can be restored verbatim from git —
+`git show HEAD:public/translations/zh.json`. Confirmed by a sibling key that kept hash
+`bq5xa9` across the same rename.
+
+**Rule:** after any `uiStrings` rename, check `zh.json` for empty-hash entries:
+
+```bash
+python3 -c "import json;d=json.load(open('public/translations/zh.json'));t=d.get('translations',d);print([k for k,v in t.items() if isinstance(v,dict) and not v.get('hash')])"
+```
+
+Expect `[]`. A non-empty list means a string is shipping in English, and if the API keeps
+rejecting it, re-running `translate` will never fix it — restore the old entry from git.
+
+---
+
 ## A regex that deletes one entry can swallow the next one
 
 **Date:** 2026-09-20
