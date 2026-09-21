@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-20",
-    "translationCount": 4890
+    "lastUpdated": "2026-09-21",
+    "translationCount": 4893
   },
   "translations": {
     "app.name": {
@@ -2752,9 +2752,9 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.pickBeanInfoText": {
-      "translation": "注册会员可以使用密码登录。新成员需要先创建密码。",
-      "hash": "xhb0ka",
-      "lastUpdated": "2026-05-14"
+      "translation": "已加入的会员可以使用PIN登录。新成员首先需要一个加入链接。",
+      "hash": "w2bopb",
+      "lastUpdated": "2026-09-20"
     },
     "loginV6.growPodTitle": {
       "translation": "启动您的Pod 🌱",
@@ -8682,9 +8682,9 @@
       "lastUpdated": "2026-03-23"
     },
     "settings.deleteFamilyAuthDesc": {
-      "translation": "输入您的密码以确认删除",
-      "hash": "89fc7n",
-      "lastUpdated": "2026-03-23"
+      "translation": "此操作无法撤消，并且会影响Pod的每个成员。",
+      "hash": "gjmyrz",
+      "lastUpdated": "2026-09-20"
     },
     "settings.deleteFamilyFarewellTitle": {
       "translation": "再见讯息",
@@ -12856,65 +12856,15 @@
       "hash": "8b7kmx",
       "lastUpdated": "2026-05-03"
     },
-    "transferOwnership.reauthTitle": {
-      "translation": "验证身份",
-      "hash": "2275vf",
-      "lastUpdated": "2026-05-03"
-    },
     "transferOwnership.reauthDescription": {
       "translation": "在转让所有权之前，请确认您的身份。",
       "hash": "gvtvoi",
       "lastUpdated": "2026-05-03"
     },
-    "transferOwnership.reauthPasswordDescription": {
-      "translation": "输入您的密码以确认转移。",
-      "hash": "vaqju9",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthPasskeyButton": {
-      "translation": "使用密钥验证",
-      "hash": "feigrf",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthPasswordButton": {
-      "translation": "请改用密码",
-      "hash": "i69vvu",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthVerifyButton": {
-      "translation": "验证",
-      "hash": "spmb8n",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthPasskeyFailed": {
-      "translation": "生物识别验证失败。请重试或使用您的PIN码。",
-      "hash": "bq5xa9",
-      "lastUpdated": "2026-08-28"
-    },
-    "transferOwnership.reauthWrongPassword": {
-      "translation": "密码不正确。请再试一次。",
-      "hash": "dchse3",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthWrongMember": {
-      "translation": "该密钥属于其他成员。使用您的密钥。",
-      "hash": "80o8hz",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthSessionMissing": {
-      "translation": "您的会话已过期。请重新登录以继续。",
-      "hash": "4igom2",
-      "lastUpdated": "2026-05-03"
-    },
-    "transferOwnership.reauthNoPassword": {
-      "translation": "此帐户没有记录密码。",
-      "hash": "ek2qha",
-      "lastUpdated": "2026-05-03"
-    },
     "transferOwnership.reauthNoCredential": {
-      "translation": "您需要设置密钥或密码才能转移所有权。打开“设置” “→帐户和登录”以添加一个帐户，然后重试。",
-      "hash": "gqbxi",
-      "lastUpdated": "2026-09-09"
+      "translation": "您需要设置PIN码或密码才能转移所有权。打开“设置” “→帐户和登录”以添加一个帐户，然后重试。",
+      "hash": "ypg165",
+      "lastUpdated": "2026-09-20"
     },
     "transferOwnership.confirmTitle": {
       "translation": "确认赠送",
@@ -13902,9 +13852,9 @@
       "lastUpdated": "2026-05-13"
     },
     "resumeSetup.subtitle": {
-      "translation": "最后一步：设置您的密码以完成设置。我们从不存储密码，因此您的数据始终保持端到端加密。",
-      "hash": "5f6gqe",
-      "lastUpdated": "2026-06-26"
+      "translation": "让我们完成您的Pod设置。我们绝不会存储您的个人识别码，因此您的数据会保持端到端加密。",
+      "hash": "q7mugo",
+      "lastUpdated": "2026-09-20"
     },
     "resumeSetup.storagePrompt": {
       "translation": "您的Pod应该住在哪里？",
@@ -20672,9 +20622,9 @@
       "lastUpdated": "2026-08-28"
     },
     "auth.memberHasPassword": {
-      "translation": "此会员有密码，请使用该密码登录。",
-      "hash": "5nh75",
-      "lastUpdated": "2026-08-28"
+      "translation": "此成员已设置PIN或密码。请使用它登录。",
+      "hash": "k3gr21",
+      "lastUpdated": "2026-09-20"
     },
     "recovery.podNotOpen": {
       "translation": "您的家庭数据必须开放才能执行此操作。",
@@ -24454,6 +24404,71 @@
     "coldEntry.haveLinkInstead": {
       "translation": "我有一个神奇的链接",
       "hash": "dch5ld",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.title": {
+      "translation": "验证身份",
+      "hash": "2275vf",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.passwordDescription": {
+      "translation": "输入您的密码以确认您的身份。",
+      "hash": "jbzi9u",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.passkeyButton": {
+      "translation": "使用密钥验证",
+      "hash": "feigrf",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.passwordButton": {
+      "translation": "请改用密码",
+      "hash": "i69vvu",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.verifyButton": {
+      "translation": "验证",
+      "hash": "spmb8n",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.passkeyFailed": {
+      "translation": "生物识别验证失败。请重试或使用您的PIN码。",
+      "hash": "bq5xa9",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.wrongPassword": {
+      "translation": "密码不正确。请再试一次。",
+      "hash": "dchse3",
+      "lastUpdated": "2026-09-21"
+    },
+    "reauth.wrongMember": {
+      "translation": "该密钥属于其他成员。使用您的密钥。",
+      "hash": "80o8hz",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.sessionMissing": {
+      "translation": "您的会话已过期。请重新登录以继续。",
+      "hash": "4igom2",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.noPassword": {
+      "translation": "此帐户没有记录密码。",
+      "hash": "ek2qha",
+      "lastUpdated": "2026-09-20"
+    },
+    "password.unlockFileTitle": {
+      "translation": "解锁此文件",
+      "hash": "jpqb5u",
+      "lastUpdated": "2026-09-20"
+    },
+    "password.unlockFileDescription": {
+      "translation": "此文件已加密。输入打开该密钥的密钥以加载您的数据。",
+      "hash": "xdjs8",
+      "lastUpdated": "2026-09-20"
+    },
+    "reauth.verifyFailed": {
+      "translation": "我们刚才无法检查。请重试。",
+      "hash": "5axl3m",
       "lastUpdated": "2026-09-20"
     }
   }

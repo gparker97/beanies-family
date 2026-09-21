@@ -50,9 +50,20 @@ export function useWallLock() {
     familyStore.members.filter((m) => !m.isPet && m.ageGroup === 'adult' && !!m.pinHash)
   );
 
-  /** Can ANYBODY unlock edits here? */
+  /**
+   * Can ANYBODY unlock edits here?
+   *
+   * ⚠️ THE LEGACY-PASSWORD ARM CARRIES THE SAME AGE FILTER AS THE PIN ARM. It used to be
+   * a bare `!!member.value?.passwordHash`, which quietly inverted the padlock: a CHILD
+   * holding a legacy password could unlock edits, while a child with only a PIN could
+   * not — the exact opposite of the rule `unlockCandidates` exists to enforce, and of the
+   * comment directly above it. The arm is a legacy-era fallback for families whose adults
+   * never set a PIN, so it must answer the same question that arm does, not a laxer one.
+   */
   const canUnlock = computed(
-    () => unlockCandidates.value.length > 0 || !!member.value?.passwordHash
+    () =>
+      unlockCandidates.value.length > 0 ||
+      (!!member.value?.passwordHash && !member.value.isPet && member.value.ageGroup === 'adult')
   );
 
   /** Can the signed-in member prove who they are, in order to leave? */

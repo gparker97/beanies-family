@@ -287,6 +287,113 @@ export interface EnvelopeCapabilities {
   kit: boolean;
 }
 
+/** Everything a decrypt surface needs to know about the secret it is asking for. */
+export interface SecretFieldCopy {
+  label: UIStringKey;
+  placeholder: UIStringKey;
+  footer: UIStringKey;
+  switchLabel: UIStringKey;
+  required: UIStringKey;
+  forgot: 'secret' | 'passphrase' | 'password';
+  /**
+   * Whether ANY typed secret opens this envelope.
+   *
+   * ⚠️ DO NOT RE-DERIVE THIS FROM `coldCredentialSurface`. That function answers a
+   * different question — which SCREEN to show on cold sign-in — and it deliberately
+   * prefers the kit when a family has both a kit and a passphrase, because LoadPodView's
+   * kit form links back to the secret field. A caller without that back-link (Settings)
+   * read `!== 'secret'` as "nothing can be typed" and refused a passphrase-only-plus-kit
+   * family a box their passphrase would have opened. Two questions, two answers, one of
+   * them wrong at the call site: hence this field.
+   */
+  canType: boolean;
+  /**
+   * What to put in the input's `autocomplete`.
+   *
+   * The rule: `current-password` only when a member password is the ONLY thing this box
+   * accepts. Otherwise `off`, because with `current-password` on a box that also takes a
+   * passphrase, a password manager fills the saved site password and then offers to
+   * OVERWRITE it with whatever is typed instead — corrupting the credential the person
+   * signs in with, on the screen they reached because they were locked out.
+   *
+   * ⚠️ THE `password && passphrase` BRANCH THEREFORE GETS `off` AND LOSES AUTOFILL. That
+   * is a legacy password-era family that later added a recovery passphrase, so it is a
+   * common shape, not an edge case, and the trade is deliberate: losing autofill is
+   * recoverable, a clobbered sign-in credential is not.
+   */
+  autocomplete: 'current-password' | 'off';
+}
+
+/**
+ * Name the credential THIS envelope can actually accept, in one place.
+ *
+ * `tryUnwrapFamilyKey` tries the member password wraps and THEN the recovery passphrase,
+ * so one field serves both and the label must name whichever the envelope can take.
+ * Labelling it "Password" unconditionally was accurate only for a password-era family:
+ * it made the passphrase a secret feature on the one surface where it silently works.
+ *
+ * ⚠️ IT NAMES A TYPED SECRET, AND A RECOVERY KIT IS NOT ONE. `caps.kit` is deliberately
+ * not a branch here: a kit is REDEEMED through its own form, not typed into this field,
+ * so a kit-only envelope has no correct label and the password wording is only a
+ * fallback. Callers must therefore ask `coldCredentialSurface` FIRST and render this
+ * field only for `'secret'` — `LoadPodView` routes to its kit form, and Settings refuses
+ * with `loginFlow.recoveryOnlyBody`. Treating this function as the whole decision is the
+ * bug it half-fixes.
+ *
+ * ⚠️ LIVES HERE, BESIDE `coldCredentialSurface`, BECAUSE IT HAS TWO CALLERS. It was
+ * inline in `LoadPodView` (the cold sign-in) while Settings' own decrypt modal was
+ * hard-coded to password wording, so a kit-born family restoring a `.beanpod` from
+ * Settings was shown a password box it could never fill. Two surfaces asking the same
+ * question must not answer it in two places; that divergence IS the defect.
+ *
+ * Derived as a SET rather than branched per render site: the label, placeholder,
+ * reassurance, empty-field error and the kit form's way back all have to agree about
+ * which credential is on offer, and they previously disagreed.
+ *
+ * `null` caps means "not known yet" and falls through to the password wording, which is
+ * the conservative default every caller already used.
+ */
+export function secretFieldFor(caps: EnvelopeCapabilities | null): SecretFieldCopy {
+  if (caps?.password && caps.passphrase) {
+    return {
+      label: 'recovery.secretEitherLabel',
+      placeholder: 'recovery.secretEitherPlaceholder',
+      footer: 'loginV6.unlockFooterEither',
+      switchLabel: 'recovery.useSecretEitherLink',
+      required: 'recovery.secretEitherRequired',
+      forgot: 'secret',
+      canType: true,
+      // Either works, so a password manager would be filling into a box that is not
+      // exclusively the password field.
+      autocomplete: 'off',
+    };
+  }
+  if (!!caps && !caps.password && caps.passphrase) {
+    return {
+      label: 'recovery.passphraseLabel',
+      placeholder: 'recovery.passphrasePlaceholder',
+      footer: 'loginV6.unlockFooterPassphrase',
+      switchLabel: 'recovery.usePassphraseLink',
+      required: 'recovery.passphraseRequired',
+      forgot: 'passphrase',
+      canType: true,
+      autocomplete: 'off',
+    };
+  }
+  return {
+    label: 'password.password',
+    placeholder: 'password.enterPasswordPlaceholder',
+    footer: 'loginV6.unlockFooter',
+    switchLabel: 'passkey.usePassword',
+    required: 'password.required',
+    forgot: 'password',
+    // `null` caps (nothing staged yet) lands here too, and defaults to "typeable" so a
+    // surface never refuses on a not-yet-known envelope.
+    canType: !caps || caps.password,
+    autocomplete: 'current-password',
+  };
+}
+
 /**
  * Why `tryUnwrapFamilyKey` could not produce a family key.
  *

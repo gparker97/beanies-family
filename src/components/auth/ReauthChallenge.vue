@@ -147,7 +147,7 @@ async function handlePinComplete(pin: string) {
         : t('pin.incorrect');
     }
   } catch (e) {
-    pinError.value = t('transferOwnership.reauthPasskeyFailed');
+    pinError.value = t('reauth.verifyFailed');
     reportError({
       surface: 'reauthChallenge.handlePinComplete',
       message: 'PIN verify threw during re-auth',
@@ -219,7 +219,7 @@ onMounted(() => {
 
 async function tryPasskey() {
   if (!authStore.currentUser?.familyId) {
-    inlineError.value = t('transferOwnership.reauthSessionMissing');
+    inlineError.value = t('reauth.sessionMissing');
     reportError({
       surface: 'reauthChallenge.tryPasskey',
       message: 'No familyId on session — cannot run passkey challenge',
@@ -249,7 +249,7 @@ async function tryPasskey() {
       return;
     }
     if (result.error === MEMBER_MISMATCH) {
-      inlineError.value = t('transferOwnership.reauthWrongMember');
+      inlineError.value = t('reauth.wrongMember');
       // Native biometric is DEVICE-scoped: it unlocks as the member who enrolled on
       // this device, so a mismatch with the target member is EXPECTED, not an
       // anomaly. Don't page/telemetry it — just guide to password. (Web WebAuthn can
@@ -268,7 +268,7 @@ async function tryPasskey() {
       return;
     }
     // Generic failure — surface the message inline.
-    inlineError.value = result.error ?? t('transferOwnership.reauthPasskeyFailed');
+    inlineError.value = result.error ?? t('reauth.passkeyFailed');
     reportError({
       surface: 'reauthChallenge.tryPasskey',
       message: 'Passkey authentication failed',
@@ -276,7 +276,7 @@ async function tryPasskey() {
       context: { detail: result.error?.slice(0, 200) },
     });
   } catch (e) {
-    inlineError.value = t('transferOwnership.reauthPasskeyFailed');
+    inlineError.value = t('reauth.passkeyFailed');
     reportError({
       surface: 'reauthChallenge.tryPasskey',
       message: 'Passkey authentication threw',
@@ -295,7 +295,7 @@ function openPassword() {
 async function handlePasswordConfirm(entered: string) {
   if (!props.member.passwordHash) {
     // Should be unreachable — UI gates the password option behind hasPassword.
-    passwordError.value = t('transferOwnership.reauthNoPassword');
+    passwordError.value = t('reauth.noPassword');
     reportError({
       surface: 'reauthChallenge.handlePasswordConfirm',
       message: 'Password modal opened for member with no passwordHash',
@@ -313,10 +313,10 @@ async function handlePasswordConfirm(entered: string) {
       passwordOpen.value = false;
       emit('verified');
     } else {
-      passwordError.value = t('transferOwnership.reauthWrongPassword');
+      passwordError.value = t('reauth.wrongPassword');
     }
   } catch (e) {
-    passwordError.value = t('transferOwnership.reauthPasskeyFailed');
+    passwordError.value = t('reauth.verifyFailed');
     reportError({
       surface: 'reauthChallenge.handlePasswordConfirm',
       message: 'verifyPassword threw',
@@ -372,7 +372,7 @@ function cancel() {
         class="w-full"
         @click="tryPasskey"
       >
-        🔐 {{ t('transferOwnership.reauthPasskeyButton') }}
+        🔐 {{ t('reauth.passkeyButton') }}
       </BaseButton>
 
       <div v-if="hasPin && showPinEntry" class="space-y-2">
@@ -424,7 +424,7 @@ function cancel() {
         class="w-full"
         @click="openPassword"
       >
-        🔑 {{ t('transferOwnership.reauthPasswordButton') }}
+        🔑 {{ t('reauth.passwordButton') }}
       </BaseButton>
 
       <div v-if="inlineError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
@@ -441,9 +441,9 @@ function cancel() {
     <!-- Password sub-flow: PasswordModal handles its own input + submit lifecycle -->
     <PasswordModal
       :open="passwordOpen"
-      :title="t('transferOwnership.reauthTitle')"
-      :description="t('transferOwnership.reauthPasswordDescription')"
-      :confirm-label="t('transferOwnership.reauthVerifyButton')"
+      :title="t('reauth.title')"
+      :description="t('reauth.passwordDescription')"
+      :confirm-label="t('reauth.verifyButton')"
       :external-error="passwordError"
       @confirm="handlePasswordConfirm"
       @close="handlePasswordClose"

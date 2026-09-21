@@ -28,7 +28,7 @@ const { state, handleVerified, handleCancelled } = useReauth();
   <BaseModal
     v-if="state.member"
     :open="state.open"
-    :title="t((state.titleKey ?? 'transferOwnership.reauthTitle') as never)"
+    :title="t((state.titleKey ?? 'reauth.title') as never)"
     size="sm"
     layer="overlay"
     @close="handleCancelled"

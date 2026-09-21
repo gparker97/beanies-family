@@ -65,7 +65,6 @@ import { COLLECTION_NAMES } from '@/types/automerge';
 import { payloadErrorMessageKey } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
-import { tryUnwrapFamilyKey } from '@/services/sync/fileSync';
 import { deliverFile } from '@/utils/deliverFile';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
@@ -80,6 +79,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { envelopeCapabilities, secretFieldFor } from '@/services/sync/fileSync';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useBeanTips } from '@/composables/useBeanTips';
@@ -224,14 +224,74 @@ const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
 
+/**
+ * What the STAGED `.beanpod` can actually be opened with.
+ *
+ * This modal decrypts a file, so asking for a secret is legitimate — but it was
+ * hard-coded to "Password" while the cold sign-in surface (`LoadPodView`) had long since
+ * derived the wording from the envelope, so a passphrase-only family was told to type
+ * the one credential they do not have. Same question as the cold screen, so it gets the
+ * same answer from the same function.
+ *
+ * ⚠️ THIS NAMES THE FIELD; IT DOES NOT DECIDE WHETHER TO SHOW ONE. A kit-born family
+ * cannot TYPE anything that opens their file, and Settings has no kit form — that is
+ * `openDecryptModal`'s job, which refuses before this wording is ever reached.
+ *
+ * Null while nothing is staged, which `secretFieldFor` maps to the password wording that
+ * was this modal's only behaviour before.
+ */
+const decryptCaps = computed(() => {
+  const env = syncStore.pendingEncryptedFile?.envelope;
+  return env ? envelopeCapabilities(env) : null;
+});
+const decryptSecretField = computed(() => secretFieldFor(decryptCaps.value));
+
+/**
+ * Open the decrypt modal, unless nothing typeable can open this file.
+ *
+ * ⚠️ `secretFieldFor` NAMES A TYPED SECRET; IT CANNOT NAME A KIT. A Phase-4 kit-born
+ * family has no `wrappedKeys` and no `recoveryPassphrase`, so `coldCredentialSurface`
+ * answers `kit` (or `none` for a truncated file) and there is no string that box could
+ * be labelled with that would let them in. Rendering it anyway is the same impossible
+ * offer this whole change exists to remove, just relabelled.
+ *
+ * Settings has no kit-redemption form — that lives on the cold sign-in screen
+ * (`LoadPodView`) — so the honest move here is to say which credential the file needs
+ * and send them there, rather than take a guess and fail. `loginFlow.recoveryOnlyBody`
+ * is the same string `tryUnwrapFamilyKey` raises for `no-candidates`, so the message is
+ * identical whether it is predicted here or discovered on submit.
+ */
+function openDecryptModal(): void {
+  const caps = decryptCaps.value;
+  if (!decryptSecretField.value.canType) {
+    encryptionError.value = null;
+    // ⚠️ THE STAGED FILE MUST BE RELEASED ON THIS PATH TOO. `clearPendingEncryptedFile`
+    // is otherwise only reached from the modal's own close/finish handlers, and this
+    // branch never opens the modal — so refusing here left `pendingEncryptedFile` armed
+    // for the rest of the session, where the trusted-device probe, the biometric unlock
+    // and the PIN path all read it (see the marker warning in `syncStore`).
+    syncStore.clearPendingEncryptedFile();
+    showToast('error', t('settings.decryptFailed'), t('loginFlow.recoveryOnlyBody'), {
+      surface: 'settings-restore',
+      context: {
+        action: 'restore_needs_kit',
+        // Which wraps the envelope actually carries — the whole diagnosis in one line.
+        detail: caps
+          ? `password=${caps.password} passphrase=${caps.passphrase} kit=${caps.kit}`
+          : 'caps=unknown',
+      },
+    });
+    return;
+  }
+  showDecryptFileModal.value = true;
+}
+
 // ── Delete Family state ────────────────────────────────────────────────────
 const showDeleteFamilyConfirm = ref(false);
-const showDeleteFamilyPassword = ref(false);
 const deleteConfirmText = ref('');
 const wantExport = ref(false);
 const wantDeleteDrive = ref(false);
 const isDeleting = ref(false);
-const deletePasswordError = ref<string | null>(null);
 
 // ── Country & holidays ───────────────────────────────────────────────────────
 const { countryOptions } = useCountryOptions();
@@ -910,7 +970,7 @@ async function handleDriveRestoreSelected(payload: {
   }
 
   if (result.needsPassword) {
-    showDecryptFileModal.value = true;
+    openDecryptModal();
     return;
   }
   if (result.success) {
@@ -953,7 +1013,7 @@ async function handleLoadFromFileConfirmed(source: 'google_drive' | 'local' = 'l
   if (result.cancelled) return;
 
   if (result.needsPassword) {
-    showDecryptFileModal.value = true;
+    openDecryptModal();
     return;
   }
 
@@ -1045,12 +1105,22 @@ async function handleDecryptFile(password: string) {
     // would loop. Same classification the login and join flows use.
     encryptionError.value = t(result.payloadError.inlineMessageKey);
   } else {
-    // `result.error` is a developer-facing string (it can be a raw exception
-    // message), so it is not rendered here: a non-English user would get a
-    // wall of English. The one case worth distinguishing is a wrong password,
-    // which `decryptPendingFile` reports by that exact literal.
+    // ⚠️ PREFER `result.errorKey`. `decryptPendingFile` carries an `UnlockFailedError`'s
+    // `messageKey` out on this field precisely so callers can tell the two unlock
+    // failures apart, and `syncStore` notes that three callers branch on it. This one did
+    // not, so it collapsed both into wording derived from `result.error` — and the
+    // `no-candidates` case (nothing in this envelope can open it, so it needs the
+    // recovery kit) was reported as a flat "could not decrypt". A family that had the
+    // answer was told only that it had failed.
+    //
+    // `result.error` stays the fallback but is never rendered raw: it is a
+    // developer-facing string that can be a bare exception message, and a non-English
+    // user would get a wall of English.
     encryptionError.value = t(
-      result.error === 'Incorrect password' ? 'password.decryptionError' : 'settings.decryptFailed'
+      result.errorKey ??
+        (result.error === 'Incorrect password'
+          ? 'password.decryptionError'
+          : 'settings.decryptFailed')
     );
   }
 }
@@ -1296,7 +1366,6 @@ function resetDeleteFamilyState() {
   wantExport.value = false;
   wantDeleteDrive.value = false;
   isDeleting.value = false;
-  deletePasswordError.value = null;
 }
 
 function handleDeleteFamilyConfirmClose() {
@@ -1304,29 +1373,53 @@ function handleDeleteFamilyConfirmClose() {
   resetDeleteFamilyState();
 }
 
-function handleDeleteFamilyClick() {
-  showDeleteFamilyConfirm.value = false;
-  showDeleteFamilyPassword.value = true;
-}
-
-async function handleDeleteFamilyPasswordConfirm(password: string) {
+/**
+ * Prove identity, then destroy the family.
+ *
+ * ⚠️ A HARD GATE, deliberately unlike its neighbour `handleClearData`, which guards on
+ * `canStepUp()`. That one is the RECOVERY escape hatch: it clears LOCAL data, the
+ * `.beanpod` on Drive survives, and people reach for it precisely when the pod is broken
+ * and a credential may be unresolvable — so failing closed there would trap them. This
+ * destroys the Drive file, the registry row and every member's copy. `useReauth`'s own
+ * docblock reserves the `canStepUp()` skip for recovery paths and keeps the irreversible
+ * actions hard-gated; this is one of those. A member with no credential at all reaches
+ * `ReauthChallenge`'s no-credential state and is told to set a PIN, which is the correct
+ * outcome for an action that cannot be undone.
+ *
+ * WHAT THIS REPLACED, so it is not reintroduced: a bespoke `PasswordModal` that verified
+ * by calling `tryUnwrapFamilyKey(envelope, password)`. That was broken both ways. A PIN is
+ * never an envelope wrap (`authStore.ts` — 10⁶ offline guesses), so for a PIN-led family
+ * `wrappedKeys` is empty, `tryUnwrapFamilyKey` threw `no-candidates` for EVERY input, and
+ * delete-family was unreachable. And the check sat behind `if (envelope)` with no `else`,
+ * so a null envelope skipped it entirely and any non-empty string deleted the family. The
+ * entered secret was only ever an identity check and was discarded, so nothing downstream
+ * lost anything by moving to the canonical gate.
+ */
+async function handleDeleteFamilyClick() {
   const familyId = familyContextStore.activeFamilyId;
   if (!familyId) return;
+  // Re-entrancy guard. The gate is `await`ed while the button stays on screen, and
+  // `requireReauth` refuses a second concurrent call by resolving false — which would
+  // land here as an ordinary refusal and file a spurious `cancelled` against the step-up
+  // gate's outcome telemetry. Disabling the button is the honest fix: a deletion IS in
+  // flight from the moment we start asking who you are.
+  if (isDeleting.value) return;
+  isDeleting.value = true;
 
-  // Verify password against the envelope
-  const envelope = syncStore.envelope;
-  if (envelope) {
-    try {
-      await tryUnwrapFamilyKey(envelope, password);
-    } catch {
-      deletePasswordError.value = t('password.incorrect');
-      return;
-    }
+  if (
+    !(await requireReauth({
+      titleKey: 'settings.deleteFamily',
+      reasonKey: 'settings.deleteFamilyAuthDesc',
+    }))
+  ) {
+    // Not an error: a cancel, a wrong PIN run out of attempts, or no credential at all.
+    // `useReauth` records the outcome and explains itself on screen, so the only thing
+    // owed here is releasing the button and leaving the confirm modal exactly as it was.
+    isDeleting.value = false;
+    return;
   }
 
-  deletePasswordError.value = null;
-  showDeleteFamilyPassword.value = false;
-  isDeleting.value = true;
+  showDeleteFamilyConfirm.value = false;
 
   try {
     // 1. Export if requested — and REFUSE to delete anything if it did not
@@ -2992,20 +3085,6 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
       </div>
     </BeanieFormModal>
 
-    <!-- ── Delete Family Password Gate ─────────────────────────────────── -->
-    <PasswordModal
-      :open="showDeleteFamilyPassword"
-      :title="t('settings.deleteFamily')"
-      :description="t('settings.deleteFamilyAuthDesc')"
-      :confirm-label="t('settings.deleteFamily')"
-      :external-error="deletePasswordError"
-      @close="
-        showDeleteFamilyPassword = false;
-        deletePasswordError = null;
-      "
-      @confirm="handleDeleteFamilyPasswordConfirm"
-    />
-
     <!-- ── Decrypt File Password Modal ─────────────────────────────────── -->
     <!-- ⚠️ `:external-error` IS THE FIX FOR A MESSAGE NOBODY COULD SEE. The
          failure was written to `encryptionError`, which renders as a
@@ -3018,9 +3097,13 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
          wired. -->
     <PasswordModal
       :open="showDecryptFileModal"
-      :title="t('password.enterPassword')"
-      :description="t('password.enterPasswordDescription')"
+      :title="t('password.unlockFileTitle')"
+      :description="t('password.unlockFileDescription')"
       :confirm-label="t('password.decryptAndLoad')"
+      :secret-label="t(decryptSecretField.label)"
+      :secret-placeholder="t(decryptSecretField.placeholder)"
+      :secret-required="t(decryptSecretField.required)"
+      :secret-autocomplete="decryptSecretField.autocomplete"
       :external-error="encryptionError"
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"

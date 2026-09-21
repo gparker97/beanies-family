@@ -2399,48 +2399,56 @@ const STRING_DEFS = {
     en: 'Your family is still loading, so we can’t check it’s you yet. Give it a moment and try again.',
     beanie: 'your family is still loading, so we can’t check it’s you yet. try again in a moment.',
   },
-  'transferOwnership.reauthTitle': { en: 'Verify Identity', beanie: 'verify identity' },
+  'reauth.title': { en: 'Verify Identity', beanie: 'verify identity' },
   'transferOwnership.reauthDescription': {
     en: 'Confirm it’s really you before transferring ownership.',
     beanie: 'confirm it’s really you before transferring ownership.',
   },
-  'transferOwnership.reauthPasswordDescription': {
-    en: 'Enter your password to confirm the transfer.',
-    beanie: 'enter your password to confirm the transfer.',
+  'reauth.passwordDescription': {
+    en: 'Enter your password to confirm it is really you.',
+    beanie: 'enter your password to confirm it is really you.',
   },
-  'transferOwnership.reauthPasskeyButton': {
+  'reauth.passkeyButton': {
     en: 'Verify with Passkey',
     beanie: 'verify with passkey',
   },
-  'transferOwnership.reauthPasswordButton': {
+  'reauth.passwordButton': {
     en: 'Use Password Instead',
     beanie: 'use password instead',
   },
-  'transferOwnership.reauthVerifyButton': { en: 'Verify', beanie: 'verify' },
-  'transferOwnership.reauthPasskeyFailed': {
+  'reauth.verifyButton': { en: 'Verify', beanie: 'verify' },
+  // Neutral failure for a verification that THREW (corrupt hash, WebCrypto unavailable)
+  // rather than a credential being wrong. Must not name a method: it is reported on the
+  // PIN path and the password path, where "Biometric verification failed. Try again or
+  // use your PIN." rendered directly under the PIN pad the person had just used.
+  'reauth.verifyFailed': {
+    en: 'We could not check that just now. Please try again.',
+    beanie: 'we could not check that just now. please try again.',
+  },
+  'reauth.passkeyFailed': {
     en: 'Biometric verification failed. Try again or use your PIN.',
     beanie: 'biometric verification failed. try again or use your pin.',
   },
-  'transferOwnership.reauthWrongPassword': {
+  'reauth.wrongPassword': {
     en: 'Incorrect password. Try again.',
     beanie: 'incorrect password. try again.',
   },
-  'transferOwnership.reauthWrongMember': {
+  'reauth.wrongMember': {
     en: 'That passkey belongs to a different member. Use yours.',
     beanie: 'that passkey belongs to a different member. use yours.',
   },
-  'transferOwnership.reauthSessionMissing': {
+  'reauth.sessionMissing': {
     en: 'Your session expired. Sign in again to continue.',
     beanie: 'your session expired. sign in again to continue.',
   },
-  'transferOwnership.reauthNoPassword': {
+  'reauth.noPassword': {
     en: 'This account has no password on file.',
     beanie: 'this account has no password on file.',
   },
   'transferOwnership.reauthNoCredential': {
-    en: 'You need a passkey or a password set up to transfer ownership. Open Settings → Account & Sign-In to add one, then try again.',
+    en: 'You need a PIN or a password set up to transfer ownership. Open Settings → Account & Sign-In to add one, then try again.',
     beanie:
-      'you need a passkey or a password set up to transfer ownership. open settings → account & sign-in to add one, then try again.',
+      'you need a pin or a password set up to transfer ownership. open settings → account & sign-in to add one, then try again.',
   },
   'transferOwnership.confirmTitle': { en: 'Confirm Transfer', beanie: 'confirm transfer' },
   'transferOwnership.confirmMessage': {
@@ -3558,6 +3566,15 @@ const STRING_DEFS = {
   },
   // Password modal
   'password.enterPassword': { en: 'Enter Password', beanie: 'enter password' },
+  // Credential-NEUTRAL title + instruction for the `.beanpod` decrypt modal. The step is
+  // "open this file"; WHICH secret opens it is the field's job to say (`secretFieldFor`),
+  // and it differs per envelope. `password.enterPassword` / `enterPasswordDescription`
+  // stay for the password-only default inside `PasswordModal`.
+  'password.unlockFileTitle': { en: 'Unlock This File', beanie: 'unlock this file' },
+  'password.unlockFileDescription': {
+    en: 'This file is encrypted. Enter the secret that opens it to load your data.',
+    beanie: 'this file is encrypted. enter the secret that opens it to load your data.',
+  },
   'password.enterPasswordDescription': {
     en: 'This file is encrypted. Enter your password to decrypt and load the data.',
     beanie: 'this file is encrypted. enter your password to decrypt and load the data.',
@@ -4206,9 +4223,9 @@ const STRING_DEFS = {
     beanie: 'finish setting up your pod',
   },
   'resumeSetup.subtitle': {
-    en: 'One last step: set your password to finish. We never store it, so your data stays encrypted end-to-end.',
+    en: 'Let’s finish setting up your pod. We never store your PIN, so your data stays encrypted end-to-end.',
     beanie:
-      'one last step: set your password to finish. we never store it, so your data stays encrypted end-to-end.',
+      'let’s finish setting up your pod. we never store your pin, so your data stays encrypted end-to-end.',
   },
   'resumeSetup.subtitleRecovery': {
     en: "Your last setup didn't quite finish. Re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
@@ -5322,8 +5339,8 @@ const STRING_DEFS = {
   },
   'auth.memberNotFound': { en: 'Member not found.', beanie: 'member not found.' },
   'auth.memberHasPassword': {
-    en: 'This member has a password — please sign in with it.',
-    beanie: 'this member has a password — please sign in with it.',
+    en: 'This member already has a PIN or password set. Please sign in with it.',
+    beanie: 'this member already has a pin or password set. please sign in with it.',
   },
   'auth.memberNeedsInvite': {
     en: 'This grown-up bean needs an invite before it can be opened. Ask someone in your family to invite you from The Pod.',
@@ -5353,9 +5370,9 @@ const STRING_DEFS = {
     beanie: 'no servers, no tracking, no data collection.',
   },
   'loginV6.pickBeanInfoText': {
-    en: 'Onboarded members can sign in with their password. New members need to create a password first.',
+    en: 'Members who have joined can sign in with their PIN. New members need a joining link first.',
     beanie:
-      'onboarded members can sign in with their password. new members need to create a password first.',
+      'members who have joined can sign in with their pin. new members need a joining link first.',
   },
   'loginV6.growPodTitle': {
     en: 'Start your pod \ud83c\udf31',
@@ -6572,8 +6589,8 @@ const STRING_DEFS = {
     beanie: 'type "delete" to confirm',
   },
   'settings.deleteFamilyAuthDesc': {
-    en: 'Enter your password to confirm deletion',
-    beanie: 'enter your password to confirm deletion',
+    en: 'This cannot be undone, and it affects every member of your pod.',
+    beanie: 'this cannot be undone, and it affects every member of your pod.',
   },
   'settings.deleteFamilyFarewellTitle': { en: 'Goodbye', beanie: 'goodbye' },
   'settings.deleteFamilyFarewellMsg': {
