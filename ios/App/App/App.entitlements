@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Associated Domains (ADR-029). One association:
-    - applinks:beanies.family → the OAuth return Universal Link
-                                (https://beanies.family/oauth/native), matched by
-                                web/public/.well-known/apple-app-site-association.
+  Associated Domains (ADR-029). TWO associations, claiming different, non-overlapping
+  paths on two origins:
+    - applinks:beanies.family     → the OAuth return Universal Link
+                                    (https://beanies.family/oauth/native), matched by
+                                    web/public/.well-known/apple-app-site-association.
+    - applinks:app.beanies.family → shared links (/join, /welcome) and entity deep links
+                                    (#63), matched by public/.well-known/apple-app-site-association.
+                                    That file's path list is owned by
+                                    src/constants/externalDeepLinkPaths.ts and pinned to it
+                                    by src/constants/__tests__/deepLinkPaths.manifests.test.ts.
+                                    It deliberately EXCLUDES /oauth/* — /oauth/callback on
+                                    that origin is the Drive Picker's web return path.
   App Groups (#64): `group.family.beanies.app` is the ONLY channel between the Share
   Extension and the app — they are separate processes that share nothing else. The
   extension writes each shared document into this container; ShareIntentPlugin reads and
@@ -14,9 +22,12 @@
 
   The former webcredentials:app.beanies.family (passkey) association was retired with
   the native WebAuthn-PRF pivot to the hardware Keystore (ADR-029, 2026-07-14) — native
-  biometric no longer uses WebAuthn. The AASA must carry the real Apple Team ID (it
-  currently holds the <APPLE_TEAM_ID> placeholder) before applinks verifies on-device —
-  see the substitution checklist in docs/runbooks/native-store-submission.md.
+  biometric no longer uses WebAuthn. Both AASA files now carry the real Apple Team ID
+  (V2CKCNM3S7); the <APPLE_TEAM_ID> placeholder this comment used to warn about is gone
+  from public/ and web/public/, and the claim that it was still there was stale — see
+  docs/plans/2026-08-06-ios-oauth-custom-scheme-bridge.md:92, which identified it and
+  never landed the fix. The remaining live steps are in the substitution checklist in
+  docs/runbooks/native-store-submission.md.
 -->
 <plist version="1.0">
 <dict>

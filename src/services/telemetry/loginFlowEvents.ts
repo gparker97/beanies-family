@@ -7,7 +7,8 @@
  * call site.
  *
  * Context discipline: every field below rides on ALREADY-ALLOWLISTED context keys
- * (`action`, `kind`, `detail`, `error_code`, `stage` — see ALLOWED_CONTEXT_KEYS in
+ * (`action`, `kind`, `detail`, `error_code`, `stage`, `route_path` — see
+ * ALLOWED_CONTEXT_KEYS in
  * diagnosticContext.ts), so no store-declaration change ships with this surface. Member
  * NAMES never appear here — ids are truncated to tails where needed, names not at all.
  */
@@ -411,5 +412,67 @@ export function emitDeviceApprovalOutcome(event: DeviceApprovalOutcomeEvent): vo
     action: event.outcome,
     ...(event.errorCode ? { error_code: event.errorCode } : {}),
     ...(event.side === 'approver' && event.delivery ? { kind: event.delivery } : {}),
+  });
+}
+
+// ─── Inbound deep links (`inboundLinkBridge`) ────────────────────────────────
+//
+// ⚠️ THIS GROUP DELIBERATELY BREAKS THE FACADE'S NAMING CONVENTION, and that is not an
+// oversight to tidy. Every other function here passes the event name as `message`. These
+// four keep the PROSE `message` and snake_case `action` pair the bridge has always
+// shipped, because both strings are load-bearing in different places: `action` is what the
+// CloudWatch filters and `docs/plans/2026-09-18-device-approval-deeplink-notification.md`
+// key on, and `message` is what `logEvent`'s rate limiter buckets on (`logEvent.ts:85-86`,
+// `key = surface::normalizeMessage(message)`). Renaming either is a silent observability
+// break for zero user benefit. They live on the facade anyway so the payload SHAPES cannot
+// drift per call site, which is the rule's actual purpose.
+
+/** A deep link passed the origin and path gates and was handed to the router. */
+export function emitInboundLinkRouted(payload: { routePath: string }): void {
+  emit('info', 'inbound link routed', {
+    action: 'inbound_link_routed',
+    route_path: payload.routePath,
+  });
+}
+
+/**
+ * A deep link was rejected before it could drive any app state.
+ *
+ * ⚠️ THE TWO REASONS GET DIFFERENT `message` STRINGS ON PURPOSE, and this function derives
+ * both `level` and `message` from `errorCode` rather than accepting them. One shared
+ * message would put both reasons in ONE 50-events-per-minute rate bucket
+ * (`logEvent.ts:85-86`), so a device tapping look-alike links could suppress the one
+ * genuinely anomalous `foreign-origin` warn — burying the signal this event exists to
+ * raise. Separate messages give separate buckets and separate levels while `action` stays
+ * single-valued, so the CloudWatch query is still one filter on
+ * `action = 'inbound_link_ignored'` with `error_code` as the breakdown.
+ */
+export function emitInboundLinkIgnored(payload: {
+  errorCode: 'path-not-claimed' | 'foreign-origin';
+}): void {
+  const foreign = payload.errorCode === 'foreign-origin';
+  emit(
+    foreign ? 'warn' : 'info',
+    foreign
+      ? 'inbound link from a foreign origin; ignored'
+      : 'inbound link path not routable; ignored',
+    // ⚠️ NO `route_path` ON EITHER REASON. Both branches reject a URL we did not mint, so
+    // the path is attacker-supplied free text in both — and `route_path` is an allowlisted
+    // field declared to Apple and Google as collected Diagnostics. `deepLinkEvents.ts`
+    // records the incident where untrusted URL content leaked into exactly this field.
+    // The value of these events is their RATE; the tripwire test names the path.
+    { action: 'inbound_link_ignored', error_code: payload.errorCode }
+  );
+}
+
+/** `new URL()` threw. Not actionable, but a silent return is how "the link did nothing" becomes untriageable. */
+export function emitInboundLinkUnparseable(): void {
+  emit('warn', 'inbound link was not a parseable URL', { action: 'inbound_link_unparseable' });
+}
+
+/** The launch URL had already been consumed by an earlier JS context; not replayed. */
+export function emitLaunchUrlReplaySuppressed(): void {
+  emit('info', 'launch url already consumed; not replaying', {
+    action: 'launch_url_replay_suppressed',
   });
 }

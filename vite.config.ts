@@ -204,6 +204,26 @@ export default defineConfig({
         },
         start_url: '/',
         scope: '/',
+        // ⚠️ NO `handle_links` / `launch_handler` — #63's PWA rung is DELIBERATELY NOT
+        // SHIPPED, and this comment is here so it is not "helpfully" added back.
+        //
+        // The other three rungs (iOS AASA, the Android intent-filter, the in-app
+        // `ROUTABLE_PATHS`) all hold one invariant: the OS must never claim more than the
+        // app routes. They enforce it by ENUMERATION, pinned by
+        // `src/constants/__tests__/deepLinkPaths.manifests.test.ts`.
+        //
+        // A PWA cannot. `scope` is `/`, so link capture is scope-wide and cannot be
+        // narrowed to EXTERNAL_DEEP_LINK_PATHS — and the in-app safety net does not run
+        // either: `inboundLinkBridge` is `if (!isNative()) return`. So `handle_links`
+        // would re-claim `/oauth/callback`, the ONE path the AASA spends a load-bearing
+        // first-position exclusion to refuse, because it is the Drive Picker's WEB return
+        // path. On Android with the WebAPK installed and "open supported links" on, that
+        // return could land in the PWA window instead of the browser tab holding the
+        // picker's parked sessionStorage selection, and the pick is silently lost.
+        //
+        // greg validated that Picker flow on a production iPhone on 2026-09-20, so the
+        // bar for touching it is a real WebAPK test on a device — not a green unit gate.
+        // Ship this only after that test passes.
         // Portrait-locked: the app is designed phone-first and every layout is
         // portrait. In an installed PWA the manifest `orientation` overrides the
         // OS auto-rotate lock, so `'any'` rotated against users who had rotation

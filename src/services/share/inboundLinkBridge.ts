@@ -15,7 +15,13 @@
  */
 import { App as CapacitorApp } from '@capacitor/app';
 import { isNative } from '@/services/sync/capabilities';
-import { logEvent } from '@/services/telemetry/logEvent';
+import {
+  emitInboundLinkRouted,
+  emitInboundLinkIgnored,
+  emitInboundLinkUnparseable,
+  emitLaunchUrlReplaySuppressed,
+} from '@/services/telemetry/loginFlowEvents';
+import { EXTERNAL_DEEP_LINK_PATHS } from '@/constants/externalDeepLinkPaths';
 import { readHashMarker, APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
 import { emitApprovalKeyDropped, type DeliveryKind } from '@/services/telemetry/deepLinkEvents';
 import { reportError } from '@/utils/errorReporter';
@@ -33,13 +39,21 @@ import { nativeOAuthTransport } from '@/constants/nativeOAuth';
  * the other requiring an exact `/welcome` — a link routes, has its fragment stripped, and
  * delivers nothing at all, silently.
  *
- * `/welcome` and `/join` are flat routes with no children, so descendant matching buys
- * nothing. Exact matching makes both gates the same comparison BY CONSTRUCTION rather than
- * by a shared helper someone has to remember to keep shared — and it keeps `utils/route.ts`
- * (a nav-highlighting helper) out of a security decision, where a future "make nav matching
+ * These are flat routes with no children, so descendant matching buys nothing. Exact
+ * matching makes both gates the same comparison BY CONSTRUCTION rather than by a shared
+ * helper someone has to remember to keep shared — and it keeps `utils/route.ts` (a
+ * nav-highlighting helper) out of a security decision, where a future "make nav matching
  * more forgiving" change would silently widen an auth boundary.
+ *
+ * ⚠️ THE SET IS NOW SHARED WITH THE OS-LEVEL CLAIMS (#63). The same list backs the
+ * `applinks` components in `public/.well-known/apple-app-site-association` and the
+ * `android:path` values in `AndroidManifest.xml`, pinned by a tripwire test. That is the
+ * point: if the OS ever claimed strictly MORE than this set routes, every URL in the gap
+ * would open the app and leave it sitting on whatever screen it was already on — the
+ * failure this whole file exists to prevent. Exact matching still holds for the same
+ * two-gate reason; the list simply got longer.
  */
-const ROUTABLE_PATHS = new Set(['/join', '/welcome']);
+const ROUTABLE_PATHS = new Set(EXTERNAL_DEEP_LINK_PATHS);
 
 /** Trailing slashes are cosmetic in a URL someone typed or a QR encoded; normalise once. */
 function normalisePath(pathname: string): string {
@@ -114,26 +128,46 @@ export function installInboundLinkListener(
       } catch {
         // A malformed URL is not actionable and not worth paging anyone over, but a
         // silent return is how "the link did nothing" becomes untriageable.
-        logEvent({
-          level: 'warn',
-          surface: 'login-flow',
-          message: 'inbound link was not a parseable URL',
-          context: { action: 'inbound_link_unparseable' },
-        });
+        emitInboundLinkUnparseable();
         return;
       }
 
       // Only our own app origin. A custom-scheme or third-party URL routed straight into
       // the router is an open redirect with extra steps.
-      if (parsed.protocol !== 'https:' || parsed.hostname !== 'app.beanies.family') return;
+      //
+      // ⚠️ THREE OUTCOMES, NOT TWO, AND THE FIRST ONE IS SILENT ON PURPOSE. `appUrlOpen`
+      // also delivers `file://` URLs for every iOS "Open in beanies" document
+      // (`iosOpenInAdapter.ts:72-76`), and the custom scheme was already handled by
+      // `nativeOAuthTransport` above. Those belong to other listeners BY CONSTRUCTION, so
+      // logging them here would emit an event per shared document and bury the one event
+      // this gate exists to raise.
+      if (parsed.protocol !== 'https:') return;
+      if (parsed.hostname !== 'app.beanies.family') {
+        // ⚠️ NO `routePath`. On a foreign host the path is not one of our routes and is
+        // wholly attacker-supplied free text; `route_path` is an allowlisted field and
+        // `deepLinkEvents.ts` records the incident where untrusted URL content leaked into
+        // it. This should never fire at all, so its VALUE is its existence, not its detail
+        // — if it ever does fire, the next step is the device, not the field.
+        emitInboundLinkIgnored({ errorCode: 'foreign-origin' });
+        return;
+      }
       const path = normalisePath(parsed.pathname);
       if (!ROUTABLE_PATHS.has(path)) {
-        logEvent({
-          level: 'info',
-          surface: 'login-flow',
-          message: 'inbound link path not routable; ignored',
-          context: { action: 'inbound_link_ignored' },
-        });
+        // ⚠️ NO `routePath` HERE EITHER. An earlier version logged `parsed.pathname` on the
+        // reasoning that "our own host means the path is one of our URLs". That reasoning
+        // is false, and the branch itself proves it: this branch fires ONLY on paths that
+        // are NOT ours. The host check constrains the host, not the path — anyone can send
+        // `https://app.beanies.family/<arbitrary text>`, and on Android any installed app
+        // can deliver an explicit Intent to the exported MainActivity, bypassing
+        // intent-filter matching altogether. `redactContext` truncates at 200 chars but
+        // does not sanitise, so that text would reach CloudWatch under a key declared to
+        // Apple and Google as collected Diagnostics.
+        //
+        // The drift signal this event exists for is the RATE, not the string: if the OS
+        // claim ever widens past `ROUTABLE_PATHS`, this fires. To find out which path,
+        // compare the manifests against `EXTERNAL_DEEP_LINK_PATHS` — which the tripwire
+        // test already does, in CI, by name.
+        emitInboundLinkIgnored({ errorCode: 'path-not-claimed' });
         return;
       }
 
@@ -212,13 +246,19 @@ export function installInboundLinkListener(
         }
       }
 
-      logEvent({
-        level: 'info',
-        surface: 'login-flow',
-        message: 'inbound link routed',
-        // ⚠️ Path only — NEVER the search string. It carries the token.
-        context: { action: 'inbound_link_routed', route_path: parsed.pathname },
-      });
+      // ⚠️ Path only — NEVER the search string. It carries the token.
+      //
+      // ⚠️ "ROUTED" MEANS HANDED TO THE ROUTER, NOT LANDED — the same discipline the
+      // approval-key delivery above states for itself. `navigate` returns void and its
+      // caller discards the result, so a router guard that bounces the person afterwards
+      // is NOT reflected here: `/accounts`, `/transactions`, `/assets` and `/goals` are
+      // `requiresFinance` (→ `/no-access`) and `/lists` is `requiresFlag` (→ `/nook`).
+      // A member without finance permission tapping a `/goals?view=…` link is recorded
+      // as routed and their bounce is recorded nowhere. Known gap, deliberately not
+      // closed here: measuring it means `navigate` reporting its resolved route back,
+      // which changes the injected contract and App.vue's wiring. Do not read this
+      // counter as "landed on the item" until that exists.
+      emitInboundLinkRouted({ routePath: parsed.pathname });
       // ⚠️ STRIP ONLY THE APPROVAL MARKER, AND FORWARD THE REST.
       //
       // Dropping the whole fragment here broke the printed recovery kit: its QR is
@@ -275,12 +315,7 @@ export function installInboundLinkListener(
     .then((launch) => {
       if (!launch?.url) return;
       if (alreadyConsumed(launch.url)) {
-        logEvent({
-          level: 'info',
-          surface: 'login-flow',
-          message: 'launch url already consumed; not replaying',
-          context: { action: 'launch_url_replay_suppressed' },
-        });
+        emitLaunchUrlReplaySuppressed();
         return;
       }
       markConsumed(launch.url);

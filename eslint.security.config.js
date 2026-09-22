@@ -126,6 +126,18 @@ export default [
       '.github/**',
       '**/*.test.ts',
       '**/*.test.js',
+      // ⚠️ ONE FILE, NOT `src/test/**`. `repoFile.ts` does a `readFileSync` on a
+      // caller-supplied repo-relative path for the manifest drift tripwires — the same
+      // category as `**/*.test.ts` above, and it was exempt until the identical code was
+      // moved out of a `.test.ts` to stop it being copied per suite.
+      //
+      // A directory-wide ignore would ALSO silence every security rule on the other
+      // files already in `src/test/` (`consentGrant.ts`, the branded back door around the
+      // ADR-030 consent gate, and `stubs/pwa-register.ts`). Those live under `src/`, are
+      // inside `tsconfig.app.json`, and are importable from production code via
+      // `@/test/...` — so a future helper dropped there with an `eval` or an unsanitised
+      // fs path would pass the gate with no signal. Scope stays at the one file.
+      'src/test/repoFile.ts',
       // .mjs was missing: the Lambda suites are ESM, so this config had never scanned a
       // lambda test file until #72 added one. Test files legitimately read fixture paths
       // built from variables (detect-non-literal-fs-filename), which is not a finding here.

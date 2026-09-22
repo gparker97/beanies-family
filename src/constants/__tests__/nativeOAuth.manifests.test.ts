@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { repoFile } from '@/test/repoFile';
 import { NATIVE_BRIDGE_URI } from '../nativeOAuth';
 
 /**
@@ -12,10 +11,8 @@ import { NATIVE_BRIDGE_URI } from '../nativeOAuth';
  * rather than silently, three days later, in a TestFlight build.
  */
 
-// Resolved from the repo root (vitest's cwd) rather than `import.meta.url`:
-// this suite runs under happy-dom, where import.meta.url is an http:// URL and
-// fileURLToPath rejects it.
-const repoFile = (relative: string) => readFileSync(join(process.cwd(), relative), 'utf8');
+// `repoFile` is shared with `deepLinkPaths.manifests.test.ts` and the appChrome
+// call-site pin — see `src/test/repoFile.ts` for why it resolves from `process.cwd()`.
 
 const scheme = NATIVE_BRIDGE_URI.split('://')[0];
 
@@ -44,10 +41,29 @@ describe('native manifests declare the bridge scheme', () => {
   it('AndroidManifest.xml keeps the verified https App Link filter', () => {
     // The custom scheme is additive. Losing the autoVerify App Link would
     // silently downgrade Android to the bridge page for every sign-in.
-    const manifest = repoFile('android/app/src/main/AndroidManifest.xml');
-    expect(manifest).toContain('android:autoVerify="true"');
-    expect(manifest).toContain('android:scheme="https"');
-    expect(manifest).toContain('android:pathPrefix="/oauth/native"');
+    //
+    // ⚠️ SCOPED TO THE OAUTH FILTER, NOT A WHOLE-FILE `toContain`. #63 added a second
+    // autoVerify filter carrying `android:scheme="https"` on twelve `<data>` lines, so a
+    // file-wide scan for those two literals is now satisfied by content that has nothing
+    // to do with OAuth — it could fail on only one of three. Consolidating the two
+    // filters, or moving the /oauth/native line to a non-autoVerify filter, would then
+    // pass while Android claims nothing for the OAuth return and every native sign-in
+    // silently downgrades to the bridge page.
+    const manifest = repoFile('android/app/src/main/AndroidManifest.xml').replace(
+      /<!--[\s\S]*?-->/g,
+      ''
+    );
+    const oauthFilters = (manifest.match(/<intent-filter[\s\S]*?<\/intent-filter>/g) ?? []).filter(
+      (b) => b.includes('android:pathPrefix="/oauth/native"')
+    );
+    expect(
+      oauthFilters.length,
+      'Expected exactly ONE intent-filter claiming the apex /oauth/native App Link.'
+    ).toBe(1);
+    const oauthFilter = oauthFilters[0];
+    expect(oauthFilter).toContain('android:autoVerify="true"');
+    expect(oauthFilter).toContain('android:scheme="https"');
+    expect(oauthFilter).toContain('android:host="beanies.family"');
   });
 });
 
@@ -59,41 +75,11 @@ describe('native manifests declare the bridge scheme', () => {
  * tell why. There is no error, no log, and no way to notice except by trying it on a
  * real phone.
  */
-describe('shared links open the app', () => {
-  const APP_HOST = 'app.beanies.family';
-
-  it('iOS claims the APP subdomain, not just the apex', () => {
-    // Every shared URL is built by `shareableOrigin()` as https://app.beanies.family/...
-    // The entitlement used to claim only `beanies.family`, so no shared link ever matched.
-    const entitlements = repoFile('ios/App/App/App.entitlements');
-    expect(entitlements).toContain(`applinks:${APP_HOST}`);
-  });
-
-  it('the app-origin AASA claims /join and /welcome', () => {
-    const aasa = JSON.parse(repoFile('public/.well-known/apple-app-site-association'));
-    const paths = aasa.applinks.details.flatMap((d: { components: { '/': string }[] }) =>
-      d.components.map((c) => c['/'])
-    );
-    expect(paths).toContain('/join');
-    expect(paths).toContain('/welcome');
-  });
-
-  it('Android claims the same host and paths with autoVerify', () => {
-    const manifest = repoFile('android/app/src/main/AndroidManifest.xml');
-    expect(manifest).toContain(`android:host="${APP_HOST}"`);
-    expect(manifest).toMatch(/android:host="app\.beanies\.family" android:pathPrefix="\/join"/);
-  });
-
-  it('does NOT claim the apex /join — the 301 would defeat it', () => {
-    // apex-cutover.js 301s /join to the app subdomain, and both platforms match the
-    // TAPPED url without following redirects. An apex claim verifies and never fires.
-    const apexAasa = JSON.parse(repoFile('web/public/.well-known/apple-app-site-association'));
-    const apexPaths = apexAasa.applinks.details.flatMap((d: { components: { '/': string }[] }) =>
-      d.components.map((c) => c['/'])
-    );
-    expect(apexPaths).not.toContain('/join');
-  });
-});
+// Shared-link + entity deep-link manifest claims (the app-origin AASA, the
+// app.beanies.family intent-filter, the entitlement's applinks:app.beanies.family)
+// now live in `deepLinkPaths.manifests.test.ts`, which pins them all to
+// EXTERNAL_DEEP_LINK_PATHS. They were moved rather than copied (#63): this file
+// keeps only what is about OAUTH. Do not re-add them here.
 
 describe('nativeOAuth.ts stays dependency-free', () => {
   it('has no module-level imports, re-exports, or requires', () => {

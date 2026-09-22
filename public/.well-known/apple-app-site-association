@@ -2,16 +2,25 @@
   "applinks": {
     "details": [
       {
-        "appIDs": [
-          "V2CKCNM3S7.family.beanies.app"
-        ],
+        "appIDs": ["V2CKCNM3S7.family.beanies.app"],
         "components": [
           {
-            "/": "/join"
+            "/": "/oauth/*",
+            "exclude": true,
+            "comment": "DO NOT REPLACE THIS LIST WITH A WILDCARD. /oauth/callback is the Drive Picker's WEB return path; handing it to the app breaks it. The enumeration below must equal EXTERNAL_DEEP_LINK_PATHS in src/constants/externalDeepLinkPaths.ts — a tripwire test enforces it."
           },
-          {
-            "/": "/welcome"
-          }
+          { "/": "/accounts" },
+          { "/": "/activities" },
+          { "/": "/assets" },
+          { "/": "/family" },
+          { "/": "/goals" },
+          { "/": "/join" },
+          { "/": "/lists" },
+          { "/": "/pod" },
+          { "/": "/todo" },
+          { "/": "/transactions" },
+          { "/": "/travel" },
+          { "/": "/welcome" }
         ]
       }
     ]

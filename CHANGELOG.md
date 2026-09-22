@@ -12,6 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 _On `main`, not yet released._
 
+### Added
+
+- **Tapping a beanies link now opens the app instead of the browser.** The link inside a
+  synced calendar invite, and links to travel plans, to-dos, lists, accounts, goals and
+  family members, all open the installed app and land on the item. If you are signed out
+  when you tap, you will land on your home page after signing in rather than on the item
+  itself.
+
 ### Fixed
 
 - **Deleting your family asked for a password that most families do not have.** Families

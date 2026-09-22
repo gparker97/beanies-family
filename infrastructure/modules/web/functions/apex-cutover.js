@@ -36,6 +36,14 @@ var APP_PATHS = [
   '/login',
   '/join',
   '/welcome',
+  // #63: newly OS-claimed deep-link paths. Their APEX form must 301 to the app origin
+  // or the browser rung of "installed app -> PWA -> browser" dead-ends on the marketing
+  // bucket's 404 (this handler falls through to the Astro rewrite, asking for /pod.html).
+  // `/pod` matters most: it is claimed precisely because a link copied from a running
+  // app's address bar says /pod. Keep this list a superset of EXTERNAL_DEEP_LINK_PATHS
+  // in src/constants/externalDeepLinkPaths.ts.
+  '/pod',
+  '/lists',
 ];
 
 function isAppPath(path) {
