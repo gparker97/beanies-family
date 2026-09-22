@@ -157,6 +157,15 @@ export function isSameOriginReturnPath(returnPath: unknown): returnPath is strin
   }
 }
 
+/**
+ * The page's own path + query. The return path for any trip whose caller CONTINUES IN PLACE —
+ * every native seam (the sink's `router.replace` then resolves as a duplicate) and the web
+ * reconnect, where reloading the same page IS the resume.
+ */
+export function currentLocationPath(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 export function decodeRedirectState(raw: string | null | undefined): RedirectStatePayload | null {
   if (!raw) return null;
   try {

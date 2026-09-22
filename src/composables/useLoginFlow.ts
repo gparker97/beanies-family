@@ -1244,8 +1244,11 @@ export function useLoginFlow(opts: {
       // `invalidateAccessToken()` had just nulled. A silent retry loop at the
       // login gate, with no message.
       //
-      // A redirect means the page is on its way to Google and nothing has been
-      // acquired; the boot path re-enters this flow with a fresh token on return.
+      // WEB ONLY: the page is on its way to Google and nothing has been acquired; the reload
+      // re-enters this flow with a fresh token. ⚠️ THIS COMMENT USED TO CLAIM THAT UNCONDITIONALLY
+      // and it was false on native, where nothing unloads and no boot path re-runs. It is moot
+      // now: `reconnect` AWAITS the trip on native and resolves `reconnected`/`failed`, so this
+      // arm is web-only and the branches below run in place, in one tap.
       if (outcome === 'redirecting') return;
       if (!reconnectSucceeded(outcome)) {
         proveError.value = reconnectError.value || t('googleDrive.reconnectFailed');

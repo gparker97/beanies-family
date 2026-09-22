@@ -734,6 +734,52 @@ describe('pod creation: full end-to-end flow', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
+  it("a PRE-WRITE refusal leaves the offline queue alone — it may hold another family's save", async () => {
+    // ⚠️ THE DATA-LOSS DIRECTION OF THE QUEUE CLEAR. The catch clears the queue because a failed
+    // create's envelope is encrypted with a key about to be discarded. But before THIS create's
+    // write has been attempted, anything queued belongs to someone else — most sharply the
+    // provider-mismatch refusal, whose whole point is that the installed provider is another
+    // family's. Clearing there would destroy that family's unsent save.
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const syncService = await import('@/services/sync/syncService');
+    const { clearQueue } = await import('@/services/sync/offlineQueue');
+    vi.mocked(syncService.providerBelongsToAnotherFamily).mockReturnValueOnce(true);
+    vi.mocked(clearQueue).mockClear();
+    mockProvider.write.mockClear();
+
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('provider-mismatch');
+    expect(mockProvider.write).not.toHaveBeenCalled();
+    expect(clearQueue).not.toHaveBeenCalled();
+  });
+
+  it('a FAILED write still clears the queue — that envelope is encrypted with a doomed key', async () => {
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const { clearQueue } = await import('@/services/sync/offlineQueue');
+    vi.mocked(clearQueue).mockClear();
+    mockProvider.write.mockRejectedValueOnce(new Error('Network down'));
+
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+
+    expect(result.ok).toBe(false);
+    expect(clearQueue).toHaveBeenCalled();
+  });
+
   it('proceeds with create when the existing-pod lookup throws (fail-open, must not block a new family)', async () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();

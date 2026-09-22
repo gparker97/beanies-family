@@ -29,11 +29,11 @@ import {
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
-import { DriveConsentDeniedError } from '@/types/sync';
+import { DriveConsentDeniedError, OAuthRoundTripAbandonedError } from '@/types/sync';
 import { withTimeout } from '@/utils/timing';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
-import { isNative, isIosOrIpadOs, isStandalone } from '@/services/sync/capabilities';
+import { isNative, isIosOrIpadOs, isStandalone, getPlatform } from '@/services/sync/capabilities';
 import {
   NATIVE_REDIRECT_URI,
   nativeOAuthTransport,
@@ -2662,6 +2662,15 @@ export interface RedirectAuthOptions {
  * consent screen on every later cold start.
  * See docs/plans/2026-05-20-google-refresh-token-persistence-fix.md.
  *
+ * On native every call arms a round trip that `awaitNativeOAuthReturn()` can read. Only three
+ * callers await it: `connectStorage.gateCreateDriveAuth` (for `connectDriveStorage` and the
+ * registry probe) and `useGoogleReconnect.reconnect`. The others — `usePickBeanpodFile` (join,
+ * both calls), `calendarAuth`, `unifiedReconnect`, `SettingsPage.handleSwitchGoogleAccount` and
+ * the Drive-load picker — do NOT await: their trips are settled and dropped deliberately, because
+ * their continuations are marker-driven (`LOAD_DRIVE_PATH`, the calendar stash + returnPath) or
+ * boot-driven. ⚠️ Do not add an await to one of them without removing its marker, or its
+ * continuation runs twice: once in place and once on the marker.
+ *
  * @param returnPath Same-origin relative path to land on after the redirect.
  * @param loginHint  Optional email to pre-fill Google's chooser with.
  * @param mode       Which onboarding flow this is (create/join/reconnect).
@@ -2749,8 +2758,21 @@ export async function startRedirectAuth(
       scope,
       opts.extraParams
     );
-    // Resolves immediately; the redirect returns via the appUrlOpen listener.
-    await Browser.open({ url: authUrl });
+    // ⚠️ ARM BEFORE OPENING. `Browser.open` resolves immediately and nothing unloads, so the
+    // caller's stack survives and awaits `awaitNativeOAuthReturn()` next. Arming first means a
+    // sheet dismissed FASTER than the open resolves still has a trip to settle.
+    armNativeTrip();
+    try {
+      await Browser.open({ url: authUrl });
+    } catch (e) {
+      // The sheet never opened. Settle so an awaiting seam does not wait for a trip that cannot
+      // happen, then rethrow into the caller's own try/catch exactly as before.
+      settleNativeTrip(
+        { kind: 'failed', error: e instanceof Error ? e : new Error(String(e)) },
+        'open_failed'
+      );
+      throw e;
+    }
     // Pairs with the `return_*` / `complete` events so a started-but-never-
     // returned flow shows up as an ABSENCE in CloudWatch. This is the signal
     // that would have caught the iOS Universal-Link handoff failure on build 7
@@ -2947,6 +2969,183 @@ export function __resetRedirectSettleForTesting(): void {
   redirectSettlePromise = null;
 }
 
+// ─── Native (Capacitor) round-trip settlement ───────────────────────────────
+//
+// ⚠️ WHY THIS EXISTS. On native, `Browser.open()` resolves immediately and NOTHING UNLOADS: the
+// WebView, the component, the composable instance and the awaiting call stack all survive the OAuth
+// round trip. That is why nothing remounts — and it is also why a seam that returns `'redirecting'`
+// throws away a perfectly good continuation. Before this, five separate marker + latch + watcher
+// machines existed to reconstruct a stack frame that was never lost, and two `/code-review max`
+// rounds found defects inside each other's fixes in them.
+//
+// So: arm a trip before opening the sheet, settle it from every arm of the deep-link handler (plus
+// a closed-sheet signal for the case where no deep link ever comes), and let the seam simply await.
+
+/** How a native round trip ended. `failed.error` is the SAME error the popup path would have
+ *  thrown (`DriveConsentDeniedError`, `OAuthRoundTripAbandonedError`, or the raw exchange error),
+ *  so a seam's existing catch classifies it with no new code. */
+export type NativeOAuthOutcome = ({ kind: 'completed' } | { kind: 'failed'; error: Error }) & {
+  /**
+   * A settling event name for arms that do NOT log one themselves. `settleNativeTrip` logs only
+   * when given an action, so that one start never yields two settling events — which means an arm
+   * that stays silent leaves CloudWatch with `start` → `return_*` → nothing, the very
+   * started-but-never-returned ambiguity the `start` counter exists to remove.
+   */
+  action?: string;
+};
+
+/** Sheet closed with no deep link: how long to wait for one before calling it dismissed. Long
+ *  enough for Android's visibilitychange→appUrlOpen ordering, short enough not to feel stuck. */
+const NATIVE_DISMISS_GRACE_MS = 2500;
+
+interface NativeTrip {
+  promise: Promise<NativeOAuthOutcome>;
+  resolve: (o: NativeOAuthOutcome) => void;
+  /** Set the moment our deep link is seen: from then on a closing sheet is the RETURN, not a dismissal. */
+  returned: boolean;
+  /** Set by `settleNativeTrip`. A settled trip STAYS in `nativeTrip` until the next arm, so a seam
+   *  that reaches its await AFTER the settle still reads the outcome instead of a bogus
+   *  "nothing armed" (the window between `Browser.open` resolving and the gate's await). */
+  settled: boolean;
+  graceTimer: ReturnType<typeof setTimeout> | null;
+}
+let nativeTrip: NativeTrip | null = null;
+let browserFinishedHandle: { remove: () => Promise<void> } | null = null;
+let visibilityHandler: (() => void) | null = null;
+
+/** The ONE liveness predicate every signal consults: armed and not yet settled. */
+function liveTrip(): NativeTrip | null {
+  return nativeTrip && !nativeTrip.settled ? nativeTrip : null;
+}
+
+function abandoned(reason: 'declined' | 'dismissed'): NativeOAuthOutcome {
+  return { kind: 'failed', error: new OAuthRoundTripAbandonedError(reason) };
+}
+
+/** Arm ONE trip. A second start while one is LIVE supersedes it with a dismissal rather than
+ *  hanging its awaiter; a SETTLED trip is simply replaced — it has been read, or never will be. */
+function armNativeTrip(): void {
+  if (liveTrip()) settleNativeTrip(abandoned('dismissed'), 'superseded');
+  let resolve!: NativeTrip['resolve'];
+  const promise = new Promise<NativeOAuthOutcome>((r) => (resolve = r));
+  nativeTrip = { promise, resolve, returned: false, settled: false, graceTimer: null };
+}
+
+/** A closed-sheet signal. Inert unless a trip is live, un-returned and not already in grace. */
+function onSheetClosed(signal: 'browser-finished' | 'visible'): void {
+  const trip = liveTrip();
+  if (!trip || trip.returned || trip.graceTimer) return;
+  trip.graceTimer = setTimeout(() => {
+    trip.graceTimer = null;
+    settleNativeTrip(abandoned('dismissed'), `dismissed_${signal}`);
+  }, NATIVE_DISMISS_GRACE_MS);
+}
+
+/** Our deep link arrived. Cancels a running grace: the sheet closing WAS the return. */
+function markNativeReturn(): void {
+  const trip = liveTrip();
+  if (!trip) return;
+  trip.returned = true;
+  if (trip.graceTimer) clearTimeout(trip.graceTimer);
+  trip.graceTimer = null;
+}
+
+/** Resolve the live trip, if any — never twice. `action` is logged ONLY for outcomes the handler
+ *  does not log itself (dismissals, supersessions, a failed open) so one start never yields two
+ *  settling events. */
+function settleNativeTrip(outcome: NativeOAuthOutcome, action?: string): void {
+  const trip = liveTrip();
+  if (!trip) return;
+  trip.settled = true;
+  if (trip.graceTimer) clearTimeout(trip.graceTimer);
+  trip.graceTimer = null;
+  if (action) {
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: `native oauth ${action}`,
+      context: { action },
+    });
+  }
+  trip.resolve(outcome);
+}
+
+/**
+ * Wait for the native round trip `startRedirectAuth` just started. ALWAYS settles: the deep link
+ * settles it on every arm (and on a throw out of the arms), and a closed sheet with no deep link
+ * settles it as dismissed after the grace. NEVER rejects — most trips (picker, calendar, join,
+ * unified reconnect, switch account) are armed and never awaited, and a rejection nobody awaits
+ * is an unhandled rejection. A seam throws `failed.error` into its own catch if it wants to.
+ *
+ * ⚠️ ON NATIVE THIS MUST DIRECTLY FOLLOW `startRedirectAuth`. A settled trip stays readable until
+ * the next arm, so a caller that forgot to start would read the PREVIOUS trip's outcome; the
+ * report below fires only when nothing has ever been armed.
+ */
+export function awaitNativeOAuthReturn(): Promise<NativeOAuthOutcome> {
+  if (!nativeTrip) {
+    reportError({
+      surface: 'native-oauth',
+      severity: 'error',
+      message:
+        'awaitNativeOAuthReturn() called with no round trip armed — on native it must directly follow startRedirectAuth',
+    });
+    return Promise.resolve({
+      kind: 'failed',
+      error: new Error('No Google sign-in is in progress'),
+    });
+  }
+  return nativeTrip.promise;
+}
+
+/**
+ * The two "the sheet is gone" signals. Both consult `liveTrip()`, so they are inert when nothing
+ * is armed and after a return (`markNativeReturn` runs BEFORE our own `Browser.close()`).
+ *
+ * `browserFinished` — both platforms. iOS fires it from `safariViewControllerDidFinish` /
+ * `presentationControllerDidDismiss`: USER dismissals only; our `Browser.close()` calls
+ * `dismiss(animated:)` directly, which invokes neither. Android fires it from an event group over
+ * TAB_HIDDEN + onPause, which its own comment calls a heuristic — hence the backstop.
+ *
+ * `visibilitychange → visible` — ⚠️ ANDROID BY DEFAULT; on iOS ONLY when `browserFinished`
+ * failed to install. Custom Tabs are a separate activity, so MainActivity is paused while the tab
+ * is up and `visible` can only mean the tab is gone (or the deep link is landing, which
+ * `returned` covers). On iOS the sheet is a modal over the SAME view controller, and `visible`
+ * ALSO fires when the app returns from the background with the sheet still presented — a phone
+ * call mid-consent — which would settle a live trip as dismissed under an open sheet.
+ *
+ * ⚠️ WHICH IS EXACTLY WHY THE FAILED-INSTALL CASE GETS IT ANYWAY. Without a fallback, an iOS
+ * device whose `browserFinished` install rejected has NO dismissal signal at all — the one hole
+ * left in the "always settles" invariant this whole design rests on. A closed sheet would then
+ * leave the awaiting seam's busy envelope latched for good, and the escapable `'redirecting'`
+ * phase that used to cover that case has been deleted. A rare false dismissal beats a screen
+ * nobody can leave.
+ */
+function installSheetClosedListeners(): void {
+  const installVisibilityBackstop = () => {
+    if (visibilityHandler) return; // never stack two
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible') onSheetClosed('visible');
+    };
+    document.addEventListener('visibilitychange', visibilityHandler);
+  };
+
+  void Browser.addListener('browserFinished', () => onSheetClosed('browser-finished'))
+    .then((h) => {
+      browserFinishedHandle = h;
+    })
+    .catch((e) => {
+      reportError({
+        surface: 'native-oauth',
+        severity: 'warning',
+        message:
+          'browserFinished listener failed to install; falling back to the visibilitychange backstop (already installed on Android, so this only changes iOS)',
+        error: e,
+      });
+      installVisibilityBackstop();
+    });
+  if (getPlatform() === 'android') installVisibilityBackstop();
+}
+
 // ─── Native (Capacitor) deep-link OAuth completion ──────────────────────────
 // On native, startRedirectAuth opens the system browser; Google redirects to
 // NATIVE_REDIRECT_URI, which reaches the app as an `appUrlOpen` event on one of
@@ -2980,6 +3179,10 @@ export function installNativeAuthListener(onComplete: (returnPath: string) => vo
   }).then((handle) => {
     nativeAuthListenerHandle = handle;
   });
+
+  // Installed HERE, once, rather than lazily per trip: this function already carries the
+  // idempotence guard and the native-only check, and both signals are inert when nothing is armed.
+  installSheetClosedListeners();
 }
 
 /** Handle one `appUrlOpen`. Exported for unit tests; not part of the public API. */
@@ -2994,6 +3197,34 @@ export async function handleNativeAuthRedirect(
   const transport = nativeOAuthTransport(url);
   if (!transport) return;
 
+  // ⚠️ BEFORE THE BODY, which closes the sheet: our own `Browser.close()` must never be read as a
+  // dismissal by the closed-sheet listeners.
+  markNativeReturn();
+
+  let outcome: NativeOAuthOutcome;
+  try {
+    outcome = await completeNativeAuthRedirect(url, transport, onComplete);
+  } catch (e) {
+    // Every arm returns an outcome; a throw here is a bug in the body, not a flow outcome. Settle
+    // anyway so an awaiting seam never hangs on it — this also closes the pre-existing unhandled
+    // rejection at the `void`ed listener call site.
+    reportError({
+      surface: 'native-oauth',
+      severity: 'error',
+      message: 'native OAuth completion threw outside its arms',
+      error: e,
+    });
+    outcome = { kind: 'failed', error: e instanceof Error ? e : new Error(String(e)) };
+  }
+  settleNativeTrip(outcome, outcome.action);
+}
+
+/** The body: every existing arm, side effect and log, returning its outcome instead of `void`. */
+async function completeNativeAuthRedirect(
+  url: string,
+  transport: NonNullable<ReturnType<typeof nativeOAuthTransport>>,
+  onComplete: (returnPath: string) => void
+): Promise<NativeOAuthOutcome> {
   // Scheme-agnostic: `new URL()` yields host='oauth', pathname='/native' for the
   // custom scheme, so params must not be derived from it. Cannot throw.
   const params = nativeOAuthParams(url);
@@ -3023,7 +3254,10 @@ export async function handleNativeAuthRedirect(
       message: 'deep link with no pending auth — ignored',
       context: { action: 'no_pending' },
     });
-    return;
+    return {
+      kind: 'failed',
+      error: new Error('No Google sign-in was pending when the return arrived'),
+    };
   }
 
   // The stash is attacker-reachable state now that a custom scheme can invoke
@@ -3041,7 +3275,10 @@ export async function handleNativeAuthRedirect(
       message: 'pending-auth stash was unparseable — cleared, no exchange attempted',
       context: { action: 'stash_unparseable' },
     });
-    return;
+    return {
+      kind: 'failed',
+      error: new Error('No Google sign-in was pending when the return arrived'),
+    };
   }
 
   // CSRF: the echoed state must match what we stored. Mismatch ⇒ discard.
@@ -3055,7 +3292,7 @@ export async function handleNativeAuthRedirect(
       severity: 'error',
       message: 'native OAuth deep-link state mismatch — code discarded',
     });
-    return;
+    return { kind: 'failed', error: new Error('Google sign-in return failed its state check') };
   }
 
   // PICKER grant: the system-browser Google Picker returning a file selection.
@@ -3081,7 +3318,8 @@ export async function handleNativeAuthRedirect(
     // query string byte-identically, so `picked_file_ids` arrives intact. Logs its own failure.
     stashPickerSelection(params.get('picked_file_ids'), 'native');
     onComplete(stored.returnPath);
-    return;
+    // Named because `stashPickerSelection` logs on its OWN surface, not `native-oauth`.
+    return { kind: 'completed', action: 'complete_picker' };
   }
 
   // OAuth error on the redirect (most commonly access_denied = user declined
@@ -3102,7 +3340,7 @@ export async function handleNativeAuthRedirect(
       message: `oauth declined/error on deep link: ${error}`,
       context: { action: 'declined' },
     });
-    return;
+    return abandoned('declined');
   }
 
   if (!code) {
@@ -3112,7 +3350,10 @@ export async function handleNativeAuthRedirect(
       severity: 'error',
       message: 'native OAuth deep link had neither code nor error',
     });
-    return;
+    return {
+      kind: 'failed',
+      error: new Error('Google sign-in returned neither a code nor an error'),
+    };
   }
 
   // CALENDAR grant (P2): do NOT run the Drive completion or commit a Drive token.
@@ -3123,11 +3364,14 @@ export async function handleNativeAuthRedirect(
   if (stored.grant === 'calendar') {
     sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY_CALENDAR, code);
     onComplete(stored.returnPath);
-    return;
+    // Named because this arm logs nothing of its own — the calendar resume at `returnPath` does.
+    return { kind: 'completed', action: 'complete_calendar' };
   }
 
   // Hand the code to the shared completion (the same exchange the web flow runs).
   sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
+  /** The exchange's own failure, if any. `null` means the token IS committed. */
+  let exchangeError: Error | null = null;
   try {
     await completeRedirectAuth();
     // Success counter — emitted so the FAILURE RATE is measurable. An event
@@ -3138,23 +3382,61 @@ export async function handleNativeAuthRedirect(
       message: 'native oauth completed',
       context: { action: 'complete' },
     });
-    onComplete(stored.returnPath);
   } catch (e) {
+    // ⚠️ NO RESUME-REASON STASH ANY MORE. The awaiting seam receives this error ITSELF and
+    // classifies it in place, so a hint written here could only ever be read by the wrong flow
+    // later (a declined Drive LOAD leaving "allow file access" for the next create screen). The
+    // web boot path still stashes for its reload — that is `App.vue`'s job, not this one's.
+    const isConsentDenied = e instanceof DriveConsentDeniedError;
     reportError({
       surface: 'native-oauth',
-      severity: 'error',
+      severity: isConsentDenied ? 'warning' : 'error',
       message: 'native OAuth code exchange failed',
       error: e,
+      // ⚠️ `error_code`, NOT a `consent_denied` boolean. `consent_denied` is NOT in
+      // `ALLOWED_CONTEXT_KEYS`, so `redactContext` strips it before the event leaves the device —
+      // the field would never have reached CloudWatch and the denial RATE would stay unmeasurable.
+      // (`App.vue` has been dropping the same key silently; fixing that is a separate change.)
+      context: { error_code: isConsentDenied ? 'drive-consent-denied' : 'exchange-failed' },
     });
-    // Land on the recovery surface so the user can retry — matches web, which
-    // always returns to returnPath after the full-page redirect.
-    onComplete(stored.returnPath);
+    exchangeError = e instanceof Error ? e : new Error(String(e));
   }
+
+  // ⚠️ OUTSIDE THE EXCHANGE'S try, AND CALLED EXACTLY ONCE. It used to sit on both the success
+  // and the failure arm INSIDE that try, so a navigation sink that threw (App.vue's
+  // `router.replace`) was caught by the exchange's catch — which then filed a false
+  // `exchange-failed` against a token that had just been committed, called this a SECOND time,
+  // threw again, and handed the awaiting seam `failed` on a live connection. The person
+  // re-consented for nothing.
+  //
+  // Landing on `returnPath` either way matches web, which always returns there after the
+  // full-page redirect; on native it resolves as a duplicate navigation.
+  try {
+    onComplete(stored.returnPath);
+  } catch (e) {
+    // A navigation failure is not an auth failure. Report it and keep the exchange's verdict.
+    reportError({
+      surface: 'native-oauth',
+      severity: 'warning',
+      message: 'navigating to the OAuth returnPath threw',
+      error: e,
+    });
+  }
+
+  return exchangeError ? { kind: 'failed', error: exchangeError } : { kind: 'completed' };
 }
 
-/** Test-only — remove the native auth listener + reset install state. */
+/** Test-only — remove the native auth listeners + reset install state and any armed trip. */
 export function __resetNativeAuthForTesting(): void {
   void nativeAuthListenerHandle?.remove();
   nativeAuthListenerHandle = null;
   nativeAuthListenerInstalled = false;
+  // ⚠️ CLEAR THE GRACE TIMER, not just the trip. Under fake timers a pending dismissal from the
+  // previous case would otherwise fire into the next one and settle ITS trip.
+  if (nativeTrip?.graceTimer) clearTimeout(nativeTrip.graceTimer);
+  nativeTrip = null;
+  void browserFinishedHandle?.remove();
+  browserFinishedHandle = null;
+  if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
+  visibilityHandler = null;
 }

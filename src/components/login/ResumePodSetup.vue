@@ -64,7 +64,11 @@
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
 import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
-import { type PayloadLoadError } from '@/types/sync';
+import {
+  type PayloadLoadError,
+  DriveConsentDeniedError,
+  OAuthRoundTripAbandonedError,
+} from '@/types/sync';
 import { surfacePayloadFatal, surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -83,7 +87,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
-import { getProvider } from '@/services/sync/syncService';
+import { getProvider, providerBelongsToAnotherFamily } from '@/services/sync/syncService';
 import { tryReconnectSilently, reconnectForWriteRetry } from '@/services/google/driveTokenRecovery';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
@@ -98,6 +102,15 @@ const authStore = useAuthStore();
 const syncStore = useSyncStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
+
+/**
+ * The family this create is for. ONE definition, used by the provider-identity gate, the Drive
+ * connect and the pod write — these previously derived it separately and could disagree, which is
+ * exactly the kind of gap the cross-family guard exists to catch.
+ */
+const createFamilyId = computed(
+  () => familyContextStore.activeFamilyId ?? authStore.currentUser?.familyId ?? null
+);
 
 const emit = defineEmits<{
   'signed-in': [destination: string];
@@ -210,7 +223,12 @@ onMounted(async () => {
   // denied on the consent screen (2026-06-19, finding 3). Set after runProbe so
   // it isn't cleared by the probe's `formError = null`. The reconnect CTA is the
   // storage step's "Connect Google Drive" button.
-  if (consumeResumeReason() === 'drive-consent') {
+  // ⚠️ ONLY WHEN THE PROBE LEFT NOTHING TO SAY. `runProbe` now has two arms of its own that set
+  // `formError` (its catch, and `drive-auth-failed`), and a stashed hint is the older, vaguer
+  // fact — overwriting a live "you cancelled sign-in" with "allow file access" would describe a
+  // flow that did not happen. Consume it either way so it cannot resurface on a later mount.
+  const stashedReason = consumeResumeReason();
+  if (!formError.value && stashedReason === 'drive-consent') {
     formError.value = t('resumeSetup.driveConsentDenied');
   }
 });
@@ -237,7 +255,25 @@ onBeforeUnmount(() => {
 async function runProbe() {
   formError.value = null;
   phase.value = 'probing';
-  const probeResult = await syncStore.attemptResumeFromRegistry();
+  let probeResult: Awaited<ReturnType<typeof syncStore.attemptResumeFromRegistry>>;
+  try {
+    probeResult = await syncStore.attemptResumeFromRegistry();
+  } catch (e) {
+    // ⚠️ THIS ENVELOPE IS NOT OPTIONAL, and it became load-bearing when the probe started
+    // AWAITING the native round trip: this one `await` now spans a whole system-browser consent
+    // plus the dismissal grace. `onErrorCaptured` below early-returns unless `phase === 'survey'`,
+    // so without this a throw leaves "counting beans…" up for good and the only way out is
+    // "Start over", which signs the person out.
+    reportError({
+      surface: 'resumeSetup.probe',
+      message: `the registry probe threw: ${e instanceof Error ? e.message : String(e)}`,
+      error: e,
+      severity: 'error',
+    });
+    formError.value = t('resumeSetup.registryError');
+    phase.value = 'retry';
+    return;
+  }
   switch (probeResult.kind) {
     case 'auto-loadable':
       autoLoadFamilyName.value = probeResult.familyName;
@@ -249,10 +285,31 @@ async function runProbe() {
       phase.value = 'identity';
       return;
     case 'redirecting':
-      // The probe kicked off a full-page OAuth redirect (iOS/PWA, no valid
-      // token) — the page is navigating to Google. Do nothing; we resume on
-      // return (2026-06-19, finding 2). Leave the spinner up.
+      // WEB ONLY: the page is unloading; keep the probing spinner up. On native
+      // `gateCreateDriveAuth` awaits the round trip, so this arm is never taken there.
       return;
+    case 'drive-auth-failed': {
+      // NATIVE (or a start failure on either transport): the gesture-less probe opened the sheet
+      // and it came back without a grant. The pod IS known — the probe only redirects when the
+      // registry holds a fileId — so `retry` copy is honest and its button re-runs the probe,
+      // now behind a real tap.
+      const abandoned = probeResult.error instanceof OAuthRoundTripAbandonedError;
+      const consentDenied = probeResult.error instanceof DriveConsentDeniedError;
+      if (!abandoned) {
+        reportError({
+          surface: 'resumeSetup.probeDriveAuth',
+          message: `Drive sign-in failed during the registry probe: ${probeResult.error.message}`,
+          error: probeResult.error,
+          severity: consentDenied ? 'warning' : 'error',
+          context: { provider_type: 'google_drive' },
+        });
+      }
+      formError.value = driveAuthMessage(
+        abandoned ? 'cancelled' : consentDenied ? 'consent-denied' : 'failed'
+      );
+      phase.value = 'retry';
+      return;
+    }
     case 'registry-error':
       reportError({
         surface: 'resumeSetup.registryLookupFailed',
@@ -282,6 +339,11 @@ async function runProbe() {
 /** "Try again" on the retry screen — re-run the registry probe. */
 async function handleRetry() {
   if (busy.value) return;
+  // ⚠️ DELIBERATELY DOES NOT RAISE `busy`, and a previous round's attempt to was reverted.
+  // Raising it bought nothing and cost the only way out: `runProbe` flips `phase` to 'probing'
+  // synchronously, which swaps this whole retry block out of the DOM, so a second tap was
+  // already impossible — while `busy` ALSO disables the "Start over" link, which is the last
+  // escape if a native trip ever fails to settle. Leave the escape live.
   await runProbe();
 }
 
@@ -490,24 +552,91 @@ async function handleIdentityNext() {
  * indefinite user pause, so this MUST re-arm the busy latch + try/catch + finally
  * rather than run the point-of-no-return bare.
  */
+/**
+ * Do we hold a usable Drive token, trying one silent recovery first?
+ *
+ * Extracted from `proceedToFinalize`'s else-branch rather than re-written, so the create path and
+ * the redirect-resume path cannot drift on what "connected" means. Before forcing a SECOND Drive
+ * redirect (which on web reloads the app and makes the person start over), try the
+ * beanpod-mirrored refresh token.
+ *
+ * ⚠️ NEVER THROWS — its one `await` is wrapped.
+ */
+async function ensureDriveToken(): Promise<boolean> {
+  let recovered = false;
+  try {
+    recovered = await tryReconnectSilently(authStore.currentUser?.email);
+  } catch (e) {
+    reportError({
+      surface: 'resumeSetup.silentReconnect',
+      message: `silent reconnect threw at finish: ${e instanceof Error ? e.message : String(e)}`,
+      error: e,
+      severity: 'warning',
+    });
+  }
+  return recovered && isTokenValid();
+}
+
+/**
+ * The one place the create flow's Drive-auth copy is chosen, shared by the probe arm and
+ * `finishOnDrive`.
+ *
+ * ⚠️ THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT WAS WRONG. A consent denial has
+ * something specific to tell them ("allow file access"). A CANCELLATION — declined at Google, or
+ * the sheet closed — must not say "sign-in failed": that frames the person's own decision as a
+ * code error and tells them to retry something that did exactly what they asked. Only a genuine
+ * fault gets the failure copy.
+ */
+function driveAuthMessage(kind: 'consent-denied' | 'cancelled' | 'failed'): string {
+  if (kind === 'consent-denied') return t('resumeSetup.driveConsentDenied');
+  if (kind === 'cancelled') return t('googleDrive.authCancelled');
+  return t('googleDrive.authFailed');
+}
+
 async function proceedToFinalize() {
   if (busy.value) return;
   busy.value = true;
   try {
-    // Desktop create hand-off: storage was ALREADY connected on this same page
-    // (CreatePodView's step-2 popup / local picker installed the provider and,
-    // for Drive, wrote the stub `.beanpod`). Write straight into it — do NOT
-    // re-run `connectDriveStorage`, which would call `createNew` a second time
-    // and collide with that stub (and re-prompt for a local file). iOS never
-    // takes this branch: its full-page Drive redirect reloads the app, so the
-    // in-memory provider is gone (`getProvider()` is null) on return.
-    if (getProvider()) {
-      phase.value = 'finishing';
+    // Storage was ALREADY connected on this same page (CreatePodView's step-2 popup / local
+    // picker installed the provider and, for Drive, wrote the stub `.beanpod`) AND it belongs to
+    // THIS family: write straight into it — do NOT re-run `connectDriveStorage`, which would call
+    // `createNew` a second time and collide with that stub (and re-prompt for a local file).
+    //
+    // ⚠️ THE FAMILY CHECK IS THE POINT, AND ITS ABSENCE WAS A NEAR DATA LOSS. The old docblock
+    // said "iOS never takes this branch: its full-page Drive redirect reloads the app, so the
+    // in-memory provider is gone on return." That is true on iOS WEB/PWA and FALSE on native
+    // Capacitor, where OAuth is `Browser.open()` + a deep link resolving to a router navigation —
+    // the WebView never unloads and the provider survives. On 2026-09-21 a provider bound to a
+    // previous family reached this branch on a production iPhone and `createNewFile` wrote into
+    // that family's Drive file; only a `drive.file` 404 (different Google account) stopped it
+    // overwriting their pod with a new envelope under a new family key.
+    //
+    // A foreign provider now falls through to the reconnect branch, where `connectDriveStorage`
+    // REPLACES it with one bound to this family — so in the common case nothing is refused and the
+    // person sees no error at all. `createNewFile` carries the same check as a backstop.
+    // ⚠️ THE FALL-THROUGH IS DRIVE-ONLY, so only a DRIVE provider may be refused here. A foreign
+    // LOCAL provider would otherwise be silently replaced by a `.beanpod` created in Google Drive
+    // — the person explicitly chose a local file and would never be asked or told. `createNewFile`
+    // still refuses a cross-family write for EVERY provider type, so the data-loss guard is intact
+    // either way; this branch only decides whether we can recover automatically.
+    //
+    // ⚠️ AND ONLY WHEN THE FAMILY IS ACTUALLY KNOWN. `?? ''` would hand an empty id to a predicate
+    // whose contract makes every bound provider foreign, so a momentarily-null family would reject
+    // a perfectly good provider and re-run `connectDriveStorage` against the stub it already wrote
+    // — the collision this branch exists to avoid.
+    const activeProvider = getProvider();
+    const foreignDriveProvider =
+      !!activeProvider &&
+      activeProvider.type === 'google_drive' &&
+      !!createFamilyId.value &&
+      providerBelongsToAnotherFamily(createFamilyId.value);
+
+    phase.value = 'finishing'; // before ANY await: the silent reconnect below can take seconds
+    if (activeProvider && !foreignDriveProvider) {
       await finalizePod();
     } else if (isTokenValid()) {
-      // iOS returned from the Drive redirect with a fresh token but no live
-      // provider yet — connect Drive here, exactly once.
-      phase.value = 'finishing';
+      // Returned from the Drive redirect with a fresh token but no usable provider — connect
+      // Drive here, exactly once.
       await finishOnDrive();
     } else {
       // iOS edge: no live provider AND no valid token at the finish surface
@@ -517,21 +646,20 @@ async function proceedToFinalize() {
       // beanpod-mirrored refresh token. If it restores a token, finish on Drive
       // with no redirect; only fall back to the storage step when it genuinely
       // can't recover.
-      phase.value = 'finishing';
-      let recovered = false;
-      try {
-        recovered = await tryReconnectSilently(authStore.currentUser?.email);
-      } catch (e) {
-        reportError({
-          surface: 'resumeSetup.silentReconnect',
-          message: `silent reconnect threw at finish: ${e instanceof Error ? e.message : String(e)}`,
-          error: e,
-          severity: 'warning',
-        });
-      }
-      if (recovered && isTokenValid()) {
+      if (await ensureDriveToken()) {
         await finishOnDrive();
       } else {
+        // ⚠️ NO ERROR MESSAGE HERE, AND THAT IS NOT AN OVERSIGHT — a previous round added one and
+        // it was wrong. This `else` is the ORDINARY route to the storage step for a brand-new
+        // family: the phase table above reads `no-registry-entry → identity → survey → storage`,
+        // and on that path there is no provider yet and no Google token (accounts are born from
+        // email + PIN, not OAuth), so every first-time creator lands here. Saying "Google
+        // sign-in failed" above "Where should we keep your family's file?" tells someone their
+        // sign-in failed before they have attempted one.
+        //
+        // The "never bounce back with no message" rule is about returning someone to a screen
+        // they just ACTED on. Nobody has acted yet; the storage screen's own prompt is the
+        // message. The genuine failures all set `formError` at the point they occur.
         phase.value = 'storage';
       }
     }
@@ -588,12 +716,26 @@ async function finalizePod(): Promise<boolean> {
     });
     return false;
   }
+  // ⚠️ REFUSE RATHER THAN PASS `''` TO THE CROSS-FAMILY GUARD. An empty id is a caller bug, not
+  // a family: `providerBelongsToAnotherFamily('')` treats every bound provider as foreign, so the
+  // create would be refused with a message about the wrong thing.
+  const familyId = createFamilyId.value;
+  if (!familyId) {
+    formError.value = t('setup.fileCreateFailed');
+    reportError({
+      surface: 'resumeSetup.finalize',
+      message:
+        'finalizePod reached with no resolvable family id — refusing rather than passing "" to the cross-family guard',
+      severity: 'critical',
+    });
+    return false;
+  }
   const podFileName = `${familyContextStore.activeFamilyName || 'my-family'}.beanpod`;
   const createPod = () =>
     syncStore.createNewFile(
       podFileName,
       user.memberId,
-      familyContextStore.activeFamilyId ?? user.familyId ?? '',
+      familyId,
       familyContextStore.activeFamilyName ?? 'My Family',
       heardVia.value
     );
@@ -657,6 +799,13 @@ async function finalizePod(): Promise<boolean> {
     // `existing-pod` is handled in the branch above, so it's narrowed out here.
     const reasonKey: Record<typeof result.reason, Parameters<typeof t>[0]> = {
       write: 'createPod.failedReasonWrite',
+      // Recovery is the storage step (connect again → a provider bound to THIS family), which the
+      // caller's `finally` already lands on for any unmapped failure. No extra phase routing here:
+      // that would be a second copy of the same rule.
+      //
+      // ⚠️ Severity is handled below: this is the GUARD WORKING, not an incident — nothing was
+      // written and recovery is one tap. Same reasoning as `existing-pod` above.
+      'provider-mismatch': 'createPod.failedReasonProviderMismatch',
       verify: 'createPod.failedReasonVerify',
       persist: 'createPod.failedReasonPersist',
       register: 'createPod.failedReasonRegister',
@@ -669,7 +818,13 @@ async function finalizePod(): Promise<boolean> {
       surface: `resumeSetup.${result.reason}`,
       message: `createNewFile failed during resume at step '${result.reason}': ${result.error.message}`,
       error: result.error,
-      severity: 'critical',
+      // ⚠️ `provider-mismatch` IS NOT CRITICAL, for the same reason `existing-pod` above is not:
+      // it is the guard REFUSING SAFELY. Nothing was written, nothing is at risk, and recovery is
+      // one tap on the storage step. `critical` pages #beanies-errors and force-flushes; reserving
+      // it for "a user action failed or data is at risk" (CLAUDE.md) keeps that channel worth
+      // reading. The keep-data-sign-out-then-create-another-family path is common enough that
+      // paging on it would bury real create failures in the same bucket.
+      severity: result.reason === 'provider-mismatch' ? 'warning' : 'critical',
       context: { provider_type: syncStore.storageProviderType ?? null },
     });
     return false;
@@ -795,16 +950,22 @@ async function finishOnDrive() {
   formError.value = null;
   const r = await connectDriveStorage(familyName.value, {
     googleEmail: authStore.currentUser?.email,
-    activeFamilyId: familyContextStore.activeFamilyId,
+    activeFamilyId: createFamilyId.value,
   });
-  if (r.status === 'redirecting') return; // page navigating to Google — nothing more to do
+  // WEB ONLY: the page is unloading. On native `connectDriveStorage` awaited the round trip and
+  // this arm is never taken — the arms below run in place, inside `handleConnectDrive`'s envelope.
+  if (r.status === 'redirecting') return;
   if (r.status === 'failed') {
     // Adopt-existing recovery — the fix for the iOS dead-end loop (2026-06-19).
     // This is exactly where the orphaned-pod collision lands on iPhone.
     if (r.errorKind === 'name-collision' && r.collision) {
       const action = await resolveDriveCollision(r.collision, {
         familyName: familyContextStore.activeFamilyName || 'my-family',
-        activeFamilyId: familyContextStore.activeFamilyId,
+        // Same single source as the connect and the write above — this path was missed when
+        // `createFamilyId` was introduced, so an `onMounted` switchFamily failure left it null
+        // here while the others resolved to `currentUser.familyId`. `adoptDriveStub` then skipped
+        // its `provider.persist(activeFamilyId)`, and the next cold boot could not find the pod.
+        activeFamilyId: createFamilyId.value,
       });
       switch (action.kind) {
         case 'adopted-stub':
@@ -848,6 +1009,7 @@ async function finishOnDrive() {
     // rather than the faults — and it carries its own guidance, because unlike a
     // plain cancel there is something specific to tell them to do.
     const consentDenied = r.errorKind === 'consent-denied';
+    const abandoned = r.errorKind === 'cancelled';
     const cancelled = consentDenied || r.cancelled || isUserCancellation(r.error);
     if (cancelled) console.warn('[ResumePodSetup] Drive connect declined:', r.error);
     else console.error('[ResumePodSetup] Drive connect failed:', r.error);
@@ -859,9 +1021,9 @@ async function finishOnDrive() {
     });
     // Translated copy only (finding 13): never assign the raw Drive message —
     // it's English-only and a name-collision message leaks an internal fileId.
-    formError.value = consentDenied
-      ? t('resumeSetup.driveConsentDenied')
-      : t('googleDrive.authFailed');
+    formError.value = driveAuthMessage(
+      consentDenied ? 'consent-denied' : abandoned ? 'cancelled' : 'failed'
+    );
     phase.value = 'storage';
     return;
   }
@@ -893,6 +1055,13 @@ async function openExistingOnDrive(fileId: string): Promise<void> {
 }
 
 async function handleConnectDrive() {
+  // ⚠️ CLOSE THE LOCAL-FILE WARNING FIRST — ABOVE the busy guard, exactly as `handleConnectLocal`
+  // does. This handler is also the modal's own "use Google Drive instead" action and the modal
+  // does not self-close, so returning early with it still open leaves a dead button on a modal
+  // nothing can dismiss. And now that the native connect CONTINUES IN PLACE rather than returning
+  // `'redirecting'`, everything after it — including the one-time, non-regenerable recovery kit —
+  // would otherwise paint BEHIND a modal about local-file sync.
+  showLocalFileWarning.value = false;
   if (busy.value) return;
   busy.value = true;
   phase.value = 'finishing';

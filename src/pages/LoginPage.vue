@@ -33,7 +33,7 @@ import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import {
   RESUME_LOAD_DRIVE,
-  RESUME_RECONNECT_LOAD,
+  RESUME_SETUP,
   isPodlessRecoveryQuery,
   RESUME_SETUP_PATH,
 } from '@/components/login/resumePaths';
@@ -110,8 +110,6 @@ const autoLoadPod = ref(false);
  * file picker with the now-cached token. See ADR-029.
  */
 const autoOpenDrivePicker = ref(false);
-/** Set by the `?resume=reconnect-load` return; LoadPodView re-enters the reconnect. */
-const autoReconnectLoad = ref(false);
 const isInitializing = ref(true);
 const forceNewGoogleAccount = ref(false);
 /** The prove screen's "use a recovery kit" escape — opens LoadPodView in kit entry. */
@@ -194,8 +192,20 @@ async function enterFlow(
 //      watch the user would be stuck on whatever onMounted picked (the
 //      WelcomeGate / family-picker / etc.) instead of ResumePodSetup.
 //
-// Stops itself once we've taken the resume-setup branch.
-//
+/**
+ * ONE-SHOT WITHOUT STOPPING THE EFFECT. Both halves matter:
+ *  - It must not re-assert on every navigation: `useRoute().query` is a computed over the router's
+ *    `currentRoute` shallowRef, so EVERY successful navigation re-runs this effect, and four
+ *    handlers move `activeView` off 'resume-setup' without touching the URL
+ *    (`handleUseRecoveryKit`, `handleRequestCreate`, `handleNavigate`, `handleFileLoaded`). A
+ *    standing rule would snap someone mid-recovery back to the create wizard.
+ *  - It must not stop the effect either: the `load-drive` branch above is the ONLY handler for
+ *    `?resume=load-drive`, and that return is reachable from here in the same mount (use a
+ *    recovery kit → LoadPodView → the Drive card → a native redirect). `stopResumeWatch()` used
+ *    to sit here and killed exactly that.
+ */
+let setupBranchHandled = false;
+
 // TDZ guard (caught 2026-05-18 from Boeder Familienplan onboarding on
 // Android — see #beanies-errors `vue-render` alert): `watchEffect` runs its
 // callback synchronously on first invocation. When all conditions are
@@ -224,31 +234,26 @@ stopResumeWatch = watchEffect(() => {
     return;
   }
 
-  // Returning from a RECONNECT redirect (`?resume=reconnect-load`). The token is already
-  // committed by the time we get here, so re-entering the reconnect is a short-circuit
-  // through `tryReconnectSilently`'s `isTokenValid()` early return — no second consent, no
-  // second round trip. What it buys is that the panel advances instead of sitting there
-  // asking again, which on native it did because a same-path `router.replace` remounts
-  // nothing. ⚠️ Deliberately does NOT touch `reconnectDriveFile`: that ref is what tells
-  // LoadPodView WHICH file to load, and it is only ever written on the boot auth-failure
-  // branch, which does not re-run on a native return.
-  if (route.query.resume === RESUME_RECONNECT_LOAD) {
-    activeView.value = 'load-pod';
-    autoReconnectLoad.value = true;
-    isInitializing.value = false;
-    // ⚠️ NO `stopResumeWatch()`. This watch is a ONE-SHOT and it is also the only handler
-    // for `?resume=load-drive` — and the reconnect's own fallback, where a 404 on the
-    // reconnected file sends us back through the Drive auth redirect, returns on exactly
-    // that marker. Consuming the dispatcher here meant the picker silently never re-opened
-    // on native, where nothing remounts to re-arm it.
-    return;
-  }
-
   if (!authStore.isAuthenticated) return;
-  if (route.query.resume !== 'setup') return;
+
+  if (route.query.resume !== RESUME_SETUP) return;
+  // One-shot via the flag, NOT via `stopResumeWatch()` — see `setupBranchHandled` above.
+  if (setupBranchHandled) return;
+  setupBranchHandled = true;
   activeView.value = 'resume-setup';
   isInitializing.value = false;
-  stopResumeWatch();
+  // ⚠️ NO `stopResumeWatch()` HERE. This branch runs FIRST on every route-driven arrival at
+  // ResumePodSetup (router guard `router/index.ts:454`/`:536`, podless rescue below, App.vue's
+  // zombie redirect), and `?resume=load-drive` is reachable in the SAME mount (use a recovery
+  // kit → LoadPodView → the Drive card → a native redirect). Stopping here killed that return.
+  //
+  // Safe to re-run: this branch sets a view and clears a spinner; it arms no latch. Re-runs are
+  // triggered only by `isInitialized`, `isAuthenticated` and `route.query.resume`. The states
+  // where this view is legitimately NOT 'resume-setup' at `?resume=setup` (use-recovery →
+  // load-pod → flow) never flip `isAuthenticated` false→true, and `handleStartOver` clears the
+  // query before anything can sign back in.
+  //
+  // (The `load-drive` branch above still stops, deliberately — its re-run WOULD re-arm a latch.)
 });
 
 /**
@@ -368,7 +373,7 @@ onMounted(async () => {
   // watchEffect above also catches this reactively; this synchronous check
   // wins the common case (URL already on `?resume=setup` at first paint)
   // without a brief flicker of the welcome gate while the watch fires.
-  if (route.query.resume === 'setup' && authStore.isAuthenticated) {
+  if (route.query.resume === RESUME_SETUP && authStore.isAuthenticated) {
     activeView.value = 'resume-setup';
     isInitializing.value = false;
     return;
@@ -505,12 +510,21 @@ function resetLoadPodFlags() {
   loadError.value = undefined;
   loadErrorProviderHint.value = undefined;
   reconnectDriveFile.value = undefined;
-  // ⚠️ RESET HERE OR IT LATCHES FOR THE LIFE OF THE PAGE. Nothing else clears it, and this
-  // helper's docblock promises it clears the whole LoadPodView intent group "so no stale mode
-  // leaks across a navigation". Left out, a later "Load a different file" remounts LoadPodView
-  // whose `{immediate:true}` watcher re-reads a still-true flag and re-enters a Google consent
-  // redirect nobody asked for.
-  autoReconnectLoad.value = false;
+  // ⚠️ KEPT DELIBERATELY, AND IT IS A JUDGEMENT CALL BETWEEN TWO HAZARDS — both reviewers flagged
+  // it, so the reasoning lives here rather than in a plan nobody reads at the call site.
+  //
+  // Clearing risks: this helper runs on four handlers that move AWAY from load-pod, and the
+  // `load-drive` branch both arms the latch and stops the dispatcher, so it can never be
+  // re-armed — a clear landing between arming and LoadPodView's `{immediate:true}` consumption
+  // would be an unrecoverable dead end. That window was traced and not reproduced.
+  //
+  // NOT clearing risks the proven one: nothing else resets it, so a later "load a different file"
+  // remounts LoadPodView, whose `{immediate:true}` watcher re-reads a still-true flag and
+  // re-enters a Google consent redirect nobody asked for.
+  //
+  // The second is reachable by ordinary navigation; the first needed a flush-order race that does
+  // not occur. Clear.
+  autoOpenDrivePicker.value = false;
 }
 
 /**
@@ -908,7 +922,6 @@ async function handleStartOver() {
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
         :auto-open-drive-picker="autoOpenDrivePicker"
-        :auto-reconnect-load="autoReconnectLoad"
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"

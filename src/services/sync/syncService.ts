@@ -789,16 +789,45 @@ export function getProviderFamilyId(): string | null {
 }
 
 /**
- * Set the storage provider directly (used by Google Drive flow)
+ * True when a provider is installed AND it was bound to a family other than `familyId`.
+ *
+ * ⚠️ THE CREATE-PATH TWIN OF `doSave()`'s CROSS-FAMILY GUARD BELOW, and it exists because
+ * `createNewFile` calls `provider.write()` DIRECTLY and therefore skips that guard entirely. On
+ * native the in-memory provider survives the Drive redirect (nothing unloads), so a provider bound
+ * to a previously-active family reached a create write on 2026-09-21 — and only a `drive.file` 404
+ * stopped it overwriting that family's pod with a new envelope under a new family key.
+ *
+ * ⚠️ A `null` BINDING PASSES, deliberately, matching `doSave()`'s shape exactly. `null` means "not
+ * yet known", not "foreign": `setProvider` binds from `getActiveFamilyId()` at call time, and a
+ * provider installed before `signUp` activates the family has no binding yet. Making this stricter
+ * than its twin would refuse legitimate installs while catching nothing extra — every stale
+ * provider that can actually reach a create write IS family-bound (a boot-restored config binds
+ * via `persist(familyId)`).
+ *
+ * Callers must pass a REAL family id. An empty string is a caller bug — `finalizePod` refuses
+ * before it reaches here rather than leaning on this predicate's reading of `''`.
  */
-export function setProvider(provider: StorageProvider): void {
+export function providerBelongsToAnotherFamily(familyId: string): boolean {
+  return !!currentProvider && !!currentProviderFamilyId && currentProviderFamilyId !== familyId;
+}
+
+/**
+ * Set the storage provider directly (used by Google Drive flow).
+ *
+ * `familyId`: the family the caller is installing this provider FOR, when it knows it. The create
+ * seams pass the id they later compare against (`ResumePodSetup.createFamilyId`), because after a
+ * failed `switchFamily` the database's active id can still be the PREVIOUS family — which made
+ * `providerBelongsToAnotherFamily` refuse the provider it had just bound, forever. Omitted (the
+ * default for every other caller) it binds from the active family exactly as before.
+ */
+export function setProvider(provider: StorageProvider, familyId?: string | null): void {
   // A different (or re-bound) file may well be readable. This is what makes
   // `rebindPodFile` — the supported repair for an unreadable pod — actually
   // repair it, without the store needing a clearing hook of its own.
   clearRemoteUnreadable();
   pendingMarker = null; // see `reset()`
   currentProvider = provider;
-  currentProviderFamilyId = getActiveFamilyId();
+  currentProviderFamilyId = familyId ?? getActiveFamilyId();
   // #61: a new provider means a DIFFERENT file (migrate to Drive, rebind pod
   // file, local→Drive) whose `version` sequence is independent of the old one.
   // The in-memory baseline described the OLD file, so it must not survive: a

@@ -38,7 +38,7 @@ import {
   emitKitRedeemed,
 } from '@/services/telemetry/loginFlowEvents';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { LOAD_DRIVE_PATH, RECONNECT_LOAD_PATH } from './resumePaths';
+import { LOAD_DRIVE_PATH } from './resumePaths';
 import {
   envelopeCapabilities,
   coldCredentialSurface,
@@ -64,11 +64,6 @@ const props = defineProps<{
    * `onMounted` would never re-fire. See ADR-029.
    */
   autoOpenDrivePicker?: boolean;
-  /**
-   * Set by the `?resume=reconnect-load` return. Re-enters the reconnect, which
-   * short-circuits on the token the first tap already obtained.
-   */
-  autoReconnectLoad?: boolean;
   forceNewGoogleAccount?: boolean;
   loadError?: string;
   providerHint?: 'local' | 'google_drive';
@@ -1183,51 +1178,20 @@ const isReconnectBusy = ref(false);
  * covers the read/decrypt-prep. If the known file is gone (404), it falls back
  * to the existing picker.
  */
-async function handleReconnectAndLoad(opts?: { isResume?: boolean }) {
+async function handleReconnectAndLoad() {
   const file = props.reconnectDriveFile;
-  if (!file) {
-    // ⚠️ NOT A BARE RETURN ANY MORE. On the resume path this is the difference between "there
-    // was nothing to reconnect" and "we came back from Google and lost the file we came back
-    // FOR" — and the second used to leave the person on a generic picker with no panel, no
-    // error and not one event on the whole resume path.
-    if (opts?.isResume) {
-      reportError({
-        surface: 'login-flow',
-        message: 'reconnect resume arrived with no target file',
-        severity: 'warning',
-        context: { action: 'reconnect_resume_no_file' },
-      });
-    }
-    return;
-  }
+  if (!file) return;
   formError.value = null;
   isReconnectBusy.value = true;
   try {
-    // ⚠️ NATIVE ONLY, AND THE `isNative()` IS THE WHOLE POINT.
-    //
-    // The marker exists because Capacitor does NOT unload the WebView: the return is a
-    // `router.replace(samePath)`, a redundant navigation that remounts nothing, so the
-    // reconnect panel stayed on screen and needed a second tap.
-    //
-    // iOS Safari and installed PWAs also take the redirect path, but there the return is a
-    // full page LOAD — the app re-boots, `handleFamilySelected` re-runs against a now-valid
-    // token, and the file loads on its own. Sending them to the marker instead SHORT-CIRCUITS
-    // that working boot path onto a resume branch whose handler needs `reconnectDriveFile`,
-    // a page-local ref the reload has just thrown away. The handler then returns on its first
-    // line with no message and no event: a silent dead end, strictly worse than the two taps
-    // it was meant to save.
-    const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined, {
-      // On a RESUME we have just come back from consent. Re-redirecting on a still-invalid
-      // token is an infinite loop with no gesture in it, so pass no marker and let the
-      // outcome surface as an error instead. Same reasoning as `openDrivePicker`'s guard.
-      returnPath: opts?.isResume ? undefined : isNative() ? RECONNECT_LOAD_PATH : undefined,
-      noRedirect: opts?.isResume === true,
-    });
+    // On native `reconnect` AWAITS the round trip and resolves here, in one tap — the marker,
+    // latch and watcher this used to need are gone. On web it returns `'redirecting'` and the
+    // page unloads; the reload re-runs `handleFamilySelected` against a now-valid token.
+    const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
 
-    // The page is navigating away to Google and nothing has been acquired yet;
-    // LoginPage re-runs the silent auto-load on return. Asked of the OUTCOME now
-    // rather than re-testing the platform: `reconnect` already made this decision
-    // and a second copy of the predicate is a second chance to disagree with it.
+    // WEB ONLY: the page is navigating away to Google and nothing has been acquired yet.
+    // Asked of the OUTCOME rather than re-testing the platform: `reconnect` already made this
+    // decision and a second copy of the predicate is a second chance to disagree with it.
     if (outcome === 'redirecting') return;
 
     if (!reconnectSucceeded(outcome)) {
@@ -1382,23 +1346,6 @@ watch(
   () => props.autoOpenDrivePicker,
   (open) => {
     if (open) void openDrivePicker({ isResume: true });
-  },
-  { immediate: true }
-);
-
-// The same shape, and for the same native reason, for the RECONNECT return. Without it the
-// reconnect panel sat there after a successful consent and the person tapped it again; that
-// second tap did nothing but short-circuit on the token the first one had already fetched.
-// `immediate` is what makes it work on native, where nothing remounts.
-watch(
-  () => props.autoReconnectLoad,
-  (on) => {
-    // ⚠️ `isResume: true` — the LOOP GUARD, exactly as `openDrivePicker` carries one. We are
-    // arriving BACK from a consent round trip. If the token is still invalid (consent
-    // declined, partially granted, or the code exchange failed — the native handler calls
-    // `onComplete` either way), re-entering would start the same redirect again, return here
-    // again, and fire this watcher again, with no user gesture anywhere in the cycle.
-    if (on && !isReconnectBusy.value) void handleReconnectAndLoad({ isResume: true });
   },
   { immediate: true }
 );

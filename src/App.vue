@@ -1303,12 +1303,10 @@ onMounted(async () => {
         // resume-setup screen explains "you must allow file access" instead of
         // a silent route the user retries blindly. Reported at warning (not
         // critical): it's user action, not a code fault.
-        const { DriveConsentDeniedError } = await import('@/types/sync');
-        const isConsentDenied = e instanceof DriveConsentDeniedError;
-        if (isConsentDenied) {
-          const { setResumeReason } = await import('@/components/login/resumePaths');
-          setResumeReason('drive-consent');
-        }
+        // ONE predicate, shared with the native deep-link handler (`googleAuth`'s exchange catch),
+        // which used to classify this differently and paged a developer for a user's decision.
+        const { stashResumeReasonFor } = await import('@/components/login/resumePaths');
+        const isConsentDenied = stashResumeReasonFor(e);
         reportError({
           surface: 'app.redirectAuthCompletion',
           message: `Redirect-auth code exchange failed during app init: ${msg}`,

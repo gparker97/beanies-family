@@ -132,3 +132,10 @@ export const getRemoteBaselineHeadsFp = vi.fn<() => string | null>(() => null);
 export const noteLineageBlocked = vi.fn();
 export const noteMergeFailed = vi.fn();
 export const noteRemoteBlocked = vi.fn();
+
+/**
+ * The create-path cross-family guard. Defaults to `false` (the provider belongs here) so every
+ * existing suite keeps exercising its real subject; the dedicated suite
+ * (`services/sync/__tests__/providerIdentity.test.ts`) covers the refusal itself.
+ */
+export const providerBelongsToAnotherFamily = vi.fn(() => false);

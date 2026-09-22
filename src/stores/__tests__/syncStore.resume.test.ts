@@ -145,6 +145,10 @@ vi.mock('@/services/sync/capabilities', () => ({
     manualSync: true,
   }),
   canAutoSync: () => true,
+  // `connectStorage.createReturnPath` consults this on every create-side gate — without it the
+  // gate's try/catch turns a missing mock into a `drive-auth-failed` probe result.
+  isNative: () => false,
+  getPlatform: () => 'web',
 }));
 
 // Google layers

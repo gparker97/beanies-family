@@ -794,11 +794,9 @@ async function openDriveRestorePicker(): Promise<void> {
       // never runs, so the user is pushed to a consent screen we could have
       // avoided. Line ~357 of this file already does this correctly.
       const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
-      // ⚠️ THE SAME TREATMENT AS THE READ LADDER BELOW, because this is its twin
-      // and fixing only one of a pair is how this file got here. On native the
-      // WebView does not unload, so a user who dismisses the Google tab lands
-      // back on Settings with the picker closed and a raw developer string still
-      // painted — and nothing in CloudWatch to find it by.
+      // ⚠️ WEB ONLY NOW. On native `reconnect` awaits the round trip and resolves
+      // `reconnected`/`failed`, so a dismissed sheet reaches the failure arm below with a message
+      // rather than leaving Settings showing a raw developer string. This arm is the web reload.
       if (outcome === 'redirecting') {
         // ⚠️ NO `clearError()` HERE, unlike the READ ladder below. This path never
         // painted `syncStore.error` — the listing failure surfaces through
@@ -903,12 +901,10 @@ async function handleDriveRestoreSelected(payload: {
     });
     const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
 
-    // ⚠️ THE REDIRECT ARM USED TO RETURN ABOVE THE `clearError()` BELOW, so it
-    // was the ONE path that kept the raw exception string the clear exists to
-    // remove — and it emitted nothing. On native the WebView does not unload, so
-    // the user dismisses the custom tab and lands back on a Settings page showing
-    // a developer string like `DriveApiError:401:…`, the picker closed, the
-    // restore abandoned, and no trace in CloudWatch.
+    // ⚠️ THE REDIRECT ARM USED TO RETURN ABOVE THE `clearError()` BELOW, so it was the ONE path
+    // that kept the raw exception string the clear exists to remove — and it emitted nothing.
+    // WEB ONLY now: on native `reconnect` awaits the trip, so a dismissed sheet lands on the
+    // failure arm with a message instead of on a Settings page showing `DriveApiError:401:…`.
     if (outcome === 'redirecting') {
       syncStore.clearError();
       logEvent({
