@@ -195,12 +195,20 @@ an apology.
 ### Phase 5: Review what was built
 
 ```
-/code-review max
+/code-review high
 ```
 
-`max` is the level this project's history justifies: `docs/lessons.md` records three consecutive
-`/code-review max` rounds each finding defects in the previous round's fixes, and a session where the four
-plan passes plus one review still missed that the feature's central premise was untrue.
+**`high` is the default, and it is the right default for almost everything this skill builds.** Go to
+`xhigh` or `max` **only when greg asks for that level by name.** Do not escalate on your own judgement that
+the change feels big — if you think it warrants more, say so in one line and let him decide.
+
+Why `high` rather than `max`: depth is not free, and past some point it stops buying correctness and starts
+buying *speculation*. A `max` review reaches for failure modes it cannot reach the evidence for, and the
+findings at that edge are the ones that get fixed, re-raised next round, and then withdrawn — which is
+expensive twice over, because the fix for a finding that was never real is a real change to working code.
+greg named this pattern directly on 2026-09-23. `high` finds the defects that have actually shipped in this
+project; the extra reach of `max` is worth paying for on a genuinely large, intricate, high-stakes
+changeset, and that is his call to make, not yours.
 
 Give the review the plan as its yardstick — it is checking three distinct things, and only the first is what
 a review does by default:
@@ -216,8 +224,33 @@ oversight.
 
 ### Phase 6: Fix what it found
 
-Fix findings in severity order. Re-run `npm run validate` after, and re-run the browser check for anything a
-fix touched visually.
+**Verify a finding before you fix it.** This is the single most important line in this phase, and it is the
+cure for the loop greg described on 2026-09-23: a review finds something, it gets fixed, the next round
+finds it again, and the round after that admits the first one was never real. That loop is not caused by the
+review level — it is caused by treating a plausible-sounding claim as a fact. A reviewer inferring from a
+diff is guessing; you have the whole codebase.
+
+So for each finding, before touching anything, go and read the code it names and satisfy yourself that the
+failure it describes can actually happen — a concrete path from real inputs or real user steps to the wrong
+outcome. Then:
+
+- **Substantiated** → fix it, and say what convinced you.
+- **Cannot be substantiated** → do NOT fix it. Record it as unverified, with what you checked and why the
+  described path does not occur. An unfixed non-bug costs nothing; a "fix" for one is an unreviewed change
+  to working code, and it is how a clean area acquires its first real defect.
+- **Genuinely uncertain** → say so plainly in the Phase 8 report rather than resolving it silently in either
+  direction. Uncertainty is information greg can act on.
+
+A reviewer's confidence is not evidence. "I could not reproduce this" in a finding's own text means it is
+unverified, whatever severity it carries.
+
+Then fix the substantiated findings in severity order. Re-run `npm run validate` after, and re-run the
+browser check for anything a fix touched visually.
+
+**If a later round re-raises something an earlier round "fixed", stop and go read the code by hand.** Two
+rounds disagreeing about one line means at least one of them is wrong, and a third patch is as likely to be
+the wrong one as the first two. Settle it against the source, state which round was right, and move on —
+never split the difference by patching again.
 
 **If a fix is the third patch in the same area, stop patching.** When review rounds keep finding regressions
 in the last round's fixes, that is the signal to move the decision onto the type or into the owning layer
@@ -229,16 +262,27 @@ propose the structural fix.
 
 ### Phase 7: Decide whether to review again
 
-Run a second `/code-review max` automatically, without asking, when **any** of these is true:
+A second review runs **at the same level as the first** — a re-review is not an escalation, and going up a
+level to settle a disagreement just produces more of the findings that caused it.
+
+Run a second review automatically, without asking, when **any** of these is true:
 
 - A fix touched auth, crypto, sync, money, or data-integrity paths
 - A fix changed a **shared** helper, composable, or component — the blast radius is every caller
-- More than roughly five findings were fixed
-- A fix added new logic rather than correcting a line
+- A fix added substantive new logic rather than correcting a line or a string
 - A fix was itself in code the first review had passed
 
 Those are the conditions under which this project has historically found defects in its own fixes, which is
-why they trip automatically rather than politely asking.
+why they trip automatically rather than politely asking. **Judge them by what the fixes touched, not by how
+many there were** — ten translated-copy fixes are not a reason to review again, and one new branch in the
+sync path is.
+
+**Scope the second review to the fixes**, not to the whole changeset again. Re-reviewing untouched code is
+where the same speculative finding gets raised a second time.
+
+**Two rounds is the ceiling without greg.** If a second round's findings would call for a third, stop and
+report instead: by then the evidence is that hand-patching is not converging, and the answer is either the
+structural fix from Phase 6 or greg's judgement — not another pass.
 
 Otherwise, report how extensive the fixes were and recommend. greg decides.
 
@@ -312,8 +356,16 @@ that overstates what was verified is worse than no report, because it retires th
   happen; do not hand-roll the commands.
 - **A screenshot you did not look at is not evidence.** Nor is a test you did not run. Say what you actually
   verified and how, and let the rest go on the manual list.
+- **Review at `high`. Escalate only when greg says so.** `xhigh` and `max` are his to ask for by name; a
+  change feeling big is not a reason to reach for them on your own. Say you think it warrants more, in one
+  line, and let him choose.
 - **Every review finding gets triaged.** Below the ship-blocker line is a priority call, not a validity call.
   Record the ones you are not fixing.
+- **Verify a finding before you fix it, and never fix one you could not substantiate.** Go read the code and
+  find the concrete path from real inputs to the wrong outcome. If there isn't one, record it as unverified
+  and leave the code alone — a fix for a non-bug is an unreviewed change to something that worked.
+- **Two review rounds is the ceiling without greg.** If a third looks warranted, that is the report, not the
+  next action.
 - **When patches stop converging, go structural.** Three rounds in the same area means the decision belongs
   on the type or in the owning layer, not in more call sites.
 - **Never deploy from this skill**, and never suggest it as the automatic next step. Reviewed code and shipped
