@@ -211,3 +211,124 @@ describe('inboundLinkBridge — device-approval delivery', () => {
     expect(navigate).toHaveBeenCalledWith('/join?token=abc');
   });
 });
+
+/**
+ * Entity deep links + the three-way gate (#63).
+ *
+ * The bridge's routable set is now `EXTERNAL_DEEP_LINK_PATHS`, shared with the iOS AASA
+ * and the AndroidManifest. These pin the two halves a manifest tripwire cannot see: that
+ * a widened path actually routes with its query intact, and that the gate's telemetry
+ * distinguishes "our host, unclaimed path" (the drift signal) from "not our host" (an
+ * anomaly) from "not even https" (someone else's listener — silent on purpose).
+ */
+describe('inboundLinkBridge — entity deep links and gate telemetry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getLaunchUrl.mockResolvedValue(null);
+    try {
+      sessionStorage.clear();
+    } catch {
+      /* happy-dom without storage — the bridge tolerates this too */
+    }
+  });
+
+  /** The `action` on the single `logEvent` call, for gate assertions. */
+  function soleEventContext(): Record<string, unknown> {
+    expect(logEvent, 'expected exactly one telemetry event').toHaveBeenCalledTimes(1);
+    return (logEvent.mock.calls[0][0] as { context: Record<string, unknown> }).context;
+  }
+
+  it('routes an entity deep link with its query preserved', async () => {
+    const { navigate, onApprovalKey } = install();
+
+    await fireWarm('https://app.beanies.family/activities?activity=abc');
+
+    // The exact URL `eventDescription.activityAppUrl` writes into every synced
+    // Google Calendar event — the journey the whole issue is about.
+    expect(navigate).toHaveBeenCalledWith('/activities?activity=abc');
+    expect(onApprovalKey).not.toHaveBeenCalled();
+    expect(soleEventContext()).toMatchObject({
+      action: 'inbound_link_routed',
+      route_path: '/activities',
+    });
+  });
+
+  it('routes a multi-param entity deep link without truncating it', async () => {
+    const { navigate } = install();
+
+    await fireWarm('https://app.beanies.family/transactions?view=t1&account=a1');
+
+    expect(navigate).toHaveBeenCalledWith('/transactions?view=t1&account=a1');
+  });
+
+  it('rejects a look-alike path WITHOUT logging the attacker-chosen path', async () => {
+    const { navigate } = install();
+
+    // Exact matching is the contract: `/activitiesX` is not `/activities`.
+    await fireWarm('https://app.beanies.family/activitiesXsomething-attacker-chose');
+
+    expect(navigate).not.toHaveBeenCalled();
+    const context = soleEventContext();
+    expect(context).toMatchObject({
+      action: 'inbound_link_ignored',
+      error_code: 'path-not-claimed',
+    });
+    // ⚠️ This branch fires ONLY on paths that are NOT ours, so the path is attacker-
+    // supplied free text even though the HOST is ours — anyone can send
+    // `https://app.beanies.family/<anything>`, and on Android any app can deliver an
+    // explicit Intent to the exported MainActivity. `route_path` is allowlisted and
+    // declared to Apple and Google as collected Diagnostics, so it must not carry it.
+    expect(context.route_path).toBeUndefined();
+  });
+
+  it('rejects the Drive Picker web return path — claiming it would break the Picker', async () => {
+    const { navigate } = install();
+
+    await fireWarm('https://app.beanies.family/oauth/callback?picked_file_ids=xyz');
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(soleEventContext()).toMatchObject({
+      action: 'inbound_link_ignored',
+      error_code: 'path-not-claimed',
+    });
+  });
+
+  it('rejects a foreign https origin WITHOUT logging its path either', async () => {
+    const { navigate } = install();
+
+    await fireWarm('https://evil.example.com/activities?activity=abc');
+
+    expect(navigate).not.toHaveBeenCalled();
+    const context = soleEventContext();
+    expect(context).toMatchObject({
+      action: 'inbound_link_ignored',
+      error_code: 'foreign-origin',
+    });
+    // `route_path` is an allowlisted telemetry field; a foreign host's path is wholly
+    // attacker-supplied free text and must never reach it.
+    expect(context.route_path).toBeUndefined();
+  });
+
+  it('SILENT: a file:// URL logs NOTHING — it belongs to iosOpenInAdapter', async () => {
+    const { navigate } = install();
+
+    // Every iOS "Open in beanies" document arrives here as a file:// URL. Logging these
+    // would emit an event per shared document and bury `path-not-claimed`, which is the
+    // one event this gate exists to make alertable.
+    await fireWarm('file:///var/mobile/Containers/Data/tmp/family.beanpod');
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it('the approval marker is still honoured ONLY on /welcome, not on a new entity path', async () => {
+    const { onApprovalKey, navigate } = install();
+
+    await fireWarm(`https://app.beanies.family/activities#beanies-approve=${KEY}`);
+
+    // Routable now, but not a path an approval may arrive on. The widened set must not
+    // widen the approval surface.
+    expect(onApprovalKey).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith('/activities');
+  });
+});
