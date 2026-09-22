@@ -150,14 +150,7 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
   // 2. Suppress Plausible for the whole seed: `signUp` fires `signup` + `login`,
   //    and a reviewer tap must not land in the conversion funnel.
   return withAnalyticsSuppressed(async () => {
-    // 3. Storage: the one step of the real create flow we substitute.
-    try {
-      setProvider(createMemoryProvider(DEMO_POD_FILE));
-    } catch (error) {
-      return fail('provider-install', error, false);
-    }
-
-    // 4. Identity + owner doc, exactly like the production create flow (Phase 4):
+    // 3. Identity + owner doc, exactly like the production create flow (Phase 4):
     //    deferred signUp, then the PIN applied via rehydrateOwnerDoc —
     //    `createNewFile` refuses a pod whose owner has no pinHash.
     const signUpResult = await authStore.signUp({
@@ -182,6 +175,24 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
         'signup',
         new Error('signUp succeeded but left no memberId/familyId on the session')
       );
+    }
+
+    // 4. Storage is the one step of the real create flow we substitute, and it runs where the real
+    //    flow runs it: AFTER identity.
+    //
+    //    ⚠️ ORDER IS LOAD-BEARING, DO NOT MOVE THIS BACK ABOVE `signUp`. `setProvider` binds the
+    //    provider to `getActiveFamilyId()` AT CALL TIME. Before `signUp` that is whatever family
+    //    this runtime last had active — and after a keep-data sign-out it is still the PREVIOUS
+    //    family, because `database.ts` clears `currentFamilyId` only on DELETE. Installed early,
+    //    the demo's provider was bound to family A while the demo family is D, so
+    //    `createNewFile`'s cross-family backstop refuses the seed outright (and `doSave()` already
+    //    refused its saves — a latent bug this reorder also closes).
+    //
+    //    `needsTeardown: true` because a family now exists by the time this can fail.
+    try {
+      setProvider(createMemoryProvider(DEMO_POD_FILE));
+    } catch (error) {
+      return fail('provider-install', error, true);
     }
 
     // 5. Build + write the pod, with every remote interaction suppressed.

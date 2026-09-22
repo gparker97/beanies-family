@@ -45,7 +45,13 @@ export type CreatePodFailureReason =
   | 'persist'
   | 'register'
   | 'concurrent-write'
-  | 'existing-pod';
+  | 'existing-pod'
+  /**
+   * The installed provider is bound to a DIFFERENT family; writing would overwrite that family's
+   * pod with a new envelope under a new family key. Recovery is to connect storage again (which
+   * replaces the provider), never to retry the write.
+   */
+  | 'provider-mismatch';
 
 export type CreatePodResult =
   /**
@@ -95,10 +101,14 @@ export type ResumeFromRegistryResult =
   | { kind: 'no-registry-entry' }
   | { kind: 'registry-error'; error: Error }
   | { kind: 'load-failed'; error: Error }
-  // The probe kicked off a full-page OAuth redirect (iOS/PWA, no valid token) —
-  // the page is navigating to Google; the caller does nothing and we resume on
-  // return (2026-06-19, finding 2: never open a gesture-less popup on iOS).
-  | { kind: 'redirecting' };
+  // WEB ONLY. The probe kicked off a full-page OAuth redirect (iOS/PWA, no valid token) — the
+  // page is navigating to Google; the caller does nothing and we resume on return (2026-06-19,
+  // finding 2: never open a gesture-less popup on iOS).
+  | { kind: 'redirecting' }
+  // NATIVE, or a start failure on either transport: the probe's gesture-less sheet came back
+  // without a grant. `error` is the popup-shaped error (`DriveConsentDeniedError`,
+  // `OAuthRoundTripAbandonedError`, or the raw failure) so the caller classifies it once.
+  | { kind: 'drive-auth-failed'; error: Error };
 
 /**
  * `completeAutoLoad` result — what happened when the user submitted their
@@ -646,6 +656,31 @@ export class DriveConsentDeniedError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'DriveConsentDeniedError';
+  }
+}
+
+/**
+ * A redirect / system-browser OAuth trip that ended with NO grant because the person said no
+ * (`declined`: Google echoed `error=access_denied`) or closed the sheet (`dismissed`: no deep link
+ * arrived within the grace). A DECISION, never a fault: `connectDriveStorage` maps it to
+ * `cancelled`, and reconnect surfaces show the message verbatim, as they do every popup failure.
+ *
+ * ⚠️ Classified by `instanceof` at every seam, NEVER by message. The messages are user-facing
+ * because the reconnect surfaces render `reconnectError` verbatim — a pre-existing English-only gap
+ * shared with every popup failure, not widened here.
+ */
+export class OAuthRoundTripAbandonedError extends Error {
+  // ⚠️ A PLAIN FIELD, NOT A PARAMETER PROPERTY. `erasableSyntaxOnly` is on, so
+  // `constructor(readonly reason: …)` does not compile.
+  readonly reason: 'declined' | 'dismissed';
+  constructor(reason: 'declined' | 'dismissed') {
+    super(
+      reason === 'declined'
+        ? 'Google sign-in was declined.'
+        : 'Google sign-in was closed before it finished.'
+    );
+    this.name = 'OAuthRoundTripAbandonedError';
+    this.reason = reason;
   }
 }
 

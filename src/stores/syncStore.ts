@@ -31,7 +31,10 @@ import { useSyncHighlightStore } from './syncHighlightStore';
 import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync, getPlatform } from '@/services/sync/capabilities';
-import { beginDriveAuthRedirectIfNeeded, RESUME_SETUP_PATH } from '@/services/sync/connectStorage';
+import {
+  beginDriveAuthRedirectIfNeeded,
+  gateCreateDriveAuth,
+} from '@/services/sync/connectStorage';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
@@ -3042,6 +3045,9 @@ export const useSyncStore = defineStore('sync', () => {
 
     criticalWriteState.value = { kind: 'creating' };
     let step: CreatePodFailureReason = 'write';
+    // ⚠️ GATES THE QUEUE CLEAR BELOW. Until THIS create's write has been attempted, anything in
+    // the offline queue belongs to someone else's save.
+    let writeAttempted = false;
     let partialFileId: string | null = null;
 
     try {
@@ -3086,7 +3092,28 @@ export const useSyncStore = defineStore('sync', () => {
         // state. Classified as 'write' because this is the write step's setup.
         throw new Error('createNewFile: syncService has no provider configured');
       }
+      // ⚠️ THE DATA-LOSS BACKSTOP. `doSave()` refuses a cross-family write; this path calls
+      // `provider.write()` DIRECTLY and did not. On native the in-memory provider survives the
+      // Drive redirect (nothing unloads), so a provider bound to a previous family reached this
+      // write on 2026-09-21 — and only a `drive.file` 404 stopped it overwriting that family's
+      // pod with a brand-new envelope under a brand-new family key, unreadable by every device
+      // holding the old one.
+      //
+      // Classified rather than thrown raw so the caller shows the storage step ("connect storage
+      // again", which replaces the provider) instead of "check your connection".
+      //
+      // NO `reportError` here: `finalizePod` already reports every create failure at
+      // `severity: 'critical'` with `surface: resumeSetup.<reason>`, and a second report would
+      // page twice for one event.
+      if (syncService.providerBelongsToAnotherFamily(familyId)) {
+        step = 'provider-mismatch';
+        throw new Error(
+          `createNewFile refused: provider is bound to family ${syncService.getProviderFamilyId()} but this create is for ${familyId}`
+        );
+      }
+
       step = 'write';
+      writeAttempted = true;
       const createAck = await provider.write(envelopeJson);
       // ⚠️ A QUEUED WRITE IS NOT A WRITE, AND THIS STEP MUST STOP HERE. The
       // provider catches a network failure, enqueues the bytes and RESOLVES —
@@ -3214,7 +3241,12 @@ export const useSyncStore = defineStore('sync', () => {
       // cached key can decrypt — bricking the pod. During a create the only queued
       // content is this doomed create-write, so clearing on failure is safe and
       // closes the data-loss path for BOTH the auto-retry and the manual re-tap.
-      clearQueue();
+      //
+      // ⚠️ ONLY ONCE THIS CREATE'S WRITE RAN can its envelope be in the queue. Before that — the
+      // precondition, existing-pod and provider-mismatch refusals — the queue may hold ANOTHER
+      // family's unsent save (the very provider the mismatch refused), and clearing it would
+      // destroy that.
+      if (writeAttempted) clearQueue();
       // Mirror to legacy error ref so any old callers still reading it see
       // the latest message; canonical signal is the returned discriminated
       // result.
@@ -5543,15 +5575,11 @@ export const useSyncStore = defineStore('sync', () => {
     // popup that iOS Safari blocks, dead-ending the resume. On a redirect
     // surface with no valid token, silently reconnect or kick off a full-page
     // redirect (page navigates away; we resume on return) instead.
-    if (
-      await beginDriveAuthRedirectIfNeeded(
-        RESUME_SETUP_PATH,
-        authStoreInst.currentUser?.email,
-        'create'
-      )
-    ) {
-      return { kind: 'redirecting' };
-    }
+    // On native the gate AWAITS the round trip rather than returning — nothing unloaded, so this
+    // stack is still here and the probe continues (or reports) in place.
+    const gate = await gateCreateDriveAuth(authStoreInst.currentUser?.email);
+    if (gate.kind === 'redirecting') return { kind: 'redirecting' }; // web: the page is unloading
+    if (gate.kind === 'failed') return { kind: 'drive-auth-failed', error: gate.error };
 
     // Fetch the encrypted envelope into `pendingEncryptedFile`. The inner
     // `loadFromGoogleDrive` already sets `criticalWriteState = 'loading'`

@@ -50,7 +50,14 @@ function seedFailureMessage(reason: DemoSeedErrorCode): string {
       return t('reviewDemo.seedFailed.storage');
     // Every remaining stage is an internal failure the reviewer can only retry;
     // the specific stage is already in telemetry via `error_code`.
+    //
+    // `provider-mismatch` joins them: a cross-family provider refusal is not actionable by a
+    // REVIEWER and not distinguishable from any other internal stage. After the 2026-09-22
+    // reorder `demoSeed` installs its provider AFTER `signUp`, so it should now be unreachable —
+    // handled rather than left to `assertNever` because an unreachable-by-design case still must
+    // not throw at a reviewer.
     case 'signup':
+    case 'provider-mismatch':
     case 'fixture-write':
     case 'concurrent-write':
     case 'precondition':

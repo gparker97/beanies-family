@@ -17,6 +17,8 @@ vi.mock('@/services/google/googleAuth', () => ({
   shouldUseRedirectAuth: vi.fn(() => false),
   startRedirectAuth: vi.fn(),
   isTokenValid: vi.fn(() => true),
+  awaitNativeOAuthReturn: vi.fn(async () => ({ kind: 'completed' })),
+  isUserCancellation: vi.fn(() => false),
 }));
 // Silent recovery is exercised in driveTokenRecovery's own tests; here it is a
 // deterministic no-op so the redirect-path assertions are unaffected.
@@ -43,16 +45,23 @@ import {
   connectLocalStorage,
   connectDriveStorage,
   beginDriveAuthRedirectIfNeeded,
+  gateCreateDriveAuth,
   resolveExistingBeanpod,
   adoptDriveStub,
 } from '../connectStorage';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
-import { DriveConsentDeniedError, FileNameCollisionError } from '@/types/sync';
+import {
+  DriveConsentDeniedError,
+  FileNameCollisionError,
+  OAuthRoundTripAbandonedError,
+} from '@/types/sync';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import {
   shouldUseRedirectAuth,
   startRedirectAuth,
   isTokenValid,
+  awaitNativeOAuthReturn,
+  isUserCancellation,
 } from '@/services/google/googleAuth';
 import * as syncService from '@/services/sync/syncService';
 
@@ -238,7 +247,8 @@ describe('adoptDriveStub', () => {
     const r = await adoptDriveStub('orphan-1', 'the-smiths', { activeFamilyId: 'fam-1' });
     expect(r).toEqual({ status: 'connected', type: 'google_drive' });
     expect(mockFromExisting).toHaveBeenCalledWith('orphan-1', 'the-smiths.beanpod');
-    expect(syncService.setProvider).toHaveBeenCalled();
+    // Bound to the family the caller named, not to whatever the database's active id happens to be.
+    expect(syncService.setProvider).toHaveBeenCalledWith(expect.anything(), 'fam-1');
     expect(persist).toHaveBeenCalledWith('fam-1');
   });
 });
@@ -288,6 +298,60 @@ describe('isStubBeanpod is structural: any populated file is adopt-existing, wha
  *
  * Typing it here is what makes all three agree.
  */
+describe('gateCreateDriveAuth — one gate, two transports', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('proceeds when a token is already in hand — no redirect at all', async () => {
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(true);
+    await expect(gateCreateDriveAuth(undefined)).resolves.toEqual({ kind: 'proceed' });
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('WEB: reports `redirecting` and does NOT await — the page is unloading', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(false);
+    await expect(gateCreateDriveAuth('a@b.com')).resolves.toEqual({ kind: 'redirecting' });
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=setup', 'a@b.com', 'create');
+    expect(awaitNativeOAuthReturn).not.toHaveBeenCalled();
+  });
+
+  it('NATIVE: awaits the round trip and proceeds in place — nothing unloaded', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'completed' });
+    await expect(gateCreateDriveAuth(undefined)).resolves.toEqual({ kind: 'proceed' });
+    expect(awaitNativeOAuthReturn).toHaveBeenCalled();
+  });
+
+  it("NATIVE: hands back the trip's own error, so the caller classifies it once", async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(true);
+    const denial = new DriveConsentDeniedError('file access not granted');
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'failed', error: denial });
+    await expect(gateCreateDriveAuth(undefined)).resolves.toEqual({
+      kind: 'failed',
+      error: denial,
+    });
+  });
+
+  it('catches a START failure instead of throwing — the probe has no envelope of its own', async () => {
+    // ⚠️ AN UNCAUGHT THROW HERE LEAVES THE RESUME SCREEN ON ITS PROBING SPINNER FOR GOOD.
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockStartRedirect.mockRejectedValue(new Error('no client id'));
+    const gate = await gateCreateDriveAuth(undefined);
+    expect(gate.kind).toBe('failed');
+    if (gate.kind !== 'failed') return;
+    expect(gate.error.message).toBe('no client id');
+  });
+});
+
 describe('connectDriveStorage — a declined consent is typed, not sniffed', () => {
   beforeEach(() => {
     vi.mocked(shouldUseRedirectAuth).mockReturnValue(false);
@@ -325,5 +389,73 @@ describe('connectDriveStorage — a declined consent is typed, not sniffed', () 
     );
     const r = await connectDriveStorage('my-family');
     expect(r).toMatchObject({ status: 'failed', errorKind: 'name-collision' });
+  });
+
+  it('a CLOSED DESKTOP POPUP is `cancelled` too — the native fix must not be the only half', async () => {
+    // ⚠️ THE POPUP REJECTS WITH A PLAIN `Error`, not `OAuthRoundTripAbandonedError`, so it used
+    // to fall through with no `errorKind` — and the callers' generic arms render `error`
+    // verbatim. That painted the untranslated "Authentication cancelled" into a Chinese UI and
+    // made the resume screen say "sign-in failed" to someone who closed the chooser themselves.
+    vi.mocked(isUserCancellation).mockReturnValue(true);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new Error('Authentication cancelled')
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled', cancelled: true });
+  });
+
+  it('a real fault is NEVER read as a cancel — the typed arms win', async () => {
+    vi.mocked(isUserCancellation).mockReturnValue(true); // the regex would say yes…
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new FileNameCollisionError('exists', 'file-1', 'my-family.beanpod', true)
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'name-collision' }); // …and is outranked
+  });
+});
+
+describe('connectDriveStorage on NATIVE — it awaits, and never reports `redirecting`', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(true);
+  });
+
+  it("a completed trip connects in place and binds the provider to the CALLER's family", async () => {
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'completed' });
+    const persist = vi.fn(async () => {});
+    const provider = { persist } as unknown as InstanceType<typeof GoogleDriveProvider>;
+    vi.mocked(GoogleDriveProvider.createNew).mockResolvedValue(provider);
+
+    const r = await connectDriveStorage('the-smiths', { activeFamilyId: 'fam-1' });
+
+    expect(r).toEqual({ status: 'connected', type: 'google_drive' });
+    // ⚠️ THE SECOND ARGUMENT IS THE POINT. An unbound provider surviving a native round trip is
+    // what reached a create write on a production iPhone on 2026-09-21.
+    expect(syncService.setProvider).toHaveBeenCalledWith(provider, 'fam-1');
+    expect(persist).toHaveBeenCalledWith('fam-1');
+  });
+
+  it('an abandoned trip is `cancelled`, and CARRIES AN errorKind so the copy stays translated', async () => {
+    // ⚠️ WITHOUT `errorKind` the callers fall into their generic arm and render `error` verbatim
+    // — and `error` here is `OAuthRoundTripAbandonedError`'s English-only message, which would
+    // paint "Google sign-in was closed before it finished." into a Chinese UI.
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new OAuthRoundTripAbandonedError('dismissed'),
+    });
+    const r = await connectDriveStorage('the-smiths');
+    expect(r).toMatchObject({ status: 'failed', cancelled: true, errorKind: 'cancelled' });
+    expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
+  });
+
+  it('a consent denial from the trip classifies exactly as the popup arm does', async () => {
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new DriveConsentDeniedError('Google Drive file access was not granted.'),
+    });
+    const r = await connectDriveStorage('the-smiths');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'consent-denied' });
   });
 });

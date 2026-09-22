@@ -139,6 +139,42 @@ describe('seedDemoFamily — happy path', () => {
     expect(h.reportError).not.toHaveBeenCalled();
   });
 
+  /**
+   * ⚠️ ORDERING REGRESSION GUARD (2026-09-22). `setProvider` binds the provider to
+   * `getActiveFamilyId()` AT CALL TIME. This used to run BEFORE `signUp`, so after a keep-data
+   * sign-out (where `database.ts` leaves the previous family's id in place — it clears it only on
+   * DELETE) the demo's provider was bound to the PREVIOUS family while the demo family is new.
+   * `createNewFile`'s cross-family backstop then refuses the seed outright, and `doSave()` already
+   * refused its saves. Installing after `signUp` binds it to the demo family, as the real create
+   * wizard does.
+   *
+   * This test fails against the unreordered `demoSeed`.
+   */
+  it('installs the provider AFTER signUp, so it binds to the DEMO family', async () => {
+    await seedDemoFamily();
+
+    expect(h.setProvider).toHaveBeenCalledTimes(1);
+    const signUpOrder = h.signUp.mock.invocationCallOrder[0]!;
+    const setProviderOrder = h.setProvider.mock.invocationCallOrder[0]!;
+    expect(
+      setProviderOrder,
+      'setProvider must run after signUp: it binds to getActiveFamilyId() at call time, and before signUp that is still the PREVIOUS family after a keep-data sign-out'
+    ).toBeGreaterThan(signUpOrder);
+  });
+
+  it('does not install a provider at all when signUp fails', async () => {
+    // Storage is now downstream of identity, so a failed signUp must leave no provider installed
+    // for the next attempt (or the next family) to inherit.
+    // A full override, not `mockResolvedValueOnce`: `happyPath()` installs a `mockImplementation`
+    // in `beforeEach`, and a queued once-value proved order-sensitive inside the full suite.
+    h.signUp.mockImplementation(async () => ({ success: false, error: 'nope' }));
+
+    const result = await seedDemoFamily();
+
+    expect(result.ok).toBe(false);
+    expect(h.setProvider).not.toHaveBeenCalled();
+  });
+
   it('passes the runtime owner id into the fixture', async () => {
     await seedDemoFamily();
     const seededDoc = h.seedDocument.mock.calls[0]![0] as Record<
@@ -216,14 +252,18 @@ describe('seedDemoFamily — failure paths', () => {
     expect(h.signOutAndClearData).not.toHaveBeenCalled();
   });
 
-  it('reports a provider-install failure without tearing anything down', async () => {
+  it('TEARS DOWN on a provider-install failure, because identity now exists by then', async () => {
+    // ⚠️ THIS EXPECTATION FLIPPED ON 2026-09-22, deliberately. Storage used to be installed BEFORE
+    // `signUp`, so a failure here left nothing behind and teardown would have been wrong. It now
+    // runs AFTER identity (so the provider binds to the DEMO family rather than whatever family
+    // was last active), which means a family and an owner DO exist at this point — leaving them
+    // would strand a half-built demo pod the reviewer cannot use or escape.
     h.createMemoryProvider.mockImplementation(() => {
       throw new Error('guard says no');
     });
     const result = await seedDemoFamily();
     expect(result).toEqual({ ok: false, code: 'provider-install' });
-    // Nothing was created yet, so there is nothing to clear.
-    expect(h.signOutAndClearData).not.toHaveBeenCalled();
+    expect(h.signOutAndClearData).toHaveBeenCalledTimes(1);
   });
 
   it('tears down exactly once when signUp fails', async () => {

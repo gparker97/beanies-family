@@ -181,7 +181,9 @@ export function useReconnectCoordinator() {
           const driveOutcome = await driveReconnect(feature.email ?? undefined);
           if (driveOutcome === 'redirecting') {
             outcome = 'redirecting';
-            return; // page is navigating away; nothing has been acquired yet
+            // WEB ONLY: the page is navigating away and nothing has been acquired yet. On native
+            // `driveReconnect` awaits the trip, so the plan continues in place (2026-09-22).
+            return;
           }
           if (!reconnectSucceeded(driveOutcome)) {
             reconnectError.value = t('reconnectPrompt.error');

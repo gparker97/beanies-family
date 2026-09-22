@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useGoogleReconnect, reconnectSucceeded } from '../useGoogleReconnect';
+import { DriveConsentDeniedError, OAuthRoundTripAbandonedError } from '@/types/sync';
 
 vi.mock('@/services/google/googleAuth', () => ({
   requestAccessToken: vi.fn(async () => 'mock-token'),
@@ -9,7 +10,13 @@ vi.mock('@/services/google/googleAuth', () => ({
   startRedirectAuth: vi.fn(async () => {
     /* noop in tests — would navigate the page in real browser */
   }),
+  awaitNativeOAuthReturn: vi.fn(async () => ({ kind: 'completed' })),
 }));
+
+// Native vs web is the whole distinction this composable now draws: on web the page unloads and
+// it returns `'redirecting'`; on native nothing unloads and it AWAITS the round trip.
+const { isNative } = vi.hoisted(() => ({ isNative: vi.fn(() => false) }));
+vi.mock('@/services/sync/capabilities', () => ({ isNative }));
 
 // ⚠️ MOCKED DELIBERATELY. Left unmocked, `tryReconnectSilently` reached into a
 // googleAuth factory that has no `isTokenValid`, threw inside its own try, and
@@ -25,8 +32,13 @@ const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
 vi.mock('@/services/telemetry', () => ({ logEvent }));
 
 describe('useGoogleReconnect', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // ⚠️ `clearAllMocks` clears CALLS, not return values, so a `mockReturnValue` set by an earlier
+    // case leaks into every later one. Restore the web defaults explicitly.
+    const { shouldUseRedirectAuth } = await import('@/services/google/googleAuth');
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(false);
+    isNative.mockReturnValue(false);
   });
 
   it('reconnect calls requestAccessToken and reports reconnected on success', async () => {
@@ -103,6 +115,71 @@ describe('useGoogleReconnect', () => {
     // token while the user was looking at the consent screen.
     expect(result).toBe('redirecting');
     expect(reconnectSucceeded(result)).toBe(false);
+  });
+
+  it('NATIVE: awaits the round trip and reports `reconnected` — the one-tap fix', async () => {
+    // ⚠️ THE WHOLE POINT OF THE 2026-09-22 CHANGE. On Capacitor the system browser opens over a
+    // live WebView, so this stack survives the trip and the caller's `reconnectSucceeded` branch
+    // runs in place. It used to need a per-surface marker + latch + watcher, of which exactly one
+    // of the four surfaces had one — the other three cost the person a second tap.
+    const { shouldUseRedirectAuth, awaitNativeOAuthReturn } =
+      await import('@/services/google/googleAuth');
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(true);
+    isNative.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'completed' });
+
+    const { reconnect } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(result).toBe('reconnected');
+    expect(reconnectSucceeded(result)).toBe(true);
+  });
+
+  it("NATIVE: a failed trip surfaces as `failed`, with the trip's own message", async () => {
+    const { shouldUseRedirectAuth, awaitNativeOAuthReturn } =
+      await import('@/services/google/googleAuth');
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(true);
+    isNative.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new DriveConsentDeniedError('Google Drive file access was not granted.'),
+    });
+
+    const { reconnect, reconnectError } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(result).toBe('failed');
+    expect(reconnectError.value).toBe('Google Drive file access was not granted.');
+  });
+
+  it('an ABANDONED native trip is logged as a decision, not a fault, and says nothing itself', async () => {
+    // ⚠️ TWO THINGS AT ONCE, BOTH ABOUT NATIVE MAKING "close the sheet" COMMON.
+    // (1) `reconnectError` must stay NULL: four call sites render it verbatim and this error's
+    //     message is untranslated English; null is what lets each fall back to its own `t()` key.
+    // (2) The event must NOT land in the `warn`/`reconnect-failed` bucket, which is the reconnect
+    //     SUCCESS-RATE denominator. Counting people who changed their mind as failures measures
+    //     nothing.
+    const { shouldUseRedirectAuth, awaitNativeOAuthReturn } =
+      await import('@/services/google/googleAuth');
+    vi.mocked(shouldUseRedirectAuth).mockReturnValue(true);
+    isNative.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new OAuthRoundTripAbandonedError('dismissed'),
+    });
+
+    const { reconnect, reconnectError } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(result).toBe('failed');
+    expect(reconnectSucceeded(result)).toBe(false);
+    expect(reconnectError.value).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({ action: 'reconnect-abandoned' }),
+      })
+    );
   });
 
   it('reports `recovered` when the silent path restores the connection', async () => {

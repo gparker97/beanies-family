@@ -3615,6 +3615,19 @@ const STRING_DEFS = {
   // Create-pod failures — one key per `CreatePodFailureReason` so the user
   // sees a message they can act on rather than a generic "something broke".
   // Used by CreatePodView.handleStep2Next's switch on `result.reason`.
+  /**
+   * The cross-family provider refusal. IMPORTANT SURFACE (data at risk), so the beanie value keeps
+   * the real nouns — "device", "storage", "family file" — and only drops case.
+   *
+   * ⚠️ Deliberately does NOT mention the connection. The 2026-09-21 report had `online: true`; the
+   * generic write message sent the person to check a connection that was fine. The recovery here is
+   * to connect storage again, which replaces the foreign provider.
+   */
+  'createPod.failedReasonProviderMismatch': {
+    en: "This device is still connected to a different family's storage, so nothing was written. Choose where to keep this family's file to continue.",
+    beanie:
+      "this device is still connected to a different family's storage, so nothing was written. choose where to keep this family's file to continue.",
+  },
   'createPod.failedReasonWrite': {
     en: "We couldn't save your pod to your storage. Please check your connection and try again.",
     beanie:
@@ -7879,6 +7892,16 @@ const STRING_DEFS = {
   'googleDrive.authFailed': {
     en: 'Google sign-in failed. Please try again.',
     beanie: 'google sign-in failed. please try again.',
+  },
+  /**
+   * The person CLOSED or DECLINED the Google sign-in sheet. A decision, not a fault — so it must
+   * not say "failed", which frames their own choice as a code error and tells them to retry
+   * something that did exactly what they asked. Important surface (sign-in), so the `beanie`
+   * value keeps the real nouns and only drops case.
+   */
+  'googleDrive.authCancelled': {
+    en: 'Google sign-in was cancelled. You can try again whenever you like.',
+    beanie: 'google sign-in was cancelled. you can try again whenever you like.',
   },
   'googleDrive.notConfigured': {
     en: 'Google Drive is not configured.',
