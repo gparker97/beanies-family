@@ -22,8 +22,40 @@ Served from the Vue app's S3 bucket / CloudFront (`app.beanies.family`), deploye
 
 Retains only the `handle_all_urls` relation for package `family.beanies.app`. The
 former `get_login_creds` relation (WebAuthn / Credential Manager) was removed with the
-native-biometric Keystore pivot (ADR-029, 2026-07-14). There is no longer an
-`apple-app-site-association` on this origin (it was `webcredentials`-only).
+native-biometric Keystore pivot (ADR-029, 2026-07-14).
+
+> The `webcredentials` association that used to live on this origin was retired with that
+> same pivot. An **`applinks` association was later re-added here** — first for shared
+> links (`/join`, `/welcome`) and now, with #63, for entity deep links. See the next
+> section. (This paragraph previously claimed there was no longer an
+> `apple-app-site-association` on this origin; that stopped being true when shared links
+> shipped, and the correction is part of #63.)
+
+## `apple-app-site-association` — iOS Universal Links
+
+Two AASA files exist, on two origins, and they claim **different, non-overlapping** things:
+
+| File | Origin | Claims | Purpose |
+| --- | --- | --- | --- |
+| `web/public/.well-known/apple-app-site-association` | `beanies.family` (Astro, `deploy-web.yml`) | `/oauth/native`, `/oauth/native/*` | The OAuth return Universal Link |
+| `apple-app-site-association` (this dir) | `app.beanies.family` (Vue app, `deploy.yml`) | the paths in `EXTERNAL_DEEP_LINK_PATHS` | Shared links + entity deep links (#63) |
+
+**The app-origin list is pinned, not free-form.** Its `components` must equal
+`EXTERNAL_DEEP_LINK_PATHS` in `src/constants/externalDeepLinkPaths.ts`, and a tripwire
+test (`src/constants/__tests__/deepLinkPaths.manifests.test.ts`) fails until they agree.
+**Adding a deep-linkable path is three edits:**
+
+1. `src/constants/externalDeepLinkPaths.ts` (the owner — usually via `ENTITY_DEEP_LINKS`)
+2. this `apple-app-site-association`
+3. `android/app/src/main/AndroidManifest.xml` (the `app.beanies.family` intent-filter)
+
+The tripwire names all three files when it fails, and refuses a wildcard.
+
+> ⚠️ **This file is PUBLIC.** Everything in `public/.well-known/` is served at
+> `https://app.beanies.family/.well-known/`, this README included. Keep operational
+> facts here; keep the *reasoning* — which paths are sensitive and why — in the repo,
+> where `docs/plans/2026-09-21-deep-links-open-the-app-first.md` and the tripwire test's
+> docblock hold it.
 
 ## ⚠️ Two assetlinks files exist — keep their fingerprints in sync
 
