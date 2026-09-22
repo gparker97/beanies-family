@@ -128,7 +128,9 @@ const handlers: Record<PodRecoveryAction, () => Promise<void>> = {
     //    unreachable — pushing the user to a consent screen every other call
     //    site avoids. See CLAUDE.md § Cloud Auth UX.
     const outcome = await reconnect(syncStore.providerAccountEmail ?? undefined);
-    if (outcome === 'redirecting') return; // the page is on its way to Google
+    // WEB ONLY: the page is on its way to Google. On native `reconnect` awaits the round trip, so
+    // the arms below run in place and this banner clears on the FIRST tap (2026-09-22).
+    if (outcome === 'redirecting') return;
     if (!reconnectSucceeded(outcome)) {
       // ⚠️ SAY SOMETHING. A bare `return` made this button a perfect no-op on
       // `'failed'`: `reconnectError` is set inside the composable but is not

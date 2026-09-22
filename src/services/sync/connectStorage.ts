@@ -17,8 +17,11 @@ import {
   startRedirectAuth,
   isTokenValid,
   whenRedirectAuthSettled,
+  awaitNativeOAuthReturn,
+  isUserCancellation,
 } from '@/services/google/googleAuth';
 import type { RedirectMode } from '@/services/google/redirectState';
+import { currentLocationPath } from '@/services/google/redirectState';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import * as syncService from '@/services/sync/syncService';
@@ -28,13 +31,13 @@ import {
   FileNameCollisionError,
   CollisionCheckUnavailableError,
   DriveConsentDeniedError,
+  OAuthRoundTripAbandonedError,
 } from '@/types/sync';
 
-// `RESUME_SETUP_PATH` now lives in the lightweight `resumePaths.ts` (so it can
-// be imported without this module's heavy Drive/sync graph). Imported for this
-// module's own use + re-exported for back-compat with existing importers.
+// The create flow's WEB return path. On native the trip is awaited in place and this is not used
+// (see `createReturnPath`). The old `export { RESUME_SETUP_PATH }` back-compat re-export is GONE —
+// every importer takes it from `resumePaths` directly, which is where it lives.
 import { RESUME_SETUP_PATH } from '@/components/login/resumePaths';
-export { RESUME_SETUP_PATH };
 
 /**
  * Begin a redirect/deep-link OAuth flow IFF the current surface needs one and we
@@ -49,9 +52,11 @@ export { RESUME_SETUP_PATH };
  * the `prompt=consent` refresh-token invariant; do not hand-roll an auth URL.
  *
  * Return-path-agnostic by design — each caller passes the path it wants to
- * resume at (create → RESUME_SETUP_PATH; load → the login-flow's LOAD_DRIVE_PATH).
+ * resume at (create → `RESUME_SETUP_PATH` on web, the current location on native; see
+ * `createReturnPath`. Load → the login-flow's LOAD_DRIVE_PATH).
  * A throw from `startRedirectAuth` (e.g. no client id, Browser.open rejects)
- * propagates to the caller's try/catch — never swallowed.
+ * propagates to the caller's try/catch — never swallowed (`gateCreateDriveAuth` is that
+ * try/catch for the two create callers).
  *
  * `opts.forceReauth` redirects even when a valid token is held — the
  * switch-account case on a redirect surface, where the popup `forceConsent`
@@ -112,11 +117,23 @@ export interface StorageConnectFailed {
    *   the "allow file access" guidance and must NOT report it as a code error.
    *   Distinct from `cancelled` (which means nothing happened at all, so there
    *   is nothing to explain); here there IS something specific to tell them.
+   * - `cancelled` — the person declined at Google, closed the sign-in sheet, or closed the
+   *   desktop popup. A DECISION too, on every transport.
+   *   ⚠️ IT EXISTS SO CALLERS NEVER RENDER `error` FOR THIS CASE. `error` carries an
+   *   English-only message (`OAuthRoundTripAbandonedError`'s, or the popup's "Authentication
+   *   cancelled"), and every caller's generic arm paints `error` verbatim — which put raw English
+   *   into a Chinese UI and told people who cancelled that their sign-in had FAILED. Pick a
+   *   `t()` key off this discriminant instead. Pairs with `cancelled: true`, which remains the
+   *   separate "do not report this as a fault" signal for severity.
    * Other failures pass through with no `errorKind` set and the caller shows
    * the generic error.
    */
   errorKind?:
-    'name-collision' | 'collision-check-unavailable' | 'unsupported-browser' | 'consent-denied';
+    | 'name-collision'
+    | 'collision-check-unavailable'
+    | 'unsupported-browser'
+    | 'consent-denied'
+    | 'cancelled';
   /**
    * Present iff `errorKind === 'name-collision'`. Grouped into one object
    * (rather than loose `collision*` siblings) so the failure shape stays
@@ -128,21 +145,79 @@ export interface StorageConnectFailed {
   /** Set on transient/verify failures the caller may retry (e.g. collision-check-unavailable). */
   retryable?: boolean;
 }
-/** A full-page redirect to Google is in flight; nothing after this runs. */
+/**
+ * A full-page redirect to Google is in flight; nothing after this runs.
+ *
+ * ⚠️ WEB ONLY. On native `connectDriveStorage` never returns this — nothing unloads there, so it
+ * awaits the round trip and reports `connected` / `failed` in place.
+ */
 export interface StorageRedirecting {
   status: 'redirecting';
 }
 export type StorageConnectOutcome = StorageConnected | StorageConnectFailed | StorageRedirecting;
 
+/** What the create flow's Drive-auth gate did. */
+export type DriveAuthGate =
+  { kind: 'proceed' } | { kind: 'redirecting' } | { kind: 'failed'; error: Error };
+
+/**
+ * Where a create-side redirect lands. WEB: the resume screen — the reload must hit LoginPage's
+ * fast path at first paint. NATIVE: right here — the stack is alive and continues in place, so
+ * the sink's `router.replace` must be a DUPLICATE (from `CreatePodView` at `/create`,
+ * `RESUME_SETUP_PATH` would be a real navigation that flips the view out from under the wizard).
+ * It matters only on a JS-context restart mid-trip, where App.vue's boot routes a podless session
+ * on anyway.
+ */
+function createReturnPath(): string {
+  return isNative() ? currentLocationPath() : RESUME_SETUP_PATH;
+}
+
+/**
+ * The create flow's Drive-auth gate, shared by `connectDriveStorage` and the registry probe.
+ * Runs `beginDriveAuthRedirectIfNeeded`, and then — on native, where nothing unloaded — WAITS for
+ * the trip. `redirecting` is web-only: the page is unloading and the caller returns. A failed trip
+ * is handed back as the SAME error the popup path would have thrown, so callers classify it once.
+ *
+ * This is ALSO the try/catch for a start failure (no client id, `Browser.open` rejected — already
+ * settled as `open_failed`). The probe has no envelope between here and `onMounted`, and an
+ * uncaught throw there would leave the screen on its probing spinner for good.
+ *
+ * NOT used by the Drive-LOAD picker, whose return is the `load-drive` marker by design.
+ */
+export async function gateCreateDriveAuth(loginHint: string | undefined): Promise<DriveAuthGate> {
+  try {
+    if (!(await beginDriveAuthRedirectIfNeeded(createReturnPath(), loginHint, 'create'))) {
+      return { kind: 'proceed' };
+    }
+    if (!isNative()) return { kind: 'redirecting' };
+    // ⚠️ INSIDE THE try, and that is the point of the try. This await now spans an entire
+    // system-browser consent plus the dismissal grace, and the registry probe calls this with no
+    // envelope of its own — so a throw escaping here would pin the resume screen on its probing
+    // spinner for good, with the only escape being "Start over", which signs the person out.
+    // `awaitNativeOAuthReturn` is contracted never to reject; this is the belt for the day that
+    // stops being true.
+    const outcome = await awaitNativeOAuthReturn();
+    return outcome.kind === 'completed'
+      ? { kind: 'proceed' }
+      : { kind: 'failed', error: outcome.error };
+  } catch (e) {
+    return { kind: 'failed', error: e instanceof Error ? e : new Error(String(e)) };
+  }
+}
+
 /**
  * Connect Google Drive as the storage for a new pod.
  *
- * - On iOS / installed PWAs (`shouldUseRedirectAuth()`), and only when we
- *   don't already hold a valid token, this performs a full-page redirect to
- *   Google and returns `{ status: 'redirecting' }` — the page navigates away,
- *   so the caller must treat that as "we're done here". On return the
- *   resume-setup screen finishes the job (it'll hit this function again, this
- *   time with a valid token in hand, so no second auth).
+ * - On WEB redirect surfaces (installed PWAs / iOS Safari), and only when we don't already hold
+ *   a valid token, this performs a full-page redirect to Google and returns
+ *   `{ status: 'redirecting' }` — the caller must treat that as "we're done here", because the
+ *   page is unloading. The work resumes at `RESUME_SETUP_PATH` on the fresh load.
+ *
+ *   ⚠️ ON NATIVE IT NEVER RETURNS `redirecting`. Nothing unloads there: the system browser opens
+ *   over a live WebView, so this function AWAITS the round trip and then continues in place,
+ *   returning `connected` / `failed` exactly as the desktop popup path does. Assuming otherwise
+ *   was the 2026-09-21 bug — the person landed back on the storage picker with nothing to
+ *   finish the job, because the continuation lived on a marker nothing re-read.
  * - Otherwise it acquires a token (fresh consent if we have none, the cached
  *   one if we do), creates the `.beanpod` file in the user's Drive, and
  *   installs the provider on `syncService`.
@@ -155,16 +230,14 @@ export async function connectDriveStorage(
   podFileBaseName: string,
   opts: { googleEmail?: string; activeFamilyId?: string | null } = {}
 ): Promise<StorageConnectOutcome> {
-  // On a redirect surface (native / iOS / installed PWA) with no valid token,
-  // bounce through the system browser / full-page redirect; the appUrlOpen
-  // listener (native) or OAuthCallbackPage (web) drives the resume-setup
-  // continuation on return. `shouldUseRedirectAuth()` already covers native
-  // (ADR-029), so no separate `isNative()` check is needed here.
-  if (await beginDriveAuthRedirectIfNeeded(RESUME_SETUP_PATH, opts.googleEmail, 'create')) {
-    return { status: 'redirecting' };
-  }
-
   try {
+    // On a redirect surface with no valid token, bounce through the system browser / full-page
+    // redirect. The gate is INSIDE this try so one catch classifies both transports: a native
+    // trip that fails hands back the very error the popup path would have thrown.
+    const gate = await gateCreateDriveAuth(opts.googleEmail);
+    if (gate.kind === 'redirecting') return { status: 'redirecting' };
+    if (gate.kind === 'failed') throw gate.error;
+
     const fileName = `${podFileBaseName || 'my-family'}.beanpod`;
     // Force a fresh consent screen only when we have no token yet; if we just
     // returned from a redirect we already hold a valid one — reuse it (no
@@ -174,10 +247,18 @@ export async function connectDriveStorage(
       150_000,
       'Connecting to Google Drive is taking too long. Try again, or use a local file instead.'
     );
-    syncService.setProvider(provider);
+    // Bind the provider to the family the caller will compare it against. An unbound provider
+    // that survives a native round trip is exactly what reached a create write on 2026-09-21.
+    syncService.setProvider(provider, opts.activeFamilyId);
     if (opts.activeFamilyId) await provider.persist(opts.activeFamilyId);
     return { status: 'connected', type: 'google_drive' };
   } catch (e) {
+    if (e instanceof OAuthRoundTripAbandonedError) {
+      // Declined at Google, or the sheet was closed. A benign abort, like a dismissed local
+      // picker — never reported as a fault. ⚠️ `errorKind` IS WHAT KEEPS THE COPY TRANSLATED:
+      // `e.message` is English-only and callers render `error` verbatim in their generic arm.
+      return { status: 'failed', error: e.message, errorKind: 'cancelled', cancelled: true };
+    }
     if (e instanceof FileNameCollisionError) {
       // Hand the caller the grouped collision metadata (no decrypt here — that
       // lives in `resolveExistingBeanpod`). The adopt-existing recovery reads
@@ -209,6 +290,23 @@ export async function connectDriveStorage(
       // classified three different ways by three callers, and exactly one of
       // them paged Slack as `critical` for a user ticking a box differently.
       return { status: 'failed', error: e.message, errorKind: 'consent-denied' };
+    }
+    // ⚠️ THE POPUP TRANSPORT'S CANCELLATION, CLASSIFIED HERE RATHER THAN AT EACH CALLER — and it
+    // sits BELOW the typed arms so a real fault can never be read as a cancel by a regex.
+    //
+    // Closing the desktop popup rejects with a plain `Error('Authentication cancelled')`, not
+    // `OAuthRoundTripAbandonedError`, so without this it fell to the generic return below with no
+    // `errorKind` — and the callers' generic arms render `error` VERBATIM. That put the
+    // untranslated English "Authentication cancelled" into a Chinese UI, and made the resume
+    // screen say "Google sign-in failed" to someone who had just closed the chooser themselves.
+    // The native half was fixed first; leaving the desktop half is the asymmetry this closes.
+    if (isUserCancellation(e)) {
+      return {
+        status: 'failed',
+        error: e instanceof Error ? e.message : String(e),
+        errorKind: 'cancelled',
+        cancelled: true,
+      };
     }
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
@@ -293,7 +391,7 @@ export async function adoptDriveStub(
 ): Promise<StorageConnected> {
   const fileName = `${podFileBaseName || 'my-family'}.beanpod`;
   const provider = GoogleDriveProvider.fromExisting(fileId, fileName);
-  syncService.setProvider(provider);
+  syncService.setProvider(provider, opts.activeFamilyId);
   if (opts.activeFamilyId) await provider.persist(opts.activeFamilyId);
   return { status: 'connected', type: 'google_drive' };
 }

@@ -8,6 +8,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-22
+
+_On `main`, not yet released._
+
+### Fixed
+
+- **Setting up a pod on iPhone no longer drops you back on the screen you just
+  finished.** After connecting Google Drive, the app now moves you straight on to the next
+  step instead of silently returning you to the storage picker, and a retry works first
+  time rather than on the third attempt.
+- **Closing the Google sign-in sheet without finishing now returns you to where you were
+  with a short message**, instead of a spinner that never ends.
+- **Reconnecting Google Drive from Settings, the access banner or the sign-in screen now
+  takes one tap on iPhone and Android**, not two.
+- **The "welcome to the nook" screen is centred on a phone** instead of bunched at the top.
+
+### Security
+
+- **Creating a family can no longer write into a different family's file.** If the app is
+  still connected to another family's storage, it now stops and asks you to choose where to
+  keep this family's file, rather than overwriting the other one.
+
 ## 2026-09-21
 
 _On `main`, not yet released._

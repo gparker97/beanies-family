@@ -266,9 +266,10 @@ async function handleChooseGoogleDriveStorage() {
       googleEmail: email.value || undefined,
       activeFamilyId: familyContextStore.activeFamilyId,
     });
-    // On iOS / installed PWAs this kicks off a full-page redirect to Google —
-    // the page is navigating away; there's nothing more to do here. We resume
-    // on return via `/welcome?resume=setup` → ResumePodSetup.
+    // ⚠️ WEB ONLY. On a web redirect surface this means the page is unloading and the work
+    // resumes at `RESUME_SETUP_PATH` on the fresh load. On native `connectDriveStorage` AWAITS
+    // the round trip and this arm is never taken — the wizard simply continues below, exactly
+    // as the desktop popup path does.
     if (r.status === 'redirecting') {
       return;
     }
@@ -336,6 +337,20 @@ async function handleChooseGoogleDriveStorage() {
       reportError({
         surface: 'createPod.connectDrive',
         message: r.error || 'Google Drive file access was not granted',
+        severity: 'warning',
+        context: { provider_type: 'google_drive' },
+      });
+      showDriveResultModal.value = true; // Try again / Use a local file
+    } else if (r.errorKind === 'cancelled') {
+      // ⚠️ TRANSLATED KEY, NEVER `r.error`. The person declined at Google or closed the sign-in
+      // sheet; `r.error` there is `OAuthRoundTripAbandonedError`'s English-only message, which
+      // the generic arm below would paint verbatim into a Chinese UI. Reported at `warning`
+      // because it is a decision, not a fault.
+      driveResultError.value = t('googleDrive.authCancelled');
+      console.warn('[CreatePodView] Drive sign-in cancelled:', r.error);
+      reportError({
+        surface: 'createPod.connectDrive',
+        message: r.error || 'Google sign-in was cancelled',
         severity: 'warning',
         context: { provider_type: 'google_drive' },
       });

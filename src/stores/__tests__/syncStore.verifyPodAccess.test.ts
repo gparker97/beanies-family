@@ -262,7 +262,9 @@ vi.mock('@/services/google/driveService', () => ({
 
 vi.mock('@/services/sync/connectStorage', () => ({
   beginDriveAuthRedirectIfNeeded: vi.fn(async () => false),
-  RESUME_SETUP_PATH: '/resume-setup',
+  // The registry probe's Drive-auth gate. `proceed` = a token is already in hand, which is what
+  // every case in this suite assumes.
+  gateCreateDriveAuth: vi.fn(async () => ({ kind: 'proceed' })),
   resolveExistingBeanpod: (...a: unknown[]) => mockResolveExistingBeanpod(...a),
 }));
 

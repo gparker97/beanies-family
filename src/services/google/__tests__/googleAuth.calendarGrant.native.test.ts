@@ -32,12 +32,20 @@ vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' },
 }));
 
-const { browserOpen, browserClose, addListener } = vi.hoisted(() => ({
+const { browserOpen, browserClose, browserAddListener, addListener } = vi.hoisted(() => ({
   browserOpen: vi.fn(),
   browserClose: vi.fn(),
+  browserAddListener: vi.fn(async () => ({ remove: vi.fn(async () => {}) })),
   addListener: vi.fn(),
 }));
-vi.mock('@capacitor/browser', () => ({ Browser: { open: browserOpen, close: browserClose } }));
+vi.mock('@capacitor/browser', () => ({
+  Browser: {
+    open: browserOpen,
+    close: browserClose,
+    // `installNativeAuthListener` registers the `browserFinished` dismissal signal through this.
+    addListener: browserAddListener,
+  },
+}));
 vi.mock('@capacitor/app', () => ({ App: { addListener } }));
 
 const NATIVE_REDIRECT = 'https://beanies.family/oauth/native';

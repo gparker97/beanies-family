@@ -472,7 +472,20 @@ watch(
     </div>
 
     <!-- Success phase -->
-    <div v-if="phase === 'success'" class="relative px-2 py-6 text-center">
+    <!-- ⚠️ `min-h-full` + `justify-center`, NOT the plain block this used to be.
+         `BaseModal` is opened `fullscreen-mobile`, which makes the panel `h-full` with a `flex-1`
+         body — so short content rendered at its natural height at the TOP of a full-height column,
+         stranding ~60% empty below it on a phone. The overlay's `items-center justify-center`
+         centres the PANEL, which is a no-op once the panel is already full height.
+         Fixed HERE rather than in `BaseModal` on purpose: seven other surfaces pass
+         `fullscreen-mobile` (forms, the photo viewer, the meal picker) where top-alignment is
+         correct, and centring them all would regress every one. `min-h-full` collapses to `auto`
+         in the windowed desktop layout, so desktop is unchanged.
+         The old `px-2 py-6` is dropped: `BaseModal`'s body already applies `p-6`. -->
+    <div
+      v-if="phase === 'success'"
+      class="relative flex min-h-full flex-col justify-center text-center"
+    >
       <ConfettiEffect :active="showSuccess" />
 
       <Transition

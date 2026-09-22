@@ -3,14 +3,18 @@ import {
   requestAccessToken,
   shouldUseRedirectAuth,
   startRedirectAuth,
+  awaitNativeOAuthReturn,
 } from '@/services/google/googleAuth';
+import { currentLocationPath } from '@/services/google/redirectState';
+import { isNative } from '@/services/sync/capabilities';
 import { tryReconnectSilently } from '@/services/google/driveTokenRecovery';
+import { OAuthRoundTripAbandonedError } from '@/types/sync';
 import { logEvent } from '@/services/telemetry';
 
 /**
  * The four distinct things a reconnect attempt can end in. `recovered` and
  * `reconnected` both mean the connection is live NOW and it is safe to clear the
- * banner; `redirecting` means the page is on its way to Google and the caller
+ * banner; `redirecting` is WEB-ONLY and means the page is on its way to Google and the caller
  * must do nothing at all; `failed` means say so.
  */
 export type ReconnectOutcome = 'recovered' | 'reconnected' | 'redirecting' | 'failed';
@@ -38,13 +42,15 @@ export function useGoogleReconnect() {
    *
    *   'recovered'   — the silent path restored it; no user interaction at all.
    *   'reconnected' — an interactive consent completed. Connection is live.
-   *   'redirecting' — the page is NAVIGATING AWAY to Google and NOTHING has been
+   *   'redirecting' — WEB ONLY. The page is NAVIGATING AWAY to Google and NOTHING has been
    *                   acquired yet. Not success. A caller that proceeds here
-   *                   issues requests on a dead token mid-navigation. On native
-   *                   the WebView does not unload, so "the page is leaving"
-   *                   cannot be relied on to stop the caller: it must return.
-   *   'failed'      — the flow failed before any navigation. `reconnectError`
-   *                   carries the reason.
+   *                   issues requests on a dead token mid-navigation.
+   *                   ⚠️ NATIVE NEVER RETURNS THIS. Nothing unloads there, so this composable
+   *                   awaits the round trip and resolves `reconnected` / `failed` in place —
+   *                   which is what makes every caller's `reconnectSucceeded` branch run in ONE
+   *                   tap. `isReconnecting` therefore spans the whole sheet on native.
+   *   'failed'      — the flow failed before any navigation, or the native round trip came back
+   *                   without a grant. `reconnectError` carries the reason.
    *
    * ⚠️ DO NOT re-derive "are we redirecting" from `shouldUseRedirectAuth()` at a
    * call site. The silent path can recover BEFORE the redirect branch is ever
@@ -55,27 +61,7 @@ export function useGoogleReconnect() {
    *   Pass the user's expected Google account so they're nudged toward
    *   the correct one when multiple accounts are signed in.
    */
-  async function reconnect(
-    loginHint?: string,
-    opts?: {
-      /**
-       * Where the OAuth redirect should land. Pass a path that DIFFERS from the current one
-       * whenever the caller's UI has to re-evaluate on return: on Capacitor the WebView is
-       * not unloaded, so returning to the same path is a no-op navigation and nothing
-       * remounts. Omitted, it falls back to the current path (correct for web, where the
-       * return is a full page load, and for callers with nothing to re-evaluate).
-       */
-      returnPath?: string;
-      /**
-       * Refuse to start a NEW redirect; report `'failed'` instead.
-       *
-       * ⚠️ FOR RESUME CALLERS ONLY. A caller re-entering on the return from consent has no
-       * user gesture behind it, so redirecting again on a still-invalid token is a loop the
-       * person cannot break out of except by editing the URL.
-       */
-      noRedirect?: boolean;
-    }
-  ): Promise<ReconnectOutcome> {
+  async function reconnect(loginHint?: string): Promise<ReconnectOutcome> {
     isReconnecting.value = true;
     reconnectError.value = null;
     // ⚠️ EMITTED HERE, IN THE OWNING LAYER, NOT AT THE CALL SITES. Six surfaces
@@ -91,6 +77,14 @@ export function useGoogleReconnect() {
     // Callers that need to say something extra about their own context still do
     // (the Drive restore carries `pod-load-failure`); this is the denominator.
     let outcome: ReconnectOutcome = 'failed';
+    /**
+     * ⚠️ SEPARATES A DECISION FROM A FAULT, and it exists because native made "close the sheet"
+     * a COMMON outcome rather than an unreachable one. Without it every abort landed in the
+     * `warn` / `reconnect-failed` bucket — the same event stream this composable's docblock
+     * above calls "the reconnect SUCCESS RATE, the number this whole work is judged on". A
+     * denominator that counts people changing their mind as failures measures nothing.
+     */
+    let abandoned = false;
     try {
       // B: try a silent recovery using the refresh token mirrored into the
       // beanpod (account-matched to loginHint) BEFORE any consent screen. On
@@ -136,32 +130,24 @@ export function useGoogleReconnect() {
       // returns to the same path, and App.vue's onMounted consumes the
       // pending OAuth code via completeRedirectAuth().
       if (shouldUseRedirectAuth()) {
-        if (opts?.noRedirect) {
-          // ⚠️ LEFT NULL ON PURPOSE. `reconnectError` is rendered VERBATIM by four call
-          // sites, and every one of them already falls back to `t('googleDrive.reconnectFailed')`
-          // when it is empty. Writing the key here would put the literal string
-          // "googleDrive.reconnectFailed" on the screen — and defeat the `||` fallback,
-          // because a key is truthy.
-          logEvent({
-            level: 'warn',
-            surface: 'login-flow',
-            message: 'reconnect resume found the token still invalid',
-            context: { action: 'reconnect_resume_invalid' },
-          });
-          return 'failed';
+        // The current path is the right return for BOTH transports: on web the reload of this
+        // same page IS the resume; on native nothing unloads, so the sink's `router.replace`
+        // resolves as a duplicate and this stack carries on below.
+        await startRedirectAuth(currentLocationPath(), loginHint, 'reconnect');
+        if (!isNative()) {
+          // WEB: the page is navigating away and NOTHING has been acquired yet. This is not
+          // success: a caller that treats it as such will clear the reconnect banner and start
+          // issuing requests on a dead token mid-navigation.
+          outcome = 'redirecting';
+          return outcome;
         }
-        // ⚠️ `opts.returnPath` FIRST, and a caller that cares MUST pass one. The fallback
-        // below is the current path, which on Capacitor makes the return a
-        // `router.replace(samePath)` — a redundant navigation that does not remount anything,
-        // so whatever raised this button is still raising it and the person taps twice. See
-        // `RECONNECT_LOAD_PATH`.
-        const returnPath =
-          opts?.returnPath ?? `${window.location.pathname}${window.location.search}`;
-        await startRedirectAuth(returnPath, loginHint, 'reconnect');
-        // Page is navigating away and NOTHING has been acquired yet. This is not
-        // success: a caller that treats it as such will clear the reconnect
-        // banner and start issuing requests on a dead token mid-navigation.
-        outcome = 'redirecting';
+        // NATIVE: nothing unloaded — this stack is still here, so wait for the trip and report
+        // what it did. This is what makes every caller's `reconnectSucceeded` branch run in ONE
+        // tap; it used to need a per-surface marker + latch + watcher, of which exactly one
+        // existed.
+        const trip = await awaitNativeOAuthReturn();
+        if (trip.kind === 'failed') throw trip.error; // classified below, like a popup failure
+        outcome = 'reconnected';
         return outcome;
       }
       // Force consent so Google re-issues a refresh_token. A stale stored token
@@ -173,8 +159,18 @@ export function useGoogleReconnect() {
       return outcome;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      console.warn('[useGoogleReconnect] reconnect failed:', message);
-      reconnectError.value = message || 'Reconnect failed';
+      if (e instanceof OAuthRoundTripAbandonedError) {
+        // ⚠️ `reconnectError` LEFT NULL ON PURPOSE. It is rendered VERBATIM by four call sites,
+        // and this error's message is untranslated English. Every one of those sites already
+        // falls back to `t('googleDrive.reconnectFailed')` when it is empty, so leaving it null
+        // is what keeps a Chinese UI in Chinese. (Writing a KEY here would be worse still: a key
+        // is truthy, so it would defeat the `||` fallback and paint the key itself.)
+        abandoned = true;
+        console.warn('[useGoogleReconnect] reconnect abandoned by the user:', message);
+      } else {
+        console.warn('[useGoogleReconnect] reconnect failed:', message);
+        reconnectError.value = message || 'Reconnect failed';
+      }
       outcome = 'failed';
       return outcome;
     } finally {
@@ -182,12 +178,13 @@ export function useGoogleReconnect() {
       logEvent({
         // `warn` only for an outright failure. A redirect is the normal native
         // path, not a problem — but it MUST be counted, or "the button does
-        // nothing" reports have nothing behind them.
-        level: outcome === 'failed' ? 'warn' : 'info',
+        // nothing" reports have nothing behind them. An ABANDONED trip is a decision, so it is
+        // `info` and carries its own action: aborts must be separable from faults in the rate.
+        level: outcome === 'failed' && !abandoned ? 'warn' : 'info',
         surface: 'google-reconnect',
-        message: `google reconnect ${outcome}`,
+        message: `google reconnect ${abandoned ? 'abandoned' : outcome}`,
         context: {
-          action: `reconnect-${outcome}`,
+          action: abandoned ? 'reconnect-abandoned' : `reconnect-${outcome}`,
           ...(reconnectError.value ? { detail: reconnectError.value } : {}),
         },
       });
