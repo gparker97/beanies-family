@@ -50,7 +50,7 @@ watch(
 </script>
 
 <template>
-  <BaseModal :open="open" :title="t('signInCode.title')" size="md" @close="emit('close')">
+  <BaseModal :open="open" :title="t('signInCode.title')" icon="📲" size="md" @close="emit('close')">
     <MagicLinkFlow ref="flowRef" origin="profile-menu" @leave="emit('close')" />
   </BaseModal>
 </template>

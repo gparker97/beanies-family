@@ -40,7 +40,7 @@
  *   1. A warning CALLOUT above the fingerprint, rendered whenever the key did NOT arrive
  *      through the in-app scanner. It fails SAFE — a null delivery shows it.
  *   2. An INTENT-BINDING Approve label. When the callout is showing, the button states what
- *      the person is asserting ("Yes, I Scanned This") rather than a generic "Approve". The
+ *      the person is asserting ("The Codes Match…") rather than a generic "Approve". The
  *      assertion the blocking step used to extract is now extracted by the button they are
  *      already reaching for.
  *
@@ -52,6 +52,9 @@
 import { computed, ref, watch } from 'vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import ReauthChallenge from '@/components/auth/ReauthChallenge.vue';
+import ApprovalCodeCheck from '@/components/auth/ApprovalCodeCheck.vue';
+import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -71,7 +74,8 @@ import {
 import type { DeliveryKind } from '@/services/telemetry/deepLinkEvents';
 import { assertNever } from '@/utils/assertNever';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { requireReauth, canStepUp } from '@/composables/useReauth';
+import { canStepUp, reportReauthOutcome, reportReauthUnavailable } from '@/composables/useReauth';
+import type { FamilyMember } from '@/types/models';
 import { reportError } from '@/utils/errorReporter';
 
 const props = defineProps<{
@@ -105,6 +109,18 @@ const emit = defineEmits<{
 
 function closeSheet(): void {
   emit('close');
+}
+
+/**
+ * The sheet's X, backdrop and Escape. During the step-up they CANCEL THE STEP-UP — back to
+ * the code, key intact — rather than closing the sheet: a close is routed to App.vue's
+ * `dismiss()`, which destroys the key for good, and a brushed backdrop while typing a PIN
+ * must not be that. (In the old two-modal flow the same mis-tap only cancelled the PIN
+ * modal on top, which is the behaviour this preserves.)
+ */
+function onModalClose(): void {
+  if (proving.value) settleProof(false);
+  else closeSheet();
 }
 
 const { t } = useTranslation();
@@ -145,7 +161,7 @@ const familyContextStore = useFamilyContextStore();
  * ⚠️ CHECKED UP FRONT, not at the approve tap. On an iOS home-screen PWA the camera opens
  * the link in SAFARI, which has completely separate IndexedDB and localStorage from the
  * installed app — so the sheet can open over a signed-out session. Discovering that only
- * after the person has compared a fingerprint and tapped "Yes, let it in" is the worst
+ * after the person has compared a fingerprint and tapped Approve is the worst
  * possible moment to tell them, and the old copy (`recovery.podNotOpen`) did not explain
  * that the app they want is the one on their home screen.
  */
@@ -230,6 +246,67 @@ const isPublishing = computed(() => approvingGeneration.value !== null);
 const errorKey = ref<UIStringKey | null>(null);
 
 /**
+ * The step-up, IN this sheet rather than in a second modal on top of it (greg, 2026-09-23).
+ *
+ * `proveInSheet()` has exactly the contract `requireReauth()` had — a promise that resolves
+ * `true` only on a real proof — so `runApproval` and every generation guard in it are
+ * untouched. `ReauthChallenge` renders in place of the compare panel while it is pending:
+ * biometric starts by itself where it is set up, otherwise the PIN pad is already open.
+ *
+ * NEVER HANGS: closing the sheet or a new key arriving settles a pending proof `false`
+ * (the watcher below), and `runApproval` then reports that as dismissed or superseded.
+ */
+/**
+ * WHO is being proved, by id, fixed when the step starts. `proving` derives from it, so the
+ * two cannot drift. The member itself is read LIVE (a PIN reset on another device mid-proof
+ * must take effect), falling back to the last one seen only for the ticks where a background
+ * merge empties the roster — the case `canApprove` documents — so the challenge never
+ * unmounts mid-PIN.
+ */
+const provingMemberId = ref<string | null>(null);
+const proving = computed(() => provingMemberId.value !== null);
+let lastProvingMember: FamilyMember | null = null;
+const provingMember = computed<FamilyMember | null>(() => {
+  const id = provingMemberId.value;
+  if (!id) return null;
+  const live = familyStore.members?.find((m) => m.id === id) ?? null;
+  if (live) lastProvingMember = live;
+  return live ?? lastProvingMember;
+});
+let settleProofRef: ((ok: boolean) => void) | null = null;
+const isTouchPrimary = useIsTouchPrimary();
+
+function proveInSheet(): Promise<boolean> {
+  const member = familyStore.currentMember;
+  if (!member) {
+    // Nothing to verify against — the same dead end `requireReauth` records as
+    // `unavailable`. Not a user cancel.
+    reportReauthUnavailable();
+    return Promise.resolve(false);
+  }
+  lastProvingMember = member;
+  provingMemberId.value = member.id;
+  return new Promise<boolean>((resolve) => {
+    settleProofRef = resolve;
+  });
+}
+
+/**
+ * Conclude a pending proof. `byPerson` is false when the SHEET ended it (closed, or a new
+ * key arrived): `runApproval` reports those as dismissed / superseded, and counting them as
+ * a reauth cancel too would inflate the cancel rate with events nobody chose.
+ */
+function settleProof(ok: boolean, reason?: 'no-credential', byPerson = true): void {
+  if (!settleProofRef) return;
+  if (byPerson) reportReauthOutcome(ok, reason);
+  const resolve = settleProofRef;
+  settleProofRef = null;
+  provingMemberId.value = null;
+  lastProvingMember = null;
+  resolve(ok);
+}
+
+/**
  * The three end-of-flow panels, as data.
  *
  * ⚠️ A MAP, NOT A THIRD AND FOURTH COPY OF THE SAME MARKUP. `done`, `pending` and
@@ -250,9 +327,11 @@ const TERMINAL_PANEL: Record<
     bodyKey: 'deviceApproval.doneBody',
     testid: 'approval-done',
   },
+  // Same words as `done` (greg, 2026-09-23): from the person's side both mean "approved,
+  // now wait for the other device". The testid still tells them apart.
   pending: {
-    titleKey: 'deviceApproval.pendingTitle',
-    bodyKey: 'deviceApproval.pendingBody',
+    titleKey: 'deviceApproval.doneTitle',
+    bodyKey: 'deviceApproval.doneBody',
     testid: 'approval-pending',
   },
   'signed-out': {
@@ -266,7 +345,9 @@ const TERMINAL_PANEL: Record<
 const settled = ref<Exclude<TerminalState, 'signed-out'> | null>(null);
 
 const terminal = computed<TerminalState | null>(() =>
-  settled.value ? settled.value : canApprove.value ? null : 'signed-out'
+  // Never 'signed-out' mid-proof: a momentary `canApprove` flicker (the family key briefly
+  // null during a reload) would unmount the challenge and lose the typed PIN.
+  settled.value ? settled.value : proving.value || canApprove.value ? null : 'signed-out'
 );
 
 const prompt = () =>
@@ -280,6 +361,9 @@ const prompt = () =>
 watch(
   () => [props.open, props.publicKey] as const,
   async ([open, publicKey]) => {
+    // A proof still pending belongs to the previous key (or to a sheet now closed): settle it
+    // false so the approval waiting on it concludes instead of hanging.
+    if (settleProofRef) settleProof(false, undefined, false);
     scanned.value = null;
     errorKey.value = null;
     // ⚠️ RESET FOR EVERY KEY. This component is mounted unconditionally in `App.vue` and
@@ -347,7 +431,7 @@ async function approve(): Promise<void> {
     return;
   }
 
-  // ⚠️ PIN THE GENERATION ACROSS EVERY AWAIT BELOW. `requireReauth` suspends for as long as
+  // ⚠️ PIN THE GENERATION ACROSS EVERY AWAIT BELOW. `proveInSheet` suspends for as long as
   // the PIN prompt is up, and the publish is a Drive round trip that may spend the full
   // credential budget — both windows in which a second approval link can arrive and repaint
   // this sheet with a DIFFERENT device's fingerprint. Without this, a resumed call wraps the
@@ -438,10 +522,7 @@ async function runApproval(ctx: {
   // show one; approving a device hands over the identical thing — the family key, wrapped
   // for someone else's device — so it asks too. It also covers the ordinary family case that
   // has nothing to do with strangers, which is a phone left unlocked on a table.
-  const proved = await requireReauth({
-    titleKey: 'deviceApproval.title',
-    reasonKey: 'deviceApproval.pinReason',
-  });
+  const proved = await proveInSheet();
 
   if (!props.open) {
     // The sheet was closed while the PIN prompt was up. Nothing to paint on, and it must not
@@ -561,7 +642,9 @@ function reject(): void {
     backdrop, so a new tier there would create a tie rather than remove one.
   -->
   <!--
-    ⚠️ NOT CLOSABLE WHILE A PUBLISH IS IN FLIGHT. The X, the backdrop and Escape stayed live
+    ⚠️ NOT CLOSABLE WHILE A PUBLISH IS IN FLIGHT. During the step-up (`proving`) the close
+    controls are live but CANCEL THE STEP-UP rather than closing the sheet — see
+    `onModalClose`: nothing has been published, and the key must survive a mis-tap. The X, the backdrop and Escape stayed live
     through the whole uncancellable publish — a window this work widened from 5s to 20s — and
     dismissing there destroyed the key record while the upload carried on and admitted the
     device anyway. The approver got no feedback at all, and telemetry carried both a
@@ -570,11 +653,12 @@ function reject(): void {
   -->
   <BaseModal
     :open="open"
-    :title="t('deviceApproval.title')"
+    :title="settled ? t('deviceApproval.doneTitle') : t('deviceApproval.title')"
+    :icon="settled ? '🎉' : '🔐'"
     size="md"
     layer="overlay"
-    :closable="!isPublishing"
-    @close="closeSheet"
+    :closable="proving || !isPublishing"
+    @close="onModalClose"
   >
     <!-- One panel for all three end states: approved, still saving, and signed out here.
          Driven by TERMINAL_PANEL rather than written out three times. -->
@@ -583,16 +667,42 @@ function reject(): void {
       class="space-y-3 text-center"
       :data-testid="TERMINAL_PANEL[terminal].testid"
     >
-      <p class="dark:text-ink text-base font-semibold text-gray-900">
+      <!-- Approved: the celebrating beanies, and the title is already in the header band.
+           Signed out keeps its title here, because the header still says "Approve Login". -->
+      <img
+        v-if="terminal !== 'signed-out'"
+        src="/brand/beanies_celebrating_line_transparent_560x225.png"
+        alt=""
+        aria-hidden="true"
+        class="mx-auto h-24 w-auto"
+      />
+      <p v-else class="dark:text-ink text-base font-semibold text-gray-900">
         {{ t(TERMINAL_PANEL[terminal].titleKey) }}
       </p>
       <p class="dark:text-ink-soft text-sm text-gray-600">
         {{ t(TERMINAL_PANEL[terminal].bodyKey) }}
       </p>
-      <BaseButton class="w-full" variant="secondary" type="button" @click="closeSheet">
-        {{ terminal === 'signed-out' ? t('action.close') : t('action.done') }}
+      <BaseButton
+        class="w-full"
+        :variant="terminal === 'signed-out' ? 'secondary' : 'primary'"
+        type="button"
+        @click="closeSheet"
+      >
+        {{ terminal === 'signed-out' ? t('action.close') : t('action.ok') }}
       </BaseButton>
     </div>
+
+    <!-- The step-up, in place of the compare panel (see `proveInSheet`). -->
+    <ReauthChallenge
+      v-else-if="scanned && proving && provingMember"
+      :member="provingMember"
+      :open="true"
+      :keypad="isTouchPrimary"
+      description-key="deviceApproval.pinReason"
+      passkey-waiting-key="deviceApproval.passkeyWaiting"
+      @verified="settleProof(true)"
+      @cancelled="settleProof(false, $event)"
+    />
 
     <div v-else-if="scanned" class="space-y-4 text-center">
       <p class="dark:text-ink-soft text-sm text-gray-600">{{ prompt() }}</p>
@@ -617,17 +727,7 @@ function reject(): void {
         </p>
       </div>
 
-      <div>
-        <p
-          class="font-outfit dark:text-ink dark:bg-surface-overlay inline-block rounded-xl bg-gray-50 px-3 py-1.5 text-lg font-bold tracking-[0.22em] text-gray-900"
-          data-testid="approver-fingerprint"
-        >
-          {{ scanned.fingerprint }}
-        </p>
-        <p class="dark:text-ink-faint mt-2 text-xs text-gray-500">
-          {{ t('deviceApproval.compareOnBoth') }}
-        </p>
-      </div>
+      <ApprovalCodeCheck :code="scanned.fingerprint" testid="approver-fingerprint" />
 
       <!-- Approve is primary; Reject is a full-width bordered button directly below it, NOT
            a ghost text link. See the header comment. -->

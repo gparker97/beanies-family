@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ModalIconTitle from '@/components/ui/ModalIconTitle.vue';
 import { computed } from 'vue';
 import BaseModal from './BaseModal.vue';
 import BaseSidePanel from './BaseSidePanel.vue';
@@ -114,27 +115,12 @@ const containerProps = computed(() => {
   <component :is="containerComponent" v-bind="containerProps" @close="emit('close')">
     <template #header>
       <slot v-if="customHeader" name="custom-header" />
-      <div v-else class="flex w-full items-center gap-3">
-        <!-- Icon box. The `icon` slot lets a caller supply artwork instead of an
-             emoji (e.g. the beanie-bell on Settings → Reminders); `iconColor`
-             drives `currentColor` for such artwork. -->
-        <div
-          v-if="icon || $slots.icon"
-          class="flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl"
-          :style="{
-            backgroundColor: iconBg || 'var(--tint-orange-8)',
-            color: iconColor,
-          }"
-        >
-          <slot name="icon">{{ icon }}</slot>
-        </div>
-        <!-- Title. Additive `title-content` slot lets a caller supply an
-             inline-editable title (e.g. ListDetailModal); fallback renders the
-             identical static text so every other caller is unchanged. -->
-        <h2 class="font-outfit dark:text-ink flex-1 text-lg font-bold text-[var(--color-text)]">
-          <slot name="title-content">{{ title }}</slot>
-        </h2>
-      </div>
+      <ModalIconTitle v-else :icon="icon" :icon-bg="iconBg" :icon-color="iconColor">
+        <template v-if="$slots.icon" #icon><slot name="icon" /></template>
+        <!-- Additive `title-content` slot lets a caller supply an inline-editable title
+             (e.g. ListDetailModal); the fallback is the static title. -->
+        <slot name="title-content">{{ title }}</slot>
+      </ModalIconTitle>
     </template>
 
     <!--
