@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-21",
-    "translationCount": 4893
+    "lastUpdated": "2026-09-23",
+    "translationCount": 4901
   },
   "translations": {
     "app.name": {
@@ -1962,9 +1962,9 @@
       "lastUpdated": "2026-02-24"
     },
     "family.deleteConfirm": {
-      "translation": "您确定要删除这个成员吗？",
-      "hash": "qvl2ub",
-      "lastUpdated": "2026-02-24"
+      "translation": "从现在起，他们将无法在每台设备上访问您家人的数据。已保存在自己设备上的任何内容都将保留给他们。",
+      "hash": "hgmt0c",
+      "lastUpdated": "2026-09-23"
     },
     "family.editFamilyName": {
       "translation": "家族名称",
@@ -23072,9 +23072,9 @@
       "lastUpdated": "2026-09-10"
     },
     "loginV6.unlockFooterEither": {
-      "translation": "两者均可解密此设备上的此Beanpod。我们永远看不到它，也无法恢复它。",
-      "hash": "gyftk",
-      "lastUpdated": "2026-09-10"
+      "translation": "您的数据已加密。我们从未见过它。",
+      "hash": "uyovyf",
+      "lastUpdated": "2026-09-23"
     },
     "recovery.secretEitherLabel": {
       "translation": "密码或家庭密码",
@@ -23881,11 +23881,6 @@
       "hash": "5soz31",
       "lastUpdated": "2026-09-18"
     },
-    "deviceApproval.compareOnBoth": {
-      "translation": "仅当其他设备显示这些相同的字符时才批准。",
-      "hash": "81oiai",
-      "lastUpdated": "2026-09-18"
-    },
     "deviceApproval.compareHint": {
       "translation": "请检查此代码是否与其他设备上的代码匹配。",
       "hash": "tjq9vp",
@@ -23897,14 +23892,14 @@
       "lastUpdated": "2026-09-18"
     },
     "deviceApproval.reject": {
-      "translation": "不，那不是我",
-      "hash": "t98wcv",
-      "lastUpdated": "2026-09-18"
+      "translation": "对不起，我不知道这个豆豆",
+      "hash": "ae7e83",
+      "lastUpdated": "2026-09-23"
     },
     "deviceApproval.waiting": {
-      "translation": "等待批准",
-      "hash": "a09fzn",
-      "lastUpdated": "2026-09-18"
+      "translation": "等待批准（这可能需要最多30秒）",
+      "hash": "pqxoec",
+      "lastUpdated": "2026-09-23"
     },
     "deviceApproval.qrAlt": {
       "translation": "要扫描的登录设备的代码",
@@ -23952,14 +23947,14 @@
       "lastUpdated": "2026-09-18"
     },
     "deviceApproval.doneTitle": {
-      "translation": "设备已批准！",
-      "hash": "a4gxq7",
-      "lastUpdated": "2026-09-18"
+      "translation": "登录已批准！",
+      "hash": "itbg9f",
+      "lastUpdated": "2026-09-23"
     },
     "deviceApproval.doneBody": {
-      "translation": "另一台设备现在应该正在登录。",
-      "hash": "b5x0zh",
-      "lastUpdated": "2026-09-18"
+      "translation": "另一台设备最多可能需要30秒才能获得批准。请耐心等待。",
+      "hash": "b6weo6",
+      "lastUpdated": "2026-09-23"
     },
     "coldEntry.or": {
       "translation": "或者",
@@ -23967,14 +23962,9 @@
       "lastUpdated": "2026-09-18"
     },
     "coldEntry.scanTitle": {
-      "translation": "使用您登录的设备",
-      "hash": "97izgp",
-      "lastUpdated": "2026-09-18"
-    },
-    "coldEntry.scanLead": {
-      "translation": "使用已登录的设备扫描此内容。",
-      "hash": "bwmias",
-      "lastUpdated": "2026-09-18"
+      "translation": "使用您已登录的设备扫描此代码",
+      "hash": "3w9lt8",
+      "lastUpdated": "2026-09-23"
     },
     "recovery.beforeYouGo": {
       "translation": "取消之前",
@@ -24117,9 +24107,9 @@
       "lastUpdated": "2026-09-18"
     },
     "magicLink.pastePrompt": {
-      "translation": "有链接吗？粘贴到这里",
-      "hash": "het0bq",
-      "lastUpdated": "2026-09-19"
+      "translation": "有魔术链接吗？粘贴到这里",
+      "hash": "cb8wtv",
+      "lastUpdated": "2026-09-23"
     },
     "magicLink.pasteLabel": {
       "translation": "粘贴Beanies链接",
@@ -24266,20 +24256,10 @@
       "hash": "4mlo9c",
       "lastUpdated": "2026-09-19"
     },
-    "deviceApproval.pendingTitle": {
-      "translation": "设备已批准！",
-      "hash": "a4gxq7",
-      "lastUpdated": "2026-09-19"
-    },
-    "deviceApproval.pendingBody": {
-      "translation": "审批仍在保存到您的家庭文件中。其他设备将在它着陆后立即拾取—您可以关闭它。",
-      "hash": "dt86f9",
-      "lastUpdated": "2026-09-19"
-    },
     "deviceApproval.approveChecked": {
-      "translation": "是的，我扫描了这个，代码匹配",
-      "hash": "jqfpal",
-      "lastUpdated": "2026-09-19"
+      "translation": "The Codes Match ， Let In My Beanie ！",
+      "hash": "7g451j",
+      "lastUpdated": "2026-09-23"
     },
     "coldEntry.pushStep3": {
       "translation": "打开相机并扫描魔术链接。",
@@ -24322,14 +24302,14 @@
       "lastUpdated": "2026-09-20"
     },
     "coldEntry.scanFirstTitle": {
-      "translation": "扫描魔术链接",
-      "hash": "pi41o1",
-      "lastUpdated": "2026-09-20"
+      "translation": "使用魔术链接",
+      "hash": "xdzzzv",
+      "lastUpdated": "2026-09-23"
     },
     "coldEntry.scanFirstWhy": {
-      "translation": "已在其他设备上登录？它可以让这个直接进入，没有密码和恢复代码。",
-      "hash": "irobr7",
-      "lastUpdated": "2026-09-20"
+      "translation": "如果您已在其他设备上登录，请生成一个魔术链接，并使用该链接登录此设备。",
+      "hash": "fgvcpu",
+      "lastUpdated": "2026-09-23"
     },
     "setup.alsoOnPhone": {
       "translation": "还在手机上戴着便帽？",
@@ -24470,6 +24450,66 @@
       "translation": "我们刚才无法检查。请重试。",
       "hash": "5axl3m",
       "lastUpdated": "2026-09-20"
+    },
+    "family.removeDone": {
+      "translation": "已移除家庭成员。",
+      "hash": "skn214",
+      "lastUpdated": "2026-09-23"
+    },
+    "family.removeSavePending": {
+      "translation": "已在此设备上删除。下次您的家庭数据保存时，其他设备将看到它。",
+      "hash": "bo2w24",
+      "lastUpdated": "2026-09-23"
+    },
+    "family.removeOfflineTitle": {
+      "translation": "您已离线",
+      "hash": "8q48ts",
+      "lastUpdated": "2026-09-23"
+    },
+    "family.removeOffline": {
+      "translation": "重新连接以删除家庭成员，以便每个设备都可以删除。",
+      "hash": "xsvy2g",
+      "lastUpdated": "2026-09-23"
+    },
+    "family.removeDriveManualTitle": {
+      "translation": "检查Google云端硬盘共享",
+      "hash": "akuudl",
+      "lastUpdated": "2026-09-23"
+    },
+    "family.removeDriveManual": {
+      "translation": "我们无法确认他们对您在Google云端硬盘中的家庭文件的访问权限已被删除。打开Google云端硬盘，找到您的beanies.family文件夹，选择“共享” ，然后将其删除。",
+      "hash": "7ukkou",
+      "lastUpdated": "2026-09-23"
+    },
+    "createPod.failedReasonProviderMismatch": {
+      "translation": "此设备仍连接到其他系列的存储，因此未写入任何内容。选择在何处保存此家庭的文件以继续。",
+      "hash": "58z5s8",
+      "lastUpdated": "2026-09-23"
+    },
+    "auth.memberRemoved": {
+      "translation": "您已不再是此家庭的成员，因此已从此设备中清除其登录信息。询问家族经理这是否是一个错误。",
+      "hash": "z7ufa1",
+      "lastUpdated": "2026-09-23"
+    },
+    "reauth.passkeyWaiting": {
+      "translation": "正在使用您的密钥检查您的身份……",
+      "hash": "1585a9",
+      "lastUpdated": "2026-09-23"
+    },
+    "pin.useInstead": {
+      "translation": "改用PIN码？",
+      "hash": "b8efgh",
+      "lastUpdated": "2026-09-23"
+    },
+    "deviceApproval.passkeyWaiting": {
+      "translation": "正在使用您的密钥进行审批。",
+      "hash": "1ah4pj",
+      "lastUpdated": "2026-09-23"
+    },
+    "googleDrive.authCancelled": {
+      "translation": "Google登入已取消。您可以随时重试。",
+      "hash": "4h1py6",
+      "lastUpdated": "2026-09-23"
     }
   }
 }
