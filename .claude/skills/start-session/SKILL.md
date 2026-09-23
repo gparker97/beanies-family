@@ -1,6 +1,6 @@
 ---
 name: start-session
-description: Fresh-session ritual — sync the repo, surface project status, fetch top news + a famtech (family-technology) competitor-news sweep + today's calendar, kick off the daily beanies-metrics refresh in the background, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
+description: Fresh-session ritual — sync the repo, surface project status, fetch top news + today's calendar, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings. The famtech (family-technology) competitor sweep and the early-adopter metrics refresh are NOT part of the default run — they happen only when greg explicitly asks for them.
 ---
 
 # start-session — Session Start Ritual
@@ -95,9 +95,17 @@ For each candidate item from STATUS.md, ask: would this leave a fingerprint in t
 
 Run the checks in parallel (one bash call per item, batched in a single message) — most checks are fast greps. Don't ask greg before each verification — only ask after, if the verdict is genuinely ambiguous.
 
-### Step 4: Fetch news — general headlines + famtech watch — and kick off the daily metrics refresh
+### Step 4: Fetch news — general headlines always; famtech watch + metrics ON REQUEST ONLY
 
-Three independent pieces here. They don't depend on each other, so kick them off together — 4b and 4c both go to background subagents in the same message.
+Three pieces, and **only the first runs by default.**
+
+**4a (general headlines) is part of every session start.** 4b (famtech watch) and 4c (metrics refresh) run **only when greg explicitly asks for them** — greg's call, 2026-09-23. Both are slow, both spend a subagent, and neither is something he wants on every single session start; a famtech sweep is worth reading when he is thinking about positioning, and metrics are worth refreshing when he is thinking about growth. Firing them unasked made a routine session start into a two-minute event and trained him to skim past the result.
+
+**What counts as asking.** A plain `/start-session` or `/good-morning` does NOT. He has to say so — "with famtech", "check the competitors", "any famtech news", "refresh the metrics", "and pull the adopter numbers", "run the full one", or an equivalent in his own words. When he asks for one, run that one; when he asks for "the full" start-session, run both.
+
+⚠️ **Do not offer them every time either.** A standing "want the famtech sweep?" at the end of every report is the same interruption in a politer form. He knows they exist. Mention them only if something in the session state makes one genuinely relevant — a competitor came up in the pending work, or STATUS shows a launch milestone landed.
+
+When both are skipped, say nothing about them. A session start that quietly does less is the point of this change.
 
 #### 4a) General headlines
 
@@ -107,7 +115,9 @@ For each story: one short line — headline + a 5-10 word context phrase. No lin
 
 If the search returns nothing useful, skip this section silently — don't pad with filler.
 
-#### 4b) Famtech watch — competitive-intelligence sweep
+#### 4b) Famtech watch — competitive-intelligence sweep ⚠️ ON REQUEST ONLY
+
+**Skip this entire section unless greg asked for it in this session** (see Step 4's header). Everything below describes how to run it WHEN he does.
 
 beanies.family competes in the family-technology ("famtech") space, and greg wants to stay on top of what's moving there. The trigger for this feature was Maple — a large family-organizer app that announced it's retiring at the end of 2026, which opened a real migration opportunity greg turned into blog + pillar content. That's the class of event worth catching early: a rival **shutting down or migrating users out**, a **funding round or acquisition**, a **major feature launch** that shifts the competitive picture, a **notable spike in users**, or **people joining/leaving/founding** these companies. This is market awareness that directly feeds positioning, blog angles, and pilot outreach — so cast a wide net.
 
@@ -123,11 +133,13 @@ Search several angles, not one query — comprehensiveness is the point:
 
 **Relevance bar:** only surface things that would actually make greg lean in — a Maple-class shutdown/migration opening, a funding round, an acquisition, a competitive-picture-changing feature, or a notable hire/departure. Skip routine app updates, "best family apps 2026" listicles, SEO spam, and anything about beanies.family itself (greg already knows his own news). If nothing clears the bar, **skip the section silently** — an empty famtech watch is honest and far better than padding.
 
-#### 4c) Daily metrics refresh — background, never blocks
+#### 4c) Early-adopter metrics refresh — background, never blocks ⚠️ ON REQUEST ONLY
 
-Every session start also refreshes the beanies growth/usage metrics so they're up to date at least once a day — but the whole point of running it HERE is that greg never waits on it. The collectors (DynamoDB registry, CloudWatch, Plausible) take minutes; the session-start report must not.
+**Skip this entire section unless greg asked for it in this session** (see Step 4's header). It used to run on every session start "so the numbers are fresh at least once a day"; that reasoning did not survive contact with how often greg actually reads them. He can always run `/beanies-metrics` directly, and asking here is one short phrase.
 
-**Launch a general-purpose subagent in the background** (same message as the famtech sweep) with a prompt like: "Run the beanies-metrics skill end to end (`.claude/skills/beanies-metrics/SKILL.md`): run all the read-only collectors, build the dashboard, and return a 3-5 line summary of the headline numbers (total families, new this week, engaged/churned movement, top traffic source) plus anything that moved sharply since the last run."
+When he DOES ask: the whole point of running it here is that he never waits on it. The collectors (DynamoDB registry, CloudWatch, Plausible) take minutes; the session-start report must not.
+
+**Launch a general-purpose subagent in the background** with a prompt like: "Run the beanies-metrics skill end to end (`.claude/skills/beanies-metrics/SKILL.md`): run all the read-only collectors, build the dashboard, and return a 3-5 line summary of the headline numbers (total families, new this week, engaged/churned movement, top traffic source) plus anything that moved sharply since the last run."
 
 - **Do NOT wait for it.** Compose and deliver the Step 6 report without the metrics; note in one line that the refresh is running.
 - **When its notification arrives later**, relay a SHORT update — the 3-5 headline lines, not the full report (greg's standing concision preference). If nothing moved meaningfully, one line ("metrics refreshed — no significant movement") is the right amount.
@@ -226,7 +238,9 @@ Deliver as a single scannable message. Use bold section labels so Greg can jump 
 [etc — max 7 items]
 ```
 
-Order matters: greeting → state → news → famtech watch → calendar → pending work. State and pending work are repo-driven and always present. News, famtech watch, and calendar are best-effort — skip silently if unavailable or nothing clears the bar. End with one line noting the background metrics refresh is running (its short summary lands later — never hold the report for it).
+Order matters: greeting → state → news → [famtech watch, only if asked] → calendar → pending work. State and pending work are repo-driven and always present. News and calendar are best-effort — skip silently if unavailable or nothing clears the bar.
+
+The famtech watch appears ONLY when greg asked for it this session; otherwise it is absent and unmentioned. Likewise the metrics refresh: close with the "refresh is running" line only when he asked for one. A default run ends at pending work.
 
 ---
 
@@ -240,4 +254,5 @@ Order matters: greeting → state → news → famtech watch → calendar → pe
 - **Skip the launch dashboard.** That's `/launch-status`'s job. Mention it as "run /launch-status if you want the launch metrics" only if the most recent STATUS update is launch-relevant.
 - **Be honest about empty sections.** If nothing's pending, say so. If calendar isn't connected, say so. No filler.
 - **News stays real.** 1-2 genuinely top stories from the last 24 hours. No clickbait, no padding. Skip the section if WebSearch returns nothing useful.
-- **Famtech watch is competitive intel, not filler.** Delegate the multi-query sweep to a subagent to keep main context clean. Only surface events that move the needle (shutdown/migration, funding, acquisition, picture-changing feature, notable people move); ~30-day window, freshest first. Dedupe, cite canonical sources, and skip the section silently when nothing clears the bar. Never include beanies.family's own news here.
+- **Famtech watch and the metrics refresh are OPT-IN, not default.** Neither runs on a plain `/start-session` or `/good-morning`; greg has to ask, in his own words, in that session. Don't run them unasked, and don't close every report by offering them — a standing offer is the same interruption in a politer form. Raise one only when something in the session state makes it genuinely relevant.
+- **Famtech watch, when asked for, is competitive intel and not filler.** Delegate the multi-query sweep to a subagent to keep main context clean. Only surface events that move the needle (shutdown/migration, funding, acquisition, picture-changing feature, notable people move); ~30-day window, freshest first. Dedupe, cite canonical sources, and skip the section silently when nothing clears the bar. Never include beanies.family's own news here.
