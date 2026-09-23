@@ -24,6 +24,45 @@
  * non-permanent — an unrecognized throw must never be mistaken for a
  * revocation, since that would clear a working token and force re-consent.
  */
+/**
+ * The RFC 6749 error codes Google actually returns on a token endpoint, longest first so
+ * `invalid_grant` can never be shadowed by a shorter prefix.
+ *
+ * ⚠️ AN ALLOWLIST, NOT A GENERIC `\w+` MATCH. The code is pulled out of a free-text error
+ * message, and a loose pattern would happily lift a word out of Google's prose and report it as
+ * a machine code — which is worse than reporting nothing, because it looks authoritative.
+ */
+const GOOGLE_OAUTH_ERROR_CODES = [
+  'unsupported_grant_type',
+  'unauthorized_client',
+  'invalid_request',
+  'invalid_client',
+  'invalid_scope',
+  'invalid_grant',
+  'access_denied',
+] as const;
+
+/**
+ * Google's machine-readable OAuth error code, lifted out of a refresh failure message.
+ *
+ * ⚠️ WHY THIS MATTERS MORE THAN THE PROSE. `invalid_grant` means ONE person revoked access, and
+ * the reconnect banner is the correct answer. `invalid_client` means OUR OAuth client is broken,
+ * which is a fleet-wide outage that would look identical in CloudWatch — every family failing to
+ * refresh, each one reported as a routine dead grant. Until 2026-09-23 the thrown message kept
+ * only `error_description`, so the two were genuinely indistinguishable after the fact.
+ *
+ * Returns `null` when no known code is present; callers must not invent one.
+ */
+export function googleOAuthErrorCode(errOrMessage: unknown): string | null {
+  const message =
+    errOrMessage instanceof Error
+      ? errOrMessage.message
+      : typeof errOrMessage === 'string'
+        ? errOrMessage
+        : '';
+  return GOOGLE_OAUTH_ERROR_CODES.find((c) => message.includes(c)) ?? null;
+}
+
 export function isPermanentRefreshFailure(errOrMessage: unknown): boolean {
   const message =
     errOrMessage instanceof Error

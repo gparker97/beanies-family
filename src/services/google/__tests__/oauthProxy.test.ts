@@ -252,6 +252,38 @@ describe('oauthProxy', () => {
         })
       ).rejects.toThrow('Token refresh failed');
     });
+
+    it("puts GOOGLE'S MACHINE CODE in the message, not only the prose (2026-09-23)", async () => {
+      // ⚠️ THE MESSAGE IS THE ONLY RECORD THAT REACHES CLOUDWATCH. It used to be
+      // `error_description ?? error`, so the description survived and the code did not — and
+      // `invalid_grant` (one family revoked access) became indistinguishable from
+      // `invalid_client` (our OAuth client broken for EVERYONE) after the fact.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () =>
+          JSON.stringify({
+            error: 'invalid_grant',
+            error_description: 'Token has been expired or revoked.',
+          }),
+      });
+
+      await expect(refreshAccessToken({ refreshToken: 'r', clientId: 'cid' })).rejects.toThrow(
+        'Token refresh failed: HTTP 400 — invalid_grant: Token has been expired or revoked.'
+      );
+    });
+
+    it('still carries the description when Google sends no code', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({ error_description: 'Something went wrong.' }),
+      });
+
+      await expect(refreshAccessToken({ refreshToken: 'r', clientId: 'cid' })).rejects.toThrow(
+        'Token refresh failed: HTTP 400 — Something went wrong.'
+      );
+    });
   });
 
   // Network timeout — iOS Safari over flaky cellular / Wi-Fi handover can let

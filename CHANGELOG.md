@@ -22,6 +22,9 @@ _On `main`, not yet released._
 - **The icon at the top of confirmation and information dialogs** was a placeholder that
   looked like a broken image. It is a proper icon now.
 - **Deleting a family says goodbye with the beanies**, instead of that placeholder.
+- **A Google sign-in that stops working is now diagnosable.** When Google refuses to
+  renew access, the reason it gives is recorded rather than thrown away, so one person
+  needing to reconnect can be told apart from a problem affecting everybody.
 - **The app keeps its background worker on iPhone.** On iOS it could silently lose the
   worker that does the heavy lifting and fall back to doing that work on the main
   thread, which made the app slow to open and could leave it hanging. It now hands the
