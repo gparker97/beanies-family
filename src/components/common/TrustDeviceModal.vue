@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import BaseModal from '@/components/ui/BaseModal.vue';
+/**
+ * The trust question. Asked FIRST on the first sign-in of any device that is not trusted
+ * and has not answered (2026-09-23, "always ask"), so it renders on `layer="top"` to sit
+ * above the onboarding wizard. See `AuthPromptModal` for why the other prompts stay 'base'.
+ */
+import AuthPromptModal from '@/components/auth/AuthPromptModal.vue';
 import { BaseButton } from '@/components/ui';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -10,30 +15,18 @@ const { t } = useTranslation();
 </script>
 
 <template>
-  <BaseModal :open="open" size="sm" :closable="false">
-    <div class="text-center">
-      <img
-        src="/brand/beanies_logo_transparent_logo_only_192x192.png"
-        alt=""
-        class="mx-auto mb-4 h-16 w-16"
-      />
-      <h2 class="font-outfit dark:text-ink mb-2 text-lg font-semibold text-gray-900">
-        {{ t('trust.title') }}
-      </h2>
-      <p class="dark:text-ink-soft mb-6 text-sm text-gray-600">
-        {{ t('trust.description') }}
-      </p>
-      <div class="flex flex-col gap-3">
-        <BaseButton variant="primary" @click="emit('trust')">
-          {{ t('trust.trustButton') }}
-        </BaseButton>
-        <BaseButton variant="ghost" @click="emit('decline')">
-          {{ t('trust.notNow') }}
-        </BaseButton>
-      </div>
-      <p class="dark:text-ink-faint mt-4 text-xs text-gray-400">
-        {{ t('trust.hint') }}
-      </p>
-    </div>
-  </BaseModal>
+  <AuthPromptModal
+    :open="open"
+    layer="top"
+    :title="t('trust.title')"
+    :body="t('trust.description')"
+    :footnote="t('trust.hint')"
+  >
+    <BaseButton variant="primary" @click="emit('trust')">
+      {{ t('trust.trustButton') }}
+    </BaseButton>
+    <BaseButton variant="ghost" @click="emit('decline')">
+      {{ t('trust.notNow') }}
+    </BaseButton>
+  </AuthPromptModal>
 </template>

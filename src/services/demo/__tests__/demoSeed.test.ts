@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   reloadAllStores: vi.fn(),
   setOnboardingCompleted: vi.fn(),
   dismissKitPrompt: vi.fn(),
+  setTrustedDevicePromptShown: vi.fn(),
   onboardingCompleted: { value: true },
   // services
   setProvider: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     setOnboardingCompleted: h.setOnboardingCompleted,
     dismissKitPrompt: h.dismissKitPrompt,
+    setTrustedDevicePromptShown: h.setTrustedDevicePromptShown,
     get onboardingCompleted() {
       return h.onboardingCompleted.value;
     },
@@ -94,6 +96,7 @@ function happyPath(): void {
   h.seedDocument.mockResolvedValue(47);
   h.setOnboardingCompleted.mockResolvedValue(undefined);
   h.dismissKitPrompt.mockResolvedValue(undefined);
+  h.setTrustedDevicePromptShown.mockResolvedValue(undefined);
   h.onboardingCompleted.value = true;
   h.reloadAllStores.mockResolvedValue(undefined);
   h.signOutAndClearData.mockResolvedValue(undefined);
@@ -194,6 +197,13 @@ describe('seedDemoFamily — happy path', () => {
   it('clears the first-run wizard so the reviewer sees the family, not onboarding', async () => {
     await seedDemoFamily();
     expect(h.setOnboardingCompleted).toHaveBeenCalledWith(true);
+  });
+
+  it('marks the trust question answered, so the reviewer is neither asked nor trusted', async () => {
+    // The trust question is now asked FIRST and may bypass the interruption slot
+    // (2026-09-23); a "yes" would leave the reviewer's device trusted.
+    await seedDemoFamily();
+    expect(h.setTrustedDevicePromptShown).toHaveBeenCalledTimes(1);
   });
 
   it('refreshes the stores after writing the fixture', async () => {

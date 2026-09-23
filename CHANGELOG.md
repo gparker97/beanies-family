@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-23
 
+_Merged after 0.22.0, not yet released:_
+
+### Fixed
+
+- **Signing out of the device you created or joined your family on no longer locks you out.**
+  That device is now trusted automatically, so signing back in there goes straight to your
+  PIN. Any other device asks, the first time you sign in, whether to trust it.
+
+### Changed
+
+- **The sign-out screen now shows whether this device is trusted**, with a tick to change it
+  and a line that says what signing back in will need. It is the same on phone and desktop.
+- **If your recovery kit was never saved, signing out asks you to create one first**, when
+  that sign-out would leave the device unable to get you back in.
+
 _Released as app v0.22.0 (web, App Store, Play open testing). Release notes also
 backfilled for 0.21.3 to 0.21.8, which shipped without one._
 

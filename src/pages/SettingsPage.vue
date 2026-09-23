@@ -1338,6 +1338,9 @@ async function handleClearData() {
   try {
     await settingsStore.clearCachedFamilyKey();
     await settingsStore.setTrustedDevice(false);
+    // Re-arm the trust question (setTrustedDevice marks it answered): the next person to
+    // sign in on this wiped device must be asked (2026-09-23, "always ask").
+    await settingsStore.resetTrustedDevicePrompt();
     const familyId = useFamilyContextStore().activeFamilyId;
     if (familyId) {
       await deleteFamilyDatabase(familyId);
@@ -2345,7 +2348,7 @@ async function handleDeleteFamilyClick() {
         </div>
         <ToggleSwitch
           :model-value="settingsStore.isTrustedDevice"
-          @update:model-value="settingsStore.setTrustedDevice($event)"
+          @update:model-value="authStore.setDeviceTrust($event, 'settings')"
         />
       </div>
 

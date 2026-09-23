@@ -564,8 +564,8 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     excerpt:
       'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the family passphrase option, and every other way back in if a PIN or device is lost.',
     icon: '\u{1F5DD}\uFE0F',
-    readTime: 4,
-    updatedDate: '2026-08-28',
+    readTime: 5,
+    updatedDate: '2026-09-23',
     sections: [
       {
         type: 'heading',
@@ -645,6 +645,29 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'No signed-in device handy? Your recovery kit or family passphrase opens your family\u2019s data on a fresh device too.',
+      },
+      {
+        type: 'heading',
+        content: 'Trusted devices and signing out',
+        level: 2,
+        id: 'trusted-devices',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A <strong>trusted device</strong> is one you use yourself. When you sign out of it, it keeps what it needs to let you straight back in with your PIN. The device you create or join your family on is trusted automatically. Any other device asks you, the first time you sign in, whether to trust it.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The sign-out screen shows whether this device is trusted, with a tick you can change right there. On a borrowed or shared device, untick it, or choose the option to clear all data from the device, so nothing is left behind for the next person.',
+      },
+      {
+        type: 'callout',
+        content:
+          'If you haven\u2019t saved your recovery kit, signing out of a device that won\u2019t keep your key asks you to create one first. You can still choose <strong>Sign out anyway</strong>, but if that device was your only way in, you could lose access to your family\u2019s data for good.',
+        title: 'Save your kit before you sign out',
+        icon: '\u26A0\uFE0F',
       },
       {
         type: 'heading',

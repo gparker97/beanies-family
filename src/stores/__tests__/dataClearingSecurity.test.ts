@@ -1134,16 +1134,15 @@ describe('Sensitive Data Clearing Security', () => {
           expect(SIGN_OUT_CLEAR_STEPS).not.toContain('resetDocClient');
           continue;
         }
-        if (step === 'reArmTrustPrompt') {
-          // Documented exception 2: tier-2-untrusted only — superseded in tier 3
-          // by untrustDevice, which sets the trust flag itself.
-          expect(SIGN_OUT_CLEAR_STEPS).not.toContain('reArmTrustPrompt');
-          expect(SIGN_OUT_CLEAR_STEPS).toContain('untrustDevice');
-          continue;
-        }
         expect(SIGN_OUT_CLEAR_STEPS).toContain(scopeMap[step] ?? step);
       }
-      // reArmTrustPrompt is exclusively the untrusted tier-2's.
+      // 2026-09-23 ("always ask"): tier 3 re-arms the trust question RIGHT AFTER
+      // untrustDevice, which marks it answered as a side effect — otherwise the next
+      // person on a wiped device would never be asked whether to trust it.
+      expect(SIGN_OUT_CLEAR_STEPS.indexOf('reArmTrustPrompt')).toBe(
+        SIGN_OUT_CLEAR_STEPS.indexOf('untrustDevice') + 1
+      );
+      // A trusted keep-data sign-out keeps the device's answer.
       expect(SIGN_OUT_TRUSTED_STEPS).not.toContain('reArmTrustPrompt');
       // Tier 3 additionally drops every family's refresh tokens + reclaims passkeys.
       expect(SIGN_OUT_CLEAR_STEPS).toContain('clearAllRefreshTokens');

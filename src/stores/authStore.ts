@@ -46,12 +46,14 @@ import { clearLastGoogleAccount } from '@/services/sync/fileHandleStore';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { emitSignoutTier } from '@/services/telemetry/loginFlowEvents';
+import {
+  emitDeviceTrustSet,
+  emitSignoutTier,
+  type DeviceTrustSource,
+} from '@/services/telemetry/loginFlowEvents';
 import {
   runSignOutSteps,
-  SIGN_OUT_TRUSTED_STEPS,
-  SIGN_OUT_UNTRUSTED_STEPS,
-  SIGN_OUT_CLEAR_STEPS,
+  signOutStepsFor,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
   type SignOutStepImpls,
@@ -2078,6 +2080,13 @@ export const useAuthStore = defineStore('auth', () => {
       const pinResult = await applyPinReset(params.memberId, params.pin);
       if (!pinResult.success) return pinResult;
 
+      // TRUST THE JOINING DEVICE (2026-09-23, greg: "let's have joined devices be trusted
+      // also"). After the claim, so a failed join never trusts; before the session is set,
+      // so the post-sign-in prompt watcher already sees a trusted device and never asks.
+      // `setDeviceTrust` NEVER THROWS, so the claim stays the last fallible write.
+      // Pinned by joinClaimOrdering.test.ts ("MUST trust the joining device").
+      await setDeviceTrust(true, 'join');
+
       // Sign the member in — the shared session shape (see `signIn`'s tail).
       const user: AuthUser = {
         memberId: params.memberId,
@@ -3039,10 +3048,7 @@ export const useAuthStore = defineStore('auth', () => {
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
-    await runSignOutSteps(
-      trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS,
-      buildSignOutStepImpls(ctx)
-    );
+    await runSignOutSteps(signOutStepsFor('sign-out', trusted), buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out', trusted, tokensKept: trusted });
     finalizeSession();
   }
@@ -3130,6 +3136,75 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * The ONE user-facing way to change this device's trust (2026-09-23). Used by
+   * trust-on-create, trust-on-join, the new-device trust prompt (both answers), the
+   * Settings toggle, and the sign-out confirm's trust tick. NEVER THROWS, so it is safe
+   * inside create and after the join claim.
+   *
+   * Success means the FLAG was written. `setTrustedDevice` also writes
+   * `trustedDevicePromptShown: true`, so any successful answer closes the question on
+   * this device. A failed flag write changes nothing (the question stays armed, a
+   * sign-out tick aborts before teardown) and shows one error toast, which also reports.
+   * Caching the open family's key afterwards is best-effort, as on every open path.
+   *
+   * The sign-out step implementations and the Settings clear-data escape hatch keep the
+   * raw settingsStore setters: their runner/handler already reports, and they must not
+   * toast mid-teardown.
+   */
+  async function setDeviceTrust(trusted: boolean, source: DeviceTrustSource): Promise<boolean> {
+    const settingsStore = useSettingsStore();
+    const was = settingsStore.isTrustedDevice
+      ? 'trusted'
+      : settingsStore.trustedDevicePromptShown
+        ? 'declined'
+        : 'unset';
+    try {
+      await settingsStore.setTrustedDevice(trusted);
+    } catch (e) {
+      // Report DIRECTLY with a stable English message, then show a SILENT toast: the
+      // toast's own auto-report is skipped whenever an identical toast is still live, so a
+      // user retrying a failing write would under-count the failure rate.
+      reportError({
+        surface: 'login-flow',
+        message: 'device trust write failed',
+        error: e,
+        // A user action failed (the trust answer, toggle or sign-out tick did not apply).
+        severity: 'critical',
+        context: { action: 'device_trust_set_failed', kind: source },
+      });
+      showToast('error', useTranslationStore().t('auth.trustSetFailed'), undefined, {
+        silent: true,
+      });
+      return false;
+    }
+    emitDeviceTrustSet({ source, trusted, was });
+    if (trusted) await cacheActiveFamilyKeyBestEffort(source);
+    return true;
+  }
+
+  /**
+   * NON-FATAL (review R2-F1): a trusted device without a cached key still opens with its
+   * PIN, and the next open caches it. Reports a warning; never toasts, never throws.
+   */
+  async function cacheActiveFamilyKeyBestEffort(source: DeviceTrustSource): Promise<void> {
+    try {
+      const familyId = useFamilyContextStore().activeFamilyId;
+      if (!familyId) return;
+      const { useSyncStore } = await import('@/stores/syncStore');
+      const exported = await useSyncStore().getExportedFamilyKey();
+      if (exported) await useSettingsStore().cacheFamilyKey(exported, familyId);
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'trusted key cache failed after the trust flag was written',
+        error: e,
+        severity: 'warning',
+        context: { action: 'device_trust_key_cache_failed', kind: source },
+      });
+    }
+  }
+
+  /**
    * Tier 3 — Sign out & clear data: the clean-device promise. Full LOCAL teardown
    * (every family's tokens, caches, wraps, passkeys, rosters) — and still NO revoke
    * at Google (device-local action; whole-grant revoke would kill every other device
@@ -3151,7 +3226,7 @@ export const useAuthStore = defineStore('auth', () => {
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
     };
-    await runSignOutSteps(SIGN_OUT_CLEAR_STEPS, buildSignOutStepImpls(ctx));
+    await runSignOutSteps(signOutStepsFor('clear', false), buildSignOutStepImpls(ctx));
     emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });
     finalizeSession();
   }
@@ -3208,6 +3283,7 @@ export const useAuthStore = defineStore('auth', () => {
     switchMember,
     signOut,
     signOutAndClearData,
+    setDeviceTrust,
     restoreE2EAuth,
   };
 });

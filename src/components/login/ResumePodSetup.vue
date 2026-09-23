@@ -893,18 +893,17 @@ async function finalizePod(): Promise<boolean> {
  * Silent is still forbidden: the failure is shown on the card and reported by the store.
  */
 
-/** The kit-step confirmation: stamp the doc-side signal, drop the code, advance. */
-async function handleKitStepStored() {
+/**
+ * The kit-step confirmation: stamp the doc-side signal (and HOW the kit was confirmed, which
+ * the sign-out kit guard keys on), drop the code, advance. No sync here: SetupProgressModal's
+ * sync carries the stamp, and the create tail must never block on a push.
+ * `markRecoveryKitConfirmed` never throws and reports a failed stamp itself.
+ */
+async function handleKitStepStored(via: 'saved' | 'acknowledged') {
   kitCode.value = '';
   // The magic link is no longer minted here, so there is nothing of its to clear: the offer
   // below the kit mints on demand and `MagicLinkFlow` owns resetting its own state.
-  try {
-    await settingsStore.markRecoveryKitConfirmed();
-  } catch (e) {
-    // Non-fatal: the envelope wrap exists; the nag re-offers if the stamp is
-    // missing. Never block the create tail on this write.
-    console.warn('[ResumePodSetup] markRecoveryKitConfirmed failed', e);
-  }
+  await settingsStore.markRecoveryKitConfirmed(via);
   phase.value = 'members';
 }
 

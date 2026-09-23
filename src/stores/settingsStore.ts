@@ -699,24 +699,31 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  /** Phase 4: the family confirmed a recovery kit is stored (see models.ts). */
-  async function markRecoveryKitConfirmed(): Promise<void> {
+  /**
+   * Phase 4: the family confirmed a recovery kit is stored (see models.ts), and HOW
+   * (2026-09-23). `via` is REQUIRED so every caller decides whether the kit was
+   * really saved or only ticked; the sign-out kit guard keys on it. A `saved` stamp is
+   * never downgraded to `acknowledged` (kits accumulate — see models.ts).
+   */
+  async function markRecoveryKitConfirmed(via: 'saved' | 'acknowledged'): Promise<void> {
     try {
       settings.value = await settingsRepo.saveSettings({
         recoveryKitConfirmedAt: new Date().toISOString(),
+        recoveryKitConfirmedVia:
+          via === 'saved' ? 'saved' : (settings.value.recoveryKitConfirmedVia ?? 'acknowledged'),
       });
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to record kit confirmation';
       // Never console/ref-only (review R2-F10): a swallowed stamp failure makes the
-      // kit nag re-fire for every manager, and one who obeys it regenerates — and
-      // thereby inerts — the kit the family actually stored. The nag re-firing is
-      // the designed safety net; the firehose trail is what was missing.
+      // kit nag re-fire for every manager, and one who obeys it mints an ADDITIONAL kit
+      // (kits accumulate; the stored one keeps working). The nag re-firing is the
+      // designed safety net; the firehose trail is what was missing.
       reportError({
         surface: 'login-flow',
         message: 'recoveryKitConfirmedAt stamp failed — kit nag will re-fire',
         error: e,
         severity: 'warning',
-        context: { action: 'kit_confirm_stamp_failed' },
+        context: { action: 'kit_confirm_stamp_failed', kind: via },
       });
     }
   }
