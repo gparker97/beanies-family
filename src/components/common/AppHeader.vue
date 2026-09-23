@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import BaseModal from '@/components/ui/BaseModal.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import ProfileMenu from '@/components/common/ProfileMenu.vue';
 import SignInCodeSheet from '@/components/auth/SignInCodeSheet.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import { isNative } from '@/services/sync/capabilities';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import SearchButton from '@/components/common/SearchButton.vue';
@@ -26,9 +22,9 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
-import { resetAllAppStores } from '@/utils/resetStores';
 import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSignOut } from '@/composables/useSignOut';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import { showToast } from '@/composables/useToast';
 import { presentRefreshOutcome } from '@/components/common/refreshOutcome';
@@ -94,7 +90,6 @@ const currentMember = computed(() => familyStore.currentMember);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
 const showCurrencyDropdown = ref(false);
-const showSignOutModal = ref(false);
 const privacyAnimating = ref(false);
 
 // ── Currency chips ───────────────────────────────────────────────────────
@@ -235,61 +230,21 @@ async function handleRefreshAll() {
   }
 }
 
+// The sign-out confirm, kit guard and progress overlay are shared with the mobile menu
+// and rendered once by SignOutHost (2026-09-23); this only opens it.
+const { requestSignOut } = useSignOut();
+
 function promptSignOut() {
   showProfileDropdown.value = false;
-  showSignOutModal.value = true;
+  requestSignOut();
 }
 
 async function confirmSwitchMember() {
   showProfileDropdown.value = false;
-  showSignOutModal.value = false;
   // Tier 1: member-only — the pod stays open, no store resets, no Google anything.
   authStore.switchMember();
   router.replace('/login');
 }
-
-// Sign-out takes a few seconds (bounded force-save + Google/session teardown).
-// The modal STAYS OPEN as the progress surface — closing it immediately left a
-// frozen-looking app until the welcome gate flashed in (greg's field report).
-const isSigningOut = ref(false);
-
-async function confirmSignOut() {
-  if (isSigningOut.value) return;
-  isSigningOut.value = true;
-  try {
-    await authStore.signOut();
-    resetAllAppStores();
-    await router.replace('/login');
-  } finally {
-    isSigningOut.value = false;
-    showSignOutModal.value = false;
-  }
-}
-
-async function confirmSignOutAndClearData() {
-  if (isSigningOut.value) return;
-  isSigningOut.value = true;
-  try {
-    await authStore.signOutAndClearData();
-    resetAllAppStores();
-    await router.replace('/login');
-  } finally {
-    isSigningOut.value = false;
-    showSignOutModal.value = false;
-  }
-}
-/**
- * "Browser" on web and PWA, "device" inside the native shell.
- *
- * ⚠️ greg asked for "from this browser", which is the wording that makes the LOCAL-ONLY scope
- * unmistakable — the whole point of the rename is that this clears traces from THIS machine and
- * never touches the family registry. But the same menu renders inside the iOS and Android
- * shells, where there is no browser to point at, so a native reader would be told to clear
- * something they cannot see. Same action, same scope, a noun each audience recognises.
- */
-const clearDataLabel = computed(() =>
-  isNative() ? t('auth.signOutClearDataNative') : t('auth.signOutClearData')
-);
 </script>
 
 <template>
@@ -575,92 +530,10 @@ const clearDataLabel = computed(() =>
       </div>
     </template>
 
-    <!-- ═══ SIGN OUT CONFIRMATION MODAL ═══ -->
     <Teleport to="body">
-      <BaseModal
-        :open="showSignOutModal"
-        :title="t('auth.signOutConfirmTitle')"
-        size="sm"
-        layer="overlay"
-        @close="isSigningOut ? undefined : (showSignOutModal = false)"
-      >
-        <div class="flex flex-col items-center gap-4 text-center">
-          <!-- Icon -->
-          <div
-            class="dark:text-danger-lift flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-500 dark:bg-red-900/30"
-          >
-            <svg
-              class="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </div>
-
-          <p class="dark:text-ink-soft text-sm text-gray-600">
-            {{ t('auth.signOutConfirmMessage') }}
-          </p>
-          <p class="dark:text-ink-faint text-xs text-gray-400">
-            {{ t('auth.signOutConfirmHint') }}
-          </p>
-        </div>
-
-        <template #footer>
-          <div class="flex flex-col gap-3">
-            <!-- The standard action, full-width and unambiguous -->
-            <BaseButton
-              variant="danger"
-              size="sm"
-              class="!h-auto !w-full"
-              :loading="isSigningOut"
-              :disabled="isSigningOut"
-              @click="confirmSignOut"
-            >
-              <template #default>
-                <span class="flex items-center justify-center gap-1.5">
-                  🚪 {{ isSigningOut ? t('auth.signingOut') : t('auth.signOut') }}
-                </span>
-              </template>
-            </BaseButton>
-            <!-- Clear-data: deliberately quiet — only for shared devices / emergencies -->
-            <button
-              type="button"
-              class="dark:text-danger-lift/80 dark:hover:text-danger-lift mx-auto text-xs font-medium text-red-400 underline-offset-2 hover:text-red-500 hover:underline disabled:opacity-50"
-              :disabled="isSigningOut"
-              @click="confirmSignOutAndClearData"
-            >
-              🗑️ {{ clearDataLabel }}
-            </button>
-            <div class="flex justify-end">
-              <span class="flex items-center gap-1">
-                <span class="dark:text-ink-faint text-[0.625rem] text-gray-400">
-                  {{ t('common.whatsThis') }}
-                </span>
-                <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
-              </span>
-            </div>
-
-            <!-- Cancel -->
-            <button
-              v-if="!isSigningOut"
-              type="button"
-              class="font-outfit dark:text-ink-faint dark:hover:text-ink-soft mx-auto text-xs font-medium text-gray-400 hover:text-gray-600"
-              @click="showSignOutModal = false"
-            >
-              {{ t('action.cancel') }}
-            </button>
-          </div>
-        </template>
-      </BaseModal>
-
       <!--
-        One instance, mounted beside the sign-out modal rather than inside `ProfileMenu`
-        (which renders twice). See `openSignInCodeSheet` for why that matters.
+        One instance, mounted here rather than inside `ProfileMenu` (which renders twice).
+        See `openSignInCodeSheet` for why that matters.
       -->
       <SignInCodeSheet :open="showSignInCodeSheet" @close="showSignInCodeSheet = false" />
     </Teleport>

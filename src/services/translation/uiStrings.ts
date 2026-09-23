@@ -3736,6 +3736,24 @@ const STRING_DEFS = {
     en: 'Your data is saved and will be here when you come back.',
     beanie: 'your data is saved and will be here when you come back.',
   },
+  'auth.signOutTrustDevice': {
+    en: 'Trust this device so I can sign back in with my PIN',
+    beanie: 'trust this device so i can sign back in with my pin',
+  },
+  'auth.signOutConfirmHintUntrusted': {
+    en: "This device isn't trusted, so signing back in here will need a link from a family member's device or your recovery kit.",
+    beanie:
+      "this device isn't trusted, so signing back in here will need a link from a family member's device or your recovery kit.",
+  },
+  'auth.signOutAnyway': { en: 'Sign out anyway', beanie: 'sign out anyway' },
+  'auth.signOutFailed': {
+    en: "Sign-out didn't finish. Try again, or reload the app.",
+    beanie: "sign-out didn't finish. try again, or reload the app.",
+  },
+  'auth.trustSetFailed': {
+    en: "We couldn't update this device's trust setting. Try again, or change it in Settings.",
+    beanie: "we couldn't update this device's trust setting. try again, or change it in settings.",
+  },
   'auth.signOutClearDataHint': {
     en: 'Clears all traces of your data from this computer. Useful if you\u2019re on a shared device. Your family data itself is untouched, so you can sign back in here or anywhere else.',
     beanie:
@@ -4024,8 +4042,8 @@ const STRING_DEFS = {
   'trust.trustButton': { en: 'Yes, I trust this device', beanie: 'yes, i trust this device' },
   'trust.notNow': { en: 'Not now', beanie: 'not now' },
   'trust.hint': {
-    en: 'You can change this in Settings. Use "Sign Out / Clear Data" to remove cached data.',
-    beanie: 'you can change this in settings. use "sign out / clear data" to remove cached data.',
+    en: 'You can change this in Settings, or when you sign out.',
+    beanie: 'you can change this in settings, or when you sign out.',
   },
   'trust.settingsLabel': { en: 'Trusted device', beanie: 'trusted device' },
   'trust.settingsDesc': {
@@ -5117,6 +5135,17 @@ const STRING_DEFS = {
       'a one-page recovery kit that opens your family data if every pin is forgotten. keep it somewhere safe.',
   },
   'recovery.kitGenerate': { en: 'Create Recovery Kit', beanie: 'create recovery kit' },
+  'recovery.kitGuardBody': {
+    en: "We didn't detect you saving your recovery kit. Please create one before signing out, otherwise you will lose access to your family file forever.",
+    beanie:
+      "we didn't detect you saving your recovery kit. please create one before signing out, otherwise you will lose access to your family file forever.",
+  },
+  'recovery.kitSaving': { en: 'Saving your kit...', beanie: 'saving your kit...' },
+  'recovery.kitNotSynced': {
+    en: "Your new kit hasn't reached your family file yet. Check your connection and try again.",
+    beanie:
+      "your new kit hasn't reached your family file yet. check your connection and try again.",
+  },
   'recovery.kitRegenerate': { en: 'Create a New Kit', beanie: 'create a new kit' },
   'recovery.kitCount': { en: '{count} kit(s) on file', beanie: '{count} kit(s) on file' },
   'recovery.kitNone': {

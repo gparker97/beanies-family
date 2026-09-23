@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue';
-import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import { isNative } from '@/services/sync/capabilities';
+import { computed, toRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
@@ -14,6 +11,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSignOut } from '@/composables/useSignOut';
 import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { getCurrencyInfo } from '@/constants/currencies';
@@ -33,7 +31,6 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
-import { resetAllAppStores } from '@/utils/resetStores';
 import { useLanguageSwitcher } from '@/composables/useLanguageSwitcher';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -145,38 +142,14 @@ function handleSwitchMember() {
   router.replace('/login');
 }
 
-// Sign-out takes a few seconds (bounded force-save + session teardown). The menu
-// closes immediately, so a full-screen overlay carries the progress — without it
-// the app looked frozen until the welcome gate flashed in (greg's field report).
-const isSigningOut = ref(false);
+// Sign-out opens the ONE shared confirm (2026-09-23): the same confirm, trust tick,
+// recovery-kit guard and progress overlay as desktop, rendered once by SignOutHost. Mobile
+// used to sign out with no confirm at all, so the keep-or-wipe choice was invisible here.
+const { requestSignOut } = useSignOut();
 
-async function handleSignOut() {
-  if (isSigningOut.value) return;
-  isSigningOut.value = true;
+function handleSignOut() {
   close();
-  try {
-    // Sign out first — flushes pending saves while sync service still has the
-    // file handle and session key, preventing plaintext writes
-    await authStore.signOut();
-    resetAllAppStores();
-    await router.replace('/login');
-  } finally {
-    isSigningOut.value = false;
-  }
-}
-
-async function handleSignOutAndClearData() {
-  if (isSigningOut.value) return;
-  isSigningOut.value = true;
-  close();
-  try {
-    // Sign out first — flushes pending saves while the session key is still available
-    await authStore.signOutAndClearData();
-    resetAllAppStores();
-    await router.replace('/login');
-  } finally {
-    isSigningOut.value = false;
-  }
+  requestSignOut();
 }
 
 function selectLanguage(code: LanguageCode) {
@@ -198,18 +171,6 @@ const encryptionLabel = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFile');
   return t('sidebar.dataEncrypted');
 });
-/**
- * "Browser" on web and PWA, "device" inside the native shell.
- *
- * ⚠️ greg asked for "from this browser", which is the wording that makes the LOCAL-ONLY scope
- * unmistakable — the whole point of the rename is that this clears traces from THIS machine and
- * never touches the family registry. But the same menu renders inside the iOS and Android
- * shells, where there is no browser to point at, so a native reader would be told to clear
- * something they cannot see. Same action, same scope, a noun each audience recognises.
- */
-const clearDataLabel = computed(() =>
-  isNative() ? t('auth.signOutClearDataNative') : t('auth.signOutClearData')
-);
 </script>
 
 <template>
@@ -614,19 +575,8 @@ const clearDataLabel = computed(() =>
                 >
                   {{ t('auth.signOut') }}
                 </button>
-                <!-- ⚠️ THE (i) WAS ONLY ON THE DESKTOP HEADER. The same irreversible action sat
-                     here with no explanation at all, which is the surface most likely to be used
-                     in a hurry on a borrowed phone. -->
-                <div v-if="settingsStore.isTrustedDevice" class="flex items-center gap-1.5 px-2">
-                  <button
-                    type="button"
-                    class="flex flex-1 cursor-pointer items-center gap-2 rounded-xl py-2 text-left text-xs text-white/40 transition-colors hover:bg-white/[0.05]"
-                    @click="handleSignOutAndClearData"
-                  >
-                    {{ clearDataLabel }}
-                  </button>
-                  <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
-                </div>
+                <!-- The clear-data option (with its explanation) now lives on the shared sign-out
+                     confirm, on every device, whatever its trust state (2026-09-23). -->
               </div>
 
               <!-- Version -->
@@ -636,18 +586,5 @@ const clearDataLabel = computed(() =>
         </Transition>
       </div>
     </Transition>
-
-    <!-- Signing-out progress overlay: outlives the closed menu drawer -->
-    <div
-      v-if="isSigningOut"
-      class="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-3 bg-[#F8F9FA]/90 backdrop-blur-sm dark:bg-[#1a252f]/90"
-      role="status"
-      aria-live="polite"
-    >
-      <BeanieSpinner size="lg" />
-      <p class="font-outfit dark:text-ink text-sm font-semibold text-[#2C3E50]">
-        {{ t('auth.signingOut') }}
-      </p>
-    </div>
   </Teleport>
 </template>

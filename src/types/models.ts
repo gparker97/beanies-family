@@ -2004,6 +2004,13 @@ export interface Settings {
    *  "family has a stored kit" signal (their envelope carries a wrap from birth
    *  even when nobody saved the code); the kit nag keys on it. */
   recoveryKitConfirmedAt?: string;
+  /** HOW the kit was confirmed (2026-09-23): `saved` = downloaded, shared or its code
+   *  copied; `acknowledged` = only the "I've stored it" tick. The sign-out kit guard
+   *  keys on it. NEVER goes from `saved` back to `acknowledged`: kits accumulate
+   *  (`addRecoveryKey` only adds), so an earlier saved kit still opens the pod. When
+   *  kit invalidation ships (tracker #99) this must reflect the NEWEST confirm and the
+   *  never-downgrade rule must be revisited. Absent on families confirmed before it. */
+  recoveryKitConfirmedVia?: 'saved' | 'acknowledged';
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   createdAt: ISODateString;
   updatedAt: ISODateString;

@@ -1030,6 +1030,108 @@ describe('pod creation: full end-to-end flow', () => {
       expect(entry.writerEmail).toBeNull();
     });
   });
+
+  // ── 2026-09-23: TRUST THE CREATING DEVICE, WITHOUT FAIL ──────────────────────
+  //
+  // greg locked himself out of a fresh family: created it, ticked past the recovery kit,
+  // signed out keeping data — and the untrusted sign-out tier deleted the cached key and
+  // the PIN wrap. The creating device is the owner's own device, so it is trusted as
+  // part of create. These tests pin that decision; a change that breaks them is a
+  // deliberate reversal of it, not a refactor.
+  describe('createNewFile — MUST trust the creating device (2026-09-23)', () => {
+    afterEach(async () => {
+      // clearAllMocks keeps implementations; restore the file's default so a throwing
+      // one here never leaks into the describes below.
+      const repo = await import('@/services/indexeddb/repositories/globalSettingsRepository');
+      vi.mocked(repo.saveGlobalSettings).mockImplementation(async () => ({}) as never);
+    });
+
+    async function trustWrites() {
+      const repo = await import('@/services/indexeddb/repositories/globalSettingsRepository');
+      return vi
+        .mocked(repo.saveGlobalSettings)
+        .mock.calls.map(([patch]) => patch as Record<string, unknown>)
+        .filter((patch) => 'isTrustedDevice' in patch);
+    }
+
+    async function createOwnerPod(opts?: { suppressRemoteSideEffects?: boolean }) {
+      const authStore = useAuthStore();
+      await authStore.signUp({
+        deferPassword: true,
+        email: 'owner@example.com',
+        familyName: 'Trust Family',
+        memberName: 'Owner',
+      });
+      expect((await authStore.rehydrateOwnerDoc('Owner', '123456')).success).toBe(true);
+      stateChangeCallbackHolder.callback?.({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'trust.beanpod',
+        isSyncing: false,
+        lastError: null,
+      });
+      return useSyncStore().createNewFile(
+        'trust.beanpod',
+        authStore.currentUser!.memberId,
+        'fam-test-1',
+        'Trust Family',
+        null,
+        opts
+      );
+    }
+
+    it('MUST trust the creating device, before the pod is marked created', async () => {
+      const repo = await import('@/services/indexeddb/repositories/globalSettingsRepository');
+      let podCreatedAtTrustWrite: boolean | null = null;
+      vi.mocked(repo.saveGlobalSettings).mockImplementation(async (patch) => {
+        if ('isTrustedDevice' in (patch as object)) {
+          podCreatedAtTrustWrite = useAuthStore().podCreated;
+        }
+        return { id: 'global_settings', ...(patch as object) } as never;
+      });
+
+      const result = await createOwnerPod();
+
+      expect(result.ok).toBe(true);
+      expect(await trustWrites()).toContainEqual(
+        expect.objectContaining({ isTrustedDevice: true, trustedDevicePromptShown: true })
+      );
+      // Trust is written at step 7, BEFORE markPodCreated (step 8).
+      expect(podCreatedAtTrustWrite).toBe(false);
+      expect(useAuthStore().podCreated).toBe(true);
+    });
+
+    it('a create that fails never trusts the device', async () => {
+      mockProvider.write.mockRejectedValueOnce(new Error('Network down'));
+      const result = await createOwnerPod();
+      expect(result.ok).toBe(false);
+      expect(await trustWrites()).toEqual([]);
+    });
+
+    it('the App Review demo seed does NOT trust the device', async () => {
+      const result = await createOwnerPod({ suppressRemoteSideEffects: true });
+      expect(result.ok).toBe(true);
+      expect(await trustWrites()).toEqual([]);
+    });
+
+    it('a failed trust write never fails the create, and is reported', async () => {
+      const repo = await import('@/services/indexeddb/repositories/globalSettingsRepository');
+      vi.mocked(repo.saveGlobalSettings).mockImplementation(async (patch) => {
+        if ('isTrustedDevice' in (patch as object)) throw new Error('IDB blocked');
+        return { id: 'global_settings', ...(patch as object) } as never;
+      });
+
+      const result = await createOwnerPod();
+
+      expect(result.ok).toBe(true);
+      expect(useAuthStore().podCreated).toBe(true);
+      expect(reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: expect.objectContaining({ action: 'device_trust_set_failed', kind: 'create' }),
+        })
+      );
+    });
+  });
 });
 
 describe('unified create flow: deferred password (signUp → rehydrateOwnerDoc → createNewFile)', () => {

@@ -47,6 +47,18 @@ describe('joinFamily writes the claim last, so a failure leaves the member invit
     expect(fn).toMatch(/catch[\s\S]*reportError/);
   });
 
+  it('MUST trust the joining device — after the claim, before the session (2026-09-23)', async () => {
+    // greg: "let's have joined devices be trusted also". After the claim so a failed join
+    // never trusts; before the session so the post-sign-in watcher never asks. A change that
+    // breaks this is a deliberate reversal of that decision, not a refactor.
+    const fn = await codeOfAuthStoreFn(...JOIN);
+    const claim = fn.indexOf('applyPinReset(');
+    const trust = fn.indexOf("setDeviceTrust(true, 'join')");
+    const session = fn.indexOf('freshSignIn.value = true');
+    expect(trust).toBeGreaterThan(claim);
+    expect(trust).toBeLessThan(session);
+  });
+
   it('binds identity with the call that cannot silently fail', async () => {
     // Same defect class as the recovery-kit path: `setCurrentMember` is a no-op when the roster
     // does not hold the id, which leaves every permission false until a reload.

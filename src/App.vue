@@ -74,9 +74,11 @@ import { breadcrumbsForReport } from '@/utils/diagnosticContext';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
-import { resolveAuthPrompt, type AuthPromptId } from '@/services/auth/authPrompts';
+import { isUnpreemptable, resolveAuthPrompt, type AuthPromptId } from '@/services/auth/authPrompts';
+import { emitAuthPromptShown } from '@/services/telemetry/loginFlowEvents';
 import PinPromptModal from '@/components/auth/PinPromptModal.vue';
 import RecoveryKitPromptModal from '@/components/auth/RecoveryKitPromptModal.vue';
+import SignOutHost from '@/components/auth/SignOutHost.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import {
@@ -354,22 +356,22 @@ const isPlannerRoute = computed(() => route.name === 'Activities');
 const activeAuthPrompt = ref<AuthPromptId | null>(null);
 const authPromptDeclinedThisSignIn = ref(false);
 
+// Both trust answers go through `authStore.setDeviceTrust`, which writes the flag, caches
+// the open family's key when trusting, and shows + reports its own failure (never throws).
+// Close the unclosable modal FIRST so a failure toast is never hidden behind it, and latch
+// the sign-in: the trust question is asked first, and whatever the answer, the PIN / kit /
+// biometric nags wait for a later sign-in (one prompt per sign-in). A failed answer leaves
+// the question armed, so the next sign-in asks again.
 async function handleTrustDevice() {
-  await settingsStore.setTrustedDevice(true);
-  // If there's a family key in memory, cache it for the newly trusted device
-  const familyId = familyContextStore.activeFamilyId;
-  if (familyId) {
-    const exportedKey = await syncStore.getExportedFamilyKey();
-    if (exportedKey) {
-      await settingsStore.cacheFamilyKey(exportedKey, familyId);
-    }
-  }
   activeAuthPrompt.value = null;
+  authPromptDeclinedThisSignIn.value = true;
+  await authStore.setDeviceTrust(true, 'prompt');
 }
 
-function handleDeclineTrust() {
-  settingsStore.setTrustedDevicePromptShown();
+async function handleDeclineTrust() {
   activeAuthPrompt.value = null;
+  authPromptDeclinedThisSignIn.value = true;
+  await authStore.setDeviceTrust(false, 'prompt');
 }
 
 // ── Phase 4 nag handlers ────────────────────────────────────────────────────
@@ -1755,8 +1757,15 @@ async function handleClearDataAndSignOut() {
   try {
     // Use the full sign-out flow: clears family DB, auth session, trust flag, cached keys
     await authStore.signOutAndClearData();
-  } catch {
-    // Best effort — continue with reload
+  } catch (error) {
+    // Best effort — the reload below is the escape hatch either way. Never silent.
+    reportError({
+      surface: 'auth-signout',
+      message: 'fatal-overlay clear-data failed; reloading anyway',
+      error,
+      severity: 'warning',
+      context: { action: 'fatal_clear_failed' },
+    });
   }
   void hardReload();
 }
@@ -1978,10 +1987,10 @@ watch(
     const familyId = authStore.currentUser?.familyId;
     if (!familyId || !memberId) return;
 
-    // Phase 4: the ordered prompt chain lives in `authPrompts.ts` (pin → kit →
-    // native-biometric → trust) — data-driven and unit-tested there; this watcher
-    // only assembles the context and claims the interruption slot at the true
-    // show-site (#45: a no-show never wastes the slot).
+    // Phase 4: the ordered prompt chain lives in `authPrompts.ts` (trust → pin → kit →
+    // native-biometric) — data-driven and unit-tested there; this watcher only
+    // assembles the context and claims the interruption slot at the true show-site
+    // (#45: a no-show never wastes the slot).
     const winner = await resolveAuthPrompt({
       familyId,
       memberId,
@@ -1993,10 +2002,16 @@ watch(
         isPinPromptDismissed: settingsStore.isPinPromptDismissed,
         kitPromptDismissed: settingsStore.kitPromptDismissed,
         trustedDevicePromptShown: settingsStore.trustedDevicePromptShown,
+        isTrustedDevice: settingsStore.isTrustedDevice,
       },
     });
-    if (winner && claimInterruption('auth-prompt')) {
+    // The trust question is the slot's ONE exemption (2026-09-23, "always ask"): it shows
+    // even when another surface (what's-new, install, app-update, feedback) already holds
+    // the slot. It still claims the slot when free, so later surfaces yield to it.
+    const claimed = winner ? claimInterruption('auth-prompt') : false;
+    if (winner && (claimed || isUnpreemptable(winner))) {
       activeAuthPrompt.value = winner;
+      emitAuthPromptShown(winner, !claimed);
     }
   }
 );
@@ -2331,6 +2346,9 @@ watch(
 
     <QuickAddFab />
     <QuickAddSheet />
+    <!-- BEFORE the trust question: both are Teleport-to-body 'top' modals, and at equal
+         z-index mount order decides which paints on top. The trust question must win. -->
+    <PwaReinstallModal />
     <TrustDeviceModal
       :open="activeAuthPrompt === 'trust'"
       @trust="handleTrustDevice"
@@ -2354,8 +2372,9 @@ watch(
       @decline="handleKitPromptDecline"
     />
     <NotificationsDrawer />
-    <PwaReinstallModal />
     <FeedbackModal />
+    <!-- The ONE sign-out confirm / recovery-kit guard / progress overlay (useSignOut). -->
+    <SignOutHost />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar -->

@@ -5,17 +5,18 @@
  * setRecoveryPassphrase); this card renders state and the one-time kit modal.
  *
  * The one-time kit modal itself is the shared `RecoveryKitDisplay` (Phase 4) — the
- * create wizard's mandatory kit step renders the same surface. Confirming it stored
- * also stamps the doc-side `recoveryKitConfirmedAt` signal the kit nag keys on.
+ * create wizard's mandatory kit step renders the same surface. Generate → show →
+ * confirm-stored is the shared `useRecoveryKitFlow` (also the kit nag and the sign-out
+ * kit guard); confirming stamps the doc-side `recoveryKitConfirmedAt` / `Via` signals.
  */
 import { ref, computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
+import { useRecoveryKitFlow } from '@/composables/useRecoveryKitFlow';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { generatePassphrase } from '@/utils/passphraseStrength';
@@ -23,42 +24,27 @@ import { generatePassphrase } from '@/utils/passphraseStrength';
 const { t } = useTranslation();
 const authStore = useAuthStore();
 const syncStore = useSyncStore();
-const settingsStore = useSettingsStore();
 
 const statusMessage = ref<{ text: string; type: 'success' | 'error' } | null>(null);
 
 // ── Kit state ────────────────────────────────────────────────────────────────
 const kitCount = computed(() => Object.keys(syncStore.envelope?.recoveryKeys ?? {}).length);
-const showKitModal = ref(false);
-const kitCode = ref('');
-const kitId = ref('');
-const isGeneratingKit = ref(false);
+const kitFlow = useRecoveryKitFlow();
 
 async function handleGenerateKit() {
   statusMessage.value = null;
-  isGeneratingKit.value = true;
-  try {
-    const result = await authStore.createRecoveryKit();
-    if (!result.success) {
-      statusMessage.value = { text: result.error, type: 'error' };
-      return;
-    }
-    kitCode.value = result.code;
-    kitId.value = result.kitId;
-    showKitModal.value = true;
-  } finally {
-    isGeneratingKit.value = false;
-  }
+  await kitFlow.generate();
+  if (kitFlow.error.value) statusMessage.value = { text: kitFlow.error.value, type: 'error' };
 }
 
-async function handleKitStored() {
-  // The one-time code leaves memory with the modal.
-  showKitModal.value = false;
-  kitCode.value = '';
-  // Doc-side confirmation signal (Phase 4): the kit nag keys on this, and for
-  // kit-born families it is the ONLY evidence anyone actually stored a code.
-  await settingsStore.markRecoveryKitConfirmed();
-  await syncStore.syncNowBounded();
+async function handleKitStored(via: 'saved' | 'acknowledged') {
+  // Doc-side confirmation signal (Phase 4): the kit nag keys on it, and for kit-born
+  // families it is the ONLY evidence anyone actually stored a code. A push that did not
+  // land is shown (the flow sets `error` to the not-synced message and reports it).
+  const durable = await kitFlow.confirmStored(via);
+  if (!durable && kitFlow.error.value) {
+    statusMessage.value = { text: kitFlow.error.value, type: 'error' };
+  }
 }
 
 // ── Passphrase state ─────────────────────────────────────────────────────────
@@ -132,7 +118,12 @@ async function handleSavePassphrase() {
             : fillTemplate(t('recovery.kitCount'), { count: String(kitCount) })
         }}
       </p>
-      <BaseButton variant="secondary" :loading="isGeneratingKit" @click="handleGenerateKit">
+      <BaseButton
+        variant="secondary"
+        :loading="kitFlow.isGenerating.value"
+        :disabled="kitFlow.isConfirming.value"
+        @click="handleGenerateKit"
+      >
         {{ kitCount === 0 ? t('recovery.kitGenerate') : t('recovery.kitRegenerate') }}
       </BaseButton>
     </div>
@@ -200,9 +191,9 @@ async function handleSavePassphrase() {
     </div>
 
     <RecoveryKitDisplay
-      :open="showKitModal"
-      :kit-id="kitId"
-      :code="kitCode"
+      :open="kitFlow.showKit.value"
+      :kit-id="kitFlow.kitId.value"
+      :code="kitFlow.kitCode.value"
       @stored="handleKitStored"
     />
   </BaseCard>

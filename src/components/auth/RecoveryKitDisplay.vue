@@ -48,8 +48,12 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** The user explicitly confirmed the kit is stored. Host clears the code. */
-  stored: [];
+  /**
+   * The user explicitly confirmed the kit is stored. Host clears the code. `via` says
+   * HOW (2026-09-23): `saved` = a real PDF delivery or a successful code copy,
+   * `acknowledged` = the tick alone. The sign-out kit guard keys on it.
+   */
+  stored: [via: 'saved' | 'acknowledged'];
 }>();
 
 const { t } = useTranslation();
@@ -75,7 +79,15 @@ const magicLinkQrUnavailable = ref(false);
  * transcribed by hand. So it is rendered for the rasteriser and taken away again.
  */
 const kitQrForExport = ref(false);
-const kitCopied = ref(false);
+// The kit code's own clipboard instance: `copied` drives the 2-second tick icon, `error`
+// the visible copy-failure line (the hand-rolled copy this replaced only reported).
+const {
+  copied: kitCopied,
+  error: kitCopyError,
+  copy: copyKitCode,
+} = useClipboard({ surface: 'login-flow', action: 'kit_copy_failed' });
+/** STICKY: a copy that succeeded this opening counts as saved (unlike `kitCopied`, which resets). */
+const kitCodeCopied = ref(false);
 const kitPdfError = ref(false);
 const isExportingPdf = ref(false);
 const kitCardEl = ref<HTMLElement | null>(null);
@@ -114,7 +126,9 @@ watch(
 watch(
   () => [props.open, props.code] as const,
   async ([open, code]) => {
+    kitCodeCopied.value = false;
     kitCopied.value = false;
+    kitCopyError.value = null;
     kitPdfError.value = false;
     kitAcknowledged.value = false;
     kitSaved.value = false;
@@ -145,20 +159,14 @@ watch(
 );
 
 async function handleCopyKitCode() {
-  try {
-    await navigator.clipboard.writeText(props.code);
-    kitCopied.value = true;
-    setTimeout(() => (kitCopied.value = false), 2000);
-  } catch (e) {
-    reportError({
-      surface: 'login-flow',
-      message: 'kit code copy failed',
-      error: e,
-      severity: 'warning',
-      context: { action: 'kit_copy_failed' },
-    });
-  }
+  // useClipboard reports a failure itself and exposes it on `kitCopyError`.
+  if (await copyKitCode(props.code)) kitCodeCopied.value = true;
 }
+
+/** HOW the kit was confirmed — see the `stored` emit. The tick gate is unaffected. */
+const kitVia = computed<'saved' | 'acknowledged'>(() =>
+  kitSaved.value || kitCodeCopied.value ? 'saved' : 'acknowledged'
+);
 
 async function exportKitPdf(preferDownload: boolean) {
   if (!kitCardEl.value || isExportingPdf.value) return;
@@ -366,7 +374,7 @@ async function exportKitPdf(preferDownload: boolean) {
           </svg>
           <svg
             v-else
-            class="h-4 w-4 text-green-500"
+            class="dark:text-success-lift h-4 w-4 text-green-500"
             fill="none"
             stroke="currentColor"
             stroke-width="2"
@@ -376,6 +384,14 @@ async function exportKitPdf(preferDownload: boolean) {
           </svg>
         </button>
       </div>
+      <p
+        v-if="kitCopyError"
+        role="alert"
+        data-export-hide
+        class="dark:text-accent-lift text-primary-700 mt-1 text-left text-xs"
+      >
+        {{ t('share.copyFailedHelp') }}
+      </p>
     </div>
 
     <p
@@ -428,7 +444,7 @@ async function exportKitPdf(preferDownload: boolean) {
           type="button"
           :disabled="!canConfirmKit"
           data-testid="kit-confirm"
-          @click="emit('stored')"
+          @click="emit('stored', kitVia)"
         >
           {{ magicLink ? t('setup.saveBothConfirm') : t('recovery.kitConfirmStored') }}
         </BaseButton>

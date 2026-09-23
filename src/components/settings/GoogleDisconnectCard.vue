@@ -4,7 +4,9 @@
  * "Disconnect Google Everywhere". For the my-tokens-were-stolen emergency — no sign-out
  * tier revokes any more, because revoke is whole-grant per (user, client) and kills
  * every device on the account. The copy says exactly that; a danger-variant confirm
- * gates it; afterwards this device signs out fully (its connection is dead anyway).
+ * gates it; afterwards this device signs out (its connection is dead anyway) through the
+ * plain sign-out, whose tier follows the device's trust: a trusted device (now every
+ * created or joined one, 2026-09-23) keeps its local cache; an untrusted one is wiped.
  */
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';

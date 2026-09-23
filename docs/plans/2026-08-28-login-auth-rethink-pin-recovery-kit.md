@@ -204,6 +204,11 @@ Mitigations: the `open`-state enrolment offer surfaces PIN setup for PIN-less me
 and the sign-out confirmation on a device with no PIN-holding enrolments warns that
 reopening will need another family member or a recovery path.
 
+> **2026-09-23:** partly covered by `docs/plans/2026-09-23-trust-on-create-and-kit-signout-guard.md`:
+> the untrusted-device case is now explicit on the sign-out confirm (a trust tick whose hint
+> says what signing back in will need), and an unsaved recovery kit is guarded. The
+> "no PIN-holding enrolments" warning itself is still open.
+
 **Dies:** `LoadPodView.checkBiometricForFamily`, `activateFamilyForBiometric`'s routing
 role, `resetLoadPodState`'s key-discarding fallback, the web PRF path (phased), plaintext
 `cachedFamilyKeys`, passwords (phased, per family).

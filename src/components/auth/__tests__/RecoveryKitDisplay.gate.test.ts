@@ -1,4 +1,4 @@
-import { mount, config } from '@vue/test-utils';
+import { mount, config, flushPromises } from '@vue/test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import RecoveryKitDisplay from '../RecoveryKitDisplay.vue';
@@ -11,9 +11,16 @@ vi.mock('@/utils/qrCode', () => ({
   renderQr: vi.fn(async () => ({ dataUrl: 'data:image/png;base64,stub' })),
 }));
 vi.mock('@/composables/useSheetExport', () => ({
-  useSheetExport: () => ({ exportElementToPng: vi.fn(), pngBlobToPdf: vi.fn() }),
+  useSheetExport: () => ({
+    exportElementToPng: vi.fn(async () => new Blob(['png'])),
+    pngBlobToPdf: vi.fn(async () => new Blob(['pdf'])),
+  }),
   prewarmSheetExport: vi.fn(),
+  ExportError: class extends Error {},
 }));
+const deliverFile = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/deliverFile', () => ({ deliverFile }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 config.global.stubs = { ...config.global.stubs, BaseModal: false, Teleport: true };
 
@@ -57,6 +64,54 @@ describe('RecoveryKitDisplay — the Continue gate', () => {
     await wrapper.find('[data-testid="kit-acknowledged"]').setValue(true);
     await wrapper.find('[data-testid="kit-confirm"]').trigger('click');
     expect(wrapper.emitted('stored')).toHaveLength(1);
+  });
+
+  // ── HOW the kit was confirmed (2026-09-23): the sign-out kit guard keys on it ──
+
+  it('the tick alone confirms as `acknowledged`', async () => {
+    const wrapper = mount(RecoveryKitDisplay, { props });
+    await wrapper.find('[data-testid="kit-acknowledged"]').setValue(true);
+    await wrapper.find('[data-testid="kit-confirm"]').trigger('click');
+    expect(wrapper.emitted('stored')).toEqual([['acknowledged']]);
+  });
+
+  it('a real PDF delivery confirms as `saved`', async () => {
+    deliverFile.mockResolvedValueOnce({ delivered: true, outcome: 'delivered' });
+    const wrapper = mount(RecoveryKitDisplay, { props });
+    const save = wrapper.findAll('button').find((b) => b.text() === 'recovery.kitDownloadPdf');
+    await save!.trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="kit-confirm"]').trigger('click');
+    expect(wrapper.emitted('stored')).toEqual([['saved']]);
+  });
+
+  it('a successful code copy confirms as `saved`, even after the 2s "copied" icon resets', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: vi.fn(async () => {}) } });
+    const wrapper = mount(RecoveryKitDisplay, { props });
+    await wrapper.find('button[aria-label="recovery.kitCopyCode"]').trigger('click');
+    await flushPromises();
+    vi.advanceTimersByTime(3000);
+    await wrapper.find('[data-testid="kit-acknowledged"]').setValue(true);
+    await wrapper.find('[data-testid="kit-confirm"]').trigger('click');
+    expect(wrapper.emitted('stored')).toEqual([['saved']]);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('a failed code copy is shown, and does not count as saved', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      clipboard: { writeText: vi.fn(async () => Promise.reject(new Error('denied'))) },
+    });
+    const wrapper = mount(RecoveryKitDisplay, { props });
+    await wrapper.find('button[aria-label="recovery.kitCopyCode"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('share.copyFailedHelp');
+    await wrapper.find('[data-testid="kit-acknowledged"]').setValue(true);
+    await wrapper.find('[data-testid="kit-confirm"]').trigger('click');
+    expect(wrapper.emitted('stored')).toEqual([['acknowledged']]);
+    vi.unstubAllGlobals();
   });
 
   /**

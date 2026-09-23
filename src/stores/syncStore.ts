@@ -2972,7 +2972,9 @@ export const useSyncStore = defineStore('sync', () => {
      *
      * LOCAL writes (cache, envelope, cached family key, session) are deliberately
      * UNAFFECTED — the demo session should behave exactly like a real local one
-     * on-device, and `signOutAndClearData` cleans all of it up.
+     * on-device, and `signOutAndClearData` cleans all of it up. With ONE exception:
+     * trust-on-create (step 7) is skipped, because a trusted reviewer device would keep
+     * the demo pod through a plain sign-out.
      *
      * Set ONLY by `seedDemoFamily`. A real pod must ALWAYS register: the registry
      * entry is the recovery anchor for `ResumePodSetup`. Delete this parameter
@@ -3210,14 +3212,24 @@ export const useSyncStore = defineStore('sync', () => {
       // REVIEW-DEMO: never plant a synthetic family in the real registry.
       if (!suppressRemote) await _registerCurrentFamilySync();
 
-      // 7. Cache the family key for auto-decrypt on reload — symmetric with
+      // 7. TRUST THE CREATING DEVICE — WITHOUT FAIL (2026-09-23, greg). The person
+      //    who creates a family is on their own device; leaving it untrusted meant a
+      //    plain "keep data" sign-out deleted the cached key and the PIN wrap, and a
+      //    kit-born family whose kit was only ticked past was locked out for good.
+      //    Pinned by createNewFile.test.ts ("MUST trust the creating device") — do not
+      //    remove it without reversing that decision. `setDeviceTrust` never throws, so
+      //    create can never fail because of trust. Skipped for the demo seed only.
+      if (!suppressRemote) await useAuthStore().setDeviceTrust(true, 'create');
+
+      //    Then cache the family key for auto-decrypt on reload — symmetric with
       //    what `decryptPendingFile` does for the load path. Without this,
       //    a hard reload (or an unexpected back-button interruption that
       //    survives the router guard) would land in a state where the
       //    provider config is persisted but the in-memory key is gone, and
       //    the user'd hit the "spilled beans" overlay with no way to
-      //    auto-recover. `{force: true}` bypasses the trusted-device check
-      //    — the user JUST entered the password on this device.
+      //    auto-recover. `{force: true}`: the demo seed does not trust the
+      //    device, and a failed trust write must still leave the create
+      //    session reloadable.
       try {
         const exported = await getExportedFamilyKey();
         if (exported) {

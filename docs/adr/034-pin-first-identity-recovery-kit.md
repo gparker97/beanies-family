@@ -71,6 +71,17 @@ memorable path. A just-created family that abandons the kit step AND loses its
 trusted cache before the nag re-offers is stranded — accepted (minutes-old family,
 near-zero stakes) with a "start over" escape on the recovery surface.
 
+> **Amended 2026-09-23.** The stranded-new-family case above is **no longer accepted**. It
+> turned out to be the default outcome, not an edge case: a new owner's device was never
+> trusted (the trust prompt came last and was always pre-empted), so a plain keep-data
+> sign-out deleted the cached key and the PIN wrap, and a kit that had only been ticked past
+> left the family unrecoverable (reproduced on prod). Now the creating and joining devices
+> are trusted automatically, every other new device is always asked on its first sign-in,
+> the sign-out confirm shows and changes the device's trust, and a manager whose kit was
+> never saved is stopped by a guard before any sign-out that would drop this device's keys.
+> See `docs/plans/2026-09-23-trust-on-create-and-kit-signout-guard.md`. The
+> "no PIN-holding enrolments" sign-out warning promised in the 2026-08-28 plan remains open.
+
 ## Consequences
 
 - One prove engine (`proveMethods.ts` probe array), one prompt sequencer

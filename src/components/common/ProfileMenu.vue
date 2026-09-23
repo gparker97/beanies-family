@@ -18,7 +18,8 @@
  * - **Only these cross**: `isRefreshing` (a prop) with `refresh-all`, because the
  *   service-worker update + `backgroundSyncFromFile` orchestration belongs to
  *   `AppHeader.handleRefreshAll`; `sign-out` and `switch-member`, because AppHeader owns
- *   the sign-out modal and its progress state; `sign-in-device`, because the sheet is
+ *   the dropdown they close (the sign-out confirm, kit guard and progress overlay
+ *   themselves are the shared SignOutHost, driven by `useSignOut`); `sign-in-device`, because the sheet is
  *   mounted ONCE in AppHeader (mounting it here would give two instances with independent
  *   mint state); and `close`.
  *

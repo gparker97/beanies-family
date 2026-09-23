@@ -18,7 +18,15 @@ import { reportError } from '@/utils/errorReporter';
  * hard-coded surface would file a travel-page copy failure under login and blunt the
  * dedupe for everyone.
  */
-export function useClipboard(opts?: { surface?: string }) {
+export function useClipboard(opts?: {
+  surface?: string;
+  /**
+   * Optional stable action code for the failure report (`context.action`), so one
+   * CloudWatch filter can isolate THIS copy (e.g. `kit_copy_failed`) from other copies on
+   * the same surface.
+   */
+  action?: string;
+}) {
   const copied = ref(false);
   /** Non-null when the LAST copy attempt failed. Render it; do not discard it. */
   const error = ref<string | null>(null);
@@ -39,6 +47,7 @@ export function useClipboard(opts?: { surface?: string }) {
         message: 'clipboard write failed',
         severity: 'warning',
         error: e,
+        ...(opts?.action ? { context: { action: opts.action } } : {}),
       });
       return false;
     }

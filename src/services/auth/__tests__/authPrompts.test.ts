@@ -26,6 +26,9 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: mocks.reportError }));
 import {
   resolveAuthPrompt,
   hasKitConfirmedSignal,
+  hasColdOpenCredential,
+  isUnpreemptable,
+  needsKitGuardBeforeSignOut,
   type AuthPromptContext,
 } from '@/services/auth/authPrompts';
 import type { FamilyMember, Settings } from '@/types/models';
@@ -54,10 +57,13 @@ function ctx(overrides: Partial<AuthPromptContext> = {}): AuthPromptContext {
     owner: member(),
     envelope: null,
     settings: null,
+    // Trust ANSWERED by default so the pin/kit/biometric ordering tests keep their
+    // meaning now that `trust` is first (2026-09-23). The trust tests override it.
     flags: {
       isPinPromptDismissed: () => false,
       kitPromptDismissed: false,
-      trustedDevicePromptShown: false,
+      trustedDevicePromptShown: true,
+      isTrustedDevice: false,
     },
     ...overrides,
   };
@@ -122,6 +128,7 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
           isPinPromptDismissed: (f, m) => f === 'fam1' && m === 'm1',
           kitPromptDismissed: true,
           trustedDevicePromptShown: true,
+          isTrustedDevice: false,
         },
       })
     );
@@ -137,6 +144,7 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
           isPinPromptDismissed: () => false,
           kitPromptDismissed: true,
           trustedDevicePromptShown: true,
+          isTrustedDevice: false,
         },
       })
     );
@@ -151,6 +159,7 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
           isPinPromptDismissed: () => false,
           kitPromptDismissed: true,
           trustedDevicePromptShown: true,
+          isTrustedDevice: false,
         },
       })
     );
@@ -172,6 +181,7 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
           isPinPromptDismissed: () => false,
           kitPromptDismissed: false,
           trustedDevicePromptShown: true,
+          isTrustedDevice: false,
         },
       })
     );
@@ -187,6 +197,7 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
         isPinPromptDismissed: () => false,
         kitPromptDismissed: false,
         trustedDevicePromptShown: true,
+        isTrustedDevice: false,
       },
     });
     expect(await resolveAuthPrompt(base)).toBe('native-biometric');
@@ -195,14 +206,43 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
     expect(await resolveAuthPrompt(base)).toBeNull();
   });
 
-  it('trust is the terminal prompt', async () => {
+  const unanswered = {
+    isPinPromptDismissed: () => false,
+    kitPromptDismissed: false,
+    trustedDevicePromptShown: false,
+    isTrustedDevice: false,
+  };
+
+  it('trust comes FIRST on an untrusted, unanswered device — ahead of pin, kit and biometric', async () => {
+    mocks.isNative.mockReturnValue(true);
+    // This member is eligible for pin (legacy password, no PIN) AND kit (manager, no
+    // confirmed-signal) AND native-biometric — trust must still win ("always ask").
     const id = await resolveAuthPrompt(
-      ctx({
-        member: member({ pinHash: 'salt:pin' }),
-        settings: { recoveryKitConfirmedAt: 'x' } as Settings,
-      })
+      ctx({ member: member({ passwordHash: 'salt:hash' }), flags: unanswered })
     );
     expect(id).toBe('trust');
+  });
+
+  it('trust is not asked on a trusted device, or once the question was answered', async () => {
+    const quiet = {
+      member: member({ pinHash: 'salt:pin' }),
+      settings: { recoveryKitConfirmedAt: 'x' } as Settings,
+    };
+    expect(
+      await resolveAuthPrompt(ctx({ ...quiet, flags: { ...unanswered, isTrustedDevice: true } }))
+    ).toBeNull();
+    expect(
+      await resolveAuthPrompt(
+        ctx({ ...quiet, flags: { ...unanswered, trustedDevicePromptShown: true } })
+      )
+    ).toBeNull();
+  });
+
+  it('only trust may bypass the one-interruption slot', () => {
+    expect(isUnpreemptable('trust')).toBe(true);
+    expect(isUnpreemptable('pin')).toBe(false);
+    expect(isUnpreemptable('kit')).toBe(false);
+    expect(isUnpreemptable('native-biometric')).toBe(false);
   });
 
   it('a throwing descriptor degrades that prompt away, reports, and the chain continues', async () => {
@@ -214,7 +254,117 @@ describe('resolveAuthPrompt — priority + eligibility', () => {
         settings: { recoveryKitConfirmedAt: 'x' } as Settings,
       })
     );
-    expect(id).toBe('trust');
+    // native-biometric threw and degraded away; trust is answered in the fixture, so
+    // nothing else is eligible — the chain finished instead of throwing.
+    expect(id).toBeNull();
     expect(mocks.reportError).toHaveBeenCalled();
+  });
+});
+
+describe('hasColdOpenCredential', () => {
+  it('a password wrap or a family passphrase in the envelope opens the pod without a kit', () => {
+    const withWrap = {
+      wrappedKeys: { m1: { wrapped: 'w', salt: 's' } },
+    } as unknown as BeanpodFileV4;
+    const withPassphrase = {
+      wrappedKeys: {},
+      recoveryPassphrase: { salt: 's' },
+    } as unknown as BeanpodFileV4;
+    expect(hasColdOpenCredential({ envelope: withWrap })).toBe(true);
+    expect(hasColdOpenCredential({ envelope: withPassphrase })).toBe(true);
+  });
+
+  it('a kit-born envelope (no wraps, no passphrase) or no envelope at all has none', () => {
+    const kitBorn = { wrappedKeys: {}, recoveryKeys: { k1: {} } } as unknown as BeanpodFileV4;
+    expect(hasColdOpenCredential({ envelope: kitBorn })).toBe(false);
+    expect(hasColdOpenCredential({ envelope: null })).toBe(false);
+  });
+});
+
+describe('needsKitGuardBeforeSignOut — truth table', () => {
+  const kitBornEnvelope = { wrappedKeys: {} } as unknown as BeanpodFileV4;
+  const passwordEraEnvelope = {
+    wrappedKeys: { m1: { wrapped: 'w', salt: 's' } },
+  } as unknown as BeanpodFileV4;
+  const passphraseEnvelope = {
+    wrappedKeys: {},
+    recoveryPassphrase: { salt: 's' },
+  } as unknown as BeanpodFileV4;
+  type GuardCase = {
+    name: string;
+    dropsKeyMaterial: boolean;
+    manager: boolean;
+    isDemo: boolean;
+    envelope: BeanpodFileV4 | null;
+    settings: Settings | null;
+    expected: boolean;
+  };
+  const base = {
+    dropsKeyMaterial: true,
+    manager: true,
+    isDemo: false,
+    envelope: kitBornEnvelope,
+    settings: { recoveryKitConfirmedVia: 'acknowledged' } as Settings,
+  };
+  const cases: GuardCase[] = [
+    { name: 'ticked-only kit, key-dropping sign-out, manager: guard', ...base, expected: true },
+    {
+      name: 'saved kit: no guard',
+      ...base,
+      settings: { recoveryKitConfirmedVia: 'saved' } as Settings,
+      expected: false,
+    },
+    {
+      name: 'sign-out keeps key material (trusted keep-data): no guard',
+      ...base,
+      dropsKeyMaterial: false,
+      expected: false,
+    },
+    { name: 'non-manager: no guard', ...base, manager: false, expected: false },
+    { name: 'App Review demo: no guard', ...base, isDemo: true, expected: false },
+    {
+      name: 'family has a recovery passphrase: no guard',
+      ...base,
+      envelope: passphraseEnvelope,
+      expected: false,
+    },
+    {
+      name: 'legacy kit-born (confirmed before `via`): guard',
+      ...base,
+      settings: { recoveryKitConfirmedAt: 'x' } as Settings,
+      expected: true,
+    },
+    {
+      name: 'legacy password-era (password wraps in the envelope): no guard (Q2)',
+      ...base,
+      settings: { recoveryKitConfirmedAt: 'x' } as Settings,
+      envelope: passwordEraEnvelope,
+      expected: false,
+    },
+    {
+      name: 'password-era family that later ticked past a NEW kit: no guard (password opens cold)',
+      ...base,
+      envelope: passwordEraEnvelope,
+      expected: false,
+    },
+    {
+      name: 'settings and envelope not loaded: guard (safe direction)',
+      ...base,
+      settings: null,
+      envelope: null,
+      expected: true,
+    },
+  ];
+  it.each(cases)('$name', (c) => {
+    expect(
+      needsKitGuardBeforeSignOut({
+        member: member({ canManagePod: c.manager }),
+        owner: member({ passwordHash: '' }),
+        settings: c.settings,
+        envelope: c.envelope,
+        dropsKeyMaterial: c.dropsKeyMaterial,
+        isDemo: c.isDemo,
+      })
+    ).toBe(c.expected);
   });
 });

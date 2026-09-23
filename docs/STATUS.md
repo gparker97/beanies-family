@@ -1,5 +1,12 @@
 # Project Status
 
+> **2026-09-23, late (SESSION 3, committed to `main`, NOT deployed):** trust-on-create/join,
+> always-ask trust on other new devices, the shared sign-out confirm with a trust tick, and the
+> recovery-kit sign-out guard. Fixes greg's prod lockout ("Test new flow 4"). Plan +
+> implementation notes: `docs/plans/2026-09-23-trust-on-create-and-kit-signout-guard.md`.
+> Manual tests owed (native builds, a real second device, join, offline kit guard, demo mode)
+> are listed at the end of that session's report. Prod registry: 10 test families removed.
+
 > **Last updated:** 2026-09-23, evening (SESSION 2 — **`0.22.0` SHIPPED (`2b203d8e`): prod web + Astro, iOS SUBMITTED TO APP STORE REVIEW (`appstore-automatic`, build 81), Android Play open testing.** Carries #77 member-removal revocation, the #97 approval-sheet polish, AND the three fixes that missed 0.21.8. Also: 16 GitHub issues migrated/closed into Notion #99-#106, blog #56 videos cut. **The testing plan below is updated for 0.22.0 — everything in it is now shipped.**)
 >
 > Previous: 2026-09-23 session 1 — native OAuth re-entry became one await; shipped as `0.21.8` (`aed1edf6`).

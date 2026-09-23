@@ -15,6 +15,12 @@
  *
  * User-initiated opens (buttons), action-driven celebrations, and state-driven
  * toasts/banners never call this — the rule governs only unsolicited auto-popups.
+ *
+ * ⚠️ THE ONE EXEMPTION (2026-09-23): the trusted-device question. greg: "for any new
+ * device, at the first sign-in, ALWAYS ask". It still claims the slot when free, but
+ * shows even if another surface already holds it (`isUnpreemptable` in authPrompts.ts,
+ * applied at App.vue's show-site). It is a one-per-device question with security
+ * consequences, not a nudge. Do not add a second exemption without the same bar.
  */
 
 let claimedBy: string | null = null;

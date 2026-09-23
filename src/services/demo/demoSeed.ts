@@ -240,6 +240,11 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
       // signOutAndClearData's teardown leaves it set, which is fine (a reviewer
       // device never needs the nag).
       await settingsStore.dismissKitPrompt();
+      // Same reasoning for the trust question (2026-09-23): it is now asked FIRST and may
+      // bypass the interruption slot, and a "yes" would leave the reviewer's device
+      // trusted. Mark it answered without trusting (createNewFile skips trust-on-create
+      // for the demo), so the reviewer is neither asked nor trusted.
+      await settingsStore.setTrustedDevicePromptShown();
 
       await syncStore.reloadAllStores();
     } catch (error) {
