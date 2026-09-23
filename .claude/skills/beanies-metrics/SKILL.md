@@ -212,6 +212,12 @@ Passing `url` is what keeps the link stable — omitting it spawns a NEW artifac
 rather than creating another. If the canonical artifact was deleted and publishing
 to `url` fails, publish fresh, then **update this file** with the new URL.
 
+**Publishing is mandatory on every run, never optional and never a question**
+(greg, 2026-09-24). This holds however the skill was invoked (directly, from
+`/start-session`, or in a subagent), and even if the caller only asked for a
+file path. A subagent without the Artifact tool must say so in its hand-back so
+the parent session publishes instead.
+
 - The template is already brand-correct (Heritage Orange / Deep Slate / Sky Silk /
   Cloud White, Outfit + Inter, squircle cards, theme-aware, inline CSS charts, CSP-safe)
   and **data-driven** — every number, the callouts, and the source list recompute from

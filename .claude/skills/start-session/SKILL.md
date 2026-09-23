@@ -139,10 +139,11 @@ Search several angles, not one query — comprehensiveness is the point:
 
 When he DOES ask: the whole point of running it here is that he never waits on it. The collectors (DynamoDB registry, CloudWatch, Plausible) take minutes; the session-start report must not.
 
-**Launch a general-purpose subagent in the background** with a prompt like: "Run the beanies-metrics skill end to end (`.claude/skills/beanies-metrics/SKILL.md`): run all the read-only collectors, build the dashboard, and return a 3-5 line summary of the headline numbers (total families, new this week, engaged/churned movement, top traffic source) plus anything that moved sharply since the last run."
+**Launch a general-purpose subagent in the background** with a prompt like: "Run the beanies-metrics skill end to end (`.claude/skills/beanies-metrics/SKILL.md`): run all the read-only collectors, build the dashboard, publish it to the canonical dashboard URL named in that skill (Deliverable 2), and return a 3-5 line summary of the headline numbers (total families, new this week, engaged/churned movement, top traffic source), anything that moved sharply since the last run, and the local path of the dashboard HTML plus whether the publish succeeded."
 
 - **Do NOT wait for it.** Compose and deliver the Step 6 report without the metrics; note in one line that the refresh is running.
 - **When its notification arrives later**, relay a SHORT update — the 3-5 headline lines, not the full report (greg's standing concision preference). If nothing moved meaningfully, one line ("metrics refreshed — no significant movement") is the right amount.
+- **Every refresh ends with the standing dashboard updated. ALWAYS, never ask** (greg, 2026-09-24). If the subagent did not publish (no Artifact tool, or it was told to return a path), the main session publishes the returned HTML itself to the canonical URL in `.claude/skills/beanies-metrics/SKILL.md` § Deliverable 2, passing `url` so the bookmark stays put. Never leave the refresh as a local file and never offer the publish as a question.
 - If the subagent fails (expired AWS creds, Plausible token), report the one-line reason and move on — the session is not blocked, and greg can run `/beanies-metrics` directly after fixing it.
 
 ### Step 5: Fetch today's calendar
