@@ -7,6 +7,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   hasRefreshToken: vi.fn(() => false),
   shouldUseRedirectAuth: vi.fn(() => false),
   invalidateAccessToken: vi.fn(),
+  isUserCancellation: vi.fn(() => false),
   startRedirectAuth: vi.fn(async () => {
     /* noop in tests — would navigate the page in real browser */
   }),
@@ -36,8 +37,10 @@ describe('useGoogleReconnect', () => {
     vi.clearAllMocks();
     // ⚠️ `clearAllMocks` clears CALLS, not return values, so a `mockReturnValue` set by an earlier
     // case leaks into every later one. Restore the web defaults explicitly.
-    const { shouldUseRedirectAuth } = await import('@/services/google/googleAuth');
+    const { shouldUseRedirectAuth, isUserCancellation } =
+      await import('@/services/google/googleAuth');
     vi.mocked(shouldUseRedirectAuth).mockReturnValue(false);
+    vi.mocked(isUserCancellation).mockReturnValue(false);
     isNative.mockReturnValue(false);
   });
 
@@ -178,6 +181,44 @@ describe('useGoogleReconnect', () => {
       expect.objectContaining({
         level: 'info',
         context: expect.objectContaining({ action: 'reconnect-abandoned' }),
+      })
+    );
+  });
+
+  it('a CLOSED DESKTOP POPUP is a decision too — the native arm must not be the only one', async () => {
+    // ⚠️ THE POPUP IS THE COMMON TRANSPORT, and it rejects with a plain `Error`, not
+    // `OAuthRoundTripAbandonedError`. Classifying only the native error left desktop painting
+    // the raw English "Authentication cancelled" and counting a deliberate abort as a failure in
+    // the reconnect success rate.
+    const { requestAccessToken, isUserCancellation } = await import('@/services/google/googleAuth');
+    vi.mocked(isUserCancellation).mockReturnValue(true);
+    vi.mocked(requestAccessToken).mockRejectedValueOnce(new Error('Authentication cancelled'));
+
+    const { reconnect, reconnectError } = useGoogleReconnect();
+    const result = await reconnect();
+
+    expect(result).toBe('failed');
+    expect(reconnectError.value).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        context: expect.objectContaining({ action: 'reconnect-abandoned' }),
+      })
+    );
+  });
+
+  it('a GENUINE failure still reports as one, with the reason attached', async () => {
+    const { requestAccessToken, isUserCancellation } = await import('@/services/google/googleAuth');
+    vi.mocked(isUserCancellation).mockReturnValue(false);
+    vi.mocked(requestAccessToken).mockRejectedValueOnce(new Error('Drive 500'));
+
+    const { reconnect, reconnectError } = useGoogleReconnect();
+    expect(await reconnect()).toBe('failed');
+    expect(reconnectError.value).toBe('Drive 500');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ action: 'reconnect-failed' }),
       })
     );
   });

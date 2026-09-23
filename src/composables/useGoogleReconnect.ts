@@ -4,6 +4,7 @@ import {
   shouldUseRedirectAuth,
   startRedirectAuth,
   awaitNativeOAuthReturn,
+  isUserCancellation,
 } from '@/services/google/googleAuth';
 import { currentLocationPath } from '@/services/google/redirectState';
 import { isNative } from '@/services/sync/capabilities';
@@ -159,11 +160,16 @@ export function useGoogleReconnect() {
       return outcome;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      if (e instanceof OAuthRoundTripAbandonedError) {
+      // ⚠️ BOTH TRANSPORTS. The native round trip rejects with `OAuthRoundTripAbandonedError`;
+      // the desktop popup rejects with a plain `Error('Authentication cancelled')` when the
+      // window is closed. They are the same event — the person aborted — and classifying only
+      // the first left the far more common desktop path painting raw English and counting a
+      // decision as a failure. `isUserCancellation` is the project's one predicate for this.
+      if (e instanceof OAuthRoundTripAbandonedError || isUserCancellation(e)) {
         // ⚠️ `reconnectError` LEFT NULL ON PURPOSE. It is rendered VERBATIM by four call sites,
-        // and this error's message is untranslated English. Every one of those sites already
-        // falls back to `t('googleDrive.reconnectFailed')` when it is empty, so leaving it null
-        // is what keeps a Chinese UI in Chinese. (Writing a KEY here would be worse still: a key
+        // and these messages are untranslated English. Every one of those sites already falls
+        // back to `t('googleDrive.reconnectFailed')` when it is empty, so leaving it null is
+        // what keeps a Chinese UI in Chinese. (Writing a KEY here would be worse still: a key
         // is truthy, so it would defeat the `||` fallback and paint the key itself.)
         abandoned = true;
         console.warn('[useGoogleReconnect] reconnect abandoned by the user:', message);
