@@ -17,6 +17,78 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.23.2',
+    date: '2026-09-23',
+    month: '23 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Signing in is smoother than ever.',
+      beanie: 'signing in is smoother than ever.',
+    },
+    features: [
+      {
+        icon: '\u{1F510}',
+        title: { en: 'Smoother sign-in, everywhere', beanie: 'smoother sign-in, everywhere' },
+        description: {
+          en: "Sign in on a new device by scanning a code from one you're already using, then approve it in one step with your passkey or PIN. beanies links open straight in the app, and your PIN works everywhere a password used to.",
+          beanie:
+            "sign in on a new device by scanning a code from one you're already using, then approve it in one step with your passkey or pin. beanies links open straight in the app, and your pin works everywhere a password used to.",
+        },
+      },
+      {
+        title: { en: 'Security improvements', beanie: 'security improvements' },
+        description: {
+          en: "When you remove someone from your family, their access to your family's data goes with them.",
+          beanie:
+            "when you remove someone from your family, their access to your family's data goes with them.",
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
+    version: '2026.09.23',
+    date: '2026-09-23',
+    month: '23 september 2026',
+    summary: {
+      en: 'beanies links now open straight in the app, and your PIN works everywhere a password used to be asked for.',
+      beanie:
+        'beanies links now open straight in the app, and your pin works everywhere a password used to be asked for.',
+    },
+  },
+  {
+    version: '2026.09.20',
+    date: '2026-09-20',
+    month: '20 september 2026',
+    summary: {
+      en: 'Scan a code from the menu to sign in another device, approve a new device with one tap and your PIN, and one magic link that picks the right Google account for you.',
+      beanie:
+        'scan a code from the menu to sign in another device, approve a new device with one tap and your pin, and one magic link that picks the right google account for you.',
+    },
+  },
+  {
+    version: '2026.09.18',
+    date: '2026-09-18',
+    month: '18 september 2026',
+    summary: {
+      en: 'Sign in on a new device by scanning a code, and new family members can join from an iPhone again.',
+      beanie:
+        'sign in on a new device by scanning a code, and new family members can join from an iphone again.',
+    },
+  },
+  {
     version: '2026.09.17',
     date: '2026-09-17',
     month: '17 september 2026',
