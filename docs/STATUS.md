@@ -1,5 +1,69 @@
 # Project Status
 
+> **Last updated:** 2026-09-23 (SESSION — **NATIVE OAUTH RE-ENTRY BECAME ONE AWAIT AND FIVE RESUME MACHINES WERE DELETED; SHIPPED AS `0.21.8` (`aed1edf6`) to prod web, TestFlight and Play open testing.** Then three more fixes that are NOT in that build: the iOS doc-worker `CryptoKey` clone failure, the IDB noise predicate, and Google's OAuth error code. **greg is testing next session — the full plan is the block immediately below.**)
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ⭐⭐ TESTING PLAN — 2026-09-23 SESSION. greg tests next session. ⭐⭐
+     ═══════════════════════════════════════════════════════════════════════════ -->
+
+## ⭐ TESTING PLAN — everything from the 2026-09-23 session
+
+**Read the split first, it decides where you can test what.**
+
+| Commit     | What                                           | In 0.21.8?        |
+| ---------- | ---------------------------------------------- | ----------------- |
+| `9e19042a` | #63 deep links open the app                    | ✅ shipped        |
+| `64da057e` | native OAuth returns are awaited               | ✅ shipped        |
+| `d5015de7` | desktop reconnect popup cancel                 | ✅ shipped        |
+| `d1886ce4` | create-wizard yank, info icon, goodbye mascot  | ✅ shipped        |
+| `1ce58a0b` | **iOS doc-worker CryptoKey clone + IDB noise** | ❌ needs a deploy |
+| `b5d85a34` | **Google OAuth error code**                    | ❌ needs a deploy |
+
+`0.21.8` is live on prod web, TestFlight (no review) and Play **open testing** (auto-submitted for Google review). The last two rows need a `0.21.9`.
+
+### A. On the 0.21.8 native build (TestFlight / Play beta) — THE POINT OF THE RELEASE
+
+⚠️ **None of this has ever run on a device.** The whole await-the-return change is unverified outside unit tests.
+
+1. **Create a pod, connect Drive.** Must continue straight to the recovery kit. Must NEVER land back on the storage picker.
+2. **Cancel Google's consent mid-create.** Must say _cancelled_ (not "failed"), leave you exactly where you were, and **must not move on by itself** — this is the bug you caught on web; confirm it on native too.
+3. **Close the consent sheet without deciding** (swipe down on iOS, back on Android). After ~2.5s you should get the cancelled message. A spinner that never ends is a fail.
+4. **Reconnect Drive from Settings** → must be ONE tap.
+5. **Reconnect from the pod-access banner** → ONE tap.
+6. **Reconnect from the sign-in / recovery screen** → ONE tap. (Before this change, 3 of these 4 surfaces took two taps.)
+7. **Deep links (#63).** Tap a beanies link in a calendar invite. Android should open the app on the item. **iOS falling back to the PWA or browser is a PASS** — Universal Links do not fire through Google's redirect wrapper.
+8. **Delete a family** → the goodbye shows the beanies, not a three-dot placeholder.
+9. **Any confirm or alert dialog** → a proper "i" icon, not three dots.
+10. ⚠️ **Edge worth one try: Drive and Calendar on DIFFERENT Google accounts**, then use the reconnect prompt. It can now open two consent sheets back to back. Newly reachable, deliberately not guarded, never observed.
+
+### B. On live web (app.beanies.family, 0.21.8)
+
+11. **Create a new family.** At the storage step there must be **no red error slab** on first arrival. (Regression caught in review: it said "Google sign-in failed" to every first-time creator before they had attempted one.)
+12. **Close the Google popup during create** → _cancelled_, not "failed", and not raw English.
+13. **Close the Google popup during a Settings reconnect** → translated message, never "Authentication cancelled".
+14. **Untick the file-access box** on Google's consent screen → the "allow file access" guidance, not a generic failure.
+15. **Repeat 11–14 in Chinese.** The whole i18n finding was that English leaked into exactly these paths.
+16. **Install the PWA and create a pod there.** That takes the full-page redirect instead of the popup — the closest proxy to native. Should return to the resume screen and carry on.
+17. **Dark mode + ~400px** on the resume and storage screens (a template block was deleted from them).
+
+### C. After a 0.21.9 deploy — the two that are not shipped
+
+18. **The iOS doc-worker fix (`1ce58a0b`) is the one to watch.** On iPhone, open a pod and look for the freeze. Then check CloudWatch: `doc-worker … failed` and `The object can not be cloned.` should go to **zero**. ⚠️ This is a plausible mechanism for the sync-freeze investigation, NOT proof it is the same thing.
+19. **`Cannot inject key into script value`** should stop paging `#beanies-errors`.
+20. **The next refresh failure** should log `invalid_grant: …` with the machine code, not prose alone.
+
+### D. Watch in CloudWatch regardless
+
+- `native-oauth`: exactly **one settling event per `start`**. An absence means a trip that never settled — the one invariant the whole design rests on.
+- `reconnect-abandoned` at `info` (new) rather than everything landing in `warn`/`reconnect-failed`.
+- `app.onboardingStallTimeout` — **still unexplained.** 35s pre-auth boot hang, 5 firings in 30 days, iPhone. I disconfirmed my own theory that it was downstream of the worker issue (it fires before a family key exists). Next firing needs instrumentation, not a guess.
+
+### What I could NOT verify, and you should not assume
+
+- Anything native. No device, no simulator on WSL (no JDK, no `ANDROID_HOME`).
+- That the doc-worker fix cures the sync freeze. It removes a real mechanism; that is all that is established.
+- The two-consent-sheet edge in A10.
+
 <!-- ═══════════════════════════════════════════════════════════════════════════
      ⭐⭐ ADR-032 AUTOMERGE WEB WORKER MIGRATION — LIVE IN PROD (docWorker prod-ON) ⭐⭐
      Worker flipped prod-ON 2026-07-07 as app 0.9.4 (+ B1/B2 incremental delta sync, iOS redirect-auth fix)
