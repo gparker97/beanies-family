@@ -79,3 +79,19 @@ describe('withIdbRetry', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('isIdbTransientError — WebKit keyPath injection (2026-09-21)', () => {
+  it("treats 'Cannot inject key into script value' as transient", () => {
+    // ⚠️ IT NAMES NEITHER "indexed" NOR "database", so the `UnknownError` pair test misses it.
+    // Production paged this at CRITICAL as an `unhandled-error` from an iPhone on iOS 18.7.
+    const e = new DOMException('Cannot inject key into script value', 'UnknownError');
+    expect(isIdbTransientError(e)).toBe(true);
+  });
+
+  it('still refuses an unrelated UnknownError, so the widening stays narrow', () => {
+    expect(isIdbTransientError(new DOMException('Cannot inject key into script value'))).toBe(true);
+    expect(isIdbTransientError(new DOMException('Something else entirely', 'UnknownError'))).toBe(
+      false
+    );
+  });
+});

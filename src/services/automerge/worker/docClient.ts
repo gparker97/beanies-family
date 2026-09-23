@@ -23,6 +23,7 @@
  * Worker-death recovery + the inline fallback executor are seams here and
  * completed in Task #6 (`setInlineExecutor`, `setRehydrator`).
  */
+import { exportFamilyKey } from '@/services/crypto/familyKeyService';
 import { withTimeout } from '@/utils/timing';
 import { deviceActorId } from '@/services/automerge/deviceActor';
 import { acquireActorLease, releaseActorLease } from '@/services/automerge/actorLease';
@@ -106,6 +107,35 @@ let mode: 'worker' | 'inline' = 'worker';
 
 // Retained across a worker re-spawn so recovery needs no re-unlock.
 let familyKey: CryptoKey | null = null;
+/**
+ * The family key as raw bytes — the WORKER WIRE FORMAT for `setKey`.
+ *
+ * ⚠️ WHY THIS EXISTS. A `CryptoKey` is structured-cloneable per spec, but iOS WKWebView throws
+ * `DataCloneError` ("The object can not be cloned.") when one is posted to a worker. Production
+ * saw it on two families across two builds. `postMessage` throws SYNCHRONOUSLY, so `setKey`
+ * never lands, every later crypto op trips its `if (!familyKey)` guard, and the realm degrades
+ * to running Automerge inline ON THE MAIN THREAD — which is the shape of a boot that stalls.
+ *
+ * ⚠️ CACHED RATHER THAN EXPORTED PER POST, because the re-spawn repost site is SYNCHRONOUS
+ * (`postRaw`) and cannot await an export. Exporting once at `setFamilyKey` is also the only
+ * point where a failure can be handled: `null` here means "fall back to posting the CryptoKey",
+ * which is exactly today's behaviour.
+ *
+ * Cleared everywhere `familyKey` is, so a signed-out realm holds no key material.
+ */
+let familyKeyRaw: Uint8Array | null = null;
+
+/**
+ * The `setKey` args, in whichever form this realm can actually deliver.
+ *
+ * Raw bytes when we have them (clone-safe on every engine), the `CryptoKey` otherwise. ONE
+ * helper rather than the ternary at three post sites, so a fourth caller cannot pick the form
+ * that iOS rejects.
+ */
+function setKeyArgs(): { raw: Uint8Array } | { key: CryptoKey } | null {
+  if (familyKeyRaw) return { raw: familyKeyRaw };
+  return familyKey ? { key: familyKey } : null;
+}
 /**
  * The stable device actor, retained beside the key so there is ONE lifetime.
  *
@@ -380,7 +410,7 @@ async function enterInlineMode(): Promise<void> {
   }
   if (familyKey) {
     try {
-      await inlineExecutor('setKey', { key: familyKey });
+      await inlineExecutor('setKey', setKeyArgs() ?? { key: familyKey });
     } catch (e) {
       console.error('[docClient] inline setKey re-drive failed', e);
     }
@@ -449,7 +479,8 @@ async function spawn(): Promise<'worker' | 'inline'> {
   // worker. ⚠️ ACTOR FIRST — the rehydrator below loads the document, so an
   // actor posted after it has pinned nothing.
   if (docActor) postRaw({ cid: nextCid++, method: 'setActor', args: { actor: docActor } });
-  if (familyKey) postRaw({ cid: nextCid++, method: 'setKey', args: { key: familyKey } });
+  const keyArgs = setKeyArgs();
+  if (keyArgs) postRaw({ cid: nextCid++, method: 'setKey', args: keyArgs });
   if (needsRehydrate && currentFamilyId && rehydrator) {
     needsRehydrate = false;
     // A1: the rehydrator routes back through requestCore → ensureReady(), which
@@ -1112,6 +1143,15 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // forget, and five places to remember forever; one required parameter is
   // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
+  // Export ONCE, here, where a failure can still be handled. A non-extractable key (nothing
+  // produces one today, but nothing stops a future path) leaves `familyKeyRaw` null and the
+  // post falls back to the CryptoKey — today's behaviour, and correct everywhere but iOS.
+  try {
+    familyKeyRaw = await exportFamilyKey(key);
+  } catch (e) {
+    familyKeyRaw = null;
+    console.warn('[docClient] family key is not exportable; posting the CryptoKey instead', e);
+  }
   // ⚠️ ACTOR PINNING IS OFF. See `ACTOR_PINNING_ENABLED` below — it is one
   // constant, and everything it gates (the lease, the derivation, their tests)
   // is intact and ready for the day the invariant it needs actually holds.
@@ -1126,7 +1166,7 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
-  await request('setKey', { key });
+  await request('setKey', setKeyArgs() ?? { key });
 }
 
 /**
@@ -1574,6 +1614,7 @@ export async function reset(): Promise<void> {
   // the next initDoc (below) re-arms normal toast policy.
   setCurrentFamily(null);
   familyKey = null;
+  familyKeyRaw = null;
   docActor = null;
   releaseActorLease();
   await request('reset');
@@ -1633,6 +1674,7 @@ export function __resetDocClientForTesting(): void {
   nextCid = 1;
   mode = 'worker';
   familyKey = null;
+  familyKeyRaw = null;
   docActor = null;
   releaseActorLease();
   currentFamilyId = null;
