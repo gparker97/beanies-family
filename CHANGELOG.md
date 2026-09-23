@@ -8,9 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-24
+
+_Released as app v0.22.1 (web, App Store, Google Play production), together with the
+2026-09-23 entries below that were merged after 0.22.0._
+
+### Fixed
+
+- The privacy policy now describes the family registry: the short entry kept for each
+  family (owner email, family name, where the family file lives, and a few usage signals),
+  how long it is kept, and how to have it removed.
+
 ## 2026-09-23
 
-_Merged after 0.22.0, not yet released:_
+_Merged after 0.22.0, released in 0.22.1:_
 
 ### Fixed
 
