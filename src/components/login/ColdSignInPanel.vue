@@ -110,19 +110,12 @@ const pushSteps = computed(() => [
     separate from. The dividers below carry the grouping instead.
   -->
   <div>
-    <h3 class="font-outfit dark:text-ink mb-3 text-base font-semibold text-gray-900">
+    <h3 class="font-outfit dark:text-ink mb-3 text-base font-semibold text-balance text-gray-900">
       {{ isTouchPrimary && !showCode ? t('coldEntry.pushTitle') : t('coldEntry.scanTitle') }}
     </h3>
-    <!-- The lead line under this heading is GONE. On the push route it said "this device has
-         a camera, so the quickest way in is…", which is a sentence explaining why a screen
-         exists to someone who is trying to leave it. The three steps say the same thing and
-         are actionable. -->
-    <p
-      v-if="!(isTouchPrimary && !showCode)"
-      class="dark:text-ink-soft mt-1 mb-4 text-sm text-gray-600"
-    >
-      {{ t('coldEntry.scanLead') }}
-    </p>
+    <!-- No lead line under this heading, on either route. The pull heading now says what to
+         do ("scan this code with a device where you're already signed in"), so the line that
+         used to repeat it underneath was redundant (greg, 2026-09-23). -->
 
     <!-- PUSH, led on a device that has a camera. The steps end by telling the person to use
          that camera, because the in-app scanner is gone and the phone's own camera app is now

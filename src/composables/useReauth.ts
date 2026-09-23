@@ -78,14 +78,8 @@ export function requireReauth(
 
   if (!member) {
     // Nothing to verify against. Without this the four call sites would await forever.
-    record('unavailable');
+    reportReauthUnavailable();
     void showAlert({ title: 'reauth.unavailableTitle', message: 'reauth.unavailable' });
-    reportError({
-      surface: 'reauth-gate',
-      message: 'reauth gate needs a resolved currentMember — called before the roster loaded',
-      severity: 'warning',
-      context: { action: 'reauth_outcome', kind: 'unavailable' },
-    });
     return Promise.resolve(false);
   }
 
@@ -106,22 +100,45 @@ export function requireReauth(
   });
 }
 
+/**
+ * A step-up that could not run: no resolved member to verify. Shared by `requireReauth` and
+ * inline hosts, so both feed the same `reauth_outcome` stream.
+ */
+export function reportReauthUnavailable(): void {
+  record('unavailable');
+  reportError({
+    surface: 'reauth-gate',
+    message: 'reauth gate needs a resolved currentMember — called before the roster loaded',
+    severity: 'warning',
+    context: { action: 'reauth_outcome', kind: 'unavailable' },
+  });
+}
+
+/**
+ * Record how a step-up ended. THE one reporter, shared by the modal gate below and by any
+ * host that embeds `ReauthChallenge` inline (the device-approval sheet), so an inline
+ * step-up is as visible in the firehose as a modal one.
+ */
+export function reportReauthOutcome(value: boolean, reason?: 'no-credential'): void {
+  record(value ? 'verified' : (reason ?? 'cancelled'));
+  if (reason === 'no-credential') {
+    // A dead end, not a decision: this member has no biometric, no PIN and no password,
+    // so they cannot complete ANY gated action until they set one. Say so plainly and
+    // report it — recorded as a plain cancel it would be invisible.
+    reportError({
+      surface: 'reauth-gate',
+      message:
+        'member has no credential to step up with — every gated action is unreachable for them until a PIN is set in Settings → Security',
+      severity: 'warning',
+      context: { action: 'reauth_outcome', kind: 'no-credential' },
+    });
+  }
+}
+
 /** Composable for the ReauthGateModal renderer component. */
 export function useReauth() {
   function settle(value: boolean, reason?: 'no-credential') {
-    record(value ? 'verified' : (reason ?? 'cancelled'));
-    if (reason === 'no-credential') {
-      // A dead end, not a decision: this member has no biometric, no PIN and no password,
-      // so they cannot complete ANY gated action until they set one. Say so plainly and
-      // report it — recorded as a plain cancel it would be invisible.
-      reportError({
-        surface: 'reauth-gate',
-        message:
-          'member has no credential to step up with — every gated action is unreachable for them until a PIN is set in Settings → Security',
-        severity: 'warning',
-        context: { action: 'reauth_outcome', kind: 'no-credential' },
-      });
-    }
+    reportReauthOutcome(value, reason);
     state.value.resolve?.(value);
     state.value = { open: false, member: null, resolve: null };
   }

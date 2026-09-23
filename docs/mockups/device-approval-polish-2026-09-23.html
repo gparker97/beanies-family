@@ -1,0 +1,196 @@
+<title>Sign-In Approval Polish</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #F8F9FA; --raised: #FFFFFF; --overlay: #F1F3F5; --ink: #2C3E50; --ink-soft: #52667A; --ink-faint: #7B8A97;
+    --line: #E3E7EB; --orange: #F15D22; --orange-ink: #C2410C; --terra: #E67E22; --tint: rgba(241,93,34,.08); --tint-strong: rgba(241,93,34,.14);
+    --callout-bg: #FFF4EE; --callout-line: #FBD3C0; --silk: #AED6F1; --shade: rgba(20,30,40,.45); --change: #9B59B6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark;
+      --ground:#151E27; --raised:#1E2A36; --overlay:#26343F; --ink:#F2F5F7; --ink-soft:#C3CED6; --ink-faint:#9AA9B4; --line:#4A5B69;
+      --orange-ink:#FF8B5E; --tint: rgba(241,93,34,.14); --tint-strong: rgba(241,93,34,.22); --callout-bg:#26343F; --callout-line: rgba(255,139,94,.4); --shade: rgba(0,0,0,.55); --change:#CB95DD; }
+  }
+  :root[data-theme="dark"] { color-scheme: dark;
+    --ground:#151E27; --raised:#1E2A36; --overlay:#26343F; --ink:#F2F5F7; --ink-soft:#C3CED6; --ink-faint:#9AA9B4; --line:#4A5B69;
+    --orange-ink:#FF8B5E; --tint: rgba(241,93,34,.14); --tint-strong: rgba(241,93,34,.22); --callout-bg:#26343F; --callout-line: rgba(255,139,94,.4); --shade: rgba(0,0,0,.55); --change:#CB95DD; }
+
+  body { background: var(--ground); color: var(--ink); font-family: Inter, system-ui, sans-serif; padding: 24px 16px 48px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-family: Outfit, system-ui, sans-serif; font-size: 1.6rem; margin: 0 0 4px; text-wrap: balance; }
+  .lede { color: var(--ink-soft); max-width: 68ch; margin: 0 0 24px; line-height: 1.5; }
+  h2.section { font-family: Outfit, sans-serif; font-size: 1.05rem; margin: 36px 0 4px; }
+  .section-note { color: var(--ink-soft); font-size: .85rem; margin: 0 0 14px; max-width: 70ch; }
+  .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .frame { width: 340px; max-width: 100%; }
+  .frame.wide { width: 640px; }
+  .cap { font-size: .75rem; color: var(--ink-faint); margin: 0 0 6px; font-family: Outfit, sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+  .screen { background: var(--raised); border: 1px solid var(--line); border-radius: 28px; padding: 22px 18px; box-shadow: 0 8px 40px rgba(44,62,80,.08); }
+  .backdrop { background: var(--shade); border-radius: 28px; padding: 48px 14px; }
+  .modal { background: var(--raised); border-radius: 24px; overflow: hidden; }
+  .mhead { background: var(--tint); display: flex; align-items: center; gap: 12px; padding: 16px 18px; position: relative; }
+  .ibox { width: 44px; height: 44px; border-radius: 14px; background: var(--tint-strong); display: grid; place-items: center; font-size: 1.3rem; flex-shrink: 0; }
+  .mtitle { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.125rem; }
+  .x { position: absolute; right: 14px; top: 16px; width: 30px; height: 30px; border-radius: 999px; background: var(--raised); display: grid; place-items: center; color: var(--ink-faint); font-size: .9rem; }
+  .mbody { padding: 18px; display: grid; gap: 14px; text-align: center; }
+  .soft { color: var(--ink-soft); font-size: .875rem; line-height: 1.45; margin: 0; }
+  .faint { color: var(--ink-faint); font-size: .75rem; margin: 0; }
+  .callout { background: var(--callout-bg); border: 1px solid var(--callout-line); color: var(--orange-ink); border-radius: 12px; padding: 10px 12px; font-size: .85rem; text-align: left; }
+  .check { display: grid; gap: 8px; justify-items: center; }
+  .instr { font-family: Outfit, sans-serif; font-weight: 600; font-size: .95rem; color: var(--ink); display: flex; gap: 6px; align-items: center; }
+  .instr::before { content: "👀"; }
+  .code { font-family: Outfit, sans-serif; font-weight: 800; font-size: 1.35rem; letter-spacing: .22em; padding: 8px 16px; border-radius: 14px; background: var(--overlay); border: 2px solid var(--orange); }
+  .btn { font-family: Outfit, sans-serif; font-weight: 700; font-size: .875rem; border-radius: 16px; padding: 13px 14px; text-align: center; }
+  .primary { background: linear-gradient(90deg, #F15D22, #E67E22); color: #fff; }
+  .outline { border: 1.5px solid var(--line); color: var(--ink); }
+  .stack { display: grid; gap: 8px; }
+  .qr { width: 168px; height: 168px; margin: 0 auto; border-radius: 22px; border: 1px solid var(--line); background:
+      repeating-linear-gradient(90deg, var(--orange) 0 9px, transparent 9px 17px), repeating-linear-gradient(0deg, var(--orange) 0 9px, transparent 9px 17px);
+      background-blend-mode: multiply; padding: 10px; background-clip: content-box; box-shadow: 0 0 0 10px var(--raised) inset; }
+  .waiting { display: inline-flex; align-items: center; gap: 10px; background: var(--tint); color: var(--orange-ink); border-radius: 999px; padding: 9px 16px; font-size: .85rem; font-weight: 600; margin: 0 auto; }
+  .spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid var(--tint-strong); border-top-color: var(--orange); animation: sp 0.9s linear infinite; flex-shrink: 0; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } }
+  .h3 { font-family: Outfit, sans-serif; font-weight: 600; font-size: 1rem; margin: 0; text-wrap: balance; }
+  .or { display: flex; align-items: center; gap: 10px; color: var(--ink-faint); font-size: .75rem; }
+  .or::before, .or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+  .paste { border: 1.5px dashed var(--line); border-radius: 14px; padding: 12px; font-size: .875rem; color: var(--ink-soft); text-align: left; }
+  .foot { text-align: center; color: var(--ink-faint); font-size: .75rem; }
+  .chg { display: inline-block; font-size: .7rem; font-weight: 700; color: #fff; background: var(--change); border-radius: 999px; padding: 1px 7px; margin-left: 4px; vertical-align: middle; font-family: Outfit, sans-serif; }
+  .fastbox { border-radius: 22px; background: var(--tint); border: 1.5px solid var(--callout-line); padding: 16px; display: grid; gap: 8px; text-align: left; }
+  .flag { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--orange-ink); font-family: Outfit, sans-serif; }
+  .pinrow { display: flex; gap: 8px; justify-content: center; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink-faint); }
+  .dot.on { background: var(--ink); border-color: var(--ink); }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 230px; margin: 0 auto; }
+  .key { background: var(--overlay); border-radius: 16px; padding: 10px 0; font-family: Outfit, sans-serif; font-weight: 600; font-size: 1.1rem; }
+  .faceid { width: 74px; height: 74px; margin: 4px auto; border-radius: 22px; background: var(--tint); display: grid; place-items: center; font-size: 2rem; }
+  .mascot { width: 88px; height: 88px; margin: 0 auto; border-radius: 50%; background: var(--tint); display: grid; place-items: center; font-size: 2.6rem; }
+  .desk { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center; text-align: left; }
+  @media (max-width: 560px) { .desk { grid-template-columns: 1fr; text-align: center; } }
+  ul.notes { color: var(--ink-soft); font-size: .85rem; line-height: 1.55; padding-left: 18px; max-width: 72ch; margin: 8px 0 0; }
+</style>
+
+<div class="wrap">
+  <h1>Sign-in approval: copy and look</h1>
+  <p class="lede">Mockup of your six changes to the scan-to-sign-in flow. <span class="chg">#</span> badges match your numbered list. The page follows your phone's light or dark setting, so flip it to check both. Colours, radii and type come from the beanies CIG; the QR is a stand-in.</p>
+
+  <h2 class="section">Cold device (the one signing in)</h2>
+  <p class="section-note">Change 1 is the box on "load your pod". Changes 2 and 3 are the "unlock my beanpod" screen after Google consent, shown at phone and desktop width.</p>
+  <div class="row">
+    <div class="frame">
+      <p class="cap">Load your pod · phone</p>
+      <div class="screen" style="display:grid;gap:14px">
+        <div class="fastbox">
+          <span class="flag">Fastest</span>
+          <p class="h3">Use a Magic Link <span class="chg">1</span></p>
+          <p class="soft" style="text-align:left">If you're already signed in on another device, generate a magic link and use it to sign in this device. <span class="chg">1</span></p>
+        </div>
+        <div class="or">or</div>
+        <div class="btn outline">Connect Google Drive</div>
+      </div>
+    </div>
+
+    <div class="frame">
+      <p class="cap">Unlock my beanpod · phone</p>
+      <div class="screen" style="display:grid;gap:14px;text-align:center">
+        <p class="h3">Scan this code with a device where you're already signed in <span class="chg">2</span></p>
+        <div class="qr" role="img" aria-label="QR code placeholder"></div>
+        <div class="check">
+          <span class="instr">Check this matches the code on the other device <span class="chg">2</span></span>
+          <span class="code">K7Q · 4MX</span>
+        </div>
+        <span class="waiting"><span class="spin"></span>Waiting for approval (this may take up to 30 seconds) <span class="chg">3</span></span>
+        <div class="or">or</div>
+        <div class="paste">🔗 Have a magic link? Paste it here <span class="chg">2</span></div>
+        <p class="foot">Your data is encrypted. We never see it. <span class="chg">2</span></p>
+      </div>
+    </div>
+
+    <div class="frame wide">
+      <p class="cap">Unlock my beanpod · desktop</p>
+      <div class="screen">
+        <div class="desk">
+          <div style="display:grid;gap:12px">
+            <p class="h3">Scan this code with a device where you're already signed in</p>
+            <div class="check" style="justify-items:start">
+              <span class="instr">Check this matches the code on the other device</span>
+              <span class="code">K7Q · 4MX</span>
+            </div>
+            <span class="waiting" style="margin:0"><span class="spin"></span>Waiting for approval (this may take up to 30 seconds)</span>
+          </div>
+          <div class="qr" role="img" aria-label="QR code placeholder"></div>
+        </div>
+        <div class="or" style="margin:16px 0">or</div>
+        <div class="paste">🔗 Have a magic link? Paste it here</div>
+        <p class="foot" style="margin-top:12px">Your data is encrypted. We never see it.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section">Approving device (already signed in)</h2>
+  <p class="section-note">One sheet from start to finish, with the same header style throughout: an orange-tinted title band and an icon square, as on the invite wizard. Change 5 happens inside this sheet, so no second PIN modal opens.</p>
+  <div class="row">
+    <div class="frame">
+      <p class="cap">Step 1 · check the code <span class="chg">4</span></p>
+      <div class="backdrop"><div class="modal">
+        <div class="mhead"><span class="ibox">🔐</span><span class="mtitle">Approve Login</span><span class="x">✕</span></div>
+        <div class="mbody">
+          <p class="soft">A device is asking to open your family's beanpod.</p>
+          <div class="callout">Confirm that you know the person asking to access your family pod.</div>
+          <div class="check">
+            <span class="instr">Check this matches the code on the other device <span class="chg">4</span></span>
+            <span class="code">K7Q · 4MX</span>
+          </div>
+          <div class="stack">
+            <div class="btn primary">The Codes Match, Let In My Beanie! <span class="chg">4</span></div>
+            <div class="btn outline">Sorry, I Don't Know This Beanie <span class="chg">4</span></div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame">
+      <p class="cap">Step 2a · biometric set up: runs by itself <span class="chg">5</span></p>
+      <div class="backdrop"><div class="modal">
+        <div class="mhead"><span class="ibox">🔐</span><span class="mtitle">Approve Login</span></div>
+        <div class="mbody">
+          <div class="faceid">🙂</div>
+          <span class="waiting"><span class="spin"></span>Approving with your passkey.</span>
+          <div class="btn outline">Use PIN Instead?</div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame">
+      <p class="cap">Step 2b · no biometric: PIN pad straight away <span class="chg">5</span></p>
+      <div class="backdrop"><div class="modal">
+        <div class="mhead"><span class="ibox">🔐</span><span class="mtitle">Approve Login</span></div>
+        <div class="mbody">
+          <p class="soft">Enter your PIN to let this device in.</p>
+          <div class="pinrow"><span class="dot on"></span><span class="dot on"></span><span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <div class="keys"><span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="key">5</span><span class="key">6</span><span class="key">7</span><span class="key">8</span><span class="key">9</span><span></span><span class="key">0</span><span class="key">⌫</span></div>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame">
+      <p class="cap">Step 3 · done <span class="chg">6</span></p>
+      <div class="backdrop"><div class="modal">
+        <div class="mhead"><span class="ibox">🎉</span><span class="mtitle">Login Approved! <span class="chg">6</span></span><span class="x">✕</span></div>
+        <div class="mbody">
+          <div class="mascot" aria-hidden="true">🫘</div>
+          <p class="soft">It may take up to 30 seconds for the other device to pick up the approval. Please be patient. <span class="chg">6</span></p>
+          <div class="btn primary">OK <span class="chg">6</span></div>
+        </div>
+      </div></div>
+    </div>
+  </div>
+
+  <h2 class="section">Other modals in this flow</h2>
+  <ul class="notes">
+    <li><strong>"Sign in another device"</strong> (the magic-link QR sheet you open from the profile menu) gets the same orange title band and icon square.</li>
+    <li><strong>The PIN step-up used elsewhere</strong> (removing a member, transferring ownership) also gets the title band. Its behaviour is unchanged: if biometric is set up it still asks, but it skips the "which method?" chooser and goes straight to biometric, falling back to the PIN pad.</li>
+    <li>The 🫘 in Step 3 stands in for the real celebrating-beanies artwork (<code>beanies_celebrating_line</code>).</li>
+  </ul>
+</div>

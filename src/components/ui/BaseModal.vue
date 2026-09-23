@@ -2,6 +2,7 @@
 import type { CSSProperties } from 'vue';
 import { computed, toRef } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import ModalIconTitle from '@/components/ui/ModalIconTitle.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 
@@ -26,6 +27,12 @@ interface Props {
   layer?: 'base' | 'overlay' | 'top' | 'gate';
   /** When true, the header slot renders edge-to-edge without padding or border */
   customHeader?: boolean;
+  /**
+   * An emoji for a BRANDED header: a Heritage Orange tinted title band (as the invite
+   * wizard has) with `ModalIconTitle` — the icon box + title `BeanieFormModal` also uses.
+   * Opt-in, so every existing modal renders exactly as before.
+   */
+  icon?: string;
   /**
    * When true, the body slot renders edge-to-edge with no padding and no
    * scroll — use for fullscreen media viewers that want the content to
@@ -166,19 +173,24 @@ useFullscreenOverlay(toRef(props, 'open'), close);
             :style="safeAreaStyle"
             @click.stop
           >
-            <!-- Header -->
+            <!-- Header. With `icon`, a tinted title band: the tint variables carry their own
+                 dark values (style.css), so the band needs no separate dark partner. -->
             <div
               v-if="title || $slots.header"
               class="shrink-0"
-              :class="
+              :class="[
                 customHeader
                   ? ''
-                  : 'dark:border-line flex items-center justify-between border-b border-gray-200 px-6 py-4'
-              "
+                  : 'dark:border-line flex items-center justify-between border-b border-gray-200 px-6 py-4',
+                icon && !customHeader ? 'bg-[var(--tint-orange-8)]' : '',
+              ]"
               :style="fullscreenHeaderStyle"
             >
               <slot name="header">
-                <h2 class="dark:text-ink text-lg font-semibold text-gray-900">
+                <ModalIconTitle v-if="icon" :icon="icon" icon-bg="var(--tint-orange-15)">
+                  {{ title }}
+                </ModalIconTitle>
+                <h2 v-else class="dark:text-ink text-lg font-semibold text-gray-900">
                   {{ title }}
                 </h2>
               </slot>

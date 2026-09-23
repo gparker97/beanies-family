@@ -29,6 +29,7 @@ const { state, handleVerified, handleCancelled } = useReauth();
     v-if="state.member"
     :open="state.open"
     :title="t((state.titleKey ?? 'reauth.title') as never)"
+    icon="🔐"
     size="sm"
     layer="overlay"
     @close="handleCancelled"

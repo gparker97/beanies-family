@@ -3926,6 +3926,11 @@ const STRING_DEFS = {
     beanie:
       'you’re no longer a member of this family, so its sign-in has been cleared from this device. ask a family manager if this is a mistake.',
   },
+  'reauth.passkeyWaiting': {
+    en: 'Checking it\u2019s you with your passkey\u2026',
+    beanie: 'checking it\u2019s you with your passkey\u2026',
+  },
+  'pin.useInstead': { en: 'Use PIN Instead?', beanie: 'use pin instead?' },
   'passkey.signInError': {
     en: 'Biometric sign-in failed. Please try with your PIN.',
     beanie: 'biometric sign-in failed. please try with your pin.',
@@ -4188,9 +4193,8 @@ const STRING_DEFS = {
       "your family passphrase decrypts this beanpod on this device. we never see it and can't recover it.",
   },
   'loginV6.unlockFooterEither': {
-    en: "Either one decrypts this beanpod on this device. We never see it and can't recover it.",
-    beanie:
-      "either one decrypts this beanpod on this device. we never see it and can't recover it.",
+    en: 'Your data is encrypted. We never see it.',
+    beanie: 'your data is encrypted. we never see it.',
   },
   // ⚠️ ONE title, deliberately. This card greets anyone who opened a beanpod that is not
   // theirs, and the advice ("ask the owner for an invite") is the same whatever the file
@@ -5733,17 +5737,23 @@ const STRING_DEFS = {
     en: 'This lets another device open your family’s beanpod.',
     beanie: 'this lets another device open your family’s beanpod.',
   },
-  'deviceApproval.compareOnBoth': {
-    en: 'Approve only if the other device shows these same characters.',
-    beanie: 'approve only if the other device shows these same characters.',
-  },
   'deviceApproval.compareHint': {
     en: 'Check this matches the code on the other device.',
     beanie: 'check this matches the code on the other device.',
   },
   'deviceApproval.approve': { en: 'Yes, Let It In', beanie: 'yes, let it in' },
-  'deviceApproval.reject': { en: 'No, That\u2019s Not Me', beanie: 'no, that\u2019s not me' },
-  'deviceApproval.waiting': { en: 'Waiting for approval', beanie: 'waiting for approval' },
+  'deviceApproval.reject': {
+    en: 'Sorry, I Don\u2019t Know This Beanie',
+    beanie: 'sorry, i don\u2019t know this beanie',
+  },
+  'deviceApproval.waiting': {
+    en: 'Waiting for approval (this may take up to 30 seconds)',
+    beanie: 'waiting for approval (this may take up to 30 seconds)',
+  },
+  'deviceApproval.passkeyWaiting': {
+    en: 'Approving with your passkey.',
+    beanie: 'approving with your passkey.',
+  },
   'deviceApproval.qrAlt': {
     en: 'Code for a signed-in device to scan',
     beanie: 'code for a signed-in device to scan',
@@ -5865,13 +5875,17 @@ const STRING_DEFS = {
     beanie:
       'this code has to be approved from a device that’s signed in. open the beanies app and try scanning again from there.',
   },
-  'deviceApproval.doneTitle': { en: 'Device Approved', beanie: 'device approved' },
+  'deviceApproval.doneTitle': { en: 'Login Approved!', beanie: 'login approved!' },
+  // ONE body for both end states (saved, and saved-but-unconfirmed): either way the other
+  // device only picks the approval up on its next check of the family file, which is what
+  // greg saw take 5-10 seconds while this screen already said it was done.
   'deviceApproval.doneBody': {
-    en: 'The other device should be signing in now.',
-    beanie: 'the other device should be signing in now.',
+    en: 'It may take up to 30 seconds for the other device to pick up the approval. Please be patient.',
+    beanie:
+      'it may take up to 30 seconds for the other device to pick up the approval. please be patient.',
   },
   // ⚠️ NEITHER STRING NAMES A BUTTON. The first draft said "Tap Approve to try again" — but
-  // the approve button reads "Yes, I Scanned This and the Codes Match" on every transport
+  // the approve button reads "The Codes Match, Let In My Beanie!" on every transport
   // except an in-app scan, so it named a control nobody could find, which is the exact
   // defect the comment on `provenanceBody` condemns.
   'deviceApproval.pinRequired': {
@@ -5890,15 +5904,9 @@ const STRING_DEFS = {
     en: 'Opening your family data on this device\u2026',
     beanie: 'opening your family data on this device\u2026',
   },
-  'deviceApproval.pendingTitle': { en: 'Device Approved', beanie: 'device approved' },
-  'deviceApproval.pendingBody': {
-    en: 'The approval is still saving to your family file. The other device will pick it up as soon as it lands \u2014 you can close this.',
-    beanie:
-      'the approval is still saving to your family file. the other device will pick it up as soon as it lands \u2014 you can close this.',
-  },
   'deviceApproval.approveChecked': {
-    en: 'Yes, I Scanned This and the Codes Match',
-    beanie: 'yes, i scanned this and the codes match',
+    en: 'The Codes Match, Let In My Beanie!',
+    beanie: 'the codes match, let in my beanie!',
   },
   // The promoted block on the unstaged cold surfaces (`cards`, `reconnect`). `coldEntry.` is an
   // important prefix in `uiStrings.test.ts`, so these `beanie` values keep the real nouns
@@ -5906,22 +5914,18 @@ const STRING_DEFS = {
   // joke must still be able to act correctly on a sign-in screen.
   'coldEntry.fastestFlag': { en: 'Fastest', beanie: 'fastest' },
   'coldEntry.scanFirstTitle': {
-    en: 'Scan a Magic Link',
-    beanie: 'scan a magic link',
+    en: 'Use a Magic Link',
+    beanie: 'use a magic link',
   },
   'coldEntry.scanFirstWhy': {
-    en: 'Already signed in on another device? It can let this one straight in, with no password and no recovery code.',
+    en: 'If you\u2019re already signed in on another device, generate a magic link and use it to sign in this device.',
     beanie:
-      'already signed in on another device? it can let this one straight in, with no password and no recovery code.',
+      'if you\u2019re already signed in on another device, generate a magic link and use it to sign in this device.',
   },
   'coldEntry.or': { en: 'or', beanie: 'or' },
   'coldEntry.scanTitle': {
-    en: 'Use a Device You\u2019re Signed In On',
-    beanie: 'use a device you\u2019re signed in on',
-  },
-  'coldEntry.scanLead': {
-    en: 'Scan this with a device that\u2019s already signed in.',
-    beanie: 'scan this with a device that\u2019s already signed in.',
+    en: 'Scan This Code With a Device Where You\u2019re Already Signed In',
+    beanie: 'scan this code with a device where you\u2019re already signed in',
   },
   'recovery.beforeYouGo': { en: 'Before You Go', beanie: 'before you go' },
   'recovery.kitAcknowledge': {
@@ -6142,8 +6146,8 @@ const STRING_DEFS = {
   //
   // greg's terms, fixed: a MAGIC LINK signs you in; a JOINING LINK joins you to a family.
   'magicLink.pastePrompt': {
-    en: 'Have a link? Paste it here',
-    beanie: 'have a link? paste it here',
+    en: 'Have a magic link? Paste it here',
+    beanie: 'have a magic link? paste it here',
   },
   'magicLink.pasteLabel': {
     en: 'Paste a beanies link',

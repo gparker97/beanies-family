@@ -180,7 +180,7 @@ describe('LoadPodView — cold credential surface', () => {
     const text = w.text().toLowerCase();
     expect(text).toContain('password or family passphrase');
     // ...and it must not fall back to either single-credential wording.
-    expect(text).toContain('either one decrypts this beanpod');
+    expect(text).toContain('your data is encrypted. we never see it.');
     expect(text).not.toContain('your password decrypts this beanpod');
   });
 
