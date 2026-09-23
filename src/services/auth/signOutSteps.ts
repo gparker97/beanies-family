@@ -14,8 +14,6 @@
  * exceptions, by the unit test):
  *   - `resetDocClient` runs in tier 2 only — tier 3's `deleteFamilyDb` →
  *     `clearCache` resets the worker doc anyway; running both is redundant churn.
- *   - `reArmTrustPrompt` runs on the UNTRUSTED tier 2 only — tier 3 sets the trust
- *     flag itself (`untrustDevice`), which supersedes re-arming the prompt.
  *
  * Every step is individually caught by the runner: a hung Drive call or broken
  * IndexedDB must never block the sign-out (a user who can't sign out is much worse
@@ -111,6 +109,10 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'resolveFamilyId',
   'deleteFamilyDb',
   'untrustDevice',
+  // Right after `untrustDevice`, which marks the trust question ANSWERED as a side effect
+  // of `setTrustedDevice(false)`. Without the re-arm, the next person to sign in on a
+  // wiped device would never be asked whether to trust it (2026-09-23: "always ask").
+  'reArmTrustPrompt',
   'clearKeyCacheAll',
   'removePinWrapsAll',
   'reclaimAllPasskeys',
@@ -159,6 +161,38 @@ export const SIGN_OUT_EVICTED_STEPS: readonly SignOutStepName[] = [
     SIGN_OUT_EVICTION_LOCK_STEPS.indexOf('clearKeyCacheFamily') + 1
   ),
 ];
+
+/**
+ * Every step that removes this device's ability to open a pod unattended (2026-09-23).
+ * The sign-out kit guard asks `dropsKeyMaterial` rather than re-deriving "is this the
+ * untrusted tier", so the guard and the teardown can never disagree. A new step that
+ * drops a key, wrap, or the family itself MUST be added here, or the guard will let a
+ * manager with an unsaved recovery kit sign out of their only way back in.
+ */
+export const KEY_MATERIAL_STEPS: ReadonlySet<SignOutStepName> = new Set<SignOutStepName>([
+  'clearKeyCacheFamily',
+  'clearKeyCacheAll',
+  'removePinWrapsFamily',
+  'removePinWrapsAll',
+  'forgetLocalFamily',
+]);
+
+/** Whether running these steps leaves this device unable to reopen the pod unattended. */
+export function dropsKeyMaterial(steps: readonly SignOutStepName[]): boolean {
+  return steps.some((s) => KEY_MATERIAL_STEPS.has(s));
+}
+
+/** The user-facing menu sign-out tiers: a keep-data sign-out, or the clear-all option. */
+export type SignOutTier = 'sign-out' | 'clear';
+
+/**
+ * The ONE place a user-facing sign-out picks its step list. `authStore.signOut` /
+ * `signOutAndClearData` and the kit guard (`useSignOut`) all select through it.
+ */
+export function signOutStepsFor(tier: SignOutTier, trusted: boolean): readonly SignOutStepName[] {
+  if (tier === 'clear') return SIGN_OUT_CLEAR_STEPS;
+  return trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS;
+}
 
 export type SignOutStepImpls = Record<SignOutStepName, () => Promise<void> | void>;
 

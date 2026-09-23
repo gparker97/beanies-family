@@ -476,3 +476,67 @@ export function emitLaunchUrlReplaySuppressed(): void {
     action: 'launch_url_replay_suppressed',
   });
 }
+
+// ── Device trust + the sign-out kit guard (2026-09-23) ─────────────────────────────
+
+export type DeviceTrustSource = 'create' | 'join' | 'prompt' | 'settings' | 'signout-tick';
+
+/**
+ * The device's trust flag was written (success path only; the single failure record is
+ * the error toast's report, `device_trust_set_failed`). `was` is read BEFORE the write:
+ * `create`/`join` with `was:declined` counts how often create or join overrides an
+ * explicit "don't trust" made on this device for another family.
+ */
+export function emitDeviceTrustSet(payload: {
+  source: DeviceTrustSource;
+  trusted: boolean;
+  was: 'trusted' | 'declined' | 'unset';
+}): void {
+  emit('info', 'device_trust_set', {
+    action: payload.source,
+    kind: payload.trusted ? 'on' : 'off',
+    detail: `was:${payload.was}`,
+  });
+}
+
+/**
+ * A post-sign-in auth prompt was shown. `slotBypassed` is true when the prompt is the
+ * unpreemptable trust question and another surface already held the interruption slot.
+ * "Always ask" is measurable from this: every untrusted first sign-in produces a
+ * `kind: 'trust'` shown event.
+ */
+export function emitAuthPromptShown(id: string, slotBypassed: boolean): void {
+  emit('info', 'auth_prompt_shown', {
+    action: 'shown',
+    kind: id,
+    detail: slotBypassed ? 'slot:bypassed' : 'slot:claimed',
+  });
+}
+
+/**
+ * One confirmed menu sign-out was checked against the kit guard. `trusted` is the trust
+ * the user CHOSE on the confirm's tick (the guard is decided before the tick is applied).
+ */
+export function emitKitGuard(payload: {
+  shown: boolean;
+  tier: 'sign-out' | 'clear';
+  trusted: boolean;
+  via: 'saved' | 'acknowledged' | 'legacy' | 'none';
+  passphrase: boolean;
+}): void {
+  emit('info', 'kit_guard', {
+    action: payload.shown ? 'shown' : 'skipped',
+    kind: payload.tier,
+    detail: `${payload.trusted ? 'trusted' : 'untrusted'}+via:${payload.via}+pp:${payload.passphrase ? 1 : 0}`,
+  });
+}
+
+/** How a shown kit guard was resolved. `sign_out_anyway` is the one to alert on later. */
+export function emitKitGuardOutcome(outcome: 'kit_saved' | 'sign_out_anyway' | 'cancelled'): void {
+  emit(outcome === 'sign_out_anyway' ? 'warn' : 'info', 'kit_guard_outcome', { action: outcome });
+}
+
+/** A confirmed recovery kit did not reach the family file (confirm push or a retry). */
+export function emitKitConfirmNotSynced(): void {
+  emit('warn', 'kit_confirm_not_synced', { action: 'kit_confirm_not_synced' });
+}
