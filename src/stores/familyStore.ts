@@ -11,15 +11,43 @@ import { refreshRosterCache } from '@/services/auth/rosterCache';
 import { reconcileDeviceKeysWithRoster } from '@/services/auth/passkeyService';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { computeInitials } from '@/utils/memberInitials';
+import { sameAccount } from '@/utils/email';
 import { isBlankMemberColor } from '@/constants/memberColors';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { REQUIRED_EPOCH } from '@/services/pod/podSoak';
 import { APP_VERSION } from '@/constants/appVersion';
+import {
+  getAllRemovedMembers,
+  removeMemberAndRecord,
+} from '@/services/automerge/repositories/removedMemberRepository';
+import {
+  membersWithDeviceCredentials,
+  retireMemberDeviceCredentials,
+} from '@/services/auth/deviceCredentials';
+import type { SessionRejectionKind } from '@/stores/authStore';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
   UpdateFamilyMemberInput,
 } from '@/types/models';
+
+/**
+ * What `deleteMember` did (tracker #77). A discriminated union so an impossible mix
+ * (`removed: false` with a save status) cannot be represented.
+ *
+ * `drive: 'manual-check'` means the family should confirm by hand that the person no
+ * longer has the file shared with them: either a Drive delete failed, or nothing matched —
+ * and a Drive share targets whatever address was typed into the invite, which the app never
+ * stored, so "nothing matched" is not proof of revocation.
+ */
+export type MemberRemovalOutcome =
+  | { removed: false; refusal: 'offline' | 'not-found' | 'error' }
+  | {
+      removed: true;
+      save: 'saved' | 'pending';
+      drive: 'revoked' | 'not-applicable' | 'manual-check';
+      manualCheckEmail: string | null;
+    };
 
 export const useFamilyStore = defineStore('family', () => {
   // State
@@ -37,6 +65,12 @@ export const useFamilyStore = defineStore('family', () => {
    * `reconcileDeviceKeysWithRoster`, where a mismatch drops the pass.
    */
   const rosterFamilyId = ref<string | null>(null);
+  /**
+   * Members this pod records as REMOVED (tracker #77), loaded with the roster. The
+   * authenticated fact every destructive eviction step keys on — never mere absence from
+   * `members`, which a half-loaded roster would also produce.
+   */
+  const removedMemberIds = ref<ReadonlySet<string>>(new Set());
 
   // Getters
   const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
@@ -150,6 +184,52 @@ export const useFamilyStore = defineStore('family', () => {
     );
   });
 
+  // A member this device holds credentials for was REMOVED (#77): retire those credentials
+  // here too — the remover's other devices, a shared family tablet. Per-member only, and
+  // NOT through `authStore.evictRemovedMember`: this is housekeeping, it never forgets a
+  // family, and sharing that function's single-flight would let a watcher run swallow a
+  // sign-in gate's eviction. Its own watcher, not part of the roster one above, which has
+  // partial-paint rules this does not need: the removal record is authoritative.
+  //
+  // Watches the family id TOO, and tracks what it has already handled per family: the
+  // removal set is republished on every load, so diffing against `previous` would either
+  // miss a set published before its family id (the first load) or rescan every historical
+  // removal on every boot.
+  const removalsHandledHere = new Set<string>();
+  watch([removedMemberIds, rosterFamilyId], async ([removed, familyId]) => {
+    if (!familyId || removed.size === 0) return;
+    const fresh = [...removed].filter((id) => !removalsHandledHere.has(`${familyId}:${id}`));
+    if (fresh.length === 0) return;
+    try {
+      const holders = await membersWithDeviceCredentials(familyId);
+      const toRetire = fresh.filter((id) => holders.has(id));
+      for (const memberId of toRetire) await retireMemberDeviceCredentials(familyId, memberId);
+      // Marked only once handled, so a failed scan is retried on the next publish.
+      for (const id of fresh) removalsHandledHere.add(`${familyId}:${id}`);
+      if (toRetire.length > 0) {
+        logEvent({
+          level: 'info',
+          surface: 'device-eviction',
+          message: 'evicted',
+          context: {
+            action: 'evicted',
+            kind: 'member',
+            stage: 'removed-watch',
+            count: toRetire.length,
+          },
+        });
+      }
+    } catch (e) {
+      reportError({
+        surface: 'device-eviction',
+        message: 'could not retire a removed member’s credentials on this device',
+        error: e,
+        severity: 'warning',
+        context: { action: 'removed_watch_failed', count: fresh.length },
+      });
+    }
+  });
+
   // Diagnostic: track permission changes on currentMember
   watch(currentMember, (newMember, oldMember) => {
     if (!oldMember || !newMember) return;
@@ -260,9 +340,13 @@ export const useFamilyStore = defineStore('family', () => {
   type MemberResolution =
     | { kind: 'use'; id: string }
     | { kind: 'none' } // no session member — the legitimate signup / pre-login bootstrap
-    | { kind: 'reject' }; // an authenticated session names a member who is not here
+    | { kind: 'reject' } // an authenticated session names a member who is not here
+    | { kind: 'removed' }; // …and the pod records that member as removed (#77)
 
-  async function resolveSessionMember(roster: FamilyMember[]): Promise<MemberResolution> {
+  async function resolveSessionMember(
+    roster: FamilyMember[],
+    removed: ReadonlySet<string>
+  ): Promise<MemberResolution> {
     try {
       const { useAuthStore } = await import('@/stores/authStore');
       const authStore = useAuthStore();
@@ -301,8 +385,10 @@ export const useFamilyStore = defineStore('family', () => {
         return { kind: 'use', id: sessionMemberId };
       }
       // Present, authenticated, and naming somebody who is not in the pod. Never fall
-      // through to the owner — that IS the escalation this exists to stop.
-      return authStore.isAuthenticated ? { kind: 'reject' } : { kind: 'none' };
+      // through to the owner — that IS the escalation this exists to stop. A member the
+      // pod records as removed is its own, EXPECTED, case (#77) — not an integrity event.
+      if (!authStore.isAuthenticated) return { kind: 'none' };
+      return removed.has(sessionMemberId) ? { kind: 'removed' } : { kind: 'reject' };
     } catch {
       // authStore not constructed yet (boot ordering) — same as "no session member".
       return { kind: 'none' };
@@ -329,9 +415,7 @@ export const useFamilyStore = defineStore('family', () => {
    * those as integrity rejections drowns the single metric that means somebody edited a
    * session. Both still end the session — they just say why.
    */
-  async function rejectSession(
-    reason: 'unknown-member' | 'roster-switched' | 'self-removed' = 'unknown-member'
-  ): Promise<void> {
+  async function rejectSession(reason: SessionRejectionKind = 'unknown-member'): Promise<void> {
     currentMemberId.value = null;
     const { useAuthStore } = await import('@/stores/authStore');
     useAuthStore().invalidateSession(reason);
@@ -365,34 +449,72 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  /**
+   * Act on a session resolution. Returns true when it settled `currentMemberId` (so the
+   * caller stops), false for `none`. The ONE place the use/reject/removed handling lives —
+   * both `loadMembers` branches used to carry their own copy.
+   */
+  async function applyResolution(resolved: MemberResolution): Promise<boolean> {
+    if (resolved.kind === 'use') {
+      currentMemberId.value = resolved.id;
+      return true;
+    }
+    if (resolved.kind === 'removed') {
+      // Removal, not tampering (#77). The device eviction this leaves pending runs from the
+      // sign-in surface — NOT here, mid-load, where post-load housekeeping would re-arm a
+      // family torn down underneath it.
+      await rejectSession('member-removed');
+      return true;
+    }
+    if (resolved.kind === 'reject') {
+      await rejectSession(await classifyRosterRejection());
+      return true;
+    }
+    return false;
+  }
+
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
       // Captured BEFORE the read, so it names the family whose doc was actually read.
       const readForFamilyId = getActiveFamilyId();
-      const loaded = await familyRepo.getAllFamilyMembers();
+      const removed = new Set((await getAllRemovedMembers()).map((r) => r.id));
+      const loadedRaw = await familyRepo.getAllFamilyMembers();
+      // A row whose id the pod records as REMOVED is a resurrection (a concurrent
+      // delete/patch race — automergeRepository.ts) and never a member. Filtered BEFORE
+      // `normalizeRoles`, so a removed row can never be promoted or patched.
+      const loaded = loadedRaw.filter((m) => !removed.has(m.id));
+      if (loaded.length !== loadedRaw.length) {
+        logEvent({
+          level: 'warn',
+          surface: 'family-roster',
+          message: 'removed_member_row_filtered',
+          context: {
+            action: 'removed_member_row_filtered',
+            count: loadedRaw.length - loaded.length,
+          },
+        });
+      }
       const roster = await normalizeRoles(loaded);
       // Resolve the session member BEFORE publishing the roster. Assigning members.value
       // first left a tick where the roster existed but currentMemberId was still null,
       // and usePermissions (which now refuses to read the session `role` once a roster
       // exists) reported the owner as a non-owner for that tick — the Piggy Bank nav
       // vanished and the canViewFinances true->false diagnostic fired on every boot.
-      const resolvedForRoster = currentMemberId.value ? null : await resolveSessionMember(roster);
+      const resolvedForRoster = currentMemberId.value
+        ? null
+        : await resolveSessionMember(roster, removed);
       members.value = roster;
       rosterFamilyId.value = readForFamilyId;
+      // With the roster and its family, never before: the removed-members watcher needs to
+      // know which family these removals belong to.
+      removedMemberIds.value = removed;
       logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
       if (!currentMemberId.value) {
-        const resolved = resolvedForRoster ?? (await resolveSessionMember(members.value));
-        if (resolved.kind === 'use') {
-          currentMemberId.value = resolved.id;
-          return;
-        }
-        if (resolved.kind === 'reject') {
-          await rejectSession(await classifyRosterRejection());
-          return;
-        }
+        const resolved = resolvedForRoster ?? (await resolveSessionMember(members.value, removed));
+        if (await applyResolution(resolved)) return;
         // No session member at all: the legitimate signup / pre-login bootstrap.
         // NOT reachable after a rejection — `sessionRejected` stays true until a real
         // sign-in, so a rejected session cannot be handed the owner's row on the next
@@ -401,15 +523,7 @@ export const useFamilyStore = defineStore('family', () => {
           currentMemberId.value = owner.value.id;
         }
       } else if (!members.value.some((m) => m.id === currentMemberId.value)) {
-        const resolved = await resolveSessionMember(members.value);
-        if (resolved.kind === 'use') {
-          currentMemberId.value = resolved.id;
-          return;
-        }
-        if (resolved.kind === 'reject') {
-          await rejectSession(await classifyRosterRejection());
-          return;
-        }
+        if (await applyResolution(await resolveSessionMember(members.value, removed))) return;
         // An EMPTY roster is "the doc did not load", not "your member was removed" — the
         // same reasoning `resolveSessionMember` uses to return `none` rather than reject.
         // Nulling here anyway cost a signed-in non-owner `canEditActivities` and
@@ -432,6 +546,21 @@ export const useFamilyStore = defineStore('family', () => {
         currentMemberId.value = null;
       }
     });
+  }
+
+  /**
+   * The ONE classifier of "is this member still here" (#77), used by the session
+   * resolution and by `authStore.gateProvenMember`. `removed` only when the pod records the
+   * removal; a member merely missing from the roster is `absent`, which proves nothing.
+   */
+  function memberStatus(id: string): 'live' | 'removed' | 'absent' {
+    if (removedMemberIds.value.has(id)) return 'removed';
+    return members.value.some((m) => m.id === id) ? 'live' : 'absent';
+  }
+
+  /** Deselect the current member without choosing another (a removed member's unlock). */
+  function clearCurrentMember(): void {
+    currentMemberId.value = null;
   }
 
   async function createMember(input: CreateFamilyMemberInput): Promise<FamilyMember | null> {
@@ -532,117 +661,215 @@ export const useFamilyStore = defineStore('family', () => {
     return next;
   }
 
-  async function deleteMember(id: string): Promise<boolean> {
-    const result = await wrapAsync(isLoading, error, async () => {
-      // ⚠️ REVOKE BEFORE THE ROW GOES. Removing a member is the product's primary
-      // "revoke access" action, and without this their saved magic link keeps unwrapping
-      // the FAMILY key for up to 7 days — full plaintext of the pod from any device.
-      // Worse, it becomes permanently unrevocable the moment the row disappears:
-      // `unclaimMember` early-returns `memberNotFound`, and `MagicLinkCard` only ever
-      // mints for the CURRENT user, so no code path can write the tombstone afterwards.
-      // Awaited: it merges before stamping so an unseen remote mint cannot out-date the
-      // tombstone, then publishes it. Failure never blocks the deletion (see the catch).
-      try {
-        const { useSyncStore } = await import('./syncStore');
-        const revoked = await useSyncStore().revokeMemberLink(id);
-        if (!revoked) {
-          // ⚠️ CHECK THE BOOLEAN. `revokeMemberLink` catches internally and returns false
-          // rather than throwing, so the catch below can no longer fire for the case that
-          // matters. False here is precisely the state where the member's 7-day wrap is
-          // still live AND is about to become unrevocable, because the row this code is
-          // about to delete is the only thing any later revoke could key on.
-          reportError({
-            surface: 'login-flow',
-            message: 'member removed while their magic link was still live — now unrevocable',
-            severity: 'critical',
-            context: { action: 'delete_member_link_not_revoked' },
-          });
-        }
-      } catch (e) {
-        // Never block the deletion on this — but never let it be silent either.
+  /**
+   * Remove a member from the family and revoke their access (tracker #77).
+   *
+   * In order — each step's reason is load-bearing:
+   *  1. refuse a member that does not exist;
+   *  2. refuse in a Google Drive family that cannot durably save right now (offline): a
+   *     revocation that never reaches the file has not happened, and nothing has changed yet;
+   *  3. snapshot what the Drive step needs, before the row goes;
+   *  4. `observeRemote()` — the one pre-merge, so the magic-link stamp beats any remote mint
+   *     this device never saw. OUTSIDE `wrapAsync`: it is a 20s credential save;
+   *  5. stage the magic-link overwrite (kept for OLD clients, which ignore `revokedKeys`);
+   *  6. delete the row and record the removal in ONE change (the authenticated fact every
+   *     eviction keys on). Row first: `healStaleWrappedKey` re-wraps a missing entry while
+   *     the row exists — though the `member:` tombstone makes the order robust anyway;
+   *  7. tombstone every wrap attributed to them, and every invite;
+   *  8. drop their Drive refresh-token copy and this device's credentials for them;
+   *  9. ONE durable save (credential budget);
+   * 10. remove their Google Drive access to the file and folder.
+   */
+  async function deleteMember(id: string): Promise<MemberRemovalOutcome> {
+    const target = members.value.find((m) => m.id === id);
+    if (!target) return refuse('not-found', id);
+
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    const isDrive = syncStore.storageProviderType === 'google_drive';
+    if (isDrive && !syncStore.canDurablySaveNow()) return refuse('offline', id);
+
+    const familyId = getActiveFamilyId();
+    const actorId = currentMemberId.value;
+    const remaining = members.value.filter((m) => m.id !== id);
+    const snapshot = { email: target.email, googleAccountEmail: target.googleAccountEmail };
+
+    await syncStore.observeRemote();
+
+    const staged = await wrapAsync(isLoading, error, async () => {
+      syncStore.stageMemberLinkTombstone(id);
+      if (!(await removeMemberRow(id, { recordRemoval: true, removedBy: actorId }))) return null;
+      const retired = syncStore.retireMemberKeyMaterial(id, 'remove');
+      await removeDriveConnectionIfUnshared(snapshot.googleAccountEmail, remaining);
+      if (familyId) await retireMemberDeviceCredentials(familyId, id);
+      return retired;
+    });
+    if (staged === undefined) return { removed: false, refusal: 'error' }; // wrapAsync toasted
+    if (staged === null) return refuse('not-found', id);
+
+    const saveStatus = await syncStore.syncNowDurable(syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS);
+    if (saveStatus !== 'saved') {
+      // NOT critical: the staged changes are not rolled back and ride the next save, and a
+      // timeout here is usually a slow upload that will still land (see the note on
+      // `revokeMemberLink`: paging on a timeout paged on-call for revocations that worked).
+      logEvent({
+        level: 'warn',
+        surface: 'member-removal',
+        message: 'removal_not_published',
+        context: { action: 'removal_not_published', save_status: saveStatus },
+      });
+      if (saveStatus === 'failed') {
         reportError({
-          surface: 'login-flow',
-          message: 'magic link revoke failed during member deletion',
-          severity: 'critical',
-          error: e,
-          context: { action: 'delete_member_link_revoke_failed' },
+          surface: 'member-removal',
+          message: 'member removed on this device but the save to the family file failed',
+          severity: 'warning',
+          context: { action: 'removal_not_published', save_status: saveStatus },
         });
       }
+    }
 
-      const success = await familyRepo.deleteFamilyMember(id);
-      if (success) {
-        members.value = members.value.filter((m) => m.id !== id);
-        if (currentMemberId.value === id) {
-          // Self-removal. Do NOT inherit the owner's row (#80): deletion is gated on
-          // canManagePod, and the call-site guard only blocks deleting THE OWNER — so a
-          // non-owner manager who removed their own bean used to land on the owner's
-          // record and read as owner. This session is simply over.
-          currentMemberId.value = null;
-          const { useAuthStore } = await import('@/stores/authStore');
-          const authStore = useAuthStore();
-          // Unauthenticated self-delete is the signup-time CreateMembersStep path — it
-          // just clears, exactly as before, minus the owner inheritance.
-          // `self-removed`, not `unknown-member`: the member chose this. Reporting a
-          // deliberate departure as an integrity rejection is what makes the tamper
-          // metric unreadable.
-          if (authStore.isAuthenticated) authStore.invalidateSession('self-removed');
-        }
-        await invalidateDeviceCredentials(id);
-      }
-      return success;
+    let drive: 'revoked' | 'not-applicable' | 'manual-check' = 'not-applicable';
+    let manualCheckEmail: string | null = null;
+    let driveKind = 'not-applicable';
+    if (isDrive && syncStore.driveFileId) {
+      const [{ driveRevocationCandidates, revokeMemberDriveAccess }, { getGoogleAccountEmail }] =
+        await Promise.all([
+          import('@/services/google/driveAccessRevocation'),
+          import('@/services/google/googleAuth'),
+        ]);
+      const emails = driveRevocationCandidates(
+        snapshot,
+        remaining,
+        getGoogleAccountEmail(),
+        actorId === id
+      );
+      driveKind = await revokeMemberDriveAccess({ fileId: syncStore.driveFileId, emails });
+      drive = driveKind === 'revoked' ? 'revoked' : 'manual-check';
+      if (drive === 'manual-check') manualCheckEmail = emails[0] ?? null;
+    }
+
+    logEvent({
+      level: 'info',
+      surface: 'member-removal',
+      message: 'removal_outcome',
+      context: {
+        action: 'remove',
+        save_status: saveStatus,
+        kind: driveKind,
+        count: staged.tombstonesWritten,
+        provider_type: syncStore.storageProviderType ?? 'none',
+        member_id_tail: id.slice(-8),
+      },
     });
-    return result ?? false;
+    return {
+      removed: true,
+      save: saveStatus === 'saved' ? 'saved' : 'pending',
+      drive,
+      manualCheckEmail,
+    };
   }
 
   /**
-   * Retire a removed member's biometric/passkey credentials on THIS device.
-   *
-   * Lives here, in the orchestrator, rather than at the three view call sites
-   * (CreateMembersStep / BeanDetailPage / MeetTheBeansPage): views must not call services
-   * (MVO), and putting it at the call sites would triplicate it and leak on any fourth
-   * path added later.
-   *
-   * Deliberately non-fatal. A keystore failure must NOT block the deletion or flip
-   * `deleteMember`'s return value — the member row is already gone, and reporting `false`
-   * for a deletion that happened would be a worse lie than a stale credential. It is
-   * wrapped INSIDE `wrapAsync`'s success branch for the same reason: `wrapAsync` already
-   * toasts and sets `error` on any throw, so an unguarded throw here would both
-   * double-toast and mis-report the outcome.
-   *
-   * SCOPE: this reaches only credentials enrolled on this device — the passkey registry is
-   * device-local. Revoking a removed member's access on THEIR devices, and their ability
-   * to decrypt the pod at all, is tracker #77.
+   * Undo a member added moments ago during onboarding (`CreateMembersStep`), before anyone
+   * could have been invited. No pre-gate, no tombstones, no Drive, no durable save — there
+   * is nothing to revoke — so it REFUSES a member who holds anything that says otherwise.
+   * A member invited but not yet joined is not a draft: their Drive share and invite exist
+   * from the moment of the invite, and they go through `deleteMember`.
    */
-  async function invalidateDeviceCredentials(memberId: string): Promise<void> {
-    try {
-      const { removeAllPasskeysForMember } = await import('@/services/auth/passkeyService');
-      await removeAllPasskeysForMember(memberId);
-    } catch (e) {
-      reportError({
-        surface: 'member-removal',
-        message: 'failed to invalidate device credentials for a removed member',
-        error: e,
-        severity: 'warning',
-        context: { action: 'invalidate_credentials', member_id_tail: memberId.slice(-8) },
-      });
+  async function discardDraftMember(id: string): Promise<boolean> {
+    const target = members.value.find((m) => m.id === id);
+    if (!target) return false;
+    const { useSyncStore } = await import('./syncStore');
+    const hasWrap = useSyncStore().holdsKeyMaterialFor(id);
+    if (target.pinHash || target.passwordHash || target.lastLoginAt || hasWrap) {
+      refuse('not-draft', id);
+      return false;
     }
-    // The PIN device-unlock wrap is family-key material too: a removed member's PIN must
-    // stop unwrapping the family key on this device (review: it previously survived
-    // removal forever — only sign-out tiers and family deletion ever reclaimed it).
+    const removed = await wrapAsync(isLoading, error, () =>
+      removeMemberRow(id, { recordRemoval: false, removedBy: null })
+    );
+    if (!removed) return false;
+    const familyId = getActiveFamilyId();
+    if (familyId) await retireMemberDeviceCredentials(familyId, id);
+    logEvent({
+      level: 'info',
+      surface: 'member-removal',
+      message: 'draft_discarded',
+      context: { action: 'draft_discarded', member_id_tail: id.slice(-8) },
+    });
+    return true;
+  }
+
+  function refuse(
+    kind: 'offline' | 'not-found' | 'not-draft',
+    id: string
+  ): { removed: false; refusal: 'offline' | 'not-found' } {
+    logEvent({
+      level: 'warn',
+      surface: 'member-removal',
+      message: 'removal_refused',
+      context: { action: 'removal_refused', kind, member_id_tail: id.slice(-8) },
+    });
+    return { removed: false, refusal: kind === 'offline' ? 'offline' : 'not-found' };
+  }
+
+  /**
+   * Delete the member's row (optionally recording the removal in the same change) and
+   * end the session if it was their own. Shared by `deleteMember` and `discardDraftMember`.
+   */
+  async function removeMemberRow(
+    id: string,
+    opts: { recordRemoval: boolean; removedBy: string | null }
+  ): Promise<boolean> {
+    if (opts.recordRemoval) {
+      await removeMemberAndRecord(id, opts.removedBy);
+      // The caller retires this device's credentials itself; the watcher need not.
+      const familyId = rosterFamilyId.value;
+      if (familyId) removalsHandledHere.add(`${familyId}:${id}`);
+      removedMemberIds.value = new Set([...removedMemberIds.value, id]);
+    } else if (!(await familyRepo.deleteFamilyMember(id))) {
+      return false;
+    }
+    members.value = members.value.filter((m) => m.id !== id);
+    if (currentMemberId.value === id) {
+      // Self-removal. Do NOT inherit the owner's row (#80): deletion is gated on
+      // canManagePod, and the call-site guard only blocks deleting THE OWNER — so a
+      // non-owner manager who removed their own bean used to land on the owner's
+      // record and read as owner. This session is simply over.
+      currentMemberId.value = null;
+      const { useAuthStore } = await import('@/stores/authStore');
+      const authStore = useAuthStore();
+      // Unauthenticated self-delete is the signup-time CreateMembersStep path — it
+      // just clears, exactly as before, minus the owner inheritance.
+      // `self-removed`, not `unknown-member`: the member chose this. Reporting a
+      // deliberate departure as an integrity rejection is what makes the tamper
+      // metric unreadable.
+      if (authStore.isAuthenticated) authStore.invalidateSession('self-removed');
+    }
+    return true;
+  }
+
+  /**
+   * Drop the removed member's Drive refresh-token copy from the pod — unless a remaining
+   * member is bound to the same Google account. Never fatal: reported, not thrown.
+   */
+  async function removeDriveConnectionIfUnshared(
+    accountEmail: string | undefined,
+    remaining: readonly FamilyMember[]
+  ): Promise<void> {
+    if (!accountEmail) return;
+    if (remaining.some((m) => sameAccount(m.googleAccountEmail, accountEmail))) return;
     try {
-      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      const familyId = getActiveFamilyId();
-      if (familyId) {
-        const { removePinUnlock } = await import('@/services/auth/deviceUnlock');
-        await removePinUnlock(familyId, memberId);
-      }
+      const { removeDriveConnectionByAccount } =
+        await import('@/services/automerge/repositories/driveRepository');
+      await removeDriveConnectionByAccount(accountEmail);
     } catch (e) {
       reportError({
         surface: 'member-removal',
-        message: 'failed to remove the PIN unlock wrap for a removed member',
+        message: 'could not remove a removed member’s Drive token copy from the pod',
         error: e,
         severity: 'warning',
-        context: { action: 'invalidate_pin_wrap', member_id_tail: memberId.slice(-8) },
+        context: { action: 'drive_connection_remove_failed' },
       });
     }
   }
@@ -882,6 +1109,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   function resetState() {
     members.value = [];
+    removedMemberIds.value = new Set();
     rosterFamilyId.value = null;
     currentMemberId.value = null;
     isLoading.value = false;
@@ -912,9 +1140,10 @@ export const useFamilyStore = defineStore('family', () => {
     updateMember,
     learnAliases,
     deleteMember,
-    // Exported for `authStore.unclaimMember`: clearing a claim must take the device credentials
-    // with it, or a wrap outlives the PIN it belonged to — the orphan class ADR-029 exists for.
-    invalidateDeviceCredentials,
+    discardDraftMember,
+    removedMemberIds,
+    memberStatus,
+    clearCurrentMember,
     transferOwnership,
     setCurrentMember,
     preselectSessionMember,

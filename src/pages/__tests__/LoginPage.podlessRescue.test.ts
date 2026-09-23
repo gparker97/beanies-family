@@ -61,6 +61,7 @@ vi.mock('@/stores/familyContextStore', () => ({
 vi.mock('@/stores/familyStore', () => ({ useFamilyStore: () => ({ members: [] }) }));
 
 const authState = {
+  consumePendingRemovedEviction: async () => false,
   isInitialized: true,
   isAuthenticated: true,
   needsAuth: false,

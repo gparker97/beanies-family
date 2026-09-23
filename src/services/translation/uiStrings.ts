@@ -3244,8 +3244,29 @@ const STRING_DEFS = {
     beanie: 'cannot delete the owner account.',
   },
   'family.deleteConfirm': {
-    en: 'Are you sure you want to remove this family member?',
-    beanie: 'remove this member from your pod?',
+    en: 'They will lose access to your family’s data on every device from now on. Anything already saved on their own device stays with them.',
+    beanie:
+      'they will lose access to your family’s data on every device from now on. anything already saved on their own device stays with them.',
+  },
+  'family.removeDone': { en: 'Family member removed.', beanie: 'member removed.' },
+  'family.removeSavePending': {
+    en: 'Removed on this device. Other devices will see it the next time your family data saves.',
+    beanie:
+      'removed on this device. other devices will see it the next time your family data saves.',
+  },
+  'family.removeOfflineTitle': { en: 'You’re Offline', beanie: 'you’re offline' },
+  'family.removeOffline': {
+    en: 'Reconnect to remove a family member, so the removal reaches every device.',
+    beanie: 'reconnect to remove a family member, so the removal reaches every device.',
+  },
+  'family.removeDriveManualTitle': {
+    en: 'Check Google Drive Sharing',
+    beanie: 'check google drive sharing',
+  },
+  'family.removeDriveManual': {
+    en: 'We couldn’t confirm their access to your family file in Google Drive was removed. Open Google Drive, find your beanies.family folder, choose Share, and remove them there.',
+    beanie:
+      'we couldn’t confirm their access to your family file in google drive was removed. open google drive, find your beanies.family folder, choose share, and remove them there.',
   },
   'family.editFamilyName': { en: 'Edit family name', beanie: 'edit family name' },
   'family.createLogin': { en: 'Create Login', beanie: 'create login' },
@@ -3899,6 +3920,11 @@ const STRING_DEFS = {
   'passkey.registerError': {
     en: 'Failed to register biometric. Please try again.',
     beanie: 'failed to register biometric. please try again.',
+  },
+  'auth.memberRemoved': {
+    en: 'You’re no longer a member of this family, so its sign-in has been cleared from this device. Ask a family manager if this is a mistake.',
+    beanie:
+      'you’re no longer a member of this family, so its sign-in has been cleared from this device. ask a family manager if this is a mistake.',
   },
   'passkey.signInError': {
     en: 'Biometric sign-in failed. Please try with your PIN.',

@@ -344,6 +344,19 @@ export async function removeAllPasskeysForMember(memberId: string): Promise<void
 }
 
 /**
+ * Clear the keystore blob addressed to (familyId, memberId) even when this device holds no
+ * registry record for it — a blob that survived an uninstall and was never adopted (#77).
+ * `nativeDisable` is idempotent without a record. No-op off native.
+ */
+export async function removeNativeKeystoreForMember(
+  familyId: string,
+  memberId: string
+): Promise<void> {
+  if (!isNative()) return;
+  await nativeBiometric.nativeDisable(familyId, memberId);
+}
+
+/**
  * Signal to the platform authenticator that the given credential IDs are no
  * longer valid. Uses the WebAuthn Signal API (Chrome/Edge 132+, Safari 26+).
  */

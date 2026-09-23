@@ -105,14 +105,16 @@ async function handleAddMember() {
 
 async function handleRemoveMember(memberId: string) {
   formError.value = null;
-  const ok = await familyStore.deleteMember(memberId);
+  // A member added moments ago, before anyone could be invited: a draft, not a removal
+  // (#77) — no tombstones, no Drive, no durable save.
+  const ok = await familyStore.discardDraftMember(memberId);
   if (!ok) {
-    // No-silent-failures: deleteMember returns false on failure. Keep the row so
-    // the UI matches the pod, and report it (same discipline as the add path).
+    // No-silent-failures: discardDraftMember returns false on failure (and refuses a member
+    // who holds credentials). Keep the row so the UI matches the pod, and report it.
     formError.value = t('loginV6.removeMemberFailed');
     reportError({
       surface: 'createMembers.removeMember',
-      message: `deleteMember returned false for member ${memberId} on the create-finish surface`,
+      message: `discardDraftMember returned false for member ${memberId} on the create-finish surface`,
       severity: 'warning',
     });
     return;

@@ -15,12 +15,17 @@
  * becomes unusable — that's the divergence root cause we're closing. The
  * helpers below are the single source of truth for that merge.
  *
- * Known limitation: deletions don't propagate either direction. A revoked
- * passkey or wrappedKey on one device won't disappear from remote via this
- * merge — requires tombstones, tracked separately.
+ * Deletions: a plain union cannot express one, so a revoked wrap would be restored by the
+ * next merge. Revocations are therefore recorded as TOMBSTONES in `revokedKeys` (tracker
+ * #77) — a grow-only set merged by union — and every merge through `mergeEnvelopes` drops
+ * the entries they name (`applyRevokedKeys`). Removing an entry locally without a
+ * tombstone still does nothing durable.
+ *
+ * ⚠️ Keep this module PURE (no telemetry, no stores): the Automerge worker imports it
+ * (`worker/cache.ts`). Callers log what `mergeEnvelopes` reports.
  */
 
-import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import type { BeanpodFileV4, EnvelopeTombstone } from '@/types/syncFileV4';
 
 /**
  * The same envelope WITHOUT its encrypted payload.
@@ -90,8 +95,17 @@ export type EnvelopeKeyDictField = {
 export type MergeRule = 'local-wins' | 'newest-wins';
 
 /**
- * Every envelope wrap dict, how its collisions resolve, and whether the field is
- * REQUIRED on `BeanpodFileV4`.
+ * How an entry in a dict names the member it belongs to, for `member:<id>` tombstones:
+ *  - `'key'`            : the dict KEY is the memberId.
+ *  - `'value.memberId'` : the value carries an (optional) `memberId`.
+ *  - `null`             : family-scoped or unattributable — never touched by a member
+ *                         tombstone (only a slot tombstone can revoke these).
+ */
+export type MemberAttribution = 'key' | 'value.memberId' | null;
+
+/**
+ * Every envelope wrap dict, how its collisions resolve, whether the field is REQUIRED on
+ * `BeanpodFileV4`, and how its entries are attributed to a member (`attributedBy`).
  *
  * ⚠️ Adding a dict to `BeanpodFileV4` without adding it here is a TYPE ERROR —
  * `satisfies Record<EnvelopeKeyDictField, …>` demands every field be present. That is
@@ -115,23 +129,24 @@ export type MergeRule = 'local-wins' | 'newest-wins';
  */
 export const ENVELOPE_KEY_DICTS: Record<
   EnvelopeKeyDictField,
-  { rule: MergeRule; required: boolean }
+  { rule: MergeRule; required: boolean; attributedBy: MemberAttribution }
 > = {
-  wrappedKeys: { rule: 'local-wins', required: true },
-  passkeyWrappedKeys: { rule: 'local-wins', required: true },
-  inviteKeys: { rule: 'local-wins', required: true },
-  recoveryKeys: { rule: 'local-wins', required: false },
+  wrappedKeys: { rule: 'local-wins', required: true, attributedBy: 'key' },
+  passkeyWrappedKeys: { rule: 'local-wins', required: true, attributedBy: 'value.memberId' },
+  // Keyed by token hash; a package carries no memberId, so it can only be revoked by slot.
+  inviteKeys: { rule: 'local-wins', required: true, attributedBy: null },
+  recoveryKeys: { rule: 'local-wins', required: false, attributedBy: null },
   // ⚠️ MUST be 'newest-wins'. Under 'local-wins' a peer still holding the pre-rotation
   // entry wins the merge and republishes the dead wrap — the Settings "create a new
   // link" action becomes a no-op that looks like it worked. This is the whole of
   // revocation; see envelopeMerge.test.ts, which asserts the rule directly.
-  memberLinkKeys: { rule: 'newest-wins', required: false },
+  memberLinkKeys: { rule: 'newest-wins', required: false, attributedBy: 'key' },
   // ⚠️ MUST be 'newest-wins' for the same reason as memberLinkKeys: entries are replaced
   // in place at one key per member, so under 'local-wins' a peer holding a stale approval
   // would win the merge and republish it. `required: false` because every dict added after
   // the original three is optional — an envelope that gains `deviceApprovalKeys: {}` where
   // it previously had no key at all serialises differently and is a different file on Drive.
-  deviceApprovalKeys: { rule: 'newest-wins', required: false },
+  deviceApprovalKeys: { rule: 'newest-wins', required: false, attributedBy: 'key' },
 };
 
 /**
@@ -190,11 +205,15 @@ export function preserveLocalKeyDicts(
   // sorts oldest; a side missing the field entirely loses to any present wrap, so a
   // local-only passphrase still survives an incoming envelope that lacks one.
   const passphrase = pickNewerByCreatedAt(incoming.recoveryPassphrase, local.recoveryPassphrase);
+  // Not a wrap dict (no `wrapped`), so not in the registry: merged explicitly, like the
+  // passphrase. A union — a tombstone either side has seen must survive.
+  const revokedKeys = mergeRevokedKeys(incoming.revokedKeys, local.revokedKeys);
 
   return {
     ...incoming,
     ...dicts,
     ...(passphrase ? { recoveryPassphrase: passphrase } : {}),
+    ...(revokedKeys ? { revokedKeys } : {}),
   };
 }
 
@@ -241,4 +260,205 @@ export function keyDictSize(envelope: BeanpodFileV4 | null | undefined): number 
   }
   // Scalar, so it is not in the registry.
   return n + (envelope.recoveryPassphrase ? 1 : 0);
+}
+
+// ── Revocation tombstones (tracker #77) ─────────────────────────────────────────
+
+/** `member:<memberId>` — every entry attributed to the member, in every attributing dict. */
+export function memberRevocationKey(memberId: string): string {
+  return `member:${memberId}`;
+}
+
+/**
+ * `<field>:<entryKey>` (slot-wide) or `<field>:<entryKey>:<wrapped>` (value-pinned).
+ * The pinned value is IN the key so two tombstones pinning different wraps of one slot
+ * can never collide and shadow each other (unclaim → re-claim → unclaim).
+ */
+export function revocationKey(
+  field: EnvelopeKeyDictField,
+  entryKey: string,
+  pinnedWrapped?: string
+): string {
+  return pinnedWrapped === undefined
+    ? `${field}:${entryKey}`
+    : `${field}:${entryKey}:${pinnedWrapped}`;
+}
+
+/** Union of two tombstone sets; on a key collision the EARLIEST `revokedAt` wins. */
+export function mergeRevokedKeys(
+  a: Record<string, EnvelopeTombstone> | undefined,
+  b: Record<string, EnvelopeTombstone> | undefined
+): Record<string, EnvelopeTombstone> | undefined {
+  if (!a && !b) return undefined;
+  const out: Record<string, EnvelopeTombstone> = { ...(a ?? {}) };
+  for (const [k, v] of Object.entries(b ?? {})) {
+    // eslint-disable-next-line security/detect-object-injection -- keys come from the tombstone set itself
+    const existing = out[k];
+    // eslint-disable-next-line security/detect-object-injection -- as above
+    if (!existing || v.revokedAt < existing.revokedAt) out[k] = v;
+  }
+  return out;
+}
+
+function entryMemberId(
+  attributedBy: MemberAttribution,
+  entryKey: string,
+  value: unknown
+): string | undefined {
+  if (attributedBy === 'key') return entryKey;
+  if (attributedBy === 'value.memberId') {
+    const id = (value as { memberId?: unknown } | null)?.memberId;
+    return typeof id === 'string' ? id : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Drop every entry `revokedKeys` names. Pure; returns a fresh envelope and how many
+ * entries it dropped (the caller's signal that a file still carried revoked wraps).
+ *
+ * An entry whose `wrapped` is `''` holds no key material and is NEVER dropped: that is
+ * the shape of the `memberLinkKeys` newest-wins revocation overwrite, and it has to stay
+ * in the file for an OLD client — which ignores `revokedKeys` — to lose the merge to it.
+ */
+export function applyRevokedKeys(envelope: BeanpodFileV4): {
+  envelope: BeanpodFileV4;
+  filtered: number;
+} {
+  const revoked = envelope.revokedKeys;
+  if (!revoked || Object.keys(revoked).length === 0) return { envelope, filtered: 0 };
+
+  let filtered = 0;
+  const next: BeanpodFileV4 = { ...envelope };
+  for (const field of Object.keys(ENVELOPE_KEY_DICTS) as EnvelopeKeyDictField[]) {
+    // eslint-disable-next-line security/detect-object-injection -- key is from the literal registry
+    const dict = envelope[field] as Record<string, { wrapped: string }> | undefined;
+    if (!dict) continue;
+    // eslint-disable-next-line security/detect-object-injection -- key is from the literal registry
+    const { attributedBy } = ENVELOPE_KEY_DICTS[field];
+    let kept: Record<string, { wrapped: string }> | null = null;
+    for (const [entryKey, value] of Object.entries(dict)) {
+      const memberId = entryMemberId(attributedBy, entryKey, value);
+      const drop =
+        value.wrapped !== '' &&
+        (revocationKey(field, entryKey) in revoked ||
+          revocationKey(field, entryKey, value.wrapped) in revoked ||
+          (memberId !== undefined && memberRevocationKey(memberId) in revoked));
+      if (drop) {
+        filtered++;
+        kept ??= { ...dict };
+        // eslint-disable-next-line security/detect-object-injection -- entryKey is an own key of dict
+        delete kept[entryKey];
+      }
+    }
+    // eslint-disable-next-line security/detect-object-injection -- key is from the literal registry
+    if (kept) (next as unknown as Record<string, unknown>)[field] = kept;
+  }
+  return filtered === 0 ? { envelope, filtered: 0 } : { envelope: next, filtered };
+}
+
+/**
+ * THE envelope merge (tracker #77): `preserveLocalKeyDicts` (union + tombstone union),
+ * then `applyRevokedKeys`, plus whether the result must be PUBLISHED.
+ *
+ * `needsPublish` is true when this side holds something the incoming file lacks — more
+ * key entries (the old `keyDictSize >` signal), a tombstone the file has not got — or when
+ * the incoming file still carried revoked entries (an old client re-published them), so
+ * a save cleans the file. A count alone can never see a revocation: filtering one entry
+ * and adding one tombstone leaves every count where it was.
+ *
+ * `filtered` counts entries the incoming file carries against ITS OWN tombstones — the
+ * old-client resurrection metric. Pure; the caller logs it (the worker imports this module).
+ */
+export function mergeEnvelopes(
+  incoming: BeanpodFileV4,
+  local: BeanpodFileV4 | null | undefined
+): { envelope: BeanpodFileV4; needsPublish: boolean; filtered: number } {
+  // ⚠️ FILTER EACH SIDE BEFORE THE UNION, not after. `local-wins` would otherwise let a
+  // REVOKED local entry shadow a LIVE incoming one in the same slot — a stale peer's
+  // pre-unclaim wrap beating the re-claimed member's new one — and the filter would then
+  // drop the survivor, leaving the slot empty and publishing that loss.
+  const revokedKeys = mergeRevokedKeys(incoming.revokedKeys, local?.revokedKeys);
+  const incomingClean = applyRevokedKeys({ ...incoming, revokedKeys });
+  const localClean = local ? applyRevokedKeys({ ...local, revokedKeys }).envelope : local;
+  const envelope = preserveLocalKeyDicts(incomingClean.envelope, localClean);
+  const incomingTombstones = incoming.revokedKeys ?? {};
+  const hasNewTombstone = Object.keys(revokedKeys ?? {}).some((k) => !(k in incomingTombstones));
+  // `incomingClean.filtered` is what the file still carries that it should not; its
+  // surviving size is the fair baseline for "this side holds more" (the raw file's size
+  // would hide a local addition behind a revoked entry).
+  const needsPublish =
+    keyDictSize(envelope) > keyDictSize(incomingClean.envelope) ||
+    hasNewTombstone ||
+    incomingClean.filtered > 0;
+  // The METRIC counts only what the file's OWN tombstones drop — an entry an old client
+  // re-published against a revocation the file already records. Entries dropped by a
+  // tombstone only this side holds are just an ordinary revocation on its way out.
+  return { envelope, needsPublish, filtered: applyRevokedKeys(incoming).filtered };
+}
+
+/**
+ * The tombstones that revoke a member's key material.
+ *
+ * - `'remove'`: `member:<id>` (every attributed entry, seen or not) plus a slot tombstone
+ *   for EVERY `inviteKeys` entry — invites carry no memberId, and expiry is only a client
+ *   check, so an expired wrap still opens with its token.
+ * - `'unclaim'`: VALUE-PINNED tombstones for the member's current `wrappedKeys` entry and
+ *   attributed passkey wraps only. The member stays, and re-claiming re-wraps the same
+ *   slots; a slot-wide or member tombstone would lock them out for good.
+ *
+ * `unattributedPasskeys` counts passkey wraps with no `memberId` (legacy): they cannot be
+ * attributed and are left alone, but the count is logged.
+ */
+export function revocationTombstonesForMember(
+  envelope: BeanpodFileV4,
+  memberId: string,
+  opts: { mode: 'remove' | 'unclaim'; now: string }
+): { tombstones: Record<string, EnvelopeTombstone>; unattributedPasskeys: number } {
+  const tombstones: Record<string, EnvelopeTombstone> = {};
+  const stamp = (key: string, wrapped?: string) => {
+    // eslint-disable-next-line security/detect-object-injection -- key built by revocationKey
+    tombstones[key] =
+      wrapped === undefined ? { revokedAt: opts.now } : { revokedAt: opts.now, wrapped };
+  };
+  const unattributedPasskeys = Object.values(envelope.passkeyWrappedKeys ?? {}).filter(
+    (p) => !p.memberId
+  ).length;
+
+  if (opts.mode === 'remove') {
+    stamp(memberRevocationKey(memberId));
+    for (const hash of Object.keys(envelope.inviteKeys ?? {})) {
+      stamp(revocationKey('inviteKeys', hash));
+    }
+    return { tombstones, unattributedPasskeys };
+  }
+
+  // eslint-disable-next-line security/detect-object-injection -- memberId is the caller's member
+  const own = envelope.wrappedKeys?.[memberId];
+  if (own?.wrapped) stamp(revocationKey('wrappedKeys', memberId, own.wrapped), own.wrapped);
+  for (const [credId, p] of Object.entries(envelope.passkeyWrappedKeys ?? {})) {
+    if (p.memberId === memberId && p.wrapped) {
+      stamp(revocationKey('passkeyWrappedKeys', credId, p.wrapped), p.wrapped);
+    }
+  }
+  return { tombstones, unattributedPasskeys };
+}
+
+/**
+ * Does the envelope hold ANY key material attributed to this member, in any dict the
+ * registry says can attribute one? Registry-driven, so a new attributed dict is covered
+ * without touching the callers.
+ */
+export function memberHasKeyMaterial(envelope: BeanpodFileV4, memberId: string): boolean {
+  for (const field of Object.keys(ENVELOPE_KEY_DICTS) as EnvelopeKeyDictField[]) {
+    // eslint-disable-next-line security/detect-object-injection -- key is from the literal registry
+    const { attributedBy } = ENVELOPE_KEY_DICTS[field];
+    if (!attributedBy) continue;
+    // eslint-disable-next-line security/detect-object-injection -- key is from the literal registry
+    const dict = (envelope[field] ?? {}) as Record<string, { wrapped: string }>;
+    for (const [key, value] of Object.entries(dict)) {
+      if (value.wrapped !== '' && entryMemberId(attributedBy, key, value) === memberId) return true;
+    }
+  }
+  return false;
 }

@@ -41,7 +41,7 @@ vi.mock('@/stores/familyStore', () => ({
     // did, because it excluded the owner.
     members: [owner],
     createMember: mockCreateMember,
-    deleteMember: mockDeleteMember,
+    discardDraftMember: mockDeleteMember,
   }),
 }));
 
@@ -106,7 +106,7 @@ describe('CreateMembersStep', () => {
     });
   });
 
-  it('keeps the row and reports when deleteMember fails (no silent divergence)', async () => {
+  it('keeps the row and reports when discarding the draft fails (no silent divergence)', async () => {
     mockCreateMember.mockResolvedValueOnce({
       id: 'm-2',
       name: 'Kiddo',
