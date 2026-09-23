@@ -268,6 +268,8 @@ import {
   SIGN_OUT_TRUSTED_STEPS,
   SIGN_OUT_UNTRUSTED_STEPS,
   SIGN_OUT_CLEAR_STEPS,
+  SIGN_OUT_EVICTED_STEPS,
+  SIGN_OUT_EVICTION_LOCK_STEPS,
 } from '@/services/auth/signOutSteps';
 import { useSettingsStore } from '../settingsStore';
 import { useSyncStore } from '../syncStore';
@@ -1148,6 +1150,34 @@ describe('Sensitive Data Clearing Security', () => {
       expect(SIGN_OUT_CLEAR_STEPS).toContain('reclaimAllPasskeys');
       expect(SIGN_OUT_UNTRUSTED_STEPS).not.toContain('clearAllRefreshTokens');
       expect(SIGN_OUT_UNTRUSTED_STEPS).not.toContain('reclaimAllPasskeys');
+    });
+
+    it('eviction (#77): forgets the family without saving, and never re-resolves the family', () => {
+      expect(SIGN_OUT_EVICTED_STEPS).toContain('forgetLocalFamily');
+      // A removed member's device has nothing legitimate to push.
+      expect(SIGN_OUT_EVICTED_STEPS).not.toContain('quietTeardownAndForceSave');
+      // The caller pre-sets the REMOVED member's family; resolving from "the active
+      // family" after the session is gone is how the wrong family could be cleared.
+      expect(SIGN_OUT_EVICTED_STEPS).not.toContain('resolveFamilyId');
+      // The in-memory key copy is cleared before the family's storage is.
+      expect(SIGN_OUT_EVICTED_STEPS.indexOf('clearKeyCacheFamily')).toBeLessThan(
+        SIGN_OUT_EVICTED_STEPS.indexOf('forgetLocalFamily')
+      );
+      // Only ever this one family's material.
+      expect(SIGN_OUT_EVICTED_STEPS).not.toContain('clearKeyCacheAll');
+      expect(SIGN_OUT_EVICTED_STEPS).not.toContain('reclaimAllPasskeys');
+    });
+
+    it('eviction LOCK (#77): closes the pod and drops the unattended key, keeps the data', () => {
+      expect(SIGN_OUT_EVICTION_LOCK_STEPS).toContain('resetDocClient');
+      expect(SIGN_OUT_EVICTION_LOCK_STEPS).toContain('clearKeyCacheFamily');
+      // Nothing that deletes the family's cache: someone still in it, or unsaved work.
+      expect(SIGN_OUT_EVICTION_LOCK_STEPS).not.toContain('forgetLocalFamily');
+      expect(SIGN_OUT_EVICTION_LOCK_STEPS).not.toContain('deleteFamilyDb');
+      // Eviction is exactly the lock plus forgetting the family.
+      expect(SIGN_OUT_EVICTED_STEPS.filter((s) => s !== 'forgetLocalFamily')).toEqual([
+        ...SIGN_OUT_EVICTION_LOCK_STEPS,
+      ]);
     });
   });
 

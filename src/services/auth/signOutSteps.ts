@@ -47,6 +47,18 @@ export type SignOutStepName =
   | 'reArmTrustPrompt'
   | 'sweepHandoffFiles'
   /**
+   * `quietTeardownAndForceSave` WITHOUT the save (#77 eviction): a removed member's device
+   * has nothing legitimate to push, and in a Drive family it can no longer reach the file.
+   */
+  | 'beginQuietTeardown'
+  /**
+   * Forget the family on this device entirely (#77 eviction) — `familyContext
+   * .deleteLocalFamily`: its database, roster cache, keystore blobs, passkey records, PIN
+   * wraps, trusted-open wrap, file handles and provider config. THROWS on failure so the
+   * runner reports it (the store action it wraps swallows errors and returns false).
+   */
+  | 'forgetLocalFamily'
+  /**
    * A recipe kept from a share link but never reviewed (#92). ON EVERY TIER, and the
    * reasoning matters: an earlier version put it on tier 3 alone, arguing the 60-minute TTL
    * and single-consume already bounded it. They bound DURATION and REPETITION; they do not
@@ -105,6 +117,47 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'removeRosterAll',
   'sweepHandoffFiles',
   'clearKeptRecipe',
+];
+
+/**
+ * Lock (tracker #77): a REMOVED member proved themselves on this device, but the family
+ * cannot be forgotten here — someone still in it uses the device, or this copy holds work
+ * the family file has not got. Close the pod and drop the key this device can open it with
+ * unattended, KEEPING the encrypted cache. The removed member's own credentials are already
+ * gone by now, so they are left with ciphertext they have no way to open, and nobody's
+ * unsaved work is lost. Everyone still in the family signs in as usual.
+ *
+ * The caller pre-sets `familyId` to the REMOVED member's family, so there is no
+ * `resolveFamilyId` step: by now the session is already gone, and resolving from "the
+ * active family" is the one way this could act on the wrong one. `clearKeyCacheFamily`
+ * drops the trusted auto-open wrap (settingsStore's in-memory copy with it).
+ */
+export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
+  'beginQuietTeardown',
+  'cancelReminders',
+  'resetSyncState',
+  'resetDocClient',
+  'clearKeyCacheFamily',
+  'sweepHandoffFiles',
+  'clearKeptRecipe',
+];
+
+/**
+ * Eviction (tracker #77): as the lock, then FORGET the family on this device — nobody still
+ * in it uses the device and there is no unsaved work to lose. `forgetLocalFamily` runs after
+ * `clearKeyCacheFamily` so the in-memory key copy is not left stale for a later write to
+ * re-persist; there is no `removeRosterFamily`, because `deleteLocalFamily` already deletes
+ * the roster cache.
+ */
+export const SIGN_OUT_EVICTED_STEPS: readonly SignOutStepName[] = [
+  ...SIGN_OUT_EVICTION_LOCK_STEPS.slice(
+    0,
+    SIGN_OUT_EVICTION_LOCK_STEPS.indexOf('clearKeyCacheFamily') + 1
+  ),
+  'forgetLocalFamily',
+  ...SIGN_OUT_EVICTION_LOCK_STEPS.slice(
+    SIGN_OUT_EVICTION_LOCK_STEPS.indexOf('clearKeyCacheFamily') + 1
+  ),
 ];
 
 export type SignOutStepImpls = Record<SignOutStepName, () => Promise<void> | void>;

@@ -27,6 +27,11 @@ import { getRegistryDatabase, isStorageBlockedError } from '@/services/indexeddb
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
+import {
+  membersWithDeviceCredentials,
+  retireMemberDeviceCredentials,
+  shouldEvictFamily,
+} from '@/services/auth/deviceCredentials';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import {
@@ -47,6 +52,8 @@ import {
   SIGN_OUT_TRUSTED_STEPS,
   SIGN_OUT_UNTRUSTED_STEPS,
   SIGN_OUT_CLEAR_STEPS,
+  SIGN_OUT_EVICTED_STEPS,
+  SIGN_OUT_EVICTION_LOCK_STEPS,
   type SignOutStepImpls,
 } from '@/services/auth/signOutSteps';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
@@ -419,7 +426,12 @@ export type SessionRejectionKind =
   /** The pod file was swapped for another family's — expected, not an integrity event. */
   | 'roster-switched'
   /** The member deliberately removed their own bean — expected, not an integrity event. */
-  | 'self-removed';
+  | 'self-removed'
+  /**
+   * A manager removed this member; the pod's authenticated `removedMembers` record says so
+   * (#77). Expected, not an integrity event — and it leaves a pending eviction behind.
+   */
+  | 'member-removed';
 
 /**
  * The kinds that mean "somebody edited a session", as opposed to the routine ways a
@@ -631,6 +643,12 @@ export const useAuthStore = defineStore('auth', () => {
    * familyStore's owner fallback, which would otherwise resurrect the escalation.
    */
   const sessionRejected = ref(false);
+  /**
+   * A session rejected because its member was REMOVED (#77), waiting for the sign-in
+   * surface to evict this device. Set by `invalidateSession('member-removed')`, consumed by
+   * `consumePendingRemovedEviction`. Never acted on where it is set: that is mid-load.
+   */
+  const pendingRemovedEviction = ref<{ familyId: string; memberId: string } | null>(null);
   /**
    * The restored session came from an UNSEALED pre-#80 blob, so nothing about it has been
    * verified yet. Cleared by `confirmSessionMember` once the roster vouches for it.
@@ -1343,21 +1361,14 @@ export const useAuthStore = defineStore('auth', () => {
    * `requiresPassword` derives true again and the owner can mint a fresh link. That is the ask.
    * Device credentials on THIS device go too, for the orphan class ADR-029 exists for.
    *
-   * IT DOES NOT revoke the envelope's `wrappedKeys` / `passkeyWrappedKeys`, and no caller
-   * should claim otherwise. Those dicts merge local-wins-by-UNION, so a deletion is invisible
-   * to the merge and the wrap unions straight back on the next sync — including the very sync
-   * below. See `syncStore.retireMemberKeyMaterial`, which proves it, and `envelopeMerge.ts`,
-   * whose header has recorded the limitation all along ("requires tombstones"). Until
-   * tombstones land, an unclaimed member's OLD password or OLD passkey remains latent key
-   * material in the envelope. It is not an active sign-in path (the doc-side hashes are gone,
-   * and every sign-in checks those), but it is not revocation and must not be described as it.
+   * IT DOES revoke the member's current password and passkey wraps in the envelope, as
+   * VALUE-PINNED tombstones (#77): `mergeEnvelopes` unions tombstones and filters on every
+   * merge, so the retirement propagates instead of being restored by the next sync. Pinned to
+   * the exact wraps, so the re-claim's new wrap in the same slot survives. Old clients ignore
+   * `revokedKeys` and may re-publish those wraps; current clients drop them again on merge.
+   * What it cannot reach is a copy of the file taken before the unclaim (#117 key rotation).
    *
    * ⚠️ NO `reason` PARAMETER. It briefly took one, so a `'join-failed'` caller could skip the
-   * manager gate — which made the gate bypassable by any caller willing to pass the string, on
-   * an action that strips another member's access. The join path no longer needs it: the claim
-   * is now the last fallible write in `joinFamily`, so there is nothing to roll back.
-   *
-   * ⚠️ NO `reason` PARAMETER. It briefly had one, so a `'join-failed'` caller could skip the
    * manager gate — which made the gate bypassable by any caller willing to pass the string, on
    * an action that strips another member's access. The join path no longer needs it: the claim
    * is now the last fallible write in `joinFamily`, so there is nothing to roll back.
@@ -1397,20 +1408,18 @@ export const useAuthStore = defineStore('auth', () => {
 
     const { useSyncStore } = await import('./syncStore');
     const syncStore = useSyncStore();
-    const retired = syncStore.retireMemberKeyMaterial(targetMemberId);
-    // ⚠️ CALLED HERE, NOT INSIDE `retireMemberKeyMaterial`. Two reasons, both fatal to the
-    // obvious placement: that function is SYNCHRONOUS (an async call inside it would be a
-    // floating promise, and an unhandled rejection is exactly the silent failure we forbid),
-    // and it early-returns when `localWrapsCleared === 0` — which is the NORMAL case for a
-    // kit-born family, since those are born with `wrappedKeys: {}`. A revoke placed after
-    // that return would never run for the families this feature exists for.
-    //
-    // Unlike the wraps above, this one GENUINELY revokes: it overwrites rather than deletes,
-    // and the dict merges newest-wins, so it propagates.
-    // Awaited: it now merges before stamping the tombstone, so that an unseen remote
-    // mint cannot out-date the revocation. See `revokeMemberLink`.
+    // VALUE-PINNED tombstones for their current password/passkey wraps (#77). They
+    // propagate — `mergeEnvelopes` unions tombstones and filters on every merge — and they
+    // name the exact wraps being retired, so the re-claim's NEW wrap in the same slots
+    // survives. Logs `entries_revoked` itself. Rides the `syncNowBounded` push below.
+    const retired = syncStore.retireMemberKeyMaterial(targetMemberId, 'unclaim');
+    // Also an overwrite under newest-wins, so it propagates too — and it is what protects
+    // against OLD clients, which ignore `revokedKeys`. Awaited: it merges before stamping
+    // the tombstone, so an unseen remote mint cannot out-date the revocation.
     const linkRevoked = await syncStore.revokeMemberLink(targetMemberId);
-    await familyStore.invalidateDeviceCredentials(targetMemberId);
+    const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+    const activeFamilyId = getActiveFamilyId();
+    if (activeFamilyId) await retireMemberDeviceCredentials(activeFamilyId, targetMemberId);
 
     logEvent({
       level: 'info',
@@ -1419,36 +1428,10 @@ export const useAuthStore = defineStore('auth', () => {
       context: {
         action: 'unclaim',
         member_id_tail: targetMemberId.slice(-8),
-        count: retired.passkeySecretsCleared,
+        count: retired.tombstonesWritten,
+        detail: `link_revoked=${linkRevoked} secrets_cleared=${retired.passkeySecretsCleared}`,
       },
     });
-
-    // ⚠️ SAY THE LIMITATION OUT LOUD, EVERY TIME. The envelope wraps this just deleted
-    // locally will union straight back from remote on the next merge, so the family's old key
-    // material survives an unclaim. Recording it per-invocation rather than trusting a code
-    // comment means the day tombstones ship there is a real number for how often it mattered,
-    // and until then it is visible to anyone reading the firehose rather than only to someone
-    // reading this file.
-    if (retired.localWrapsCleared > 0 || retired.noEnvelope || linkRevoked) {
-      logEvent({
-        level: 'warn',
-        surface: 'join-flow',
-        // ⚠️ The magic link is the ONE exception and must not be tarred with this: it is
-        // overwritten, not deleted, so it does propagate. Saying "the merge will restore
-        // them" about everything would tell a reader the opposite of what just happened to
-        // that link. Password and passkey wraps remain genuinely unrevocable until #117.
-        message: retired.noEnvelope
-          ? 'unclaim ran with no envelope loaded; no key material was even attempted'
-          : linkRevoked
-            ? 'unclaim REVOKED the magic link (propagates); password/passkey wraps cleared LOCALLY ONLY and the merge will restore them'
-            : 'unclaim cleared envelope wraps LOCALLY ONLY; the merge will restore them',
-        context: {
-          action: 'unclaim_wraps_not_revoked',
-          member_id_tail: targetMemberId.slice(-8),
-          count: retired.localWrapsCleared,
-        },
-      });
-    }
 
     // ⚠️ PUSH IT. The doc mutation and the envelope write both only schedule a debounced
     // autosave, and the very next thing the owner does is mint a new invite link against a
@@ -2276,28 +2259,47 @@ export const useAuthStore = defineStore('auth', () => {
   /**
    * After file decryption, update the auth session with full member data.
    */
-  function updateSessionWithMemberData(): void {
-    if (!currentUser.value) return;
+  /**
+   * Fill the thin session a passkey/biometric sign-in created. Returns `false` when there is
+   * no session, or when the member is not on the loaded roster — which, after
+   * `gateProvenMember` has run, only happens on an empty or partial roster. That is reported
+   * and the sign-in must fail; it is NOT an integrity rejection (it would raise a false
+   * tamper alarm), so the session is not invalidated here.
+   */
+  function updateSessionWithMemberData(): boolean {
+    if (!currentUser.value) return false;
 
     const familyStore = useFamilyStore();
     const member = familyStore.members.find((m) => m.id === currentUser.value?.memberId);
-    if (member) {
-      currentUser.value = {
-        ...currentUser.value,
-        email: member.email,
-        role: member.role,
-      };
-      // Fire-and-forget by design (#80): this action is SYNCHRONOUS and is called
-      // synchronously from familyStore / useBiometricSignIn. persistSession never
-      // rejects, and the generation counter makes ordering safe, so an await here
-      // would only ripple an async signature through two other modules.
-      void persistSession(currentUser.value);
-      familyStore.setCurrentMember(member.id);
-
-      // Track last login timestamp
-      const now = toISODateString(new Date());
-      familyStore.updateMember(member.id, { lastLoginAt: now });
+    if (!member) {
+      reportError({
+        surface: 'session-integrity',
+        message: 'passkey session names a member missing from the loaded roster',
+        severity: 'warning',
+        context: {
+          action: 'session_member_missing',
+          member_id_tail: currentUser.value.memberId.slice(-8),
+          count: familyStore.members.length,
+        },
+      });
+      return false;
     }
+    currentUser.value = {
+      ...currentUser.value,
+      email: member.email,
+      role: member.role,
+    };
+    // Fire-and-forget by design (#80): this action is SYNCHRONOUS and is called
+    // synchronously from familyStore / useBiometricSignIn. persistSession never
+    // rejects, and the generation counter makes ordering safe, so an await here
+    // would only ripple an async signature through two other modules.
+    void persistSession(currentUser.value);
+    familyStore.setCurrentMember(member.id);
+
+    // Track last login timestamp
+    const now = toISODateString(new Date());
+    familyStore.updateMember(member.id, { lastLoginAt: now });
+    return true;
   }
 
   /**
@@ -2545,6 +2547,13 @@ export const useAuthStore = defineStore('auth', () => {
     // family on the device. Reading it now pins the answer to the rejection.
     const rejectedFamilyId =
       currentUser.value?.familyId ?? useFamilyContextStore().activeFamilyId ?? undefined;
+    // A removed member's device is evicted AFTER this, from the sign-in surface — never
+    // here: this runs inside `loadMembers`, i.e. mid `reloadAllStores`, and the post-load
+    // housekeeping that follows would re-arm a family torn down underneath it.
+    const rejectedMemberId = currentUser.value?.memberId;
+    if (kind === 'member-removed' && rejectedFamilyId && rejectedMemberId) {
+      pendingRemovedEviction.value = { familyId: rejectedFamilyId, memberId: rejectedMemberId };
+    }
     if (!INTEGRITY_REJECTIONS.has(kind)) {
       logEvent({
         level: 'warn',
@@ -2562,6 +2571,218 @@ export const useAuthStore = defineStore('auth', () => {
     }
     finalizeSession();
     void revokeUnattendedReopen(rejectedFamilyId);
+  }
+
+  /**
+   * Is the member a proven credential names still a live member of THIS family?
+   * (tracker #77) — the one gate every "prove, then sign in" path runs after the pod is
+   * open and BEFORE any session is created or filled.
+   *
+   * `'removed'` evicts this device (see `evictRemovedMember`) and the caller shows
+   * `auth.memberRemoved`. `'absent'` is an ordinary failure, not a removal: a member
+   * missing from a roster that is empty or belongs to another family proves nothing, so it
+   * never evicts anything.
+   */
+  async function gateProvenMember(
+    familyId: string,
+    memberId: string,
+    trigger: 'pin' | 'biometric'
+  ): Promise<'live' | 'removed' | 'absent'> {
+    const familyStore = useFamilyStore();
+    const status =
+      familyStore.rosterFamilyId === familyId ? familyStore.memberStatus(memberId) : 'absent';
+    if (status === 'absent') {
+      reportError({
+        surface: 'session-integrity',
+        message: 'a proven credential names a member this loaded roster does not hold',
+        severity: 'warning',
+        context: {
+          action: 'proven_member_absent',
+          stage: trigger,
+          member_id_tail: memberId.slice(-8),
+          count: familyStore.members.length,
+        },
+      });
+    }
+    if (status === 'removed') {
+      // `loadMembers` has already run its no-session branch by now and may have made the
+      // OWNER the current member; nothing of this pod may stay selected.
+      familyStore.clearCurrentMember();
+      // A passkey sign-in creates its thin session BEFORE the pod opens; end it, as a
+      // removal. That (or the load's own rejection) leaves a pending eviction — cleared,
+      // because this gate runs the eviction itself, right now.
+      if (currentUser.value?.memberId === memberId) invalidateSession('member-removed');
+      const pending = pendingRemovedEviction.value;
+      if (pending?.familyId === familyId && pending.memberId === memberId) {
+        pendingRemovedEviction.value = null;
+      }
+      await evictRemovedMember({ familyId, memberId, trigger });
+    }
+    return status;
+  }
+
+  /**
+   * Run the eviction a `member-removed` session rejection left behind (#77). Called from
+   * the sign-in surface, i.e. once no pod load is in flight. Idempotent; a no-op when
+   * nothing is pending. Returns whether there was a pending eviction.
+   */
+  async function consumePendingRemovedEviction(): Promise<boolean> {
+    const pending = pendingRemovedEviction.value;
+    if (!pending) return false;
+    pendingRemovedEviction.value = null;
+    await evictRemovedMember({ ...pending, trigger: 'session' });
+    return true;
+  }
+
+  const evictionsInFlight = new Map<string, Promise<void>>();
+
+  /**
+   * Evict a REMOVED member from this device (#77): always their own credentials, and the
+   * whole family when `shouldEvictFamily` says no live member still uses the device.
+   *
+   * Single-flight per (family, member) and idempotent: one unlock can reach it from both
+   * the gate and the pending-eviction pickup. (The removed-members watcher does NOT come
+   * through here — it only retires credentials, and a watcher run joined by a sign-in's
+   * eviction would swallow it.) Keys on
+   * the authenticated `removedMembers` record, never on roster absence, so a half-loaded
+   * roster can never make it destroy anything.
+   */
+  function evictRemovedMember(input: {
+    familyId: string;
+    memberId: string;
+    trigger: 'pin' | 'biometric' | 'session';
+  }): Promise<void> {
+    const key = `${input.familyId}:${input.memberId}`;
+    const running = evictionsInFlight.get(key);
+    if (running) return running;
+    const run = runEviction(input).finally(() => evictionsInFlight.delete(key));
+    evictionsInFlight.set(key, run);
+    return run;
+  }
+
+  /** The inputs `shouldEvictFamily` decides on, read from the stores and this device. */
+  async function gatherEvictionInputs(
+    familyId: string,
+    memberId: string,
+    trigger: string
+  ): Promise<Parameters<typeof shouldEvictFamily>[0]> {
+    const familyStore = useFamilyStore();
+    const onThisRoster = familyStore.rosterFamilyId === familyId;
+    const isLive = (id: string) => onThisRoster && familyStore.memberStatus(id) === 'live';
+    let liveMemberIdsWithDeviceCredential: string[];
+    try {
+      const holders = await membersWithDeviceCredentials(familyId);
+      liveMemberIdsWithDeviceCredential = [...holders].filter(isLive);
+    } catch (e) {
+      // Unknown credential state reads as "someone still uses this device" — the safe
+      // direction, since the alternative forgets a whole family.
+      reportError({
+        surface: 'device-eviction',
+        message: 'could not list device credentials; keeping the family on this device',
+        error: e,
+        severity: 'warning',
+        context: { action: 'evict_credential_scan_failed', stage: trigger },
+      });
+      liveMemberIdsWithDeviceCredential = ['unknown'];
+    }
+    const session = currentUser.value;
+    // Work in this device's copy that the family file has not got. A removed member's
+    // edits have nowhere legitimate to go — but a LIVE member who signs in here with a
+    // password or a magic link leaves no device credential, so their unsaved edits could
+    // be sitting in this cache. Measured the way sign-out measures it; an unknown answer
+    // reads as dirty, which only ever DEFERS the eviction.
+    let hasUnpushedWork: boolean;
+    try {
+      hasUnpushedWork = (await docPushedAgainst(getRemoteBaselineHeadsFp())) === 'dirty';
+    } catch (e) {
+      // Unknown reads as dirty: it only turns an eviction into a lock (see runEviction).
+      reportError({
+        surface: 'device-eviction',
+        message: 'could not measure unpushed work; locking rather than forgetting the family',
+        error: e,
+        severity: 'warning',
+        context: { action: 'evict_unpushed_probe_failed', stage: trigger },
+      });
+      hasUnpushedWork = true;
+    }
+    return {
+      memberIsRemoved: onThisRoster && familyStore.memberStatus(memberId) === 'removed',
+      liveMemberIdsWithDeviceCredential,
+      sessionMemberIsLive: !!session && session.familyId === familyId && isLive(session.memberId),
+      hasUnpushedWork,
+    };
+  }
+
+  async function runEviction(input: {
+    familyId: string;
+    memberId: string;
+    trigger: 'pin' | 'biometric' | 'session';
+  }): Promise<void> {
+    const { familyId, memberId, trigger } = input;
+    await retireMemberDeviceCredentials(familyId, memberId);
+
+    const decision = shouldEvictFamily(await gatherEvictionInputs(familyId, memberId, trigger));
+    // A live member is signed in right here: their session stays, and so does the pod.
+    if (decision === 'live-session' || decision === 'not-removed') {
+      logEviction('family_evict_deferred', decision, trigger, memberId);
+      return;
+    }
+    // Otherwise the pod CLOSES either way. Forget the family only when that is safe; when
+    // it is not (someone still in the family uses this device, or this copy holds unsaved
+    // work) LOCK it instead — the removed member's credentials are already gone, so what is
+    // left is ciphertext they cannot open, and nobody's work is lost. A deferral used to
+    // leave the pod open with no retry.
+    const evict = decision === 'evict';
+    await runSignOutSteps(
+      evict ? SIGN_OUT_EVICTED_STEPS : SIGN_OUT_EVICTION_LOCK_STEPS,
+      buildSignOutStepImpls({
+        departedEmail: null,
+        familyId,
+        // Set, though no step in either list reads it: it says what this is — the family is
+        // leaving this device, not a person choosing to keep their data.
+        userAskedToClear: true,
+        remoteWasUnreadable: null,
+        unpushedAtSignOut: null,
+      })
+    );
+    finalizeSession();
+    logEviction(
+      evict ? 'evicted' : 'family_locked',
+      evict ? 'family' : decision,
+      trigger,
+      memberId
+    );
+  }
+
+  function logEviction(
+    message: 'evicted' | 'family_locked' | 'family_evict_deferred',
+    kind: string,
+    trigger: string,
+    memberId: string
+  ): void {
+    logEvent({
+      level: message === 'evicted' ? 'info' : 'warn',
+      surface: 'device-eviction',
+      message,
+      context: { action: message, kind, stage: trigger, member_id_tail: memberId.slice(-8) },
+    });
+  }
+
+  /**
+   * End a session a passkey/biometric sign-in created that did not complete (#77): its
+   * member could not be bound to the loaded roster. Not an integrity rejection — nobody
+   * edited anything, the roster just did not hold them — so it is not reported as one, and
+   * leaving it would make the NEXT boot reject the persisted session as tampering.
+   */
+  function abandonThinSession(): void {
+    if (!isAuthenticated.value) return;
+    logEvent({
+      level: 'warn',
+      surface: 'session-integrity',
+      message: 'session_ended_expectedly',
+      context: { action: 'session_rejected', kind: 'sign-in-incomplete' },
+    });
+    finalizeSession();
   }
 
   function finalizeSession(): void {
@@ -2643,6 +2864,7 @@ export const useAuthStore = defineStore('auth', () => {
           ctx.unpushedAtSignOut = 'dirty';
         }
       },
+      beginQuietTeardown: () => docClient.beginQuietTeardown(),
       cancelReminders: () => cancelRemindersForSignOut(),
       captureDepartingAccount: () => {
         // MUST run before the Google clear nulls the cached email (#62).
@@ -2772,6 +2994,11 @@ export const useAuthStore = defineStore('auth', () => {
         if (passkeys.length > 0) {
           await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
         }
+      },
+      forgetLocalFamily: async () => {
+        if (!ctx.familyId) throw new Error('forgetLocalFamily: no familyId');
+        const forgotten = await useFamilyContextStore().deleteLocalFamily(ctx.familyId);
+        if (!forgotten) throw new Error('deleteLocalFamily returned false');
       },
       untrustDevice: () => settingsStore.setTrustedDevice(false),
       reArmTrustPrompt: () => settingsStore.resetTrustedDevicePrompt(),
@@ -2966,6 +3193,11 @@ export const useAuthStore = defineStore('auth', () => {
     invalidateSession,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,
+    gateProvenMember,
+    consumePendingRemovedEviction,
+    abandonThinSession,
+    evictRemovedMember,
+    pendingRemovedEviction,
     updateCurrentUserRole,
     registerPasskeyForCurrentUser,
     resolveDeviceKeysForFamily,

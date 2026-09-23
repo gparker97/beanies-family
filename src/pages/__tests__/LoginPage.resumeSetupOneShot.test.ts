@@ -73,6 +73,7 @@ vi.mock('@/stores/familyStore', () => ({ useFamilyStore: () => ({ members: [] })
 
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
+    consumePendingRemovedEviction: async () => false,
     // The create flow is always authenticated by the time storage connects.
     isInitialized: true,
     isAuthenticated: true,

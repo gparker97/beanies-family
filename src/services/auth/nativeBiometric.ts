@@ -1046,7 +1046,7 @@ export async function nativeReclaimAllKeystores(familyIds: string[]): Promise<vo
  * successful reconcile.
  *
  * This is also the only case requirement 4 actually needs.
- * `familyStore.invalidateDeviceCredentials` → `removeAllPasskeysForMember` already
+ * `retireMemberDeviceCredentials` (deviceCredentials.ts) → `removeAllPasskeysForMember` already
  * retires a member's credentials at removal time, so the sole gap is a member removed
  * WHILE THE APP WAS UNINSTALLED.
  *

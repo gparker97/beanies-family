@@ -139,6 +139,27 @@ export interface DeviceApprovalPackage {
   expiresAt: ISODateString;
 }
 
+/**
+ * One revocation in `BeanpodFileV4.revokedKeys` (tracker #77).
+ *
+ * Envelope dicts merge by union and cannot express a deletion, so a revoked wrap is
+ * recorded here instead and filtered out of every merge (`applyRevokedKeys`). Three key
+ * shapes, all built by `revocationKey` / `memberRevocationKey` in `envelopeMerge.ts`:
+ *
+ *  - `member:<memberId>` — every entry attributed to that member, in every dict that can
+ *    attribute one, including entries the revoking device never saw. Removal only: a
+ *    removed member's id never comes back.
+ *  - `<dictField>:<entryKey>` — one slot, whatever it holds.
+ *  - `<dictField>:<entryKey>:<wrapped>` — VALUE-PINNED: only the entry whose `wrapped`
+ *    equals the pinned value. Unclaim uses this, because the same member id is re-wrapped
+ *    when they re-claim, and a slot-wide tombstone would lock them out for good.
+ */
+export interface EnvelopeTombstone {
+  revokedAt: ISODateString;
+  /** Present on value-pinned tombstones only; mirrors the last key segment. */
+  wrapped?: string;
+}
+
 export type BeanpodVersion = '4.0' | '5.0';
 
 /** Beanpod file format v4.0 (envelope), at either `BeanpodVersion`. */
@@ -183,6 +204,13 @@ export interface BeanpodFileV4 {
    * one device cannot be silently reverted by another device's stale in-memory copy.
    */
   recoveryPassphrase?: WrappedMemberKey & { createdAt?: ISODateString };
+  /**
+   * Revoked wraps (tracker #77). ADDITIVE OPTIONAL — old clients carry it through
+   * untouched (parse returns the object as-is; every writer spreads the envelope) but do
+   * not honour it. GROW-ONLY: merged as a union, never pruned, so a revocation can never
+   * be un-done by a peer that has not seen it. See `EnvelopeTombstone` for the key shapes.
+   */
+  revokedKeys?: Record<string, EnvelopeTombstone>;
 
   // ⚠️ NO `podLineage` HERE, AND THERE MUST NEVER BE ONE AGAIN — see ADR-036
   // and `PodLineage` in `models.ts`. It lived here until 2026-09-06 and that is

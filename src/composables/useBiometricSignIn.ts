@@ -111,10 +111,22 @@ export function useBiometricSignIn(): {
         }
       }
 
+      // #77: a removed member's biometric must never become a session. The gate evicts
+      // this device's credentials for them (and the family, if nobody else uses it here).
+      if ((await authStore.gateProvenMember(familyId, memberId, 'biometric')) === 'removed') {
+        return { ok: false, message: t('auth.memberRemoved') };
+      }
+
       // Fills in the thin session created by signInWithPasskey AND sets the current
       // member AND stamps lastLoginAt — so there is no separate setCurrentMember call
-      // to keep in step with it.
-      authStore.updateSessionWithMemberData();
+      // to keep in step with it. False = the member is not on the loaded roster: fail
+      // rather than report success with no session behind it (it reports itself).
+      if (!authStore.updateSessionWithMemberData()) {
+        // signInWithPasskey already created (and persisted) a thin session; do not leave it
+        // behind for the next boot to reject as tampering.
+        authStore.abandonThinSession();
+        return { ok: false, message: t('passkey.signInError') };
+      }
 
       // Best-effort Drive push — never hang the spinner on it. The unlock has already
       // succeeded and the doc is in memory + cache; the push rides the next auto-sync.

@@ -16,6 +16,10 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { FamilyMember } from '@/types/models';
 
+vi.mock('@/services/automerge/repositories/removedMemberRepository', () => ({
+  getAllRemovedMembers: vi.fn(async () => []),
+  removeMemberAndRecord: vi.fn(async () => {}),
+}));
 vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
   getAllFamilyMembers: vi.fn(),
   getFamilyMemberById: vi.fn(),

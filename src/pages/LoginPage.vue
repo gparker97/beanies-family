@@ -355,6 +355,13 @@ onMounted(async () => {
     });
   }
 
+  // #77: this device's member was removed from the family while they were signed in. The
+  // eviction was deferred to here — no pod load is in flight on the sign-in surface — and it
+  // runs BEFORE the boot logic below reads the (possibly now forgotten) active family.
+  if (await authStore.consumePendingRemovedEviction()) {
+    showToast('info', t('auth.memberRemoved'));
+  }
+
   /**
    * ⚠️ A LINK ARRIVAL OWNS THIS SCREEN. BAIL OUT BEFORE ANY OF THE BOOT LOGIC BELOW.
    *

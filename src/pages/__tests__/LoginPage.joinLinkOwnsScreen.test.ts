@@ -53,6 +53,7 @@ vi.mock('@/stores/familyStore', () => ({
 
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
+    consumePendingRemovedEviction: async () => false,
     isInitialized: true,
     isAuthenticated: true,
     needsAuth: false,

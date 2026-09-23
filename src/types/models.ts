@@ -744,6 +744,28 @@ export interface ListCycleMark {
 }
 
 /**
+ * The authenticated record that a member was REMOVED from the family (tracker #77).
+ *
+ * Lives in the encrypted doc — so the family key authenticates it and Automerge merges it
+ * per member — rather than in the unauthenticated envelope. It is the ONE fact the app
+ * uses to tell "this member was removed" apart from "this member is absent from a roster
+ * that has not finished loading", which is why every DESTRUCTIVE step (evicting a device's
+ * credentials, clearing a family from a device) keys on it and never on roster absence.
+ *
+ * Keyed by the removed member's id. Write-once, never deleted: a removed id never comes
+ * back (re-adding the person creates a new member with a new id).
+ */
+export interface RemovedMember {
+  /** The removed member's id. */
+  id: UUID;
+  removedAt: ISODateString;
+  /** Who removed them; null when it could not be determined. */
+  removedByMemberId: UUID | null;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
  * A finished cycle of a recurring list.
  *
  * Written ONCE at rollover with a single `set` and NEVER patched — retention deletes it

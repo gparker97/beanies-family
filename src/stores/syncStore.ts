@@ -107,7 +107,16 @@ import {
   UnlockFailedError,
 } from '@/services/sync/fileSync';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { preserveLocalKeyDicts, keyDictSize, withoutPayload } from '@/services/sync/envelopeMerge';
+import {
+  applyRevokedKeys,
+  mergeEnvelopes,
+  mergeRevokedKeys,
+  memberHasKeyMaterial,
+  revocationTombstonesForMember,
+  withoutPayload,
+} from '@/services/sync/envelopeMerge';
+import type { EnvelopeTombstone } from '@/types/syncFileV4';
+import { logRevokedEntriesFiltered } from '@/services/sync/revocationLog';
 import type { EnvelopeKeyDictField } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
@@ -390,13 +399,44 @@ export const useSyncStore = defineStore('sync', () => {
    * callers can pass the same reference onward.
    */
   function replaceEnvelope(incoming: BeanpodFileV4): BeanpodFileV4 {
+    return replaceEnvelopeTracked(incoming).envelope;
+  }
+
+  /**
+   * `replaceEnvelope`, also reporting whether the merged result must be PUBLISHED — this
+   * side holds key entries or revocation tombstones the incoming file lacks, or the file
+   * still carried revoked wraps (tracker #77; see `mergeEnvelopes`).
+   */
+  function replaceEnvelopeTracked(incoming: BeanpodFileV4): {
+    envelope: BeanpodFileV4;
+    needsPublish: boolean;
+  } {
+    const {
+      envelope: mergedFull,
+      needsPublish,
+      filtered,
+    } = mergeEnvelopes(incoming, envelope.value);
+    logRevokedEntriesFiltered(filtered, 'merge');
     // Stripped: this is the long-lived copy, and nothing reads the payload back
     // off it (verified — the only readers are worker-side, fed a freshly-parsed
     // envelope, plus `reEncryptEnvelope`, which overwrites the field).
-    const merged = withoutPayload(preserveLocalKeyDicts(incoming, envelope.value));
+    const merged = withoutPayload(mergedFull);
     envelope.value = merged;
     syncService.setEnvelope(merged);
-    return merged;
+    return { envelope: merged, needsPublish };
+  }
+
+  /**
+   * Hold a parsed-but-not-yet-decrypted file. The ONE writer of `pendingEncryptedFile`'s
+   * non-null state (tracker #77): a device that has not merged this family yet unwraps
+   * straight from the pending envelope (password, PIN, passkey, magic link, invite), and
+   * never passes through `mergeEnvelopes`. So revoked wraps an OLD client re-published are
+   * dropped here, or they would still open the pod on a fresh device.
+   */
+  function stagePendingFile(pending: NonNullable<(typeof pendingEncryptedFile)['value']>): void {
+    const { envelope: clean, filtered } = applyRevokedKeys(pending.envelope);
+    logRevokedEntriesFiltered(filtered, 'pending');
+    pendingEncryptedFile.value = { ...pending, envelope: clean };
   }
 
   /** Null the envelope on sign-out / disconnect. */
@@ -2018,7 +2058,8 @@ export const useSyncStore = defineStore('sync', () => {
           // `replaceEnvelope` merges in local-only key entries (rotate-key
           // writes that may not be on the fetched envelope yet) — see the
           // envelope-replacement invariant near the top of this file.
-          const merged = replaceEnvelope(remoteEnvelope);
+          const { envelope: merged, needsPublish: envelopeNeedsPublish } =
+            replaceEnvelopeTracked(remoteEnvelope);
           // `liveKey`, not `familyKey.value!` — this is the terminus of the
           // NORMAL branch, reached after a multi-megabyte network read, and the
           // ref can genuinely have gone null in that window (a sign-out nulls it
@@ -2041,8 +2082,9 @@ export const useSyncStore = defineStore('sync', () => {
           // write). Those are documented as "riding the next successful save"
           // (PasskeySettings.vue, LoadPodView.vue), so the save trigger must
           // consider them or the passkey never reaches Drive and the member cannot
-          // unlock the pod from another device.
-          const envelopeGainedLocalKeys = keyDictSize(merged) > keyDictSize(remoteEnvelope);
+          // unlock the pod from another device. Revocations (#77) ride the same signal:
+          // a count cannot see them, so `mergeEnvelopes` decides.
+          const envelopeGainedLocalKeys = envelopeNeedsPublish;
 
           lastSync.value = toISODateString(new Date());
 
@@ -2124,12 +2166,12 @@ export const useSyncStore = defineStore('sync', () => {
 
       // No family key or decryption failed — store as pending
       const provider = syncService.getProvider();
-      pendingEncryptedFile.value = {
+      stagePendingFile({
         envelope: remoteEnvelope,
         driveFileId: provider?.getFileId() ?? undefined,
         driveFileName: provider?.getDisplayName(),
         driveAccountEmail: provider?.getAccountEmail() ?? undefined,
-      };
+      });
       return { success: false, needsPassword: true };
     } finally {
       // ⚠️ TOTAL, not per-branch. `syncService.load()` stamps the remote's
@@ -2161,11 +2203,11 @@ export const useSyncStore = defineStore('sync', () => {
     const result = await syncService.openAndLoadFile();
 
     if (result.needsPassword && result.envelope) {
-      pendingEncryptedFile.value = {
+      stagePendingFile({
         envelope: result.envelope,
         fileHandle: result.fileHandle,
         provider: result.provider,
-      };
+      });
       return { success: false, needsPassword: true };
     }
 
@@ -2207,11 +2249,11 @@ export const useSyncStore = defineStore('sync', () => {
     const result = await syncService.loadDroppedFile(file, fileHandle);
 
     if (result.needsPassword && result.envelope) {
-      pendingEncryptedFile.value = {
+      stagePendingFile({
         envelope: result.envelope,
         fileHandle: result.fileHandle,
         provider: result.provider,
-      };
+      });
       return { success: false, needsPassword: true };
     }
 
@@ -5463,12 +5505,12 @@ export const useSyncStore = defineStore('sync', () => {
       );
 
       // Store as pending — needs password
-      pendingEncryptedFile.value = {
+      stagePendingFile({
         envelope: env,
         driveFileId: fileId,
         driveFileName,
         driveAccountEmail: provider.getAccountEmail() ?? undefined,
-      };
+      });
       storageProviderType.value = 'google_drive';
       return { success: false, needsPassword: true };
     } catch (e) {
@@ -6350,40 +6392,9 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function revokeMemberLink(memberId: string): Promise<boolean> {
     if (!authoritativeEnvelope()) return false;
-
-    // ⚠️ OBSERVE BEFORE STAMPING. This is the correction to a fix that did not work.
-    //
-    // The previous version stamped `max(now, localEntry.createdAt + 1)` and called that
-    // monotonic. It is monotonic only against an entry THIS DEVICE ALREADY HOLDS. Against
-    // a remote entry we have never seen it is just our wall clock, and `mintMagicLinkPackage`
-    // actively manufactures future-dated stamps (it too stamps strictly-newer-than-what-it-saw),
-    // so a member minting on a device with a fast clock produces an entry that BEATS the
-    // owner's tombstone under newest-wins. The owner is told the link is revoked; it is not.
-    //
-    // Wall clocks cannot express causality, so the only sound fix is to look first: merge,
-    // then stamp newer than what is actually out there. One extra round trip on a rare,
-    // deliberate, owner-initiated action is a fair price for the guarantee.
-    // No try/catch: `syncNowDurable` classifies and logs internally and never rejects, so a
-    // wrapper here would be the same dead `catch {}` this file already removed once from
-    // `unclaimMember`. Any outcome other than 'saved' simply means we did not observe.
-    // Same budget as the write it precedes: this is the observe half of a credential
-    // revocation, and 5s routinely expires before a multi-MB upload has started.
-    const observed = (await syncNowDurable(CREDENTIAL_PUBLISH_TIMEOUT_MS)) === 'saved';
-
+    const observed = await observeRemote();
     const base = authoritativeEnvelope();
     if (!base) return false;
-    const existing = base.memberLinkKeys?.[memberId];
-
-    // ⚠️ NOT a delete. `envelopeMerge` unions, so a deletion does not propagate and any
-    // peer would resurrect the live wrap on its next sync. An overwrite DOES propagate,
-    // under the dict's newest-wins rule. And it is written even when this device holds no
-    // local entry: a member can mint on their own phone and publish while the owner still
-    // holds an older envelope, and an early return would let that wrap union straight back.
-    //
-    // Inlined rather than imported: a static import of `magicLink` here pulls
-    // `inviteService` → `familyKeyService` into the eager boot graph and silently no-ops
-    // the deliberate `await import(...)` sites elsewhere. It is a pure 6-line value —
-    // a package nothing can unwrap.
     // ⚠️ NOT `=== 'saved'`. A `'timeout'` here is NOT a failed revocation: `rollbackOnFailure`
     // is false, so the tombstone stays staged and rides the next save — the revocation WILL
     // land. Collapsing it to a boolean made familyStore fire a `severity: 'critical'` Slack
@@ -6394,16 +6405,7 @@ export const useSyncStore = defineStore('sync', () => {
       (await publishEnvelopeEntry({
         dict: 'memberLinkKeys',
         key: memberId,
-        value: {
-          salt: '',
-          wrapped: '',
-          tokenHash: '',
-          keyId: base.keyId,
-          createdAt: new Date(
-            Math.max(Date.now(), (Date.parse(existing?.createdAt ?? '') || 0) + 1)
-          ).toISOString(),
-          expiresAt: new Date(0).toISOString(),
-        },
+        value: memberLinkTombstone(base, memberId),
         // ⚠️ NEVER roll this back. See the option's own docstring: the default would restore
         // the live wrap this tombstone exists to kill, and `doSave` reports a merely QUEUED
         // write as a failure — so revoking while offline would reinstate the credential.
@@ -6428,6 +6430,78 @@ export const useSyncStore = defineStore('sync', () => {
     return published;
   }
 
+  /**
+   * The observe half of a credential revocation: merge the remote in (and publish what we
+   * hold) so the next stamp can be made newer than what is actually out there. See the
+   * long note in `memberLinkTombstone` for why a wall clock alone is not enough.
+   *
+   * No try/catch: `syncNowDurable` classifies and logs internally and never rejects.
+   * Credential budget, not the 5s post-auth one: this precedes a credential write, and 5s
+   * routinely expires before a multi-MB upload has started.
+   */
+  async function observeRemote(): Promise<boolean> {
+    return (await syncNowDurable(CREDENTIAL_PUBLISH_TIMEOUT_MS)) === 'saved';
+  }
+
+  /**
+   * Stage a member's magic-link revocation in memory, WITHOUT publishing. For callers
+   * that run their own single durable save afterwards (member removal, #77). Call
+   * `observeRemote()` first, or the stamp may lose to a remote mint this device never saw.
+   */
+  function stageMemberLinkTombstone(memberId: string): { committed: boolean } {
+    const base = authoritativeEnvelope();
+    if (!base) return { committed: false };
+    return {
+      committed: setEnvelopeEntry('memberLinkKeys', memberId, memberLinkTombstone(base, memberId))
+        .committed,
+    };
+  }
+
+  /**
+   * A magic-link package nothing can unwrap, stamped newer than whatever this device holds.
+   */
+  function memberLinkTombstone(
+    base: BeanpodFileV4,
+    memberId: string
+  ): import('@/types/syncFileV4').MemberLinkKeyPackage {
+    const existing = base.memberLinkKeys?.[memberId];
+
+    // ⚠️ OBSERVE BEFORE STAMPING (the caller's job — `observeRemote`). This is the
+    // correction to a fix that did not work.
+    //
+    // The previous version stamped `max(now, localEntry.createdAt + 1)` and called that
+    // monotonic. It is monotonic only against an entry THIS DEVICE ALREADY HOLDS. Against
+    // a remote entry we have never seen it is just our wall clock, and `mintMagicLinkPackage`
+    // actively manufactures future-dated stamps (it too stamps strictly-newer-than-what-it-saw),
+    // so a member minting on a device with a fast clock produces an entry that BEATS the
+    // owner's tombstone under newest-wins. The owner is told the link is revoked; it is not.
+    // Wall clocks cannot express causality, so the only sound fix is to look first: merge,
+    // then stamp newer than what is actually out there.
+    //
+    // ⚠️ NOT a delete. `envelopeMerge` unions, so a deletion does not propagate and any
+    // peer would resurrect the live wrap on its next sync. An overwrite DOES propagate,
+    // under the dict's newest-wins rule. And it is written even when this device holds no
+    // local entry: a member can mint on their own phone and publish while the owner still
+    // holds an older envelope, and an early return would let that wrap union straight back.
+    // (`wrapped: ''` is also what keeps `applyRevokedKeys` from ever filtering it out: an
+    // OLD client, which ignores `revokedKeys`, only loses the merge to it if it stays.)
+    //
+    // Inlined rather than imported: a static import of `magicLink` here pulls
+    // `inviteService` → `familyKeyService` into the eager boot graph and silently no-ops
+    // the deliberate `await import(...)` sites elsewhere. It is a pure 6-line value —
+    // a package nothing can unwrap.
+    return {
+      salt: '',
+      wrapped: '',
+      tokenHash: '',
+      keyId: base.keyId,
+      createdAt: new Date(
+        Math.max(Date.now(), (Date.parse(existing?.createdAt ?? '') || 0) + 1)
+      ).toISOString(),
+      expiresAt: new Date(0).toISOString(),
+    };
+  }
+
   /** Store (or replace) the family recovery-passphrase wrap in the envelope (Phase 3). */
   function setRecoveryPassphraseWrap(
     pkg: import('@/types/syncFileV4').BeanpodFileV4['recoveryPassphrase'] & object
@@ -6440,76 +6514,105 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Retire what we CAN of a member's family-key material.
+   * Record revocation tombstones in the envelope and drop what they name, IN MEMORY ONLY
+   * (tracker #77). Commit-only by design, like `setEnvelopeEntry`: the caller runs its own
+   * single publish (member removal's durable save; unclaim's `syncNowBounded`), so a
+   * removal is one save, not three.
    *
-   * ⚠️ READ THIS BEFORE TELLING A FAMILY THEIR ACCESS IS REVOKED. It is not, and this function
-   * cannot make it so. Envelope key dicts are merged LOCAL-WINS-BY-UNION
-   * (`envelopeMerge.mergeKeyDict` is `{...remote, ...local}`), and a spread cannot express a
-   * deletion. So the very `syncNowBounded()` that follows an unclaim runs
-   * `fetchAndMergeRemote` → `adoptRemoteEnvelopeKeys` → `preserveLocalKeyDicts`, the remote copy
-   * of the wrap unions straight back in, and it is re-uploaded. Any second family device does
-   * the same on its next poll. Proven, not assumed:
+   * Builds from `authoritativeEnvelope()`, never `envelope.value` (see that function). The
+   * tombstones propagate because `mergeEnvelopes` unions them and filters on every merge —
+   * a bare local delete would be restored by the next one.
    *
-   *     mergeKeyDict({A:'w', B:'w'}, {A:'w'})  ->  {A:'w', B:'w'}
-   *
-   * `envelopeMerge.ts` states the limitation in its own header ("deletions don't propagate
-   * either direction ... requires tombstones, tracked separately"). Until tombstones exist,
-   * envelope-level revocation is NOT available to any caller, and an earlier version of this
-   * function promised it in its name, its log line and the confirm copy above it.
-   *
-   * What IS real and does stick:
-   *  · the doc-side `pinHash` / `passwordHash` clear and the `pinVersion` bump, which are
-   *    Automerge writes and merge properly — that is what blocks sign-in and re-enables the
-   *    invite, i.e. the thing the owner actually asked for;
-   *  · this device's passkey/unlock credentials, via `invalidateDeviceCredentials`;
-   *  · the in-memory `passkeySecrets` entries below, which matter because
-   *    `effectivePasskeySecrets` lets the in-memory ref WIN over the envelope — so a passkey
-   *    enrolled this session would otherwise keep offering its `wrappedFamilyKey` to
-   *    `useBiometricSignIn` for the rest of the session.
-   *
-   * Returns what happened, rather than a bare count, so the caller can report honestly instead
-   * of asserting a cleanup it did not observe.
+   * `committed: false` means there was no envelope; the CALLER must report it.
    */
-  function retireMemberKeyMaterial(memberId: string): {
-    localWrapsCleared: number;
+  function revokeEnvelopeEntries(tombstones: Record<string, EnvelopeTombstone>): {
+    committed: boolean;
+    filtered: number;
+  } {
+    const base = authoritativeEnvelope();
+    if (!base) return { committed: false, filtered: 0 };
+    const { envelope: next, filtered } = applyRevokedKeys({
+      ...base,
+      revokedKeys: mergeRevokedKeys(base.revokedKeys, tombstones),
+    });
+    commitEnvelope(next);
+    return { committed: true, filtered };
+  }
+
+  /** Does the authoritative envelope hold any key material for this member? (#77) */
+  function holdsKeyMaterialFor(memberId: string): boolean {
+    const base = authoritativeEnvelope();
+    return !!base && memberHasKeyMaterial(base, memberId);
+  }
+
+  /**
+   * Revoke a member's family-key material in the envelope, durably across devices once the
+   * caller's save lands (tracker #77).
+   *
+   *  - `'remove'`: the member is leaving for good — `member:<id>` (every attributed wrap,
+   *    including ones this device never saw) plus every invite, which cannot be attributed.
+   *  - `'unclaim'`: the member stays and may re-claim — VALUE-PINNED tombstones for their
+   *    current password and passkey wraps only, so the re-claim's new wrap survives.
+   *
+   * Also clears this session's in-memory `passkeySecrets` for the member, which matter
+   * because `effectivePasskeySecrets` lets the in-memory ref WIN over the envelope.
+   *
+   * Passkey wraps with no `memberId` (older envelopes) cannot be attributed and are left
+   * alone — deleting one could lock out whoever it does belong to — but they are counted.
+   */
+  function retireMemberKeyMaterial(
+    memberId: string,
+    mode: 'remove' | 'unclaim'
+  ): {
+    tombstonesWritten: number;
+    entriesDropped: number;
+    unattributedPasskeys: number;
     passkeySecretsCleared: number;
     /** True when there was no envelope at all — nothing was even attempted. */
     noEnvelope: boolean;
   } {
-    // In-memory passkey secrets first: this part is unconditional and genuinely effective for
-    // the rest of the session, envelope or no envelope.
     const before = passkeySecrets.value.length;
     passkeySecrets.value = passkeySecrets.value.filter((sec) => sec.memberId !== memberId);
     const passkeySecretsCleared = before - passkeySecrets.value.length;
 
     const base = authoritativeEnvelope();
+    const empty = { tombstonesWritten: 0, entriesDropped: 0, unattributedPasskeys: 0 };
     if (!base) {
-      return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: true };
+      reportError({
+        surface: 'envelope-revocation',
+        message: 'no envelope to record revocations in',
+        severity: 'warning',
+        context: { action: 'revoke_no_envelope', kind: mode, member_id_tail: memberId.slice(-8) },
+      });
+      return { ...empty, passkeySecretsCleared, noEnvelope: true };
     }
 
-    const wrappedKeys = { ...base.wrappedKeys };
-    let localWrapsCleared = 0;
-    if (wrappedKeys[memberId]) {
-      delete wrappedKeys[memberId];
-      localWrapsCleared += 1;
-    }
-
-    const passkeyWrappedKeys = { ...base.passkeyWrappedKeys };
-    for (const [credentialId, wpk] of Object.entries(passkeyWrappedKeys)) {
-      // ⚠️ An entry with NO `memberId` is an older envelope's, and is deliberately left alone:
-      // it cannot be attributed to this member, and deleting it would lock whoever it does
-      // belong to out of the pod. A stale wrap is recoverable; a destroyed one is not.
-      if (wpk.memberId === memberId) {
-        delete passkeyWrappedKeys[credentialId];
-        localWrapsCleared += 1;
-      }
-    }
-    if (localWrapsCleared === 0) {
-      return { localWrapsCleared: 0, passkeySecretsCleared, noEnvelope: false };
-    }
-
-    commitEnvelope({ ...base, wrappedKeys, passkeyWrappedKeys });
-    return { localWrapsCleared, passkeySecretsCleared, noEnvelope: false };
+    const { tombstones, unattributedPasskeys } = revocationTombstonesForMember(base, memberId, {
+      mode,
+      now: new Date().toISOString(),
+    });
+    const tombstonesWritten = Object.keys(tombstones).length;
+    const { filtered: entriesDropped } =
+      tombstonesWritten > 0 ? revokeEnvelopeEntries(tombstones) : { filtered: 0 };
+    logEvent({
+      level: 'info',
+      surface: 'envelope-revocation',
+      message: 'entries_revoked',
+      context: {
+        action: 'entries_revoked',
+        kind: mode,
+        count: tombstonesWritten,
+        detail: `dropped=${entriesDropped} unattributed_passkeys=${unattributedPasskeys}`,
+        member_id_tail: memberId.slice(-8),
+      },
+    });
+    return {
+      tombstonesWritten,
+      entriesDropped,
+      unattributedPasskeys,
+      passkeySecretsCleared,
+      noEnvelope: false,
+    };
   }
 
   function removePasskeySecretsForCredential(credentialId: string): void {
@@ -6743,6 +6846,10 @@ export const useSyncStore = defineStore('sync', () => {
     deviceApprovalCreatedAt,
     setMemberLinkWrap,
     revokeMemberLink,
+    observeRemote,
+    stageMemberLinkTombstone,
+    revokeEnvelopeEntries,
+    holdsKeyMaterialFor,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,
   };

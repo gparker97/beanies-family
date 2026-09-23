@@ -223,8 +223,77 @@ const MAGIC_LINK_ARTICLE: HelpArticle = {
   ],
 };
 
+/**
+ * Removing a family member (tracker #77). ⚠️ SAY ONLY WHAT IS TRUE. Every member shares one
+ * family key and it is not rotated on removal (#117), so this must never claim "their keys
+ * are destroyed" or "their password no longer opens the family's data on any device" —
+ * copy drafted during #76 said both, and neither is true of what removal can do.
+ */
+const REMOVING_A_MEMBER_ARTICLE: HelpArticle = {
+  slug: 'removing-a-family-member',
+  category: 'security',
+  title: 'What Happens When You Remove a Family Member',
+  excerpt:
+    'Removing someone stops their sign-ins, links and file access from then on. Anything already on their own device stays with them.',
+  icon: '\u{1F6AA}',
+  readTime: 3,
+  updatedDate: '2026-09-23',
+  sections: [
+    { type: 'heading', content: 'What removal does', level: 2, id: 'what-it-does' },
+    {
+      type: 'paragraph',
+      content:
+        'An owner or manager can remove a family member from their page in <strong>Meet the Beans</strong>. From that moment:',
+    },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'Their PIN, password, face or fingerprint sign-in and magic link can no longer be used to open your family file as it is from now on.',
+        'Every invite link that has not been used yet stops working too. If you were in the middle of inviting someone else, send them a new one.',
+        'Their access to your family file in <strong>Google Drive</strong> is removed, so their app can no longer load anything new.',
+        'On any device that can still read your family file, beanies signs them out and removes their sign-in from it. It clears your family from that device completely when nobody else in the family uses it and nothing unsaved is waiting on it; otherwise it locks your family on that device, so only people still in the family can open it.',
+      ],
+    },
+    {
+      type: 'callout',
+      title: 'It needs a connection',
+      icon: '\u{1F4F6}',
+      content:
+        'If your family file is in Google Drive, you need to be online to remove someone, so the removal reaches every device at once.',
+    },
+    { type: 'heading', content: 'What removal cannot do', level: 2, id: 'limits' },
+    {
+      type: 'paragraph',
+      content:
+        'Removal protects everything your family adds <strong>from now on</strong>. It cannot reach what is already on their own device:',
+    },
+    {
+      type: 'list',
+      content: '',
+      items: [
+        'Anything they already downloaded or copied stays readable to them. That includes the offline copy the app keeps on their phone or computer, which their PIN or fingerprint may still open if that device never sees the removal.',
+        'Photos are shared by link, so a photo link they kept still opens that photo.',
+        'If they knew your family recovery passphrase or had a copy of your recovery kit, those still open any copy of the family file they already have.',
+      ],
+    },
+    {
+      type: 'heading',
+      content: 'If beanies asks you to check Google Drive',
+      level: 2,
+      id: 'check-drive',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Sometimes beanies cannot confirm their Drive access was removed, for example if they were invited with a different email address than the one on their profile. beanies tells you when that happens. Open Google Drive, find your <strong>beanies.family</strong> folder, choose <strong>Share</strong>, and remove them from the folder and from your family file.',
+    },
+  ],
+};
+
 export const SECURITY_ARTICLES: HelpArticle[] = [
   MAGIC_LINK_ARTICLE,
+  REMOVING_A_MEMBER_ARTICLE,
   {
     slug: 'how-your-data-is-encrypted',
     category: 'security',

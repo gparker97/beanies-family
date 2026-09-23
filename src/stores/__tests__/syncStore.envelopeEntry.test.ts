@@ -91,6 +91,14 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
 vi.mock('@/services/sync/envelopeMerge', () => ({
   preserveLocalKeyDicts: vi.fn((remote: unknown) => remote),
   keyDictSize: vi.fn(() => 0),
+  mergeEnvelopes: vi.fn((remote: unknown) => ({
+    envelope: remote,
+    needsPublish: false,
+    filtered: 0,
+  })),
+  applyRevokedKeys: vi.fn((env: unknown) => ({ envelope: env, filtered: 0 })),
+  mergeRevokedKeys: vi.fn((a: unknown, b: unknown) => ({ ...(a ?? {}), ...(b ?? {}) })),
+  revocationTombstonesForMember: vi.fn(() => ({ tombstones: {}, unattributedPasskeys: 0 })),
   // Real behaviour, not a pass-through: `replaceEnvelope` strips the payload
   // from the long-lived envelope, and a stub that skipped it would hide a
   // regression in exactly the invariant this change introduces.

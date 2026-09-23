@@ -72,18 +72,37 @@ export async function removeMember(id: string): Promise<boolean> {
   // Step-up AFTER the confirm, so cancelling the confirm never shows a PIN prompt.
   if (!(await requireReauth())) return false;
 
-  const removed = await familyStore.deleteMember(id);
-  if (!removed) {
-    // Previously invisible: no throw, so no toast, and the caller navigated anyway.
-    const t = useTranslationStore().t;
-    showToast('error', t('family.deleteFailed'));
-    reportError({
-      surface: 'member-removal',
-      message: 'deleteMember returned false',
-      severity: 'warning',
-      context: { action: 'delete_returned_false', member_id_tail: id.slice(-6) },
-    });
+  const outcome = await familyStore.deleteMember(id);
+  const t = useTranslationStore().t;
+  if (!outcome.removed) {
+    if (outcome.refusal === 'offline') {
+      await showAlert({ title: 'family.removeOfflineTitle', message: 'family.removeOffline' });
+    } else if (outcome.refusal === 'not-found') {
+      // Previously invisible: no throw, so no toast, and the caller navigated anyway.
+      showToast('error', t('family.deleteFailed'));
+      reportError({
+        surface: 'member-removal',
+        message: 'deleteMember found no such member',
+        severity: 'warning',
+        context: { action: 'delete_returned_false', member_id_tail: id.slice(-6) },
+      });
+    }
+    // 'error': `wrapAsync` has already toasted and reported the throw.
     return false;
+  }
+
+  showToast(
+    outcome.save === 'saved' ? 'success' : 'info',
+    t(outcome.save === 'saved' ? 'family.removeDone' : 'family.removeSavePending')
+  );
+  if (outcome.drive === 'manual-check') {
+    // The one step the family may have to do by hand (#77). The address, when we know it,
+    // goes in `detail` (plain text); the steps themselves need no placeholder.
+    await showAlert({
+      title: 'family.removeDriveManualTitle',
+      message: 'family.removeDriveManual',
+      detail: outcome.manualCheckEmail ?? undefined,
+    });
   }
   return true;
 }
