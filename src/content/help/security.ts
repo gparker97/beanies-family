@@ -581,7 +581,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The kit is created when your family is created. You can also create (or replace) one any time in <strong>Settings \u2192 Security &amp; Recovery</strong>. <strong>Regenerating replaces the old kit</strong> \u2014 the old code stops working, and the new one is the copy to keep.',
+          'The kit is created when your family is created. You can also create a new one any time in <strong>Settings \u2192 Security &amp; Recovery</strong>. <strong>Creating a new kit does not switch off an old one:</strong> every kit you have made still opens your family\u2019s data, so keep each copy as safe as the first and destroy any copy you no longer need.',
       },
       {
         type: 'callout',
