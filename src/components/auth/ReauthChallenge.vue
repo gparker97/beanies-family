@@ -15,7 +15,7 @@
  * caller is responsible for the host modal/overlay. The only modal this
  * component opens is the password sub-flow, on top of the host.
  */
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { BaseButton } from '@/components/ui';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import {
@@ -24,6 +24,7 @@ import {
   MEMBER_MISMATCH,
 } from '@/services/auth/passkeyService';
 import PinInput from '@/components/ui/PinInput.vue';
+import StatusPill from '@/components/ui/StatusPill.vue';
 import PinKeypad from '@/components/ui/PinKeypad.vue';
 import { usePinPad } from '@/composables/usePinPad';
 import { isNative } from '@/services/sync/capabilities';
@@ -60,6 +61,8 @@ const props = defineProps<{
    * component does not.
    */
   keypad?: boolean;
+  /** What the in-progress line says while the biometric check runs. */
+  passkeyWaitingKey?: UIStringKey;
 }>();
 
 const emit = defineEmits<{
@@ -83,6 +86,12 @@ const passwordError = ref<string | null>(null);
 const inlineError = ref<string | null>(null);
 
 const hasPin = computed(() => !!props.member.pinHash);
+/**
+ * The pad is busy only with its OWN work. The shared `isVerifying` is also set by a
+ * biometric check, and gating the pad on it opened a dead pad when "Use PIN instead?" was
+ * tapped mid-check.
+ */
+const pinBusy = computed(() => isVerifying.value && !passkeyInFlight.value);
 // Password step-up survives ONLY for legacy members who haven't set a PIN yet —
 // once a PIN exists it is the memorable step-up, password entry stops appearing.
 const hasPassword = computed(() => !!props.member.passwordHash && !props.member.pinHash);
@@ -174,6 +183,42 @@ function openWhenSoleMethod(): void {
   if (hasPin.value && !passkeyAvailable.value) showPinEntry.value = true;
 }
 
+/**
+ * Biometric is the DEFAULT, so it starts by itself (greg, 2026-09-23): there is no "which
+ * method?" screen any more. Once per opening — a person who cancels the OS prompt gets a
+ * retry button and "Use PIN instead?" rather than the prompt reappearing on its own.
+ */
+const autoPasskeyTried = ref(false);
+/**
+ * A biometric check is in flight — its OWN flag, not `isVerifying`, which a password or PIN
+ * check also sets and which would otherwise show "checking your passkey" during those.
+ */
+const passkeyInFlight = ref(false);
+/**
+ * False once unmounted. Detection awaits the keystore, and an unmounted component keeps its
+ * last props (`open` still true) — without this a late detection would raise the OS
+ * biometric prompt after the host had already taken the challenge away.
+ */
+let alive = true;
+onUnmounted(() => {
+  alive = false;
+});
+function startPasskeyIfDefault(): void {
+  // Never after the person chose the PIN: detection can settle late, and a biometric prompt
+  // appearing over the pad they picked is the screen overruling them.
+  if (
+    !alive ||
+    !passkeyAvailable.value ||
+    autoPasskeyTried.value ||
+    showPinEntry.value ||
+    !props.open
+  ) {
+    return;
+  }
+  autoPasskeyTried.value = true;
+  void tryPasskey();
+}
+
 async function detectPasskey() {
   // Phase 4: biometric step-up is NATIVE-only (the web WebAuthn+PRF path is retired).
   if (!isNative() || !authStore.currentUser?.familyId) {
@@ -189,6 +234,7 @@ async function detectPasskey() {
     const deviceKeys = await resolveDeviceKeys(authStore.currentUser.familyId);
     passkeyAvailable.value = deviceKeys.some((k) => k.memberId === props.member.id);
     openWhenSoleMethod();
+    startPasskeyIfDefault();
   } catch (e) {
     // Detection failure is non-fatal — fall back to password-only UX.
     passkeyAvailable.value = false;
@@ -208,6 +254,10 @@ watch(
       inlineError.value = null;
       passwordError.value = null;
       showPinEntry.value = false;
+      autoPasskeyTried.value = false;
+      // Re-derived by detection; a stale `true` from the last opening would show a retry
+      // button that races the auto-start into two concurrent biometric calls.
+      passkeyAvailable.value = false;
       detectPasskey();
     }
   }
@@ -227,7 +277,10 @@ async function tryPasskey() {
     return;
   }
 
+  // One biometric call at a time: a manual retry and the auto-start must never overlap.
+  if (passkeyInFlight.value) return;
   isVerifying.value = true;
+  passkeyInFlight.value = true;
   inlineError.value = null;
   try {
     // Naming the member turns this from "prompt, then discover it was the wrong person"
@@ -284,6 +337,7 @@ async function tryPasskey() {
     });
   } finally {
     isVerifying.value = false;
+    passkeyInFlight.value = false;
   }
 }
 
@@ -365,15 +419,17 @@ function cancel() {
 
     <!-- Choice: passkey first, then password -->
     <div v-else class="space-y-3">
-      <BaseButton
-        v-if="passkeyAvailable"
-        variant="primary"
-        :disabled="isVerifying"
-        class="w-full"
-        @click="tryPasskey"
-      >
-        🔐 {{ t('reauth.passkeyButton') }}
-      </BaseButton>
+      <!-- Biometric in progress, or ready to retry after the person cancelled the OS prompt.
+           Hidden once they chose the PIN, so the pad is the only thing asking for input. -->
+      <div v-if="passkeyAvailable && !showPinEntry" class="text-center">
+        <StatusPill
+          v-if="passkeyInFlight"
+          :text="t(props.passkeyWaitingKey ?? 'reauth.passkeyWaiting')"
+        />
+        <BaseButton v-else variant="primary" class="w-full" @click="tryPasskey">
+          🔐 {{ t('reauth.passkeyButton') }}
+        </BaseButton>
+      </div>
 
       <div v-if="hasPin && showPinEntry" class="space-y-2">
         <p class="dark:text-ink-soft text-center text-sm font-medium text-gray-600">
@@ -382,7 +438,7 @@ function cancel() {
         <PinInput
           v-model="pinValue"
           :has-error="!!pinError"
-          :disabled="isVerifying || pinLimit.inCooldown.value"
+          :disabled="pinBusy || pinLimit.inCooldown.value"
           :keypad="keypad"
           autofocus
           :label="t('pin.enterPin')"
@@ -390,7 +446,7 @@ function cancel() {
         />
         <PinKeypad
           v-if="keypad"
-          :disabled="isVerifying || pinLimit.inCooldown.value"
+          :disabled="pinBusy || pinLimit.inCooldown.value"
           @digit="pad.press"
           @backspace="pad.backspace"
         />
@@ -407,14 +463,11 @@ function cancel() {
           }}
         </p>
       </div>
-      <BaseButton
-        v-else-if="hasPin"
-        :variant="passkeyAvailable ? 'ghost' : 'primary'"
-        :disabled="isVerifying"
-        class="w-full"
-        @click="showPinEntry = true"
-      >
-        🔢 {{ t('pin.signInWithPin') }}
+      <!-- Only reachable when biometric is the default: a PIN-only member has the pad open
+           already (`openWhenSoleMethod`). Enabled even mid-check, so the way out is always
+           one tap. -->
+      <BaseButton v-else-if="hasPin" variant="outline" class="w-full" @click="showPinEntry = true">
+        {{ passkeyAvailable ? t('pin.useInstead') : t('pin.signInWithPin') }}
       </BaseButton>
 
       <BaseButton

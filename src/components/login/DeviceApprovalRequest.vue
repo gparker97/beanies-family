@@ -21,6 +21,8 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import StatusPill from '@/components/ui/StatusPill.vue';
+import ApprovalCodeCheck from '@/components/auth/ApprovalCodeCheck.vue';
 import { renderQr } from '@/utils/qrCode';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
@@ -361,24 +363,10 @@ function retry(): void {
     </div>
 
     <template v-if="fingerprint && !expired && !failed && !approved">
-      <p
-        class="font-outfit dark:text-ink dark:bg-surface-overlay mt-3 inline-block rounded-xl bg-gray-50 px-3 py-1.5 text-lg font-bold tracking-[0.22em] text-gray-900"
-        data-testid="approval-fingerprint"
-      >
-        {{ fingerprint }}
-      </p>
-      <p class="dark:text-ink-faint mt-2 text-xs text-gray-500">
-        {{ t('deviceApproval.compareHint') }}
-      </p>
-      <p
-        class="dark:text-ink-soft mt-3 flex items-center justify-center gap-2 text-sm text-gray-600"
-      >
-        <span
-          class="bg-primary-500 h-2 w-2 shrink-0 animate-pulse rounded-full"
-          aria-hidden="true"
-        />
-        {{ t('deviceApproval.waiting') }}
-      </p>
+      <ApprovalCodeCheck class="mt-4" :code="fingerprint" testid="approval-fingerprint" />
+      <!-- A real in-progress indicator. This was an 8px pulsing dot, which read as a colour
+           change rather than as work being done while the pickup took 5-10 seconds. -->
+      <StatusPill class="mt-4" :text="t('deviceApproval.waiting')" />
     </template>
 
     <!-- Expired and failed both say what happened and what to do — never a dead screen. -->

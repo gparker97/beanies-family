@@ -21,6 +21,14 @@ _On `main`, not yet released._
   already copied stays with them; the new Help Center article explains exactly what removal
   can and cannot do.
 
+### Changed
+
+- **Letting a new device in is quicker and clearer.** Approving a sign-in now happens in one
+  sheet: Face ID or fingerprint starts by itself (with "Use PIN instead?" one tap away), or
+  the PIN pad opens straight away. Both devices show the code to compare in the same way, the
+  waiting device shows a clear spinner, and the wording on every screen of the flow is
+  simpler.
+
 ### Fixed
 
 - **Setting up a pod no longer moves on without you.** If you closed Google's sign-in
