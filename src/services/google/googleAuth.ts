@@ -12,7 +12,11 @@
 
 import { generateCodeVerifier, generateCodeChallenge } from './pkce';
 import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
-import { isPermanentRefreshFailure, isRefreshRejection } from './refreshFailure';
+import {
+  isPermanentRefreshFailure,
+  isRefreshRejection,
+  googleOAuthErrorCode,
+} from './refreshFailure';
 import { revokeGrant, logTokenLifecycle } from './googleRevoke';
 import { encodeRedirectState, type RedirectMode, type RedirectGrant } from './redirectState';
 import { stashPickerSelection, PICKER_REDIRECT_RESULT_KEY } from './pickerRedirect';
@@ -1321,6 +1325,15 @@ export interface SilentRefreshAttemptDiagnostic {
   classification: 'permanent' | 'timeout' | 'network' | 'http' | 'unknown';
   errorName: string;
   errorMessage: string;
+  /**
+   * Google's machine-readable OAuth code (`invalid_grant`, `invalid_client`, …), or absent.
+   *
+   * ⚠️ STRUCTURED, NOT LEFT IN THE PROSE. `errorMessage` is truncated at 120 chars and is free
+   * text Google can reword; this is what a CloudWatch filter can actually key on. It is the
+   * field that tells one family's revoked grant (`invalid_grant`) apart from our OAuth client
+   * being broken for everyone (`invalid_client`) — which otherwise look identical in aggregate.
+   */
+  googleErrorCode?: string;
 }
 
 /**
@@ -1743,12 +1756,16 @@ async function performSilentRefresh(): Promise<string | null> {
       const classification = classifySilentRefreshError(e);
       // Truncate message to keep the Slack payload compact — full message
       // is still in the console log above.
+      const googleErrorCode = googleOAuthErrorCode(errorMessage);
       diagnosticAttempts.push({
         attempt,
         durationMs,
         classification,
         errorName,
         errorMessage: errorMessage.length > 120 ? errorMessage.slice(0, 120) + '…' : errorMessage,
+        // Omitted rather than set to null when Google named no code — an absent key reads as
+        // "we do not know", where a null could be mistaken for "Google sent nothing".
+        ...(googleErrorCode ? { googleErrorCode } : {}),
       });
 
       const isPermanent = classification === 'permanent';
