@@ -101,7 +101,9 @@ vi.mock('@/components/login/LoadPodView.vue', () => ({
   },
 }));
 vi.mock('@/components/login/PickBeanView.vue', () => ({ default: { template: '<div />' } }));
-vi.mock('@/components/login/CreatePodView.vue', () => ({ default: { template: '<div />' } }));
+vi.mock('@/components/login/CreatePodView.vue', () => ({
+  default: { template: '<div data-testid="create-pod" />' },
+}));
 vi.mock('@/components/login/ResumePodSetup.vue', () => ({
   default: {
     name: 'ResumePodSetup',
@@ -155,6 +157,36 @@ describe('LoginPage — the resume dispatcher is one-shot but stays alive', () =
       wrapper.find('[data-testid="load-pod"]').exists(),
       'a standing rule would snap the person mid-recovery back to the resume screen'
     ).toBe(true);
+  });
+
+  it('(d) does NOT yank an OPEN CREATE WIZARD to the resume screen', async () => {
+    // ⚠️ greg's 2026-09-23 report, and the mechanism is entirely inside this file.
+    //
+    // A person mid-create is authenticated with no pod yet, so `needsPodSetup` is true for the
+    // whole wizard. When App.vue's boot finally reaches its podless check — several awaits and
+    // two dynamic imports in, which on a cold dev boot lands 5-10 seconds after the page loads —
+    // it `router.replace`s to `/welcome?resume=setup` to "continue their flow". That navigation
+    // re-runs this effect, the setup branch fires, and `activeView` is taken from 'create' to
+    // 'resume-setup'. The wizard unmounts, which silently closes whatever modal it had open.
+    //
+    // greg hit it with the Drive-result modal on screen after cancelling Google's consent
+    // popup: the dialog vanished by itself and he was moved to "finish setting up your pod"
+    // having taken no action. His framing is the rule: the app was waiting on HIS decision.
+    const wrapper = mount(LoginPage);
+    await flushPromises();
+
+    (wrapper.vm as unknown as Record<string, () => void>).handleRequestCreate();
+    await nextTick();
+    expect(wrapper.find('[data-testid="create-pod"]').exists()).toBe(true);
+
+    // App.vue's boot rescue lands, late.
+    await navigateTo('setup');
+
+    expect(
+      wrapper.find('[data-testid="create-pod"]').exists(),
+      'the wizard must survive a late podless redirect — it IS the flow being steered to'
+    ).toBe(true);
+    expect(wrapper.find('[data-testid="resume-pod-setup"]').exists()).toBe(false);
   });
 
   it('(c) STILL dispatches `?resume=load-drive` after the setup branch has run in the same mount', async () => {

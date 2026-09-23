@@ -240,8 +240,24 @@ stopResumeWatch = watchEffect(() => {
   // One-shot via the flag, NOT via `stopResumeWatch()` — see `setupBranchHandled` above.
   if (setupBranchHandled) return;
   setupBranchHandled = true;
-  activeView.value = 'resume-setup';
   isInitializing.value = false;
+  // ⚠️ NEVER TAKE THE VIEW FROM AN OPEN CREATE WIZARD. Someone mid-create is authenticated with
+  // no pod yet, so `needsPodSetup` is true for the WHOLE wizard — and App.vue's boot podless
+  // check sits behind several awaits and two dynamic imports, so on a slow boot it can land
+  // here seconds after the person has started typing. It replaces to `?resume=setup` meaning
+  // "continue their flow", which is right when they are idle on the welcome gate and actively
+  // harmful once the wizard is open: the view swaps, `CreatePodView` unmounts, and any dialog
+  // it had on screen vanishes with it.
+  //
+  // greg hit exactly that on 2026-09-23 (create flow, desktop): he cancelled Google's consent
+  // popup, read the "sign-in was cancelled" dialog, and was moved to "finish setting up your
+  // pod" some seconds later having taken no action. His framing is the rule worth keeping:
+  // the app was waiting on HIS decision, so nothing was entitled to move on without it.
+  //
+  // Leaving the URL at `?resume=setup` is correct and harmless — they ARE podless. The wizard
+  // reaches the same screen a moment later through `handleFinishStorage`, by their own hand.
+  if (activeView.value === 'create') return;
+  activeView.value = 'resume-setup';
   // ⚠️ NO `stopResumeWatch()` HERE. This branch runs FIRST on every route-driven arrival at
   // ResumePodSetup (router guard `router/index.ts:454`/`:536`, podless rescue below, App.vue's
   // zombie redirect), and `?resume=load-drive` is reachable in the SAME mount (use a recovery

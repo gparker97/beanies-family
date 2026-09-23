@@ -34,6 +34,16 @@ interface ConfirmOptions {
   confirmLabel?: UIStringKey;
   /** Custom cancel button label (overrides default "Cancel") */
   cancelLabel?: UIStringKey;
+  /**
+   * A brand mascot to show INSTEAD of the icon squircle, as a `/brand/...` path.
+   *
+   * For the handful of moments that are emotional rather than transactional — a farewell, a
+   * milestone — where a small glyph in a coloured tile is the wrong register. Most dialogs should
+   * NOT set this: the squircle is the norm, and a mascot on every confirm would stop meaning
+   * anything. Pick the asset by the meaning the theme skill assigns it (§ Visual Assets), not by
+   * what looks nice; `covering_eyes` in particular is reserved for privacy and encryption.
+   */
+  mascotSrc?: string;
 }
 
 interface ConfirmState {
@@ -47,6 +57,7 @@ interface ConfirmState {
   showCancel: boolean;
   confirmLabel?: UIStringKey;
   cancelLabel?: UIStringKey;
+  mascotSrc?: string;
   resolve: ((value: boolean) => void) | null;
 }
 
@@ -63,6 +74,7 @@ const state = ref<ConfirmState>({
   confirmHref: undefined,
   confirmLabel: undefined,
   cancelLabel: undefined,
+  mascotSrc: undefined,
 });
 
 /**
@@ -82,6 +94,7 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
       showCancel: options.showCancel ?? true,
       confirmLabel: options.confirmLabel,
       cancelLabel: options.cancelLabel,
+      mascotSrc: options.mascotSrc,
       resolve,
     };
   });
