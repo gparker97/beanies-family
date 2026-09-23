@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="27 August 2026"
+  lastUpdated="24 September 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -22,14 +22,46 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <h2>how beanies.family works</h2>
     <p>
       beanies.family is a <strong>local-first application</strong>. this means your family data —
-      finances, activities, goals, to-dos, and everything else — lives on your device. it is never
-      transmitted to our servers because we don't have servers that store your data.
+      finances, activities, goals, to-dos, and everything else — lives on your device. your family
+      content is never transmitted to our servers.
     </p>
     <ul>
       <li><strong>local storage:</strong> all family data is stored in your browser's IndexedDB, encrypted at rest</li>
-      <li><strong>no accounts on our servers:</strong> we don't maintain user accounts, databases, or profiles on any server</li>
+      <li><strong>no accounts on our servers:</strong> there are no usernames, passwords or profiles on our servers. we keep one short directory entry per family so the app can find your family file again on a new device, described in <a href="#family-registry">the family registry</a> below</li>
       <li><strong>no cloud dependency:</strong> the app works fully offline — no internet connection required after initial load</li>
     </ul>
+  </section>
+
+  <section id="family-registry">
+    <h2>the family registry</h2>
+    <p>
+      there is one thing we do keep on our servers: a short directory entry for each family, called
+      the family registry. it lets the app find your family file again when you sign in on a new
+      device, and tells us roughly how many families use beanies.family. it never contains your
+      family content, and nothing in it can open your family file.
+    </p>
+    <p>each entry holds:</p>
+    <ul>
+      <li><strong>the family owner's email address</strong>, taken from the owner's profile, so we can reach the owner about a serious problem with their family</li>
+      <li><strong>your family's name</strong>, as you typed it when you created the family</li>
+      <li><strong>where the family file lives:</strong> whether it's kept on your device or in Google Drive, the file's name and, for Google Drive, its file id</li>
+      <li><strong>whether the owner opted in to our newsletter</strong></li>
+      <li><strong>your country</strong>, if you set one in Settings</li>
+      <li><strong>usage signals:</strong> the date the family was created, the date of the most recent sign-in (a date, not a time), which platform the family signed up on (web, iOS or Android), the approximate size of the encrypted family file, and how many members the family has (a number only, never names)</li>
+      <li><strong>random ids</strong> for the family and its owner, generated on your device</li>
+    </ul>
+    <p>
+      we use it to run the app and to understand how beanies.family is used overall. we do not sell
+      it or use it for advertising. it is stored with Amazon Web Services.
+    </p>
+    <p>
+      <strong>retention and deletion:</strong> the entry has no automatic expiry, because it is what
+      lets a returning family find their file on a new device. when you delete your family from
+      Settings, we remove the family name, the file location, the newsletter opt-in and the usage
+      signals, and keep only the owner's email, country, creation date and signup platform, so the
+      family can't be mistakenly registered again under someone else. to have those removed too,
+      contact us via the <a href="/">homepage</a> and we'll delete the entry entirely.
+    </p>
   </section>
 
   <section>
@@ -37,15 +69,16 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <p>to be absolutely clear, we do <strong>not</strong> collect:</p>
     <ul>
       <li>your financial data (accounts, transactions, balances, budgets)</li>
-      <li>your family information (names, relationships, activities)</li>
+      <li>your family members' names, relationships, or activities</li>
       <li>your goals, to-do items, or travel plans</li>
       <li>your passwords or encryption keys</li>
       <li>your location data</li>
       <li>your contacts or address book</li>
-      <li>your personal information beyond the limited technical diagnostics described below</li>
+      <li>your personal information beyond the family registry entry above and the limited technical diagnostics described below</li>
     </ul>
     <p>
-      the one thing that does reach us is a small amount of technical diagnostics, covered in
+      the only things that reach us are the <a href="#family-registry">family registry</a> entry
+      above and a small amount of technical diagnostics, covered in
       <a href="#diagnostics">diagnostics &amp; error reporting</a> below.
     </p>
   </section>
@@ -184,7 +217,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <ul>
       <li>used solely to label which Google account is connected to which family pod, so you can recognise it in the app's settings</li>
       <li>stored locally in your browser (IndexedDB), alongside the rest of your family data</li>
-      <li>never transmitted to or stored on our servers</li>
+      <li>never sent to our servers. (separately, the email on the family owner's profile is kept in <a href="#family-registry">the family registry</a>.)</li>
       <li>cleared when you sign out of beanies.family or revoke the Google authorisation</li>
     </ul>
   </section>
@@ -205,6 +238,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>Plausible Analytics:</strong> privacy-friendly, cookie-free analytics — on the website and in the apps</li>
       <li><strong>Google Drive:</strong> only if you explicitly enable it — encrypted data only</li>
       <li><strong>Google OAuth:</strong> only when you choose to sign in</li>
+      <li><strong>Amazon Web Services:</strong> hosts the family registry and our diagnostic logs</li>
       <li><strong>ExchangeRate API:</strong> to fetch currency exchange rates — no personal data is sent</li>
     </ul>
   </section>
@@ -221,9 +255,11 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   <section>
     <h2>children's privacy</h2>
     <p>
-      beanies.family is designed for families, which may include children. since all data is stored
-      locally on the parent's or guardian's device and we collect no personal information, there is
-      no data processing of children's information by us. the family owner controls all data.
+      beanies.family is designed for families, which may include children. family data is stored
+      locally on the parent's or guardian's device, and the only personal information we hold is the
+      family owner's email and the family name in <a href="#family-registry">the family registry</a>.
+      the registry records only how many members a family has, never their names or ages, so no
+      information about children reaches us. the family owner controls all data.
     </p>
   </section>
 
@@ -232,7 +268,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <ul>
       <li><strong>encryption at rest:</strong> local data is encrypted in IndexedDB</li>
       <li><strong>encryption in transit:</strong> Google Drive files are AES-GCM encrypted before upload</li>
-      <li><strong>your family data stays with you:</strong> your family content lives only on your devices and your own Google Drive, never on our servers. the only information that reaches us is the limited diagnostics described above</li>
+      <li><strong>your family data stays with you:</strong> your family content lives only on your devices and your own Google Drive, never on our servers. the only information that reaches us is the limited diagnostics and the family registry entry described above</li>
       <li><strong>open source:</strong> our code is publicly auditable on <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a></li>
     </ul>
   </section>
