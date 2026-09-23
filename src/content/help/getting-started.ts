@@ -81,7 +81,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "Family members join your pod through a <strong>secure invite link</strong>. The link contains a one-time token that grants access to your pod's encryption key \u2014 it expires after 24 hours.",
+          "Family members join your pod through a <strong>secure invite link</strong>. The link contains a token that grants access to your pod's encryption key, and it stops working after 24 hours. Until then anyone who has it can use it, so send it only to the person it is for.",
       },
       {
         type: 'heading',

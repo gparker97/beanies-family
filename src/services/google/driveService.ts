@@ -7,6 +7,7 @@
 
 import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
 import { extractGoogleError, isGoogleThrottleReason } from '@/utils/googleApiError';
+import { sameAccount } from '@/utils/email';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
@@ -338,6 +339,55 @@ export async function listFilePermissions(
   const res = await driveRequest(token, url);
   const data = await res.json();
   return data.permissions ?? [];
+}
+
+/**
+ * Delete one permission from a file or folder (tracker #77 — removing a member).
+ *
+ * The file's creator can do this under `drive.file` for files and folders the app made; a
+ * different actor may be refused (403), which the caller reports rather than hides.
+ */
+export async function deletePermission(
+  token: string,
+  fileId: string,
+  permissionId: string
+): Promise<void> {
+  await driveRequest(token, `${DRIVE_API}/files/${fileId}/permissions/${permissionId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Remove every `user` permission on `fileId` whose email matches one of `emails`
+ * (case-insensitive), NEVER the owner's. Per-permission failures are counted, not thrown,
+ * so one refused delete does not stop the rest; `lastStatus` carries the last HTTP status
+ * seen for the caller's log. Listing failure DOES throw: with no list nothing was checked.
+ */
+export async function revokeEmailsFromFile(
+  token: string,
+  fileId: string,
+  emails: readonly string[]
+): Promise<{ deleted: number; failed: number; lastStatus?: number }> {
+  const permissions = await listFilePermissions(token, fileId);
+  const targets = permissions.filter(
+    (p) =>
+      p.type === 'user' && p.role !== 'owner' && emails.some((e) => sameAccount(e, p.emailAddress))
+  );
+  let deleted = 0;
+  let failed = 0;
+  let lastStatus: number | undefined;
+  for (const p of targets) {
+    try {
+      await deletePermission(token, fileId, p.id);
+      deleted++;
+    } catch (e) {
+      failed++;
+      const status = (e as { status?: unknown }).status;
+      if (typeof status === 'number') lastStatus = status;
+      console.warn('[driveService] permission delete failed', { fileId, status, error: e });
+    }
+  }
+  return { deleted, failed, lastStatus };
 }
 
 /**

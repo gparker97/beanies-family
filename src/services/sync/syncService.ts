@@ -50,7 +50,8 @@ import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import { preserveLocalKeyDicts, withoutPayload } from './envelopeMerge';
+import { mergeEnvelopes, withoutPayload } from './envelopeMerge';
+import { logRevokedEntriesFiltered } from './revocationLog';
 import { setFlushProvider, setResaveHandler } from './offlineQueue';
 import {
   usePollWhileVisible,
@@ -1774,8 +1775,15 @@ async function fetchAndMergeRemote(): Promise<void> {
    * this device — so it is written once: a second copy drifting would lock a
    * family member out on whichever branch was not updated.
    */
-  const adoptRemoteEnvelopeKeys = (): void => {
-    setEnvelope(preserveLocalKeyDicts(remoteEnvelope, currentEnvelope));
+  const adoptRemoteEnvelopeKeys = (): boolean => {
+    const {
+      envelope: adopted,
+      needsPublish,
+      filtered,
+    } = mergeEnvelopes(remoteEnvelope, currentEnvelope);
+    logRevokedEntriesFiltered(filtered, 'merge');
+    setEnvelope(adopted);
+    return needsPublish;
   };
 
   if (merged.action === 'kept-local') {
@@ -1844,7 +1852,7 @@ async function fetchAndMergeRemote(): Promise<void> {
   // passkeyWrappedKeys) — the local side is the just-mutated state about to
   // be pushed. `setEnvelope` also RPCs the worker to re-persist the envelope
   // cache (keeps cold-start unlock working after a peer key-add/rotation).
-  adoptRemoteEnvelopeKeys();
+  const envelopeNeedsPublish = adoptRemoteEnvelopeKeys();
   // Terminus 2 (C10): the worker's doc now provably contains this remote state —
   // but only commit if no family switch landed mid read+merge (C1).
   // #65: `remoteHeads` is the heads of the bytes Drive holds (captured pre-migrate,
@@ -1855,7 +1863,14 @@ async function fetchAndMergeRemote(): Promise<void> {
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
   // on a no-op/remote-ahead merge.
+  //
+  // Plus the envelope's own signal (#77): a revocation tombstone the file lacks, or a
+  // file an old client re-polluted with revoked wraps, is invisible to the heads-derived
+  // `dirty`, and without this the file keeps the wraps until some unrelated edit.
+  // `saveInProgress`, for the reason given on the kept-local branch above: `doSave` runs
+  // this very merge before its own upload.
   if (dirty) triggerDebouncedSave();
+  else if (envelopeNeedsPublish && !saveInProgress) triggerDebouncedSave();
 }
 
 /**

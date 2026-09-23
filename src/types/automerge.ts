@@ -27,6 +27,7 @@ import type {
   DriveConnection,
   OverlapAck,
   ListCycle,
+  RemovedMember,
   Settings,
   PodLineage,
 } from './models';
@@ -90,6 +91,11 @@ export interface FamilyDocument {
    * linked-list embeds) can ever see one.
    */
   listCycles: Record<string, ListCycle>;
+  /**
+   * Members removed from the family, keyed by the removed member's id (tracker #77).
+   * Write-once, never deleted. See `RemovedMember` in models.ts.
+   */
+  removedMembers: Record<string, RemovedMember>;
   settings: Settings | null;
   /**
    * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
@@ -163,5 +169,6 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   driveConnections: 0,
   overlapAcknowledgments: 0,
   listCycles: 0,
+  removedMembers: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];

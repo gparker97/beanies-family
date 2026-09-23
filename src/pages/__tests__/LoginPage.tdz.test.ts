@@ -67,6 +67,7 @@ vi.mock('@/stores/familyStore', () => ({
 
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
+    consumePendingRemovedEviction: async () => false,
     // All three conditions true from the start — this is the scenario that
     // triggered the TDZ. Pre-fix, mounting threw a ReferenceError.
     isInitialized: true,

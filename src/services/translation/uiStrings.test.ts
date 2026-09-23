@@ -113,6 +113,8 @@ describe('uiStrings', () => {
       'ai.picker.expired.',
       'app.initError.',
       'auth.',
+      // Member removal (#77): what removal did, and what the remover must still do.
+      'family.remove',
       'reauth.',
       'password.',
       'pin.',

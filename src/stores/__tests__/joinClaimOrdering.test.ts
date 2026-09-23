@@ -91,7 +91,7 @@ describe('unclaimMember gives a stuck member their invite back', () => {
   it('takes the device credentials with it', async () => {
     // A wrap that outlives the PIN it belonged to is the orphan class ADR-029 exists for.
     const fn = await codeOfAuthStoreFn(...UNCLAIM);
-    expect(fn).toContain('invalidateDeviceCredentials');
+    expect(fn).toContain('retireMemberDeviceCredentials');
   });
 
   it('pushes the change to the family file', async () => {

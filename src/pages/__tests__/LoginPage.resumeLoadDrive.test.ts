@@ -58,6 +58,7 @@ vi.mock('@/stores/familyStore', () => ({
 
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
+    consumePendingRemovedEviction: async () => false,
     // The fresh-sign-in shape: initialized but NOT authenticated, no pod yet.
     isInitialized: true,
     isAuthenticated: false,

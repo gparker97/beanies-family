@@ -809,6 +809,9 @@ export function useLoginFlow(opts: {
         emitProveOutcome({ method: 'pin', ok, errorCode, fallbackDepth: s.fallbackDepth });
 
       // ── Doc-side verify path (pod open) — covers both shapes when the pod is open. ──
+      // (No removal gate here: nothing has PROVEN the PIN yet, and a removed member is not
+      // on the live roster this path picks from — `signInWithPin` simply fails. Their
+      // device credentials are retired by the removed-members watcher.)
       if (podOpen()) {
         const result = await authStore.signInWithPin(s.person.id, pin);
         if (!result.success) {
@@ -950,6 +953,15 @@ export function useLoginFlow(opts: {
           return;
         }
         await familyStore.loadMembers();
+      }
+      // #77: the pod records this member as REMOVED. The device wrap just proved the PIN;
+      // no session, nobody left selected (the no-session load above may have picked the
+      // owner), and this device's credentials for them go.
+      if ((await authStore.gateProvenMember(s.familyId, s.person.id, 'pin')) === 'removed') {
+        proveError.value = t('auth.memberRemoved');
+        emitOutcome(false, 'member-removed');
+        dispatch({ type: 'BACK' });
+        return;
       }
       // Doc open now — verify the doc hash, distinguishing the two stale states
       // (review F9): no doc-side pinHash at all means the WRAP is stale (the hash never

@@ -12,6 +12,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 _On `main`, not yet released._
 
+### Security
+
+- **Removing a family member now actually revokes their access.** Their sign-ins, saved
+  links and any unused invites stop opening your family file from then on, their Google
+  Drive access to the family file and folder is removed, and a device of theirs that can
+  still see the removal signs them out and clears or locks your family there. Anything they
+  already copied stays with them; the new Help Center article explains exactly what removal
+  can and cannot do.
+
 ### Fixed
 
 - **Setting up a pod no longer moves on without you.** If you closed Google's sign-in

@@ -5,7 +5,9 @@ import { setActivePinia, createPinia } from 'pinia';
 const { authMocks, syncMocks, reportErrorMock } = vi.hoisted(() => ({
   authMocks: {
     signInWithPasskey: vi.fn(),
-    updateSessionWithMemberData: vi.fn(),
+    updateSessionWithMemberData: vi.fn(() => true),
+    gateProvenMember: vi.fn(async () => 'live'),
+    abandonThinSession: vi.fn(),
   },
   syncMocks: {
     hasPendingEncryptedFile: false,
@@ -98,6 +100,28 @@ describe('useBiometricSignIn — the one shared "biometric succeeded, now become
     // perfectly successful unlock — the bug this branch exists to prevent.
     expect(syncMocks.decryptPendingFileWithKey).not.toHaveBeenCalled();
     expect(authMocks.updateSessionWithMemberData).toHaveBeenCalled();
+  });
+
+  it('never becomes a REMOVED member (#77): the gate evicts, no session is filled', async () => {
+    authMocks.signInWithPasskey.mockResolvedValue({ success: true, memberId: MEMBER });
+    authMocks.gateProvenMember.mockResolvedValueOnce('removed');
+    const { signIn } = useBiometricSignIn();
+
+    const result = await signIn(FAMILY, MEMBER);
+
+    expect(result).toEqual({ ok: false, message: 'auth.memberRemoved' });
+    expect(authMocks.gateProvenMember).toHaveBeenCalledWith(FAMILY, MEMBER, 'biometric');
+    expect(authMocks.updateSessionWithMemberData).not.toHaveBeenCalled();
+  });
+
+  it('fails rather than succeeding with no session behind it', async () => {
+    authMocks.signInWithPasskey.mockResolvedValue({ success: true, memberId: MEMBER });
+    authMocks.updateSessionWithMemberData.mockReturnValueOnce(false);
+    const { signIn } = useBiometricSignIn();
+
+    expect((await signIn(FAMILY, MEMBER)).ok).toBe(false);
+    // The thin session signInWithPasskey persisted must not survive to be read as tampering.
+    expect(authMocks.abandonThinSession).toHaveBeenCalled();
   });
 
   it('decrypts when a file IS pending', async () => {
