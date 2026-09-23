@@ -42,8 +42,20 @@ function onConfirmKeydown(e: KeyboardEvent): void {
   >
     <!-- Body -->
     <div class="flex flex-col items-center gap-4 text-center">
-      <!-- Icon in colored squircle -->
+      <!-- A mascot, for the few moments that are emotional rather than transactional (a
+           farewell, a milestone). No tile behind it: these are transparent PNGs that sit on the
+           modal surface directly, so they need no dark partner. Decorative — the title and
+           message carry the meaning, so it is hidden from screen readers. -->
+      <img
+        v-if="state.mascotSrc"
+        :src="state.mascotSrc"
+        alt=""
+        aria-hidden="true"
+        class="h-24 w-24 shrink-0"
+      />
+      <!-- Otherwise the standard icon in its coloured squircle. -->
       <div
+        v-else
         class="flex h-12 w-12 items-center justify-center rounded-2xl"
         :class="
           state.variant === 'danger'

@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-23
+
+_On `main`, not yet released._
+
+### Fixed
+
+- **Setting up a pod no longer moves on without you.** If you closed Google's sign-in
+  window and were reading the message about it, the app could take you to the next step a
+  few seconds later on its own. It now waits for you.
+- **Cancelling a Google sign-in says it was cancelled**, rather than telling you it
+  failed, and says it in your own language rather than in English.
+- **The icon at the top of confirmation and information dialogs** was a placeholder that
+  looked like a broken image. It is a proper icon now.
+- **Deleting a family says goodbye with the beanies**, instead of that placeholder.
+
 ## 2026-09-22
 
 _On `main`, not yet released._

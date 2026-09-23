@@ -1716,6 +1716,13 @@ async function handleDeleteFamilyClick() {
         : keptByChoice
           ? 'settings.deleteFamilyFarewellKeptFileMsg'
           : 'settings.deleteFamilyFarewellMsg',
+      // A goodbye is the one dialog in Settings that is purely emotional — nothing is being
+      // decided, the work is already done — so it gets the mascot rather than an icon tile.
+      // `family_hugging` is this app's warm-family medallion (onboarding, announcements, share,
+      // export), which reads as the farewell hug the copy describes. NOT `covering_eyes`, which
+      // the theme skill reserves for privacy and encryption; borrowing it here would blunt that
+      // meaning everywhere it is doing real work.
+      mascotSrc: '/brand/beanies_family_hugging_transparent_512x512.png',
     });
 
     // 7. Redirect
