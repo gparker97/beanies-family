@@ -126,7 +126,16 @@ export async function exchangeCodeForTokens(params: {
 
   if (!res.ok) {
     const err = (body ?? {}) as OAuthError;
-    const detail = err.error_description ?? err.error ?? 'unknown';
+    // ⚠️ THE MACHINE CODE GOES FIRST, AND IT IS NOT OPTIONAL. This used to be
+    // `error_description ?? error`, which kept Google's prose and threw the code away — so
+    // `invalid_grant` (one person revoked access; the reconnect banner is correct) and
+    // `invalid_client` (OUR OAuth client is broken; a fleet-wide outage) were indistinguishable
+    // in CloudWatch after the fact. The description is still carried, because it is what a
+    // human reads; the code is what a filter reads. See `googleOAuthErrorCode`.
+    const detail =
+      err.error && err.error_description
+        ? `${err.error}: ${err.error_description}`
+        : (err.error ?? err.error_description ?? 'unknown');
     console.warn(`[oauthProxy] Token exchange failed: HTTP ${res.status} — ${detail}`);
     throw new Error(`Token exchange failed: ${detail}`);
   }
@@ -175,7 +184,12 @@ export async function refreshAccessToken(params: {
 
   if (!res.ok) {
     const err = (body ?? {}) as OAuthError;
-    const detail = err.error_description ?? err.error ?? 'unknown';
+    // Same rule as the exchange above: the machine code leads, the prose follows. See the
+    // comment there, and `googleOAuthErrorCode` for why the code is the part that matters.
+    const detail =
+      err.error && err.error_description
+        ? `${err.error}: ${err.error_description}`
+        : (err.error ?? err.error_description ?? 'unknown');
     console.warn(`[oauthProxy] Token refresh failed: HTTP ${res.status} — ${detail}`);
     // ⚠️ The status MUST stay in the thrown message, not only in the warn above.
     // `refreshFailure.isRefreshRejection` reads it to tell a 4xx (Google refused
