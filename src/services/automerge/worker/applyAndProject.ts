@@ -26,6 +26,7 @@ import type { PodLineage, DriveConnection } from '@/types/models';
 import { PayloadLoadError, LocalDocUnreadableError, CacheInitError } from '@/types/sync';
 import type { CacheInitLoss } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
+import { importFamilyKey } from '@/services/crypto/familyKeyService';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import {
   docLineage,
@@ -555,9 +556,22 @@ function requireKey(method: string): CryptoKey {
 
 // ─── RPC handlers (the surface `docClient` calls) ────────────────────────────
 
-/** Post the family key (once at unlock; re-posted on re-spawn). */
-export function setKey(key: CryptoKey): void {
-  familyKey = key;
+/**
+ * Post the family key (once at unlock; re-posted on re-spawn).
+ *
+ * ⚠️ ACCEPTS RAW BYTES AS WELL AS A `CryptoKey`, AND THE BYTES ARE THE WORKER WIRE FORMAT.
+ * A `CryptoKey` is structured-cloneable per spec, but iOS WKWebView throws `DataCloneError`
+ * ("The object can not be cloned.") when one is posted to a worker — observed in production on
+ * two families across two builds. `postMessage` throws SYNCHRONOUSLY there, so the key never
+ * arrives, every later crypto op fails its `if (!familyKey)` guard, and the whole realm falls
+ * back to running Automerge inline on the main thread.
+ *
+ * Raw bytes clone everywhere, so `docClient` exports once and posts those instead. The
+ * `CryptoKey` arm is still live and is NOT dead code: inline mode hands the key over directly
+ * with no clone in the way, and it is also the fallback when a key cannot be exported.
+ */
+export async function setKey(key: CryptoKey | Uint8Array): Promise<void> {
+  familyKey = key instanceof Uint8Array ? await importFamilyKey(key) : key;
 }
 
 /**
@@ -1589,7 +1603,9 @@ export async function dispatch(
   const a = (args ?? {}) as Record<string, unknown>;
   switch (method) {
     case 'setKey':
-      setKey(a.key as CryptoKey);
+      // ⚠️ AWAITED. Importing raw bytes is async, and a floating promise here would let the
+      // rehydrate that follows run against a realm whose key has not landed yet.
+      await setKey((a.raw ?? a.key) as CryptoKey | Uint8Array);
       return {};
     case 'compactDoc':
       return { result: compactDoc() };
