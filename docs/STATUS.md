@@ -1,6 +1,8 @@
 # Project Status
 
-> **Last updated:** 2026-09-23 (SESSION — **NATIVE OAUTH RE-ENTRY BECAME ONE AWAIT AND FIVE RESUME MACHINES WERE DELETED; SHIPPED AS `0.21.8` (`aed1edf6`) to prod web, TestFlight and Play open testing.** Then three more fixes that are NOT in that build: the iOS doc-worker `CryptoKey` clone failure, the IDB noise predicate, and Google's OAuth error code. **greg is testing next session — the full plan is the block immediately below.**)
+> **Last updated:** 2026-09-23, evening (SESSION 2 — **`0.22.0` SHIPPED (`2b203d8e`): prod web + Astro, iOS SUBMITTED TO APP STORE REVIEW (`appstore-automatic`, build 81), Android Play open testing.** Carries #77 member-removal revocation, the #97 approval-sheet polish, AND the three fixes that missed 0.21.8. Also: 16 GitHub issues migrated/closed into Notion #99-#106, blog #56 videos cut. **The testing plan below is updated for 0.22.0 — everything in it is now shipped.**)
+>
+> Previous: 2026-09-23 session 1 — native OAuth re-entry became one await; shipped as `0.21.8` (`aed1edf6`).
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
      ⭐⭐ TESTING PLAN — 2026-09-23 SESSION. greg tests next session. ⭐⭐
@@ -10,16 +12,18 @@
 
 **Read the split first, it decides where you can test what.**
 
-| Commit     | What                                           | In 0.21.8?        |
-| ---------- | ---------------------------------------------- | ----------------- |
-| `9e19042a` | #63 deep links open the app                    | ✅ shipped        |
-| `64da057e` | native OAuth returns are awaited               | ✅ shipped        |
-| `d5015de7` | desktop reconnect popup cancel                 | ✅ shipped        |
-| `d1886ce4` | create-wizard yank, info icon, goodbye mascot  | ✅ shipped        |
-| `1ce58a0b` | **iOS doc-worker CryptoKey clone + IDB noise** | ❌ needs a deploy |
-| `b5d85a34` | **Google OAuth error code**                    | ❌ needs a deploy |
+| Commit     | What                                           | In 0.21.8?   |
+| ---------- | ---------------------------------------------- | ------------ |
+| `9e19042a` | #63 deep links open the app                    | ✅ shipped   |
+| `64da057e` | native OAuth returns are awaited               | ✅ shipped   |
+| `d5015de7` | desktop reconnect popup cancel                 | ✅ shipped   |
+| `d1886ce4` | create-wizard yank, info icon, goodbye mascot  | ✅ shipped   |
+| `1ce58a0b` | **iOS doc-worker CryptoKey clone + IDB noise** | ✅ in 0.22.0 |
+| `b5d85a34` | **Google OAuth error code**                    | ✅ in 0.22.0 |
+| `d5f521f2` | **#77 member removal revokes access**          | ✅ in 0.22.0 |
+| `0073a76e` | **#97 one-sheet device approval polish**       | ✅ in 0.22.0 |
 
-`0.21.8` is live on prod web, TestFlight (no review) and Play **open testing** (auto-submitted for Google review). The last two rows need a `0.21.9`.
+`0.22.0` (`2b203d8e`) is live on prod web, **submitted to App Store review** (auto-releases on approval; replaces the 0.21.8 TestFlight build) and on Play **open testing** (auto-submitted for Google review). Section C is now covered by that build; section E below is new.
 
 ### A. On the 0.21.8 native build (TestFlight / Play beta) — THE POINT OF THE RELEASE
 
@@ -46,7 +50,7 @@
 16. **Install the PWA and create a pod there.** That takes the full-page redirect instead of the popup — the closest proxy to native. Should return to the resume screen and carry on.
 17. **Dark mode + ~400px** on the resume and storage screens (a template block was deleted from them).
 
-### C. After a 0.21.9 deploy — the two that are not shipped
+### C. On 0.22.0 — the fixes that missed 0.21.8 (now shipped)
 
 18. **The iOS doc-worker fix (`1ce58a0b`) is the one to watch.** On iPhone, open a pod and look for the freeze. Then check CloudWatch: `doc-worker … failed` and `The object can not be cloned.` should go to **zero**. ⚠️ This is a plausible mechanism for the sync-freeze investigation, NOT proof it is the same thing.
 19. **`Cannot inject key into script value`** should stop paging `#beanies-errors`.
@@ -58,9 +62,18 @@
 - `reconnect-abandoned` at `info` (new) rather than everything landing in `warn`/`reconnect-failed`.
 - `app.onboardingStallTimeout` — **still unexplained.** 35s pre-auth boot hang, 5 firings in 30 days, iPhone. I disconfirmed my own theory that it was downstream of the worker issue (it fires before a family key exists). Next firing needs instrumentation, not a guess.
 
+### E. On 0.22.0 — #77 and the #97 approval polish (Notion rows carry the detail)
+
+21. **#77 remove a member** who is signed in on a second device. On that device, after it syncs: signed out, family cleared or locked. Their Google Drive access to the family file AND folder is gone (check sharing in Drive). Their saved magic link and any unused invites no longer open the pod.
+22. **#77 re-add the same person** afterwards: their new sign-in works on a second device once both sync.
+23. **#97 approve a new device** from a signed-in phone: one sheet; Face ID / fingerprint starts by itself with "Use PIN instead?" one tap away; with no passkey the PIN pad shows straight away. Cancelling the biometric prompt must NOT dismiss the approval.
+24. **#97 waiting device**: the ring spinner and the code check read clearly in light AND dark.
+25. **Update floor**: still 0.21.1 on purpose. Once 0.22.0 is LIVE on both stores (App Store approval + Play promotion), consider raising it: pre-0.22 clients ignore `revokedKeys` and can re-publish a revoked wrap.
+
 ### What I could NOT verify, and you should not assume
 
 - Anything native. No device, no simulator on WSL (no JDK, no `ANDROID_HOME`).
+- #77 and #97 on a real device; both were browser-verified only.
 - That the doc-worker fix cures the sync freeze. It removes a real mechanism; that is all that is established.
 - The two-consent-sheet edge in A10.
 
@@ -2397,6 +2410,44 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > **Previous update (2026-04-15):** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Pending / Next Session
+
+> **Validated 2026-09-23 (session 2 close, the 0.22.0 release).** Pending block re-checked by
+> fingerprint. **2 dropped.**
+>
+> - DROPPED: "the **0.21.1 update floor** is on `main` and UNPUBLISHED". `curl
+https://beanies.family/min-app-version.json` now serves `0.21.1`. Published.
+> - DROPPED: "**#82 and everything after it is undeployed**". Prod has since deployed six times;
+>   the latest `Deploy beanies PROD` is `2b203d8e` (0.22.0, today).
+> - NOTE: 5 open Dependabot PRs again (#345, #347-#350), including a **vitest 4 -> 5 major**.
+>   Their branches are the only non-`main` refs; kept (deleting closes the PR).
+>
+> **Session 2026-09-23 (2) record:**
+>
+> - **Shipped `0.22.0`** (`2b203d8e`, release note `2026.09.23.2`, SPOTLIGHT at greg's request:
+>   "Signing in is smoother than ever" + a lower "Security improvements" block for #77).
+>   Web + Astro deployed; iOS build 81 SUBMITTED to App Store review with `appstore-automatic`
+>   (What's New set, promo text unchanged); Android to Play `beta`. Floor left at 0.21.1.
+> - **Backfilled release notes** for the six releases that shipped without one (0.21.3-0.21.8):
+>   `2026.09.18`, `2026.09.20`, `2026.09.23`, summary-only, no spotlight. Lesson: the TestFlight
+>   / open-testing path in the deploy skills skipped the note six times in a row; a Vue deploy
+>   always needs one, even when the release is "for testing".
+> - **#77 member removal** and **#97 approval polish** built, reviewed and shipped (see the
+>   plan `docs/plans/2026-09-23-member-removal-revokes-access.md`; Notion rows updated with the
+>   release). Both Ready for Testing; section E of the testing plan above.
+> - **GitHub issues retired.** All 16 open issues triaged against the code: 8 migrated as Notion
+>   **#99-#106** (#99 recovery-kit list + invalidate, rescoped from key rotation by greg's
+>   decision: NO automatic rotation on member removal), #5 merged into Notion #39, 5 closed with
+>   reasons (#225 done as #53, #226 superseded by `64da057e`, #18/#41/#82 obsolete). GitHub now
+>   has **0 open issues**; the Notion tracker is the only tracker.
+> - **Help centre corrected** (`9cb42e98`): it claimed regenerating a recovery kit switches off
+>   the old one. It does not, until Notion #99 ships invalidation.
+> - **#38 (Qwen translation) PAUSED** by greg mid pre-plan; nothing written. Notion row unchanged.
+> - **Blog #56 videos**: flyer + travel share loops and the captain beanie animation (tagline
+>   period removed; a logo mark was tried and dropped) cut to GIF/WebP/MP4 in Drive
+>   `Marketing/Blog/blog images/app sharing/gif-edits/`, and the WebPs placed in the Notion post.
+> - **OPEN from greg (not acted on):** "never download the full file unless necessary" for the
+>   approval flow. The metadata revision probe already exists in `DeviceApprovalRequest.vue`
+>   (~130-155); greg has not said whether to go further.
 
 > **Validated 2026-09-16 (session close, #49 + the wall session).** Pending block re-checked by
 > fingerprint. **1 dropped, 2 confirmed still pending.**
