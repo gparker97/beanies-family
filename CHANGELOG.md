@@ -10,7 +10,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-23
 
-_On `main`, not yet released._
+_Released as app v0.22.0 (web, App Store, Play open testing). Release notes also
+backfilled for 0.21.3 to 0.21.8, which shipped without one._
 
 ### Security
 
@@ -46,6 +47,8 @@ _On `main`, not yet released._
   worker that does the heavy lifting and fall back to doing that work on the main
   thread, which made the app slow to open and could leave it hanging. It now hands the
   worker what it needs in a form iOS accepts.
+- **Corrected the Help Center on recovery kits:** creating a new kit does not switch off an
+  old one.
 
 ## 2026-09-22
 
