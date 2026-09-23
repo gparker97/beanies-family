@@ -29,7 +29,13 @@ export function isIdbTransientError(err: unknown): boolean {
     // Transactions can self-abort on iOS during SW activation with these
     // shapes — both surfaced as DOMException, both recoverable on retry.
     /Connection to Indexed Database server lost/i.test(msg) ||
-    /A mutation operation was attempted on a database that did not allow/i.test(msg)
+    /A mutation operation was attempted on a database that did not allow/i.test(msg) ||
+    // ⚠️ NAMES NEITHER "indexed" NOR "database", which is why the `UnknownError` pair above
+    // misses it. It is WebKit's IDB error for failing to write a keyPath into a stored value,
+    // and it reached #beanies-errors as an `unhandled-error` at CRITICAL from an iPhone on
+    // iOS 18.7 (2026-09-21). Matched on the literal rather than by loosening the pair test,
+    // which would start swallowing unrelated `UnknownError`s.
+    /Cannot inject key into script value/i.test(msg)
   );
 }
 
