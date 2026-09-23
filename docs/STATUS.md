@@ -1,13 +1,8 @@
 # Project Status
 
-> **2026-09-23, late (SESSION 3, committed to `main`, NOT deployed):** trust-on-create/join,
-> always-ask trust on other new devices, the shared sign-out confirm with a trust tick, and the
-> recovery-kit sign-out guard. Fixes greg's prod lockout ("Test new flow 4"). Plan +
-> implementation notes: `docs/plans/2026-09-23-trust-on-create-and-kit-signout-guard.md`.
-> Manual tests owed (native builds, a real second device, join, offline kit guard, demo mode)
-> are listed at the end of that session's report. Prod registry: 10 test families removed.
-
-> **Last updated:** 2026-09-23, evening (SESSION 2 — **`0.22.0` SHIPPED (`2b203d8e`): prod web + Astro, iOS SUBMITTED TO APP STORE REVIEW (`appstore-automatic`, build 81), Android Play open testing.** Carries #77 member-removal revocation, the #97 approval-sheet polish, AND the three fixes that missed 0.21.8. Also: 16 GitHub issues migrated/closed into Notion #99-#106, blog #56 videos cut. **The testing plan below is updated for 0.22.0 — everything in it is now shipped.**)
+> **Last updated:** 2026-09-23, late (SESSION 3 — **trust + sign-out kit guard, committed `195380a4` to `main`, NOT deployed.** Fixes greg's prod lockout on "Test new flow 4" (created a family, ticked past the kit, signed out keeping data, landed on kit entry with no way in: the creating device was never trusted, so the untrusted sign-out tier deleted the key cache + PIN wrap). Creating or joining a family now trusts the device (pinned by tests); every other new device is ALWAYS asked the trust question on first sign-in (first in the prompt chain, the one exemption from the interruption slot); desktop + mobile share one sign-out confirm (`SignOutHost` / `useSignOut`) with a trust tick + live hint; a manager whose kit was never SAVED gets a guard before any key-dropping sign-out, unless the envelope has another cold-open credential. Plan + implementation notes: `docs/plans/2026-09-23-trust-on-create-and-kit-signout-guard.md`. Two `/code-review high` rounds, 15 fixes; `validate` green (8596 tests); browser-verified desktop + 400px, light + dark. **Also:** prod family registry cleaned of 10 test families (Test new flow 4, Test Prod, 7 `@test.com` rows, test@example.com); kept `GP Dev Fam v4`, `GP Test Linking`, `The Beanie Family`, the two `beaniesdemo` rows, and the two unclear "test"/"Hello" rows. Testing: section F below.)
+>
+> Previous: 2026-09-23, evening (SESSION 2 — **`0.22.0` SHIPPED (`2b203d8e`): prod web + Astro, iOS SUBMITTED TO APP STORE REVIEW (`appstore-automatic`, build 81), Android Play open testing.** Carries #77 member-removal revocation, the #97 approval-sheet polish, AND the three fixes that missed 0.21.8. Also: 16 GitHub issues migrated/closed into Notion #99-#106, blog #56 videos cut. **The testing plan below is updated for 0.22.0 — everything in it is now shipped.**)
 >
 > Previous: 2026-09-23 session 1 — native OAuth re-entry became one await; shipped as `0.21.8` (`aed1edf6`).
 
@@ -77,12 +72,22 @@
 24. **#97 waiting device**: the ring spinner and the code check read clearly in light AND dark.
 25. **Update floor**: still 0.21.1 on purpose. Once 0.22.0 is LIVE on both stores (App Store approval + Play promotion), consider raising it: pre-0.22 clients ignore `revokedKeys` and can re-publish a revoked wrap.
 
+### F. Trust + the sign-out kit guard (committed `195380a4`, NOT deployed — needs a deploy first)
+
+26. **The prod repro, reversed.** Create a family, tick past the kit, sign out with the trust tick left CHECKED, reopen. Pass: "Who's signing in?" then your PIN, never the recovery-kit screen. Do it on iOS and Android builds too.
+27. **Always ask.** Sign in on a second browser profile or phone by magic link. Pass: "Trust this device?" shows FIRST, even over onboarding or the what's-new drawer.
+28. **Join trusts.** Join with a joining link on a phone, then open Sign Out. Pass: the tick is already checked.
+29. **The guard, offline, on real Drive.** Family whose kit was only ticked: go offline, untick, Sign Out, Create Recovery Kit, store it. Pass: "Your new kit hasn't reached your family file yet", still signed in; back online, "Try again" completes the sign-out.
+30. **Demo mode (`beaniesdemo`).** Pass: the sign-out confirm has no trust tick, and no guard ever appears.
+31. **Watch in CloudWatch:** `device_trust_set` (action create/join/prompt/settings/signout-tick), `auth_prompt_shown` (`kind:trust`, `detail:slot:bypassed` count), `kit_guard` / `kit_guard_outcome` (`sign_out_anyway` is the one to alert on later), and any `device_trust_set_failed` / `sign_out_failed` (both page as critical).
+
 ### What I could NOT verify, and you should not assume
 
 - Anything native. No device, no simulator on WSL (no JDK, no `ANDROID_HOME`).
 - #77 and #97 on a real device; both were browser-verified only.
 - That the doc-worker fix cures the sync freeze. It removes a real mechanism; that is all that is established.
 - The two-consent-sheet edge in A10.
+- Section F on native, on a real second device, or against real Google Drive (browser-verified with the in-memory provider only). The trust modal sitting above the onboarding wizard is unit-pinned, not browser-observed.
 
 <!-- ═══════════════════════════════════════════════════════════════════════════
      ⭐⭐ ADR-032 AUTOMERGE WEB WORKER MIGRATION — LIVE IN PROD (docWorker prod-ON) ⭐⭐
