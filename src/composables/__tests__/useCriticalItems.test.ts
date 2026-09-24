@@ -46,6 +46,18 @@ vi.mock('@/services/automerge/repositories/medicationLogRepository', () => ({
   deleteMedicationLog: vi.fn(),
 }));
 
+// Toggle `helpfulHints` per-test so the briefing's hint loop can be proven
+// flag-gated (under vitest `isFlagEnabled` is otherwise true for every flag).
+const { flagState } = vi.hoisted(() => ({ flagState: { helpfulHints: true } }));
+vi.mock('@/config/flags', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/config/flags')>();
+  return {
+    ...actual,
+    isFlagEnabled: (flag: string) =>
+      flag === 'helpfulHints' ? flagState.helpfulHints : actual.isFlagEnabled(flag as never),
+  };
+});
+
 vi.mock('@/composables/useToday', async () => {
   const { ref, computed } = await import('vue');
   const { toDateInputValue, getStartOfDay } = await import('@/utils/date');
@@ -154,6 +166,7 @@ describe('useCriticalItems', () => {
 
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    flagState.helpfulHints = true;
 
     familyStore = useFamilyStore();
     activityStore = useActivityStore();
@@ -967,5 +980,134 @@ describe('useCriticalItems', () => {
     const { criticalItems } = useCriticalItems();
     const meds = criticalItems.value.filter((i) => i.type === 'medication');
     expect(meds).toHaveLength(0);
+  });
+
+  // ── Helpful Hints (#40) in the briefing ──────────────────────────────
+  describe('helpful hints in the briefing', () => {
+    // A hint's dueDate is its NUDGE date — deliberately in the past relative to
+    // TODAY here, so any leak into the to-do loop would frame it as overdue.
+    const partyHint = () =>
+      makeTodo({
+        id: 'hint-1',
+        title: "Get a present for Emma's party (12 Mar)",
+        hintType: 'birthday-party-gift',
+        hintKey: 'birthday-party-gift:act-1:2026-03-12',
+        hintEventDate: '2026-03-12',
+        dueDate: '2026-03-08',
+        assigneeIds: ['parent-1'],
+        createdBy: 'parent-1',
+      });
+
+    it('shows a visible hint with fixed "Helpful hint:" framing and its type emoji', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(partyHint());
+
+      const { criticalItems } = useCriticalItems();
+      expect(criticalItems.value).toHaveLength(1);
+      const item = criticalItems.value[0];
+      expect(item.type).toBe('todo');
+      // Copy is asserted case-insensitively: the test locale renders the beanie
+      // (lowercase) variant, prod English renders "Helpful hint: …".
+      expect(item.message).toMatch(/^helpful hint: get a present for Emma's party \(12 Mar\)$/i);
+      expect(item.icon).toBe('🎉');
+      expect(item.completable).toBe(true);
+      expect(item.completed).toBe(false);
+      expect(item.time).toBe('');
+    });
+
+    it('never frames a past-nudge-date hint as overdue (no date label, no ⏰)', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(partyHint());
+
+      const { criticalItems } = useCriticalItems();
+      const item = criticalItems.value[0];
+      expect(item.message).not.toMatch(/gentle/i);
+      expect(item.message).not.toContain('8 Mar');
+      expect(item.icon).not.toBe('⏰');
+    });
+
+    it('hides a surprise-sensitive hint from a non-assignee, shows it to the assignee', () => {
+      todoStore.todos.push(
+        makeTodo({
+          id: 'hint-present',
+          title: 'Plan a birthday present for Mom (20 Mar)',
+          hintType: 'birthday-present',
+          hintKey: 'birthday-present:parent-2:2026-03-20',
+          assigneeIds: ['parent-1'],
+          createdBy: 'parent-1',
+        })
+      );
+
+      familyStore.setCurrentMember('parent-2');
+      expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+
+      familyStore.setCurrentMember('parent-1');
+      const items = useCriticalItems().criticalItems.value;
+      expect(items.map((i) => i.id)).toEqual(['hint-present']);
+    });
+
+    it('orders hints after a manual untimed to-do', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(
+        partyHint(),
+        makeTodo({ id: 'todo-manual', assigneeId: 'parent-1', dueDate: TODAY })
+      );
+
+      const ids = useCriticalItems().criticalItems.value.map((i) => i.id);
+      expect(ids.indexOf('todo-manual')).toBeLessThan(ids.indexOf('hint-1'));
+    });
+
+    it('keeps hint framing for a kept (acknowledged) hint', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push({ ...partyHint(), hintAcknowledged: true });
+
+      const item = useCriticalItems().criticalItems.value[0];
+      expect(item.message).toMatch(/^helpful hint: /i);
+    });
+
+    it('orders several hints by event date, soonest first, not by creation order', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(
+        // Generated most recently (activeTodos puts it first) but for the later event.
+        makeTodo({
+          id: 'hint-present',
+          title: 'Plan a birthday present for Mom (24 Mar)',
+          hintType: 'birthday-present',
+          hintKey: 'birthday-present:parent-2:2026-03-24',
+          hintEventDate: '2026-03-24',
+          assigneeIds: ['parent-1'],
+          createdBy: 'parent-1',
+          createdAt: '2026-03-10T09:00:00.000Z',
+        }),
+        makeTodo({
+          id: 'hint-packing',
+          title: 'Start packing for Beach trip (11 Mar)',
+          hintType: 'trip-packing',
+          hintKey: 'trip-packing:trip-1:2026-03-11',
+          hintEventDate: '2026-03-11',
+          assigneeIds: ['parent-1'],
+          createdBy: 'parent-1',
+          createdAt: '2026-03-09T09:00:00.000Z',
+        })
+      );
+
+      const ids = useCriticalItems().criticalItems.value.map((i) => i.id);
+      expect(ids).toEqual(['hint-packing', 'hint-present']);
+    });
+
+    it('still shows a hint whose nudge date is tomorrow (dueDate is the notification date)', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push({ ...partyHint(), dueDate: '2026-03-11' });
+
+      expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+    });
+
+    it('shows no hints when the helpfulHints flag is off', () => {
+      flagState.helpfulHints = false;
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(partyHint());
+
+      expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+    });
   });
 });

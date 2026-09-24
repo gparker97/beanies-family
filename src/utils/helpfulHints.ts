@@ -84,6 +84,22 @@ export const HINT_TYPE_META: Record<
 /** All hint types, in a stable display order (Settings toggle order). */
 export const HELPFUL_HINT_TYPES = Object.keys(HINT_TYPE_META) as HelpfulHintType[];
 
+/** Shown for a hint whose type this build does not know. */
+export const UNKNOWN_HINT_EMOJI = '💡';
+
+/** The emoji for a hint type, tolerant of a type this build has never heard of.
+ *  `isHint` is only `!!hintType`, so a pod synced from a newer client (or a
+ *  malformed record) can carry a `hintType` outside `HINT_TYPE_META`. A bare
+ *  index would throw inside a render computed and blank the whole surface
+ *  (the briefing, the to-do list) for one bad record; this degrades to a
+ *  generic icon instead. An un-kept record is pruned by reconcile on its next
+ *  tick; a kept or completed one is the family's own to-do and keeps the
+ *  generic icon on this build. */
+export function hintEmoji(hintType: HelpfulHintType | undefined): string {
+  if (!hintType) return '';
+  return HINT_TYPE_META[hintType]?.emoji ?? UNKNOWN_HINT_EMOJI;
+}
+
 /** Injected translator: `(key, params?) => string`. The orchestrator adapts the
  *  app's `t()` + `fillTemplate` into this shape so the engine stays pure. */
 export type HintTranslate = (key: string, params?: Record<string, string>) => string;
@@ -128,8 +144,13 @@ export type HintSkipReason =
   | 'no-attendees'
   | 'malformed-record';
 
+/** A to-do that IS a hint: `hintType` is present, not merely optional. The
+ *  narrowed type `isHint` produces, named so consumers (the store's hint feed,
+ *  the briefing) can index `HINT_TYPE_META` without a `!` or a ternary. */
+export type HintTodo = TodoItem & { hintType: HelpfulHintType };
+
 /** The single predicate for "is this to-do an auto-generated hint?". */
-export function isHint(todo: TodoItem): todo is TodoItem & { hintType: HelpfulHintType } {
+export function isHint(todo: TodoItem): todo is HintTodo {
   return !!todo.hintType;
 }
 
@@ -363,10 +384,15 @@ export function reconcileHints(
 
 /** Collapse hints sharing a `hintKey` (two devices generated the same one before
  *  syncing) to the earliest-created — the CRDT-merge collision resolver, mirroring
- *  the recurring-transaction dedup. */
-export function dedupeHintsByKey(hints: TodoItem[]): TodoItem[] {
-  const byKey = new Map<string, TodoItem>();
-  const out: TodoItem[] = [];
+ *  the recurring-transaction dedup.
+ *
+ *  Generic so the store's `filter(isHint)` narrowing survives (→ `HintTodo[]`)
+ *  while the reminder scheduler's mixed feed (`useScheduledReminders`, which
+ *  passes ALL active to-dos and relies on non-hints passing through) still comes
+ *  back as `TodoItem[]`. The bound must stay `TodoItem`, never `HintTodo`. */
+export function dedupeHintsByKey<T extends TodoItem>(hints: T[]): T[] {
+  const byKey = new Map<string, T>();
+  const out: T[] = [];
   for (const h of hints) {
     if (!h.hintKey) {
       out.push(h);

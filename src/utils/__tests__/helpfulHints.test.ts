@@ -6,8 +6,10 @@ import {
   computeDesiredHints,
   dedupeHintsByKey,
   isHint,
+  hintEmoji,
   reconcileHints,
   HINT_LEAD_DAYS,
+  UNKNOWN_HINT_EMOJI,
   type DesiredHint,
   type HelpfulHintsInput,
 } from '@/utils/helpfulHints';
@@ -179,6 +181,14 @@ describe('computeDesiredHints — trips', () => {
 });
 
 describe('hintKey + malformed-record isolation', () => {
+  it('hintEmoji degrades to a generic icon for a hint type this build does not know', () => {
+    expect(hintEmoji('birthday-party-gift')).toBe('🎉');
+    expect(hintEmoji(undefined)).toBe('');
+    // A pod synced from a newer client can carry a type outside HINT_TYPE_META;
+    // a bare index would throw inside a render computed and blank the surface.
+    expect(hintEmoji('from-the-future' as never)).toBe(UNKNOWN_HINT_EMOJI);
+  });
+
   it('buildHintKey is stable and locale-independent', () => {
     expect(buildHintKey('trip-packing', 't', '2026-08-01')).toBe('trip-packing:t:2026-08-01');
   });

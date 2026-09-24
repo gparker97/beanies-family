@@ -298,7 +298,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4CB}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-05-13',
+    updatedDate: '2026-09-24',
     sections: [
       {
         type: 'heading',
@@ -338,7 +338,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Three kinds of item can appear: <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
+          'The briefing brings together <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, <strong>helpful hints</strong> beanies added ahead of an upcoming event, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
       },
       {
         type: 'heading',
@@ -432,6 +432,17 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Helpful hints',
+        level: 3,
+        id: 'helpful-hints',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Ahead of a birthday, party or trip, beanies can add a gentle suggested to-do for you, called a helpful hint. It appears in your briefing as <em>"Helpful hint: get a present for Emma’s party (3 Oct)"</em> with the hint’s own icon, and it sits after your other items for the day. A hint never turns into an overdue nudge. Tick it to mark it done (it leaves your to-do list too), or tap it to open it. A birthday-present hint is only ever shown to the other grown-ups, never to the person whose birthday it is. <a href="/help/features/helpful-hints">Learn more about helpful hints</a>.',
+      },
+      {
+        type: 'heading',
         content: 'Medications',
         level: 3,
         id: 'medications',
@@ -472,7 +483,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'If you have nothing that needs your attention today \u2014 no activities, no to-dos due, no overdue items \u2014 the orange box won\u2019t appear at all. A clean Nook means a clean day. Enjoy it!',
+          'If you have nothing that needs your attention today \u2014 no activities, no to-dos due, no overdue items, no helpful hints \u2014 the orange box won\u2019t appear at all. A clean Nook means a clean day. Enjoy it!',
       },
       {
         type: 'heading',

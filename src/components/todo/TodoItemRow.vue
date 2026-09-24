@@ -5,7 +5,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
-import { isHint, HINT_TYPE_META } from '@/utils/helpfulHints';
+import { isHint, hintEmoji as hintEmojiFor } from '@/utils/helpfulHints';
 import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
@@ -42,9 +42,7 @@ const isDueToday = computed(() => isTodoDueToday(props.todo));
 // hint behaves like a normal to-do but keeps its marker.
 const isHintRow = computed(() => isHint(props.todo));
 const isFreshHint = computed(() => isHintRow.value && !props.todo.hintAcknowledged);
-const hintEmoji = computed(() =>
-  props.todo.hintType ? HINT_TYPE_META[props.todo.hintType].emoji : ''
-);
+const hintEmoji = computed(() => hintEmojiFor(props.todo.hintType));
 const hintEventLabel = computed(() =>
   props.todo.hintEventDate ? formatNookDate(props.todo.hintEventDate) : null
 );

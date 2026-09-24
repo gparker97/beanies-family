@@ -11,6 +11,10 @@ vi.mock('@/services/automerge/repositories/todoRepository', () => ({
 
 vi.mock('@/composables/useCelebration', () => ({ celebrate: vi.fn() }));
 
+// Telemetry spy — hoisted because `vi.mock` factories run before `const`s.
+const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
+
 // Pass-through — the member filter is exercised in its own test; here we want
 // the unfiltered/filtered getters to track the same `todos` source.
 vi.mock('@/composables/useMemberFiltered', () => ({
@@ -202,5 +206,60 @@ describe('todoStore — Helpful Hints (#40)', () => {
     await store.acknowledgeHint('h');
     const calls = (todoRepo.updateTodo as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.at(-1)![1]).toEqual({ hintAcknowledged: true });
+  });
+
+  it('visibleHintTodos is typed HintTodo[] — hintType readable without a guard', () => {
+    const store = useTodoStore();
+    const dad = { id: 'dad', name: 'Dad', role: 'owner' } as never;
+    store.todos = [todo({ id: 'h', hintType: 'trip-packing', hintKey: 'k', assigneeIds: ['dad'] })];
+    const [hint] = store.visibleHintTodos(dad, () => dad);
+    // Compile-time: `hint.hintType` is `HelpfulHintType`, not `| undefined`.
+    const type: string = hint.hintType;
+    expect(type).toBe('trip-packing');
+  });
+
+  it('completing a hint emits the helpful-hints consumption event; a manual to-do does not', async () => {
+    const store = useTodoStore();
+    const hint = todo({ id: 'h', hintType: 'trip-packing', hintKey: 'k' });
+    const manual = todo({ id: 'm' });
+    store.todos = [hint, manual];
+    (todoRepo.updateTodo as ReturnType<typeof vi.fn>).mockImplementation(
+      async (id: string, patch: Partial<TodoItem>) => ({
+        ...store.todos.find((t) => t.id === id)!,
+        ...patch,
+      })
+    );
+
+    logEventMock.mockClear();
+    await store.toggleComplete('h', 'm-1');
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        surface: 'helpful-hints',
+        context: expect.objectContaining({
+          hint_type: 'trip-packing',
+          hint_op: 'complete',
+          route_path: '/',
+        }),
+      })
+    );
+
+    logEventMock.mockClear();
+    await store.toggleComplete('m', 'm-1');
+    const hintEvents = logEventMock.mock.calls.filter(
+      (call) => (call[0] as { surface: string }).surface === 'helpful-hints'
+    );
+    expect(hintEvents).toHaveLength(0);
+  });
+
+  it('toggleComplete on an unknown id warns instead of returning null silently', async () => {
+    const store = useTodoStore();
+    store.todos = [];
+    logEventMock.mockClear();
+
+    await expect(store.toggleComplete('nope', 'm-1')).resolves.toBeNull();
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', surface: 'todos' })
+    );
   });
 });
