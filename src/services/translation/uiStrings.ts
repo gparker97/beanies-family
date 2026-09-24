@@ -2748,18 +2748,18 @@ const STRING_DEFS = {
       "local cache isn't saving, so your data might not survive a refresh. this browser couldn't write to local storage: it may be low on space or in private mode. your saved copy is safe.",
   },
   'settings.cachePersistWarning': {
-    en: 'Local cache is not updating — your data may not survive a page refresh. This often happens when beanies is open in more than one tab. Close the others, then refresh this one. If it keeps happening, your browser may be low on storage or in private mode.',
+    en: 'Local cache is not updating — your data may not survive a page refresh. This often happens when beanies.family is open in more than one tab. Close the others, then refresh this one. If it keeps happening, your browser may be low on storage or in private mode.',
     beanie:
-      "local cache isn't saving — your data might not survive a refresh. this often happens when beanies is open in more than one tab. close the others, then refresh this one. if it keeps happening, your browser may be low on storage or in private mode.",
+      "local cache isn't saving — your data might not survive a refresh. this often happens when beanies.family is open in more than one tab. close the others, then refresh this one. if it keeps happening, your browser may be low on storage or in private mode.",
   },
   'sync.durabilityBannerTitle': {
     en: "This device can't save locally right now",
     beanie: "this device can't save locally right now",
   },
   'sync.durabilityBanner': {
-    en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe. This often happens when beanies is open in more than one tab — close the others, then refresh.',
+    en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe. This often happens when beanies.family is open in more than one tab — close the others, then refresh.',
     beanie:
-      'recent changes might not survive a refresh on this device. your saved copy is safe. this often happens when beanies is open in more than one tab — close the others, then refresh.',
+      'recent changes might not survive a refresh on this device. your saved copy is safe. this often happens when beanies.family is open in more than one tab — close the others, then refresh.',
   },
   'sync.durabilityBanner.otherTabs': {
     en: 'beanies.family is open in another tab or window, which is stopping this one from saving locally. Your saved copy is safe. Close the other beanies.family tabs, then refresh this one.',
@@ -4958,9 +4958,9 @@ const STRING_DEFS = {
       'two devices compacted your family file at the same time. beanies cannot safely pick between them. please contact support@beanies.family before making more changes.',
   },
   'podMerge.failedInline': {
-    en: 'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
+    en: 'beanies.family could not combine the changes in your family file with the ones on this device, so nothing has been written over. Your changes are kept here. Close any other beanies.family tabs and reload; if this keeps happening, export your changes from Settings and contact support@beanies.family.',
     beanie:
-      'beanies could not combine the changes in your family file with the ones on this device, so nothing has been written over. your changes are kept here. close any other beanies tabs and reload; if this keeps happening, export your changes from settings and contact support@beanies.family.',
+      'beanies.family could not combine the changes in your family file with the ones on this device, so nothing has been written over. your changes are kept here. close any other beanies.family tabs and reload; if this keeps happening, export your changes from settings and contact support@beanies.family.',
   },
   'podUnreadable.inline': {
     en: 'beanies could not read your family file this time. It may have been part-way through saving on another device, or it may have been written by a newer version of beanies. Nothing has been changed. Try again in a moment, and update beanies on this device if the message keeps coming back.',
@@ -4974,9 +4974,9 @@ const STRING_DEFS = {
   // thing the user most needs: nothing has been replaced, their work is still
   // here. The two exits are named in order of likelihood.
   'podLocalUnreadable.inline': {
-    en: 'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies is open in another tab or window. Close the others and reload this page. If the message stays, choose "Carry on with the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
+    en: 'beanies.family could not open this device\'s own copy of your family data, so it has not been replaced with the family file. Anything you have not saved yet is still here. This usually means beanies.family is open in another tab or window. Close the others and reload this page. If the message stays, choose "Carry on with the family file" below (changes made only on this device will be let go), or export your data from Settings and contact support@beanies.family.',
     beanie:
-      'beanies could not open this device\'s own copy of your family data, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies is open in another tab or window. close the others and reload this page. if the message stays, choose "carry on with the family file" below (changes made only on this device will be let go), or export your data from settings and contact support@beanies.family.',
+      'beanies.family could not open this device\'s own copy of your family data, so it has not been replaced with the family file. anything you have not saved yet is still here. this usually means beanies.family is open in another tab or window. close the others and reload this page. if the message stays, choose "carry on with the family file" below (changes made only on this device will be let go), or export your data from settings and contact support@beanies.family.',
   },
   // The banner heading for the above. Short — the sentence does the work.
   'podLocalUnreadable.title': {
@@ -4991,9 +4991,9 @@ const STRING_DEFS = {
     beanie: 'use the family file instead?',
   },
   'podLocalUnreadable.useFileConfirmMessage': {
-    en: "beanies will load your family file and let go of this device's own copy. Because that copy could not be opened, there is no way to tell whether it held anything that was never saved. Everything already saved to your family file is safe. If you would rather not risk it, close any other beanies tabs and reload this page first.",
+    en: "beanies.family will load your family file and let go of this device's own copy. Because that copy could not be opened, there is no way to tell whether it held anything that was never saved. Everything already saved to your family file is safe. If you would rather not risk it, close any other beanies.family tabs and reload this page first.",
     beanie:
-      "beanies will load your family file and let go of this device's own copy. because that copy could not be opened, there is no way to tell whether it held anything that was never saved. everything already saved to your family file is safe. if you would rather not risk it, close any other beanies tabs and reload this page first.",
+      "beanies.family will load your family file and let go of this device's own copy. because that copy could not be opened, there is no way to tell whether it held anything that was never saved. everything already saved to your family file is safe. if you would rather not risk it, close any other beanies.family tabs and reload this page first.",
   },
   // ⚠️ THE OVERLAY VARIANT, and it names ONLY actions that exist before the app
   // shell is up. The inline copy points at "Use the family file" and Settings;
@@ -5014,9 +5014,9 @@ const STRING_DEFS = {
       'this family file was saved by a much older version of beanies and can no longer be opened. nothing is wrong with your family data. contact support@beanies.family if this is the only copy you have.',
   },
   'resumeSetup.podLocalUnreadable': {
-    en: "beanies could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
+    en: "beanies.family could not open this device's own copy of your family data. Nothing has been changed and nothing has been lost. This usually means beanies.family is already open in another tab or window, so close the others and reload this page. If it keeps happening, contact support@beanies.family.",
     beanie:
-      "beanies could not open this device's own copy of your family data. nothing has been changed and nothing has been lost. this usually means beanies is already open in another tab or window, so close the others and reload this page. if it keeps happening, contact support@beanies.family.",
+      "beanies.family could not open this device's own copy of your family data. nothing has been changed and nothing has been lost. this usually means beanies.family is already open in another tab or window, so close the others and reload this page. if it keeps happening, contact support@beanies.family.",
   },
   // The overlay variant, for a lineage block raised at OPEN where there is no
   // sync bar on screen.
@@ -8936,9 +8936,9 @@ const STRING_DEFS = {
       'the app failed to start properly. you can try reloading, or clear your data and start fresh.',
   },
   'app.initError.registryBlocked': {
-    en: 'beanies is open in another tab or window, and it is holding up a storage update. Close your other beanies tabs and windows (including the installed app), then reload this page.',
+    en: 'beanies.family is open in another tab or window, and it is holding up a storage update. Close your other beanies.family tabs and windows (including the installed app), then reload this page.',
     beanie:
-      'beanies is open in another tab or window and holding up a storage update. close your other beanies tabs and windows, then reload this page.',
+      'beanies.family is open in another tab or window and holding up a storage update. close your other beanies.family tabs and windows, then reload this page.',
   },
   'app.initError.stalled': {
     en: 'Setup is taking longer than expected. Reload to try again.',
