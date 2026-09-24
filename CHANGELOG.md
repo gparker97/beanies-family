@@ -12,6 +12,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 _Merged after 0.22.1, not yet released:_
 
+### Added
+
+- **Manage your recovery kits.** Settings → Security & Recovery now lists every recovery
+  kit your family has ever made, by the ID printed on the kit, with who created it and
+  when. The owner or a pod manager can invalidate a kit that was lost, photographed or
+  no longer trusted; it stops opening your family data on every device once they sync
+  and stays listed as invalidated. Your only remaining kit can be replaced but never
+  removed outright. A copy of the family file saved before an invalidation can still be
+  opened with the old kit, and the app says so. Because a kit can reset every PIN, creating
+  one is now also limited to the owner and pod managers.
+
 ### Fixed
 
 - **"Sign Out & Clear All Data" now really clears this browser when beanies.family is

@@ -894,11 +894,21 @@ async function handleKitRedeem() {
   isLoadingFile.value = true;
   formError.value = null;
   try {
-    const { redeemRecoveryKit, parseKitInput } = await import('@/services/auth/recoveryKit');
+    const { redeemRecoveryKit, parseKitInput, summarizeRecoveryKits } =
+      await import('@/services/auth/recoveryKit');
     const result = await redeemRecoveryKit(envelope, parseKitInput(kitCodeInput.value));
     if (!result.ok) {
-      formError.value =
-        result.reason === 'no-kits' ? t('recovery.kitNoKits') : t('recovery.kitWrongCode');
+      // An invalidated kit is not identifiable here (#99): its wrap is filtered out of
+      // every envelope before redeem, and the code carries no kit id. So when the family
+      // has retired any kit, say so as a possible cause instead of a bare "wrong code".
+      const hasInvalidatedKits =
+        result.reason !== 'error' &&
+        summarizeRecoveryKits(envelope).some((k) => k.status === 'invalidated');
+      formError.value = hasInvalidatedKits
+        ? t('recovery.kitWrongCodeOrInvalidated')
+        : result.reason === 'no-kits'
+          ? t('recovery.kitNoKits')
+          : t('recovery.kitWrongCode');
       emitKitRedeemed({ outcome: 'failed', errorCode: result.reason });
       return;
     }

@@ -50,7 +50,7 @@ import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { mergeEnvelopes, withoutPayload } from './envelopeMerge';
-import { logRevokedEntriesFiltered } from './revocationLog';
+import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from './revocationLog';
 import { setFlushProvider, setResaveHandler } from './offlineQueue';
 import {
   usePollWhileVisible,
@@ -1805,6 +1805,7 @@ async function fetchAndMergeRemote(): Promise<void> {
       filtered,
     } = mergeEnvelopes(remoteEnvelope, currentEnvelope);
     logRevokedEntriesFiltered(filtered, 'merge');
+    logRecoveryKitsExhausted(adopted, 'merge');
     setEnvelope(adopted);
     return needsPublish;
   };

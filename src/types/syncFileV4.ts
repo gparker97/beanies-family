@@ -40,6 +40,13 @@ export interface RecoveryKeyPackage {
   salt: string; // PBKDF2 salt (base64, 16 bytes)
   wrapped: string; // AES-KW wrapped family key (base64)
   createdAt: ISODateString;
+  /**
+   * The member who created the kit (tracker #99). ADDITIVE OPTIONAL: absent on every kit
+   * created before 2026-09-24 and on the kit-born first kit, which is minted during pod
+   * creation before a member exists. Attribution for the Manage Kits list, never a
+   * permission check.
+   */
+  createdBy?: string;
 }
 
 export interface InviteKeyPackage {
@@ -158,6 +165,12 @@ export interface EnvelopeTombstone {
   revokedAt: ISODateString;
   /** Present on value-pinned tombstones only; mirrors the last key segment. */
   wrapped?: string;
+  /**
+   * The member who wrote the tombstone (tracker #99, recovery-kit invalidation). ADDITIVE
+   * OPTIONAL and attribution only: the merge never reads it, and the earliest `revokedAt`
+   * still wins the whole object on a key collision.
+   */
+  revokedBy?: string;
 }
 
 export type BeanpodVersion = '4.0' | '5.0';
@@ -182,9 +195,9 @@ export interface BeanpodFileV4 {
   /**
    * Recovery-kit wraps (ADDITIVE OPTIONAL on '4.0' — never a version bump; old writers
    * preserve unknown fields via reEncryptEnvelope's spread and envelopeMerge). Keyed by
-   * kitId (a random id printed on the kit so a family can tell copies apart). Old
-   * entries persist until #117 key rotation retires them — same no-deletion-propagation
-   * semantics as every other envelope dict.
+   * kitId (a random id printed on the kit so a family can tell copies apart). An entry is
+   * retired by a `recoveryKeys:<kitId>` slot tombstone in `revokedKeys` (tracker #99,
+   * Settings → Manage Kits) — never by deletion, which would not propagate.
    */
   recoveryKeys?: Record<string, RecoveryKeyPackage>;
   /**

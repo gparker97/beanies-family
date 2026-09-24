@@ -114,6 +114,8 @@ vi.mock('@/services/sync/envelopeMerge', () => ({
   applyRevokedKeys: vi.fn((env: unknown) => ({ envelope: env, filtered: 0 })),
   mergeRevokedKeys: vi.fn((a: unknown, b: unknown) => ({ ...(a ?? {}), ...(b ?? {}) })),
   revocationTombstonesForMember: vi.fn(() => ({ tombstones: {}, unattributedPasskeys: 0 })),
+  revocationKey: vi.fn((field: string, key: string) => `${field}:${key}`),
+  slotTombstoneEntryKey: vi.fn(() => null),
   // Real behaviour, not a pass-through: `replaceEnvelope` strips the payload
   // from the long-lived envelope, and a stub that skipped it would hide a
   // regression in exactly the invariant this change introduces.

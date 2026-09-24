@@ -284,6 +284,21 @@ export function revocationKey(
     : `${field}:${entryKey}:${pinnedWrapped}`;
 }
 
+/**
+ * The inverse of `revocationKey` for SLOT-WIDE tombstones only: the entry key of a
+ * `<field>:<entryKey>` tombstone on `field`, or `null` for a value-pinned key, a member
+ * key, or another field. Lives beside `revocationKey` so the two cannot drift (tracker
+ * #99 reads kit tombstones back into the Manage Kits list). Safe because entry keys
+ * (hex kit ids, member ids, base64url hashes) never contain `:`.
+ */
+export function slotTombstoneEntryKey(
+  field: EnvelopeKeyDictField,
+  tombstoneKey: string
+): string | null {
+  const parts = tombstoneKey.split(':');
+  return parts.length === 2 && parts[0] === field && parts[1] !== '' ? parts[1] : null;
+}
+
 /** Union of two tombstone sets; on a key collision the EARLIEST `revokedAt` wins. */
 export function mergeRevokedKeys(
   a: Record<string, EnvelopeTombstone> | undefined,

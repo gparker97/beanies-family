@@ -233,3 +233,17 @@ All kit lifecycle events stay on the existing `login-flow` surface, via the faca
 > The assembled `=== BEANIES PRE-PLAN ===` block for Notion #99 (stored on the Notion row under "beanies-plan prompt").
 
 </details>
+
+## Outcome (2026-09-24, built via /beanies-build-auto, NOT committed, NOT deployed)
+
+Built to the plan; `validate` green (8698 tests); browser-verified in real Chromium (light, dark, phone) through the harness `scripts/design-screenshots/recovery-kits-capture.ts`: two live kits → Invalidate (red confirm + PIN) → the remaining kit reads Replace → Replace (info confirm + PIN + kit modal) → `1 live · 2 invalidated`, with `kit_invalidate_outcome` emitted for both kinds.
+
+**Deviations from the plan, and why:**
+
+- **The concurrent two-device race is detected, not prevented.** Requirement 6 and the Pass 4 note overclaimed: the store guard closes the sequential case (a peer's tombstone merged before this device counts) but two devices retiring "the other" kit inside the same observe→push window both pass. Because each device's own commit still holds the peer's kit, the exhausted state is only visible at a merge, so `logRecoveryKitsExhausted` (`recovery_kits_exhausted`, `envelope-revocation`) now fires from the merge termini, once per family per session. The kit nag keys on the doc-side confirmation stamp and would not notice; this is the only signal. Review round 1 finding.
+- **`kit_invalidate_outcome` carries `detail: 'unobserved'`** when `observeRemote()` failed before the guard ran, and `count` is taken on the authoritative envelope after the push (the store ref can be one commit stale).
+- **A `busy` prop on the list** disables every action while a revoke is in flight (up to 40 s), including the post-confirm revoke of the Replace flow.
+- **Kit creation stays open to every member**, in the drawer and in the list footer. Round 1 asked for the footer Create to be gated on `canManagePod`; round 2 pointed out the drawer's button one row above is not, and the kit nag and sign-out guard mint kits for whoever is signed in, so a modal-only gate contradicted three surfaces. greg then decided (2026-09-24): a kit can reset every PIN, so minting is manager-only. `authStore.createRecoveryKit` refuses a signed-in member who is neither the owner nor `canManagePod` (the kit-born create flow, which runs before a roster exists, stays allowed), and both Settings surfaces hide Create for non-managers; the kit nag and sign-out guard were already manager-only (`authPrompts.ts`).
+- **Not fixed, recorded:** `LoadPodView` builds the full kit summary to answer "does any kit tombstone exist" on a failed redeem (a handful of entries; negligible).
+
+Two review rounds at `high`; the second was scoped to the first round's fixes and is the ceiling without greg.

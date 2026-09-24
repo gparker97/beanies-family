@@ -5183,7 +5183,85 @@ const STRING_DEFS = {
       "your new kit hasn't reached your family file yet. check your connection and try again.",
   },
   'recovery.kitRegenerate': { en: 'Create a New Kit', beanie: 'create a new kit' },
-  'recovery.kitCount': { en: '{count} kit(s) on file', beanie: '{count} kit(s) on file' },
+  // ── Manage Kits (tracker #99). `recovery.` is an important surface: the beanie values
+  // keep every real noun (kit, family file, device) and only drop case.
+  'recovery.kitSummary': {
+    en: '{live} live · {invalidated} invalidated · newest {newest}',
+    beanie: '{live} live · {invalidated} invalidated · newest {newest}',
+  },
+  'recovery.kitsManage': { en: 'Manage Kits', beanie: 'manage kits' },
+  'recovery.kitsModalTitle': { en: 'Recovery Kits', beanie: 'recovery kits' },
+  'recovery.kitsModalIntro': {
+    en: 'Each kit you have ever made still opens your family data until you invalidate it here. The ID matches the one printed on the kit.',
+    beanie:
+      'each kit you have ever made still opens your family data until you invalidate it here. the id matches the one printed on the kit.',
+  },
+  'recovery.kitRowLabel': { en: 'Kit {kitId}', beanie: 'kit {kitId}' },
+  'recovery.kitCreatedBy': { en: 'Created {date} by {name}', beanie: 'created {date} by {name}' },
+  'recovery.kitCreatedOn': { en: 'Created {date}', beanie: 'created {date}' },
+  'recovery.kitInvalidatedBy': {
+    en: 'Invalidated {date} by {name}',
+    beanie: 'invalidated {date} by {name}',
+  },
+  'recovery.kitInvalidatedOn': { en: 'Invalidated {date}', beanie: 'invalidated {date}' },
+  'recovery.kitNewest': { en: 'Newest', beanie: 'newest' },
+  'recovery.kitInvalidatedPill': { en: 'Invalidated', beanie: 'invalidated' },
+  'recovery.kitInvalidate': { en: 'Invalidate', beanie: 'invalidate' },
+  'recovery.kitReplace': { en: 'Replace', beanie: 'replace' },
+  'recovery.kitReplaceHint': {
+    en: 'Your only kit. Replacing makes a new one first.',
+    beanie: 'your only kit. replacing makes a new one first.',
+  },
+  'recovery.kitInvalidateTitle': { en: 'Invalidate This Kit?', beanie: 'invalidate this kit?' },
+  'recovery.kitInvalidateBody': {
+    en: 'This kit will stop opening your family data on every device as soon as they sync. This cannot be undone, and no device that missed the change can bring it back.',
+    beanie:
+      'this kit will stop opening your family data on every device as soon as they sync. this cannot be undone, and no device that missed the change can bring it back.',
+  },
+  'recovery.kitInvalidateLimit': {
+    en: 'Kit {kitId}. One limit: a copy of your family file saved before today can still be opened with this kit. Destroy any printouts you no longer trust.',
+    beanie:
+      'kit {kitId}. one limit: a copy of your family file saved before today can still be opened with this kit. destroy any printouts you no longer trust.',
+  },
+  'recovery.kitInvalidateConfirm': { en: 'Invalidate Kit', beanie: 'invalidate kit' },
+  'recovery.kitReplaceTitle': { en: 'Replace Your Only Kit', beanie: 'replace your only kit' },
+  'recovery.kitReplaceBody': {
+    en: 'This kit is the only way back into your family data if every PIN is lost, so it stays valid until a new kit is safely in your hands. First, create the new kit and save or print it. Once you confirm you have it, this kit is invalidated.',
+    beanie:
+      'this kit is the only way back into your family data if every pin is lost, so it stays valid until a new kit is safely in your hands. first, create the new kit and save or print it. once you confirm you have it, this kit is invalidated.',
+  },
+  'recovery.kitReplaceConfirm': { en: 'Create the New Kit', beanie: 'create the new kit' },
+  'recovery.kitReauthReason': {
+    en: 'Invalidating a recovery kit cannot be undone, so please confirm it is you.',
+    beanie: 'invalidating a recovery kit cannot be undone, so please confirm it is you.',
+  },
+  'recovery.kitInvalidated': {
+    en: 'Kit invalidated. It no longer opens your family data.',
+    beanie: 'kit invalidated. it no longer opens your family data.',
+  },
+  'recovery.kitInvalidateNotSynced': {
+    en: 'Kit invalidated here. The change reaches your family file on the next save.',
+    beanie: 'kit invalidated here. the change reaches your family file on the next save.',
+  },
+  'recovery.kitInvalidateFailed': {
+    en: 'The kit could not be invalidated. It is still valid. Try again in a moment.',
+    beanie: 'the kit could not be invalidated. it is still valid. try again in a moment.',
+  },
+  'recovery.kitReplaceNotSynced': {
+    en: "Your new kit hasn't reached your family file yet, so your old kit is still valid. Once it has synced, invalidate the old one from Manage Kits.",
+    beanie:
+      "your new kit hasn't reached your family file yet, so your old kit is still valid. once it has synced, invalidate the old one from manage kits.",
+  },
+  'recovery.kitLastKit': {
+    en: 'This is your only recovery kit, so it cannot be invalidated. Create a new kit first, or use Replace.',
+    beanie:
+      'this is your only recovery kit, so it cannot be invalidated. create a new kit first, or use replace.',
+  },
+  'recovery.kitWrongCodeOrInvalidated': {
+    en: "That code doesn't match any live recovery kit for this family. A kit that was invalidated from Manage Kits no longer opens your family data.",
+    beanie:
+      "that code doesn't match any live recovery kit for this family. a kit that was invalidated from manage kits no longer opens your family data.",
+  },
   'recovery.kitNone': {
     en: 'No recovery kit yet — we recommend creating one.',
     beanie: 'no recovery kit yet — we recommend creating one.',
