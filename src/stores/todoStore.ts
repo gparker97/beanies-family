@@ -8,15 +8,39 @@ import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
 import { isTodoOverdue } from '@/utils/todo';
-import { isHint, dedupeHintsByKey } from '@/utils/helpfulHints';
+import { isHint, dedupeHintsByKey, type HintTodo } from '@/utils/helpfulHints';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput, FamilyMember } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { trackFeature } from '@/services/analytics/plausible';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 // Sort comparators — newest-created first / most-recently-completed first.
 const byCreatedDesc = (a: TodoItem, b: TodoItem) => b.createdAt.localeCompare(a.createdAt);
 const byCompletedDesc = (a: TodoItem, b: TodoItem) =>
   (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt);
+
+// #40: the ONE consumption counter for hints, emitted from `toggleComplete` so
+// every surface (briefing tick, to-do row, modal, Nook widget, wall job) is
+// covered by one implementation. It counts TICKS, not net completions: an
+// undo-then-retick logs twice and un-completing logs nothing (deliberate —
+// `hint_op` is a closed enum with one value). `route_path` says which surface
+// ticked it (`/nook` = the briefing, `/todo` = the to-do page) — it is not
+// auto-enriched, so it is read here exactly as OAuthNativeBridgePage does.
+// Pairs with the `reconcile` generation event on the same surface. No emit
+// gate: a tick is a discrete user action, not a re-emitted watcher outcome.
+function logHintCompleted(todo: TodoItem): void {
+  if (!isHint(todo)) return;
+  logEvent({
+    level: 'info',
+    surface: 'helpful-hints',
+    message: 'hint completed',
+    context: {
+      hint_type: todo.hintType,
+      hint_op: 'complete',
+      route_path: window.location.pathname,
+    },
+  });
+}
 
 export const useTodoStore = defineStore('todos', () => {
   // State
@@ -32,10 +56,12 @@ export const useTodoStore = defineStore('todos', () => {
 
   // #40: the manual/hint boundary — the single place hints are split out of the
   // "family's own tasks" lanes. `activeTodos` deliberately KEEPS hints (so the
-  // #55 reminder path still schedules their notifications); every attention /
-  // open / scheduled lane derives from `manualActiveTodos` instead, so hints are
-  // structurally excluded from those surfaces in exactly one place. Hints are
-  // surfaced ONLY via `hintTodos` below.
+  // #55 reminder path still schedules their notifications); every open /
+  // scheduled / overdue lane and nav badge derives from `manualActiveTodos`
+  // instead, so hints are structurally excluded from those surfaces in exactly
+  // one place. Hints are surfaced ONLY via `hintTodos` / `visibleHintTodos`
+  // below — on the to-do page's Helpful Hints section and, with their own fixed
+  // framing, in the daily briefing (`useCriticalItems`).
   const manualActiveTodos = computed(() => activeTodos.value.filter((t) => !isHint(t)));
 
   const somedayTodos = computed(() =>
@@ -67,9 +93,11 @@ export const useTodoStore = defineStore('todos', () => {
   );
 
   // #40: hint to-dos, deduped by hintKey (CRDT-merge collision resolver). The
-  // ONLY getter that surfaces hints. `visibleHintTodos` additionally applies
-  // audience-based visibility so a surprise-sensitive hint (e.g. a birthday
-  // present) is hidden from the person it concerns.
+  // ONLY getter that surfaces hints (to-do page + daily briefing).
+  // `visibleHintTodos` additionally applies audience-based visibility so a
+  // surprise-sensitive hint (e.g. a birthday present) is hidden from the person
+  // it concerns. Typed `HintTodo[]`: the `filter(isHint)` narrowing survives the
+  // generic dedupe, so consumers read `hintType` without a guard.
   const hintTodos = computed(() => dedupeHintsByKey(activeTodos.value.filter(isHint)));
   // ALL hint to-dos incl. completed (NOT deduped) — the reconcile engine needs
   // completed hints (a completed hint blocks regeneration) and the raw duplicates
@@ -78,7 +106,7 @@ export const useTodoStore = defineStore('todos', () => {
   function visibleHintTodos(
     viewer: FamilyMember,
     resolveMember: (id: string) => FamilyMember | undefined
-  ): TodoItem[] {
+  ): HintTodo[] {
     return hintTodos.value.filter(
       (t) => classifyAudience(normalizeAssignees(t), viewer, resolveMember).kind !== 'hidden'
     );
@@ -204,7 +232,17 @@ export const useTodoStore = defineStore('todos', () => {
 
   async function toggleComplete(id: string, completedBy: string): Promise<TodoItem | null> {
     const existing = todos.value.find((t) => t.id === id);
-    if (!existing) return null;
+    if (!existing) {
+      // Never silent: every caller funnels here, so one warn covers them all.
+      // Mirrors listStore.setAllItemsCompleted.
+      logEvent({
+        level: 'warn',
+        surface: 'todos',
+        message: 'toggleComplete: to-do not found',
+        context: { action: 'toggle_complete_missing_todo' },
+      });
+      return null;
+    }
 
     const now = toISODateString(new Date());
 
@@ -223,6 +261,7 @@ export const useTodoStore = defineStore('todos', () => {
         completedAt: now,
       });
       if (result) {
+        logHintCompleted(existing);
         celebrate('goal-reached', {
           onUndo: () => {
             updateTodo(id, {

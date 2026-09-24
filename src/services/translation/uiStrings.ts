@@ -7767,6 +7767,12 @@ const STRING_DEFS = {
     en: "Don't forget: {task}",
     beanie: "don't forget: {task}",
   },
+  // #40: a Helpful Hint in the briefing. One fixed framing — never the overdue /
+  // today / no-due variants (a hint's dueDate is its nudge date, not a deadline).
+  'nook.criticalHint': {
+    en: 'Helpful hint: {task}',
+    beanie: 'helpful hint: {task}',
+  },
   'nook.criticalTodoAssignedOverdue': {
     en: '{creator} asked you: {task} — it was due {date}, whenever you get a chance!',
     beanie: '{creator} asked you: {task} — was due {date}, no rush!',

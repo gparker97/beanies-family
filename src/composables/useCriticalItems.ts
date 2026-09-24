@@ -24,6 +24,7 @@ import {
 import { isListDue } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { hintEmoji } from '@/utils/helpfulHints';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
@@ -103,6 +104,9 @@ const LIST_UNASSIGNED_KEYS = {
 const MEAL_OWNER_KEY = 'mealPlanner.briefing.owner' satisfies UIStringKey;
 const MEAL_FORCHILD_KEY = 'mealPlanner.briefing.forChild' satisfies UIStringKey;
 const MEAL_UNASSIGNED_KEY = 'mealPlanner.briefing.unassigned' satisfies UIStringKey;
+
+// Helpful Hints (#40) — one fixed framing, no due-state table (see the loop).
+const HINT_KEY = 'nook.criticalHint' satisfies UIStringKey;
 
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
@@ -267,8 +271,9 @@ export function useCriticalItems() {
     // Visibility per `classifyAudience` above: assignees see their own,
     // every adult sees child-only to-dos, everyone sees unassigned ones.
     // #40: `manualActiveTodos` excludes Helpful Hints — a hint's nudge-date
-    // dueDate is in the past for its whole lead window, so via `activeTodos` it
-    // would surface here as an "overdue" critical item, which hints must never be.
+    // dueDate is in the past for its whole lead window, so through this loop's
+    // overdue/today/noDue tables it would read as "overdue". Hints have their
+    // own loop below with a single fixed framing.
     for (const todo of todoStore.manualActiveTodos) {
       const audience = classifyAudience(normalizeAssignees(todo), currentMember, getMemberById);
       if (audience.kind === 'hidden') continue;
@@ -399,6 +404,39 @@ export function useCriticalItems() {
           icon: '🍲',
           time: meal.serveTime ?? '',
           completable: false,
+        });
+      }
+    }
+
+    // ── Helpful Hints (#40) for the current member ─────────────────────
+    // Hints ride their own loop, never the to-do loop: a hint's dueDate is its
+    // nudge date, so through the overdue/today/noDue tables every hint would read
+    // as overdue for its whole lead window. One fixed framing, no date state, no
+    // ⏰. Audience is the store's own `visibleHintTodos` so a surprise-sensitive
+    // hint (the birthday person's present) stays hidden from them.
+    //
+    // Untimed, and pushed LAST: the sort below returns 0 for any two untimed
+    // items, so tail position is insertion order alone. Keep this the final block
+    // before the sort — a new item kind goes ABOVE it. The "hints after a manual
+    // to-do" unit test is what locks this.
+    if (isFlagEnabled('helpfulHints')) {
+      // dueDate is deliberately ignored: for a hint it is the notification-fire
+      // date (today, or tomorrow once the 09:00 slot has passed), so a date
+      // filter here would hide every hint generated after 09:00 until the next
+      // morning. Sort soonest event first, not newest-generated first
+      // (`activeTodos` order).
+      const hints = todoStore
+        .visibleHintTodos(currentMember, getMemberById)
+        .sort((a, b) => (a.hintEventDate ?? '').localeCompare(b.hintEventDate ?? ''));
+      for (const hint of hints) {
+        items.push({
+          id: hint.id,
+          type: 'todo', // tick → toggleComplete, tap → open-todo, unchanged
+          message: buildMessage(HINT_KEY, { task: lowercaseFirst(hint.title) }),
+          icon: hintEmoji(hint.hintType), // tolerant of a type this build doesn't know
+          time: '',
+          completable: true,
+          completed: false,
         });
       }
     }
