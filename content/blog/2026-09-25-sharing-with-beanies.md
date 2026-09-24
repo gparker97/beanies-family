@@ -4,7 +4,7 @@ slug: sharing-with-beanies
 date: 2026-09-25
 category: use-case
 coverEmoji: 📤
-coverImage: /blog/sharing-flyer-bedok-carnival.webp
+coverImage: /blog/captain-beanie-saves-baby.webp
 excerpt: 'a flyer by the elevator, one photo, one share. five seconds later a whole saturday was planned on the family calendar. magic beans read anything you send them.'
 subtitle: 'learning to share can be a good thing'
 featured: false
