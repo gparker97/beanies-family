@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Notion #99 — Manage recovery kits: see every kit on file, invalidate the ones you no longer trust.
+      APPROVED BY GREG 2026-09-24: DIRECTION B (drawer keeps the count; "Manage Kits" opens a modal,
+      a sheet on phone). Direction A is kept here as the rejected comparison only.
+      Two directions for greg to compare. Both share the same list row, the same confirm, and the
+      same last-kit rule (block, unless replaced in the same flow). Decisions captured in pre-plan:
+        - owner + pod managers can invalidate; every member can see the list
+        - invalidated kits stay listed, greyed, with the invalidated date
+        - the last live kit cannot be invalidated on its own: its action is "Replace"
+      Tokens from docs/brand/beanies-cig-v2.html slides 8 and 9. Specimens are fixed light/dark
+      artwork; only the page chrome follows the reader's theme.
+    -->
+    <title>Recovery Kits</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+    />
+    <style>
+      :root {
+        --c-bg: #f4f2f0;
+        --c-ink: #2c3e50;
+        --c-ink-soft: #5c6b78;
+        --c-rule: #dfdad5;
+        --c-accent: #d14d1a;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --c-bg: #141a20;
+          --c-ink: #f2f5f7;
+          --c-ink-soft: #c3ced6;
+          --c-rule: #38434d;
+          --c-accent: #ff8b5e;
+        }
+      }
+      :root[data-theme='dark'] {
+        --c-bg: #141a20;
+        --c-ink: #f2f5f7;
+        --c-ink-soft: #c3ced6;
+        --c-rule: #38434d;
+        --c-accent: #ff8b5e;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--c-bg);
+        color: var(--c-ink);
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 0.9375rem;
+        line-height: 1.5;
+        padding: 2rem 1rem 4rem;
+      }
+      .page { max-width: 72rem; margin: 0 auto; }
+      h1 { font-family: Outfit, sans-serif; font-size: 1.75rem; font-weight: 600; margin: 0 0 0.25rem; }
+      .lede { color: var(--c-ink-soft); max-width: 44rem; margin: 0 0 2.5rem; }
+      h2 { font-family: Outfit, sans-serif; font-size: 1.25rem; font-weight: 600; margin: 3rem 0 0.25rem; }
+      h2 + p { color: var(--c-ink-soft); margin: 0 0 1.25rem; max-width: 44rem; }
+      .row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-start; }
+      .cap { font-size: 0.8125rem; color: var(--c-ink-soft); margin: 0.5rem 0 0; }
+
+      /* ───────── specimen tokens (fixed light) ───────── */
+      .frame {
+        --s-ground: #f8f9fa;
+        --s-raised: #ffffff;
+        --s-overlay: #f1f3f5;
+        --s-hover: #e9ecef;
+        --s-ink: #2c3e50;
+        --s-ink-soft: #5c6b78;
+        --s-ink-faint: #8794a0;
+        --s-line: #e2e6ea;
+        --s-line-strong: #c9d0d6;
+        --s-accent: #f15d22;
+        --s-accent-bg: rgb(241 93 34 / 10%);
+        --s-danger: #dc2626;
+        --s-danger-line: #fecaca;
+        --s-danger-bg: #fef2f2;
+        --s-slate: #2c3e50;
+        --s-slate-hover: #1a252f;
+        --s-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+        background: var(--s-ground);
+        color: var(--s-ink);
+        border-radius: 1.5rem;
+        border: 1px solid var(--c-rule);
+        overflow: hidden;
+        width: 100%;
+        max-width: 34rem;
+        padding: 1.25rem;
+      }
+      .frame.is-dark {
+        --s-ground: #151e27;
+        --s-raised: #1e2a36;
+        --s-overlay: #26343f;
+        --s-hover: #2f3e4b;
+        --s-ink: #f2f5f7;
+        --s-ink-soft: #c3ced6;
+        --s-ink-faint: #9aa9b4;
+        --s-line: #38434d;
+        --s-line-strong: #4a5764;
+        --s-accent: #ff8b5e;
+        --s-accent-bg: rgb(255 139 94 / 12%);
+        --s-danger: #f87171;
+        --s-danger-line: #7f1d1d;
+        --s-danger-bg: rgb(127 29 29 / 25%);
+        --s-slate: #3b4f63;
+        --s-slate-hover: #4a6078;
+        --s-shadow: 0 8px 40px rgb(0 0 0 / 40%);
+      }
+      .frame.phone { max-width: 24rem; padding: 0.75rem; }
+
+      /* the drawer panel */
+      .panel {
+        background: var(--s-raised);
+        border-radius: 1.5rem;
+        box-shadow: var(--s-shadow);
+        padding: 1.25rem;
+      }
+      .panel-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+      .panel-icon {
+        width: 2.25rem; height: 2.25rem; border-radius: 14px; display: grid; place-items: center;
+        background: var(--s-accent-bg); font-size: 1.125rem;
+      }
+      .panel-title { font-family: Outfit, sans-serif; font-weight: 600; font-size: 1.125rem; }
+      .muted { color: var(--s-ink-soft); font-size: 0.875rem; }
+      .faint { color: var(--s-ink-faint); font-size: 0.75rem; }
+      .section { border-top: 1px solid var(--s-line); padding-top: 1rem; margin-top: 1rem; }
+      .section:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+      h4 { font-family: Outfit, sans-serif; font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem; }
+      .section > p { margin: 0 0 0.75rem; }
+      .collapsed {
+        display: flex; justify-content: space-between; align-items: center;
+        border: 1px solid var(--s-line); border-radius: 1rem; padding: 0.75rem 1rem; color: var(--s-ink-soft);
+      }
+
+      /* kit rows */
+      .kits { display: flex; flex-direction: column; gap: 0.5rem; margin: 0 0 0.75rem; }
+      .kit {
+        display: flex; align-items: center; gap: 0.75rem;
+        border: 1px solid var(--s-line); border-radius: 1rem; padding: 0.75rem 1rem;
+      }
+      .kit-main { min-width: 0; flex: 1; }
+      .kit-id { font-weight: 600; font-size: 0.9375rem; letter-spacing: 0.04em; }
+      .kit-meta { color: var(--s-ink-soft); font-size: 0.8125rem; margin-top: 0.125rem; }
+      .kit.dead { background: var(--s-overlay); border-color: transparent; }
+      .kit.dead .kit-id { color: var(--s-ink-faint); text-decoration: line-through; text-decoration-thickness: 1px; }
+      .kit.dead .kit-meta { color: var(--s-ink-faint); }
+      .pill {
+        display: inline-block; border-radius: 20px; padding: 0.125rem 0.625rem; font-size: 0.75rem; font-weight: 500;
+      }
+      .pill.this { background: var(--s-accent-bg); color: var(--s-accent); }
+      .pill.dead { background: var(--s-hover); color: var(--s-ink-faint); }
+
+      /* buttons */
+      .btn {
+        font: inherit; font-weight: 500; border-radius: 1rem; padding: 0.625rem 1.125rem; cursor: pointer;
+        border: 1px solid transparent; white-space: nowrap;
+      }
+      .btn.secondary { background: var(--s-slate); color: #fff; }
+      .btn.primary { background: #f15d22; color: #fff; }
+      .btn.ghost { background: transparent; color: var(--s-ink); border-color: var(--s-line-strong); }
+      .btn.sm { padding: 0.375rem 0.75rem; font-size: 0.75rem; border-radius: 0.75rem; }
+      .btn.danger-outline { background: transparent; color: var(--s-danger); border-color: var(--s-danger-line); }
+      .btn.danger { background: #dc2626; color: #fff; }
+      .btn.disabled { opacity: 0.5; cursor: default; }
+      .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .row-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+      .hint { font-size: 0.6875rem; color: var(--s-ink-faint); text-align: right; max-width: 10rem; }
+
+      /* modal specimen */
+      .backdrop {
+        background: rgb(0 0 0 / 50%); border-radius: 1.5rem; padding: 1.5rem 1rem; display: grid; place-items: center;
+        min-height: 20rem;
+      }
+      .modal {
+        background: var(--s-raised); border-radius: 1.5rem; width: 100%; max-width: 30rem; box-shadow: var(--s-shadow);
+        overflow: hidden;
+      }
+      .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1.125rem 1.25rem 0; }
+      .modal-body { padding: 1rem 1.25rem; }
+      .modal-foot {
+        display: flex; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1.25rem 1.125rem;
+        border-top: 1px solid var(--s-line);
+      }
+      .x { color: var(--s-ink-faint); font-size: 1.25rem; line-height: 1; }
+      .phone .modal { border-radius: 1.5rem 1.5rem 0 0; }
+      .phone .backdrop { align-items: end; padding: 3rem 0 0; }
+
+      /* confirm */
+      .confirm { max-width: 26rem; }
+      .confirm .modal-body p { margin: 0 0 0.75rem; }
+      .callout {
+        border-radius: 1rem; padding: 0.75rem 1rem; font-size: 0.875rem;
+        background: var(--s-accent-bg); color: var(--s-ink);
+      }
+      .callout b { color: var(--s-accent); font-weight: 600; }
+
+      /* stepper for the replace flow */
+      .steps { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0 0; padding: 0; list-style: none; }
+      .steps li { display: flex; gap: 0.75rem; align-items: flex-start; font-size: 0.875rem; }
+      .dot {
+        flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: grid; place-items: center;
+        font-size: 0.75rem; font-weight: 600; background: var(--s-overlay); color: var(--s-ink-soft);
+      }
+      .dot.on { background: var(--s-accent); color: #fff; }
+
+      @media (max-width: 40rem) {
+        body { padding: 1.25rem 1rem 3rem; }
+        .kit { flex-wrap: wrap; }
+        .row-actions { align-items: flex-start; width: 100%; }
+        .hint { text-align: left; max-width: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>Recovery kits: see them, retire them</h1>
+      <p class="lede">
+        Today Settings says only “2 kit(s) on file”. Both directions below list every kit by the ID printed on
+        it, keep invalidated kits visible so an old printout can be recognised as dead, and never let the last
+        live kit go without a replacement. They differ only in where the list lives.
+      </p>
+
+      <!-- ═══════════════ A ═══════════════ -->
+      <h2>Direction A: the list lives in the Security &amp; Recovery drawer</h2>
+      <p>
+        Mirrors the passkeys list in Account &amp; Sign-In. The kits replace the bare count. Everything is one
+        scroll away, no extra modal. Costs vertical space in a drawer that already holds the trusted-device
+        toggle, magic link and Google cards.
+      </p>
+      <div class="row">
+        <!-- A light desktop, manager view -->
+        <div class="frame">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-icon">🔒</div>
+              <div class="panel-title">Security &amp; Recovery</div>
+            </div>
+
+            <div class="section">
+              <h4>Recovery Kits</h4>
+              <p class="muted">
+                A kit is a printed code that opens your family’s data if every PIN is lost. Each kit you have
+                ever made still works until you invalidate it here.
+              </p>
+              <div class="kits">
+                <div class="kit">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 3fa09c1e <span class="pill this">Newest</span></div>
+                    <div class="kit-meta">Created 12 Sep 2026 by Greg</div>
+                  </div>
+                  <button class="btn sm danger-outline">Invalidate</button>
+                </div>
+                <div class="kit">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 9b2e77c4</div>
+                    <div class="kit-meta">Created 3 Mar 2026</div>
+                  </div>
+                  <button class="btn sm danger-outline">Invalidate</button>
+                </div>
+                <div class="kit dead">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit c01d4e88</div>
+                    <div class="kit-meta">Created 14 Jan 2026 · Invalidated 20 Sep 2026 by Sophia</div>
+                  </div>
+                  <span class="pill dead">Invalidated</span>
+                </div>
+              </div>
+              <div class="actions">
+                <button class="btn secondary">Create a New Kit</button>
+              </div>
+              <p class="faint" style="margin: 0.75rem 0 0">
+                Invalidating stops a kit opening the family file from now on. A copy of the file saved before
+                today can still be opened with it.
+              </p>
+            </div>
+
+            <div class="section">
+              <h4>Family Passphrase</h4>
+              <p class="muted">Set · last changed 2 Jun 2026</p>
+              <button class="btn ghost">Change Passphrase</button>
+            </div>
+          </div>
+          <p class="cap">Light · desktop · owner or pod manager. Kits older than this feature show only ID and date.</p>
+        </div>
+
+        <!-- A dark phone, last-kit state, member view below -->
+        <div class="frame is-dark phone">
+          <div class="panel">
+            <div class="section">
+              <h4>Recovery Kits</h4>
+              <p class="muted">Each kit you have ever made still works until you invalidate it here.</p>
+              <div class="kits">
+                <div class="kit">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 3fa09c1e</div>
+                    <div class="kit-meta">Created 12 Sep 2026 by Greg</div>
+                  </div>
+                  <div class="row-actions">
+                    <button class="btn sm ghost">Replace</button>
+                    <span class="hint">Your only kit. Replacing makes a new one first.</span>
+                  </div>
+                </div>
+                <div class="kit dead">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 9b2e77c4</div>
+                    <div class="kit-meta">Invalidated 24 Sep 2026 by Greg</div>
+                  </div>
+                  <span class="pill dead">Invalidated</span>
+                </div>
+              </div>
+              <button class="btn secondary" style="width: 100%">Create a New Kit</button>
+            </div>
+          </div>
+          <div class="panel" style="margin-top: 0.75rem">
+            <div class="section">
+              <h4>Recovery Kits</h4>
+              <div class="kits">
+                <div class="kit">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 3fa09c1e</div>
+                    <div class="kit-meta">Created 12 Sep 2026 by Greg</div>
+                  </div>
+                </div>
+                <div class="kit dead">
+                  <div class="kit-main">
+                    <div class="kit-id">Kit 9b2e77c4</div>
+                    <div class="kit-meta">Invalidated 24 Sep 2026</div>
+                  </div>
+                  <span class="pill dead">Invalidated</span>
+                </div>
+              </div>
+              <p class="faint" style="margin: 0">Only Greg and the pod managers can invalidate or replace a kit.</p>
+            </div>
+          </div>
+          <p class="cap">Dark · phone. Top: the last live kit reads “Replace”, never “Invalidate”. Bottom: a member without manage rights sees the list, no actions.</p>
+        </div>
+      </div>
+
+      <!-- ═══════════════ B ═══════════════ -->
+      <h2>Direction B: the drawer keeps its count, a modal holds the list</h2>
+      <p>
+        The drawer stays short: one honest line and two buttons. “Manage Kits” opens a Tier 1 modal (a sheet on
+        phone) with the same rows and rules. Better for a drawer that is already long, and the modal gives the
+        destructive actions a room of their own. One more tap to reach the list.
+      </p>
+      <div class="row">
+        <!-- B dark desktop: drawer -->
+        <div class="frame is-dark">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-icon">🔒</div>
+              <div class="panel-title">Security &amp; Recovery</div>
+            </div>
+            <div class="section">
+              <h4>Recovery Kits</h4>
+              <p class="muted">
+                A kit is a printed code that opens your family’s data if every PIN is lost.
+              </p>
+              <p class="muted" style="margin-bottom: 0.75rem">2 kits on file · 1 invalidated · newest 12 Sep 2026</p>
+              <div class="actions">
+                <button class="btn ghost">Manage Kits</button>
+                <button class="btn secondary">Create a New Kit</button>
+              </div>
+            </div>
+            <div class="section">
+              <h4>Family Passphrase</h4>
+              <p class="muted">Set · last changed 2 Jun 2026</p>
+              <button class="btn ghost">Change Passphrase</button>
+            </div>
+          </div>
+          <p class="cap">Dark · desktop · the drawer. The count line now says what a person needs before opening the list.</p>
+        </div>
+
+        <!-- B light phone: the modal as a sheet -->
+        <div class="frame phone">
+          <div class="backdrop">
+            <div class="modal">
+              <div class="modal-head">
+                <div class="panel-title">Recovery Kits</div>
+                <span class="x">×</span>
+              </div>
+              <div class="modal-body">
+                <p class="muted" style="margin: 0 0 0.75rem">Each kit you have ever made still works until you invalidate it.</p>
+                <div class="kits">
+                  <div class="kit">
+                    <div class="kit-main">
+                      <div class="kit-id">Kit 3fa09c1e <span class="pill this">Newest</span></div>
+                      <div class="kit-meta">Created 12 Sep 2026 by Greg</div>
+                    </div>
+                    <button class="btn sm danger-outline">Invalidate</button>
+                  </div>
+                  <div class="kit">
+                    <div class="kit-main">
+                      <div class="kit-id">Kit 9b2e77c4</div>
+                      <div class="kit-meta">Created 3 Mar 2026</div>
+                    </div>
+                    <button class="btn sm danger-outline">Invalidate</button>
+                  </div>
+                  <div class="kit dead">
+                    <div class="kit-main">
+                      <div class="kit-id">Kit c01d4e88</div>
+                      <div class="kit-meta">Invalidated 20 Sep 2026 by Sophia</div>
+                    </div>
+                    <span class="pill dead">Invalidated</span>
+                  </div>
+                </div>
+                <p class="faint" style="margin: 0">
+                  A copy of your family file saved before an invalidation can still be opened with that kit.
+                </p>
+              </div>
+              <div class="modal-foot">
+                <button class="btn secondary">Create a New Kit</button>
+                <button class="btn ghost">Close</button>
+              </div>
+            </div>
+          </div>
+          <p class="cap">Light · phone · the “Manage Kits” sheet, full width on mobile as every modal is.</p>
+        </div>
+      </div>
+
+      <!-- ═══════════════ shared ═══════════════ -->
+      <h2>Shared: the confirm, and replacing the last kit</h2>
+      <p>
+        Both directions use these. Invalidation is destructive, so this is one of the few places red is correct.
+        The confirm names the kit by ID so a person can check it against the printout in their hand.
+      </p>
+      <div class="row">
+        <div class="frame">
+          <div class="backdrop">
+            <div class="modal confirm">
+              <div class="modal-head"><div class="panel-title">Invalidate Kit 9b2e77c4?</div></div>
+              <div class="modal-body">
+                <p>
+                  This kit will stop opening your family’s data on every device as soon as they sync. This
+                  cannot be undone, and no device that missed the change can bring it back.
+                </p>
+                <div class="callout">
+                  <b>One limit:</b> a copy of your family file saved before today can still be opened with this
+                  kit. Destroy any printouts you no longer trust.
+                </div>
+              </div>
+              <div class="modal-foot">
+                <button class="btn ghost">Cancel</button>
+                <button class="btn danger">Invalidate Kit</button>
+              </div>
+            </div>
+          </div>
+          <p class="cap">Light · the destructive confirm (ConfirmModal, variant danger).</p>
+        </div>
+
+        <div class="frame is-dark">
+          <div class="backdrop">
+            <div class="modal confirm">
+              <div class="modal-head"><div class="panel-title">Replace Your Only Kit</div></div>
+              <div class="modal-body">
+                <p>
+                  Kit 3fa09c1e is the only way back into your family’s data if every PIN is lost, so it stays
+                  valid until a new kit is safely in your hands.
+                </p>
+                <ul class="steps">
+                  <li><span class="dot on">1</span><span>Create a new kit and save or print it.</span></li>
+                  <li><span class="dot">2</span><span>Confirm you have it. Kit 3fa09c1e is then invalidated.</span></li>
+                </ul>
+              </div>
+              <div class="modal-foot">
+                <button class="btn ghost">Cancel</button>
+                <button class="btn primary">Create the New Kit</button>
+              </div>
+            </div>
+          </div>
+          <p class="cap">Dark · the replace flow. Two steps because there genuinely are two: make the new kit, then retire the old one.</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
