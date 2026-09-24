@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-24",
-    "translationCount": 4917
+    "translationCount": 4944
   },
   "translations": {
     "app.name": {
@@ -5822,9 +5822,9 @@
       "lastUpdated": "2026-03-08"
     },
     "settings.cachePersistWarning": {
-      "translation": "本地缓存未更新—您的数据可能无法在页面刷新后存活。当Beanies在多个选项卡中打开时，通常会发生这种情况。关闭其他选项，然后刷新此选项。如果这种情况持续下去，您的浏览器可能存储空间不足或处于隐私模式。",
-      "hash": "6xxtkl",
-      "lastUpdated": "2026-09-20"
+      "translation": "本地缓存未更新—您的数据可能无法在页面刷新后存活。当beanies.family在多个标签页中打开时，通常会发生这种情况。关闭其他选项，然后刷新此选项。如果这种情况持续下去，您的浏览器可能存储空间不足或处于隐私模式。",
+      "hash": "lvmyjp",
+      "lastUpdated": "2026-09-24"
     },
     "settings.noRatesWarning": {
       "translation": "汇率尚未加载。没有它们，货币转换将无法正常工作。",
@@ -18307,9 +18307,9 @@
       "lastUpdated": "2026-07-13"
     },
     "sync.durabilityBanner": {
-      "translation": "最近的更改可能无法在此设备上的刷新中存活。您保存的副本是安全的。当在多个选项卡中打开Beanies时，通常会发生这种情况—关闭其他选项卡，然后刷新。",
-      "hash": "c0bx3t",
-      "lastUpdated": "2026-09-20"
+      "translation": "最近的更改可能无法在此设备上的刷新中存活。您保存的副本是安全的。当beanies.family在多个选项卡中打开时，通常会发生这种情况：关闭其他选项卡，然后刷新。",
+      "hash": "kojhc5",
+      "lastUpdated": "2026-09-24"
     },
     "sync.durabilityBannerCta": {
       "translation": "这是什么？",
@@ -20656,11 +20656,6 @@
       "hash": "k0ffpv",
       "lastUpdated": "2026-08-28"
     },
-    "recovery.kitCount": {
-      "translation": "{count}个套件已存档",
-      "hash": "w6qp7g",
-      "lastUpdated": "2026-08-28"
-    },
     "recovery.kitNone": {
       "translation": "还没有恢复工具包—我们建议创建一个。",
       "hash": "q14z0z",
@@ -20972,9 +20967,9 @@
       "lastUpdated": "2026-08-28"
     },
     "app.initError.registryBlocked": {
-      "translation": "beanies在另一个选项卡或窗口中打开，并且正在保留存储更新。关闭其他beanies选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
-      "hash": "biwkd1",
-      "lastUpdated": "2026-08-28"
+      "translation": "beanies.family在另一个选项卡或窗口中打开，并且正在进行存储更新。关闭其他beanies.family选项卡和窗口（包括已安装的应用） ，然后重新加载此页面。",
+      "hash": "d05zzd",
+      "lastUpdated": "2026-09-24"
     },
     "family.resetPin.modalTitle": {
       "translation": "重置{name}的PIN码",
@@ -22192,9 +22187,9 @@
       "lastUpdated": "2026-09-06"
     },
     "podMerge.failedInline": {
-      "translation": "beanies无法将家庭文件中的更改与此设备上的更改合并，因此未写入任何内容。您的更改将保留在此处。关闭任何其他beanies选项卡并重新加载；如果继续发生这种情况，请从“设置”中导出更改并联系support@beanies.family。",
-      "hash": "g39z74",
-      "lastUpdated": "2026-09-05"
+      "translation": "beanies.family无法将家庭文件中的更改与此设备上的更改合并，因此未写入任何内容。您的更改将保留在此处。关闭任何其他beanies.family选项卡并重新加载；如果继续发生这种情况，请从“设置”中导出更改并联系support@beanies.family。",
+      "hash": "2pc5ym",
+      "lastUpdated": "2026-09-24"
     },
     "compaction.refused.no-permission": {
       "translation": "beanies目前无法写入您的家庭文件，因此没有任何变化。重新连接存储，或再次授予对文件的访问权限，然后再次尝试对其进行整理。",
@@ -22447,9 +22442,9 @@
       "lastUpdated": "2026-09-07"
     },
     "podLocalUnreadable.inline": {
-      "translation": "beanies无法打开此设备自己的家庭数据副本，因此尚未替换为家庭文件。您尚未保存的任何内容仍在此处。这通常意味着在另一个选项卡或窗口中打开了Beanies。关闭其他页面并重新加载此页面。如果消息保持不变，请选择下面的“继续使用家庭文件” （仅在此设备上进行的更改将被放弃） ，或从“设置”中导出您的数据并联系support@beanies.family。",
-      "hash": "tz1jpz",
-      "lastUpdated": "2026-09-09"
+      "translation": "beanies.family无法打开此设备自己的家庭数据副本，因此尚未替换为家庭文件。您尚未保存的任何内容仍在此处。这通常意味着beanies.family在另一个选项卡或窗口中打开。关闭其他页面并重新加载此页面。如果消息保持不变，请选择下面的“继续使用家庭文件” （仅在此设备上进行的更改将被放弃） ，或从“设置”中导出您的数据并联系support@beanies.family。",
+      "hash": "ka8tc3",
+      "lastUpdated": "2026-09-24"
     },
     "podLocalUnreadable.title": {
       "translation": "无法打开此设备的副本",
@@ -22462,14 +22457,14 @@
       "lastUpdated": "2026-09-07"
     },
     "podLocalUnreadable.useFileConfirmMessage": {
-      "translation": "beanies将加载您的家庭文件并放弃此设备自己的副本。由于该副本无法打开，因此无法判断它是否保存了从未保存过的任何内容。已保存到家庭文件的所有内容都是安全的。如果您不想冒险，请关闭任何其他beanies选项卡并先重新加载此页面。",
-      "hash": "3zxgtf",
-      "lastUpdated": "2026-09-07"
+      "translation": "beanies.family将加载您的家庭文件，并放弃此设备自己的副本。由于该副本无法打开，因此无法判断它是否保存了从未保存过的任何内容。已保存到家庭文件的所有内容都是安全的。如果您不想冒险，请关闭任何其他beanies.family选项卡并先重新加载此页面。",
+      "hash": "8pdxjb",
+      "lastUpdated": "2026-09-24"
     },
     "resumeSetup.podLocalUnreadable": {
-      "translation": "beanies无法打开此设备自己的家庭数据副本。什么都没有改变，什么都没有丢失。这通常意味着beanies已在其他选项卡或窗口中打开，因此请关闭其他选项卡或窗口并重新加载此页面。如果问题仍然存在，请联系support@beanies.family。",
-      "hash": "8eeok4",
-      "lastUpdated": "2026-09-07"
+      "translation": "beanies.family无法打开此设备自己的家庭数据副本。什么都没有改变，什么都没有丢失。这通常意味着beanies.family已在其他选项卡或窗口中打开，因此请关闭其他选项卡或窗口并重新加载此页面。如果问题仍然存在，请联系support@beanies.family。",
+      "hash": "hxf3t0",
+      "lastUpdated": "2026-09-24"
     },
     "settings.browseDrive": {
       "translation": "Google Drive",
@@ -24589,6 +24584,146 @@
     "recovery.kitNotSynced": {
       "translation": "您的新套件尚未到达您的家庭文件。请检查您的网络连接，然后重试。",
       "hash": "cf3jd0",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitSummary": {
+      "translation": "{live}实时· {invalidated}无效·最新{newest}",
+      "hash": "h5b8em",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitsManage": {
+      "translation": "管理套件",
+      "hash": "qz51ko",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitsModalTitle": {
+      "translation": "恢复试剂盒",
+      "hash": "q6nldk",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitsModalIntro": {
+      "translation": "您制作的每个试剂盒仍然会打开您的家庭数据，直到您在此处将其无效。身份证件与套件上打印的身份证件相匹配。",
+      "hash": "wcfwny",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitRowLabel": {
+      "translation": "套件{kitId}",
+      "hash": "9udejh",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitCreatedBy": {
+      "translation": "由{name}在{date}建立",
+      "hash": "x44e2c",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitCreatedOn": {
+      "translation": "Created {date}",
+      "hash": "",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidatedBy": {
+      "translation": "已由{name}在{date}失效",
+      "hash": "4huph",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidatedOn": {
+      "translation": "已失效{date}",
+      "hash": "yxnwcr",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitNewest": {
+      "translation": "最新",
+      "hash": "whw64a",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidatedPill": {
+      "translation": "已失效",
+      "hash": "btr5nt",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidate": {
+      "translation": "作废",
+      "hash": "2o7z2z",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplace": {
+      "translation": "替 换",
+      "hash": "pedw18",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplaceHint": {
+      "translation": "您唯一的套件。先更换新套件。",
+      "hash": "hn1yny",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateTitle": {
+      "translation": "是否使此试剂盒无效？",
+      "hash": "lf0oo6",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateBody": {
+      "translation": "此套件将在每台设备同步后立即停止打开您的家庭数据。此操作无法撤消，任何错过更改的设备都无法恢复更改。",
+      "hash": "oukzmd",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateLimit": {
+      "translation": "套件{kitId}。一个限制：今天之前保存的家庭文件副本仍然可以使用此套件打开。销毁任何您不再信任的打印件。",
+      "hash": "y61sha",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateConfirm": {
+      "translation": "使试剂盒无效",
+      "hash": "a8jwc1",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplaceTitle": {
+      "translation": "更换您唯一的套件",
+      "hash": "2k1u65",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplaceBody": {
+      "translation": "如果每个PIN丢失，此套件是返回家庭数据的唯一途径，因此在新套件安全到达您的手中之前，它始终有效。首先，创建新套件并保存或打印。一旦您确认拥有该试剂盒，该试剂盒将失效。",
+      "hash": "ye38b4",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplaceConfirm": {
+      "translation": "创建新套件",
+      "hash": "cl79nh",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReauthReason": {
+      "translation": "使恢复工具包失效无法撤消，因此请确认您的身份。",
+      "hash": "q9bysh",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidated": {
+      "translation": "套件已失效。它不再打开您的家庭数据。",
+      "hash": "pdqm1u",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateNotSynced": {
+      "translation": "此处套件无效。更改将在下次保存时到达您的家庭文件。",
+      "hash": "yeg49w",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitInvalidateFailed": {
+      "translation": "试剂盒无法失效。它仍然有效。请稍后重试。",
+      "hash": "5onbmd",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitReplaceNotSynced": {
+      "translation": "您的新套件尚未到达您的家庭文件，因此您的旧套件仍然有效。同步后，从管理套件中使旧的无效。",
+      "hash": "ggc14",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitLastKit": {
+      "translation": "这是您唯一的恢复工具包，因此它不能失效。首先创建一个新套件，或使用替换。",
+      "hash": "ur4rvt",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitWrongCodeOrInvalidated": {
+      "translation": "该代码与此家庭的任何实时恢复工具包都不匹配。从管理套件中失效的套件不再打开您的家庭数据。",
+      "hash": "fz9p65",
       "lastUpdated": "2026-09-24"
     }
   }
