@@ -447,6 +447,7 @@
   .beanie-sync-pulse,
   .animate-beanie-shimmer,
   .attention-pulse,
+  .attention-pulse-twice,
   .bell-ring,
   .magic-tick,
   .magic-text-shimmer,
@@ -657,6 +658,12 @@
 
 .attention-pulse {
   animation: attention-pulse 1.5s ease-out;
+}
+
+/* Two quick beats for a control the person has not acted on yet (e.g. the empty
+   recovery-kit state on opening Security & Recovery). Same keyframes, same driver. */
+.attention-pulse-twice {
+  animation: attention-pulse 0.8s ease-out 2;
 }
 
 /* ───── Live dot pulse ───────────────────────────────────────────────────────
