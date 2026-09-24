@@ -216,3 +216,57 @@ describe('memberHasKeyMaterial', () => {
     expect(memberHasKeyMaterial(tombstoned, 'gone')).toBe(false);
   });
 });
+
+// ── Recovery kits (tracker #99): a slot tombstone retires one kit, with attribution ──
+import { slotTombstoneEntryKey } from '../envelopeMerge';
+
+describe('recovery kit tombstones (#99)', () => {
+  const kits = () =>
+    env({
+      recoveryKeys: {
+        kitA: { salt: 's', wrapped: 'wa', createdAt: NOW, createdBy: 'm1' },
+        kitB: { salt: 's', wrapped: 'wb', createdAt: NOW },
+      },
+    });
+
+  it('slotTombstoneEntryKey is the inverse of revocationKey for slot-wide keys only', () => {
+    expect(slotTombstoneEntryKey('recoveryKeys', revocationKey('recoveryKeys', 'kitA'))).toBe(
+      'kitA'
+    );
+    expect(
+      slotTombstoneEntryKey('recoveryKeys', revocationKey('recoveryKeys', 'kitA', 'wa'))
+    ).toBeNull();
+    expect(slotTombstoneEntryKey('recoveryKeys', revocationKey('wrappedKeys', 'kitA'))).toBeNull();
+    expect(slotTombstoneEntryKey('recoveryKeys', memberRevocationKey('m1'))).toBeNull();
+    expect(slotTombstoneEntryKey('recoveryKeys', 'recoveryKeys:')).toBeNull();
+  });
+
+  it('drops only the tombstoned kit, keeps revokedBy, and survives a merge with a stale peer', () => {
+    const tombstones = {
+      [revocationKey('recoveryKeys', 'kitA')]: { revokedAt: NOW, revokedBy: 'm2' },
+    };
+    const local = applyRevokedKeys({
+      ...kits(),
+      revokedKeys: mergeRevokedKeys(undefined, tombstones),
+    }).envelope;
+    expect(Object.keys(local.recoveryKeys ?? {})).toEqual(['kitB']);
+    expect(local.revokedKeys?.['recoveryKeys:kitA']).toEqual({ revokedAt: NOW, revokedBy: 'm2' });
+
+    // A peer that never saw the tombstone still carries kitA's wrap.
+    const stalePeer = kits();
+    const merged = mergeEnvelopes(stalePeer, local);
+    expect(Object.keys(merged.envelope.recoveryKeys ?? {})).toEqual(['kitB']);
+    expect(merged.envelope.revokedKeys?.['recoveryKeys:kitA']?.revokedBy).toBe('m2');
+    expect(merged.needsPublish).toBe(true);
+
+    // And in the other direction: the tombstone side merging the stale side.
+    const other = mergeEnvelopes(local, stalePeer);
+    expect(Object.keys(other.envelope.recoveryKeys ?? {})).toEqual(['kitB']);
+  });
+
+  it('a createdBy on a live kit rides through the merge untouched', () => {
+    const merged = mergeEnvelopes(env(), kits());
+    expect(merged.envelope.recoveryKeys?.kitA?.createdBy).toBe('m1');
+    expect(merged.envelope.recoveryKeys?.kitB?.createdBy).toBeUndefined();
+  });
+});

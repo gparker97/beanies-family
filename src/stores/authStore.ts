@@ -51,8 +51,10 @@ import {
   emitDeviceTrustSet,
   emitSignoutTier,
   emitCacheKept,
+  emitKitInvalidateOutcome,
   type DeviceTrustSource,
 } from '@/services/telemetry/loginFlowEvents';
+import type { DurableSaveOutcome } from './syncStore';
 import {
   runSignOutSteps,
   signOutStepsFor,
@@ -129,6 +131,16 @@ export type RotateError =
   | 'noConnection'
   | 'rollbackFailed';
 export type RotateResult = { success: true } | { success: false; error: RotateError };
+
+/**
+ * Outcome of retiring a recovery kit (tracker #99), in the `deleteMember` shape: a
+ * discriminated result with a typed refusal, and the push result on `save` so the caller
+ * can say "done" vs "done, reaches your family file on the next save". `'error'` means
+ * the store threw and has already reported it.
+ */
+export type KitInvalidateOutcome =
+  | { invalidated: true; save: DurableSaveOutcome; liveRemaining: number }
+  | { invalidated: false; refusal: 'last_kit' | 'no_envelope' | 'error' };
 
 export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
 
@@ -1925,6 +1937,21 @@ export const useAuthStore = defineStore('auth', () => {
   > {
     const translationStore = useTranslationStore();
     try {
+      // A kit is a full-access key that also lets its holder reset every PIN, so minting
+      // one is manager-only (greg, 2026-09-24): the owner, or a member with canManagePod.
+      // No signed-in member means the kit-born create flow, which runs before a roster
+      // exists and must stay allowed. `role === 'owner'` is checked explicitly because
+      // `canManagePod` is optional on older owner rows (see `useMintTarget.ts`).
+      const me = useFamilyStore().currentMember;
+      if (me && me.role !== 'owner' && !me.canManagePod) {
+        reportError({
+          surface: 'login-flow',
+          message: 'kit generation refused: actor lacks canManagePod',
+          severity: 'warning',
+          context: { action: 'kit_generate_refused', error_code: 'not_authorized' },
+        });
+        return { success: false, error: translationStore.t('settings.adminOnly') };
+      }
       const { useSyncStore } = await import('./syncStore');
       const syncStore = useSyncStore();
       if (!syncStore.familyKey || !syncStore.envelope) {
@@ -1932,7 +1959,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
       const { generateRecoveryKit } = await import('@/services/auth/recoveryKit');
       const kit = await generateRecoveryKit(syncStore.familyKey);
-      syncStore.addRecoveryKey(kit.kitId, kit.pkg);
+      // Attribution for the Manage Kits list (#99). Absent on the kit-born first kit, which
+      // is minted before a member exists.
+      const createdBy = currentUser.value?.memberId;
+      syncStore.addRecoveryKey(kit.kitId, createdBy ? { ...kit.pkg, createdBy } : kit.pkg);
       logEvent({
         level: 'info',
         surface: 'login-flow',
@@ -1953,6 +1983,57 @@ export const useAuthStore = defineStore('auth', () => {
         success: false,
         error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
       };
+    }
+  }
+
+  /**
+   * Retire a recovery kit from Manage Kits (tracker #99). Never throws; every branch emits
+   * `kit_invalidate_outcome`. No actor authorization here — `useRecoveryKitActions` refuses
+   * before the store is reached (one `usePermissions()` check, the `removeMember` shape) —
+   * and no policy either: the last-kit guard lives in `syncStore.revokeRecoveryKit`, on the
+   * freshly merged envelope the tombstone is built from. Copy is the composable's job;
+   * this returns the outcome and nothing translated.
+   */
+  async function invalidateRecoveryKit(
+    kitId: string,
+    opts: { kind: 'invalidate' | 'replace' }
+  ): Promise<KitInvalidateOutcome> {
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      const r = await syncStore.revokeRecoveryKit(kitId, currentUser.value?.memberId);
+      if (!r.committed) {
+        emitKitInvalidateOutcome({ outcome: 'refused', kind: opts.kind, errorCode: r.refusal });
+        return { invalidated: false, refusal: r.refusal };
+      }
+      const liveRemaining = r.liveRemaining;
+      if (r.outcome === 'saved') {
+        emitKitInvalidateOutcome({
+          outcome: 'invalidated',
+          kind: opts.kind,
+          liveRemaining,
+          observed: r.observed,
+        });
+      } else {
+        emitKitInvalidateOutcome({
+          outcome: 'not_synced',
+          kind: opts.kind,
+          saveStatus: r.outcome,
+          liveRemaining,
+          observed: r.observed,
+        });
+      }
+      return { invalidated: true, save: r.outcome, liveRemaining };
+    } catch (e) {
+      reportError({
+        surface: 'login-flow',
+        message: 'kit invalidate failed',
+        error: e,
+        severity: 'error',
+        context: { action: 'kit_invalidate_failed', kind: opts.kind },
+      });
+      emitKitInvalidateOutcome({ outcome: 'refused', kind: opts.kind, errorCode: 'error' });
+      return { invalidated: false, refusal: 'error' };
     }
   }
 
@@ -3342,6 +3423,7 @@ export const useAuthStore = defineStore('auth', () => {
     unclaimMember,
     enrollDevicePinWrapForMember,
     createRecoveryKit,
+    invalidateRecoveryKit,
     setRecoveryPassphrase,
     signInWithPasskey,
     sessionRejected,

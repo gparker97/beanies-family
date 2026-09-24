@@ -113,11 +113,13 @@ import {
   mergeEnvelopes,
   mergeRevokedKeys,
   memberHasKeyMaterial,
+  revocationKey,
   revocationTombstonesForMember,
   withoutPayload,
 } from '@/services/sync/envelopeMerge';
+import { summarizeRecoveryKits } from '@/services/auth/recoveryKit';
 import type { EnvelopeTombstone } from '@/types/syncFileV4';
-import { logRevokedEntriesFiltered } from '@/services/sync/revocationLog';
+import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from '@/services/sync/revocationLog';
 import type { EnvelopeKeyDictField } from '@/services/sync/envelopeMerge';
 import {
   generateFamilyKey,
@@ -418,6 +420,7 @@ export const useSyncStore = defineStore('sync', () => {
       filtered,
     } = mergeEnvelopes(incoming, envelope.value);
     logRevokedEntriesFiltered(filtered, 'merge');
+    logRecoveryKitsExhausted(mergedFull, 'merge');
     // Stripped: this is the long-lived copy, and nothing reads the payload back
     // off it (verified — the only readers are worker-side, fed a freshly-parsed
     // envelope, plus `reEncryptEnvelope`, which overwrites the field).
@@ -437,6 +440,7 @@ export const useSyncStore = defineStore('sync', () => {
   function stagePendingFile(pending: NonNullable<(typeof pendingEncryptedFile)['value']>): void {
     const { envelope: clean, filtered } = applyRevokedKeys(pending.envelope);
     logRevokedEntriesFiltered(filtered, 'pending');
+    logRecoveryKitsExhausted(clean, 'pending');
     pendingEncryptedFile.value = { ...pending, envelope: clean };
   }
 
@@ -847,6 +851,19 @@ export const useSyncStore = defineStore('sync', () => {
   // Encryption is always on in V4 — backward compat computed
   const hasSessionPassword = computed(() => familyKey.value !== null);
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
+
+  /**
+   * Every recovery kit on file, for the Manage Kits list (tracker #99). Reads
+   * `envelope.value`, which a background sync can leave one commit stale (see
+   * `authoritativeEnvelope`); that is fine for a list, and `revokeRecoveryKit` takes its
+   * own count on the authoritative envelope, so the last-kit invariant never rests here.
+   */
+  const recoveryKits = computed(() =>
+    envelope.value ? summarizeRecoveryKits(envelope.value) : []
+  );
+  const liveRecoveryKitCount = computed(
+    () => recoveryKits.value.filter((k) => k.status === 'live').length
+  );
 
   // Getters
   const syncStatus = computed(() => {
@@ -6557,6 +6574,64 @@ export const useSyncStore = defineStore('sync', () => {
     return { committed: true, filtered };
   }
 
+  /**
+   * Retire one recovery kit with a `recoveryKeys:<kitId>` slot tombstone (tracker #99):
+   * observe → guard → tombstone → push, as one action with one push site.
+   *
+   * `observeRemote()` first, not for `createdAt` ordering (a slot tombstone kills the slot
+   * whatever it holds) but so the LAST-KIT GUARD counts a freshly merged envelope: after a
+   * background sync `envelope.value` is a pre-merge snapshot, so a guard on the store ref
+   * would let this device retire kit Y after a peer had already retired X. The guard and
+   * the tombstone read the same `authoritativeEnvelope()`, so they cannot disagree. The
+   * guard is unconditional — the Replace flow calls this only after its new kit is
+   * committed locally, so another live kit exists by then.
+   *
+   * ⚠️ WHAT THE GUARD DOES NOT CLOSE: the CONCURRENT race. Two devices each retiring "the
+   * other" kit inside the same observe→push window both pass their guard, and the tombstone
+   * union leaves no live kit. A per-device guard cannot see a tombstone that has not been
+   * pushed yet, and this device's own commit still holds the peer's kit, so the exhausted
+   * state is only ever visible at a MERGE: `logRecoveryKitsExhausted` fires from the merge
+   * termini (`recovery_kits_exhausted`), and the outcome carries `observed` so a lock-out
+   * report can tell a fresh count from a stale one.
+   *
+   * Pushed on the credential budget (`revokeMemberLink` precedent; the 5 s post-auth budget
+   * reports a false failure on every envelope write). NEVER rolled back: a tombstone that
+   * did not reach the file stays staged and rides the next save, so `'timeout'` and
+   * `'unknown'` are in flight, not failures. Policy about WHO may call this lives in
+   * `useRecoveryKitActions`; the store owns the data invariants only.
+   */
+  async function revokeRecoveryKit(
+    kitId: string,
+    revokedBy?: string
+  ): Promise<
+    | { committed: false; refusal: 'no_envelope' | 'last_kit' }
+    | { committed: true; outcome: DurableSaveOutcome; observed: boolean; liveRemaining: number }
+  > {
+    if (!authoritativeEnvelope()) return { committed: false, refusal: 'no_envelope' };
+    const observed = await observeRemote();
+    const base = authoritativeEnvelope();
+    if (!base) return { committed: false, refusal: 'no_envelope' };
+    const otherLive = summarizeRecoveryKits(base).some(
+      (k) => k.status === 'live' && k.kitId !== kitId
+    );
+    if (!otherLive) return { committed: false, refusal: 'last_kit' };
+    const tombstone: EnvelopeTombstone = {
+      revokedAt: new Date().toISOString(),
+      ...(revokedBy ? { revokedBy } : {}),
+    };
+    const { committed } = revokeEnvelopeEntries({
+      [revocationKey('recoveryKeys', kitId)]: tombstone,
+    });
+    if (!committed) return { committed: false, refusal: 'no_envelope' };
+    const outcome = await syncNowDurable(CREDENTIAL_PUBLISH_TIMEOUT_MS);
+    // Counted AFTER the push on the authoritative envelope: the push may have merged a
+    // peer's tombstone that `envelope.value` (one commit stale) does not show.
+    const liveRemaining = summarizeRecoveryKits(authoritativeEnvelope() ?? {}).filter(
+      (k) => k.status === 'live'
+    ).length;
+    return { committed: true, outcome, observed, liveRemaining };
+  }
+
   /** Does the authoritative envelope hold any key material for this member? (#77) */
   function holdsKeyMaterialFor(memberId: string): boolean {
     const base = authoritativeEnvelope();
@@ -6868,6 +6943,9 @@ export const useSyncStore = defineStore('sync', () => {
     observeRemote,
     stageMemberLinkTombstone,
     revokeEnvelopeEntries,
+    recoveryKits,
+    liveRecoveryKitCount,
+    revokeRecoveryKit,
     holdsKeyMaterialFor,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,

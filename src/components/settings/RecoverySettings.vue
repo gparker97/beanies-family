@@ -14,34 +14,118 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
+import RecoveryKitsModal from '@/components/settings/RecoveryKitsModal.vue';
+import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNotice.vue';
 import { useRecoveryKitFlow } from '@/composables/useRecoveryKitFlow';
+import {
+  approveReplace,
+  invalidateKit,
+  toastKitInvalidateOutcome,
+} from '@/composables/useRecoveryKitActions';
+import { usePermissions } from '@/composables/usePermissions';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatDate } from '@/utils/date';
 import { generatePassphrase } from '@/utils/passphraseStrength';
+import { emitKitInvalidateOutcome } from '@/services/telemetry/loginFlowEvents';
+import type { RecoveryKitSummary } from '@/services/auth/recoveryKit';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
 const syncStore = useSyncStore();
+const { canManagePod } = usePermissions();
 
 const statusMessage = ref<{ text: string; type: 'success' | 'error' } | null>(null);
 
 // ── Kit state ────────────────────────────────────────────────────────────────
-const kitCount = computed(() => Object.keys(syncStore.envelope?.recoveryKeys ?? {}).length);
 const kitFlow = useRecoveryKitFlow();
+const showKits = ref(false);
+/** A kit action is in flight; the list disables its actions meanwhile (see the modal). */
+const kitActionBusy = ref(false);
+const kitSummary = computed(() => {
+  const kits = syncStore.recoveryKits;
+  const live = syncStore.liveRecoveryKitCount;
+  const newest = kits.find(
+    (k): k is Extract<RecoveryKitSummary, { status: 'live' }> => k.status === 'live'
+  );
+  return fillTemplate(t('recovery.kitSummary'), {
+    live: String(live),
+    invalidated: String(kits.length - live),
+    newest: newest ? formatDate(newest.createdAt) : '',
+  });
+});
+
+/**
+ * The kit being replaced (#99), set only between an approved Replace and the new kit's
+ * stored confirmation. This host owns it rather than the shared flow: the kit nag and the
+ * sign-out guard use the same flow and never replace anything.
+ */
+const replacingKitId = ref<string | null>(null);
 
 async function handleGenerateKit() {
   statusMessage.value = null;
+  // The list and the kit modal are both base-layer modals; close the list first.
+  showKits.value = false;
   await kitFlow.generate();
   if (kitFlow.error.value) statusMessage.value = { text: kitFlow.error.value, type: 'error' };
 }
 
+async function handleInvalidateKit(kit: RecoveryKitSummary) {
+  // The confirm (top layer) and the PIN gate (gate layer) paint over the open list.
+  kitActionBusy.value = true;
+  try {
+    await invalidateKit(kit);
+  } finally {
+    kitActionBusy.value = false;
+  }
+}
+
+async function handleReplaceKit(kit: RecoveryKitSummary) {
+  kitActionBusy.value = true;
+  try {
+    if (!(await approveReplace(kit))) return;
+    replacingKitId.value = kit.kitId;
+    await handleGenerateKit();
+    // A failed mint leaves no pending replacement.
+    if (kitFlow.error.value) replacingKitId.value = null;
+  } finally {
+    kitActionBusy.value = false;
+  }
+}
+
 async function handleKitStored(via: 'saved' | 'acknowledged') {
+  // Taken and cleared BEFORE the await, so a second `stored` event during a slow
+  // invalidation cannot retire the old kit twice.
+  const oldKit = replacingKitId.value;
+  replacingKitId.value = null;
   // Doc-side confirmation signal (Phase 4): the kit nag keys on it, and for kit-born
   // families it is the ONLY evidence anyone actually stored a code. A push that did not
   // land is shown (the flow sets `error` to the not-synced message and reports it).
   const durable = await kitFlow.confirmStored(via);
+  if (oldKit && durable) {
+    // The old kit's revoke can take 40 s on a slow link; keep the list's actions disabled
+    // for the whole of it, exactly as for a plain Invalidate.
+    kitActionBusy.value = true;
+    try {
+      toastKitInvalidateOutcome(await authStore.invalidateRecoveryKit(oldKit, { kind: 'replace' }));
+    } finally {
+      kitActionBusy.value = false;
+    }
+    return;
+  }
+  if (oldKit && !durable) {
+    // The old kit stays valid on purpose: the replacement is not on file yet. Two live
+    // kits now exist, so Manage Kits offers Invalidate on the old one once synced.
+    emitKitInvalidateOutcome({
+      outcome: 'refused',
+      kind: 'replace',
+      errorCode: 'confirm_not_synced',
+    });
+    statusMessage.value = { text: t('recovery.kitReplaceNotSynced'), type: 'error' };
+    return;
+  }
   if (!durable && kitFlow.error.value) {
     statusMessage.value = { text: kitFlow.error.value, type: 'error' };
   }
@@ -107,25 +191,33 @@ async function handleSavePassphrase() {
       <p
         class="mb-3 text-xs"
         :class="
-          kitCount === 0
+          syncStore.liveRecoveryKitCount === 0
             ? 'dark:text-accent-lift text-[#F15D22]'
             : 'dark:text-ink-faint text-gray-500'
         "
       >
-        {{
-          kitCount === 0
-            ? t('recovery.kitNone')
-            : fillTemplate(t('recovery.kitCount'), { count: String(kitCount) })
-        }}
+        {{ syncStore.liveRecoveryKitCount === 0 ? t('recovery.kitNone') : kitSummary }}
       </p>
-      <BaseButton
-        variant="secondary"
-        :loading="kitFlow.isGenerating.value"
-        :disabled="kitFlow.isConfirming.value"
-        @click="handleGenerateKit"
-      >
-        {{ kitCount === 0 ? t('recovery.kitGenerate') : t('recovery.kitRegenerate') }}
-      </BaseButton>
+      <!-- A kit resets every PIN, so minting one is manager-only; everyone may see the list. -->
+      <SettingsAdminOnlyNotice v-if="!canManagePod" class="mb-3" />
+      <div class="flex flex-wrap gap-2">
+        <BaseButton variant="outline" type="button" @click="showKits = true">
+          {{ t('recovery.kitsManage') }}
+        </BaseButton>
+        <BaseButton
+          v-if="canManagePod"
+          variant="secondary"
+          :loading="kitFlow.isGenerating.value"
+          :disabled="kitFlow.isConfirming.value"
+          @click="handleGenerateKit"
+        >
+          {{
+            syncStore.liveRecoveryKitCount === 0
+              ? t('recovery.kitGenerate')
+              : t('recovery.kitRegenerate')
+          }}
+        </BaseButton>
+      </div>
     </div>
 
     <!-- Recovery passphrase -->
@@ -189,6 +281,17 @@ async function handleSavePassphrase() {
         </div>
       </div>
     </div>
+
+    <RecoveryKitsModal
+      :open="showKits"
+      :kits="syncStore.recoveryKits"
+      :can-manage="canManagePod"
+      :busy="kitActionBusy"
+      @close="showKits = false"
+      @create="handleGenerateKit"
+      @invalidate="handleInvalidateKit"
+      @replace="handleReplaceKit"
+    />
 
     <RecoveryKitDisplay
       :open="kitFlow.showKit.value"

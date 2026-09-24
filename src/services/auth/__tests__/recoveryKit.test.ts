@@ -90,3 +90,56 @@ describe('passphraseStrength', () => {
     });
   });
 });
+
+// ── Manage Kits (tracker #99): the pure list builder ──────────────────────────
+import { summarizeRecoveryKits } from '@/services/auth/recoveryKit';
+
+describe('summarizeRecoveryKits', () => {
+  const pkg = (createdAt: string, createdBy?: string) => ({
+    salt: 's',
+    wrapped: 'w',
+    createdAt,
+    ...(createdBy ? { createdBy } : {}),
+  });
+
+  it('lists live kits newest first, then invalidated kits newest first', () => {
+    const kits = summarizeRecoveryKits({
+      recoveryKeys: { old: pkg('2026-01-01T00:00:00Z', 'm1'), new: pkg('2026-09-01T00:00:00Z') },
+      revokedKeys: {
+        'recoveryKeys:deadEarly': { revokedAt: '2026-03-01T00:00:00Z', revokedBy: 'm2' },
+        'recoveryKeys:deadLate': { revokedAt: '2026-08-01T00:00:00Z' },
+      },
+    });
+    expect(kits).toEqual([
+      { kitId: 'new', status: 'live', createdAt: '2026-09-01T00:00:00Z' },
+      { kitId: 'old', status: 'live', createdAt: '2026-01-01T00:00:00Z', createdBy: 'm1' },
+      {
+        kitId: 'deadLate',
+        status: 'invalidated',
+        revokedAt: '2026-08-01T00:00:00Z',
+      },
+      {
+        kitId: 'deadEarly',
+        status: 'invalidated',
+        revokedAt: '2026-03-01T00:00:00Z',
+        revokedBy: 'm2',
+      },
+    ]);
+  });
+
+  it('ignores tombstones that are not slot-wide recoveryKeys ones', () => {
+    const kits = summarizeRecoveryKits({
+      recoveryKeys: {},
+      revokedKeys: {
+        'member:m1': { revokedAt: '2026-03-01T00:00:00Z' },
+        'wrappedKeys:m1': { revokedAt: '2026-03-01T00:00:00Z' },
+        'recoveryKeys:k1:pinnedwrap': { revokedAt: '2026-03-01T00:00:00Z', wrapped: 'pinnedwrap' },
+      },
+    });
+    expect(kits).toEqual([]);
+  });
+
+  it('is empty for an envelope with neither field', () => {
+    expect(summarizeRecoveryKits({})).toEqual([]);
+  });
+});

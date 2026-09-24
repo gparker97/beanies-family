@@ -13,7 +13,9 @@
  */
 
 import type { BeanpodFileV4, RecoveryKeyPackage } from '@/types/syncFileV4';
+import type { ISODateString } from '@/types/models';
 import { unwrapFamilyKey, wrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
+import { slotTombstoneEntryKey } from '@/services/sync/envelopeMerge';
 import { toISODateString } from '@/utils/date';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { KIT_LINK_HASH, readHashMarker } from '@/services/auth/deepLinks';
@@ -137,9 +139,57 @@ export type KitRedeemResult =
   | { ok: true; familyKey: CryptoKey; kitId: string }
   | { ok: false; reason: 'no-kits' | 'wrong-code' | 'error' };
 
+/** One row of the Manage Kits list (tracker #99). */
+export type RecoveryKitSummary =
+  | { kitId: string; status: 'live'; createdAt: ISODateString; createdBy?: string }
+  | { kitId: string; status: 'invalidated'; revokedAt: ISODateString; revokedBy?: string };
+
 /**
- * Redeem a kit code against an envelope: tries every `recoveryKeys` entry (old entries
- * stay valid until #117 rotation retires them — the same semantics as `wrappedKeys`).
+ * Every kit the envelope knows about: live ones from `recoveryKeys`, invalidated ones
+ * from their `recoveryKeys:<kitId>` slot tombstones. Live first, then invalidated, each
+ * newest first. Pure and Pinia-free, so the store computed, the store's last-kit guard
+ * and the sign-in view all read one definition.
+ *
+ * A revoked kit's package is gone by the time this runs (`applyRevokedKeys` drops it), so
+ * an invalidated row carries only what the tombstone holds.
+ */
+export function summarizeRecoveryKits(
+  envelope: Pick<BeanpodFileV4, 'recoveryKeys' | 'revokedKeys'>
+): RecoveryKitSummary[] {
+  const live: RecoveryKitSummary[] = Object.entries(envelope.recoveryKeys ?? {}).map(
+    ([kitId, pkg]) => ({
+      kitId,
+      status: 'live',
+      createdAt: pkg.createdAt,
+      ...(pkg.createdBy ? { createdBy: pkg.createdBy } : {}),
+    })
+  );
+  const invalidated: RecoveryKitSummary[] = [];
+  for (const [key, tombstone] of Object.entries(envelope.revokedKeys ?? {})) {
+    const kitId = slotTombstoneEntryKey('recoveryKeys', key);
+    if (!kitId) continue;
+    invalidated.push({
+      kitId,
+      status: 'invalidated',
+      revokedAt: tombstone.revokedAt,
+      ...(tombstone.revokedBy ? { revokedBy: tombstone.revokedBy } : {}),
+    });
+  }
+  const newestFirst = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0);
+  live.sort((a, b) => newestFirst(stampOf(a), stampOf(b)));
+  invalidated.sort((a, b) => newestFirst(stampOf(a), stampOf(b)));
+  return [...live, ...invalidated];
+}
+
+function stampOf(kit: RecoveryKitSummary): string {
+  return kit.status === 'live' ? kit.createdAt : kit.revokedAt;
+}
+
+/**
+ * Redeem a kit code against an envelope: tries every `recoveryKeys` entry. An entry
+ * stays valid until a `recoveryKeys:<kitId>` slot tombstone retires it (tracker #99);
+ * revoked wraps are filtered out of every envelope before this function is reached, so
+ * an invalidated kit fails here as `wrong-code` (or `no-kits`).
  */
 export async function redeemRecoveryKit(
   envelope: Pick<BeanpodFileV4, 'recoveryKeys'>,
