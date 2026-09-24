@@ -25,6 +25,11 @@ _Merged after 0.22.1, not yet released:_
   browser that is out of space or in private mode.
 - Forgetting a family from the picker no longer fails silently.
 
+### Changed
+
+- The local dev server now always uses port 5173 and stops with a clear error if the port
+  is taken, instead of silently moving to 5174 and breaking SSH tunnels and tests.
+
 _Released as app v0.22.1 (web, App Store, Google Play production), together with the
 2026-09-23 entries below that were merged after 0.22.0._
 

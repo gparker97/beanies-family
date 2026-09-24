@@ -163,6 +163,12 @@ export default defineConfig({
   // rejects unknown Host headers by default. No effect on the production build.
   server: {
     allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', '.loca.lt'],
+    // Fail loudly instead of silently moving to 5174 when 5173 is taken. SSH tunnels
+    // and Playwright's `webServer` both point at 5173, so a quiet port bump shows up
+    // later as a refused tunnel ("channel N: open failed: connect failed") or tests
+    // hitting the wrong server, far from the cause.
+    port: 5173,
+    strictPort: true,
   },
   plugins: [
     assertOfficialBuildEnv(),
