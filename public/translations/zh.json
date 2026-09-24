@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-23",
-    "translationCount": 4901
+    "lastUpdated": "2026-09-24",
+    "translationCount": 4917
   },
   "translations": {
     "app.name": {
@@ -2412,9 +2412,9 @@
       "lastUpdated": "2026-03-03"
     },
     "trust.hint": {
-      "translation": "您可以在“设置”中更改此设置。使用“注销/清除数据”删除缓存数据。",
-      "hash": "k1nybi",
-      "lastUpdated": "2026-02-26"
+      "translation": "您可以在“设置”或注销时更改此设置。",
+      "hash": "1ev38q",
+      "lastUpdated": "2026-09-24"
     },
     "trust.settingsLabel": {
       "translation": "受信任的设备",
@@ -24510,6 +24510,86 @@
       "translation": "Google登入已取消。您可以随时重试。",
       "hash": "4h1py6",
       "lastUpdated": "2026-09-23"
+    },
+    "settings.cachePersistWarning.otherTabs": {
+      "translation": "本地缓存未更新，因此您的数据可能无法在页面刷新后存活。beanies.family在另一个选项卡或窗口中打开，这会阻止该选项卡或窗口保存。关闭其他beanies.family标签页，然后刷新此标签页。",
+      "hash": "m7j7dw",
+      "lastUpdated": "2026-09-24"
+    },
+    "settings.cachePersistWarning.storage": {
+      "translation": "本地缓存未更新，因此您的数据可能无法在页面刷新后存活。此浏览器无法写入本地存储：空间可能不足或处于私有模式。您保存的副本是安全的。",
+      "hash": "wv7qg8",
+      "lastUpdated": "2026-09-24"
+    },
+    "sync.durabilityBanner.otherTabs": {
+      "translation": "beanies.family在另一个选项卡或窗口中打开，这会阻止该选项卡或窗口在本地保存。您保存的副本是安全的。关闭其他beanies.family标签页，然后刷新此标签页。",
+      "hash": "5h4sck",
+      "lastUpdated": "2026-09-24"
+    },
+    "sync.durabilityBanner.storage": {
+      "translation": "此浏览器无法写入本地存储。空间可能不足，也可能处于私人模式。您保存的副本是安全的。",
+      "hash": "8ibq60",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.signOutTrustDevice": {
+      "translation": "信任此设备，以便我可以使用PIN重新登录",
+      "hash": "v3b58v",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.signOutConfirmHintUntrusted": {
+      "translation": "此设备不受信任，因此重新登录此处需要来自家庭成员设备或恢复工具包的链接。",
+      "hash": "ug4o6k",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.signOutAnyway": {
+      "translation": "仍然退出",
+      "hash": "lsd16w",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.cacheKeptTitle": {
+      "translation": "部分数据仍缓存在此浏览器中",
+      "hash": "syle2h",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.cacheKept": {
+      "translation": "beanies.family无法删除此系列的缓存数据。如果beanies.family在其他选项卡或窗口（包括已安装的应用）中打开，请关闭它，然后重试。否则，请在浏览器设置中清除此网站的数据。",
+      "hash": "i5ro9f",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.signedOutElsewhere": {
+      "translation": "此家庭的数据已在另一个选项卡中从此浏览器中清除，因此此处也已关闭。",
+      "hash": "2hox2y",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.signOutFailed": {
+      "translation": "登出未完成。请重试，或重新加载应用。",
+      "hash": "11r70y",
+      "lastUpdated": "2026-09-24"
+    },
+    "auth.trustSetFailed": {
+      "translation": "无法更新此设备的信任设置。请重试，或在“设置”中更改。",
+      "hash": "kwdwma",
+      "lastUpdated": "2026-09-24"
+    },
+    "familyPicker.forgetFailed": {
+      "translation": "不能忘记这个家庭",
+      "hash": "3sl0gp",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitGuardBody": {
+      "translation": "我们没有检测到您保存了恢复工具包。请在退出前创建一个，否则您将永远失去对家庭文件的访问权限。",
+      "hash": "7ft25x",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitSaving": {
+      "translation": "正在保存您的工具包...",
+      "hash": "gdqu1t",
+      "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitNotSynced": {
+      "translation": "您的新套件尚未到达您的家庭文件。请检查您的网络连接，然后重试。",
+      "hash": "cf3jd0",
+      "lastUpdated": "2026-09-24"
     }
   }
 }

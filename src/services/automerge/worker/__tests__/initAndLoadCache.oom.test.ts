@@ -55,6 +55,7 @@ beforeEach(async () => {
     pushChunk: () => {},
     perf: () => {},
     cachePersistFailed,
+    cacheReleased: () => {},
   });
   setKey(await generateFamilyKey());
 });

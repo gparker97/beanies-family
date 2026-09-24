@@ -29,9 +29,11 @@ import {
   reset,
   __resetApplyAndProjectForTesting,
   __hasDocForTesting,
+  postingSink,
   type WorkerSink,
 } from '../applyAndProject';
-import type { ProjectionDelta } from '../protocol';
+import type { ProjectionDelta, WorkerSignal } from '../protocol';
+import { deleteDB, openDB } from 'idb';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
 const FAMILY_ID = 'aap-test-family';
@@ -58,6 +60,7 @@ describe('worker/applyAndProject', () => {
   let perf: string[];
   let failed: boolean[];
   let failedDetails: Array<unknown>;
+  let released: boolean[];
 
   const bulkFor = (collection: string) =>
     chunks
@@ -72,6 +75,7 @@ describe('worker/applyAndProject', () => {
     perf = [];
     failed = [];
     failedDetails = [];
+    released = [];
     const sink: WorkerSink = {
       pushChunk: (delta, final) => chunks.push({ delta, final }),
       perf: (label) => perf.push(label),
@@ -79,6 +83,7 @@ describe('worker/applyAndProject', () => {
         failed.push(f);
         failedDetails.push(detail);
       },
+      cacheReleased: () => released.push(true),
     };
     configure(sink);
     key = await generateFamilyKey();
@@ -128,6 +133,7 @@ describe('worker/applyAndProject', () => {
         pushChunk: (delta, final) => chunks.push({ delta, final }),
         perf: (label) => perf.push(label),
         cachePersistFailed: () => {},
+        cacheReleased: () => {},
       });
       setKey(key);
       await cache.initPersistenceDB(FAMILY_ID);
@@ -253,6 +259,97 @@ describe('worker/applyAndProject', () => {
     expect(failed).toEqual([true]);
     expect(failedDetails[0]).toEqual({ kind: 'increment', errorName: 'InvalidStateError' });
     spy.mockRestore();
+  });
+
+  describe('#100: another tab deletes the cache', () => {
+    const DB = `beanies-automerge-${FAMILY_ID}`;
+
+    it('signals cacheReleased and stops persisting, without raising the durability banner', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      await flush();
+
+      await deleteDB(DB); // another tab's delete; before #100 this never settled
+
+      expect(released).toEqual([true]);
+      expect(cache.isCacheReady()).toBe(false);
+      // Edits after the release are not written back, and are not a "failure" either.
+      mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 2 } });
+      await flush();
+      expect(failed).toEqual([]);
+    });
+
+    it('a write in flight when the release lands does NOT raise a false failure', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const spy = vi.spyOn(cache, 'persistDocBinary').mockImplementationOnce(async () => {
+        await deleteDB(DB); // the other tab deletes mid-write
+        const closed = new Error('The database connection is closing.');
+        closed.name = 'InvalidStateError';
+        throw closed;
+      });
+
+      await flush();
+
+      expect(released).toEqual([true]);
+      expect(failed).toEqual([]);
+      spy.mockRestore();
+    });
+
+    it('a real open failure is still raised (the guard lives only after a successful open)', async () => {
+      setKey(key);
+      const err = new Error('nope');
+      err.name = 'UnknownError';
+      const spy = vi.spyOn(cache, 'initPersistenceDB').mockRejectedValueOnce(err);
+      await initAndLoadCache(FAMILY_ID).catch(() => {});
+      expect(failed).toEqual([true]);
+      expect(failedDetails[0]).toEqual({ kind: 'open', errorName: 'UnknownError' });
+      spy.mockRestore();
+    });
+
+    it('an upgrade from elsewhere (impossible today) is surfaced, never silent', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      const upgraded = await openDB(DB, 2);
+      upgraded.close();
+
+      expect(released).toEqual([]); // not a session-ending release
+      expect(failed).toEqual([true]);
+      expect(failedDetails[0]).toEqual({ kind: 'open', errorName: 'CacheUpgradeElsewhere' });
+    });
+
+    it('reset() closes the connection, so a signed-out tab never blocks another tab', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      expect(cache.isCacheReady()).toBe(true);
+      reset();
+      expect(cache.isCacheReady()).toBe(false);
+    });
+  });
+
+  it('#100: postingSink maps every sink call to its signal (the one mapping, both realms)', () => {
+    const posted: WorkerSignal[] = [];
+    const sink = postingSink((sig) => posted.push(sig));
+    const delta = { kind: 'reset' } as unknown as ProjectionDelta;
+    sink.pushChunk(delta, true);
+    sink.perf('op', 12, { n: 1 });
+    sink.cachePersistFailed(true, { kind: 'base', errorName: 'QuotaExceededError' });
+    sink.cacheReleased();
+    expect(posted).toEqual([
+      { signal: 'projection', delta, final: true },
+      { signal: 'perf', label: 'op', durationMs: 12, ctx: { n: 1 } },
+      {
+        signal: 'cache-persist-failed',
+        failed: true,
+        detail: { kind: 'base', errorName: 'QuotaExceededError' },
+      },
+      { signal: 'cache-released' },
+    ]);
   });
 
   it('initAndLoadCache streams a large collection as multiple bulk chunks (chunking)', async () => {

@@ -19,6 +19,11 @@
  * Module-level state, the `useConfirm` pattern: one host renders it, any surface drives it.
  * The escape-hatch sign-outs (fatal overlay, delete family, start over, Google disconnect)
  * deliberately do NOT come through here — they must never be blocked by a guard.
+ *
+ * The one session end NOT started by this tab also lands here (#100):
+ * `endSessionClearedElsewhere`, wired by `bootstrap.ts`, runs when another tab deleted
+ * this family's cache, and shares this module's phase so it cannot race a sign-out the
+ * person started here.
  */
 import { ref, readonly } from 'vue';
 import router from '@/router';
@@ -29,19 +34,39 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 import { resetAllAppStores } from '@/utils/resetStores';
 import { isDemoSession } from '@/utils/reviewDemo';
 import { dropsKeyMaterial, signOutStepsFor, type SignOutTier } from '@/services/auth/signOutSteps';
 import { needsKitGuardBeforeSignOut } from '@/services/auth/authPrompts';
-import { emitKitGuard, emitKitGuardOutcome } from '@/services/telemetry/loginFlowEvents';
+import {
+  emitKitGuard,
+  emitKitGuardOutcome,
+  emitCacheKept,
+} from '@/services/telemetry/loginFlowEvents';
 
 export type SignOutPhase = 'idle' | 'confirm' | 'guard' | 'signing-out';
-export type KitGuardOutcome = 'kit_saved' | 'sign_out_anyway' | 'cancelled';
+export type KitGuardOutcome = 'kit_saved' | 'sign_out_anyway' | 'cancelled' | 'superseded';
 export type SignOutResult = 'signed-out' | 'cancelled' | 'failed';
 
 // One value, so "guard open while signing out" cannot exist.
 const phase = ref<SignOutPhase>('idle');
 let resolveGuard: ((outcome: KitGuardOutcome) => void) | null = null;
+/**
+ * The session end in progress: a sign-out the person started, or a cleared-elsewhere
+ * teardown (#100). A release that arrives meanwhile waits for it and then asks the auth
+ * store whether anyone is still signed in, rather than guessing from how it returned.
+ * Both runs never reject.
+ */
+let leaving: Promise<unknown> | null = null;
+
+function trackLeaving<T>(run: Promise<T>): Promise<T> {
+  leaving = run;
+  void run.finally(() => {
+    if (leaving === run) leaving = null;
+  });
+  return run;
+}
 
 /** Open the shared sign-out confirm. A no-op unless idle. */
 function requestSignOut(): void {
@@ -63,8 +88,15 @@ function abandonSignOut(): void {
   else if (phase.value === 'guard') resolveGuard?.('cancelled');
 }
 
-/** SignOutKitGuard reports how the guard was resolved. */
+/**
+ * SignOutKitGuard reports how the guard was resolved. ⚠️ ONLY WHILE THE GUARD OWNS THE
+ * PHASE. The guard's actions are async (`confirmStored`, `retrySync`), so one can finish
+ * after `endSessionClearedElsewhere` has taken the phase over (#100); resolving the
+ * parked guard as `kit_saved` then would start a SECOND, concurrent sign-out. The
+ * takeover resolves the parked guard itself, as `cancelled`, once its teardown is done.
+ */
 function resolveKitGuard(outcome: KitGuardOutcome): void {
+  if (phase.value !== 'guard') return;
   resolveGuard?.(outcome);
 }
 
@@ -118,46 +150,144 @@ async function applyTrustTick(tier: SignOutTier, trust: boolean): Promise<boolea
   return useAuthStore().setDeviceTrust(trust, 'signout-tick');
 }
 
-async function runTeardown(tier: SignOutTier): Promise<void> {
-  const authStore = useAuthStore();
-  if (tier === 'clear') await authStore.signOutAndClearData();
-  else await authStore.signOut();
+/** Every in-app sign-out ends the same way: the app stores cleared, then `/login`. */
+export async function leaveToLogin(): Promise<void> {
   resetAllAppStores();
   await router.replace('/login');
+}
+
+/**
+ * The ONE place a person is told their family's cached data is still in this browser
+ * (#100): another tab or window held it past the deadline. Warning, not error: nothing
+ * failed that they did, and the data is encrypted with a key this device no longer
+ * holds. Counted separately by `emitCacheKept`, because a `warning` toast never
+ * auto-reports.
+ */
+function showCacheKeptToast(): void {
+  const { t } = useTranslationStore();
+  showToast('warning', t('auth.cacheKeptTitle'), t('auth.cacheKept'), { durationMs: 12_000 });
+}
+
+/** Count the kept cache and tell the person, for callers with nothing in between. */
+export function notifyCacheKept(kind: 'forget-family'): void {
+  emitCacheKept(kind);
+  showCacheKeptToast();
+}
+
+/** A sign-out threw: report it once (the person is stuck), then a SILENT toast. */
+function failSignOut(error: unknown, kind: SignOutTier | 'cleared-elsewhere'): void {
+  // Report DIRECTLY (stable message), then a SILENT toast: the toast's auto-report is
+  // skipped while an identical toast is live, which would under-count repeated failures.
+  reportError({
+    surface: 'login-flow',
+    message: 'sign-out failed',
+    error,
+    // A user action failed: the person is stuck signed in.
+    severity: 'critical',
+    context: { action: 'sign_out_failed', kind },
+  });
+  showToast('error', useTranslationStore().t('auth.signOutFailed'), undefined, { silent: true });
+}
+
+async function runTeardown(tier: SignOutTier): Promise<void> {
+  const authStore = useAuthStore();
+  // BOTH tiers can delete the cache: clear-data always, and an ordinary sign-out on an
+  // untrusted device (`SIGN_OUT_UNTRUSTED_STEPS` runs `deleteFamilyDb`).
+  const { cacheDeleted } =
+    tier === 'clear' ? await authStore.signOutAndClearData() : await authStore.signOut();
+  // `null` (no delete attempted, e.g. a trusted sign-out) is not "kept"; only a delete
+  // that ran and did not finish is. COUNTED before the route, so a navigation that
+  // throws cannot lose it; SHOWN after, so it is read on the login screen.
+  const kept = cacheDeleted === false;
+  if (kept) emitCacheKept(tier === 'clear' ? 'sign-out-clear' : 'sign-out');
+  await leaveToLogin();
+  if (kept) showCacheKeptToast();
 }
 
 /**
  * Sign out from the shared confirm. See the header for the order and why it matters.
  * Returns what happened; never throws.
  */
-async function signOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutResult> {
-  if (phase.value !== 'confirm') return 'cancelled';
+function signOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutResult> {
+  if (phase.value !== 'confirm') return Promise.resolve('cancelled');
+  return trackLeaving(runSignOut(tier, opts));
+}
+
+async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutResult> {
   try {
     // Synchronous, before any await: a second tap now fails the check above.
     const guard = evaluateKitGuard(tier, opts.trust);
     phase.value = guard ? 'guard' : 'signing-out';
     if (guard) {
       const outcome = await awaitKitGuard();
-      if (outcome === 'cancelled') return 'cancelled';
+      // `superseded`: another tab ended this session while the guard was open (#100).
+      if (outcome === 'cancelled' || outcome === 'superseded') return 'cancelled';
       phase.value = 'signing-out';
     }
     if (!(await applyTrustTick(tier, opts.trust))) return 'failed';
     await runTeardown(tier);
     return 'signed-out';
   } catch (error) {
-    // Report DIRECTLY (stable message), then a SILENT toast: the toast's auto-report is
-    // skipped while an identical toast is live, which would under-count repeated failures.
-    reportError({
-      surface: 'login-flow',
-      message: 'sign-out failed',
-      error,
-      // A user action failed: the person is stuck signed in.
-      severity: 'critical',
-      context: { action: 'sign_out_failed', kind: tier },
-    });
-    showToast('error', useTranslationStore().t('auth.signOutFailed'), undefined, { silent: true });
+    failSignOut(error, tier);
     return 'failed';
   } finally {
+    phase.value = 'idle';
+    resolveGuard = null;
+  }
+}
+
+/**
+ * Another tab deleted this family's cache, and this tab's worker has already let go of
+ * it (#100). End this tab's session: the person asked for the family's data to leave
+ * this browser, so this tab must not keep showing it or write it back.
+ *
+ * Wired by `bootstrap.ts` to `docClient.setCacheReleasedHandler`. Never rejects.
+ *
+ * ⚠️ NO `isAuthenticated` GUARD. A tab on the person picker after "switch person", or
+ * one whose passkey sign-in never bound to the roster, still has the pod open in the
+ * worker and must tear down too. The toast copy is true for those tabs as well.
+ */
+export async function endSessionClearedElsewhere(): Promise<void> {
+  if (phase.value === 'signing-out') {
+    // A session end is already running in this tab. Let it finish, then ask the store
+    // whether anyone is still signed in: a sign-out that ended the session but then
+    // failed to navigate must NOT be torn down twice, and one that failed before the
+    // teardown (a refused trust write) must be finished, because this tab's cache is
+    // already gone and it would otherwise stay signed in, saving nothing.
+    await leaving;
+    if (!useAuthStore().isAuthenticated) return logReleased('deferred-already-ended');
+    logReleased('deferred-then-ran');
+  } else {
+    logReleased('direct');
+  }
+  await trackLeaving(runClearedElsewhere());
+}
+
+/** One event per release, naming the decision taken (CLAUDE.md observability rule 1). */
+function logReleased(detail: 'direct' | 'deferred-already-ended' | 'deferred-then-ran'): void {
+  logEvent({
+    level: 'info',
+    surface: 'cache-persist',
+    message: 'cache released by another context',
+    context: { action: 'cache-released', detail },
+  });
+}
+
+async function runClearedElsewhere(): Promise<void> {
+  // ⚠️ TAKE THE PHASE FIRST, RESOLVE A PARKED GUARD LAST. This closes the confirm or the
+  // kit guard (both are v-if'd on their phase) and shows the progress overlay. Resolving
+  // the guard BEFORE the teardown would let the parked `signOut()` return
+  // in the next microtask and run its `finally`, resetting the phase to idle under the
+  // running teardown: the overlay would vanish and a second sign-out would be possible.
+  phase.value = 'signing-out';
+  try {
+    await useAuthStore().endSessionClearedElsewhere();
+    await leaveToLogin();
+    showToast('info', useTranslationStore().t('auth.signedOutElsewhere'));
+  } catch (error) {
+    failSignOut(error, 'cleared-elsewhere');
+  } finally {
+    resolveGuard?.('superseded');
     phase.value = 'idle';
     resolveGuard = null;
   }
@@ -177,4 +307,5 @@ export function useSignOutHost() {
 export function __resetSignOutForTests(): void {
   phase.value = 'idle';
   resolveGuard = null;
+  leaving = null;
 }

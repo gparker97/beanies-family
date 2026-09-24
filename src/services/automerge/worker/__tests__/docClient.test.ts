@@ -6,7 +6,7 @@ import { serializeError, type RpcRequest } from '../protocol';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
-vi.mock('../../projection', () => ({ applyDelta: vi.fn() }));
+vi.mock('../../projection', () => ({ applyDelta: vi.fn(), resetProjection: vi.fn() }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 // Stub the visibility tracker (not the DOM): default = never hidden, so the
@@ -38,6 +38,10 @@ import {
   initAndLoadCache,
   setInlineExecutor,
   forceInlineMode,
+  clearCache,
+  setCacheReleasedHandler,
+  setCachePersistFailedHandler,
+  receiveSignal,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -1237,5 +1241,87 @@ describe('docClient — worker crash notification policy', () => {
     fw.onerror?.(new Error('idle boom'));
     expect(showToast).not.toHaveBeenCalled();
     expect(reportError).not.toHaveBeenCalled();
+  });
+});
+
+describe('#100: cache release + the delete outcome', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  it('a cache-released signal from the worker reaches the session handler', async () => {
+    const fw = useWorker(okHeads);
+    const onReleased = vi.fn();
+    setCacheReleasedHandler(onReleased);
+    await getHeads(); // spawn + handshake
+    fw.emit({ signal: 'cache-released' });
+    expect(onReleased).toHaveBeenCalledTimes(1);
+  });
+
+  it('the inline realm goes through the SAME handler (receiveSignal), for every signal', () => {
+    const onReleased = vi.fn();
+    const onFailed = vi.fn();
+    setCacheReleasedHandler(onReleased);
+    setCachePersistFailedHandler(onFailed);
+    receiveSignal({ signal: 'cache-released' });
+    receiveSignal({
+      signal: 'cache-persist-failed',
+      failed: true,
+      detail: { kind: 'open', errorName: 'CacheOpenTimeoutError' },
+    });
+    expect(onReleased).toHaveBeenCalledTimes(1);
+    expect(onFailed).toHaveBeenCalledWith(true, {
+      kind: 'open',
+      errorName: 'CacheOpenTimeoutError',
+    });
+  });
+
+  it('a release with no session handler wired is reported, never dropped silently', () => {
+    receiveSignal({ signal: 'cache-released' });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'cache-persist',
+        severity: 'warning',
+        context: expect.objectContaining({ error_code: 'no-handler' }),
+      })
+    );
+  });
+
+  const clearWith =
+    (result: unknown): Responder =>
+    (req) =>
+      req.method === 'clearCache' ? { cid: req.cid, ok: true, result } : null;
+
+  it('a completed delete returns deleted:true and logs the success counter', async () => {
+    useWorker(clearWith({ deleted: true }));
+    await expect(clearCache('fam')).resolves.toEqual({ deleted: true });
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'info', context: { action: 'clear-cache' } })
+    );
+  });
+
+  it('a delete still blocked at the deadline returns deleted:false and warns once', async () => {
+    useWorker(clearWith({ deleted: false }));
+    await expect(clearCache('fam')).resolves.toEqual({ deleted: false });
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: { action: 'clear-cache', error_code: 'delete-blocked' },
+      })
+    );
+  });
+
+  it('an unknown result (an older worker bundle) is NOT reported as clean', async () => {
+    useWorker(clearWith({}));
+    await expect(clearCache('fam')).resolves.toEqual({ deleted: false });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: { action: 'clear-cache', error_code: 'unknown-result' },
+      })
+    );
   });
 });

@@ -83,7 +83,7 @@ beforeEach(async () => {
   changeHook.throws = null;
   key = await generateFamilyKey();
   ap.reset();
-  ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {} });
+  ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
   ap.setKey(key);
 });
 
@@ -869,7 +869,7 @@ describe('a restore is a lineage event', () => {
     // A fresh device joining must not churn the fleet.
     const original = base();
     ap.reset();
-    ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {} });
+    ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
     ap.setKey(key);
     const res = await ap.mergeRemoteEnvelope(await envelopeFor(original, key), 'fam', {
       kind: 'no-local-document',

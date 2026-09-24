@@ -1755,7 +1755,9 @@ function handleReload() {
 
 async function handleClearDataAndSignOut() {
   try {
-    // Use the full sign-out flow: clears family DB, auth session, trust flag, cached keys
+    // Use the full sign-out flow: clears family DB, auth session, trust flag, cached keys.
+    // Result discarded on purpose: the hard reload below cannot show it, and
+    // `docClient.clearCache` has already logged a cache another tab kept (#100).
     await authStore.signOutAndClearData();
   } catch (error) {
     // Best effort — the reload below is the escape hatch either way. Never silent.

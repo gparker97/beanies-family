@@ -65,6 +65,9 @@ import { COLLECTION_NAMES } from '@/types/automerge';
 import { payloadErrorMessageKey } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
+import { emitCacheKept } from '@/services/telemetry/loginFlowEvents';
+import type { CacheFailureCause } from '@/utils/cacheFailureCause';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { deliverFile } from '@/utils/deliverFile';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { deleteFile } from '@/services/google/driveService';
@@ -93,6 +96,12 @@ const authStore = useAuthStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+/** The Settings copy for why local saving stopped (#100). */
+const CACHE_WARNING_BY_CAUSE: Record<CacheFailureCause, UIStringKey> = {
+  'other-tabs': 'settings.cachePersistWarning.otherTabs',
+  storage: 'settings.cachePersistWarning.storage',
+  unknown: 'settings.cachePersistWarning',
+};
 const translationStore = useTranslationStore();
 const beanTips = useBeanTips();
 const familyStore = useFamilyStore();
@@ -1335,6 +1344,8 @@ async function handleClearData() {
   // be no resolved member or no credential to prove with. Failing closed here would trap
   // them. Low stakes anyway — this clears LOCAL data; the .beanpod on Drive survives.
   if (canStepUp() && !(await requireReauth())) return;
+  // null = no active family, so no cache to delete (not "kept").
+  let cacheDeleted: boolean | null = null;
   try {
     await settingsStore.clearCachedFamilyKey();
     await settingsStore.setTrustedDevice(false);
@@ -1343,7 +1354,7 @@ async function handleClearData() {
     await settingsStore.resetTrustedDevicePrompt();
     const familyId = useFamilyContextStore().activeFamilyId;
     if (familyId) {
-      await deleteFamilyDatabase(familyId);
+      cacheDeleted = (await deleteFamilyDatabase(familyId)).deleted;
     }
   } catch (e) {
     showToast('error', t('settings.clearDataFailed'));
@@ -1357,6 +1368,14 @@ async function handleClearData() {
     return;
   }
   showClearConfirm.value = false;
+  // Another tab or window still held the cache (#100). The reload below is what
+  // restores a working app, and it would wipe any toast, so the outcome is shown
+  // in an awaited alert first. `requireReauth()` has resolved, so the one-resolve
+  // `useConfirm` singleton is free.
+  if (cacheDeleted === false) {
+    emitCacheKept('clear-data');
+    await showAlert({ title: 'auth.cacheKeptTitle', message: 'auth.cacheKept' });
+  }
   window.location.reload();
 }
 
@@ -1659,21 +1678,31 @@ async function handleDeleteFamilyClick() {
     //    throw and returns false, so discarding it let a failed IndexedDB or
     //    passkey teardown sail through to the farewell screen with the members,
     //    the passkeys and the cached family key still on the device.
-    if (!(await familyContextStore.deleteLocalFamily(familyId))) {
+    const local = await familyContextStore.deleteLocalFamily(familyId);
+    if (!local || !local.deleted) {
       // ⚠️ INTO `kept` TOO. Every one of the three farewell messages opens with
       // "Your family has been removed from this device" — which is exactly the
       // sentence this failure falsifies. Paging the team is not the same as
       // telling the person reading the screen.
+      //
+      // Two different failures (#100): `null` = the local teardown threw (critical:
+      // members, passkeys and the cached key may still be here); `deleted: false` =
+      // everything else went, but another tab still held the encrypted cache.
       kept.push('local-data');
       reportError({
         surface: 'pod-access',
-        severity: 'critical',
+        severity: local ? 'warning' : 'critical',
         message: 'local family data survived a family deletion',
-        context: { action: 'delete-family', error_code: 'local-delete-failed' },
+        context: {
+          action: 'delete-family',
+          error_code: local ? 'cache-kept-other-tabs' : 'local-delete-failed',
+        },
       });
+      if (local) emitCacheKept('delete-family');
     }
 
-    // 5. Auth teardown
+    // 5. Auth teardown. Its `cacheDeleted` is deliberately not read: step 4 already
+    //    deleted (or queued) this family's cache and recorded the outcome once.
     await authStore.signOutAndClearData();
 
     // 6. Track deletion — BEFORE the store reset, not after. `resetAllAppStores`
@@ -2668,7 +2697,7 @@ async function handleDeleteFamilyClick() {
               class="mt-2 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
             >
               <p class="dark:text-terracotta-lift text-sm text-amber-700">
-                {{ t('settings.cachePersistWarning') }}
+                {{ t(CACHE_WARNING_BY_CAUSE[syncStore.cachePersistCause]) }}
               </p>
             </div>
 

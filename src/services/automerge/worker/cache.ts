@@ -10,15 +10,19 @@
  *     check the Drive path has, so a materialize-corrupt cache is detected
  *     BEFORE it's installed (today it slips past `Automerge.load` and throws
  *     later, invisible + looping corrupt→re-persist-corrupt),
- *   - `clearCache` closes THEN deletes (a live connection makes
- *     `deleteDatabase` fire `onblocked` and silently never delete → privacy
- *     break + stale-cache hazard).
+ *   - `clearCache` closes THEN deletes, and waits (bounded) for the delete to
+ *     actually finish rather than treating `onblocked` as an answer,
+ *   - every connection answers `versionchange` by closing (#100). Each tab has
+ *     its own worker and its own connection, so a delete issued by another tab
+ *     is blocked until THIS one lets go; holding on left the encrypted cache on
+ *     disk after "sign out and clear data" and queued every later open behind a
+ *     delete that could never finish.
  *
  * Reuses the worker-safe `familyKeyService` crypto, `encoding`, and
  * `idbTransient` retry helpers verbatim. `idb`'s `openDB` and `IndexedDB` are
  * both available in a Web Worker.
  */
-import { openDB, type IDBPDatabase } from 'idb';
+import { openDB, deleteDB, type IDBPDatabase } from 'idb';
 import { withoutPayload } from '@/services/sync/envelopeMerge';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
@@ -99,6 +103,23 @@ const DB_PREFIX = 'beanies-automerge-';
  */
 export const CACHE_OPEN_TIMEOUT_MS = 10_000;
 
+/**
+ * How long `clearCache` waits for its `deleteDatabase` to finish (#100).
+ *
+ * A peer tab answers `versionchange` by closing within milliseconds, and a
+ * transaction still draining on it takes well under a second, so a healthy
+ * delete never comes near this. It is reached only when a peer cannot answer at
+ * all, which in practice is a frozen background tab. The caller then reports the
+ * cache as kept rather than hanging sign-out, and the queued delete completes
+ * on its own once that tab thaws and closes.
+ *
+ * Far below `DEFAULT_RPC_TIMEOUT_MS` (45s, `docClient.ts`), so the worker
+ * classifies the outcome rather than the RPC layer tearing it down.
+ *
+ * Exported so the tests advance by exactly this and cannot drift from a literal.
+ */
+export const CACHE_DELETE_TIMEOUT_MS = 5_000;
+
 interface CacheDB {
   doc: {
     key: string;
@@ -113,22 +134,64 @@ let cacheDbFamilyId: string | null = null;
  * reset to 0 whenever a fresh base is written (which clears all increments). */
 let incSeq = 0;
 
+/** Who hears about a release. Registered once by `applyAndProject.configure()`. */
+type CacheReleasedListener = (reason: 'deleted' | 'upgrade') => void;
+let releasedListener: CacheReleasedListener | null = null;
+
+export function setCacheReleasedListener(fn: CacheReleasedListener | null): void {
+  releasedListener = fn;
+}
+
+/** Close the current handle and forget it. The ONE place the handle is nulled. */
+function closeHandle(): void {
+  cacheDb?.close();
+  cacheDb = null;
+  cacheDbFamilyId = null;
+  incSeq = 0;
+}
+
 /** Open (or reuse) the cache IndexedDB for the given family. */
 export async function initPersistenceDB(familyId: string): Promise<void> {
   if (cacheDbFamilyId === familyId && cacheDb) return;
 
   // A switch to another family must close the previous connection first.
-  if (cacheDb) {
-    cacheDb.close();
-    cacheDb = null;
-  }
+  if (cacheDb) closeHandle();
 
   const dbName = `${DB_PREFIX}${familyId}`;
+  // This open's own handle, so `blocking` can tell the live connection from a
+  // stale late-open. Safe as a plain closure variable because `versionchange` is
+  // delivered as an event task, never a microtask: it cannot run before the
+  // assignment below, which happens before this function's next task boundary.
+  let handle: IDBPDatabase<CacheDB> | null = null;
   const opening = openDB<CacheDB>(dbName, 1, {
     upgrade(db) {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
+    },
+    // ⚠️ ANOTHER CONTEXT WANTS THIS DATABASE GONE (or, impossibly today, at a
+    // new version). Per spec its request cannot proceed while we hold a
+    // connection, and an open queued behind that delete fires NO event at all
+    // (see `CACHE_OPEN_TIMEOUT_MS`), so holding on is what stranded every later
+    // sign-in in a timeout (#100). Close whichever connection got this, then, if
+    // it was the live one, stop using the cache and tell the listener, which ends
+    // this tab's session.
+    //
+    // ⚠️ KNOWN LIMIT, deliberately accepted (greg, 2026-09-24): nothing here REFUSES
+    // a reopen in the seconds before that teardown finishes, so a pending save or a
+    // recovery can recreate an (encrypted) cache. A refusal was built and reviewed
+    // three times and never held, because worker restarts and session identity are
+    // owned on the main thread. The other tab's clear has already removed the key
+    // that would open it, and `authStore.endSessionClearedElsewhere` logs the case
+    // (`cache-present-after-eviction`). See the #100 plan's Outcome.
+    blocking(_current, newVersion, event) {
+      (event.target as IDBDatabase).close();
+      if (cacheDb === null || cacheDb !== handle) {
+        console.warn(`[cache] versionchange on a stale ${dbName} connection; closed it`);
+        return;
+      }
+      closeHandle();
+      releasedListener?.(newVersion === null ? 'deleted' : 'upgrade');
     },
   });
 
@@ -156,6 +219,7 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   // exactly `cacheDb !== null`, so a timeout must leave it null or a write will
   // target a DB we do not hold; and a late open cannot install itself as another
   // family's handle minutes later.
+  handle = db;
   cacheDb = db;
   cacheDbFamilyId = familyId;
   incSeq = await maxIncSeq(cacheDb);
@@ -495,42 +559,47 @@ export function isCacheReady(): boolean {
 }
 
 /**
- * Delete the cache IndexedDB for a family. Closes our own connection FIRST so
- * `deleteDatabase` isn't blocked by it (a blocked delete `resolve()`s as if it
- * worked but never deletes → the encrypted cache survives sign-out).
+ * Delete the cache IndexedDB for a family, and wait (bounded) for it to go.
+ *
+ * Closes our own connection FIRST so the delete isn't blocked by it; every
+ * other tab's connection answers the resulting `versionchange` by closing (see
+ * `blocking` above). `onblocked` is therefore NOT an answer any more: it fires
+ * briefly whenever a peer is still draining a transaction, and `onsuccess`
+ * follows. Only a peer that cannot answer at all (a frozen tab) runs out the
+ * deadline, which resolves `{ deleted: false }`: the encrypted cache is still on
+ * disk, the caller is told the truth and must not report it as clean, and the
+ * queued delete completes by itself once that tab closes. It resolves rather
+ * than rejects because a blocked delete must not fail sign-out. The one thing a
+ * caller must not do after `false` is immediately re-open.
  */
 export async function clearCache(familyId: string): Promise<CacheClearResult> {
-  if (cacheDbFamilyId === familyId && cacheDb) {
-    cacheDb.close();
-    cacheDb = null;
-    cacheDbFamilyId = null;
-    incSeq = 0;
-  }
+  // Our own connection first, so it cannot block the delete.
+  if (cacheDbFamilyId === familyId) closeHandle();
 
   const dbName = `${DB_PREFIX}${familyId}`;
-  return new Promise<CacheClearResult>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(dbName);
-    request.onsuccess = () => resolve({ deleted: true });
-    request.onerror = () => reject(request.error);
-    // ⚠️ BLOCKED IS NOT DELETED, and reporting it as success was the first half
-    // of a hang. Another context still holds a connection, so the delete is
-    // QUEUED: the encrypted cache is still on disk (the privacy invariant in the
-    // header above), and any open of this name now waits behind a delete that
-    // cannot finish. We still resolve rather than reject, because a blocked
-    // delete must not fail sign-out — but the caller is told the truth and
-    // decides. The one thing it must not do is immediately re-open.
-    request.onblocked = () => resolve({ deleted: false });
-  });
+  try {
+    await withTimeout(
+      deleteDB(dbName, {
+        blocked: () => console.warn(`[cache] delete of ${dbName} is waiting on another connection`),
+      }),
+      CACHE_DELETE_TIMEOUT_MS,
+      `cache delete still blocked after ${CACHE_DELETE_TIMEOUT_MS}ms: ${dbName} is held open by another tab, window or the installed app`,
+      'CacheDeleteTimeoutError'
+    );
+    return { deleted: true };
+  } catch (e) {
+    if (e instanceof Error && e.name === 'CacheDeleteTimeoutError') return { deleted: false };
+    throw e; // a real IDB error: the caller's step runner reports it
+  }
 }
 
-/** Close the cache DB connection (sign-out) without deleting it. */
+/**
+ * Close the cache DB connection without deleting it (sign-out, family switch, via
+ * `applyAndProject.reset()`). A signed-out tab has no reason to hold a connection,
+ * and holding one is what blocks another tab's delete (#100).
+ */
 export function closeCacheDB(): void {
-  if (cacheDb) {
-    cacheDb.close();
-    cacheDb = null;
-    cacheDbFamilyId = null;
-    incSeq = 0;
-  }
+  closeHandle();
 }
 
 /** ISO timestamp. Isolated so tests with a fixed clock can spy if needed. */
@@ -540,8 +609,6 @@ function nowIso(): string {
 
 /** Test-only: force-close + forget the cache handle between cases. */
 export function __resetCacheForTesting(): void {
-  if (cacheDb) cacheDb.close();
-  cacheDb = null;
-  cacheDbFamilyId = null;
-  incSeq = 0;
+  closeCacheDB();
+  releasedListener = null;
 }

@@ -9,7 +9,10 @@ import { setActivePinia, createPinia } from 'pinia';
 
 const { pushMock, syncState } = vi.hoisted(() => ({
   pushMock: vi.fn(),
-  syncState: { cachePersistFailed: false as boolean },
+  syncState: {
+    cachePersistFailed: false as boolean,
+    cachePersistCause: 'unknown' as 'other-tabs' | 'storage' | 'unknown',
+  },
 }));
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -27,6 +30,7 @@ describe('DurabilityBanner', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     syncState.cachePersistFailed = false;
+    syncState.cachePersistCause = 'unknown';
   });
 
   it('is hidden when cachePersistFailed is false', () => {
@@ -44,6 +48,24 @@ describe('DurabilityBanner', () => {
     expect(banner.text()).toContain('sync.durabilityBannerTitle');
     expect(banner.text()).toContain('sync.durabilityBanner');
     expect(wrapper.find('button').text()).toContain('sync.durabilityBannerCta');
+  });
+
+  // #100: the message names the cause when it is known. Asserted on the MESSAGE element
+  // alone: the title key `sync.durabilityBannerTitle` contains `sync.durabilityBanner`
+  // as a substring, so a whole-banner `toContain` would pass without any message.
+  it.each([
+    ['other-tabs', 'sync.durabilityBanner.otherTabs'],
+    ['storage', 'sync.durabilityBanner.storage'],
+    ['unknown', 'sync.durabilityBanner'],
+  ] as const)('cause %s shows %s', (cause, key) => {
+    syncState.cachePersistFailed = true;
+    syncState.cachePersistCause = cause;
+    const wrapper = mount(DurabilityBanner);
+    const text = wrapper.find('[role="status"]').text().replace('sync.durabilityBannerTitle', '');
+    expect(text).toContain(key);
+    for (const other of ['sync.durabilityBanner.otherTabs', 'sync.durabilityBanner.storage']) {
+      if (other !== key) expect(text).not.toContain(other);
+    }
   });
 
   it('CTA routes to the Settings family-data modal', async () => {
