@@ -22,6 +22,9 @@ _Merged after 0.22.1, not yet released:_
   removed outright. A copy of the family file saved before an invalidation can still be
   opened with the old kit, and the app says so. Because a kit can reset every PIN, creating
   one is now also limited to the owner and pod managers.
+- Creating a new kit now asks first, telling you how many kits are already live and that a
+  new one does not switch the old ones off. If your family has no live kit, the create
+  button pulses when you open Security & Recovery.
 
 ### Fixed
 
