@@ -10,6 +10,7 @@ relatedPosts:
   - accidentally-built-greatest-family-app
   - buy-fruit
   - mommy-whats-for-dinner-tonight
+  - sharing-with-beanies
 tags:
   - mental-load
   - family-organization
