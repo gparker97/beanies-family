@@ -16,26 +16,16 @@
  * is initialized. The client waits for `ready` before sending work.
  */
 import { serializeError, type RpcRequest, type RpcResponse, type WorkerSignal } from './protocol';
-import { configure, dispatch, type WorkerSink } from './applyAndProject';
+import { configure, dispatch, postingSink } from './applyAndProject';
 
 function post(msg: RpcResponse | WorkerSignal): void {
   (self as unknown as Worker).postMessage(msg);
 }
 
-// The worker's sink → main via `postMessage`. Projection chunks + heavy-op perf
-// + cache-persist-failed all travel as unsolicited (cid-less) signals.
-const workerSink: WorkerSink = {
-  pushChunk(delta, final) {
-    post({ signal: 'projection', delta, final });
-  },
-  perf(label, durationMs, ctx) {
-    post({ signal: 'perf', label, durationMs, ctx });
-  },
-  cachePersistFailed(failed, detail) {
-    post({ signal: 'cache-persist-failed', failed, detail });
-  },
-};
-configure(workerSink);
+// The worker's sink → main via `postMessage`. Every sink call travels as an
+// unsolicited (cid-less) signal; `postingSink` is the one mapping, shared with
+// the inline bridge.
+configure(postingSink(post));
 
 // Serialized async FIFO: each request fully completes before the next begins.
 let tail: Promise<void> = Promise.resolve();

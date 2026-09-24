@@ -556,6 +556,33 @@ describe('syncService — save failure tracking', () => {
       expect(reportError).toHaveBeenCalledTimes(1);
     });
 
+    it('#100: a NEW cause in the same episode reaches subscribers (not telemetry)', async () => {
+      const handler = await wiredHandler();
+      const { reportError } = await import('@/utils/errorReporter');
+      const seen: unknown[] = [];
+      const unsub = syncService.onCacheFailureChange((failed, detail) =>
+        seen.push([failed, detail])
+      );
+
+      handler(true, { kind: 'increment', errorName: 'QuotaExceededError' });
+      handler(true, { kind: 'increment', errorName: 'QuotaExceededError' }); // same cause: quiet
+      handler(true, { kind: 'open', errorName: 'CacheOpenTimeoutError' }); // new cause: heard
+
+      expect(seen).toEqual([
+        [true, { kind: 'increment', errorName: 'QuotaExceededError' }],
+        [true, { kind: 'open', errorName: 'CacheOpenTimeoutError' }],
+      ]);
+      expect(reportError).toHaveBeenCalledTimes(1); // still one report per episode
+      const { logEvent } = await import('@/services/telemetry');
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'cache-persist cause changed',
+          context: { cache_persist_kind: 'open', cache_persist_error: 'CacheOpenTimeoutError' },
+        })
+      );
+      unsub();
+    });
+
     it('a recovery edge fires logEvent(info) once, not reportError', async () => {
       const handler = await wiredHandler();
       const { reportError } = await import('@/utils/errorReporter');

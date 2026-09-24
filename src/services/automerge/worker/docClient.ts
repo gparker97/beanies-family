@@ -243,6 +243,10 @@ function setCurrentFamily(familyId: string | null): void {
 let cachePersistFailedHandler:
   ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null = null;
 
+/** Notified when another tab deleted this family's cache (#100). `bootstrap.ts`
+ * wires it to `useSignOut.endSessionClearedElsewhere`. */
+let cacheReleasedHandler: (() => void) | null = null;
+
 /** Notified after every successful local `mutate` — syncService maps it to a
  * debounced Drive save (replaces the old `onDocPersistNeeded` fan-out; the worker
  * owns the cache persist internally, so this only drives the remote upload). */
@@ -274,6 +278,10 @@ export function setCachePersistFailedHandler(
 ): void {
   cachePersistFailedHandler = fn;
 }
+/** #100: observe "another tab deleted this family's cache" (ends this session). */
+export function setCacheReleasedHandler(fn: (() => void) | null): void {
+  cacheReleasedHandler = fn;
+}
 /** Task #5: called after every successful local mutate (→ debounced Drive save). */
 export function setLocalChangeHandler(fn: (() => void) | null): void {
   localChangeHandler = fn;
@@ -282,7 +290,7 @@ export function setLocalChangeHandler(fn: (() => void) | null): void {
 // ─── Message routing ─────────────────────────────────────────────────────────
 
 function onMessage(data: unknown): void {
-  if (isWorkerSignal(data)) return handleSignal(data);
+  if (isWorkerSignal(data)) return receiveSignal(data);
   if (!isRpcResponse(data)) return; // ignore malformed
   const p = pending.get(data.cid);
   if (!p) return; // late reply to a timed-out/cancelled call — discard by cid
@@ -306,7 +314,12 @@ function onMessage(data: unknown): void {
   p.resolve(data);
 }
 
-function handleSignal(sig: WorkerSignal): void {
+/**
+ * The ONE place a worker signal is handled, for both realms: the worker's
+ * `postMessage` lands here via `onMessage`, and the inline bridge calls it
+ * directly (wired in `bootstrap.ts`). Exported for that reason only.
+ */
+export function receiveSignal(sig: WorkerSignal): void {
   switch (sig.signal) {
     case 'ready':
       break; // resolved via the handshake promise in spawn()
@@ -335,6 +348,16 @@ function handleSignal(sig: WorkerSignal): void {
       break;
     case 'cache-persist-failed':
       cachePersistFailedHandler?.(sig.failed, sig.detail);
+      break;
+    case 'cache-released':
+      if (cacheReleasedHandler) cacheReleasedHandler();
+      else
+        reportError({
+          surface: 'cache-persist',
+          message: 'cache released but no session handler is registered',
+          severity: 'warning',
+          context: { action: 'cache-released', error_code: 'no-handler' },
+        });
       break;
   }
 }
@@ -1623,39 +1646,52 @@ export async function reset(): Promise<void> {
   resetProjection();
 }
 /**
- * Close + delete the encrypted cache DB (sign-out / family-switch).
+ * Close + delete the encrypted cache DB (sign-out / clear data / forget family),
+ * and say whether it is actually gone.
  *
- * ⚠️ STAYS `Promise<void>` ON PURPOSE. The blocked-delete outcome is read and
- * reported HERE rather than handed upward, which keeps `deleteFamilyDatabase`
- * and the whole sign-out path in `authStore` out of this change entirely.
- * Sign-out is the highest-consequence caller in the chain and the one you least
- * want to churn for a diagnostic.
+ * ⚠️ RETURNS THE OUTCOME, and every caller acts on it (#100). It used to stay
+ * `Promise<void>` so the sign-out path never learned, and "sign out and clear
+ * data" told people their data had left the browser when it had not. This is
+ * still the ONE log site for the worker-level outcome, so callers must not log
+ * it again; they decide what the person is told.
+ *
+ * The worker now waits for the delete (bounded), and every peer connection,
+ * including a stale late-open, answers `versionchange` by closing. So
+ * `deleted: false` means exactly one thing: still blocked at the deadline.
  */
-export async function clearCache(familyId: string): Promise<void> {
+export async function clearCache(familyId: string): Promise<CacheClearResult> {
   const result = (await request('clearCache', { familyId })) as CacheClearResult | undefined;
-  // ⚠️ `=== false`, NOT `!result?.deleted`. An older worker bundle answers `{}`,
-  // and a bare falsy test would firehose a false "the cache survived sign-out"
-  // for it. (The inline path is NOT such a case: `inlineExecutor` runs the same
-  // `dispatch`, so inline and worker both carry a real `{ deleted }`.)
-  //
-  // ⚠️ IT CAN STILL OVER-REPORT, in one narrow window. If an abandoned open
-  // from an earlier timeout has not yet arrived to be closed, it is one of the
-  // connections blocking this delete — so we assert the cache survived, and a
-  // tick later the late-close lets the queued delete through and it did not.
-  // Over-reporting is the safe direction for a privacy claim, and the only way
-  // to be sure would be to await `onsuccess`, which is the wait that can never
-  // settle.
+  resetProjection();
+  if (result?.deleted === true) {
+    // The success-path counter, so the blocked RATE is measurable.
+    logEvent({
+      level: 'info',
+      surface: 'cache-persist',
+      message: 'cache deleted',
+      context: { action: 'clear-cache' },
+    });
+    return { deleted: true };
+  }
   if (result?.deleted === false) {
     logEvent({
       level: 'warn',
       surface: 'cache-persist',
-      message: 'cache delete was blocked',
+      message: 'cache delete still blocked at the deadline',
       // A stated privacy invariant, not a nicety: the encrypted cache is still
-      // on disk after a sign-out that told the person it was gone.
+      // on disk after the person asked for it to go.
       context: { action: 'clear-cache', error_code: 'delete-blocked' },
     });
+    return { deleted: false };
   }
-  resetProjection();
+  // An older worker bundle mid-deploy answers `{}`. Unknown is NOT clean:
+  // over-reporting is the safe direction for a privacy claim.
+  logEvent({
+    level: 'warn',
+    surface: 'cache-persist',
+    message: 'cache delete returned no result',
+    context: { action: 'clear-cache', error_code: 'unknown-result' },
+  });
+  return { deleted: false };
 }
 
 /** Test-only: the retry allowlist, so its membership is assertable. */
@@ -1684,5 +1720,6 @@ export function __resetDocClientForTesting(): void {
   inlineExecutor = null;
   rehydrator = null;
   cachePersistFailedHandler = null;
+  cacheReleasedHandler = null;
   localChangeHandler = null;
 }

@@ -16,10 +16,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // `idb` is mocked here, the global is not.
 import 'fake-indexeddb/auto';
 
-const idb = vi.hoisted(() => ({ openDB: vi.fn() }));
+const idb = vi.hoisted(() => ({ openDB: vi.fn(), deleteDB: vi.fn() }));
 vi.mock('idb', () => idb);
 
-import { initPersistenceDB, clearCache, isCacheReady, CACHE_OPEN_TIMEOUT_MS } from '../cache';
+import {
+  initPersistenceDB,
+  clearCache,
+  isCacheReady,
+  CACHE_OPEN_TIMEOUT_MS,
+  CACHE_DELETE_TIMEOUT_MS,
+} from '../cache';
 
 /** A handle that records whether anyone ever closed it. */
 function fakeDb() {
@@ -95,31 +101,43 @@ describe('initPersistenceDB, when the open is queued behind a pending delete', (
 });
 
 describe('clearCache', () => {
-  beforeEach(() => vi.clearAllMocks());
+  // #100: the delete now WAITS (bounded) for the other tabs to release the
+  // database, instead of treating `onblocked` as the answer. `onblocked` fires
+  // briefly whenever a peer is still draining, and `onsuccess` follows it.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    vi.clearAllMocks();
+  });
+  afterEach(() => vi.useRealTimers());
 
-  it('reports a BLOCKED delete as not deleted', async () => {
-    // The other half of the hang, and a privacy fact in its own right: the
-    // encrypted cache is still on disk after a sign-out that said otherwise.
-    const request: Record<string, unknown> = {};
-    vi.stubGlobal('indexedDB', {
-      deleteDatabase: () => {
-        queueMicrotask(() => (request.onblocked as () => void)());
-        return request;
-      },
-    });
-    await expect(clearCache('fam-3')).resolves.toEqual({ deleted: false });
-    vi.unstubAllGlobals();
+  it('reports a delete still blocked at the deadline as NOT deleted', async () => {
+    // A peer that cannot answer at all (a frozen tab). The privacy fact: the
+    // encrypted cache is still on disk, and the caller must not call it clean.
+    idb.deleteDB.mockReturnValueOnce(new Promise(() => {}));
+    const clearing = clearCache('fam-3');
+    const assertion = expect(clearing).resolves.toEqual({ deleted: false });
+    await vi.advanceTimersByTimeAsync(CACHE_DELETE_TIMEOUT_MS);
+    await assertion;
   });
 
-  it('reports a successful delete as deleted', async () => {
-    const request: Record<string, unknown> = {};
-    vi.stubGlobal('indexedDB', {
-      deleteDatabase: () => {
-        queueMicrotask(() => (request.onsuccess as () => void)());
-        return request;
-      },
-    });
+  it('does not give up before the deadline', async () => {
+    let settle!: () => void;
+    idb.deleteDB.mockReturnValueOnce(new Promise<void>((r) => (settle = r)));
+    const clearing = clearCache('fam-5');
+    await vi.advanceTimersByTimeAsync(CACHE_DELETE_TIMEOUT_MS - 1);
+    settle(); // the peer let go just in time
+    await expect(clearing).resolves.toEqual({ deleted: true });
+  });
+
+  it('reports a delete that completed as deleted', async () => {
+    idb.deleteDB.mockResolvedValueOnce(undefined);
     await expect(clearCache('fam-4')).resolves.toEqual({ deleted: true });
-    vi.unstubAllGlobals();
+    expect(idb.deleteDB).toHaveBeenCalledWith('beanies-automerge-fam-4', expect.any(Object));
+  });
+
+  it('rejects on a real IndexedDB error instead of reporting it as "blocked"', async () => {
+    const boom = new DOMException('disk on fire', 'UnknownError');
+    idb.deleteDB.mockRejectedValueOnce(boom);
+    await expect(clearCache('fam-6')).rejects.toBe(boom);
   });
 });

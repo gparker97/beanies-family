@@ -24,7 +24,6 @@ import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, beanpodVersionFor } from './fileSync';
 import * as docClient from '@/services/automerge/worker/docClient';
 import type { DriveConnection } from '@/types/models';
-import { setInlineCachePersistFailedHandler } from '@/services/automerge/worker/inlineBridge';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { logEvent } from '@/services/telemetry';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
@@ -649,17 +648,41 @@ export function onSaveFailureChange(callback: SaveFailureCallback): () => void {
 
 // --- Cache persistence failure tracking ---
 let cachePersistFailed = false;
-type CacheFailureCallback = (failed: boolean) => void;
+/** `detail` names which write failed and why (null on recovery / reset), so the
+ * UI can say "close your other tabs" instead of hedging (#100). */
+type CacheFailureCallback = (failed: boolean, detail: CachePersistFailureDetail | null) => void;
 const cacheFailureCallbacks: CacheFailureCallback[] = [];
+
+/** The cause the UI currently shows; compared so a new cause re-notifies subscribers. */
+let lastFailureDetail: CachePersistFailureDetail | null = null;
+const sameDetail = (a: CachePersistFailureDetail, b: CachePersistFailureDetail | null): boolean =>
+  !!b && a.kind === b.kind && a.errorName === b.errorName;
 
 function setCachePersistFailed(
   failed: boolean,
   detail?: CachePersistFailureDetail,
   opts?: { silent?: boolean }
 ): void {
+  if (failed && cachePersistFailed && detail && !sameDetail(detail, lastFailureDetail)) {
+    // Still failing, but for a DIFFERENT reason (#100): the banner's advice depends on
+    // the cause, so subscribers hear it. Not a new episode, so not a second failure
+    // report; an info event keeps what the person was shown traceable in CloudWatch.
+    lastFailureDetail = detail;
+    cacheFailureCallbacks.forEach((cb) => cb(true, detail));
+    if (!opts?.silent) {
+      logEvent({
+        level: 'info',
+        surface: 'cache-persist',
+        message: 'cache-persist cause changed',
+        context: { cache_persist_kind: detail.kind, cache_persist_error: detail.errorName },
+      });
+    }
+    return;
+  }
   if (cachePersistFailed !== failed) {
     cachePersistFailed = failed;
-    cacheFailureCallbacks.forEach((cb) => cb(failed)); // subscribers see the boolean only
+    lastFailureDetail = failed ? (detail ?? null) : null;
+    cacheFailureCallbacks.forEach((cb) => cb(failed, lastFailureDetail));
     // Telemetry is edge-triggered (once per episode/recovery) and covers both the
     // worker + inline paths at this one site. `silent` lets a lifecycle reset() clear
     // the banner WITHOUT firehosing a false "recovered" event for an abandoned episode.
@@ -2506,8 +2529,9 @@ export function registerDocPersistCallback(): void {
   // to the durability banner. The old onDocPersistNeeded fan-out + main-thread
   // persistDoc/persistEnvelope/isCacheReady are gone.
   docClient.setLocalChangeHandler(() => triggerDebouncedSave());
-  docClient.setCachePersistFailedHandler(setCachePersistFailed); // worker path
-  setInlineCachePersistFailedHandler(setCachePersistFailed); // inline fallback path
+  // Covers BOTH realms: the inline bridge routes its signals through
+  // `docClient.receiveSignal` too (#100), so there is no second handler to wire.
+  docClient.setCachePersistFailedHandler(setCachePersistFailed);
 }
 
 /**

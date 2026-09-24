@@ -62,6 +62,7 @@ import type {
   MergeOutcome,
   CachePersistFailureDetail,
   CacheClearResult,
+  WorkerSignal,
 } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -77,9 +78,42 @@ export interface WorkerSink {
   /** The debounced cache persist failed (or recovered) → durability banner. On a
    * failure, `detail` names which write failed + its error class (triage). */
   cachePersistFailed(failed: boolean, detail?: CachePersistFailureDetail): void;
+  /** Another context deleted this family's cache; the connection is closed (#100). */
+  cacheReleased(): void;
 }
 
-const NOOP_SINK: WorkerSink = { pushChunk() {}, perf() {}, cachePersistFailed() {} };
+const NOOP_SINK: WorkerSink = {
+  pushChunk() {},
+  perf() {},
+  cachePersistFailed() {},
+  cacheReleased() {},
+};
+
+/**
+ * The ONE mapping from sink calls to `WorkerSignal`s, shared by both realms.
+ * The worker posts them across `postMessage`; the inline bridge hands them to
+ * `docClient.receiveSignal` directly. Before #100 the worker sink, the inline
+ * sink and `docClient.handleSignal` each hand-mirrored every signal, so a new
+ * signal meant five edits and the inline copy had drifted (it lacked the
+ * projection `reportError` guards). A signal is now defined here and handled
+ * in `docClient.receiveSignal`, and nowhere else.
+ */
+export function postingSink(post: (sig: WorkerSignal) => void): WorkerSink {
+  return {
+    pushChunk(delta, final) {
+      post({ signal: 'projection', delta, final });
+    },
+    perf(label, durationMs, ctx) {
+      post({ signal: 'perf', label, durationMs, ctx });
+    },
+    cachePersistFailed(failed, detail) {
+      post({ signal: 'cache-persist-failed', failed, detail });
+    },
+    cacheReleased() {
+      post({ signal: 'cache-released' });
+    },
+  };
+}
 
 /** Entities per streamed chunk. A big collection is sliced so each `postMessage`
  * is a bounded main-thread task rather than one giant structured clone. */
@@ -218,6 +252,32 @@ function resetDocCursors(): void {
 export function configure(nextSink: WorkerSink): void {
   sink = nextSink;
   registerNamedOp('attachPhotoToEntity', attachPhotoNamedHandler);
+  // #100: another tab deleted this family's cache and `cache.ts` has already
+  // closed the connection. Stop scheduling writes against it; the doc and key
+  // are KEPT, because the teardown main is about to run still does a bounded
+  // force-save, and `reset()` drops them a moment later. Reads `sink` at call
+  // time, so a later `configure` is honoured.
+  cache.setCacheReleasedListener((reason) => {
+    cancelPendingPersists();
+    if (reason === 'deleted') sink.cacheReleased();
+    // Cannot happen today (the DB is opened at version 1 forever). Surfaced
+    // through the existing durability signal rather than widening
+    // `cache-released`, so it is never silent and never a new code path on main.
+    else raiseCachePersistFailure('open', 'CacheUpgradeElsewhere');
+  });
+}
+
+/** Cancel the debounced cache + snapshot persists. Shared by `flush`, `reset`
+ * and the #100 release, so the three cannot disagree about what "pending" means. */
+function cancelPendingPersists(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  if (snapshotTimer) {
+    clearTimeout(snapshotTimer);
+    snapshotTimer = null;
+  }
 }
 
 // ─── Timing (relayed, not telemetered in-worker) ─────────────────────────────
@@ -497,6 +557,21 @@ async function persistOnce(): Promise<void> {
     // `lastPersistedHeads` is NOT advanced on failure → the delta is re-captured
     // next tick. The console.error is the worker's only local channel (it can't
     // reach logEvent/reportError) — keep it; the signal carries triage detail.
+    //
+    // ⚠️ #100: a write that was already in flight when another tab deleted the
+    // cache fails here AFTER the handle was released. That is not this device
+    // losing durability, it is a session that is about to end, so it must not
+    // raise the banner or a false `cache-persist` warning. Safe ONLY in this
+    // catch, which follows a successful open: after a FAILED open the handle is
+    // always null, so the same check in an open catch would swallow every real
+    // open failure.
+    if (!cache.isCacheReady()) {
+      console.warn(
+        '[applyAndProject] cache write failed after the handle was released; the session is ending',
+        e
+      );
+      return;
+    }
     raiseCachePersistFailure(writeKind, e instanceof Error ? e.name : 'UnknownError');
     console.error('[applyAndProject] cache persist failed', e);
   }
@@ -1377,14 +1452,7 @@ export async function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }
 /** Force an immediate cache persist (backgrounding flush). Cancels the debounce and
  * awaits the single-flight chain so any in-flight persist completes too. */
 export async function flush(): Promise<void> {
-  if (persistTimer) {
-    clearTimeout(persistTimer);
-    persistTimer = null;
-  }
-  if (snapshotTimer) {
-    clearTimeout(snapshotTimer);
-    snapshotTimer = null;
-  }
+  cancelPendingPersists();
   await enqueuePersist();
   await enqueueSnapshotPersist(); // leave a fresh fast-paint snapshot on backgrounding
 }
@@ -1398,13 +1466,13 @@ export function dropDoc(): void {
 }
 
 /** Drop the in-memory doc + cancel the debounce (sign-out). Does NOT delete the
- * cache — `clearCache` does that. The main-thread projection is cleared by the
- * caller (`docClient.reset`). */
+ * cache — `clearCache` does that — but DOES close the connection to it: a
+ * signed-out tab has no reason to hold one, and holding it is what blocks
+ * another tab's delete (#100). Every open site reopens idempotently on a null
+ * handle. The main-thread projection is cleared by the caller (`docClient.reset`). */
 export function reset(): void {
-  if (persistTimer) {
-    clearTimeout(persistTimer);
-    persistTimer = null;
-  }
+  cancelPendingPersists();
+  cache.closeCacheDB();
   currentDoc = null;
   familyKey = null;
   cachePersistFailed = false;
@@ -1689,10 +1757,7 @@ async function time2<T>(label: string, fn: () => Promise<T>, ctx?: PerfCtx): Pro
 
 /** Test-only: reset all orchestrator state (does not touch the cache DB). */
 export function __resetApplyAndProjectForTesting(): void {
-  if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = null;
-  if (snapshotTimer) clearTimeout(snapshotTimer);
-  snapshotTimer = null;
+  cancelPendingPersists();
   snapshotInFlight = Promise.resolve();
   currentDoc = null;
   familyKey = null;

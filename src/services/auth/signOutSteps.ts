@@ -78,6 +78,18 @@ export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'clearKeptRecipe',
 ];
 
+/**
+ * Another tab deleted this family's cache (#100). The same non-destructive teardown as a
+ * trusted sign-out, deliberately, and two properties of it are load-bearing (both asserted
+ * by the unit test):
+ *   - NO delete and NO key-material step. The deleting tab owns those, a second delete
+ *     against a name that is mid-delete is exactly the queue #100 removed, and the other
+ *     tab may be reloading into this same family (Settings "Clear Data" keeps tokens).
+ *   - `resetDocClient` MUST stay in it. That step drops this tab's doc and key from the
+ *     worker and closes its cache connection, which is what ends the session there.
+ */
+export const SIGN_OUT_CLEARED_ELSEWHERE_STEPS: readonly SignOutStepName[] = SIGN_OUT_TRUSTED_STEPS;
+
 /** Tier 2, untrusted device: full family-scoped local teardown (still NO revoke). */
 export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',

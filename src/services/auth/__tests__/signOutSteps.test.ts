@@ -11,6 +11,7 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 import {
   KEY_MATERIAL_STEPS,
   SIGN_OUT_CLEAR_STEPS,
+  SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
   SIGN_OUT_TRUSTED_STEPS,
@@ -49,5 +50,29 @@ describe('dropsKeyMaterial', () => {
       ...SIGN_OUT_EVICTED_STEPS,
     ]);
     for (const step of KEY_MATERIAL_STEPS) expect(all.has(step)).toBe(true);
+  });
+});
+
+describe('SIGN_OUT_CLEARED_ELSEWHERE_STEPS (#100)', () => {
+  // Another tab deleted this family's cache. The two properties the evicted tab relies on.
+  it('never deletes and never drops key material: the deleting tab owns both', () => {
+    expect(SIGN_OUT_CLEARED_ELSEWHERE_STEPS).not.toContain('deleteFamilyDb');
+    expect(dropsKeyMaterial(SIGN_OUT_CLEARED_ELSEWHERE_STEPS)).toBe(false);
+    for (const step of SIGN_OUT_CLEARED_ELSEWHERE_STEPS) {
+      expect(KEY_MATERIAL_STEPS.has(step)).toBe(false);
+    }
+  });
+
+  it('resets the doc client, which is what lets this family sign in here again', () => {
+    expect(SIGN_OUT_CLEARED_ELSEWHERE_STEPS).toContain('resetDocClient');
+  });
+
+  it('keeps stored tokens: the deleting tab may be reloading into this same family', () => {
+    expect(SIGN_OUT_CLEARED_ELSEWHERE_STEPS).not.toContain('clearGoogleSessionDropTokens');
+    expect(SIGN_OUT_CLEARED_ELSEWHERE_STEPS).not.toContain('clearAllRefreshTokens');
+  });
+
+  it('the clear tier still deletes', () => {
+    expect(SIGN_OUT_CLEAR_STEPS).toContain('deleteFamilyDb');
   });
 });

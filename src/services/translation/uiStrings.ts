@@ -2734,12 +2734,19 @@ const STRING_DEFS = {
   },
   'settings.reconnectDrive': { en: 'Reconnect', beanie: 'reconnect' },
   'settings.forceSave': { en: 'Force Save', beanie: 'force save' },
-  // ⚠️ "OFTEN", NOT "THIS MEANS". The durability signal has FOUR raise sites and only the
-  // two `open` ones are the multi-tab story — the other two are genuine WRITE failures
-  // (`base` / `increment`: storage quota, private browsing, disk pressure), where closing
-  // tabs achieves nothing. Until the failure `kind` is plumbed through to the UI (it
-  // currently stops at telemetry — `onCacheFailureChange` hands subscribers a bare boolean),
-  // this copy must SUGGEST the common cause without promising it is the cause.
+  // Three variants, picked by `cacheFailureCause` (src/utils/cacheFailureCause.ts, #100):
+  // `.otherTabs` and `.storage` name the cause when it is known; the bare key is the
+  // fallback and keeps its hedge ("often") because there the cause genuinely is unknown.
+  'settings.cachePersistWarning.otherTabs': {
+    en: 'Local cache is not updating, so your data may not survive a page refresh. beanies.family is open in another tab or window, which is stopping this one from saving. Close the other beanies.family tabs, then refresh this one.',
+    beanie:
+      "local cache isn't saving, so your data might not survive a refresh. beanies.family is open in another tab or window, which is stopping this one from saving. close the other beanies.family tabs, then refresh this one.",
+  },
+  'settings.cachePersistWarning.storage': {
+    en: 'Local cache is not updating, so your data may not survive a page refresh. This browser could not write to local storage: it may be low on space or in private mode. Your saved copy is safe.',
+    beanie:
+      "local cache isn't saving, so your data might not survive a refresh. this browser couldn't write to local storage: it may be low on space or in private mode. your saved copy is safe.",
+  },
   'settings.cachePersistWarning': {
     en: 'Local cache is not updating — your data may not survive a page refresh. This often happens when beanies is open in more than one tab. Close the others, then refresh this one. If it keeps happening, your browser may be low on storage or in private mode.',
     beanie:
@@ -2753,6 +2760,16 @@ const STRING_DEFS = {
     en: 'Recent changes might not survive a refresh on this device. Your saved copy is safe. This often happens when beanies is open in more than one tab — close the others, then refresh.',
     beanie:
       'recent changes might not survive a refresh on this device. your saved copy is safe. this often happens when beanies is open in more than one tab — close the others, then refresh.',
+  },
+  'sync.durabilityBanner.otherTabs': {
+    en: 'beanies.family is open in another tab or window, which is stopping this one from saving locally. Your saved copy is safe. Close the other beanies.family tabs, then refresh this one.',
+    beanie:
+      'beanies.family is open in another tab or window, which is stopping this one from saving locally. your saved copy is safe. close the other beanies.family tabs, then refresh this one.',
+  },
+  'sync.durabilityBanner.storage': {
+    en: 'This browser could not write to local storage. It may be low on space or in private mode. Your saved copy is safe.',
+    beanie:
+      "this browser couldn't write to local storage. it may be low on space or in private mode. your saved copy is safe.",
   },
   'sync.durabilityBannerCta': {
     en: "What's This?",
@@ -3746,6 +3763,21 @@ const STRING_DEFS = {
       "this device isn't trusted, so signing back in here will need a link from a family member's device or your recovery kit.",
   },
   'auth.signOutAnyway': { en: 'Sign out anyway', beanie: 'sign out anyway' },
+  // #100. Important surface (data deletion): the beanie values keep the real nouns.
+  'auth.cacheKeptTitle': {
+    en: 'Some data is still cached in this browser',
+    beanie: 'some data is still cached in this browser',
+  },
+  'auth.cacheKept': {
+    en: "beanies.family could not remove this family's cached data. If beanies.family is open in another tab or window (including the installed app), close it and try again. Otherwise clear this site's data in your browser settings.",
+    beanie:
+      "beanies.family couldn't remove this family's cached data. if beanies.family is open in another tab or window (including the installed app), close it and try again. otherwise clear this site's data in your browser settings.",
+  },
+  'auth.signedOutElsewhere': {
+    en: "This family's data was cleared from this browser in another tab, so it was closed here too.",
+    beanie:
+      "this family's data was cleared from this browser in another tab, so it was closed here too.",
+  },
   'auth.signOutFailed': {
     en: "Sign-out didn't finish. Try again, or reload the app.",
     beanie: "sign-out didn't finish. try again, or reload the app.",
@@ -4237,6 +4269,10 @@ const STRING_DEFS = {
   },
   // Family picker view
   'familyPicker.title': { en: 'Which family?', beanie: 'which beanies?' },
+  'familyPicker.forgetFailed': {
+    en: "Couldn't Forget This Family",
+    beanie: "couldn't forget this family",
+  },
   'familyPicker.subtitle': { en: 'Choose a family to sign into', beanie: 'pick your pod of beans' },
   'familyPicker.loadDifferent': { en: 'Load a different file', beanie: 'load a different file' },
   'familyPicker.noFamilies': {
