@@ -9,7 +9,7 @@
  * confirm-stored is the shared `useRecoveryKitFlow` (also the kit nag and the sign-out
  * kit guard); confirming stamps the doc-side `recoveryKitConfirmedAt` / `Via` signals.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -23,6 +23,8 @@ import {
   toastKitInvalidateOutcome,
 } from '@/composables/useRecoveryKitActions';
 import { usePermissions } from '@/composables/usePermissions';
+import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -64,13 +66,51 @@ const kitSummary = computed(() => {
  */
 const replacingKitId = ref<string | null>(null);
 
-async function handleGenerateKit() {
+/** Mint a kit through the shared flow. No confirm here: callers decide (see below). */
+async function mintKit() {
   statusMessage.value = null;
   // The list and the kit modal are both base-layer modals; close the list first.
   showKits.value = false;
   await kitFlow.generate();
   if (kitFlow.error.value) statusMessage.value = { text: kitFlow.error.value, type: 'error' };
 }
+
+/**
+ * Create a New Kit from the drawer or the Manage Kits footer: a moment to reconsider
+ * before a new full-access key exists, leading with how many are already live and the
+ * fact a new kit does not switch the old ones off. The Replace flow has its own confirm
+ * and calls `mintKit` directly, so nobody sees two confirms in a row.
+ */
+async function handleGenerateKit() {
+  const live = syncStore.liveRecoveryKitCount;
+  const detail =
+    live === 0
+      ? t('recovery.kitCreateHaveNone')
+      : live === 1
+        ? t('recovery.kitCreateHaveOne')
+        : fillTemplate(t('recovery.kitCreateHaveMany'), { count: String(live) });
+  const confirmed = await showConfirm({
+    title: 'recovery.kitCreateTitle',
+    message: 'recovery.kitCreateBody',
+    detail,
+    detailTone: live > 0 ? 'caution' : undefined,
+    variant: 'info',
+    confirmLabel: 'recovery.kitCreateConfirm',
+  });
+  if (!confirmed) return;
+  await mintKit();
+}
+
+// ── Empty state: draw the eye to the create button when the drawer opens with no live
+// kit. The drawer's content mounts on every open, so `onMounted` is "on open"; the short
+// delay lets the drawer's slide-in finish so the pulse is seen, not hidden by it.
+const createButtonWrap = ref<HTMLElement | null>(null);
+const { pulse } = useAttentionPulse();
+onMounted(async () => {
+  if (syncStore.liveRecoveryKitCount !== 0 || !canManagePod.value) return;
+  await nextTick();
+  window.setTimeout(() => pulse(createButtonWrap.value, 'attention-pulse-twice'), 350);
+});
 
 async function handleInvalidateKit(kit: RecoveryKitSummary) {
   // The confirm (top layer) and the PIN gate (gate layer) paint over the open list.
@@ -87,7 +127,7 @@ async function handleReplaceKit(kit: RecoveryKitSummary) {
   try {
     if (!(await approveReplace(kit))) return;
     replacingKitId.value = kit.kitId;
-    await handleGenerateKit();
+    await mintKit();
     // A failed mint leaves no pending replacement.
     if (kitFlow.error.value) replacingKitId.value = null;
   } finally {
@@ -204,19 +244,20 @@ async function handleSavePassphrase() {
         <BaseButton variant="outline" type="button" @click="showKits = true">
           {{ t('recovery.kitsManage') }}
         </BaseButton>
-        <BaseButton
-          v-if="canManagePod"
-          variant="secondary"
-          :loading="kitFlow.isGenerating.value"
-          :disabled="kitFlow.isConfirming.value"
-          @click="handleGenerateKit"
-        >
-          {{
-            syncStore.liveRecoveryKitCount === 0
-              ? t('recovery.kitGenerate')
-              : t('recovery.kitRegenerate')
-          }}
-        </BaseButton>
+        <div v-if="canManagePod" ref="createButtonWrap" class="inline-flex rounded-2xl">
+          <BaseButton
+            variant="secondary"
+            :loading="kitFlow.isGenerating.value"
+            :disabled="kitFlow.isConfirming.value"
+            @click="handleGenerateKit"
+          >
+            {{
+              syncStore.liveRecoveryKitCount === 0
+                ? t('recovery.kitGenerate')
+                : t('recovery.kitRegenerate')
+            }}
+          </BaseButton>
+        </div>
       </div>
     </div>
 

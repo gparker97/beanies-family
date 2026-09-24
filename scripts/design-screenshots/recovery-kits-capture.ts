@@ -84,7 +84,10 @@ test('recovery kits: manage, invalidate, replace', async ({ page }) => {
   for (let i = 0; i < 2; i++) {
     if (await page.getByText(/2 live/).isVisible()) break;
     await generateButton(page).click();
-    await shot(page, `01b-after-generate-click-${i}`);
+    // Create asks first (2026-09-24): the info confirm leads with the live count.
+    await page.getByText(ui('recovery.kitCreateTitle')).waitFor({ state: 'visible' });
+    await shot(page, `01b-create-confirm-${i}`);
+    await page.getByRole('button', { name: ui('recovery.kitCreateConfirm') }).click();
     await confirmKitStored(page);
   }
   await expect(page.getByText(/2 live/)).toBeVisible();

@@ -5231,6 +5231,25 @@ const STRING_DEFS = {
       'this kit is the only way back into your family data if every pin is lost, so it stays valid until a new kit is safely in your hands. first, create the new kit and save or print it. once you confirm you have it, this kit is invalidated.',
   },
   'recovery.kitReplaceConfirm': { en: 'Create the New Kit', beanie: 'create the new kit' },
+  'recovery.kitCreateTitle': { en: 'Create a New Kit?', beanie: 'create a new kit?' },
+  'recovery.kitCreateBody': {
+    en: 'A new kit is another full key to your family data. It does not switch off the kits you already have, so invalidate any you no longer trust from Manage Kits.',
+    beanie:
+      'a new kit is another full key to your family data. it does not switch off the kits you already have, so invalidate any you no longer trust from manage kits.',
+  },
+  'recovery.kitCreateHaveNone': {
+    en: 'You have no live recovery kit yet.',
+    beanie: 'you have no live recovery kit yet.',
+  },
+  'recovery.kitCreateHaveOne': {
+    en: 'You already have 1 live recovery kit.',
+    beanie: 'you already have 1 live recovery kit.',
+  },
+  'recovery.kitCreateHaveMany': {
+    en: 'You already have {count} live recovery kits.',
+    beanie: 'you already have {count} live recovery kits.',
+  },
+  'recovery.kitCreateConfirm': { en: 'Create Kit', beanie: 'create kit' },
   'recovery.kitReauthReason': {
     en: 'Invalidating a recovery kit cannot be undone, so please confirm it is you.',
     beanie: 'invalidating a recovery kit cannot be undone, so please confirm it is you.',

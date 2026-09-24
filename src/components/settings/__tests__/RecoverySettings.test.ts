@@ -25,8 +25,15 @@ const h = vi.hoisted(() => ({
     liveRemaining: 1,
   })),
   emitKitInvalidateOutcome: vi.fn(),
+  confirm: vi.fn(async () => true),
+  pulse: vi.fn(),
   recoveryKits: [] as unknown[],
   liveRecoveryKitCount: 1,
+}));
+
+vi.mock('@/composables/useConfirm', () => ({ confirm: h.confirm, alert: vi.fn() }));
+vi.mock('@/composables/useAttentionPulse', () => ({
+  useAttentionPulse: () => ({ pulse: h.pulse }),
 }));
 
 vi.mock('@/composables/useRecoveryKitFlow', () => ({
@@ -107,7 +114,9 @@ beforeEach(() => {
   h.recoveryKits = [oldKit];
   h.liveRecoveryKitCount = 1;
   h.approveReplace.mockResolvedValue(true);
+  h.confirm.mockResolvedValue(true);
   h.confirmStored.mockResolvedValue(true);
+  vi.useRealTimers();
   h.invalidateRecoveryKit.mockResolvedValue({ invalidated: true, save: 'saved', liveRemaining: 1 });
 });
 
@@ -186,6 +195,14 @@ describe('RecoverySettings — Replace the last kit', () => {
     expect(h.invalidateRecoveryKit).toHaveBeenCalledTimes(1);
   });
 
+  it('Replace never shows the create confirm (it has its own)', async () => {
+    const w = mountSettings();
+    await w.findComponent({ name: 'RecoveryKitsModal' }).vm.$emit('replace', oldKit);
+    await flushPromises();
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
   it('a plain create from the list closes the list and mints without a pending replacement', async () => {
     const w = mountSettings();
     const modal = w.findComponent({ name: 'RecoveryKitsModal' });
@@ -204,5 +221,64 @@ describe('RecoverySettings — Replace the last kit', () => {
     await w.findComponent({ name: 'RecoveryKitsModal' }).vm.$emit('invalidate', oldKit);
     await flushPromises();
     expect(h.invalidateKit).toHaveBeenCalledWith(oldKit);
+  });
+});
+
+describe('RecoverySettings — create confirm and the empty-state pulse', () => {
+  it('create asks first, leading with how many kits are live, and mints only on yes', async () => {
+    h.recoveryKits = [oldKit, { ...oldKit, kitId: 'new00002' }];
+    h.liveRecoveryKitCount = 2;
+    const w = mountSettings();
+    await w.findComponent({ name: 'RecoveryKitsModal' }).vm.$emit('create');
+    await flushPromises();
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'recovery.kitCreateTitle',
+        message: 'recovery.kitCreateBody',
+        detail: 'recovery.kitCreateHaveMany',
+        detailTone: 'caution',
+        variant: 'info',
+      })
+    );
+    expect(h.generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('declining the confirm mints nothing', async () => {
+    h.confirm.mockResolvedValueOnce(false);
+    const w = mountSettings();
+    await w.findComponent({ name: 'RecoveryKitsModal' }).vm.$emit('create');
+    await flushPromises();
+    expect(h.generate).not.toHaveBeenCalled();
+  });
+
+  it('with no live kit the detail is encouragement, not caution', async () => {
+    h.recoveryKits = [];
+    h.liveRecoveryKitCount = 0;
+    const w = mountSettings();
+    await w.findComponent({ name: 'RecoveryKitsModal' }).vm.$emit('create');
+    await flushPromises();
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: 'recovery.kitCreateHaveNone', detailTone: undefined })
+    );
+  });
+
+  it('pulses the create button on open when no kit is live, and only then', async () => {
+    vi.useFakeTimers();
+    h.recoveryKits = [];
+    h.liveRecoveryKitCount = 0;
+    mountSettings();
+    await flushPromises();
+    vi.advanceTimersByTime(400);
+    expect(h.pulse).toHaveBeenCalledTimes(1);
+    expect(h.pulse).toHaveBeenCalledWith(expect.any(HTMLElement), 'attention-pulse-twice');
+
+    h.pulse.mockClear();
+    h.recoveryKits = [oldKit];
+    h.liveRecoveryKitCount = 1;
+    mountSettings();
+    await flushPromises();
+    vi.advanceTimersByTime(400);
+    expect(h.pulse).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });
