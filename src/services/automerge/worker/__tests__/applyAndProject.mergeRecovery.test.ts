@@ -54,7 +54,12 @@ describe('applyAndProject — merge-throw recoverability (clone removal side-eff
   beforeEach(async () => {
     __resetApplyAndProjectForTesting();
     cache.__resetCacheForTesting();
-    const sink: WorkerSink = { pushChunk() {}, perf() {}, cachePersistFailed() {} };
+    const sink: WorkerSink = {
+      pushChunk() {},
+      perf() {},
+      cachePersistFailed() {},
+      cacheReleased() {},
+    };
     configure(sink);
     key = await generateFamilyKey();
   });

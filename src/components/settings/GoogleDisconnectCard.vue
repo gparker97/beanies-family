@@ -38,7 +38,9 @@ async function handleDisconnect() {
     emitExplicitRevokeUsed();
     await disconnectGoogleEverywhere();
     // This device's connection is gone — complete the sign-out so the user lands on a
-    // truthful surface instead of an app that can no longer reach its file.
+    // truthful surface instead of an app that can no longer reach its file. The cache
+    // outcome is deliberately not read: this escape hatch shows its own result, and
+    // `docClient.clearCache` has already logged a cache another tab kept (#100).
     await authStore.signOut();
     router.replace('/login');
   } catch (e) {

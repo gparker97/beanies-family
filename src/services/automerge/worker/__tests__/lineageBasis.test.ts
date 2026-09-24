@@ -69,7 +69,7 @@ beforeEach(async () => {
   guardHook.force = null;
   key = await generateFamilyKey();
   ap.reset();
-  ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {} });
+  ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
   ap.setKey(key);
 });
 

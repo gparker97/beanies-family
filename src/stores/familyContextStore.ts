@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import * as familyContext from '@/services/familyContext';
 import type { Family } from '@/types/models';
+import type { CacheClearResult } from '@/services/automerge/worker/protocol';
+import { reportError } from '@/utils/errorReporter';
 
 export const useFamilyContextStore = defineStore('familyContext', () => {
   // State
@@ -154,18 +156,31 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
   /**
    * Delete all local data for a family and remove it from the registry.
    * Cannot delete the currently active family.
+   *
+   * Returns the cache-delete outcome, or `null` if the delete threw (the message
+   * is in `error`). The family is forgotten whenever this is non-null, even when
+   * `deleted` is false: that only means another tab still held its cache (#100).
    */
-  async function deleteLocalFamily(familyId: string): Promise<boolean> {
+  async function deleteLocalFamily(familyId: string): Promise<CacheClearResult | null> {
     try {
-      await familyContext.deleteLocalFamily(familyId);
+      const result = await familyContext.deleteLocalFamily(familyId);
       allFamilies.value = allFamilies.value.filter((f) => f.id !== familyId);
       if (activeFamily.value?.id === familyId) {
         activeFamily.value = null;
       }
-      return true;
+      return result;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to delete family';
-      return false;
+      // Reported HERE, with the real error (its class and stack), not rebuilt from the
+      // message string by a view. Callers only decide what the person is told.
+      reportError({
+        surface: 'family-context',
+        message: 'forget family failed',
+        error: e,
+        severity: 'error',
+        context: { action: 'forget_family_failed' },
+      });
+      return null;
     }
   }
 

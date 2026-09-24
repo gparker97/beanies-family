@@ -6,44 +6,31 @@
  * off-thread benefit is lost but functionality is identical — one implementation,
  * two realms.
  *
- * It configures `applyAndProject` with a main-side sink (projection deltas apply
- * directly; perf goes to the real `perfTiming.record`; cache-persist failures go
- * to the durability-banner handler) and serializes calls with a promise chain —
- * the same async-FIFO discipline the worker uses, so an async merge can't
- * interleave with a following mutate.
+ * It configures `applyAndProject` with the SAME `postingSink` the worker uses,
+ * and hands each signal to `docClient.receiveSignal` (wired by `bootstrap.ts`),
+ * so a signal is handled in exactly one place whichever realm raised it (#100).
+ * Calls are serialized with a promise chain, the same async-FIFO discipline the
+ * worker uses, so an async merge can't interleave with a following mutate.
  */
-import { applyChunk, bumpDocVersion } from '../projection';
-import { record as recordPerf } from '@/utils/perfTiming';
-import { configure, dispatch, type WorkerSink } from './applyAndProject';
-import type { ProjectionDelta, CachePersistFailureDetail } from './protocol';
+import { configure, dispatch, postingSink } from './applyAndProject';
+import type { ProjectionDelta, WorkerSignal } from './protocol';
 
-let cachePersistFailedHandler:
-  ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null = null;
+let signalHandler: ((sig: WorkerSignal) => void) | null = null;
 
-/** Task #5: observe worker/inline cache-persist failures (durability banner). */
-export function setInlineCachePersistFailedHandler(
-  fn: ((failed: boolean, detail?: CachePersistFailureDetail) => void) | null
-): void {
-  cachePersistFailedHandler = fn;
+/** Where inline signals go. Wired once to `docClient.receiveSignal`. */
+export function setInlineSignalHandler(fn: ((sig: WorkerSignal) => void) | null): void {
+  signalHandler = fn;
 }
-
-const mainSink: WorkerSink = {
-  pushChunk(delta: ProjectionDelta, final: boolean) {
-    applyChunk(delta);
-    if (final) bumpDocVersion();
-  },
-  perf(label, durationMs, ctx) {
-    recordPerf(label, durationMs, ctx);
-  },
-  cachePersistFailed(failed, detail) {
-    cachePersistFailedHandler?.(failed, detail);
-  },
-};
 
 let configured = false;
 function ensureConfigured(): void {
   if (configured) return;
-  configure(mainSink);
+  configure(
+    postingSink((sig) => {
+      if (signalHandler) signalHandler(sig);
+      else console.warn('[inlineBridge] signal dropped, no handler wired', sig.signal);
+    })
+  );
   configured = true;
 }
 
@@ -65,5 +52,5 @@ export function inlineExecutor(
 export function __resetInlineBridgeForTesting(): void {
   configured = false;
   tail = Promise.resolve();
-  cachePersistFailedHandler = null;
+  signalHandler = null;
 }

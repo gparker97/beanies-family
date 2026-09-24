@@ -267,7 +267,7 @@ export function emitRosterFallbackUsed(): void {
 
 /** One sign-out ran. Confirms no tier ever revokes; local token deletion only on 2-untrusted/3. */
 export function emitSignoutTier(payload: {
-  tier: 'switch-person' | 'sign-out' | 'sign-out-clear';
+  tier: 'switch-person' | 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere';
   trusted: boolean;
   tokensKept: boolean;
 }): void {
@@ -276,6 +276,18 @@ export function emitSignoutTier(payload: {
     kind: payload.trusted ? 'trusted' : 'untrusted',
     detail: payload.tokensKept ? 'tokens-kept' : 'tokens-cleared',
   });
+}
+
+/**
+ * Where the person was told their family's cached data is STILL in this browser (#100):
+ * a delete another tab could not release in time. The user-visible outcome, counted
+ * separately from `docClient.clearCache`'s worker-level `delete-blocked`, because the
+ * toast type is `warning`, which never auto-reports.
+ */
+export function emitCacheKept(
+  kind: 'sign-out' | 'sign-out-clear' | 'clear-data' | 'forget-family' | 'delete-family' | 'evicted'
+): void {
+  emit('warn', 'cache_kept', { action: 'cache_kept', kind });
 }
 
 /** The Settings "Disconnect Google everywhere" action ran — the ONLY revoke site left. */
@@ -532,7 +544,11 @@ export function emitKitGuard(payload: {
 }
 
 /** How a shown kit guard was resolved. `sign_out_anyway` is the one to alert on later. */
-export function emitKitGuardOutcome(outcome: 'kit_saved' | 'sign_out_anyway' | 'cancelled'): void {
+/** `superseded`: another tab cleared the family while the guard was open (#100), so the
+ * guard closed without the person choosing anything. Kept apart from `cancelled`. */
+export function emitKitGuardOutcome(
+  outcome: 'kit_saved' | 'sign_out_anyway' | 'cancelled' | 'superseded'
+): void {
   emit(outcome === 'sign_out_anyway' ? 'warn' : 'info', 'kit_guard_outcome', { action: outcome });
 }
 

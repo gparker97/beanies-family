@@ -12,6 +12,7 @@
  */
 
 import * as docClient from '@/services/automerge/worker/docClient';
+import type { CacheClearResult } from '@/services/automerge/worker/protocol';
 import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
 
 const DB_NAME_PREFIX = 'beanies-data-';
@@ -50,6 +51,22 @@ export function getAutomergeDatabaseName(familyId: string): string {
 }
 
 /**
+ * Does this family's encrypted cache database exist in this browser right now?
+ * `null` when the browser cannot say (`indexedDB.databases()` is missing or threw),
+ * so a caller never mistakes "unknown" for "absent". Diagnostic use only (#100).
+ */
+export async function familyCacheExists(familyId: string): Promise<boolean | null> {
+  if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return null;
+  try {
+    const name = getAutomergeDatabaseName(familyId);
+    return (await indexedDB.databases()).some((d) => d.name === name);
+  } catch (e) {
+    console.warn('[database] indexedDB.databases() failed', e);
+    return null;
+  }
+}
+
+/**
  * Close any open database connections.
  */
 export async function closeDatabase(): Promise<void> {
@@ -62,12 +79,17 @@ export async function closeDatabase(): Promise<void> {
 /**
  * Delete a family's databases (both legacy entity DB and Automerge cache).
  * Used on sign-out to treat local storage as an ephemeral cache.
+ *
+ * Returns whether the encrypted Automerge cache is actually gone (#100), and
+ * every caller acts on it: `false` means another tab or window still held it at
+ * the deadline, so the person must not be told their data left the browser.
  */
-export async function deleteFamilyDatabase(familyId: string): Promise<void> {
-  // Delete the Automerge persistence cache via the worker (close-then-delete —
-  // the only open connection lives in the worker post-ADR-032; a main-thread
-  // delete would fire onblocked and silently keep the encrypted cache).
-  await docClient.clearCache(familyId);
+export async function deleteFamilyDatabase(familyId: string): Promise<CacheClearResult> {
+  // Delete the Automerge persistence cache via the worker (close-then-delete).
+  // THIS tab's connection lives in the worker, but every OTHER open tab holds
+  // its own; `docClient.clearCache` waits (bounded) for them to release it and
+  // reports whether they did. It also logs the outcome, so it is not logged here.
+  const cache = await docClient.clearCache(familyId);
 
   // Delete legacy per-family IndexedDB (if it still exists from before migration)
   const legacyDbName = getFamilyDatabaseName(familyId);
@@ -79,6 +101,7 @@ export async function deleteFamilyDatabase(familyId: string): Promise<void> {
   if (currentFamilyId === familyId) {
     currentFamilyId = null;
   }
+  return cache;
 }
 
 /** Helper to delete an IndexedDB by name. */

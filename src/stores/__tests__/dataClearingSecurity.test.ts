@@ -103,12 +103,27 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
 }));
 
 // Database operations
-const mockDeleteFamilyDatabase = vi.fn(async (_familyId?: string) => {});
+// Resolves the real shape (#100): the store reads `deleted` to tell the person whether
+// the cache is actually gone.
+const mockDeleteFamilyDatabase = vi.fn(
+  async (_familyId?: string): Promise<{ deleted: boolean } | undefined> => ({ deleted: true })
+);
+
+// Capture the sign-out telemetry while keeping every other export real.
+const mockEmitSignoutTier = vi.fn();
+const mockEmitCacheKept = vi.fn();
+vi.mock('@/services/telemetry/loginFlowEvents', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/telemetry/loginFlowEvents')>()),
+  emitSignoutTier: (...a: unknown[]) => mockEmitSignoutTier(...a),
+  emitCacheKept: (...a: unknown[]) => mockEmitCacheKept(...a),
+}));
 const mockClearAllData = vi.fn(async () => {});
 const mockGetActiveFamilyId = vi.fn(() => 'family-123');
 
+const mockFamilyCacheExists = vi.fn(async (_familyId: string): Promise<boolean | null> => false);
 vi.mock('@/services/indexeddb/database', () => ({
   deleteFamilyDatabase: (familyId?: string) => mockDeleteFamilyDatabase(familyId),
+  familyCacheExists: (familyId: string) => mockFamilyCacheExists(familyId),
   clearAllData: () => mockClearAllData(),
   getActiveFamilyId: () => mockGetActiveFamilyId(),
   getDatabase: vi.fn(async () => ({})),
@@ -131,7 +146,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
   dropDoc: vi.fn(async () => {}),
   reset: vi.fn(async () => {}),
-  clearCache: vi.fn(async () => {}),
+  clearCache: vi.fn(async () => ({ deleted: true })),
   setLocalChangeHandler: vi.fn(),
   setCachePersistFailedHandler: vi.fn(),
 }));
@@ -512,6 +527,67 @@ describe('Sensitive Data Clearing Security', () => {
   // =========================================================================
   // 1. signOutAndClearData() — full destructive sign-out
   // =========================================================================
+  describe('endSessionClearedElsewhere() — another tab deleted this family (#100)', () => {
+    it('ends the session without deleting anything or dropping key material', async () => {
+      const { auth, settings } = populateAllStores();
+      // A key is only ever cached on a trusted device.
+      await settings.setTrustedDevice(true);
+      await settings.cacheFamilyKey(KEY_A, 'family-123');
+
+      await auth.endSessionClearedElsewhere();
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      // The deleting tab owns key material; this tab may be reloading into it.
+      expect(await settings.getCachedFamilyKey('family-123')).toBe(KEY_A);
+      expect(auth.currentUser).toBeNull();
+      expect(auth.isAuthenticated).toBe(false);
+    });
+
+    it('checks for a cache recreated in the eviction window (the accepted, measured limit)', async () => {
+      const { auth } = populateAllStores();
+      mockFamilyCacheExists.mockResolvedValueOnce(true);
+      await expect(auth.endSessionClearedElsewhere()).resolves.toBeUndefined();
+      expect(mockFamilyCacheExists).toHaveBeenCalledWith('family-123');
+    });
+
+    it('records the cleared-elsewhere tier with tokens KEPT, even on an untrusted device', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(false);
+
+      await auth.endSessionClearedElsewhere();
+
+      expect(mockEmitSignoutTier).toHaveBeenCalledWith({
+        tier: 'cleared-elsewhere',
+        trusted: false,
+        tokensKept: true,
+      });
+    });
+
+    it('an untrusted sign-out reports whether its cache delete completed (review #4)', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(false);
+      mockDeleteFamilyDatabase.mockResolvedValueOnce({ deleted: false });
+      await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: false });
+    });
+
+    it('a trusted sign-out attempts no delete, so reports null', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+      await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: null });
+    });
+
+    it('an ordinary untrusted sign-out still records tokens cleared', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(false);
+      await auth.signOut();
+      expect(mockEmitSignoutTier).toHaveBeenCalledWith({
+        tier: 'sign-out',
+        trusted: false,
+        tokensKept: false,
+      });
+    });
+  });
+
   describe('signOutAndClearData() — full destructive sign-out', () => {
     it('clears cachedFamilyKeys from global settings', async () => {
       const { auth, settings } = populateAllStores();
@@ -581,6 +657,36 @@ describe('Sensitive Data Clearing Security', () => {
       await auth.signOutAndClearData();
 
       expect(registryPasskeys.rows).toHaveLength(0);
+    });
+
+    describe('#100: whether the cache is actually gone reaches the caller', () => {
+      it('cacheDeleted is true when the delete completed', async () => {
+        const { auth } = populateAllStores();
+        await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: true });
+      });
+
+      it('cacheDeleted is false when another tab still held the cache, and every step still runs', async () => {
+        const { auth, settings } = populateAllStores();
+        await settings.setTrustedDevice(true);
+        mockDeleteFamilyDatabase.mockResolvedValueOnce({ deleted: false });
+
+        await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+        // The steps after `deleteFamilyDb` were not skipped.
+        expect(settings.isTrustedDevice).toBe(false);
+        expect(auth.isAuthenticated).toBe(false);
+      });
+
+      it('cacheDeleted is false when the delete THREW (reported by the runner, never clean)', async () => {
+        const { auth } = populateAllStores();
+        mockDeleteFamilyDatabase.mockRejectedValueOnce(new Error('DB locked'));
+        await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      });
+
+      it('an undefined result follows unknown-means-not-deleted, never a TypeError', async () => {
+        const { auth } = populateAllStores();
+        mockDeleteFamilyDatabase.mockResolvedValueOnce(undefined);
+        await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      });
     });
 
     it('calls deleteFamilyDatabase with the family ID', async () => {
@@ -728,7 +834,8 @@ describe('Sensitive Data Clearing Security', () => {
       const { auth } = populateAllStores();
       vi.mocked(saveNow).mockRejectedValueOnce(new Error('Drive 500'));
 
-      await expect(auth.signOut()).resolves.toBeUndefined();
+      // Completes: resolves with the delete outcome (#100) rather than throwing.
+      await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: true });
 
       // Teardown still ran; auth state cleared.
       expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
@@ -739,7 +846,8 @@ describe('Sensitive Data Clearing Security', () => {
       const { auth } = populateAllStores();
       vi.mocked(saveNow).mockResolvedValueOnce(false);
 
-      await expect(auth.signOut()).resolves.toBeUndefined();
+      // Completes: resolves with the delete outcome (#100) rather than throwing.
+      await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: true });
 
       expect(mockDeleteFamilyDatabase).toHaveBeenCalled();
       expect(auth.currentUser).toBeNull();

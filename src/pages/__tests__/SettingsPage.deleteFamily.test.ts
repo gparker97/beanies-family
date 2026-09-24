@@ -19,6 +19,8 @@ const {
   alertMock,
   deleteDriveFileMock,
   signOutMock,
+  reportErrorMock,
+  emitCacheKeptMock,
   showToastMock,
   resetAllAppStoresMock,
   replaceMock,
@@ -36,15 +38,20 @@ const {
         delivered: true,
       }) as import('@/utils/shareOrDownloadFile').ShareOrDownloadResult
   ),
-  // ⚠️ RETURNS TRUE, like the real one. `familyContextStore.deleteLocalFamily`
-  // catches every throw and reports a BOOLEAN, and the delete flow now treats a
-  // false as "the local data survived" and says so in the farewell — so a double
-  // returning `undefined` describes a failing teardown on every test.
-  deleteLocalFamilyMock: vi.fn(async () => true),
+  // ⚠️ RETURNS A CLEAN RESULT, like the real one. `familyContextStore.deleteLocalFamily`
+  // catches every throw and returns `null`, or the cache-delete outcome (#100), and the
+  // delete flow treats `null` or `deleted: false` as "the local data survived" and says
+  // so in the farewell — so a double returning `undefined` describes a failing teardown
+  // on every test.
+  deleteLocalFamilyMock: vi.fn(async (): Promise<{ deleted: boolean } | null> => ({
+    deleted: true,
+  })),
   removeFamilyMock: vi.fn(async () => true),
   alertMock: vi.fn(async () => {}),
   deleteDriveFileMock: vi.fn(async () => {}),
   signOutMock: vi.fn(async () => {}),
+  reportErrorMock: vi.fn(),
+  emitCacheKeptMock: vi.fn(),
   showToastMock: vi.fn(),
   resetAllAppStoresMock: vi.fn(),
   replaceMock: vi.fn(),
@@ -106,7 +113,8 @@ vi.mock('@/services/google/googleAuth', async (importOriginal) => ({
   isUserCancellation: () => false,
   shouldUseRedirectAuth: () => false,
 }));
-vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
+vi.mock('@/services/telemetry/loginFlowEvents', () => ({ emitCacheKept: emitCacheKeptMock }));
 
 // The owner-gated full deletion now removes the family's SHARED registry row
 // itself, explicitly and before the local teardown (2026-09-08): the per-device
@@ -201,7 +209,40 @@ describe('SettingsPage — delete family export gate', () => {
     confirmMock.mockResolvedValue(true);
     isNativeMock.mockReturnValue(false);
     requireReauthMock.mockResolvedValue(true);
+    deleteLocalFamilyMock.mockResolvedValue({ deleted: true });
     setActivePinia(createPinia());
+  });
+
+  // #100: two different ways the local data can survive, told apart in telemetry.
+  it('a cache another tab kept is a WARNING, and the farewell says local data was kept', async () => {
+    deleteLocalFamilyMock.mockResolvedValue({ deleted: false });
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'warning',
+        context: expect.objectContaining({ error_code: 'cache-kept-other-tabs' }),
+      })
+    );
+    expect(emitCacheKeptMock).toHaveBeenCalledWith('delete-family');
+    expect(alertMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'settings.deleteFamilyFarewellKeptFileMsg' })
+    );
+  });
+
+  it('a teardown that threw stays CRITICAL and is not counted as a kept cache', async () => {
+    deleteLocalFamilyMock.mockResolvedValue(null);
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        context: expect.objectContaining({ error_code: 'local-delete-failed' }),
+      })
+    );
+    expect(emitCacheKeptMock).not.toHaveBeenCalled();
   });
 
   it('destroys nothing when the step-up gate refuses', async () => {
@@ -235,7 +276,7 @@ describe('SettingsPage — delete family export gate', () => {
     });
     deleteLocalFamilyMock.mockImplementation(async () => {
       calls.push('delete');
-      return true;
+      return { deleted: true };
     });
 
     const wrapper = await mountPage();

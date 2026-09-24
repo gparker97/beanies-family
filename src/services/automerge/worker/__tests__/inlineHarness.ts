@@ -3,10 +3,15 @@
 // Installs the inline docClient backend + a fresh empty doc so a store/repo unit
 // test drives the REAL new data path (docClient → applyAndProject → projection)
 // on the main thread, no Worker required.
-import { inlineExecutor, __resetInlineBridgeForTesting } from '../inlineBridge';
+import {
+  inlineExecutor,
+  setInlineSignalHandler,
+  __resetInlineBridgeForTesting,
+} from '../inlineBridge';
 import {
   setInlineExecutor,
   forceInlineMode,
+  receiveSignal,
   initDoc,
   __resetDocClientForTesting,
 } from '../docClient';
@@ -22,6 +27,8 @@ export async function installInlineBackend(): Promise<void> {
   __resetCacheForTesting();
   resetProjection();
   setInlineExecutor(inlineExecutor);
+  // Same wiring as `bootstrap.ts`: inline signals reach docClient's one handler.
+  setInlineSignalHandler(receiveSignal);
   forceInlineMode();
   await initDoc();
 }

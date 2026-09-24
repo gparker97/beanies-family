@@ -36,6 +36,7 @@ import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import {
   deleteFamilyDatabase,
+  familyCacheExists,
   getActiveFamilyId as getActiveFamilyIdFromDb,
 } from '@/services/indexeddb/database';
 import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
@@ -49,14 +50,17 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import {
   emitDeviceTrustSet,
   emitSignoutTier,
+  emitCacheKept,
   type DeviceTrustSource,
 } from '@/services/telemetry/loginFlowEvents';
 import {
   runSignOutSteps,
   signOutStepsFor,
+  SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
   type SignOutStepImpls,
+  type SignOutStepName,
 } from '@/services/auth/signOutSteps';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
@@ -2745,13 +2749,14 @@ export const useAuthStore = defineStore('auth', () => {
     await runSignOutSteps(
       evict ? SIGN_OUT_EVICTED_STEPS : SIGN_OUT_EVICTION_LOCK_STEPS,
       buildSignOutStepImpls({
-        departedEmail: null,
+        // `userAskedToClear` set, though no step in either list reads it: it says what
+        // this is — the family is leaving this device, not a person choosing to keep
+        // their data. `buildSignOutCtx` snapshots the remote latch; eviction overrides it
+        // to null because neither eviction list consults it. Keep the override AFTER
+        // the spread.
+        ...buildSignOutCtx(true),
         familyId,
-        // Set, though no step in either list reads it: it says what this is — the family is
-        // leaving this device, not a person choosing to keep their data.
-        userAskedToClear: true,
         remoteWasUnreadable: null,
-        unpushedAtSignOut: null,
       })
     );
     finalizeSession();
@@ -2844,6 +2849,14 @@ export const useAuthStore = defineStore('auth', () => {
      * not care WHY the save did not land. An unknown answer reads as dirty.
      */
     unpushedAtSignOut: 'clean' | 'dirty' | null;
+    /**
+     * Did `deleteFamilyDb` actually remove the cache (#100)? `null` = no delete
+     * was attempted; `false` = attempted and the encrypted cache is still on
+     * disk (another tab could not release it in time, or the delete threw).
+     * The clear-data tier hands this to the UI so the person is never told
+     * their data left the browser when it did not.
+     */
+    cacheDeleted: boolean | null;
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -2951,7 +2964,13 @@ export const useAuthStore = defineStore('auth', () => {
           });
           return;
         }
-        await deleteFamilyDatabase(ctx.familyId);
+        // `false` BEFORE the attempt: a throw below is caught by the step runner
+        // (reported as `step_failed`) and must still reach the person as "not
+        // cleared". A result with no `deleted` field follows the same
+        // unknown-means-not-deleted rule as `docClient.clearCache`.
+        ctx.cacheDeleted = false;
+        const result = await deleteFamilyDatabase(ctx.familyId);
+        ctx.cacheDeleted = result?.deleted === true;
       },
       clearKeyCacheFamily: async () => {
         if (ctx.familyId) await settingsStore.clearCachedFamilyKey(ctx.familyId);
@@ -3006,8 +3025,12 @@ export const useAuthStore = defineStore('auth', () => {
       },
       forgetLocalFamily: async () => {
         if (!ctx.familyId) throw new Error('forgetLocalFamily: no familyId');
-        const forgotten = await useFamilyContextStore().deleteLocalFamily(ctx.familyId);
-        if (!forgotten) throw new Error('deleteLocalFamily returned false');
+        const result = await useFamilyContextStore().deleteLocalFamily(ctx.familyId);
+        if (result === null) throw new Error('deleteLocalFamily returned null');
+        // The family is forgotten either way; a cache another tab would not release
+        // is still counted (#100). No UI: the login page already explains the
+        // removal, and this device no longer holds the key.
+        if (!result.deleted) emitCacheKept('evicted');
       },
       untrustDevice: () => settingsStore.setTrustedDevice(false),
       reArmTrustPrompt: () => settingsStore.resetTrustedDevicePrompt(),
@@ -3031,12 +3054,27 @@ export const useAuthStore = defineStore('auth', () => {
    * tokens + caches + wraps (silent reconnect); untrusted devices get the full
    * family-scoped local teardown. The step ORDER is data in `signOutSteps.ts`.
    */
-  async function signOut(): Promise<void> {
-    const settingsStore = useSettingsStore();
-    const trusted = settingsStore.isTrustedDevice;
-    const ctx = {
+  async function signOut(): Promise<{ cacheDeleted: boolean | null }> {
+    const trusted = useSettingsStore().isTrustedDevice;
+    const ctx = await runSignOutTier({
+      tier: 'sign-out',
+      steps: signOutStepsFor('sign-out', trusted),
+      userAskedToClear: false,
+      trusted,
+    });
+    // Untrusted devices delete the cache too; `null` on a trusted one (#100).
+    return { cacheDeleted: ctx.cacheDeleted };
+  }
+
+  /**
+   * The step context every user-facing sign-out tier starts from. ONE literal, so
+   * the three tiers below cannot drift apart on what they track.
+   */
+  function buildSignOutCtx(userAskedToClear: boolean) {
+    return {
       departedEmail: null as string | null,
       familyId: undefined as string | undefined,
+      userAskedToClear,
       // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS, AND REFRESHED BY STEP ONE.
       // `resetSyncState` sits FOUR steps ahead of `deleteFamilyDb` in both
       // deleting tiers and reaches `syncService.reset()` ->
@@ -3044,13 +3082,65 @@ export const useAuthStore = defineStore('auth', () => {
       // always saw `null` and the guard was dead code. Taking it here alone was
       // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
       // the breaker itself, so it re-reads into this field (see that step).
-      userAskedToClear: false,
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
+      cacheDeleted: null as boolean | null,
     };
-    await runSignOutSteps(signOutStepsFor('sign-out', trusted), buildSignOutStepImpls(ctx));
-    emitSignoutTier({ tier: 'sign-out', trusted, tokensKept: trusted });
+  }
+
+  /** Run one sign-out tier's steps, record it, and end the session. */
+  async function runSignOutTier(opts: {
+    tier: 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere';
+    steps: readonly SignOutStepName[];
+    userAskedToClear: boolean;
+    trusted: boolean;
+  }): Promise<ReturnType<typeof buildSignOutCtx>> {
+    const ctx = buildSignOutCtx(opts.userAskedToClear);
+    await runSignOutSteps(opts.steps, buildSignOutStepImpls(ctx));
+    emitSignoutTier({
+      tier: opts.tier,
+      trusted: opts.trusted,
+      // Read off the list, not off `trusted`: the cleared-elsewhere tier keeps
+      // tokens on an untrusted device too, and a hand-passed boolean would
+      // mislabel it.
+      tokensKept: !opts.steps.includes('clearGoogleSessionDropTokens'),
+    });
     finalizeSession();
+    return ctx;
+  }
+
+  /**
+   * Another tab deleted this family's cache (#100): end THIS tab's session without
+   * touching anything the deleting tab owns. Non-destructive by construction (see
+   * `SIGN_OUT_CLEARED_ELSEWHERE_STEPS`): a bounded force-save, the in-memory session
+   * dropped, the worker doc and key released. Reached only through
+   * `useSignOut.endSessionClearedElsewhere`, which owns the UI around it.
+   */
+  async function endSessionClearedElsewhere(): Promise<void> {
+    const familyId = getActiveFamilyIdFromDb();
+    await runSignOutTier({
+      tier: 'cleared-elsewhere',
+      steps: SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
+      userAskedToClear: false,
+      trusted: useSettingsStore().isTrustedDevice,
+    });
+    // ⚠️ THE ACCEPTED LIMIT, MEASURED (greg, 2026-09-24). Nothing refuses a reopen in the
+    // seconds between the release and this teardown, so a pending save or a recovery
+    // can have recreated the (encrypted) cache the other tab deleted. That tab's clear
+    // removed the key that opens it, so the exposure is ciphertext with no key here;
+    // this makes its rate visible. Ambiguous by nature: the other tab may itself have
+    // reloaded into this family (Settings "Clear Data" does), which also shows as
+    // present. The count is an upper bound, never a proof of a leak.
+    if (!familyId) return;
+    const present = await familyCacheExists(familyId);
+    if (present) {
+      logEvent({
+        level: 'warn',
+        surface: 'cache-persist',
+        message: 'cache present after cleared-elsewhere teardown',
+        context: { action: 'cache-present-after-eviction' },
+      });
+    }
   }
 
   /**
@@ -3211,24 +3301,16 @@ export const useAuthStore = defineStore('auth', () => {
    * on the account — the explicit Settings disconnect is the sole revoke site).
    * Step ORDER is data in `signOutSteps.ts`.
    */
-  async function signOutAndClearData(): Promise<void> {
-    const ctx = {
-      departedEmail: null as string | null,
-      familyId: undefined as string | undefined,
-      // ⚠️ SNAPSHOT, TAKEN BEFORE ANY STEP RUNS, AND REFRESHED BY STEP ONE.
-      // `resetSyncState` sits FOUR steps ahead of `deleteFamilyDb` in both
-      // deleting tiers and reaches `syncService.reset()` ->
-      // `clearRemoteUnreadable()`, so reading the latch inside `deleteFamilyDb`
-      // always saw `null` and the guard was dead code. Taking it here alone was
-      // the opposite error: `quietTeardownAndForceSave` runs FIRST and can arm
-      // the breaker itself, so it re-reads into this field (see that step).
+  async function signOutAndClearData(): Promise<{ cacheDeleted: boolean | null }> {
+    const ctx = await runSignOutTier({
+      tier: 'sign-out-clear',
+      steps: signOutStepsFor('clear', false),
       userAskedToClear: true, // the human typed the consent — honour it
-      remoteWasUnreadable: isRemoteBlocked(),
-      unpushedAtSignOut: null as 'clean' | 'dirty' | null,
-    };
-    await runSignOutSteps(signOutStepsFor('clear', false), buildSignOutStepImpls(ctx));
-    emitSignoutTier({ tier: 'sign-out-clear', trusted: false, tokensKept: false });
-    finalizeSession();
+      trusted: false,
+    });
+    // `false` = the encrypted cache is still in this browser (#100); the caller
+    // tells the person rather than letting "clear data" read as clean.
+    return { cacheDeleted: ctx.cacheDeleted };
   }
 
   return {
@@ -3283,6 +3365,7 @@ export const useAuthStore = defineStore('auth', () => {
     switchMember,
     signOut,
     signOutAndClearData,
+    endSessionClearedElsewhere,
     setDeviceTrust,
     restoreE2EAuth,
   };

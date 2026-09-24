@@ -210,8 +210,9 @@ export interface CachePersistFailureDetail {
   errorName: string;
 }
 
-/** Outcome of a cache-DB delete. `deleted: false` means the delete was BLOCKED by
- *  another connection and the encrypted cache is still on disk.
+/** Outcome of a cache-DB delete. `deleted: false` means the delete was still
+ *  blocked by another connection at the deadline (`CACHE_DELETE_TIMEOUT_MS`) and
+ *  the encrypted cache is still on disk.
  *
  *  ⚠️ AN OBJECT, NOT A BARE BOOLEAN. This value crosses four layers and a
  *  postMessage boundary; `await docClient.clearCache(id)` returning `true` reads
@@ -242,7 +243,16 @@ export type WorkerSignal =
    * cache post-migration, so this replaces the old main-thread
    * `setCachePersistFailed` coupling. See ADR-032 (Persist/Drive split).
    */
-  | { signal: 'cache-persist-failed'; failed: boolean; detail?: CachePersistFailureDetail };
+  | { signal: 'cache-persist-failed'; failed: boolean; detail?: CachePersistFailureDetail }
+  /**
+   * Another context (usually another tab) deleted this family's cache, and the
+   * worker has closed its connection so that delete could finish (#100). Main
+   * ends this tab's session: the person asked for the family's data to leave
+   * this browser, and this tab must not keep showing it or writing it back.
+   * No payload: the one other `versionchange` cause (an upgrade) never leaves
+   * the worker realm.
+   */
+  | { signal: 'cache-released' };
 
 /** Type guards for routing an inbound worker message. */
 export function isRpcResponse(m: unknown): m is RpcResponse {

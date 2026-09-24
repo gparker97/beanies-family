@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-24
 
+_Merged after 0.22.1, not yet released:_
+
+### Fixed
+
+- **"Sign Out & Clear All Data" now really clears this browser when beanies.family is
+  open in another tab.** The other tab lets go of the family's cached data so it can be
+  deleted, and signs itself out with a short explanation. If a tab cannot let go in time
+  (a frozen background tab), you are told the data is still cached and what to do,
+  instead of being told it was cleared.
+- Signing back in after that no longer stalls for ten seconds and then stops saving
+  locally.
+- The "can't save locally" banner now says why: another tab holding the data, or a
+  browser that is out of space or in private mode.
+- Forgetting a family from the picker no longer fails silently.
+
 _Released as app v0.22.1 (web, App Store, Google Play production), together with the
 2026-09-23 entries below that were merged after 0.22.0._
 

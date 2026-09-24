@@ -74,7 +74,12 @@ beforeEach(() => {
   statsHook.seen = 0;
   resetDocActor();
   __resetApplyAndProjectForTesting();
-  configure({ pushChunk: () => {}, perf: () => {}, cachePersistFailed: () => {} });
+  configure({
+    pushChunk: () => {},
+    perf: () => {},
+    cachePersistFailed: () => {},
+    cacheReleased: () => {},
+  });
 });
 
 describe('compactDoc', () => {

@@ -6,6 +6,8 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { showToast } from '@/composables/useToast';
+import { notifyCacheKept } from '@/composables/useSignOut';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PasskeyRegistration } from '@/types/models';
 
@@ -94,8 +96,17 @@ async function deleteFamily(family: FamilyEntry) {
   });
   if (!confirmed) return;
 
-  await familyContextStore.deleteLocalFamily(family.id);
+  const result = await familyContextStore.deleteLocalFamily(family.id);
+  if (!result) {
+    // The delete threw (the store reported it, with the real error). Nothing was
+    // forgotten, so the row stays; before #100 it vanished here with no word to the
+    // person. Silent: the report is already filed, and no raw error text on screen.
+    showToast('error', t('familyPicker.forgetFailed'), undefined, { silent: true });
+    return;
+  }
   families.value = families.value.filter((f) => f.id !== family.id);
+  // Forgotten, but another tab still held its cache (#100).
+  if (!result.deleted) notifyCacheKept('forget-family');
 }
 </script>
 

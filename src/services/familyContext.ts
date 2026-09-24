@@ -9,6 +9,7 @@ import {
   setLastActiveFamilyId,
 } from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type { Family } from '@/types/models';
+import type { CacheClearResult } from '@/services/automerge/worker/protocol';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
 import { toISODateString } from '@/utils/date';
@@ -145,10 +146,14 @@ export function hasActiveFamily(): boolean {
 /**
  * Delete all local data for a family: IndexedDB, passkeys, file handles,
  * provider config, cached password, and registry entry.
+ *
+ * Returns the cache-delete outcome (#100): the family is forgotten either way,
+ * but `deleted: false` means its encrypted cache is still in this browser
+ * because another tab would not release it, and the caller tells the person.
  */
-export async function deleteLocalFamily(familyId: string): Promise<void> {
+export async function deleteLocalFamily(familyId: string): Promise<CacheClearResult> {
   // 1. Delete the family's IndexedDB database (data cache)
-  await deleteFamilyDatabase(familyId);
+  const cache = await deleteFamilyDatabase(familyId);
 
   // 2a. Native (installed app): reclaim the device-local hardware-Keystore blobs for this
   // family — every member's, plus the legacy family-keyed one.
@@ -263,4 +268,5 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   // Remote removal now lives ONLY at the owner-gated full-family deletion in
   // SettingsPage, called explicitly and awaited there. See
   // docs/investigations/2026-09-08-compaction-fallout.md.
+  return cache;
 }

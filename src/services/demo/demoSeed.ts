@@ -108,6 +108,8 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
       // pod is worse than a clean error with a retry. Its own try/catch so a
       // teardown failure is reported but never masks the original one.
       try {
+        // Result discarded on purpose: a non-interactive teardown on a reviewer path
+        // cannot show it, and `docClient.clearCache` has already logged it (#100).
         await authStore.signOutAndClearData();
       } catch (teardownError) {
         reportError({

@@ -838,6 +838,8 @@ function handleSignedIn(destination: string) {
 
 /** "Start over instead" from the resume-setup screen — abandon the half-finished onboarding. */
 async function handleStartOver() {
+  // Cache outcome deliberately not read: an abandoned half-finished onboarding, and
+  // `docClient.clearCache` has already logged a cache another tab kept (#100).
   await authStore.signOut();
   activeView.value = 'welcome';
   await router.replace('/welcome');

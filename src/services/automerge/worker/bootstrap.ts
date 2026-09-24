@@ -4,8 +4,9 @@
  */
 import { isFlagEnabled } from '@/config/flags';
 import * as docClient from './docClient';
-import { inlineExecutor } from './inlineBridge';
+import { inlineExecutor, setInlineSignalHandler } from './inlineBridge';
 import { seedRemoteBaseline } from '@/services/sync/syncService';
+import { endSessionClearedElsewhere } from '@/composables/useSignOut';
 
 let bootstrapped = false;
 
@@ -16,6 +17,14 @@ export function bootstrapDocClient(): void {
   // Inline fallback: the SAME applyAndProject on the main thread when the worker
   // can't spawn, dies, or is flagged off.
   docClient.setInlineExecutor(inlineExecutor);
+  // Its signals land in the SAME handler the worker's do, so a signal is handled in
+  // one place whichever realm raised it (#100).
+  setInlineSignalHandler(docClient.receiveSignal);
+
+  // Another tab deleted this family's cache (#100): end this tab's session. Wired
+  // here, beside the other one-time docClient handlers, rather than in a component:
+  // it must fire whatever is mounted, and it never needs unwiring. It never rejects.
+  docClient.setCacheReleasedHandler(() => void endSessionClearedElsewhere());
 
   // Worker-death re-hydration: reload the doc from the encrypted cache after a
   // respawn (docClient re-posts the retained key first).

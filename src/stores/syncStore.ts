@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { LineageBasis } from '@/services/automerge/worker/protocol';
+import type { LineageBasis, CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { decodeBaselinePayload, decodeHeadsFingerprint } from '@/services/sync/remoteBaseline';
 import { ref, computed, shallowRef, nextTick, watch } from 'vue';
 
@@ -66,6 +66,7 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { cacheFailureCause } from '@/utils/cacheFailureCause';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createSampler } from '@/services/telemetry/emitPolicy';
@@ -991,9 +992,14 @@ export const useSyncStore = defineStore('sync', () => {
 
   // Subscribe to cache persistence failure changes
   const cachePersistFailed = ref(false);
-  syncService.onCacheFailureChange((failed) => {
+  // Private: nothing reads the raw detail, only the cause derived from it (#100).
+  const cachePersistFailure = shallowRef<CachePersistFailureDetail | null>(null);
+  syncService.onCacheFailureChange((failed, detail) => {
     cachePersistFailed.value = failed;
+    cachePersistFailure.value = failed ? detail : null;
   });
+  /** Why local saving stopped, for the banner and the Settings warning to pick copy. */
+  const cachePersistCause = computed(() => cacheFailureCause(cachePersistFailure.value));
 
   // Register docService persist callback → triggers debounced save
   syncService.registerDocPersistCallback();
@@ -6781,6 +6787,7 @@ export const useSyncStore = defineStore('sync', () => {
     showSaveFailureBanner,
     shouldShowSaveFailureBanner,
     cachePersistFailed,
+    cachePersistCause,
     isBackgroundSyncing,
     backgroundSyncError,
     snapshotPaintedThisSession,
