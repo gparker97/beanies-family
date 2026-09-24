@@ -38,6 +38,7 @@ _Merged after 0.22.1, not yet released:_
 
 ### Changed
 
+- The "open in another tab" cache messages now name the app as beanies.family.
 - The local dev server now always uses port 5173 and stops with a clear error if the port
   is taken, instead of silently moving to 5174 and breaking SSH tunnels and tests.
 
