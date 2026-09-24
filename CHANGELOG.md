@@ -14,6 +14,9 @@ _Merged after 0.22.1, not yet released:_
 
 ### Added
 
+- **Helpful hints now show in your daily briefing.** A hint beanies added ahead of a
+  birthday, party or trip appears in the Nook's briefing as "Helpful hint: …", after your
+  other items for the day. Tick it there to mark it done, or tap it to open it.
 - **Manage your recovery kits.** Settings → Security & Recovery now lists every recovery
   kit your family has ever made, by the ID printed on the kit, with who created it and
   when. The owner or a pod manager can invalidate a kit that was lost, photographed or

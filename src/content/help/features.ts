@@ -282,7 +282,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Ahead of birthdays, parties, and trips, beanies can drop a gentle, clearly-marked suggestion into your family to-do list — buy a present, start packing, check passports — so the obvious prep never slips.',
     icon: '\u{1F4A1}',
     readTime: 3,
-    updatedDate: '2026-07-24',
+    updatedDate: '2026-09-24',
     sections: [
       {
         type: 'paragraph',
@@ -298,7 +298,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'A hint is a suggested to-do beanies added for you — not something you typed. It sits at the top of your to-do list in a soft warm card with a <strong>Hint</strong> tag and a little icon, so it never looks like one of your own tasks. Tap the <strong>?</strong> beside it any time to remember what it is. Each hint also gives you a gentle notification around the time it appears, using your normal reminder settings.',
+          'A hint is a suggested to-do beanies added for you — not something you typed. It sits at the top of your to-do list in a soft warm card with a <strong>Hint</strong> tag and a little icon, so it never looks like one of your own tasks. It also shows in your daily briefing on the Family Nook, framed as <em>Helpful hint: …</em>, after your other items for the day. Tap the <strong>?</strong> beside it any time to remember what it is. Each hint also gives you a gentle notification around the time it appears, using your normal reminder settings.',
       },
       {
         type: 'heading',
