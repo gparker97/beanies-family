@@ -565,7 +565,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the family passphrase option, and every other way back in if a PIN or device is lost.',
     icon: '\u{1F5DD}\uFE0F',
     readTime: 5,
-    updatedDate: '2026-09-23',
+    updatedDate: '2026-09-24',
     sections: [
       {
         type: 'heading',
@@ -581,7 +581,19 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The kit is created when your family is created. You can also create a new one any time in <strong>Settings \u2192 Security &amp; Recovery</strong>. <strong>Creating a new kit does not switch off an old one:</strong> every kit you have made still opens your family\u2019s data, so keep each copy as safe as the first and destroy any copy you no longer need.',
+          'The kit is created when your family is created. The family owner or a pod manager can also create a new one any time in <strong>Settings \u2192 Security &amp; Recovery</strong> (a kit can reset every PIN, so other members cannot). Every kit has a short <strong>kit ID</strong> printed on it, and <strong>Manage Kits</strong> lists every kit your family has ever made by that ID: live kits show who created them and when, and invalidated kits show when and by whom they were invalidated.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>Creating a new kit does not switch off an old one.</strong> If a kit is lost, photographed, or you simply no longer trust it, the family owner or a pod manager can <strong>invalidate</strong> it from Manage Kits. An invalidated kit stops opening your family\u2019s data on every device as soon as they sync, and stays listed as invalidated so an old printout can be recognised. This cannot be undone. Your only remaining kit can be <strong>replaced</strong> but never removed outright: a new kit is created and saved first, and the old one is invalidated only once the new one is safely on file.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Invalidating a kit protects your family file from now on. A copy of the file saved <em>before</em> the invalidation can still be opened with the old kit, because the file itself is not re-encrypted. Destroy any printout you no longer trust.',
+        title: 'One limit to know about',
+        icon: '\u{1F4CB}',
       },
       {
         type: 'callout',

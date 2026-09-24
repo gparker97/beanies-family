@@ -99,6 +99,8 @@ vi.mock('@/services/sync/envelopeMerge', () => ({
   applyRevokedKeys: vi.fn((env: unknown) => ({ envelope: env, filtered: 0 })),
   mergeRevokedKeys: vi.fn((a: unknown, b: unknown) => ({ ...(a ?? {}), ...(b ?? {}) })),
   revocationTombstonesForMember: vi.fn(() => ({ tombstones: {}, unattributedPasskeys: 0 })),
+  revocationKey: vi.fn((field: string, key: string) => `${field}:${key}`),
+  slotTombstoneEntryKey: vi.fn(() => null),
   // Real behaviour, not a pass-through: `replaceEnvelope` strips the payload
   // from the long-lived envelope, and a stub that skipped it would hide a
   // regression in exactly the invariant this change introduces.
@@ -256,5 +258,91 @@ describe('publishEnvelopeEntry — the rollback must not clobber a concurrent me
 
     const store = useSyncStore();
     expect(await store.publishDeviceApprovalWrap('m1', PKG as never)).toBe('saved');
+  });
+});
+
+// ── revokeRecoveryKit (tracker #99): observe → last-kit guard → tombstone → push ──
+import { logRecoveryKitsExhausted } from '@/services/sync/revocationLog';
+vi.mock('@/services/sync/revocationLog', () => ({
+  logRevokedEntriesFiltered: vi.fn(),
+  logRecoveryKitsExhausted: vi.fn(),
+}));
+
+describe('revokeRecoveryKit — the last-kit guard runs on the freshly merged envelope', () => {
+  const KIT = (createdAt: string) => ({ salt: 's', wrapped: 'w', createdAt });
+  const TWO_KITS = {
+    version: '4.0',
+    familyId: 'family-123',
+    keyId: 'key-1',
+    encryptedPayload: '',
+    wrappedKeys: {},
+    passkeyWrappedKeys: {},
+    inviteKeys: {},
+    recoveryKeys: { kitA: KIT('2026-01-01T00:00:00Z'), kitB: KIT('2026-02-01T00:00:00Z') },
+  } as unknown as Parameters<typeof syncService.setEnvelope>[0] & Record<string, unknown>;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    vi.mocked(syncService.getProviderType).mockReturnValue('google_drive');
+  });
+
+  it('writes a recoveryKeys:<kitId> tombstone with revokedBy, observes first, pushes on the credential budget', async () => {
+    const committed: Array<Record<string, unknown>> = [];
+    vi.mocked(syncService.setEnvelope).mockImplementation((env) => {
+      committed.push(env as unknown as Record<string, unknown>);
+    });
+    vi.mocked(syncService.getEnvelope).mockReturnValue({ ...TWO_KITS } as never);
+    vi.mocked(syncService.save).mockResolvedValue(true);
+
+    const store = useSyncStore();
+    const r = await store.revokeRecoveryKit('kitA', 'm-greg');
+
+    // `applyRevokedKeys` is a pass-through in this harness, so the tombstoned slot is not
+    // dropped and both kits still count as live; the real filter is pinned in
+    // envelopeRevocation.test.ts.
+    expect(r).toEqual({ committed: true, outcome: 'saved', observed: true, liveRemaining: 2 });
+    // The observe (one save) and the push (a second) both ran.
+    expect(vi.mocked(syncService.save).mock.calls.length).toBeGreaterThanOrEqual(2);
+    const final = committed.at(-1)!;
+    expect((final.revokedKeys as Record<string, unknown>)['recoveryKeys:kitA']).toEqual(
+      expect.objectContaining({ revokedBy: 'm-greg', revokedAt: expect.any(String) })
+    );
+    // The exhausted detector is a MERGE-time signal; the revoke path never fires it, because
+    // this device's own commit always still holds the peer's kit (the guard guarantees it).
+    expect(logRecoveryKitsExhausted).not.toHaveBeenCalled();
+  });
+
+  it('refuses last_kit when the observe brought in a peer tombstone for the OTHER kit', async () => {
+    // Pre-observe: two live kits. After observe: the merge retired kitB, so kitA is the last.
+    vi.mocked(syncService.getEnvelope)
+      .mockReturnValueOnce({ ...TWO_KITS } as never)
+      .mockReturnValue({
+        ...TWO_KITS,
+        recoveryKeys: { kitA: KIT('2026-01-01T00:00:00Z') },
+      } as never);
+    vi.mocked(syncService.save).mockResolvedValue(true);
+
+    const store = useSyncStore();
+    const r = await store.revokeRecoveryKit('kitA', 'm-greg');
+
+    expect(r).toEqual({ committed: false, refusal: 'last_kit' });
+    expect(vi.mocked(syncService.setEnvelope)).not.toHaveBeenCalled();
+  });
+
+  it('refuses no_envelope when nothing is open, and never throws on a failed push', async () => {
+    vi.mocked(syncService.getEnvelope).mockReturnValue(null as never);
+    const store = useSyncStore();
+    expect(await store.revokeRecoveryKit('kitA')).toEqual({
+      committed: false,
+      refusal: 'no_envelope',
+    });
+
+    vi.mocked(syncService.getEnvelope).mockReturnValue({ ...TWO_KITS } as never);
+    vi.mocked(syncService.setEnvelope).mockImplementation(() => {});
+    vi.mocked(syncService.save).mockResolvedValue(false);
+    const r = await store.revokeRecoveryKit('kitB');
+    // Not rolled back: the tombstone is staged and rides the next save.
+    expect(r).toEqual({ committed: true, outcome: 'failed', observed: false, liveRemaining: 2 });
   });
 });

@@ -14,6 +14,7 @@
  */
 
 import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
+import type { DurableSaveOutcome } from '@/stores/syncStore';
 import type { DeliveryKind } from '@/services/telemetry/deepLinkEvents';
 // Type-only, mirroring the `DeliveryKind` import above. `linkMint` decides the hint reason and
 // emits nothing itself; importing the type rather than re-declaring it keeps the two in step
@@ -555,4 +556,34 @@ export function emitKitGuardOutcome(
 /** A confirmed recovery kit did not reach the family file (confirm push or a retry). */
 export function emitKitConfirmNotSynced(): void {
   emit('warn', 'kit_confirm_not_synced', { action: 'kit_confirm_not_synced' });
+}
+
+/**
+ * One outcome event for invalidating a recovery kit from Manage Kits (tracker #99), in
+ * the `reauth_outcome` / `kit_redeemed` shape: the outcome in `action`, the refusal in
+ * `error_code`, the push result on `save_status` (as `removal_not_published` does). `kind`
+ * separates a plain Invalidate from the Replace-the-last-kit flow. No kit or member ids:
+ * `count` is the live kits remaining, which is what the last-kit rate is read from.
+ */
+export function emitKitInvalidateOutcome(payload: {
+  outcome: 'invalidated' | 'refused' | 'not_synced';
+  kind: 'invalidate' | 'replace';
+  errorCode?: 'not_authorized' | 'last_kit' | 'no_envelope' | 'error' | 'confirm_not_synced';
+  saveStatus?: DurableSaveOutcome;
+  liveRemaining?: number;
+  /**
+   * Whether the remote was merged in before the last-kit guard ran. `false` means the
+   * guard counted a possibly stale envelope (offline, slow Drive); carried as
+   * `detail: 'unobserved'` so a later lock-out report can tell fresh from stale.
+   */
+  observed?: boolean;
+}): void {
+  emit(payload.outcome === 'invalidated' ? 'info' : 'warn', 'kit_invalidate_outcome', {
+    action: payload.outcome,
+    kind: payload.kind,
+    ...(payload.errorCode ? { error_code: payload.errorCode } : {}),
+    ...(payload.saveStatus ? { save_status: payload.saveStatus } : {}),
+    ...(payload.liveRemaining !== undefined ? { count: payload.liveRemaining } : {}),
+    ...(payload.observed === false ? { detail: 'unobserved' } : {}),
+  });
 }

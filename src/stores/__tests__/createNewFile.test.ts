@@ -221,6 +221,7 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => {
 // Recovery kit (Phase 4): createNewFile generates the pod's ONLY birth wrap via
 // this service. Mocked so the kit is deterministic and its failure injectable.
 vi.mock('@/services/auth/recoveryKit', () => ({
+  summarizeRecoveryKits: vi.fn(() => []),
   generateRecoveryKit: vi.fn(async () => ({
     kitId: 'kit0001',
     code: 'AAAA-BBBB-CCCC-DDDD-EEEE-FFFF-GGGG-HHHH',
