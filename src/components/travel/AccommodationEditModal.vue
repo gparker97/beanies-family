@@ -67,7 +67,6 @@ const { isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit(acc) {
-      validation.reset();
       status.value = acc.status ?? 'pending';
       name.value = acc.name ?? '';
       address.value = acc.address ?? '';
@@ -82,7 +81,6 @@ const { isSubmitting } = useFormModal(
       travellerIds.value = resolveSegmentTravellers(acc.travellerIds, tripAssigneeIds.value);
     },
     onNew() {
-      validation.reset();
       status.value = 'pending';
       name.value = '';
       address.value = '';
@@ -137,7 +135,10 @@ const rules = computed<BookingValidationRules<AccommodationField>>(() => ({
   },
 }));
 
-const validation = useBookingValidation<AccommodationField>(status, rules);
+const validation = useBookingValidation<AccommodationField>(status, rules, {
+  formName: 'accommodation',
+  open: () => props.open,
+});
 
 // --- Booking-document attachments (images + PDFs) --------------------
 const segmentPhotoIds = computed<string[]>(
@@ -210,6 +211,7 @@ async function handleSave() {
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
     :is-submitting="isSubmitting"
+    :save-ready="validation.canSave.value"
     @close="$emit('close')"
     @save="handleSave"
   >
@@ -236,20 +238,12 @@ async function handleSave() {
       </div>
 
       <!-- Name (type-specific label) -->
-      <FormFieldGroup
-        :label="nameFieldLabel"
-        :required="validation.isRequired('name')"
-        :error="validation.showError('name')"
-      >
+      <FormFieldGroup :label="nameFieldLabel" v-bind="validation.bind('name')">
         <BaseInput v-model="name" :placeholder="nameFieldLabel" />
       </FormFieldGroup>
 
       <!-- Address -->
-      <FormFieldGroup
-        :label="t('vacation.field.address')"
-        :required="validation.isRequired('address')"
-        :error="validation.showError('address')"
-      >
+      <FormFieldGroup :label="t('vacation.field.address')" v-bind="validation.bind('address')">
         <BaseTextarea v-model="address" :placeholder="t('vacation.field.address')" :rows="2" />
       </FormFieldGroup>
 
@@ -257,15 +251,13 @@ async function handleSave() {
       <div class="grid grid-cols-2 gap-3">
         <FormFieldGroup
           :label="t('vacation.field.checkIn')"
-          :required="validation.isRequired('checkInDate')"
-          :error="validation.showError('checkInDate')"
+          v-bind="validation.bind('checkInDate')"
         >
           <BeanieDatePicker v-model="checkInDate" />
         </FormFieldGroup>
         <FormFieldGroup
           :label="t('vacation.field.checkOut')"
-          :required="validation.isRequired('checkOutDate')"
-          :error="validation.showError('checkOutDate')"
+          v-bind="validation.bind('checkOutDate')"
         >
           <BeanieDatePicker v-model="checkOutDate" />
         </FormFieldGroup>
@@ -275,8 +267,7 @@ async function handleSave() {
       <FormFieldGroup
         v-if="!isFamilyFriends"
         :label="t('vacation.field.confirmationNumber')"
-        :required="validation.isRequired('confirmationNumber')"
-        :error="validation.showError('confirmationNumber')"
+        v-bind="validation.bind('confirmationNumber')"
       >
         <BaseInput
           v-model="confirmationNumber"

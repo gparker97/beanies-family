@@ -575,8 +575,9 @@ Extends BaseModal with the standard form layout. **Use this for ALL create/edit 
 | `iconBg` | string | `var(--tint-orange-8)` | Icon box background |
 | `size` | `'default'`\|`'narrow'` | `'default'` | Maps to BaseModal `xl`/`lg` |
 | `saveLabel` | string | `t('action.save')` | Save button text |
-| `saveGradient` | `'orange'`\|`'purple'` | `'orange'` | Save button gradient |
-| `saveDisabled` | boolean | `false` | Disable save button |
+| `saveGradient` | `'orange'`\|`'purple'`\|`'teal'` | `'orange'` | Save button gradient |
+| `saveReady` | boolean | `true` | Validation state. `false` draws Save "not ready" (neutral tint, no gradient) but it stays tappable and still emits `save` |
+| `saveDisabled` | boolean | `false` | A real `disabled`, for a **genuinely unavailable** action only (nothing to save yet, a read in progress). Never for missing input |
 | `isSubmitting` | boolean | `false` | Show spinner in save button |
 | `showDelete` | boolean | `false` | Show 🗑️ delete button |
 
@@ -597,7 +598,27 @@ Extends BaseModal with the standard form layout. **Use this for ALL create/edit 
 
 **Icon box:** 44×44px, rounded-[14px] (squircle), tinted background. Use `var(--tint-orange-8)` for finance forms, `var(--tint-purple-12)` for to-do forms, `var(--tint-silk-20)` for family forms.
 
-**Save button:** Full-width flex-1, rounded-[16px], py-3.5, Outfit `text-sm` bold. Gradient: `from-primary-500 to-terracotta-400` (orange) or `from-purple-500 to-purple-400` (purple). Spinner on submit.
+**Save button:** Full-width flex-1, rounded-[16px], py-3.5, Outfit `text-sm` bold. Gradient: `from-primary-500 to-terracotta-400` (orange), `from-purple-500 to-purple-400` (purple) or the teal travel gradient. Spinner on submit. While `saveReady` is `false` it is drawn "not ready": `--tint-slate-10` / `surface-overlay`, `text-secondary-500` / `ink-soft`, no gradient, no shadow.
+
+**Required fields — `useFormValidation`, never a disabled Save.** A disabled button swallows the tap, so the form can never tell the person what is missing (on a phone the empty field is often off-screen). Every form with required fields uses the shared composable instead:
+
+```ts
+const v = useFormValidation('goal', () => ({
+  name: () => name.value.trim().length > 0,
+  ...(isRecurring.value ? { schedule: () => isRuleComplete(rule.value) } : {}),
+}), { open: () => props.open });
+```
+
+```vue
+<BeanieFormModal :save-ready="v.canSave.value" @save="v.attemptSave(handleSave)">
+  <FormFieldGroup :label="t('goal.name')" v-bind="v.bind('name')">…</FormFieldGroup>
+```
+
+A tap while incomplete rings every missing field (Heritage Orange, "This field is required"), scrolls the first into view, pulses it, and toasts "Still needed: …" with the fields' own labels. Rules:
+- Include a rule only while its field is rendered. A field inside a `ConditionalSection` (which hides by CSS) uses the section's own `show` as its condition.
+- A target that is not a `FormFieldGroup` uses `v.hook('field', label)`, and the label must be a noun that names the field (the toast prints it).
+- Pass `open` and never call `reset()` from `onNew`/`onEdit`; the composable resets itself on every open.
+- Mirror the form's real requirements only: an asterisk alone does not make a rule.
 
 **Delete button:** 48×48px, rounded-[14px], red tint bg (8%), 🗑️ emoji.
 
@@ -945,7 +966,7 @@ The Create Pod flow (`src/components/login/CreatePodView.vue`) is a 3-step wizar
 ### Design Patterns
 
 - **Step indicator:** Horizontal steps with Heritage Orange active state
-- **Navigation:** Back/Next buttons, disabled until validation passes
+- **Navigation:** Back/Next buttons. Next looks not-ready (`saveReady`) while the step's input is missing and a tap takes the person to it; it is disabled only when the step's action is genuinely unavailable (e.g. storage not yet connected)
 - **Brand voice:** Warm CTAs ("Grow a brand-new pod"), security reassurance
 - **Storage options:** Local file (`.beanpod`), with cloud connectors coming soon
 - **Celebration:** On completion, navigates to the dashboard with the new pod loaded

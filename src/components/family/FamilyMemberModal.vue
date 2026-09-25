@@ -10,6 +10,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useFormValidation } from '@/composables/useFormValidation';
 import { confirm } from '@/composables/useConfirm';
 import { isTemporaryEmail } from '@/utils/email';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -246,7 +247,9 @@ async function handleClose(): Promise<void> {
 
 const isOwnerMember = computed(() => props.member?.role === 'owner');
 
-const canSave = computed(() => name.value.trim().length > 0);
+const v = useFormValidation('family-member', () => ({ name: () => name.value.trim().length > 0 }), {
+  open: () => props.open,
+});
 
 const modalTitle = computed(() => {
   if (isPet.value) {
@@ -264,8 +267,16 @@ const saveLabel = computed(() => {
   return isEditing.value ? t('modal.saveMember') : t('modal.addToPod');
 });
 
+/** Save doubles as Close in read-only mode; otherwise validate, then save. */
+function onSaveClick() {
+  if (props.readOnly) {
+    emit('close');
+    return;
+  }
+  return v.attemptSave(handleSave);
+}
+
 function handleSave() {
-  if (!canSave.value) return;
   isSubmitting.value = true;
 
   try {
@@ -352,11 +363,11 @@ function handleDelete() {
     icon-bg="var(--tint-orange-8)"
     size="narrow"
     :save-label="readOnly ? t('action.close') : saveLabel"
-    :save-disabled="readOnly ? false : !canSave"
+    :save-ready="readOnly || v.canSave.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing && !readOnly"
     @close="readOnly ? emit('close') : handleClose()"
-    @save="readOnly ? emit('close') : handleSave()"
+    @save="onSaveClick"
     @delete="handleDelete"
   >
     <!-- Bean avatar preview + upload/remove -->
@@ -393,7 +404,7 @@ function handleDelete() {
     </div>
 
     <!-- 3. Name -->
-    <FormFieldGroup :label="t('modal.memberName')" required>
+    <FormFieldGroup :label="t('modal.memberName')" v-bind="v.bind('name')">
       <div
         class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >

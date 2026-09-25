@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import TripDatesInput from '../TripDatesInput.vue';
 import BeanieDatePicker from '../BeanieDatePicker.vue';
+import FormFieldGroup from '../FormFieldGroup.vue';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -93,6 +94,54 @@ describe('TripDatesInput', () => {
       await wrapper.vm.$nextTick();
       const alert = wrapper.find('[role="alert"]');
       expect(alert.attributes('id')).toMatch(/^trip-dates-error-/);
+    });
+  });
+
+  describe('error prop (parent tried to save with empty dates)', () => {
+    function groupErrors(wrapper: ReturnType<typeof factory>) {
+      return wrapper.findAllComponents(FormFieldGroup).map((g) => g.props('error'));
+    }
+
+    it('marks the empty start, not the filled end, with or without a Save attempt', async () => {
+      const wrapper = mount(TripDatesInput, { props: { startDate: '', endDate: '2026-06-05' } });
+      await wrapper.vm.$nextTick();
+      expect(groupErrors(wrapper)).toEqual([true, false]);
+      await wrapper.setProps({ error: true });
+      expect(groupErrors(wrapper)).toEqual([true, false]);
+    });
+
+    it('marks only the empty date when one is filled', async () => {
+      const wrapper = mount(TripDatesInput, {
+        props: { startDate: '2026-06-01', endDate: '', error: true },
+      });
+      await wrapper.vm.$nextTick();
+      expect(groupErrors(wrapper)).toEqual([false, true]);
+    });
+
+    it('marks both date groups and says the dates are missing when error is set', async () => {
+      const wrapper = mount(TripDatesInput, {
+        props: { startDate: '', endDate: '', error: true },
+      });
+      await wrapper.vm.$nextTick();
+      expect(groupErrors(wrapper)).toEqual([true, true]);
+      expect(wrapper.find('[role="alert"]').text()).toContain('travel.dates.errorMissing');
+      expect(wrapper.emitted('update:errorMessage')?.at(-1)).toEqual(['travel.dates.errorMissing']);
+    });
+
+    it('stays quiet on empty dates when error is absent', async () => {
+      const wrapper = factory();
+      await wrapper.vm.$nextTick();
+      expect(groupErrors(wrapper)).toEqual([false, false]);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    });
+
+    it('clears the empty-state message once error goes back to false', async () => {
+      const wrapper = mount(TripDatesInput, {
+        props: { startDate: '', endDate: '', error: true },
+      });
+      await wrapper.setProps({ error: false });
+      expect(groupErrors(wrapper)).toEqual([false, false]);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     });
   });
 

@@ -1,22 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
+import { createPinia, setActivePinia } from 'pinia';
 import {
   useBookingValidation,
   type BookingValidationRules,
 } from '@/composables/useBookingValidation';
 import type { VacationSegmentStatus } from '@/types/models';
 
+// The invalid attemptSave paths now reveal the missing fields via useFormValidation: a
+// translated toast and a telemetry event. Neither is under test here.
+vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+
 type TestField = 'airline' | 'flightNumber' | 'departureAirport' | 'arrivalAirport';
 
 describe('useBookingValidation', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setActivePinia(createPinia());
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    // No DOM hooks are mounted here, so revealMissing warns `target_missing` per field.
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   function makeRules(
@@ -203,6 +214,28 @@ describe('useBookingValidation', () => {
       expect(v.hasAttemptedSave.value).toBe(false);
       expect(v.showError('airline')).toBe(false);
     });
+
+    it('resets itself when the open getter flips true', async () => {
+      const status = ref<VacationSegmentStatus>('booked');
+      const rules = makeRules(() => false);
+      const open = ref(true);
+      const v = useBookingValidation(status, rules, {
+        formName: 'segment',
+        open: () => open.value,
+      });
+
+      await v.attemptSave(() => undefined);
+      expect(v.hasAttemptedSave.value).toBe(true);
+
+      open.value = false;
+      await nextTick();
+      expect(v.hasAttemptedSave.value).toBe(true);
+
+      open.value = true;
+      await nextTick();
+      expect(v.hasAttemptedSave.value).toBe(false);
+      expect(v.showError('airline')).toBe(false);
+    });
   });
 
   describe('error handling — never silent', () => {
@@ -221,7 +254,7 @@ describe('useBookingValidation', () => {
 
       expect(v.missing.value.has('departureAirport')).toBe(true);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[useBookingValidation] rule "departureAirport" threw:',
+        '[useFormValidation:booking] rule "departureAirport" threw — fix the rule predicate:',
         expect.any(Error)
       );
     });
@@ -269,5 +302,25 @@ describe('useBookingValidation', () => {
       ruleKind.value = 'cruise';
       expect(v.missing.value).toEqual(new Set(['cruiseLine']));
     });
+  });
+  it('requires BOTH predicates for a field listed in both sets while booked', () => {
+    const status = ref<VacationSegmentStatus>('booked');
+    const rules = computed<BookingValidationRules<TestField>>(() => ({
+      alwaysRequired: { airline: () => false },
+      requiredWhenBooked: { airline: () => true },
+    }));
+    const v = useBookingValidation(status, rules);
+    expect(v.missing.value.has('airline')).toBe(true);
+  });
+  it('fails a shared field when only the booked predicate fails, and relaxes it off booked', () => {
+    const status = ref<VacationSegmentStatus>('booked');
+    const rules = computed<BookingValidationRules<TestField>>(() => ({
+      alwaysRequired: { airline: () => true },
+      requiredWhenBooked: { airline: () => false },
+    }));
+    const v = useBookingValidation(status, rules);
+    expect(v.missing.value.has('airline')).toBe(true);
+    status.value = 'pending';
+    expect(v.missing.value.has('airline')).toBe(false);
   });
 });

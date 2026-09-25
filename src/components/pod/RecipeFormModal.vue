@@ -31,6 +31,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFormModal } from '@/composables/useFormModal';
+import { useFormValidation } from '@/composables/useFormValidation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -266,7 +267,9 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-const canSave = computed(() => name.value.trim().length > 0);
+const v = useFormValidation('recipe', () => ({ name: () => name.value.trim().length > 0 }), {
+  open: () => props.open,
+});
 
 const { courseLabel } = useRecipeCourseLabel();
 
@@ -431,15 +434,15 @@ function buildPayload() {
 /**
  * Eager-create + photo-binding wiring.
  *
- * Eager-create gates on `canSave` (recipe name is the only required
- * field). The placeholder label flips between "Add photo" and the
+ * Eager-create gates on the same rule as Save (`v`: recipe name is the
+ * only required field). The placeholder label flips between "Add photo" and the
  * "save first" hint based on the same predicate.
  */
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
 const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
   resolveExistingId: () => props.recipe?.id ?? null,
-  firstMissingField: () => (name.value.trim() ? null : 'name'),
+  firstMissingField: () => (v.missing.value.has('name') ? 'name' : null),
   buildPayload,
   create: (payload) => recipesStore.createRecipe(payload),
   // Send only what CHANGED. The baseline is read from the store rather than from
@@ -501,7 +504,6 @@ async function handleAddFirstPhoto(): Promise<void> {
 }
 
 async function handleSave(): Promise<void> {
-  if (!canSave.value) return;
   // The footer sits OUTSIDE the slot the reading overlay covers, so Save stayed clickable
   // while a capture was in flight. Committing then closing means the extraction resolves
   // into a closed form, applyPrefill writes into nothing, and the next open wipes it —
@@ -580,11 +582,12 @@ const LIST_TEXTAREA_CLASS =
     icon="🍝"
     icon-bg="var(--tint-orange-8)"
     size="default"
-    :save-disabled="!canSave || isReadingLocally"
+    :save-ready="v.canSave.value"
+    :save-disabled="isReadingLocally"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="handleClose"
-    @save="handleSave"
+    @save="v.attemptSave(handleSave)"
     @delete="handleDelete"
   >
     <!-- `relative` so the reading overlay below anchors to the FORM BODY. The drawer and
@@ -624,7 +627,7 @@ const LIST_TEXTAREA_CLASS =
            modal, so this form asks for consent without hosting the UI. -->
 
       <FormSection label-key="recipes.section.dish" emoji="🍽️" first>
-        <FormFieldGroup :label="t('recipes.field.name')" required>
+        <FormFieldGroup :label="t('recipes.field.name')" v-bind="v.bind('name')">
           <BaseInput v-model="name" :placeholder="t('recipes.placeholder.name')" />
         </FormFieldGroup>
 
@@ -754,13 +757,13 @@ const LIST_TEXTAREA_CLASS =
             <button
               type="button"
               class="hover:border-primary-500 hover:text-primary-500 dark:hover:text-accent-lift flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-              :disabled="!canSave || eager.isCreating.value"
+              :disabled="!v.canSave.value || eager.isCreating.value"
               @click="handleAddFirstPhoto"
             >
               <BeanieIcon name="camera" size="md" />
               <span class="font-outfit text-xs font-semibold">
                 {{
-                  canSave
+                  v.canSave.value
                     ? willAttachPhoto
                       ? t('recipes.photos.addAnother')
                       : t('photos.addPhoto')

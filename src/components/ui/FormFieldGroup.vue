@@ -22,6 +22,12 @@
  * Re-applied on update because fields are `v-if`-swapped (the travel drawers change their
  * whole field set with the segment type), so the control under this group can be replaced
  * after mount.
+ *
+ * VALIDATION CONTRACT with `useFormValidation`. The root carries `data-form-label` (this
+ * group's label, which the "still needed" toast prints verbatim) and receives
+ * `data-form-field` by attribute fallthrough from `v-bind="v.bind('x')"`, which is the element
+ * the composable scrolls to and pulses. `errorMessage` is the one-line reason under the control.
+ * The root is `rounded-2xl` so the attention pulse follows the same shape as the error ring.
  */
 import { onMounted, onUpdated, ref, useId } from 'vue';
 
@@ -30,12 +36,15 @@ interface Props {
   optional?: boolean;
   required?: boolean;
   error?: boolean;
+  /** Shown under the control while `error` is true. */
+  errorMessage?: string;
 }
 
 withDefaults(defineProps<Props>(), {
   optional: false,
   required: false,
   error: false,
+  errorMessage: undefined,
 });
 
 const labelId = useId();
@@ -56,7 +65,7 @@ onUpdated(associateLabel);
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-2 rounded-2xl" :data-form-label="label">
     <label
       :id="labelId"
       class="font-outfit flex items-center gap-1.5 text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
@@ -77,5 +86,11 @@ onUpdated(associateLabel);
     <div ref="controlWrap" :class="error ? 'ring-primary-500/40 rounded-2xl ring-2' : ''">
       <slot />
     </div>
+    <p
+      v-if="error && errorMessage"
+      class="font-outfit text-primary-500 dark:text-accent-lift mt-1.5 mb-0 text-xs font-semibold"
+    >
+      {{ errorMessage }}
+    </p>
   </div>
 </template>

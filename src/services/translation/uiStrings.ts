@@ -2879,6 +2879,10 @@ const STRING_DEFS = {
 
   // Validation messages
   'validation.required': { en: 'This field is required', beanie: 'this field is required' },
+  // The "still needed" toast from useFormValidation: shown when Save is tapped while required
+  // fields are empty. `{fields}` is the missing fields' own on-screen labels, in page order.
+  'form.missing.title': { en: 'A Few Things Are Missing', beanie: 'a few things are missing' },
+  'form.missing.message': { en: 'Still needed: {fields}', beanie: 'still needed: {fields}' },
   'validation.invalidEmail': {
     en: 'Please enter a valid email address',
     beanie: 'please enter a valid email address',
@@ -8780,6 +8784,8 @@ const STRING_DEFS = {
       'all sessions — one upfront payment covering every session from start to end date. creates a one-time transaction instead of a recurring one',
   },
   'planner.fee.customPeriod': { en: 'Every', beanie: 'every' },
+  // The custom fee period's field NAME (the toast prints it); `customPeriod` is the inline "Every".
+  'planner.fee.customPeriodLabel': { en: 'Custom Period', beanie: 'custom period' },
   'planner.fee.weeks': { en: 'Weeks', beanie: 'weeks' },
   'planner.fee.months': { en: 'Months', beanie: 'months' },
 
@@ -10261,6 +10267,8 @@ const STRING_DEFS = {
 
   // Trip dates input (wizard Step 1 + summary-page edit — ADR-023)
   'travel.dates.startLabel': { en: 'Start Date', beanie: 'start date' },
+  // The trip's dates as one field, for the "still needed" toast when either date is missing.
+  'travel.dates.label': { en: 'Trip Dates', beanie: 'trip dates' },
   'travel.dates.endLabel': { en: 'End Date', beanie: 'end date' },
   'travel.dates.quickAdd': { en: 'Quick set:', beanie: 'quick set:' },
   'travel.dates.chip3days': { en: '+3 days', beanie: '+3 days' },
@@ -10898,6 +10906,63 @@ const STRING_DEFS = {
   'ai.capture.dest.event': { en: 'Activity', beanie: 'activity' },
   'ai.capture.dest.travel': { en: 'Trip', beanie: 'trip' },
   'ai.capture.dest.recipe': { en: 'Recipe', beanie: 'recipe' },
+  // ── the optional pick (#108) ──────────────────────────────────────────────────────────
+  // The tiles are tappable: "tell us what this is" is an invitation to help beanies out in
+  // advance, never a question that has to be answered. Nothing selected is the default.
+  'ai.capture.pick.title': { en: 'Tell us what this is', beanie: 'tell us what this is' },
+  'ai.capture.pick.optional': { en: 'Optional', beanie: 'optional' },
+  'ai.capture.pick.idle': {
+    en: 'Pick one, or let beanies work it out.',
+    beanie: 'pick one, or let beanies work it out.',
+  },
+  // Keyed per kind so the article is right ("an activity", "a trip"). Item 6 on the checklist
+  // in `magicDestinations.ts`; a fourth kind without one fails the build via the template key.
+  'ai.capture.pick.as.event': {
+    en: "We'll read this as an activity.",
+    beanie: "we'll read this as an activity.",
+  },
+  'ai.capture.pick.as.travel': {
+    en: "We'll read this as a trip.",
+    beanie: "we'll read this as a trip.",
+  },
+  'ai.capture.pick.as.recipe': {
+    en: "We'll read this as a recipe.",
+    beanie: "we'll read this as a recipe.",
+  },
+  'ai.capture.pick.undo': {
+    en: 'Tap again to let beanies decide.',
+    beanie: 'tap again to let beanies decide.',
+  },
+  // A pasted link whose page declares what it is (schema.org) never reaches the model, so a
+  // pick was never consulted. Said once, lightly; nothing to correct and nothing was charged.
+  'ai.capture.pick.unused': {
+    en: "This page says what it is, so your pick wasn't needed.",
+    beanie: "this page says what it is, so your pick wasn't needed.",
+  },
+  // The two hinted OUTCOMES. Important-surface copy (the beanie floor): real nouns, and the
+  // person must know what happened and what to do. `{kind}` / `{picked}` / `{actual}` are the
+  // QUOTED tile names from `ai.capture.dest.*` — never put "a"/"an" in front of them, the
+  // label is Title Case and carries no article ("a Activity").
+  'ai.capture.pick.none.title': {
+    en: "beanies Couldn't Read It That Way",
+    beanie: "beanies couldn't read it that way",
+  },
+  'ai.capture.pick.none.message': {
+    en: 'You picked "{kind}", but beanies couldn\'t find one in this. Hand it over again without a pick, or choose a different tile.',
+    beanie:
+      'you picked "{kind}", but beanies couldn\'t find one in this. hand it over again without a pick, or choose a different tile.',
+  },
+  'ai.capture.pick.overruled.title': {
+    en: 'beanies Read It Differently',
+    beanie: 'beanies read it differently',
+  },
+  'ai.capture.pick.overruled.message': {
+    // No promise of a "not right?" here: on the managed tier the banner only appears when a
+    // grant was issued, and a first read can come back without one.
+    en: 'You picked "{picked}", but beanies read this as "{actual}". Check the details before you save.',
+    beanie:
+      'you picked "{picked}", but beanies read this as "{actual}". check the details before you save.',
+  },
   // Shown under the field when a single pasted token looks like a link but will not route.
   // NON-BLOCKING: the sheet refuses only emptiness, because deciding what the content is IS
   // the feature.
