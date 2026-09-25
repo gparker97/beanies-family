@@ -1,5 +1,6 @@
-import { computed, ref, type ComputedRef, type Ref } from 'vue';
+import type { ComputedRef, Ref } from 'vue';
 import type { VacationSegmentStatus } from '@/types/models';
+import { useFormValidation, type FormRules } from '@/composables/useFormValidation';
 
 /**
  * Rules for a segment-like form: fields that must be filled always, and
@@ -19,140 +20,55 @@ export interface BookingValidationRules<Field extends string = string> {
   requiredWhenBooked: Partial<Record<Field, () => boolean>>;
 }
 
+export interface BookingValidationOptions {
+  /** Telemetry `kind`: 'segment', 'accommodation' or 'transportation'. */
+  formName?: string;
+  /** The drawer's open state; validation resets itself on every open. */
+  open?: () => boolean;
+}
+
 /**
- * Shared conditional-required validation for vacation segment modals
- * (flights, cruises, cars, trains, accommodations, transportation).
+ * Conditional-required validation for the vacation segment drawers (flights, cruises, cars,
+ * trains, accommodations, transportation): a thin adapter over `useFormValidation`, which owns
+ * the marking, the scroll to the first missing field, the toast and the telemetry.
  *
- * Booking-contingent fields trigger the orange error ring only *after*
- * the user attempts to save. The asterisk (isRequired) lights up live
- * with status changes so the user can see what *will* be required when
- * they toggle to booked, without being yelled at on modal open.
- *
- * Rule predicates are wrapped in try/catch: if one throws, the field
- * is treated as missing (fail-safe, never silent) and logged with the
- * field name for debugging.
- *
- * @param status       Reactive segment status (booked | pending).
- * @param rulesSource  Computed returning the current rules shape. Use
- *                     a computed so rules can vary by segment type
- *                     within a single modal instance.
+ * All it adds is the booking rule: `requiredWhenBooked` fields join the rule set only while the
+ * segment is booked. So the asterisk lights up live as the status flips, and the orange ring
+ * still waits for a Save attempt, never appearing on open.
  *
  * @example
- *   type FlightField = 'airline' | 'flightNumber' | 'departureAirport' | ...;
  *   const rules = computed<BookingValidationRules<FlightField>>(() => ({
- *     alwaysRequired: {
- *       departureAirport: () => !!depAirport.value,
- *       arrivalAirport: () => !!arrAirport.value,
- *     },
- *     requiredWhenBooked: {
- *       airline: () => !!airline.value,
- *       flightNumber: () => !!flightNumber.value,
- *     },
+ *     alwaysRequired: { departureAirport: () => !!depAirport.value },
+ *     requiredWhenBooked: { airline: () => !!airline.value },
  *   }));
- *   const v = useBookingValidation(status, rules);
+ *   const v = useBookingValidation(status, rules, { formName: 'segment', open: () => props.open });
  *
- *   // In template:
- *   //   :required="v.isRequired('airline')"
- *   //   :error="v.showError('airline')"
- *   //
- *   // In save handler:
- *   //   await v.attemptSave(async () => { ... });
+ *   // <BeanieFormModal :save-ready="v.canSave.value" @save="handleSave">
+ *   // <FormFieldGroup :label="…" v-bind="v.bind('airline')">
+ *   // handleSave: await v.attemptSave(async () => { … });
  */
 export function useBookingValidation<Field extends string = string>(
   status: Ref<VacationSegmentStatus>,
-  rulesSource: ComputedRef<BookingValidationRules<Field>> | Ref<BookingValidationRules<Field>>
+  rulesSource: ComputedRef<BookingValidationRules<Field>> | Ref<BookingValidationRules<Field>>,
+  opts: BookingValidationOptions = {}
 ) {
-  const hasAttemptedSave = ref(false);
-
-  function evaluate(predicate: () => boolean, field: Field): boolean {
-    try {
-      return predicate();
-    } catch (err) {
-      console.error(`[useBookingValidation] rule "${field}" threw:`, err);
-      return false; // fail-safe: treat as missing so UI flags it
-    }
-  }
-
-  const missing = computed<Set<Field>>(() => {
-    const rules = rulesSource.value;
-    const out = new Set<Field>();
-
-    for (const [field, predicate] of Object.entries(rules.alwaysRequired)) {
-      if (!predicate) continue;
-      if (!evaluate(predicate as () => boolean, field as Field)) {
-        out.add(field as Field);
+  return useFormValidation<Field>(
+    opts.formName ?? 'booking',
+    (): FormRules<Field> => {
+      const { alwaysRequired, requiredWhenBooked } = rulesSource.value;
+      if (status.value !== 'booked') return alwaysRequired;
+      // A field in BOTH sets must pass both predicates, as before the adapter: a plain spread
+      // would silently drop the always-rule.
+      const merged: FormRules<Field> = { ...alwaysRequired };
+      for (const [field, booked] of Object.entries(requiredWhenBooked) as [
+        Field,
+        (() => boolean) | undefined,
+      ][]) {
+        const always = merged[field];
+        merged[field] = always && booked ? () => always() && booked() : (booked ?? always);
       }
-    }
-
-    if (status.value === 'booked') {
-      for (const [field, predicate] of Object.entries(rules.requiredWhenBooked)) {
-        if (!predicate) continue;
-        if (!evaluate(predicate as () => boolean, field as Field)) {
-          out.add(field as Field);
-        }
-      }
-    }
-
-    return out;
-  });
-
-  const canSave = computed(() => missing.value.size === 0);
-
-  /** For `:required` prop binding on `FormFieldGroup`. Drives the asterisk. */
-  function isRequired(field: Field): boolean {
-    const rules = rulesSource.value;
-    if (rules.alwaysRequired[field]) return true;
-    return status.value === 'booked' && !!rules.requiredWhenBooked[field];
-  }
-
-  /** For `:error` prop binding on `FormFieldGroup`. Gated on attempted save. */
-  function showError(field: Field): boolean {
-    return hasAttemptedSave.value && missing.value.has(field);
-  }
-
-  /**
-   * Wrap your save handler. Flips `hasAttemptedSave` so the error rings light up for any
-   * missing fields, then invokes `onValid` only if `canSave` is true.
-   *
-   * THE SAVE BUTTON MUST NOT BE DISABLED ON `!canSave`.
-   *
-   * All three travel drawers bound `:save-disabled="!canSave"`, which made this entire
-   * mechanism unreachable: when a field was missing the click never fired, so
-   * `hasAttemptedSave` never flipped and no ring ever appeared; and when nothing was missing
-   * there was nothing to show. Dead in both states.
-   *
-   * What the user actually met: an AI-extracted hotel comes back `status: 'booked'` with no
-   * address — routine, since confirmation emails often omit it. They open the drawer to add
-   * a note and find Save permanently greyed out, with no ring, no message and no way to
-   * learn that `address` is the blocker, on a segment the app created itself.
-   *
-   * So the button stays live and THIS is the gate. `onInvalid` lets the caller say out loud
-   * what a ring alone cannot on a long scrolling form.
-   */
-  async function attemptSave<T>(
-    onValid: () => T | Promise<T>,
-    onInvalid?: (missingFields: Field[]) => void
-  ): Promise<T | undefined> {
-    hasAttemptedSave.value = true;
-    if (!canSave.value) {
-      onInvalid?.([...missing.value]);
-      return undefined;
-    }
-    return await onValid();
-  }
-
-  /** Reset validation — call from `useFormModal.onNew` when reopening. */
-  function reset(): void {
-    hasAttemptedSave.value = false;
-  }
-
-  return {
-    hasAttemptedSave,
-    missing,
-    canSave,
-    isRequired,
-    showError,
-    attemptSave,
-    reset,
-  };
+      return merged;
+    },
+    { open: opts.open }
+  );
 }

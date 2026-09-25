@@ -21,9 +21,14 @@ import { isValidISODate, tripDurationDays } from '@/utils/vacation';
 interface Props {
   startDate: string;
   endDate: string;
+  /**
+   * The parent tried to save with the dates still empty: mark both groups and say so. Without it
+   * an untouched pair stays quiet (the trip summary page never sets it).
+   */
+  error?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { error: false });
 const emit = defineEmits<{
   'update:startDate': [value: string];
   'update:endDate': [value: string];
@@ -44,18 +49,24 @@ const endBeforeStart = computed(() => bothValid.value && props.endDate < props.s
 
 /**
  * Error message for inline display + parent. Stays null when nothing
- * is filled yet (don't yell at a fresh form); kicks in once the user
- * engages with either field and the state is incomplete or invalid.
+ * is filled yet (don't yell at a fresh form) unless the parent passes
+ * `error` after a save attempt; kicks in once the user engages with
+ * either field and the state is incomplete or invalid.
  */
 const errorMessage = computed<string | null>(() => {
   const someEntry = !!props.startDate || !!props.endDate;
-  if (!someEntry) return null;
+  if (!someEntry) return props.error ? t('travel.dates.errorMissing') : null;
   if (!bothSet.value) return t('travel.dates.errorMissing');
   if (endBeforeStart.value) return t('travel.dates.errorEndBeforeStart');
   return null;
 });
 
 const isValid = computed(() => bothValid.value && !endBeforeStart.value);
+
+/** Ring a date only when IT is the problem: empty (once a Save was tried, or once its partner
+ *  is filled), or an end before the start. A filled date is never marked. */
+const startMarked = computed(() => !props.startDate && (props.error || !!props.endDate));
+const endMarked = computed(() => endBeforeStart.value || (!props.endDate && props.error));
 
 watch(isValid, (v) => emit('update:isValid', v), { immediate: true });
 watch(errorMessage, (m) => emit('update:errorMessage', m), { immediate: true });
@@ -102,14 +113,10 @@ const chipClass = computed(() => [
 <template>
   <div class="space-y-3">
     <div class="grid grid-cols-2 gap-3">
-      <FormFieldGroup :label="t('travel.dates.startLabel')" required>
+      <FormFieldGroup :label="t('travel.dates.startLabel')" required :error="startMarked">
         <BeanieDatePicker :model-value="startDate" @update:model-value="onStartChange" />
       </FormFieldGroup>
-      <FormFieldGroup
-        :label="t('travel.dates.endLabel')"
-        required
-        :error="!!errorMessage && (endBeforeStart || !!endDate)"
-      >
+      <FormFieldGroup :label="t('travel.dates.endLabel')" required :error="endMarked">
         <BeanieDatePicker
           :model-value="endDate"
           :min="startDate"
@@ -145,7 +152,12 @@ const chipClass = computed(() => [
     <p
       v-if="errorMessage"
       :id="errorId"
-      class="dark:text-danger-lift text-xs text-red-600"
+      class="text-xs"
+      :class="
+        endBeforeStart
+          ? 'dark:text-danger-lift text-red-600'
+          : 'text-primary-500 dark:text-accent-lift font-outfit font-semibold'
+      "
       role="alert"
     >
       {{ errorMessage }}

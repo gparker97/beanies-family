@@ -103,3 +103,25 @@ describe('FormFieldGroup accessibility', () => {
     expect(w.find('input.y').attributes('aria-labelledby')).toBe(labels[1]);
   });
 });
+
+describe('FormFieldGroup validation contract', () => {
+  it('names itself for the "still needed" toast and takes the scroll hook by fallthrough', () => {
+    const w = mount(FormFieldGroup, {
+      props: { label: 'Trip Name' },
+      attrs: { 'data-form-field': 'fv1:tripName' },
+      slots: { default: '<input />' },
+    });
+    expect(w.attributes('data-form-label')).toBe('Trip Name');
+    expect(w.attributes('data-form-field')).toBe('fv1:tripName');
+  });
+
+  it('shows the error message only while in error', async () => {
+    const w = mount(FormFieldGroup, {
+      props: { label: 'Date', errorMessage: 'This field is required' },
+      slots: { default: '<input />' },
+    });
+    expect(w.text()).not.toContain('This field is required');
+    await w.setProps({ error: true });
+    expect(w.text()).toContain('This field is required');
+  });
+});

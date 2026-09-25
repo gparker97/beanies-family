@@ -134,7 +134,6 @@ const { isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit(seg) {
-      validation.reset();
       title.value = seg.title ?? '';
       status.value = seg.status ?? 'pending';
       airline.value = seg.airline ?? '';
@@ -177,7 +176,6 @@ const { isSubmitting } = useFormModal(
       travellerIds.value = resolveSegmentTravellers(seg.travellerIds, tripAssigneeIds.value);
     },
     onNew() {
-      validation.reset();
       title.value = '';
       status.value = 'pending';
       airline.value = '';
@@ -345,7 +343,10 @@ const rules = computed<BookingValidationRules<SegmentField>>(() => {
   return { alwaysRequired: {}, requiredWhenBooked: {} };
 });
 
-const validation = useBookingValidation<SegmentField>(status, rules);
+const validation = useBookingValidation<SegmentField>(status, rules, {
+  formName: 'segment',
+  open: () => props.open,
+});
 
 // --- Booking-document attachments (images + PDFs) --------------------
 const attachmentEntityId = computed(() =>
@@ -569,6 +570,7 @@ async function handleSave() {
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
     :is-submitting="isSubmitting"
+    :save-ready="validation.canSave.value"
     @close="$emit('close')"
     @save="handleSave"
   >
@@ -611,8 +613,7 @@ async function handleSave() {
       <FormFieldGroup
         v-if="isActivity"
         :label="t('vacation.field.title')"
-        :required="validation.isRequired('title')"
-        :error="validation.showError('title')"
+        v-bind="validation.bind('title')"
       >
         <BaseInput v-model="title" />
       </FormFieldGroup>
@@ -634,17 +635,12 @@ async function handleSave() {
           </div>
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
-              <FormFieldGroup
-                :label="t('form.date')"
-                :required="validation.isRequired('departureDate')"
-                :error="validation.showError('departureDate')"
-              >
+              <FormFieldGroup :label="t('form.date')" v-bind="validation.bind('departureDate')">
                 <BeanieDatePicker v-model="departureDate" />
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.departureAirport')"
-                :required="validation.isRequired('departureAirport')"
-                :error="validation.showError('departureAirport')"
+                v-bind="validation.bind('departureAirport')"
               >
                 <BaseCombobox
                   v-model="departureAirport"
@@ -654,8 +650,7 @@ async function handleSave() {
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.arrivalAirport')"
-                :required="validation.isRequired('arrivalAirport')"
-                :error="validation.showError('arrivalAirport')"
+                v-bind="validation.bind('arrivalAirport')"
               >
                 <BaseCombobox
                   v-model="arrivalAirport"
@@ -677,8 +672,7 @@ async function handleSave() {
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
               <FormFieldGroup
                 :label="t('vacation.field.airline')"
-                :required="validation.isRequired('airline')"
-                :error="validation.showError('airline')"
+                v-bind="validation.bind('airline')"
               >
                 <BaseCombobox
                   v-model="airline"
@@ -688,8 +682,7 @@ async function handleSave() {
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.flightNumber')"
-                :required="validation.isRequired('flightNumber')"
-                :error="validation.showError('flightNumber')"
+                v-bind="validation.bind('flightNumber')"
               >
                 <BaseInput
                   v-model="flightNumber"
@@ -700,8 +693,7 @@ async function handleSave() {
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
               <FormFieldGroup
                 :label="t('vacation.field.departureTime')"
-                :required="validation.isRequired('departureTime')"
-                :error="validation.showError('departureTime')"
+                v-bind="validation.bind('departureTime')"
               >
                 <BeanieTimeInput
                   v-model="departureTime"
@@ -710,8 +702,7 @@ async function handleSave() {
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.arrivalTime')"
-                :required="validation.isRequired('arrivalTime')"
-                :error="validation.showError('arrivalTime')"
+                v-bind="validation.bind('arrivalTime')"
               >
                 <div class="flex items-center gap-1.5">
                   <BeanieTimeInput v-model="arrivalTime" class="min-w-0 flex-1" />
@@ -766,22 +757,19 @@ async function handleSave() {
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup
                 :label="t('vacation.field.embarkationDate')"
-                :required="validation.isRequired('embarkationDate')"
-                :error="validation.showError('embarkationDate')"
+                v-bind="validation.bind('embarkationDate')"
               >
                 <BeanieDatePicker v-model="embarkationDate" />
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.disembarkationDate')"
-                :required="validation.isRequired('disembarkationDate')"
-                :error="validation.showError('disembarkationDate')"
+                v-bind="validation.bind('disembarkationDate')"
               >
                 <BeanieDatePicker v-model="disembarkationDate" />
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.departurePort')"
-                :required="validation.isRequired('departurePort')"
-                :error="validation.showError('departurePort')"
+                v-bind="validation.bind('departurePort')"
               >
                 <BaseCombobox
                   v-model="departurePort"
@@ -803,8 +791,7 @@ async function handleSave() {
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormFieldGroup
                 :label="t('vacation.field.cruiseLine')"
-                :required="validation.isRequired('cruiseLine')"
-                :error="validation.showError('cruiseLine')"
+                v-bind="validation.bind('cruiseLine')"
               >
                 <BaseCombobox
                   v-model="cruiseLine"
@@ -814,8 +801,7 @@ async function handleSave() {
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.shipName')"
-                :required="validation.isRequired('shipName')"
-                :error="validation.showError('shipName')"
+                v-bind="validation.bind('shipName')"
               >
                 <BaseCombobox
                   v-model="shipName"
@@ -827,8 +813,7 @@ async function handleSave() {
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <FormFieldGroup
                 :label="t('vacation.field.embarkationTime')"
-                :required="validation.isRequired('embarkationTime')"
-                :error="validation.showError('embarkationTime')"
+                v-bind="validation.bind('embarkationTime')"
               >
                 <BeanieTimeInput v-model="embarkationTime" />
               </FormFieldGroup>
@@ -854,11 +839,7 @@ async function handleSave() {
 
       <!-- ═══ Car fields ═══ -->
       <template v-if="isCar">
-        <FormFieldGroup
-          :label="t('vacation.field.carType')"
-          :required="validation.isRequired('carType')"
-          :error="validation.showError('carType')"
-        >
+        <FormFieldGroup :label="t('vacation.field.carType')" v-bind="validation.bind('carType')">
           <TogglePillGroup
             :model-value="carType"
             :options="carTypeOptions"
@@ -876,8 +857,7 @@ async function handleSave() {
         </div>
         <FormFieldGroup
           :label="t('vacation.field.departureDate')"
-          :required="validation.isRequired('departureDate')"
-          :error="validation.showError('departureDate')"
+          v-bind="validation.bind('departureDate')"
         >
           <BeanieDatePicker v-model="departureDate" />
         </FormFieldGroup>
@@ -892,11 +872,7 @@ async function handleSave() {
 
         <!-- Date + Time + Duration -->
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <FormFieldGroup
-            :label="t('form.date')"
-            :required="validation.isRequired('departureDate')"
-            :error="validation.showError('departureDate')"
-          >
+          <FormFieldGroup :label="t('form.date')" v-bind="validation.bind('departureDate')">
             <BeanieDatePicker v-model="departureDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.startTime')">
@@ -946,8 +922,7 @@ async function handleSave() {
                 ? t('vacation.field.trainCompany')
                 : t('vacation.field.operator')
             "
-            :required="validation.isRequired('operator')"
-            :error="validation.showError('operator')"
+            v-bind="validation.bind('operator')"
           >
             <BaseInput
               v-model="operator"
@@ -964,8 +939,7 @@ async function handleSave() {
                 ? t('vacation.field.trainNumber')
                 : t('vacation.field.route')
             "
-            :required="validation.isRequired('route')"
-            :error="validation.showError('route')"
+            v-bind="validation.bind('route')"
           >
             <BaseInput
               v-model="route"
@@ -980,8 +954,7 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.departureStation')"
-            :required="validation.isRequired('departureStation')"
-            :error="validation.showError('departureStation')"
+            v-bind="validation.bind('departureStation')"
           >
             <BaseInput
               v-model="departureStation"
@@ -990,8 +963,7 @@ async function handleSave() {
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.arrivalStation')"
-            :required="validation.isRequired('arrivalStation')"
-            :error="validation.showError('arrivalStation')"
+            v-bind="validation.bind('arrivalStation')"
           >
             <BaseInput v-model="arrivalStation" :placeholder="t('vacation.field.arrivalStation')" />
           </FormFieldGroup>
@@ -999,15 +971,13 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <FormFieldGroup
             :label="t('vacation.field.departureDate')"
-            :required="validation.isRequired('departureDate')"
-            :error="validation.showError('departureDate')"
+            v-bind="validation.bind('departureDate')"
           >
             <BeanieDatePicker v-model="departureDate" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.departureTime')"
-            :required="validation.isRequired('departureTime')"
-            :error="validation.showError('departureTime')"
+            v-bind="validation.bind('departureTime')"
           >
             <BeanieTimeInput v-model="departureTime" />
           </FormFieldGroup>

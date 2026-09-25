@@ -15,6 +15,17 @@ interface Props {
   size?: 'default' | 'narrow' | 'wide' | 'full';
   saveLabel?: string;
   saveGradient?: 'orange' | 'purple' | 'teal';
+  /**
+   * The VALIDATION state. `false` draws Save "not ready" (neutral, no gradient) while it stays
+   * tappable and still emits `save`, so `useFormValidation` can mark and scroll to what is
+   * missing. Bind it to `v.canSave.value`.
+   */
+  saveReady?: boolean;
+  /**
+   * A real `disabled`: the action is genuinely UNAVAILABLE (nothing to save yet, a read in
+   * progress). Never use it for missing input — a disabled button swallows the tap, so nothing
+   * can tell the person what is missing. Use `saveReady` for that.
+   */
   saveDisabled?: boolean;
   isSubmitting?: boolean;
   /** Label shown beside the spinner while submitting. Defaults to `common.saving`. */
@@ -55,6 +66,7 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'default',
   saveLabel: undefined,
   saveGradient: 'orange',
+  saveReady: true,
   saveDisabled: false,
   isSubmitting: false,
   submittingLabel: undefined,
@@ -73,6 +85,25 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 
 const containerComponent = computed(() => (props.variant === 'drawer' ? BaseSidePanel : BaseModal));
+
+const SAVE_GRADIENTS: Record<NonNullable<Props['saveGradient']>, string> = {
+  orange:
+    'from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 bg-gradient-to-r',
+  purple:
+    'bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500',
+  teal: 'bg-gradient-to-r from-[#00B4D8] to-[#0096B7] hover:from-[#0096B7] hover:to-[#007A96]',
+};
+
+/**
+ * Everything that differs between ready and not-ready lives here, INCLUDING the white ink and
+ * the shadows: Tailwind resolves conflicting utilities by stylesheet order, not class order, so
+ * a static `text-white` or `hover:shadow-md` would leak into the not-ready look.
+ */
+const saveClasses = computed(() =>
+  props.saveReady
+    ? `text-white shadow-sm hover:shadow-md ${SAVE_GRADIENTS[props.saveGradient]}`
+    : 'dark:bg-surface-overlay dark:text-ink-soft text-secondary-500 bg-[var(--tint-slate-10)] shadow-none'
+);
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
 type DrawerSize = 'narrow' | 'medium' | 'wide' | 'full';
@@ -174,14 +205,8 @@ const containerProps = computed(() => {
         <!-- Save button -->
         <button
           type="button"
-          class="font-outfit flex-1 rounded-[16px] py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
-          :class="
-            saveGradient === 'purple'
-              ? 'bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500'
-              : saveGradient === 'teal'
-                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0096B7] hover:from-[#0096B7] hover:to-[#007A96]'
-                : 'from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 bg-gradient-to-r'
-          "
+          class="font-outfit flex-1 rounded-[16px] py-3.5 text-sm font-bold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+          :class="saveClasses"
           :disabled="saveDisabled || isSubmitting"
           @click="emit('save')"
         >

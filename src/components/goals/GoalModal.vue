@@ -10,6 +10,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useFormValidation } from '@/composables/useFormValidation';
 import type {
   Goal,
   GoalType,
@@ -152,14 +153,20 @@ watch(goalEmoji, (emoji) => {
   }
 });
 
-const canSave = computed(() => name.value.trim().length > 0 && (targetAmount.value ?? 0) > 0);
+const v = useFormValidation(
+  'goal',
+  () => ({
+    name: () => name.value.trim().length > 0,
+    targetAmount: () => (targetAmount.value ?? 0) > 0,
+  }),
+  { open: () => props.open }
+);
 
 const modalTitle = computed(() => (isEditing.value ? t('goals.editGoal') : t('goals.addGoal')));
 
 const saveLabel = computed(() => (isEditing.value ? t('modal.saveGoal') : t('modal.addGoal')));
 
 function handleSave() {
-  if (!canSave.value) return;
   isSubmitting.value = true;
 
   try {
@@ -201,11 +208,11 @@ function handleDelete() {
     :icon="goalEmoji || '🎯'"
     icon-bg="var(--tint-green-10)"
     :save-label="saveLabel"
-    :save-disabled="!canSave"
+    :save-ready="v.canSave.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"
-    @save="handleSave"
+    @save="v.attemptSave(handleSave)"
     @delete="handleDelete"
   >
     <!-- 1. Goal type picker -->
@@ -214,7 +221,7 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 2. Goal name -->
-    <FormFieldGroup :label="t('modal.goalName')" required>
+    <FormFieldGroup :label="t('modal.goalName')" v-bind="v.bind('name')">
       <input
         v-model="name"
         type="text"
@@ -224,7 +231,7 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 3. Target amount + Currency (inline row) -->
-    <FormFieldGroup :label="t('modal.targetAmount')" required>
+    <FormFieldGroup :label="t('modal.targetAmount')" v-bind="v.bind('targetAmount')">
       <CurrencyAmountInput v-model:amount="targetAmount" v-model:currency="currency" />
     </FormFieldGroup>
 

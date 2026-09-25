@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import type { FormValidation } from '@/composables/useFormValidation';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import type { VacationTripType, VacationTripPurpose } from '@/types/models';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TripDatesInput from '@/components/ui/TripDatesInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+
+/** The fields step 1 requires. Owned here (the wizard imports it) to avoid a circular import. */
+export type VacationStep1Field = 'name' | 'tripType' | 'assignees' | 'tripDates';
 
 interface Props {
   name: string;
@@ -14,13 +18,13 @@ interface Props {
   assigneeIds: string[];
   tripStartDate: string;
   tripEndDate: string;
-  showErrors?: boolean;
+  /** The wizard's step-1 validation: marks, asterisks and scroll hooks for these fields. */
+  validation: Pick<FormValidation<VacationStep1Field>, 'bind' | 'hook' | 'showError'>;
   /** True for a brand-new trip — shows the "beanies can do magic" reader banner. */
   isNewTrip?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showErrors: false,
   isNewTrip: false,
 });
 
@@ -108,7 +112,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
 
   <div class="space-y-5">
     <!-- Vacation name -->
-    <FormFieldGroup :label="t('vacation.field.vacationName')" :error="showErrors && !name">
+    <FormFieldGroup :label="t('vacation.field.vacationName')" v-bind="validation.bind('name')">
       <BaseInput
         :model-value="name"
         :placeholder="t('vacation.field.vacationNamePlaceholder')"
@@ -118,7 +122,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
     </FormFieldGroup>
 
     <!-- Trip type grid -->
-    <FormFieldGroup :label="t('vacation.field.tripType')" :error="showErrors && !tripType">
+    <FormFieldGroup :label="t('vacation.field.tripType')" v-bind="validation.bind('tripType')">
       <div class="grid grid-cols-3 gap-2">
         <button
           v-for="tt in tripTypes"
@@ -182,16 +186,15 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
     <TripDatesInput
       :start-date="tripStartDate"
       :end-date="tripEndDate"
+      v-bind="validation.hook('tripDates', t('travel.dates.label'))"
+      :error="validation.showError('tripDates')"
       @update:start-date="emit('update:tripStartDate', $event)"
       @update:end-date="emit('update:tripEndDate', $event)"
       @update:is-valid="emit('update:tripDatesValid', $event)"
     />
 
     <!-- Who's going -->
-    <FormFieldGroup
-      :label="t('vacation.field.whosGoing')"
-      :error="showErrors && assigneeIds.length === 0"
-    >
+    <FormFieldGroup :label="t('vacation.field.whosGoing')" v-bind="validation.bind('assignees')">
       <FamilyChipPicker
         :model-value="assigneeIds"
         mode="multi"

@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import ConfettiEffect from '@/components/ui/ConfettiEffect.vue';
-import VacationStep1 from './VacationStep1.vue';
+import VacationStep1, { type VacationStep1Field } from './VacationStep1.vue';
 import VacationStep2 from './VacationStep2.vue';
 import VacationStep3 from './VacationStep3.vue';
 import VacationStep4 from './VacationStep4.vue';
@@ -12,6 +12,7 @@ import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormValidation } from '@/composables/useFormValidation';
 import { formatDateShort } from '@/utils/date';
 import { bookingProgress, tripTypeEmoji, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import type {
@@ -43,7 +44,6 @@ const familyStore = useFamilyStore();
 // Wizard state
 const currentStep = ref(1);
 const isSubmitting = ref(false);
-const showErrors = ref(false);
 
 // Form data
 const name = ref('');
@@ -115,17 +115,23 @@ const modalTitle = computed(() =>
   isEditing.value ? t('vacation.wizardTitleEdit') : t('vacation.wizardTitle')
 );
 
-const canGoNext = computed(() => {
-  if (currentStep.value === 1) {
-    return (
-      !!name.value.trim() &&
-      !!tripType.value &&
-      assigneeIds.value.length > 0 &&
-      tripDatesValid.value
-    );
-  }
-  return true; // Steps 2-5 have no required fields
-});
+// Step 1 is the only step with required fields; steps 2-5 have no rules, so canSave is true there.
+const v = useFormValidation<VacationStep1Field>(
+  'vacation-wizard',
+  () =>
+    currentStep.value === 1
+      ? {
+          name: () => !!name.value.trim(),
+          tripType: () => !!tripType.value,
+          assignees: () => assigneeIds.value.length > 0,
+          tripDates: () => tripDatesValid.value,
+        }
+      : {},
+  { open: () => props.open }
+);
+
+// Any step change (Back, a stepper tap, a successful Next) starts the new step quiet.
+watch(currentStep, () => v.reset());
 
 const steps = [
   { num: 1, icon: '✈️', label: 'vacation.step.trip' },
@@ -140,7 +146,6 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    showErrors.value = false;
 
     if (props.vacation) {
       // Edit mode — populate from existing
@@ -176,11 +181,6 @@ watch(
 );
 
 function goNext() {
-  if (!canGoNext.value) {
-    showErrors.value = true;
-    return;
-  }
-  showErrors.value = false;
   if (currentStep.value < 5) {
     currentStep.value++;
   }
@@ -188,16 +188,20 @@ function goNext() {
 
 function goBack() {
   if (currentStep.value > 1) {
-    showErrors.value = false;
     currentStep.value--;
   }
 }
 
+/** The shared Next/Save button: validated, then Next on steps 1-4 and Save on step 5. */
+function onPrimaryAction() {
+  return v.attemptSave(currentStep.value < 5 ? goNext : handleSave);
+}
+
+function onSaveAndClose() {
+  return v.attemptSave(handleSave);
+}
+
 async function handleSave() {
-  if (!canGoNext.value && currentStep.value === 1) {
-    showErrors.value = true;
-    return;
-  }
   isSubmitting.value = true;
 
   try {
@@ -271,10 +275,10 @@ const saveLabel = computed(() => {
     size="full"
     save-gradient="teal"
     :save-label="saveLabel"
-    :save-disabled="false"
+    :save-ready="v.canSave.value"
     :is-submitting="isSubmitting"
     @close="emit('close')"
-    @save="currentStep < 5 ? goNext() : handleSave()"
+    @save="onPrimaryAction"
   >
     <template #footer-start>
       <div class="flex items-center gap-2">
@@ -290,7 +294,7 @@ const saveLabel = computed(() => {
           v-if="isEditing && currentStep < 5"
           type="button"
           class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 rounded-2xl bg-gradient-to-r px-4 py-3 text-xs font-semibold text-white shadow-sm transition-all hover:shadow-md"
-          @click="handleSave"
+          @click="onSaveAndClose"
         >
           {{ t('action.saveAndClose') }}
         </button>
@@ -353,7 +357,7 @@ const saveLabel = computed(() => {
       v-model:trip-start-date="tripStartDate"
       v-model:trip-end-date="tripEndDate"
       v-model:trip-dates-valid="tripDatesValid"
-      :show-errors="showErrors"
+      :validation="v"
       :is-new-trip="!isEditing"
     />
     <VacationStep2
