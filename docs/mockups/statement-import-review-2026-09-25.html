@@ -3,8 +3,10 @@
      Magic beans reads a bank statement: the review-and-reconcile step (2026-09-25)
      Tracker #107
 
-     ✅ DIRECTION A (inline expand) APPROVED by greg, 2026-09-25. B is kept here as the
-        record of what was considered; build A.
+     ✅ DIRECTION B (paired card) APPROVED by greg, 2026-09-25: "clearer as you see the two
+        side by side, and the copy is more concise, which is very important as this could
+        potentially be many lines." A is kept here as the record of what was considered;
+        build B. B also carries the bulk bar (tick/untick all, merge/keep/skip all familiar).
 
      What this shows: the moment AFTER the read. The statement has been read
      (here: a Standard Chartered SG Visa statement, 20 Aug to 18 Sep, 178 lines)
@@ -190,6 +192,10 @@
   .tot.fam { background: var(--accent-bg-2); color: var(--accent-ink); }
   .tot.fam b { color: var(--accent-ink); }
 
+  .bulk { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 0 10px; }
+  .bulk .k { font: 600 0.75rem 'Outfit', sans-serif; color: var(--ink-faint); margin-right: 2px; }
+  .bulk .b { font: 600 0.75rem 'Outfit', sans-serif; color: var(--accent-ink); padding: 5px 9px; border-radius: 999px; background: var(--accent-bg); }
+  .bulk .sep { width: 1px; height: 16px; background: var(--line); margin: 0 4px; }
   .list { background: var(--body-bg); padding: 0 18px 14px; display: grid; gap: 8px; }
   .day { font: 600 0.75rem 'Outfit', sans-serif; color: var(--ink-faint); margin: 8px 2px 0; }
 
@@ -494,7 +500,9 @@
     Same modal, same rows. A likely duplicate becomes a two-up card instead: the statement line on the
     left, the beanies entry on the right, so the amounts sit side by side and the difference is visible
     at a glance. The choice runs across the bottom. Costs more height per match; reads faster when
-    amounts differ (2,000 entered, 2,305.17 charged).
+    amounts differ (2,000 entered, 2,305.17 charged). A bulk bar under the totals ticks or unticks
+    every line, and sets merge / keep both / skip for every familiar card at once; a day header
+    carries the same tick toggle for its group; already-added lines are never swept up by a bulk action.
   </p>
   <div class="row">
     <div class="frame">
@@ -512,6 +520,7 @@
             <span class="tot fam"><b>6</b> look familiar</span>
             <span class="tot"><b>3</b> skipped</span>
           </div>
+          <div class="bulk"><span class="b">Tick all</span><span class="b">Untick all</span><span class="sep"></span><span class="k">Familiar:</span><span class="b">Merge all</span><span class="b">Keep all</span><span class="b">Skip all</span></div>
         </div>
         <div class="list">
           <div class="day">Mon 1 Sep</div>
