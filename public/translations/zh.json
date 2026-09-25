@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-25",
-    "translationCount": 4963
+    "translationCount": 4967
   },
   "translations": {
     "app.name": {
@@ -24819,6 +24819,26 @@
     "ai.capture.pick.overruled.message": {
       "translation": "您选择了“{picked}”，但 beanies 将其读作“{actual}”。保存前请检查详细信息。",
       "hash": "pqa7xd",
+      "lastUpdated": "2026-09-25"
+    },
+    "form.missing.title": {
+      "translation": "少了几样东西",
+      "hash": "y6ne6e",
+      "lastUpdated": "2026-09-25"
+    },
+    "form.missing.message": {
+      "translation": "仍然需要： {fields}",
+      "hash": "w5ojic",
+      "lastUpdated": "2026-09-25"
+    },
+    "planner.fee.customPeriodLabel": {
+      "translation": "自定义时间段",
+      "hash": "eggmds",
+      "lastUpdated": "2026-09-25"
+    },
+    "travel.dates.label": {
+      "translation": "行程日期",
+      "hash": "bfdfii",
       "lastUpdated": "2026-09-25"
     }
   }
