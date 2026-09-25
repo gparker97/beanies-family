@@ -32,6 +32,7 @@ import {
 } from '@/composables/useQuickAdd';
 import { surfaceForOrigin } from '@/types/magicPayload';
 import type { SharePayload, ShareKind } from '@/types/magicPayload';
+import { MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
 import { reportError } from '@/utils/errorReporter';
 
 /** Which AI reader an affordance asked to open. */
@@ -110,6 +111,22 @@ export function isReaderEnabled(reader: MagicReader): boolean {
   const { canEditActivities } = sharedPermissions();
   const { flag } = MAGIC_READERS[reader];
   return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
+}
+
+/**
+ * The kinds this member can be routed to right now — permission × flag — in tile order.
+ *
+ * ONE rule, two callers: the magic-beans door (which tiles the sheet may offer as a pick, #108)
+ * and the "not right?" banner (which kinds a correction may name). Both used to be able to
+ * offer a kind whose reader is off; the spine's reader gate runs AFTER the model has answered,
+ * so that spends a read, gets a correct answer, and throws it away with "that reader is off".
+ * Filtering here is free because the user has NAMED the kind, so it can be checked in advance.
+ *
+ * A plain function for the same reason `isReaderEnabled` is: it must be callable outside
+ * `setup()`. Callers that need reactivity wrap it in a `computed`.
+ */
+export function availableShareKinds(): ShareKind[] {
+  return MAGIC_DESTINATION_KINDS.filter((kind) => isReaderEnabled(readerForShareKind(kind)));
 }
 
 // --- Module singleton state ------------------------------------------------

@@ -43,7 +43,12 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
     requiredKeys: readonly string[];
     jsonShape: Record<string, string>;
     sources: readonly string[];
-    buildMessages: (source: unknown, todayIso: string, kindHint?: string) => unknown;
+    buildMessages: (
+      source: unknown,
+      todayIso: string,
+      kindHint?: string,
+      hintReason?: string
+    ) => unknown;
   };
   const tasks = (registry: Record<string, unknown>, task: string) => registry[task] as TaskEntry;
 
@@ -102,6 +107,55 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
       ).toEqual(expected);
     });
   }
+
+  // The STATED reason (#108): the person picked a kind BEFORE the first read. Same three-way
+  // guard, so the one clause that differs cannot drift across the copies either.
+  for (const kind of Object.keys(SOURCE_FIXTURES)) {
+    it(`task "share" / source "${kind}" / stated hint: built messages match across all three`, () => {
+      const fixture = SOURCE_FIXTURES[kind];
+      const expected = tasks(spike.EXTRACTION_TASKS, 'share').buildMessages(
+        fixture,
+        todayIso,
+        'recipe',
+        'stated'
+      );
+      expect(
+        tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe', 'stated')
+      ).toEqual(expected);
+      expect(
+        tasks(server.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, 'recipe', 'stated')
+      ).toEqual(expected);
+    });
+  }
+
+  it('the two hint reasons differ by exactly the "earlier reading" clause', () => {
+    const fixture = SOURCE_FIXTURES[Object.keys(SOURCE_FIXTURES)[0]!];
+    const share = tasks(client.EXTRACTION_TASKS, 'share');
+    const corrected = JSON.stringify(
+      share.buildMessages(fixture, todayIso, 'recipe', 'correction')
+    );
+    const stated = JSON.stringify(share.buildMessages(fixture, todayIso, 'recipe', 'stated'));
+
+    expect(corrected).toContain('An earlier reading got that wrong.');
+    // A pre-labelled first read must not tell the model a reading it never had was wrong.
+    expect(stated).not.toContain('earlier reading');
+    expect(stated).toContain('told us what it is: a recipe');
+    // Both replace the classification rule — the hint is authoritative either way.
+    expect(stated).not.toContain('is always better than a wrong guess');
+    expect(corrected.replace(' An earlier reading got that wrong.', '')).toEqual(stated);
+  });
+
+  it('the three-argument call — the Lambda legacy arm — still builds the correction prompt', () => {
+    // `index.mjs` calls the server copy with three arguments; the default must reproduce the
+    // pre-#108 correction prompt byte-for-byte, on every copy.
+    const fixture = SOURCE_FIXTURES[Object.keys(SOURCE_FIXTURES)[0]!];
+    for (const registry of [spike, client, server]) {
+      const share = tasks(registry.EXTRACTION_TASKS as Record<string, unknown>, 'share');
+      expect(share.buildMessages(fixture, todayIso, 'recipe')).toEqual(
+        share.buildMessages(fixture, todayIso, 'recipe', 'correction')
+      );
+    }
+  });
 
   it('a hint actually CHANGES the prompt, so the fixture above is not vacuous', () => {
     const fixture = SOURCE_FIXTURES[Object.keys(SOURCE_FIXTURES)[0]!];

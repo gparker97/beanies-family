@@ -15,8 +15,10 @@ vi.mock('@/composables/useDocumentConsent', () => ({
   useDocumentConsent: () => ({ requestConsent: () => requestConsent() }),
 }));
 
+const availableKinds = ['event', 'travel', 'recipe'];
 vi.mock('@/composables/useMagicReader', () => ({
   useMagicReader: () => ({ canReadAny: ref(canReadAny) }),
+  availableShareKinds: () => availableKinds,
 }));
 
 vi.mock('@/composables/useSharedDocumentIngest', () => ({
@@ -40,7 +42,7 @@ vi.mock('@/components/ai/AiDocumentPicker.vue', () => ({
 }));
 
 vi.mock('@/components/ai/MagicBeansSheet.vue', () => ({
-  default: { name: 'MagicBeansSheet', props: ['open'], render: () => null },
+  default: { name: 'MagicBeansSheet', props: ['open', 'kinds'], render: () => null },
 }));
 
 /** The door renders its affordance through a slot, so a test needs one to drive. */
@@ -218,14 +220,79 @@ describe('MagicBeansDoor', () => {
     });
   });
 
+  describe('the optional pick (#108)', () => {
+    it('hands the sheet the kinds this member may pick — decided here, not in the sheet', () => {
+      const w = mountDoor();
+      expect(sheet(w).props('kinds')).toEqual(availableKinds);
+    });
+
+    it("carries a pasted capture's pick into the ingest as `hint`", async () => {
+      const grant = { id: 'g5' };
+      requestConsent.mockResolvedValue(grant);
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('submit', 'BA123 LHR-SIN 4 Oct 22:05', 'travel');
+      await flushPromises();
+
+      expect(ingestInAppSource).toHaveBeenCalledWith(
+        { kind: 'paste', text: 'BA123 LHR-SIN 4 Oct 22:05', hint: 'travel' },
+        grant,
+        undefined
+      );
+    });
+
+    it('holds the pick WITH the grant for the picker, and delivers both with the file', async () => {
+      const grant = { id: 'g6' };
+      requestConsent.mockResolvedValue(grant);
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('camera', 'recipe');
+      await flushPromises();
+      expect(pickCamera).toHaveBeenCalledTimes(1);
+
+      const file = new File(['x'], 'dish.png', { type: 'image/png' });
+      w.findComponent({ name: 'AiDocumentPicker' }).vm.$emit('file', file);
+      await flushPromises();
+
+      expect(ingestInAppSource).toHaveBeenCalledWith(
+        { kind: 'file', file, hint: 'recipe' },
+        grant,
+        undefined
+      );
+    });
+
+    it('lets a pick expire WITH its grant — the two are one value, never half-cleared', async () => {
+      // If the hint survived the grant's TTL it could attach to the next, different document.
+      requestConsent.mockResolvedValue({ id: 'g7' });
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('file', 'event');
+      await flushPromises();
+
+      vi.advanceTimersByTime(3 * 60_000);
+      await flushPromises();
+
+      // A NEW commit with no pick, then its file arrives: it must not inherit 'event'.
+      requestConsent.mockResolvedValue({ id: 'g8' });
+      await sheet(w).vm.$emit('file');
+      await flushPromises();
+      const later = new File(['y'], 'later.png', { type: 'image/png' });
+      w.findComponent({ name: 'AiDocumentPicker' }).vm.$emit('file', later);
+      await flushPromises();
+
+      expect(ingestInAppSource).toHaveBeenCalledTimes(1);
+      expect(ingestInAppSource.mock.calls[0][0]).toEqual({ kind: 'file', file: later });
+    });
+  });
+
   describe('the destination vocabulary', () => {
     it('is one list, so a fourth kind cannot half-land', async () => {
       const { MAGIC_DESTINATIONS, MAGIC_DESTINATION_KINDS } =
         await import('@/constants/magicDestinations');
 
-      // The sheet's tiles at rest and the overlay's resolve render the SAME module, and the
-      // ChoiceModal picker will too. Keyed on ShareKind so adding a reader is a compile error
-      // here rather than a tile that silently never lights.
+      // The sheet's pick tiles, the overlay's resolve and the "not right?" banner all render
+      // the SAME module. Keyed on ShareKind so adding a reader is a compile error here rather
+      // than a tile that silently never lights.
       expect(MAGIC_DESTINATION_KINDS).toEqual(['event', 'travel', 'recipe']);
       for (const kind of MAGIC_DESTINATION_KINDS) {
         expect(MAGIC_DESTINATIONS[kind].emoji).toBeTruthy();

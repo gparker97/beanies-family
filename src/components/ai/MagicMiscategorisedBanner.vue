@@ -47,8 +47,8 @@ import { useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { IN_APP_ENV, ingestInAppSource, refuseIfBusy } from '@/composables/useSharedDocumentIngest';
-import { MAGIC_DESTINATIONS, MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
-import { isReaderEnabled, readerForShareKind } from '@/composables/useMagicReader';
+import { MAGIC_DESTINATIONS } from '@/constants/magicDestinations';
+import { availableShareKinds } from '@/composables/useMagicReader';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ResultEnvelope, ShareKind } from '@/types/magicPayload';
 
@@ -84,21 +84,11 @@ const canCorrect = computed(
 );
 
 /**
- * Every kind except the one beanies already chose, and except any whose reader this member
- * cannot reach.
- *
- * The same-kind filter is because "correcting" event to event is a no-op the server refuses
- * anyway. The READER filter matters more: the spine's reader gate runs AFTER the model has
- * answered, so offering a kind with its flag off would spend the grant, get a correct answer,
- * and then throw it away with "that reader is off". Here the user has NAMED the kind, so —
- * unlike a first read, where the kind is unknown until the model says — it can be checked in
- * advance for free.
+ * Every kind this member can be routed to (`availableShareKinds`, the one rule shared with the
+ * sheet's optional pick) except the one beanies already chose: "correcting" event to event is
+ * a no-op the server refuses anyway.
  */
-const options = computed(() =>
-  MAGIC_DESTINATION_KINDS.filter(
-    (kind) => kind !== props.from && isReaderEnabled(readerForShareKind(kind))
-  )
-);
+const options = computed(() => availableShareKinds().filter((kind) => kind !== props.from));
 
 const panel = ref<HTMLElement | null>(null);
 

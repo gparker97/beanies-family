@@ -110,6 +110,10 @@ describe('uiStrings', () => {
       'ai.error.',
       'ai.correct.refused.',
       'ai.correct.disagreed.',
+      // The two hinted outcomes of the sheet's optional pick (#108): what beanies read, and
+      // what to do about it, must survive beanie mode intact.
+      'ai.capture.pick.none.',
+      'ai.capture.pick.overruled.',
       'ai.picker.expired.',
       'app.initError.',
       'auth.',

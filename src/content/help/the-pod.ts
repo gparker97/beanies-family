@@ -511,7 +511,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Point beanies at a photo, a PDF, a recipe link or a cooking video, and it writes the recipe into your cookbook for you to check.',
     icon: '🍳',
     readTime: 5,
-    updatedDate: '2026-08-25',
+    updatedDate: '2026-09-25',
     popular: true,
     sections: [
       {
@@ -550,7 +550,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap it. Give beanies the recipe as a photo, a file, a link or pasted text; it works out that it is a recipe and takes you to the cookbook with the reader open.',
+          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap it. Give beanies the recipe as a photo, a file, a link or pasted text; it works out that it is a recipe and takes you to the cookbook with the reader open. Tap the <strong>Recipe</strong> tile first if you like, and beanies reads it as a recipe straight away.',
         title: 'A shortcut from anywhere',
         icon: '✨',
       },

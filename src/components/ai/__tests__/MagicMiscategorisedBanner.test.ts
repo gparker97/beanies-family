@@ -32,8 +32,8 @@ vi.mock('@/composables/useTranslation', () => ({
 /** Every kind routes and every reader is on, unless a case says otherwise. */
 let readersOn = true;
 vi.mock('@/composables/useMagicReader', () => ({
-  isReaderEnabled: () => readersOn,
-  readerForShareKind: (k: string) => ({ event: 'photo', travel: 'document', recipe: 'recipe' })[k],
+  // The one availability rule, shared with the sheet's optional pick (#108).
+  availableShareKinds: () => (readersOn ? ['event', 'travel', 'recipe'] : []),
 }));
 
 vi.mock('@/composables/useSharedDocumentIngest', () => ({
