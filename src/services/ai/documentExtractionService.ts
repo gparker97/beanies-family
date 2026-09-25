@@ -19,7 +19,7 @@ import {
   type CompressOptions,
 } from '@/services/photos/photoCompression';
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
-import type { ShareKindHint } from './types';
+import type { HintReason, ShareKindHint } from './types';
 import { assertNever } from '@/utils/assertNever';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { MAX_EXTRACT_PAGES, isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
@@ -85,11 +85,13 @@ export interface ExtractOptions {
    */
   familyId: string;
   /**
-   * Set only on a correction re-read. `to` is what makes the re-read targeted; `token` is the
-   * managed-tier grant that makes it free, and is absent on BYOK and on-device, whose reads
-   * cost us nothing and so need no exemption.
+   * Set on a correction re-read, or on a first read the person pre-labelled from the
+   * magic-beans sheet (#108, `reason: 'stated'`). `to` is what makes the read targeted;
+   * `token` is the managed-tier grant that makes a CORRECTION free, and is absent on BYOK and
+   * on-device, whose reads cost us nothing, and always absent on a stated first read, which
+   * is billed like any other. Mirrors `ExtractionRequest.correction`.
    */
-  correction?: { token?: string; to: ShareKindHint };
+  correction?: { token?: string; to: ShareKindHint; reason?: HintReason };
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {

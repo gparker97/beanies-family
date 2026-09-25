@@ -44,6 +44,7 @@ import {
   consumePendingMagic,
   dispatchSharePayload,
   pendingMagicReader,
+  availableShareKinds,
 } from '@/composables/useMagicReader';
 import type { SharePayload } from '@/types/magicPayload';
 
@@ -61,6 +62,25 @@ beforeEach(() => {
   h.currentPath.value = '/';
   h.hasMarker.value = false;
   resetPending();
+});
+
+describe('availableShareKinds — the one availability rule (#108)', () => {
+  it('offers every kind, in tile order, when the member can edit and every flag is on', () => {
+    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe']);
+  });
+
+  it('drops a kind whose reader flag is off, keeping the others in order', () => {
+    h.flags.aiPhotoExtract = false;
+    expect(availableShareKinds()).toEqual(['travel', 'recipe']);
+    h.flags.aiTravelExtract = false;
+    // The recipe reader is ungated by decision (#72), so it is the one that remains.
+    expect(availableShareKinds()).toEqual(['recipe']);
+  });
+
+  it('offers nothing to a member without edit permission, whatever the flags say', () => {
+    h.canEdit.value = false;
+    expect(availableShareKinds()).toEqual([]);
+  });
 });
 
 describe('useMagicReader — gating', () => {

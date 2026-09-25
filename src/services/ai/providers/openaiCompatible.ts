@@ -149,7 +149,8 @@ export function callOpenAiCompatibleTask<T extends ExtractionTask>(
   const messages = EXTRACTION_TASKS[task].buildMessages(
     request.source,
     request.todayIso,
-    request.correction?.to
+    request.correction?.to,
+    request.correction?.reason
   );
   const parse = EXTRACTION_PARSERS[task] as (raw: unknown) => ExtractionResultByTask[T];
   return callOpenAiCompatible(config, request, messages, parse);

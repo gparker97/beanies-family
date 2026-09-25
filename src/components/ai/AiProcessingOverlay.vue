@@ -37,6 +37,19 @@ const { t } = useTranslation();
 /** The kind the model settled on, or null while it is still reading. */
 const resolvedKind = () =>
   magicIngestState.value.phase === 'resolved' ? magicIngestState.value.kind : null;
+
+/**
+ * The tile that is LIT: the resolved kind, or — while still reading — the kind the person
+ * picked in the sheet (#108). A hinted read starts with its tile already lifted and resolves in
+ * place, so the pick reads as the answer here too; if the model overrules it the lift moves to
+ * the kind it chose, which is the honest picture. The spinner and the exit fade key on
+ * `resolvedKind()` alone, so the wait still reads as a wait.
+ */
+const litKind = () => {
+  const state = magicIngestState.value;
+  if (state.phase === 'resolved') return state.kind;
+  return state.phase === 'reading' ? (state.hint ?? null) : null;
+};
 </script>
 
 <template>
@@ -92,21 +105,22 @@ const resolvedKind = () =>
       >
         <BeanieSpinner v-if="!resolvedKind()" size="lg" :halo="true" />
 
-        <!-- The same three tiles the sheet shows, now answering rather than offering. Faint while
-           reading; on resolve two fall back and one lifts. Visually unlabelled by design — the
-           strings are their accessible names. -->
+        <!-- The same tiles the sheet shows, now answering rather than offering. Faint while
+           reading; on resolve the others fall back and one lifts. A read the person pre-labelled
+           starts with that tile lit and nothing ticking (`litKind`). Visually unlabelled by
+           design — the strings are their accessible names. -->
         <ul class="flex list-none gap-2.5 p-0">
           <!-- `magic-tick` on the LI, not the tile: its stagger is `:nth-child`, so it has to sit
              on the element that is actually the nth child of this list. -->
           <li
             v-for="kind in MAGIC_DESTINATION_KINDS"
             :key="kind"
-            :class="resolvedKind() ? '' : 'magic-tick'"
+            :class="litKind() ? '' : 'magic-tick'"
           >
             <div
               class="flex h-16 w-16 flex-col items-center justify-center rounded-[14px] transition-all duration-300"
               :class="
-                resolvedKind() === kind
+                litKind() === kind
                   ? 'from-primary-500 to-terracotta-400 magic-shimmer magic-shimmer-once scale-110 bg-gradient-to-br shadow-[0_12px_26px_-10px_rgba(241,93,34,0.65)]'
                   : // ⚠️ Opacity ONLY on the two tiles that are on their way out. The CIG forbids an
                     // opacity modifier on text a person reads, and the RESTING state is read —
@@ -124,7 +138,7 @@ const resolvedKind = () =>
               <span
                 class="font-outfit relative z-[1] mt-1 block text-xs font-semibold"
                 :class="
-                  resolvedKind() === kind ? 'text-white' : 'text-secondary-400 dark:text-ink-faint'
+                  litKind() === kind ? 'text-white' : 'text-secondary-400 dark:text-ink-faint'
                 "
               >
                 {{ t(`ai.capture.dest.${kind}`) }}

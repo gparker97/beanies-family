@@ -128,8 +128,16 @@ export interface ShareMeta {
  */
 type IngestState =
   | { phase: 'idle' }
-  | { phase: 'reading'; presentation: 'global' | 'local' }
+  /** `hint`: the kind the person picked in the sheet (#108), so the overlay lights that tile
+   *  from the first frame. Absent on a share, a correction, and an unpicked capture. */
+  | { phase: 'reading'; presentation: 'global' | 'local'; hint?: ShareKind }
   | { phase: 'resolved'; presentation: 'global' | 'local'; kind: ShareKind };
+
+/**
+ * What a caller may state about a read as it starts — typed FROM the reading arm so a new
+ * reading-time fact is declared once, on the state, and every caller sees it.
+ */
+type ReadingFacts = Partial<Omit<Extract<IngestState, { phase: 'reading' }>, 'phase'>>;
 
 const ingestState = ref<IngestState>({ phase: 'idle' });
 
@@ -392,10 +400,21 @@ function refuseForQuota(env: IngestEnv, resetsAt: number): void {
  * `truncated` means the text was longer than the read cap and has been bounded; the
  * orchestrator says so with its own toast (see `runTextBands`).
  */
-type ShareSource =
+/**
+ * The three FIRST-READ arms — what `prepare` and `sourceFromText` can produce. Intersected
+ * ONCE with the optional `hint`: the kind the person picked in the magic-beans sheet before
+ * the read (#108). It is a property of the source, not of an arm, because documents, pasted
+ * text and a fetched link page all reach the model through the one `opts` object in `read()`;
+ * attaching it per arm is how a pasted LINK once lost its pick. The share path never sets it.
+ */
+type FirstReadSource = (
   | { kind: 'documents'; files: File[] }
   | { kind: 'link'; url: string }
   | { kind: 'text'; text: string; truncated: boolean }
+) & { hint?: ShareKind };
+
+type ShareSource =
+  | FirstReadSource
   /**
    * A re-read of a document this spine has ALREADY resolved and (on the managed tier) paid
    * for, as the kind the user says it actually is.
@@ -435,6 +454,60 @@ function sourceDetail(source: ShareSource): 'file' | 'link' | 'text' {
     default:
       return assertNever(source, 'shareSourceDetail');
   }
+}
+
+/**
+ * The kind the person STATED before this read (#108), or nothing. A sibling of `sourceDetail`
+ * for the same reason: `ShareSource` is the discriminator and both `read()` and `runIngest()`
+ * already receive it, so this is written once rather than in each. A correction carries `to`,
+ * which is a different fact (a re-read after a wrong answer) and is handled by its own arm.
+ */
+function statedKind(source: ShareSource): ShareKind | undefined {
+  return source.kind === 'correction' ? undefined : source.hint;
+}
+
+/**
+ * The two OUTCOMES a stated kind can have that a blind read cannot (#108). Same shape as
+ * `refuseForQuota` and `notReady`: one event, one toast, so the spine gains a one-line branch
+ * and the pairing lives here. Both interpolate the QUOTED tile name (`ai.capture.dest.*`), which
+ * carries no article — "a Activity" is the bug the quoting avoids.
+ */
+function hintDisagreed(env: IngestEnv, hint: ShareKind): void {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+  logEvent({
+    level: 'info',
+    surface: env.surface,
+    // A model OUTCOME, not a fault: the document genuinely holds nothing of that kind.
+    message: 'the model could not read it as the stated kind',
+    context: { action: 'hint_disagreed', kind: hint },
+  });
+  showToast(
+    'info',
+    t('ai.capture.pick.none.title'),
+    fillTemplate(t('ai.capture.pick.none.message'), { kind: t(`ai.capture.dest.${hint}`) })
+  );
+}
+
+function hintOverruled(env: IngestEnv, hint: ShareKind, actual: ShareKind): void {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+  logEvent({
+    // `warn`: the prompt told the model not to re-decide and it did anyway. A rising rate is the
+    // first thing to look at before touching the prompt.
+    level: 'warn',
+    surface: env.surface,
+    message: 'the model overruled the stated kind',
+    context: { action: 'hint_overruled', kind: actual, detail: hint },
+  });
+  showToast(
+    'info',
+    t('ai.capture.pick.overruled.title'),
+    fillTemplate(t('ai.capture.pick.overruled.message'), {
+      picked: t(`ai.capture.dest.${hint}`),
+      actual: t(`ai.capture.dest.${actual}`),
+    })
+  );
 }
 
 /**
@@ -480,7 +553,7 @@ async function sourceFromText(
   text: string,
   env: IngestEnv,
   overCeilingByBytes = false
-): Promise<ShareSource | null> {
+): Promise<FirstReadSource | null> {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -674,7 +747,7 @@ async function sourceFromText(
  * That sentinel is stated here because a silent `null` is exactly the failure mode this
  * surface is most prone to.
  */
-async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSource | null> {
+async function prepare(content: SharedContent, meta: ShareMeta): Promise<FirstReadSource | null> {
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -836,7 +909,13 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<ShareSo
  * Returns `null` to mean "the user has already been told and the event already logged" —
  * the same sentinel `prepare` uses, for the same reason.
  */
-type ReadOutcome = { kind: 'none' } | { kind: ShareKind; payload: SharePayload };
+/**
+ * `model: false` marks the two link paths that answer WITHOUT the model (a schema.org JSON-LD
+ * page, a title-only fallback). A stated kind (#108) rides the model channel only, so on those
+ * paths it was never consulted — and `runIngest` must not report the page's own answer as the
+ * model overruling the pick.
+ */
+type ReadOutcome = { kind: 'none' } | { kind: ShareKind; payload: SharePayload; model: boolean };
 
 async function read(
   source: ShareSource,
@@ -854,6 +933,7 @@ async function read(
 
   const { tier, byokConfig } = useAiCapability();
   const detail = sourceDetail(source);
+  const hint = statedKind(source);
   const opts = {
     tier: tier.value,
     todayIso: toDateInputValue(new Date()),
@@ -863,6 +943,12 @@ async function read(
     // it would be an UNCOUNTED read — the Lambda has no partition key to write under — which is
     // the loophole the meter exists to close. Resolved (and refused) above, before the model.
     familyId,
+    // The person's pick (#108) rides the SAME channel a correction does — `to` is what makes
+    // a read targeted — but with no token and `reason: 'stated'`, so it is billed like any
+    // first read, never reaches the meter, and the prompt does not claim an earlier reading
+    // existed. Folded in HERE, once: documents, pasted text and a fetched link page all read
+    // through this one object. The correction arm spreads its own `correction` over it below.
+    ...(hint ? { correction: { to: hint, reason: 'stated' as const } } : {}),
   };
 
   /** Report an extraction failure once, tagged with which funnel it came from. */
@@ -1017,6 +1103,7 @@ async function read(
       // `RecipeShareSource` is a union.
       return {
         kind: 'recipe',
+        model: false,
         payload: {
           kind: 'recipe',
           source: { via: 'jsonld', recipe: resolved.recipe },
@@ -1043,9 +1130,15 @@ async function read(
         message: 'link resolved to a title only',
         context: { action: 'resolved', extraction_path: resolved.path, detail: 'title_only' },
       });
+      // A title-only stub is an evidence-free RECIPE fallback, not a page-declared answer. If
+      // the person said this is something else (#108), a recipe named after a video title is
+      // not "what they picked, best effort" — it is a wrong thing. `none` here lets the spine
+      // tell them beanies could not read it as their pick, instead of the recipe toast.
+      if (hint && hint !== 'recipe') return { kind: 'none' };
       showToast('info', t('recipeExtract.titleOnly.title'), t('recipeExtract.titleOnly.message'));
       return {
         kind: 'recipe',
+        model: false,
         payload: {
           kind: 'recipe',
           source: { via: 'titleOnly', title: resolved.title },
@@ -1166,8 +1259,9 @@ export async function ingestSharedContent(content: SharedContent, meta: ShareMet
 async function withIngestLock(
   env: IngestEnv,
   run: () => Promise<void>,
-  presentation: 'global' | 'local' = 'global'
+  facts: ReadingFacts = {}
 ): Promise<void> {
+  const { presentation = 'global', hint } = facts;
   const { showToast } = useToast();
   const { t } = useTranslation();
 
@@ -1185,8 +1279,9 @@ async function withIngestLock(
   // 'local' several awaits later — `withSniffedType` reads the file — so an in-form capture
   // painted the full-screen overlay over the very fields the scoped one exists to keep
   // visible, then swapped. A triage refusal never reached `runIngest` at all, so the user saw
-  // only the wrong overlay for the whole thing.
-  ingestState.value = { phase: 'reading', presentation };
+  // only the wrong overlay for the whole thing. The same applies to `hint`: the overlay must
+  // light the picked tile from the first frame, not once triage has run.
+  ingestState.value = { phase: 'reading', presentation, ...(hint ? { hint } : {}) };
 
   try {
     await run();
@@ -1246,15 +1341,42 @@ async function runIngest(
   const outcome = await read(source, grant, env);
   if (!outcome) return; // already logged and toasted
 
+  // The stated kind (#108) counts only where the model actually saw it. A JSON-LD or
+  // title-only link answers from the page itself, so there the pick was never applied: say so
+  // once, and treat the read as unhinted from here on — the page's answer is not the model
+  // overruling anything, and the "not right?" the overruled toast promises does not exist.
+  const stated = statedKind(source);
+  const hint = stated && outcome.kind !== 'none' && !outcome.model ? undefined : stated;
+  if (stated && !hint) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'the stated kind was not consulted: the link answered without the model',
+      context: { action: 'hint_unused', kind: stated },
+    });
+    // Never silently: the overlay lit their tile and the answer is about to land somewhere
+    // else. One line, no promise of a "not right?" (a page-declared result has none).
+    showToast('info', t('ai.capture.title'), t('ai.capture.pick.unused'));
+  }
   logEvent({
     level: 'info',
     surface: env.surface,
     message: 'share classified',
-    context: { action: 'classified', kind: outcome.kind },
+    // `detail` is how a read was steered, so "did the model return the stated kind" is this
+    // event's `kind` against the preceding `hinted` event's, filtered on `detail: 'hinted'`.
+    context: {
+      action: 'classified',
+      kind: outcome.kind,
+      detail: source.kind === 'correction' ? 'corrected' : hint ? 'hinted' : 'unhinted',
+    },
   });
 
   if (outcome.kind === 'none') {
-    showToast('info', t('shareTarget.unrecognised.title'), t('shareTarget.unrecognised.message'));
+    // Under a stated kind, "none" means "not that" — say which, and what to do (#108).
+    if (hint) hintDisagreed(env, hint);
+    else {
+      showToast('info', t('shareTarget.unrecognised.title'), t('shareTarget.unrecognised.message'));
+    }
     return;
   }
 
@@ -1271,6 +1393,13 @@ async function runIngest(
     showToast('info', t('shareTarget.readerOff.title'), t('shareTarget.readerOff.message'));
     return;
   }
+
+  // The model was told the kind and chose another. The read is spent and the extraction is
+  // real, so it is DELIVERED — but never silently: the person is told which kind beanies read,
+  // and "not right?" is at the foot of the modal that opens. Deliberately AFTER the reader gate:
+  // that toast promises a review, which only exists once the gate has passed, and a kind whose
+  // reader is off has already been reported once above.
+  if (hint && outcome.kind !== hint) hintOverruled(env, hint, outcome.kind);
 
   // Hold the resolved tile long enough to be seen. Only on a DISPATCHED outcome — never on
   // `none`, never on a refusal, where there is nothing to resolve to.
@@ -1327,8 +1456,13 @@ export const IN_APP_ENV: IngestEnv = { surface: 'magic-beans-capture', origin: '
 /** What the magic-beans sheet can hand over. A camera shot and a picked file are the same
  *  thing once a `File` exists, so there are two arms rather than three. */
 export type InAppInput =
-  | { kind: 'file'; file: File }
-  | { kind: 'paste'; text: string }
+  /**
+   * `hint` on both first-read arms: the kind the person stated in the sheet before the read
+   * (#108). Authoritative for the prompt; never sent to the meter. Absent = "let beanies
+   * work it out", which is the default and the common case.
+   */
+  | { kind: 'file'; file: File; hint?: ShareKind }
+  | { kind: 'paste'; text: string; hint?: ShareKind }
   /**
    * A re-read of a document the spine has ALREADY resolved, as the kind the user says it
    * actually is. Raised by `MagicMiscategorisedBanner` from inside a review modal.
@@ -1408,6 +1542,9 @@ export async function ingestInAppSource(
 ): Promise<void> {
   const { showToast } = useToast();
   const { t } = useTranslation();
+  // Read off the INPUT once, here, because the lock is taken before a `ShareSource` exists.
+  // Everywhere downstream derives it from the source (`statedKind`).
+  const hint = input.kind === 'correction' ? undefined : input.hint;
 
   await withIngestLock(
     IN_APP_ENV,
@@ -1435,15 +1572,30 @@ export async function ingestInAppSource(
         });
       }
 
+      // The pick's DENOMINATOR (#108), beside the correction's for the same reason: emitted
+      // before triage, so it counts every stated read, including one triage then refuses.
+      // `classified` carries `detail: 'hinted'` for the post-triage count.
+      if (hint) {
+        logEvent({
+          level: 'info',
+          surface: IN_APP_ENV.surface,
+          message: 'the person told us what this is',
+          context: { action: 'hinted', kind: hint },
+        });
+      }
+
       const source = await inAppSource(input, showToast, t);
       if (!source) return; // already logged and toasted
 
       await runIngest(source, IN_APP_ENV, grant, destination);
     },
-    // A door that will CLAIM the payload is by definition the door the user is looking at, so
-    // it scopes its own overlay and the app-shell one must stand down — from the first frame,
-    // not from several awaits later.
-    destination ? 'local' : 'global'
+    {
+      // A door that will CLAIM the payload is by definition the door the user is looking at,
+      // so it scopes its own overlay and the app-shell one must stand down — from the first
+      // frame, not from several awaits later.
+      presentation: destination ? 'local' : 'global',
+      hint,
+    }
   );
 }
 
@@ -1461,7 +1613,10 @@ async function inAppSource(
   t: ReturnType<typeof useTranslation>['t']
 ): Promise<ShareSource | null> {
   if (input.kind === 'paste') {
-    return sourceFromText(input.text, IN_APP_ENV);
+    // The pick rides on whatever `sourceFromText` decided — text OR a link — so a pasted URL
+    // keeps it too. Attached here, once, rather than inside the shared text policy.
+    const source = await sourceFromText(input.text, IN_APP_ENV);
+    return source && { ...source, hint: input.hint };
   }
 
   if (input.kind === 'correction') {
@@ -1514,7 +1669,7 @@ async function inAppSource(
   }
 
   logReceivedKind(IN_APP_ENV, 'file', 1);
-  return { kind: 'documents', files: [stamped] };
+  return { kind: 'documents', files: [stamped], hint: input.hint };
 }
 
 /**
@@ -1526,12 +1681,13 @@ function classify(data: ShareExtractionResult, env: ResultEnvelope): ReadOutcome
     case 'none':
       return { kind: 'none' };
     case 'event':
-      return { kind: 'event', payload: { kind: 'event', data: data.event, env } };
+      return { kind: 'event', model: true, payload: { kind: 'event', data: data.event, env } };
     case 'travel':
-      return { kind: 'travel', payload: { kind: 'travel', data: data.travel, env } };
+      return { kind: 'travel', model: true, payload: { kind: 'travel', data: data.travel, env } };
     case 'recipe':
       return {
         kind: 'recipe',
+        model: true,
         payload: { kind: 'recipe', source: { via: 'extraction', data: data.recipe }, env },
       };
     default:

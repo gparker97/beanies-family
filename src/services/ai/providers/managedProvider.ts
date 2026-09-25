@@ -465,8 +465,10 @@ export const managedProvider: ExtractionProvider = {
         request.todayIso,
         // The hint reaches OUR prompt, never the wire. The server-side "hint only when a grant was
         // spent" fence dies with plaintext, exactly as it already does for BYOK; biasing your own
-        // read costs you a bean, which is the same trade that tier already makes.
-        request.correction?.to
+        // read costs you a bean, which is the same trade that tier already makes. A `stated` hint
+        // (#108) is exactly that trade: a normal billable read whose prompt is pre-labelled.
+        request.correction?.to,
+        request.correction?.reason
       );
 
       const sealed = await sealForEnclave(enclave.hpkePublicKey, {
