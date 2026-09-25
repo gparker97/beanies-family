@@ -1,0 +1,645 @@
+<title>Magic Beans Category Chips</title>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Magic beans: optional category pre-select, scalable (2026-09-25) — tracker #108
+
+     ✅ DIRECTION C (tappable tiles) APPROVED by greg, 2026-09-25. A and B are kept
+        here as the record of what was considered; build C.
+
+     Successor to magic-beans-one-surface-2026-09-14.html. The sheet keeps its
+     "where is it?" shape (paste hero, camera / file beneath). What changes is the
+     capability row at the bottom: today it is a static statement of three tiles;
+     here it becomes an OPTIONAL pick. Nothing selected is the default and must
+     read as the default. A pick is authoritative for the read.
+
+     Three directions, each rendered at 3 / 4 / 7 categories so scaling is visible:
+       A  wrapping chips     — pills that wrap to a second line
+       B  scrolling rail     — one row, horizontal scroll, faded edges
+       C  tappable tiles     — today's tiles, made selectable, on a grid
+
+     CIG-clamped. Every token comes from .claude/skills/beanies-theme/SKILL.md or
+     packages/brand/theme.css. Nothing invented:
+       Heritage Orange #F15D22 · Deep Slate #2C3E50 · Sky Silk #AED6F1
+       Cloud White #F8F9FA · tint-slate-5 rgba(44,62,80,.05) · tint-slate-10 .10
+       dark: surface-raised #1E2A36 · surface-overlay #26343F · surface-hover #2F3E4B
+             ink #F2F5F7 · ink-soft #C3CED6 · ink-faint #9AA9B4 · line #4A5B69
+             line-strong #5C6F7E · accent-lift #FF8B5E
+     Outfit (headings, chip labels) · Inter (body) · Caveat (tagline only).
+     Squircle radii, diffused shadows only, no Alert Red anywhere.
+
+     Authored body-only so it both opens via file:// and publishes as an Artifact.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@700&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  :root {
+    /* page chrome (not the design) */
+    --page-bg: #eef1f4;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 10%);
+    /* the sheet (the design) — light */
+    --sheet-bg: #ffffff;
+    --sheet-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+    --ink: #2c3e50;
+    --ink-soft: #4d5d6c;
+    --ink-faint: #7b8a98;
+    --line: rgb(44 62 80 / 10%);
+    --field-bg: #f8f9fa;
+    --chip-bg: rgb(44 62 80 / 5%);
+    --chip-bg-hover: rgb(44 62 80 / 8%);
+    --chip-ink: #5a6b7b;
+    --accent: #f15d22;
+    --accent-ink: #f15d22;
+    --accent-bg: rgb(241 93 34 / 10%);
+    --accent-border: #f15d22;
+    --focus: #aed6f1;
+    --fade-from: rgb(255 255 255 / 0%);
+    --fade-to: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --page-bg: #101820;
+      --page-ink: #f2f5f7;
+      --page-ink-soft: #9aa9b4;
+      --page-line: rgb(255 255 255 / 10%);
+      --sheet-bg: #1e2a36;
+      --sheet-shadow: 0 8px 40px rgb(0 0 0 / 35%);
+      --ink: #f2f5f7;
+      --ink-soft: #c3ced6;
+      --ink-faint: #9aa9b4;
+      --line: #4a5b69;
+      --field-bg: #26343f;
+      --chip-bg: #26343f;
+      --chip-bg-hover: #2f3e4b;
+      --chip-ink: #9aa9b4;
+      --accent: #f15d22;
+      --accent-ink: #ff8b5e;
+      --accent-bg: #2f3e4b;
+      --accent-border: #ff8b5e;
+      --focus: #aed6f1;
+      --fade-from: rgb(30 42 54 / 0%);
+      --fade-to: #1e2a36;
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --page-bg: #101820;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #9aa9b4;
+    --page-line: rgb(255 255 255 / 10%);
+    --sheet-bg: #1e2a36;
+    --sheet-shadow: 0 8px 40px rgb(0 0 0 / 35%);
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: #4a5b69;
+    --field-bg: #26343f;
+    --chip-bg: #26343f;
+    --chip-bg-hover: #2f3e4b;
+    --chip-ink: #9aa9b4;
+    --accent: #f15d22;
+    --accent-ink: #ff8b5e;
+    --accent-bg: #2f3e4b;
+    --accent-border: #ff8b5e;
+    --focus: #aed6f1;
+    --fade-from: rgb(30 42 54 / 0%);
+    --fade-to: #1e2a36;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-block: 28px 72px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+    max-width: 72ch;
+    margin: 0 0 6px;
+  }
+  h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 44px 0 4px;
+  }
+  h2 .n {
+    color: var(--accent-ink);
+    margin-right: 8px;
+  }
+  .sub {
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+    max-width: 74ch;
+    margin: 0 0 18px;
+  }
+
+  /* ── the three-up row of sheets ──────────────────────────────────────────── */
+  .row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+  .frame {
+    display: grid;
+    gap: 8px;
+  }
+  .frame > .cap {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--page-ink-soft);
+    margin: 0;
+  }
+
+  /* ── the sheet itself (this IS the design) ───────────────────────────────── */
+  .sheet {
+    background: var(--sheet-bg);
+    color: var(--ink);
+    border-radius: 24px;
+    box-shadow: var(--sheet-shadow);
+    padding: 20px 18px 18px;
+    max-width: 360px;
+    width: 100%;
+  }
+  .sheet .grab {
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    margin: 0 auto 16px;
+  }
+  .sheet .title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin: 0;
+    line-height: 1.2;
+  }
+  .sheet .tagline {
+    font-family: 'Caveat', 'Outfit', cursive;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-ink);
+    margin: 2px 0 0;
+    line-height: 1.3;
+  }
+  .sheet label.field {
+    display: block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 18px 0 6px;
+  }
+  .sheet .textarea {
+    background: var(--field-bg);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 10px 12px;
+    min-height: 88px;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--ink-faint);
+  }
+  .sheet .orfrom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .sheet .orfrom::before,
+  .sheet .orfrom::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--line);
+  }
+  .sheet .sources {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .sheet .src {
+    height: 44px;
+    border: 2px solid rgb(44 62 80 / 10%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    background: transparent;
+  }
+  :root[data-theme='dark'] .sheet .src {
+    border-color: #5c6f7e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .sheet .src {
+      border-color: #5c6f7e;
+    }
+  }
+
+  /* the new part: the pick row */
+  .pick {
+    margin-top: 22px;
+  }
+  .pick .q {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0 0 8px;
+  }
+  .pick .q b {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .pick .q span {
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .pick .state {
+    margin: 8px 0 0;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-faint);
+    min-height: 1.2em;
+  }
+  .pick .state.on {
+    color: var(--accent-ink);
+  }
+
+  /* one chip, three skins */
+  .chip {
+    appearance: none;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: var(--chip-bg);
+    color: var(--chip-ink);
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    line-height: 1;
+    transition:
+      background-color 150ms,
+      border-color 150ms,
+      color 150ms,
+      transform 150ms;
+  }
+  .chip:hover {
+    background: var(--chip-bg-hover);
+  }
+  .chip:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .chip[aria-pressed='true'] {
+    background: var(--accent-bg);
+    border-color: var(--accent-border);
+    color: var(--accent-ink);
+  }
+  .chip .e {
+    font-size: 1.125rem;
+    line-height: 1;
+  }
+  .chip .t {
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip {
+      transition: none;
+    }
+  }
+
+  /* A — wrapping pills */
+  .rail-a {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .rail-a .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 12px 0 10px;
+    border-radius: 999px;
+  }
+
+  /* B — one scrolling row with faded edges */
+  .rail-b-wrap {
+    position: relative;
+    margin: 0 -18px;
+  }
+  .rail-b {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    padding: 2px 18px;
+    scrollbar-width: none;
+  }
+  .rail-b::-webkit-scrollbar {
+    display: none;
+  }
+  .rail-b .chip {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 12px 0 10px;
+    border-radius: 999px;
+    scroll-snap-align: start;
+  }
+  .rail-b-wrap::before,
+  .rail-b-wrap::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 26px;
+    pointer-events: none;
+  }
+  .rail-b-wrap::before {
+    left: 0;
+    background: linear-gradient(to right, var(--fade-to), var(--fade-from));
+  }
+  .rail-b-wrap::after {
+    right: 0;
+    background: linear-gradient(to left, var(--fade-to), var(--fade-from));
+  }
+
+  /* C — today's tiles, made tappable */
+  .rail-c {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 8px;
+  }
+  .rail-c .chip {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 10px 4px 8px;
+    border-radius: 14px;
+    font-size: 0.75rem;
+  }
+  .rail-c .chip .e {
+    font-size: 1.25rem;
+  }
+  .rail-c .chip .t {
+    white-space: normal;
+    text-align: center;
+  }
+
+  /* ── notes ─────────────────────────────────────────────────────────────────── */
+  .notes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 18px;
+  }
+  .note {
+    border-top: 2px solid var(--page-line);
+    padding-top: 10px;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+  }
+  .note b {
+    display: block;
+    font-family: 'Outfit', sans-serif;
+    color: var(--page-ink);
+    margin-bottom: 4px;
+  }
+  .rules {
+    margin: 18px 0 0;
+    padding-left: 18px;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    color: var(--page-ink-soft);
+    max-width: 74ch;
+  }
+  .rules li {
+    margin: 0 0 4px;
+  }
+</style>
+
+<div class="wrap">
+  <h1>Magic beans: pick a category, or don't</h1>
+  <p class="lede">
+    The drawer stays as shipped: paste is the hero, camera and file sit beneath. The row at the bottom
+    changes from a statement into an optional pick. Every chip below is live: tap to choose, tap again
+    to hand the decision back to beanies. Each direction is shown at three, four and seven categories,
+    because three is today, four is the transactions reader, and seven is where this is going.
+  </p>
+
+  <h2><span class="n">A</span>Wrapping chips</h2>
+  <p class="sub">
+    Pills that wrap to a second line. Nothing scrolls, nothing hides. Height grows by one row at a
+    time, which the sheet can afford because the row sits at the bottom.
+  </p>
+  <div class="row" data-dir="a"></div>
+
+  <h2><span class="n">B</span>Scrolling rail</h2>
+  <p class="sub">
+    One row, always the same height, faded edges hint that there is more. Familiar from every phone
+    keyboard suggestion strip. The seventh category is one flick away rather than in view.
+  </p>
+  <div class="row" data-dir="b"></div>
+
+  <h2><span class="n">C</span>Tappable tiles</h2>
+  <p class="sub">
+    Today's tiles, kept, made selectable. They already carry the meaning "what beanies can make", so
+    the change to learn is smallest. The grid re-flows from a single row to two as categories grow.
+  </p>
+  <div class="row" data-dir="c"></div>
+
+  <h2>What all three share</h2>
+  <ul class="rules">
+    <li>Nothing selected is the default, and it looks like the default: quiet slate chips, no empty slot, no placeholder.</li>
+    <li>One pick at a time. Tapping the selected chip clears it. The state line under the row says what will happen.</li>
+    <li>Selected uses Heritage Orange on light and the accent lift on dark. It is the only orange in the sheet besides the tagline.</li>
+    <li>A pick is authoritative: beanies reads the content as that kind. The "not right?" banner still works afterwards.</li>
+    <li>Only categories whose reader is enabled and permitted for this member are rendered. A member without finances never sees transactions.</li>
+    <li>The seven shown are illustrative. Activity, trip, recipe exist; transactions is #107; the rest are placeholders to prove the layout.</li>
+  </ul>
+
+  <div class="notes">
+    <div class="note">
+      <b>Lean: A</b>
+      Wrapping keeps everything visible and needs no gesture. At seven it costs one extra row, which
+      the sheet has room for. Rail B hides options; tiles C get cramped on narrow phones once labels
+      are translated.
+    </div>
+    <div class="note">
+      <b>Copy</b>
+      "Know what it is?" plus "pick one, or let beanies work it out". Selected: "reading as a trip.
+      tap again to let beanies decide." All lowercase in beanie mode, sentence case in English.
+    </div>
+    <div class="note">
+      <b>Out of scope here</b>
+      Remembering the last pick, and per-page defaults. Both were rejected in the 2026-09-14 plan and
+      stay rejected; this is a choice the person makes each time.
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var ALL = [
+      { k: 'event', e: '📅', t: 'Activity', as: 'an activity' },
+      { k: 'travel', e: '✈️', t: 'Trip', as: 'a trip' },
+      { k: 'recipe', e: '🍳', t: 'Recipe', as: 'a recipe' },
+      { k: 'transactions', e: '💳', t: 'Transactions', as: 'transactions' },
+      { k: 'list', e: '📋', t: 'List', as: 'a list' },
+      { k: 'milestone', e: '🎂', t: 'Milestone', as: 'a milestone' },
+      { k: 'contact', e: '📇', t: 'Contact', as: 'a contact' },
+    ];
+    var COUNTS = [
+      { n: 3, cap: 'Today: three readers' },
+      { n: 4, cap: 'With transactions (#107)' },
+      { n: 7, cap: 'Seven, to prove the layout' },
+    ];
+
+    function el(tag, cls, text) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text != null) n.textContent = text;
+      return n;
+    }
+
+    function sheet(dir, count, preselect) {
+      var s = el('div', 'sheet');
+      s.appendChild(el('div', 'grab'));
+      s.appendChild(el('p', 'title', '✨ Magic beans'));
+      s.appendChild(el('p', 'tagline', "give us something to read and we'll work out the rest"));
+      s.appendChild(el('label', 'field', 'Paste anything'));
+      s.appendChild(el('div', 'textarea', 'Paste a message, an email, or a link…'));
+      s.appendChild(el('div', 'orfrom', 'or from'));
+      var src = el('div', 'sources');
+      src.appendChild(el('div', 'src', '📷 Take a photo'));
+      src.appendChild(el('div', 'src', '🖼️ Choose a file'));
+      s.appendChild(src);
+
+      var pick = el('div', 'pick');
+      var q = el('p', 'q');
+      q.appendChild(el('b', null, 'Know what it is?'));
+      q.appendChild(el('span', null, 'optional'));
+      pick.appendChild(q);
+
+      var rail;
+      var railWrap = null;
+      if (dir === 'a') rail = el('div', 'rail-a');
+      if (dir === 'b') {
+        railWrap = el('div', 'rail-b-wrap');
+        rail = el('div', 'rail-b');
+        railWrap.appendChild(rail);
+      }
+      if (dir === 'c') rail = el('div', 'rail-c');
+      rail.setAttribute('role', 'group');
+      rail.setAttribute('aria-label', 'Category, optional');
+
+      var state = el('p', 'state', 'pick one, or let beanies work it out');
+      var selected = null;
+      var chips = [];
+
+      function render() {
+        chips.forEach(function (c) {
+          c.btn.setAttribute('aria-pressed', c.k === selected ? 'true' : 'false');
+        });
+        if (selected) {
+          var item = ALL.filter(function (x) {
+            return x.k === selected;
+          })[0];
+          state.textContent = 'reading as ' + item.as + '. tap again to let beanies decide.';
+          state.classList.add('on');
+        } else {
+          state.textContent = 'pick one, or let beanies work it out';
+          state.classList.remove('on');
+        }
+      }
+
+      ALL.slice(0, count).forEach(function (item) {
+        var b = el('button', 'chip');
+        b.type = 'button';
+        b.setAttribute('aria-pressed', 'false');
+        b.id = 'chip-' + dir + '-' + count + '-' + item.k;
+        var e = el('span', 'e', item.e);
+        e.setAttribute('aria-hidden', 'true');
+        b.appendChild(e);
+        b.appendChild(el('span', 't', item.t));
+        b.addEventListener('click', function () {
+          selected = selected === item.k ? null : item.k;
+          render();
+        });
+        chips.push({ k: item.k, btn: b });
+        rail.appendChild(b);
+      });
+
+      pick.appendChild(railWrap || rail);
+      pick.appendChild(state);
+      s.appendChild(pick);
+      if (preselect) selected = preselect;
+      render();
+      return s;
+    }
+
+    ['a', 'b', 'c'].forEach(function (dir) {
+      var row = document.querySelector('.row[data-dir="' + dir + '"]');
+      COUNTS.forEach(function (c, i) {
+        var f = el('div', 'frame');
+        f.appendChild(el('p', 'cap', c.cap));
+        /* the middle frame opens with a pick made, so the selected state is visible at rest */
+        f.appendChild(sheet(dir, c.n, i === 1 ? 'travel' : null));
+        row.appendChild(f);
+      });
+    });
+  })();
+</script>
