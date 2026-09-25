@@ -12,13 +12,14 @@ import type { ExtractionSource } from '@/services/ai/types';
 import type {
   ExtractionResult,
   RecipeExtractionResult,
+  StatementReadResult,
   TravelExtractionResult,
 } from '@/services/ai/types';
 import type { ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
 
-/** The three things a shared document can turn out to be. Keep in step with `MAGIC_READERS`. */
-export type ShareKind = 'event' | 'travel' | 'recipe';
+/** The things a shared document can turn out to be. Keep in step with `MAGIC_READERS`. */
+export type ShareKind = 'event' | 'travel' | 'recipe' | 'transactions';
 
 /**
  * Where a shared LINK came from, and what may be trusted about it (#64 links).
@@ -226,4 +227,6 @@ export function surfaceForOrigin(origin: ResultEnvelope['origin']): string {
 export type SharePayload =
   | { kind: 'event'; data: ExtractionResult; env: ResultEnvelope }
   | { kind: 'travel'; data: TravelExtractionResult; env: ResultEnvelope }
-  | { kind: 'recipe'; source: RecipeShareSource; env: ResultEnvelope };
+  | { kind: 'recipe'; source: RecipeShareSource; env: ResultEnvelope }
+  // A bank statement (#107). Carries the whole read (units, dropped pages), not a bare result.
+  | { kind: 'transactions'; data: StatementReadResult; env: ResultEnvelope };

@@ -23746,11 +23746,6 @@
       "hash": "dhng7y",
       "lastUpdated": "2026-09-15"
     },
-    "ai.correct.picked": {
-      "translation": "正在以{kind}的身份再次阅读…",
-      "hash": "x32wwc",
-      "lastUpdated": "2026-09-15"
-    },
     "ai.picker.expired.title": {
       "translation": "那花了一段时间",
       "hash": "vxxdsu",
@@ -24804,11 +24799,6 @@
     "ai.capture.pick.none.title": {
       "translation": "beanies 无法那样读取",
       "hash": "9zw0vm",
-      "lastUpdated": "2026-09-25"
-    },
-    "ai.capture.pick.none.message": {
-      "translation": "您选择了“{kind}”，但 beanies 在这里找不到。请不选任何图块再交一次，或换一个图块。",
-      "hash": "nd5r6b",
       "lastUpdated": "2026-09-25"
     },
     "ai.capture.pick.overruled.title": {

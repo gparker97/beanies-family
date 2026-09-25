@@ -39,6 +39,7 @@ import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 // The privacy article lives on the marketing site (deployed via deploy-web.yml). LIVE as of
 // the 2026-06-07 soft launch — this change ships alongside that web deploy, so the consent
@@ -48,7 +49,16 @@ const PRIVACY_ARTICLE_URL =
   'https://beanies.family/help/security/how-beanies-ai-handles-your-photos';
 
 const { t } = useTranslation();
-const { consentOpen, resolveConsent, onConsentConfirm } = useDocumentConsent();
+const { consentOpen, consentRequest, resolveConsent, onConsentConfirm } = useDocumentConsent();
+
+/**
+ * The bank-statement variant (#107). It discloses what the generic prompt never had to: the
+ * family's past merchant names and categories travel with the pages, and the read costs one bean
+ * per page. Everything else (tier line, footnote, remember) is shared.
+ */
+const statement = computed(() =>
+  consentRequest.value?.kind === 'transactions' ? consentRequest.value : null
+);
 // Tier drives the "where it goes" line, and is read here rather than passed in so the single
 // global mount needs no wiring in App.vue.
 const { tier } = useAiCapability();
@@ -65,18 +75,48 @@ watch(consentOpen, (isOpen) => {
 // LoginBackground): case-insensitive, and if the phrase isn't present in a
 // translation it degrades to the whole sentence as `lead` with no link.
 const introParts = computed(() =>
-  splitAroundAccent(t('ai.consent.intro'), t('ai.consent.introLink'))
+  splitAroundAccent(
+    t(statement.value ? 'ai.consent.statement.intro' : 'ai.consent.intro'),
+    t('ai.consent.introLink')
+  )
 );
 
-const items = computed(() => [
-  { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.whatValue') },
-  {
+const items = computed(() => {
+  const where = {
     icon: '🔒',
     label: t('ai.consent.whereLabel'),
     value: tier.value === 'byok' ? t('ai.consent.whereByok') : t('ai.consent.whereManaged'),
-  },
-  { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t('ai.consent.afterValue') },
-]);
+  };
+  const request = statement.value;
+  if (!request) {
+    return [
+      { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.whatValue') },
+      where,
+      { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t('ai.consent.afterValue') },
+    ];
+  }
+  return [
+    { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.statement.whatValue') },
+    where,
+    {
+      icon: '🫘',
+      label: t('ai.consent.statement.readsLabel'),
+      value: fillTemplate(
+        t(
+          request.reads === 1
+            ? 'ai.consent.statement.reads.one'
+            : 'ai.consent.statement.reads.other'
+        ),
+        { count: String(request.reads) }
+      ),
+    },
+    {
+      icon: '🗑️',
+      label: t('ai.consent.afterLabel'),
+      value: t('ai.consent.statement.afterValue'),
+    },
+  ];
+});
 
 function onConfirm(): void {
   void onConsentConfirm(remember.value);
@@ -89,10 +129,10 @@ function onConfirm(): void {
     layer="gate"
     size="narrow"
     :open="consentOpen"
-    :title="t('ai.consent.title')"
-    icon="✨"
+    :title="t(statement ? 'ai.consent.statement.title' : 'ai.consent.title')"
+    :icon="statement ? '🏦' : '✨'"
     icon-bg="var(--tint-orange-8)"
-    :save-label="t('ai.consent.confirm')"
+    :save-label="t(statement ? 'ai.consent.statement.confirm' : 'ai.consent.confirm')"
     @close="resolveConsent(false)"
     @save="onConfirm"
   >

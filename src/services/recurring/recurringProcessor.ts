@@ -3,7 +3,7 @@ import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
-import type { RecurringItem, CreateTransactionInput } from '@/types/models';
+import type { RecurringItem, CreateTransactionInput, DisplayTransaction } from '@/types/models';
 import {
   toDateInputValue,
   addDays,
@@ -11,7 +11,6 @@ import {
   addYears,
   getStartOfDay,
   parseLocalDate,
-  extractDatePart,
 } from '@/utils/date';
 import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
@@ -19,6 +18,7 @@ import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenc
 import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { reportError } from '@/utils/errorReporter';
 import * as perfTiming from '@/utils/perfTiming';
+import { recurringInstanceDate, recurringInstanceKey } from '@/utils/recurringInstance';
 
 export interface ProcessResult {
   processed: number;
@@ -52,10 +52,13 @@ export async function processRecurringItems(): Promise<ProcessResult> {
         const dueDates = getDueDatesSince(item, today);
 
         for (const dueDate of dueDates) {
-          // Dedup: skip if a transaction already exists for this item + date
+          // Dedup: skip if this due date's instance is already accounted for: a transaction for
+          // this item exists ON the due date, or one STANDS FOR it (`recurringDueDate`, #107: a
+          // statement line merged into this instance, written on the day the bank took the
+          // money). Exact per due date, so a weekly item's other instances are unaffected.
           const dateStr = toDateInputValue(dueDate);
           const alreadyExists = allTransactions.some(
-            (tx) => tx.recurringItemId === item.id && extractDatePart(tx.date) === dateStr
+            (tx) => tx.recurringItemId === item.id && recurringInstanceDate(tx) === dateStr
           );
           if (alreadyExists) continue;
 
@@ -153,6 +156,43 @@ export function getDueDatesInRange(item: RecurringItem, rangeStart: Date, rangeE
   }
 
   return dueDates;
+}
+
+/**
+ * Ephemeral projected transactions for `items` over [rangeStart, rangeEnd]: one per due date,
+ * never written anywhere. The ONE projection loop, shared by `useProjectedTransactions` (the
+ * ledger's current/future month), `TransactionsPage` (next month's preview) and the statement
+ * import matcher. `idPrefix` exists only because the next-month preview has always used its own
+ * id namespace (`next-projected-`) so its rows can never collide with the current month's.
+ */
+export function projectRecurringTransactions(
+  items: readonly RecurringItem[],
+  rangeStart: Date,
+  rangeEnd: Date,
+  opts: { idPrefix?: string } = {}
+): DisplayTransaction[] {
+  const idPrefix = opts.idPrefix ?? 'projected';
+  const projected: DisplayTransaction[] = [];
+  for (const item of items) {
+    for (const date of getDueDatesInRange(item, rangeStart, rangeEnd)) {
+      projected.push({
+        id: `${idPrefix}-${item.id}-${toDateInputValue(date)}`,
+        accountId: item.accountId,
+        type: item.type,
+        amount: item.amount,
+        currency: item.currency,
+        category: item.category,
+        date: toDateInputValue(date),
+        description: item.description,
+        recurringItemId: item.id,
+        isReconciled: false,
+        isProjected: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+  return projected;
 }
 
 /**
@@ -411,8 +451,11 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
   // Group recurring transactions by recurringItemId + date
   const groups = new Map<string, { id: string; createdAt: string }[]>();
   for (const tx of allTransactions) {
-    if (!tx.recurringItemId) continue;
-    const key = `${tx.recurringItemId}|${extractDatePart(tx.date)}`;
+    // Keyed on the due date a row STANDS FOR (#107): a statement-merged row dated the 24th that
+    // stands for the 28th is the 28th's instance, and must never be swept as a duplicate of a
+    // real row that happens to be dated the 24th.
+    const key = recurringInstanceKey(tx);
+    if (!key) continue;
     const group = groups.get(key);
     if (group) {
       group.push({ id: tx.id, createdAt: tx.createdAt });

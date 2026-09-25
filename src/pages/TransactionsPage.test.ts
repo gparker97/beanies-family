@@ -112,6 +112,22 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
 }));
 
 // Mock vue-router
+// The statement import (#107) hangs off this page: its consumer and drawer are stubbed here so
+// this suite keeps testing the ledger, not the magic-beans pipeline (covered in its own suites).
+// A real ref: a plain `{ value: false }` object is TRUTHY in a template, so the gate never closed.
+vi.mock('@/composables/useMagicReader', async () => {
+  const { ref } = await import('vue');
+  return {
+    useMagicReader: () => ({ canReadStatement: ref(false) }),
+    useMagicReaderConsumer: () => {},
+  };
+});
+vi.mock('@/components/transactions/StatementImportModal.vue', () => ({
+  default: { name: 'StatementImportModal', render: () => null },
+}));
+vi.mock('@/components/ai/MagicBeansDoor.vue', () => ({
+  default: { name: 'MagicBeansDoor', render: () => null },
+}));
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {} }),
   useRouter: () => ({ push: vi.fn() }),
@@ -119,18 +135,14 @@ vi.mock('vue-router', () => ({
 
 // Mock recurring processor
 const mockProcessRecurringItems = vi.fn().mockResolvedValue({ processed: 0, errors: [] });
-const mockGetDueDatesInRange = vi.fn(
-  (item: { dayOfMonth?: number }, rangeStart: Date, rangeEnd: Date) => {
-    const day = item.dayOfMonth || 1;
-    const d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), day);
-    return d >= rangeStart && d <= rangeEnd ? [d] : [];
-  }
-);
-vi.mock('@/services/recurring/recurringProcessor', () => ({
+vi.mock('@/services/recurring/recurringProcessor', async (importOriginal) => ({
+  // The real projection loop (it calls the real `getDueDatesInRange` internally).
+  projectRecurringTransactions: (
+    await importOriginal<typeof import('@/services/recurring/recurringProcessor')>()
+  ).projectRecurringTransactions,
   formatFrequency: vi.fn((item: any) => item.frequency),
   getNextDueDateForItem: vi.fn(() => new Date('2024-02-01T00:00:00.000Z')),
   processRecurringItems: (...args: unknown[]) => mockProcessRecurringItems(...(args as [any])),
-  getDueDatesInRange: (...args: unknown[]) => mockGetDueDatesInRange(...(args as [any, any, any])),
 }));
 
 describe('TransactionsPage — Unified Ledger', () => {
@@ -978,14 +990,6 @@ describe('TransactionsPage — Unified Ledger', () => {
       // Change dayOfMonth from 5 to 20
       recurringStore.recurringItems = recurringStore.recurringItems.map((item: RecurringItem) =>
         item.id === 'r1' ? { ...item, dayOfMonth: 20 } : item
-      );
-      // Reset mock to return date with new dayOfMonth
-      mockGetDueDatesInRange.mockImplementation(
-        (item: { dayOfMonth?: number }, rangeStart: Date, rangeEnd: Date) => {
-          const day = item.dayOfMonth || 1;
-          const d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), day);
-          return d >= rangeStart && d <= rangeEnd ? [d] : [];
-        }
       );
       await wrapper.vm.$nextTick();
 

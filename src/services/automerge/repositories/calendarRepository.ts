@@ -10,6 +10,7 @@ import { mutate } from '../worker/docClient';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import type { MutationOp } from '../worker/protocol';
+import { ImportNotVisibleError } from './importErrors';
 import type { CreateFamilyActivityInput, FamilyActivity } from '@/types/models';
 import type {
   CalendarConnection,
@@ -88,20 +89,9 @@ export async function getCalendarEventLinksForConnection(
 
 // ── One-time import (#94) ──────────────────────────────────────────────────
 
-/** Thrown when the batch committed but its entities are not where readers look. */
-export class ImportNotVisibleError extends Error {
-  missing: number;
-  total: number;
-
-  constructor(missing: number, total: number) {
-    super(
-      `createImportedActivities: ${missing} of ${total} activities missing from the projection after a batch write`
-    );
-    this.name = 'ImportNotVisibleError';
-    this.missing = missing;
-    this.total = total;
-  }
-}
+// Moved to `importErrors.ts` (#107) so the statement import throws the same class; re-exported
+// here so existing importers and their tests keep one import path.
+export { ImportNotVisibleError };
 
 export interface ImportEntry {
   activity: CreateFamilyActivityInput;

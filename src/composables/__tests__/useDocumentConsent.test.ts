@@ -12,13 +12,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 const setSkip = vi.fn();
+const acknowledge = vi.fn();
 let skipPrompt = false;
+let statementAckAt: string | null = null;
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     get skipDocumentConsentPrompt() {
       return skipPrompt;
     },
+    get aiStatementConsentAcknowledgedAt() {
+      return statementAckAt;
+    },
     setSkipDocumentConsentPrompt: setSkip,
+    acknowledgeStatementConsent: acknowledge,
   }),
 }));
 
@@ -29,6 +35,8 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: (...a: unknown[]) => repo
 // if the module called `useSettingsStore()` at module scope rather than lazily inside its
 // functions, this import alone would throw and every test in the file would fail to load.
 import {
+  deferConsentForStatement,
+  isDeferredStatementConsent,
   requestConsent,
   resolveConsent,
   onConsentConfirm,
@@ -47,7 +55,9 @@ describe('useDocumentConsent (singleton, #64)', () => {
   beforeEach(async () => {
     setActivePinia(createPinia());
     skipPrompt = false;
+    statementAckAt = null;
     setSkip.mockReset().mockResolvedValue(undefined);
+    acknowledge.mockReset().mockResolvedValue(undefined);
     reportError.mockReset();
     // Settle anything a previous test left open, then let the serialization tail drain.
     resolveConsent(false);
@@ -144,5 +154,93 @@ describe('useDocumentConsent (singleton, #64)', () => {
 
   it('exposes consentOpen through the accessor for the single global mount', () => {
     expect(useDocumentConsent().consentOpen.value).toBe(false);
+  });
+
+  // ── The bank-statement variant (#107) ────────────────────────────────────────────────
+  describe('statement consent', () => {
+    it('shows the statement variant with its read count', async () => {
+      const { consentOpen: open, consentRequest } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'transactions', reads: 5 });
+      await flush();
+      expect(open.value).toBe(true);
+      expect(consentRequest.value).toEqual({ kind: 'transactions', reads: 5 });
+      resolveConsent(true);
+      expect(await pending).not.toBeNull();
+    });
+
+    it('a generic prompt carries no variant', async () => {
+      const { consentRequest } = useDocumentConsent();
+      const pending = requestConsent();
+      await flush();
+      expect(consentRequest.value).toBeNull();
+      resolveConsent(false);
+      await pending;
+    });
+
+    it('"don\'t ask again" does NOT skip a statement the family has never acknowledged', async () => {
+      // The merchant list is a new disclosure: a family that skips the generic prompt still
+      // sees the statement one once.
+      skipPrompt = true;
+      const { consentOpen: open } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'transactions', reads: 1 });
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(true);
+      expect(await pending).not.toBeNull();
+    });
+
+    it('skips a statement once the family has acknowledged it and chose "don\'t ask again"', async () => {
+      skipPrompt = true;
+      statementAckAt = '2026-09-25T00:00:00.000Z';
+      const { consentOpen: open } = useDocumentConsent();
+      const grant = await requestConsent({ kind: 'transactions', reads: 3 });
+      expect(grant).not.toBeNull();
+      expect(open.value).toBe(false);
+    });
+
+    it('still asks for a statement when acknowledged but the family asks every time', async () => {
+      statementAckAt = '2026-09-25T00:00:00.000Z';
+      const { consentOpen: open } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'transactions', reads: 2 });
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(false);
+      expect(await pending).toBeNull();
+    });
+
+    it('confirming the statement variant records the acknowledgement once', async () => {
+      const pending = requestConsent({ kind: 'transactions', reads: 2 });
+      await flush();
+      await onConsentConfirm(false);
+      expect(await pending).not.toBeNull();
+      expect(acknowledge).toHaveBeenCalledTimes(1);
+      expect(setSkip).not.toHaveBeenCalled();
+    });
+
+    it('does not re-record an acknowledgement that already exists', async () => {
+      statementAckAt = '2026-09-25T00:00:00.000Z';
+      const pending = requestConsent({ kind: 'transactions', reads: 2 });
+      await flush();
+      await onConsentConfirm(false);
+      await pending;
+      expect(acknowledge).not.toHaveBeenCalled();
+    });
+
+    it('a failed acknowledgement still resolves the caller with a grant', async () => {
+      acknowledge.mockRejectedValueOnce(new Error('disk full'));
+      const pending = requestConsent({ kind: 'transactions', reads: 1 });
+      await flush();
+      await onConsentConfirm(false);
+      expect(await pending).not.toBeNull();
+      expect(reportError).toHaveBeenCalledTimes(1);
+    });
+
+    it('the deferred marker is distinguishable from a real grant', async () => {
+      skipPrompt = true;
+      statementAckAt = '2026-09-25T00:00:00.000Z';
+      const grant = await requestConsent();
+      expect(isDeferredStatementConsent(deferConsentForStatement())).toBe(true);
+      expect(isDeferredStatementConsent(grant!)).toBe(false);
+    });
   });
 });

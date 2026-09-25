@@ -156,7 +156,7 @@ describe('seal/open against the real ehbp (#49)', () => {
       (
         await sealForEnclave(pub, {
           model: 'gemma4-31b',
-          messages: EXTRACTION_TASKS.share.buildMessages(source, today, hint),
+          messages: EXTRACTION_TASKS.share.buildMessages(source, today, { kindHint: hint }),
           temperature: 0,
         })
       ).ciphertext.length;
@@ -164,6 +164,8 @@ describe('seal/open against the real ehbp (#49)', () => {
     const paid = await sealOf();
     const TOLERANCE = GRANT_BYTES_TOLERANCE;
 
+    // `transactions` is left out on purpose: a re-read as a statement is never a free
+    // correction (it costs a bean per page), so it never carries a grant to be sized against.
     for (const hint of ['event', 'travel', 'recipe'] as const) {
       const reread = await sealOf(hint);
       expect(

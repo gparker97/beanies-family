@@ -838,7 +838,7 @@ async function addQuickIdea() {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <PageWelcomeSubtitle :text="t('travel.subtitle')" />
         <div class="flex flex-wrap items-center gap-2">
-          <MagicBeansDoor @closed="targetTrip()">
+          <MagicBeansDoor hint="travel" @closed="targetTrip()">
             <template #trigger="{ open }">
               <MagicReaderPill
                 :label="t('ai.magic.perform')"
@@ -985,7 +985,7 @@ async function addQuickIdea() {
             <!-- ✨ Beanies AI — read a booking into THIS trip. Same responsive pill as
                  everywhere else; defaults the review modal to the open trip (user can
                  still switch to New / another trip). -->
-            <MagicBeansDoor @closed="targetTrip()">
+            <MagicBeansDoor hint="travel" @closed="targetTrip()">
               <template #trigger="{ open }">
                 <MagicReaderPill
                   :label="t('ai.magic.perform')"

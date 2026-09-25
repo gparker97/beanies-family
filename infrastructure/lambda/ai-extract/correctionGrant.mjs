@@ -53,7 +53,7 @@ import { grantKey, hash, resolveClient } from './ddb.mjs';
 const GRANT_TTL_SECONDS = 3600;
 
 /** The kinds a correction may target. Re-stated here because TypeScript does not exist at runtime. */
-export const SHARE_KINDS = Object.freeze(['event', 'travel', 'recipe']);
+export const SHARE_KINDS = Object.freeze(['event', 'travel', 'recipe', 'transactions']);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

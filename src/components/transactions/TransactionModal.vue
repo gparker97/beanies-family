@@ -22,6 +22,8 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import AccountSelect from '@/components/ui/AccountSelect.vue';
+import MagicBeansQuickCard from '@/components/ai/MagicBeansQuickCard.vue';
+import { useMagicReader } from '@/composables/useMagicReader';
 import { useTransferForm } from '@/composables/useTransferForm';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -40,15 +42,11 @@ import type {
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateRecurringItemInput,
-  Account,
 } from '@/types/models';
 import { toDateInputValue, formatNookDate, extractDatePart } from '@/utils/date';
 import { computeGoalAllocRaw, isLiabilityType } from '@/utils/finance';
-import {
-  buildAccountOptionGroups,
-  type AccountGroupId,
-  type AccountOptionGroup,
-} from '@/utils/accountOptions';
+import type { AccountOptionGroup } from '@/utils/accountOptions';
+import { useAccountOptionGroups } from '@/composables/useAccountOptionGroups';
 import { calculateAmortization, calculateExtraPayment, findLoanDetails } from '@/utils/loanPayment';
 import { activityCategoryToExpenseCategory } from '@/constants/categories';
 
@@ -159,6 +157,9 @@ const isAmountLocked = computed(() => {
 });
 
 // Reset form when modal opens
+/** Offer a statement import at the top of a NEW transaction (#107): finance-gated like the reader. */
+const { canReadStatement } = useMagicReader();
+
 const { isEditing, isSubmitting } = useFormModal(
   () => props.transaction ?? props.recurringItem ?? null,
   () => props.open,
@@ -274,35 +275,16 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-// Shared label + group builders for every account picker: alphabetical within a
-// group, grouped by kind, with the balance (or amount owed) shown inline.
-const groupLabel = (id: AccountGroupId): string => {
-  switch (id) {
-    case 'cash':
-      return t('txn.accountGroup.cash');
-    case 'cards':
-      return t('txn.accountGroup.cards');
-    case 'investments':
-      return t('txn.accountGroup.investments');
-    case 'loans':
-      return t('txn.accountGroup.loans');
-    case 'other':
-      return t('txn.accountGroup.other');
-  }
-};
-const makeAccountLabel = (a: Account) =>
-  isLiabilityType(a.type)
-    ? `${a.name} · ${t('txn.owedLabel')} ${formatCurrencyWithCode(a.balance, a.currency)}`
-    : `${a.name} · ${formatCurrencyWithCode(a.balance, a.currency)}`;
+// Shared label + group builder for every account picker (grouped by kind, alphabetical, balance
+// inline); one implementation with the statement import's picker (#107).
+const { groupsFor: accountGroupsFor } = useAccountOptionGroups();
 
 // Money in/out source: any active account (currency-restricted when linked).
 const accountGroups = computed<AccountOptionGroup[]>(() =>
-  buildAccountOptionGroups(
+  accountGroupsFor(
     accountsStore.activeAccounts.filter(
       (a) => !hasActiveLink.value || a.currency === currency.value
-    ),
-    makeAccountLabel,
-    groupLabel
+    )
   )
 );
 
@@ -388,18 +370,10 @@ const {
 // "send" money out of a card/loan — that would be borrowing). DESTINATION can be
 // any other account (paying a card/loan is a transfer to it).
 const transferSourceGroups = computed<AccountOptionGroup[]>(() =>
-  buildAccountOptionGroups(
-    accountsStore.activeAccounts.filter((a) => !isLiabilityType(a.type)),
-    makeAccountLabel,
-    groupLabel
-  )
+  accountGroupsFor(accountsStore.activeAccounts.filter((a) => !isLiabilityType(a.type)))
 );
 const transferDestGroups = computed<AccountOptionGroup[]>(() =>
-  buildAccountOptionGroups(
-    accountsStore.activeAccounts.filter((a) => a.id !== accountId.value),
-    makeAccountLabel,
-    groupLabel
-  )
+  accountGroupsFor(accountsStore.activeAccounts.filter((a) => a.id !== accountId.value))
 );
 
 // Entering transfer mode: transfers are one-time + unlinked, and the amount is
@@ -563,7 +537,9 @@ function handleSave() {
         category: '',
         date: date.value,
         description: description.value.trim(),
-        isReconciled: false,
+        // Preserve on edit (#107): a statement import reconciles rows, and editing one here
+        // must not silently un-reconcile it. New rows start unreconciled.
+        isReconciled: props.transaction?.isReconciled ?? false,
       };
       if (isEditing.value && props.transaction) {
         emit('save', { id: props.transaction.id, data: data as UpdateTransactionInput });
@@ -650,7 +626,8 @@ function handleSave() {
       category: category.value,
       date: date.value,
       description: description.value.trim(),
-      isReconciled: false,
+      // Preserved on edit, as above (#107).
+      isReconciled: props.transaction?.isReconciled ?? false,
     };
 
     if (isEditing.value && props.transaction) {
@@ -744,6 +721,15 @@ function dismissLinkPrompt() {
           {{ t('transactions.editingProjected').replace('{date}', formatNookDate(projectedDate)) }}
         </span>
       </div>
+    </div>
+
+    <!-- Magic beans: import a whole statement instead of typing one line. Adding only, never
+         on an edit or a recurring item; the page closes this drawer when the review opens. -->
+    <div
+      v-if="canReadStatement && !isEditing && !isEditingRecurring && !projectedDate"
+      class="mb-4"
+    >
+      <MagicBeansQuickCard hint="transactions" :subtitle="t('transactions.magicHint')" />
     </div>
 
     <!-- 0. Recurring / One-time tab bar (hidden for recurring-item edits and transfers) -->

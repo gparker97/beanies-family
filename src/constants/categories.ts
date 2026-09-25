@@ -47,6 +47,14 @@ export const INCOME_CATEGORIES: Category[] = [
     group: 'Investments',
   },
   {
+    id: 'interest',
+    name: 'Interest',
+    icon: 'account-savings',
+    type: 'income',
+    color: '#0e7490',
+    group: 'Investments',
+  },
+  {
     id: 'investments',
     name: 'Investment Returns',
     icon: 'trending-up',
@@ -564,6 +572,7 @@ export const CATEGORY_EMOJI_MAP: Record<string, string> = {
   consultancy: '🤝',
   other_employment: '💼',
   dividends: '💰',
+  interest: '🏦',
   investments: '📈',
   other_investment: '📊',
   rental: '🏠',

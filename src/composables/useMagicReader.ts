@@ -33,10 +33,11 @@ import {
 import { surfaceForOrigin } from '@/types/magicPayload';
 import type { SharePayload, ShareKind } from '@/types/magicPayload';
 import { MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
+import type { QuickAddPermission } from '@/constants/quickAddItems';
 import { reportError } from '@/utils/errorReporter';
 
 /** Which AI reader an affordance asked to open. */
-export type MagicReader = 'photo' | 'document' | 'recipe';
+export type MagicReader = 'photo' | 'document' | 'recipe' | 'statement';
 
 /**
  * reader → the share kind it consumes, at the TYPE level, so a page's consumer receives
@@ -47,6 +48,7 @@ export interface ReaderShareKind {
   photo: 'event';
   document: 'travel';
   recipe: 'recipe';
+  statement: 'transactions';
 }
 
 /** The one payload variant a given reader can ever receive. */
@@ -60,14 +62,38 @@ export type PayloadFor<R extends MagicReader> = Extract<SharePayload, { kind: Re
  * `flag` is optional on purpose: the recipe reader ships UNGATED by explicit decision
  * (greg, #72). Do not add a flag for it — feature gating in this project is by request only.
  */
+/*
+ * `permission` names which member permission the reader's DESTINATION needs, in the same
+ * vocabulary the quick-add sheet uses. The statement reader writes transactions, so it needs
+ * `finance`; the other three write activities, trips and recipes (#107).
+ */
 const MAGIC_READERS: Record<
   MagicReader,
-  { route: string; flag?: 'aiPhotoExtract' | 'aiTravelExtract'; shareKind: ShareKind }
+  {
+    route: string;
+    flag?: 'aiPhotoExtract' | 'aiTravelExtract';
+    shareKind: ShareKind;
+    permission: QuickAddPermission;
+  }
 > = {
-  photo: { route: '/activities', flag: 'aiPhotoExtract', shareKind: 'event' },
-  document: { route: '/travel', flag: 'aiTravelExtract', shareKind: 'travel' },
-  recipe: { route: '/pod/cookbook', shareKind: 'recipe' },
+  photo: {
+    route: '/activities',
+    flag: 'aiPhotoExtract',
+    shareKind: 'event',
+    permission: 'activities',
+  },
+  document: {
+    route: '/travel',
+    flag: 'aiTravelExtract',
+    shareKind: 'travel',
+    permission: 'activities',
+  },
+  recipe: { route: '/pod/cookbook', shareKind: 'recipe', permission: 'activities' },
+  statement: { route: '/transactions', shareKind: 'transactions', permission: 'finance' },
 };
+
+/** Every reader id, typed, for code that must consider them all. */
+const MAGIC_READER_IDS = Object.keys(MAGIC_READERS) as MagicReader[];
 
 /**
  * kind → reader, so a shared document's detected kind resolves to a route + flag + permission
@@ -75,9 +101,7 @@ const MAGIC_READERS: Record<
  * asserted total and injective by a unit test, so a fourth reader cannot half-land.
  */
 export function readerForShareKind(kind: ShareKind): MagicReader {
-  const entry = (Object.keys(MAGIC_READERS) as MagicReader[]).find(
-    (r) => MAGIC_READERS[r].shareKind === kind
-  );
+  const entry = MAGIC_READER_IDS.find((r) => MAGIC_READERS[r].shareKind === kind);
   // Unreachable while the totality test passes; throwing beats returning a wrong reader.
   if (!entry) throw new Error(`No magic reader for share kind "${kind}"`);
   return entry;
@@ -108,9 +132,15 @@ function sharedPermissions(): ReturnType<typeof usePermissions> {
 }
 
 export function isReaderEnabled(reader: MagicReader): boolean {
-  const { canEditActivities } = sharedPermissions();
-  const { flag } = MAGIC_READERS[reader];
-  return canEditActivities.value && (flag === undefined || isFlagEnabled(flag));
+  const { canEditActivities, canViewFinances } = sharedPermissions();
+  // Exhaustive over the permission union, so a new permission is a compile error here rather
+  // than a reader that silently falls open (the same shape as `useQuickAddAvailability`).
+  const permissionGate: Record<QuickAddPermission, Ref<boolean>> = {
+    finance: canViewFinances,
+    activities: canEditActivities,
+  };
+  const { flag, permission } = MAGIC_READERS[reader];
+  return permissionGate[permission].value && (flag === undefined || isFlagEnabled(flag));
 }
 
 /**
@@ -316,13 +346,15 @@ export function useMagicReader() {
   // SUBSET). Gating this reader on canManagePod would hide it from members who are
   // allowed to edit the cookbook.
   const canReadRecipe = gate('recipe');
-  const canReadAny = computed(
-    () => canReadPhoto.value || canReadDocument.value || canReadRecipe.value
-  );
+  // Statements write transactions, so this one follows `canViewFinances` (#107).
+  const canReadStatement = gate('statement');
+  // Derived from the registry, so a fifth reader cannot be forgotten here.
+  const canReadAny = computed(() => MAGIC_READER_IDS.some(isReaderEnabled));
   return {
     canReadPhoto,
     canReadDocument,
     canReadRecipe,
+    canReadStatement,
     canReadAny,
     openDocumentReader,
   };

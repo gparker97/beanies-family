@@ -1,7 +1,7 @@
 import type { ShareKind } from '@/types/magicPayload';
 
 /**
- * The three things magic beans can make, declared ONCE.
+ * The four things magic beans can make, declared ONCE.
  *
  * Keyed on `ShareKind` — the vocabulary the rest of the system already uses — rather than on a
  * product noun, so a fourth reader is a **compile error** here rather than a tile that silently
@@ -16,9 +16,11 @@ import type { ShareKind } from '@/types/magicPayload';
  *   4. an entry HERE                              (this `Record<ShareKind, …>` will not compile without one)
  *   5. an `ai.capture.dest.<kind>` string         (`uiStrings.ts` — its accessible name)
  *   6. an `ai.capture.pick.as.<kind>` string      (`uiStrings.ts` — "we'll read this as a …", #108)
+ *   7. an `ai.capture.noun.<kind>` string         (`uiStrings.ts` — "an activity", in a sentence)
+ *   8. a `.magic-tick:nth-child(n)` delay         (`style.css` — the overlay's ticking stagger)
  *
- * 1-4 fail the build; 5 and 6 fail it too, via the template-literal keys in the sheet. Nothing
- * else needs touching: the magic-beans sheet, the reading overlay AND the "not right?"
+ * 1-4 fail the build; 5-7 fail it too, via the template-literal keys. 8 does not: without it
+ * the new tile pulses in step with the first. Beyond those: the magic-beans sheet, the reading overlay AND the "not right?"
  * correction surface all ITERATE this module rather than listing kinds, so all three pick the
  * new kind up at once. Nothing server-side changes either — the meter and the grant are
  * kind-agnostic.
@@ -41,6 +43,7 @@ export const MAGIC_DESTINATIONS: Record<ShareKind, { emoji: string }> = {
   event: { emoji: '📅' },
   travel: { emoji: '✈️' },
   recipe: { emoji: '🍳' },
+  transactions: { emoji: '🏦' },
 };
 
 /** Iteration order for the tiles. Typed, so the `t()` key stays a compile-checked literal. */

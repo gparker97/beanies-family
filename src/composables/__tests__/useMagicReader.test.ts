@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Mutable mock state — hoisted so the vi.mock factories below can close over it.
 const h = vi.hoisted(() => ({
   canEdit: { value: true },
+  canViewFinances: { value: true },
   // Controllable flag state — defaults on (both readers shipped + committed-true).
   flags: { aiPhotoExtract: true, aiTravelExtract: true } as Record<string, boolean>,
   closeQuickAdd: vi.fn(),
@@ -14,7 +15,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/composables/usePermissions', () => ({
-  usePermissions: () => ({ canEditActivities: h.canEdit }),
+  usePermissions: () => ({ canEditActivities: h.canEdit, canViewFinances: h.canViewFinances }),
 }));
 vi.mock('@/config/flags', () => ({
   isFlagEnabled: (flag: string) => h.flags[flag] === true,
@@ -57,6 +58,7 @@ function resetPending(): void {
 beforeEach(() => {
   vi.clearAllMocks();
   h.canEdit.value = true;
+  h.canViewFinances.value = true;
   h.flags.aiPhotoExtract = true;
   h.flags.aiTravelExtract = true;
   h.currentPath.value = '/';
@@ -66,20 +68,36 @@ beforeEach(() => {
 
 describe('availableShareKinds — the one availability rule (#108)', () => {
   it('offers every kind, in tile order, when the member can edit and every flag is on', () => {
-    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe']);
+    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe', 'transactions']);
   });
 
   it('drops a kind whose reader flag is off, keeping the others in order', () => {
     h.flags.aiPhotoExtract = false;
-    expect(availableShareKinds()).toEqual(['travel', 'recipe']);
+    expect(availableShareKinds()).toEqual(['travel', 'recipe', 'transactions']);
     h.flags.aiTravelExtract = false;
-    // The recipe reader is ungated by decision (#72), so it is the one that remains.
-    expect(availableShareKinds()).toEqual(['recipe']);
+    // The recipe and statement readers are ungated by decision, so they remain.
+    expect(availableShareKinds()).toEqual(['recipe', 'transactions']);
   });
 
-  it('offers nothing to a member without edit permission, whatever the flags say', () => {
+  it('offers only statements to a member who can see finances but not edit activities', () => {
     h.canEdit.value = false;
-    expect(availableShareKinds()).toEqual([]);
+    expect(availableShareKinds()).toEqual(['transactions']);
+  });
+
+  it('never offers statements to a member without finance access (#107)', () => {
+    h.canViewFinances.value = false;
+    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe']);
+    const r = useMagicReader();
+    expect(r.canReadStatement.value).toBe(false);
+    // The other readers still keep the door open.
+    expect(r.canReadAny.value).toBe(true);
+  });
+
+  it('keeps the door open for a finance-only member, through the statement reader', () => {
+    h.canEdit.value = false;
+    const r = useMagicReader();
+    expect(r.canReadStatement.value).toBe(true);
+    expect(r.canReadAny.value).toBe(true);
   });
 });
 
@@ -94,6 +112,9 @@ describe('useMagicReader — gating', () => {
 
   it('both readers gated off when the member cannot edit activities (regardless of flags)', () => {
     h.canEdit.value = false;
+    // Finance access would keep the door open through the statement reader (#107); this case
+    // is about the activity readers alone.
+    h.canViewFinances.value = false;
     const r = useMagicReader();
     expect(r.canReadPhoto.value).toBe(false);
     expect(r.canReadDocument.value).toBe(false);
@@ -136,6 +157,7 @@ describe('useMagicReader — gating', () => {
 
   it('every reader — including the ungated recipe one — still requires edit permission', () => {
     h.canEdit.value = false;
+    h.canViewFinances.value = false;
     h.flags.aiPhotoExtract = true;
     h.flags.aiTravelExtract = true;
     const r = useMagicReader();

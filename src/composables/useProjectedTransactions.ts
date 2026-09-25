@@ -1,9 +1,9 @@
 import { computed, type Ref } from 'vue';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useToday } from '@/composables/useToday';
-import { getDueDatesInRange } from '@/services/recurring/recurringProcessor';
+import { projectRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import type { DisplayTransaction } from '@/types/models';
-import { getStartOfMonth, getEndOfMonth, toDateInputValue } from '@/utils/date';
+import { getStartOfMonth, getEndOfMonth } from '@/utils/date';
 
 /**
  * Generates ephemeral projected transactions for the current and future months
@@ -31,29 +31,7 @@ export function useProjectedTransactions(selectedMonth: Ref<Date>) {
 
     const start = getStartOfMonth(selectedMonth.value);
     const end = getEndOfMonth(selectedMonth.value);
-    const projected: DisplayTransaction[] = [];
-
-    for (const item of recurringStore.filteredActiveItems) {
-      for (const date of getDueDatesInRange(item, start, end)) {
-        projected.push({
-          id: `projected-${item.id}-${toDateInputValue(date)}`,
-          accountId: item.accountId,
-          type: item.type,
-          amount: item.amount,
-          currency: item.currency,
-          category: item.category,
-          date: toDateInputValue(date),
-          description: item.description,
-          recurringItemId: item.id,
-          isReconciled: false,
-          isProjected: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    }
-
-    return projected;
+    return projectRecurringTransactions(recurringStore.filteredActiveItems, start, end);
   });
 
   return { isFutureMonth, projectedTransactions };

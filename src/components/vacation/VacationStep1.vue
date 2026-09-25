@@ -68,7 +68,7 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
        the door leaves "OR ADD IT YOURSELF" sitting above the manual fields with nothing above
        it to add instead. -->
   <div v-if="isNewTrip && canReadAny" class="mb-5">
-    <MagicBeansDoor>
+    <MagicBeansDoor hint="travel">
       <template #trigger="{ open }">
         <button
           type="button"

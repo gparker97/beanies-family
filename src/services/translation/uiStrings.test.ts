@@ -173,6 +173,7 @@ describe('uiStrings', () => {
       // The whole one-time import surface. It is about the family's real Google
       // Calendar data, and a reader who acts on a euphemism here ends up with two
       // of everything or an edit that never reaches their calendar.
+      'statementImport.',
       'calendarImport.',
       'calendarSync.reconnect.',
       // Connection loss, told to someone who may not be able to fix it — they need

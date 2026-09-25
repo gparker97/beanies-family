@@ -467,8 +467,13 @@ export const managedProvider: ExtractionProvider = {
         // spent" fence dies with plaintext, exactly as it already does for BYOK; biasing your own
         // read costs you a bean, which is the same trade that tier already makes. A `stated` hint
         // (#108) is exactly that trade: a normal billable read whose prompt is pre-labelled.
-        request.correction?.to,
-        request.correction?.reason
+        {
+          kindHint: request.correction?.to,
+          hintReason: request.correction?.reason,
+          // The statement task's merchant memory (#107). Built into the prompt HERE, inside the
+          // sealed body, so it never reaches our proxy in the clear.
+          context: request.context,
+        }
       );
 
       const sealed = await sealForEnclave(enclave.hpkePublicKey, {

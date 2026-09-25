@@ -519,9 +519,33 @@ export interface Transaction {
   recurringItemId?: UUID; // Links to source RecurringItem if auto-generated
   adjustment?: BalanceAdjustmentMeta; // only set when type === 'balance_adjustment'
   isReconciled: boolean;
+  // ── Statement import provenance (#107). All optional and additive: a row typed by hand
+  // carries none of them, and an older client that does not know them keeps them on edit
+  // (the repository only deletes keys explicitly set to `undefined`).
+  /** The bank's raw line text, shown as "on your statement as". Never overwrites `description`. */
+  statementDescription?: string;
+  /** Identifies the statement line this row came from or absorbed. A later import that computes
+   *  the same fingerprint shows the line as already added. See `utils/statement/fingerprint.ts`. */
+  importFingerprint?: string;
+  /** Groups the rows written by one import run. */
+  importId?: UUID;
+  importSource?: StatementImportSource;
+  /** The statement period, `YYYY-MM-DD` both ends. */
+  importPeriod?: { from: string; to: string };
+  /**
+   * The recurring DUE date (`YYYY-MM-DD`) this row stands for, when it is dated differently (#107):
+   * a statement line merged into a projected instance is written on the day the bank took the
+   * money, not the day it was due. The recurring processor treats this due date as materialised,
+   * so it never adds a second instance beside it. Exact per due date, so a weekly item's other
+   * instances in the month are unaffected.
+   */
+  recurringDueDate?: string;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
+
+/** Where an imported statement came from. Provenance only; the document itself is never kept. */
+export type StatementImportSource = 'pdf' | 'image' | 'csv' | 'text';
 
 // RecurringItem - Template for generating recurring transactions
 export type RecurringFrequency = 'daily' | 'monthly' | 'yearly';
@@ -1994,6 +2018,7 @@ export interface Settings {
   country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
+  aiStatementConsentAcknowledgedAt?: ISODateString; // #107: when the family first confirmed the bank-statement consent (its merchant-list disclosure is new, so a family that skips the generic prompt still sees it once). Family-scoped.
   calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.

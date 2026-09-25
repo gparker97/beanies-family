@@ -48,7 +48,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { deferConsentForStatement, useDocumentConsent } from '@/composables/useDocumentConsent';
 import { availableShareKinds, useMagicReader } from '@/composables/useMagicReader';
 import {
   IN_APP_ENV,
@@ -56,7 +56,7 @@ import {
   logCaptureOpened,
   refuseIfBusy,
 } from '@/composables/useSharedDocumentIngest';
-import type { ConsentGrant } from '@/composables/useDocumentConsent';
+import type { ConsentGrant, DeferredStatementConsent } from '@/composables/useDocumentConsent';
 import type { InAppDestination } from '@/composables/useSharedDocumentIngest';
 import type { ShareKind } from '@/types/magicPayload';
 
@@ -76,9 +76,25 @@ const props = defineProps<{
    * mismatched kind still lands on the page that owns it.
    */
   claim?: InAppDestination['claim'];
+  /**
+   * The kind to pre-pick when the sheet opens: the surface the door sits on (the calendar and
+   * activity drawer pick `event`, travel `travel`, the cookbook and recipe form `recipe`, the
+   * Transactions page, Budget tile and add-transaction drawer `transactions`). The person can
+   * still change or clear it. Only the app-wide doors (the quick-add sheet) leave it unset.
+   */
+  hint?: ShareKind;
 }>();
 
 const { canReadAny } = useMagicReader();
+
+/**
+ * Marks a pick that is this door's own pre-pick, left as it was: the SURFACE said what it is,
+ * not the person. The ingest logs it apart (so the #108 pick metrics stay about people) and
+ * does not tell the person "your pick wasn't needed" for a pick they never made.
+ */
+function surfaceHint(hint?: ShareKind): { hintFromSurface?: true } {
+  return hint && hint === props.hint ? { hintFromSurface: true } : {};
+}
 const { showToast } = useToast();
 const { t } = useTranslation();
 
@@ -115,7 +131,7 @@ const picker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
  * outlive the consent it was made under.
  */
 const PICKER_GRANT_TTL_MS = 2 * 60_000;
-let pending: { grant: ConsentGrant; hint?: ShareKind } | null = null;
+let pending: { grant: ConsentGrant | DeferredStatementConsent; hint?: ShareKind } | null = null;
 let grantTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearGrant(): void {
@@ -124,7 +140,7 @@ function clearGrant(): void {
   grantTimer = null;
 }
 
-function holdGrant(grant: ConsentGrant, hint?: ShareKind): void {
+function holdGrant(grant: ConsentGrant | DeferredStatementConsent, hint?: ShareKind): void {
   clearGrant();
   pending = { grant, hint };
   grantTimer = setTimeout(clearGrant, PICKER_GRANT_TTL_MS);
@@ -148,14 +164,19 @@ function closeSheet(): void {
  *
  * Returns the grant, or `null` when the user has already been told why nothing happened —
  * a busy toast, or a silent decline. Either way the caller simply returns.
+ *
+ * A Transactions pick (#107) is the one exception to consent-at-the-commit: a statement's cost
+ * (one bean per page) is unknown until its pages are classified, and the statement consent
+ * states it. So this returns the DEFERRED marker, and the spine asks once the count is known.
  */
-async function commit(): Promise<ConsentGrant | null> {
+async function commit(hint?: ShareKind): Promise<ConsentGrant | DeferredStatementConsent | null> {
   if (refuseIfBusy(IN_APP_ENV)) {
     // A refusal ends this capture as surely as a decline does — the comment below applies to
     // both, so the emit has to be on both paths.
     emit('closed');
     return null;
   }
+  if (hint === 'transactions') return deferConsentForStatement();
   const granted = await requestConsent();
   // A refusal or a decline ends this capture. The sheet stays open (the user may try again),
   // but any tap-time state a page is holding for it must be released now — otherwise a target
@@ -165,13 +186,13 @@ async function commit(): Promise<ConsentGrant | null> {
 }
 
 async function handlePaste(text: string, hint?: ShareKind): Promise<void> {
-  const grant = await commit();
+  const grant = await commit(hint);
   if (!grant) return;
   sheetOpen.value = false;
   // Deliberately not awaited: the ingest owns its own errors and runs for several seconds
   // behind the global reading overlay. Awaiting would keep this handler alive across a
   // navigation for no benefit.
-  void ingestInAppSource({ kind: 'paste', text, hint }, grant, destination());
+  void ingestInAppSource({ kind: 'paste', text, hint, ...surfaceHint(hint) }, grant, destination());
 }
 
 /**
@@ -179,7 +200,7 @@ async function handlePaste(text: string, hint?: ShareKind): Promise<void> {
  * function. The grant (and the pick) are held for the picker, which comes back later, if at all.
  */
 async function commitToPicker(pick: 'pickCamera' | 'pickFile', hint?: ShareKind): Promise<void> {
-  const grant = await commit();
+  const grant = await commit(hint);
   if (!grant) return;
   holdGrant(grant, hint);
   sheetOpen.value = false;
@@ -212,7 +233,11 @@ function handlePickedFile(file: File): void {
     showToast('info', t('ai.picker.expired.title'), t('ai.picker.expired.message'));
     return;
   }
-  void ingestInAppSource({ kind: 'file', file, hint: held.hint }, held.grant, destination());
+  void ingestInAppSource(
+    { kind: 'file', file, hint: held.hint, ...surfaceHint(held.hint) },
+    held.grant,
+    destination()
+  );
 }
 
 defineExpose({ open });
@@ -226,6 +251,7 @@ defineExpose({ open });
     <MagicBeansSheet
       :open="sheetOpen"
       :kinds="kinds"
+      :initial-hint="props.hint"
       @close="closeSheet"
       @submit="(text: string, hint?: ShareKind) => void handlePaste(text, hint)"
       @camera="(hint?: ShareKind) => void commitToPicker('pickCamera', hint)"
