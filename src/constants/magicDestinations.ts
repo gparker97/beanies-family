@@ -15,14 +15,17 @@ import type { ShareKind } from '@/types/magicPayload';
  *   3. a `MAGIC_READERS` entry                    (`composables/useMagicReader.ts` — where it routes)
  *   4. an entry HERE                              (this `Record<ShareKind, …>` will not compile without one)
  *   5. an `ai.capture.dest.<kind>` string         (`uiStrings.ts` — its accessible name)
+ *   6. an `ai.capture.pick.as.<kind>` string      (`uiStrings.ts` — "we'll read this as a …", #108)
  *
- * 1-4 fail the build; 5 fails it too, via the template-literal key below. Nothing else needs
- * touching: the magic-beans sheet, the reading overlay AND the "not right?" correction surface
- * all ITERATE this module rather than listing kinds, so all three pick the new kind up at once.
- * Nothing server-side changes either — the meter and the grant are kind-agnostic.
+ * 1-4 fail the build; 5 and 6 fail it too, via the template-literal keys in the sheet. Nothing
+ * else needs touching: the magic-beans sheet, the reading overlay AND the "not right?"
+ * correction surface all ITERATE this module rather than listing kinds, so all three pick the
+ * new kind up at once. Nothing server-side changes either — the meter and the grant are
+ * kind-agnostic.
  *
- * ONE rendering, used three times. `emoji` is what every surface draws: faint tiles at rest in
- * the sheet, ticking then resolving in the overlay, and the choices in the correction surface.
+ * ONE rendering, used three times. `emoji` is what every surface draws: the optional pick
+ * tiles in the sheet (#108 — tappable, none selected by default), ticking then resolving in
+ * the overlay, and the choices in the correction surface.
  * ⚠️ There was a second, `icon` (a BeanieIcon name), for when the correction opened a
  * `ChoiceModal`. It is gone with that modal, and deliberately: BeanieIcon is a monochrome
  * stroke glyph and the tiles read as DISABLED next to the coloured ones everywhere else. If a

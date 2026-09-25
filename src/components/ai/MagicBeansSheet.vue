@@ -1,21 +1,33 @@
 <script setup lang="ts">
 /**
  * The one magic-beans surface (#84) — direction B of
- * `docs/mockups/magic-beans-one-button-2026-09-03.html`.
+ * `docs/mockups/magic-beans-one-button-2026-09-03.html`, with the optional pick of #108
+ * (direction C of `docs/mockups/magic-beans-category-chips-2026-09-25.html`).
  *
- * DESIGN NOTE — why there is no source chooser.
+ * DESIGN NOTE — why there is no MANDATORY type chooser, and why there is an optional one.
  *
- * The three chips this replaces (📸 invite / ✈️ travel booking / 🍳 recipe) asked the user
- * "what IS this?" before beanies had looked at it. That is the AI's job, and it is a question
- * a person can get *wrong* — and picking wrong did not produce a helpful error, it produced a
- * bad extraction: a filled-in form of the wrong shape that the user has to notice. The share
- * path never asked it, which is why the same school PDF landed correctly from Gmail and
- * wrongly from inside beanies.
+ * The three chips #84 replaced (📸 invite / ✈️ travel booking / 🍳 recipe) asked the user
+ * "what IS this?" before beanies had looked at it, as a question that had to be answered. That
+ * is the AI's job, and picking wrong did not produce a helpful error, it produced a bad
+ * extraction: a filled-in form of the wrong shape that the user has to notice. The share path
+ * never asked it, which is why the same school PDF landed correctly from Gmail and wrongly
+ * from inside beanies.
  *
  * So this asks "where is it?" instead, which is a question the user always knows the answer
  * to. The paste field is the hero because it is the case with no other home — a photo already
  * has a camera button, but a class-group message has nothing. Camera and file sit underneath,
  * one tap away and visually quieter.
+ *
+ * THE TILES ARE AN OFFER, NOT A QUESTION (#108). The person handing something over always
+ * knows what it is, so the capability tiles at the foot are tappable: "tell us what this is"
+ * lets them help beanies out in advance, for this one capture. Nothing selected is the default
+ * and stays the common case — Save never waits on a pick, and the tiles never ask. A pick is
+ * emitted as `hint` and is authoritative for that read (the orchestrator sends it down the same
+ * channel a "not right?" correction uses). This is NOT the per-surface positional hint the
+ * 2026-09-14 plan rejected: nothing about WHERE the sheet was opened is ever sent.
+ *
+ * The sheet is a VIEW. It draws the `kinds` it is given — the door filters them by permission
+ * and flag through `availableShareKinds` — and knows nothing about readers itself.
  *
  * This used to sit beside `RecipeLinkModal`, which asked the same question in a link-only way:
  * it validated a URL, disabled save until it routed, and showed a three-way hint. That modal is
@@ -44,21 +56,69 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import AiSourceButtons from '@/components/ai/AiSourceButtons.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { MAGIC_DESTINATIONS, MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
+import { MAGIC_DESTINATIONS } from '@/constants/magicDestinations';
 import { routeUrl } from '@/utils/recipeSourceUrl';
+import type { ShareKind } from '@/types/magicPayload';
 
-const props = defineProps<{ open: boolean }>();
+const props = defineProps<{
+  open: boolean;
+  /** The tiles to draw, in order, already filtered to what this member can be routed to. */
+  kinds: ShareKind[];
+}>();
+/**
+ * Every capture intent carries the optional pick as `hint` — `undefined` is "no pick", and
+ * `null` never crosses this boundary, so no caller converts between the two.
+ */
 const emit = defineEmits<{
   close: [];
   /** Pasted text or a pasted link — the orchestrator decides which. */
-  submit: [text: string];
-  camera: [];
-  file: [];
+  submit: [text: string, hint?: ShareKind];
+  camera: [hint?: ShareKind];
+  file: [hint?: ShareKind];
 }>();
 
 const { t } = useTranslation();
 
 const text = ref('');
+
+/** The one tile the person tapped, if any. Local, view-side name; it travels as `hint`. */
+const pickedKind = ref<ShareKind | undefined>();
+
+function togglePick(kind: ShareKind): void {
+  pickedKind.value = pickedKind.value === kind ? undefined : kind;
+}
+
+/**
+ * What actually travels as `hint`: the pick, only while its tile is still offered. Derived
+ * rather than watched, so a `kinds` that shrinks while the sheet is open (every emit site
+ * reads this one value) can never buy a read the reader gate would refuse.
+ */
+const hint = computed(() =>
+  pickedKind.value && props.kinds.includes(pickedKind.value) ? pickedKind.value : undefined
+);
+
+/**
+ * Columns, from the count: three across is the row the sheet has always drawn, so up to three
+ * kinds stay on one row at EVERY width (fractions, not a minimum track — a `minmax(5.5rem)`
+ * grid wrapped the third tile to a half-width orphan at 320px and under Large reading mode).
+ * Four kinds sit two by two; more re-flow in rows of three.
+ */
+const cols = computed(() => {
+  const n = props.kinds.length;
+  if (n <= 3) return Math.max(n, 1);
+  return n === 4 ? 2 : 3;
+});
+
+/**
+ * The selected look is the same light recipe `ChipButton` ships (Heritage Orange text, border
+ * and `--tint-orange-8`), so the app has one "selected" vocabulary. On dark the tile sits on
+ * `surface-overlay`, so its selected background is the next surface step and the accent takes
+ * its `-lift` partner — never a darker orange, per the CIG.
+ */
+const TILE_AT_REST =
+  'dark:bg-surface-overlay dark:hover:bg-surface-hover border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)]';
+const TILE_SELECTED =
+  'border-primary-500 dark:border-accent-lift dark:bg-surface-hover bg-[var(--tint-orange-8)]';
 
 /**
  * A single pasted token that looks like a link but will not route.
@@ -80,6 +140,8 @@ watch(
   async (isOpen) => {
     if (!isOpen) return;
     text.value = '';
+    // A pick is for ONE capture. Remembering it across opens is explicitly out of scope (#108).
+    pickedKind.value = undefined;
     // Focused on open — the whole point of this layout is that you can paste immediately.
     // Guarded because BaseTextarea may not have mounted on the first tick.
     await nextTick();
@@ -93,7 +155,7 @@ function handleSave(): void {
   // in the orchestrator's `sourceFromText`, shared with the share path — a second opinion
   // about what text is acceptable is exactly the divergence #84 exists to remove.
   if (!value) return;
-  emit('submit', value);
+  emit('submit', value, hint.value);
 }
 </script>
 
@@ -156,31 +218,72 @@ function handleSave(): void {
       </p>
     </FormFieldGroup>
 
-    <AiSourceButtons @camera="emit('camera')" @file="emit('file')" />
+    <AiSourceButtons @camera="emit('camera', hint)" @file="emit('file', hint)" />
 
-    <!-- What beanies can make. A capability statement, not a question: the tiles never ask the
-         user to choose, they say what the answer could be. Visually unlabelled by design — the
-         strings are their ACCESSIBLE names, because an icon-only tile with no name is unusable
-         with a screen reader.
+    <!-- What beanies can make, offered as an OPTIONAL pick (#108). The tiles say what the answer
+         could be; tapping one says what it IS, for this capture only. Nothing selected is the
+         default and looks like it: quiet slate tiles, no empty slot, no placeholder.
+
+         The column count comes from how many kinds there are (`cols`), never from a minimum
+         track width, so three tiles share one row at every width and Large reading mode simply
+         scales them; more kinds re-flow in rows of three. The labels are the tiles' ACCESSIBLE
+         names as well as their visible ones.
 
          At rest here; they tick and resolve in AiProcessingOverlay, which is where the reading
-         actually happens (this sheet closes before the ingest starts). Carrying the same three
-         tiles across that transition is what makes the resolve read as an answer. -->
-    <ul class="mt-6 flex list-none gap-2 p-0">
-      <li v-for="kind in MAGIC_DESTINATION_KINDS" :key="kind" class="min-w-0 flex-1">
-        <div
-          class="dark:bg-surface-overlay rounded-[14px] bg-[var(--tint-slate-5)] px-1.5 pt-2.5 pb-2 text-center"
+         actually happens (this sheet closes before the ingest starts). Carrying the same tiles
+         across that transition is what makes the resolve read as an answer — and a picked tile
+         arrives there already lit. -->
+    <div class="mt-6">
+      <div class="mb-2 flex items-baseline justify-between gap-2">
+        <p class="font-outfit dark:text-ink m-0 text-sm font-semibold text-[var(--color-text)]">
+          {{ t('ai.capture.pick.title') }}
+        </p>
+        <span class="text-secondary-400 dark:text-ink-faint text-xs">
+          {{ t('ai.capture.pick.optional') }}
+        </span>
+      </div>
+      <div
+        role="group"
+        :aria-label="t('ai.capture.pick.title')"
+        class="grid grid-cols-[repeat(var(--cols),minmax(0,1fr))] gap-2"
+        :style="{ '--cols': cols }"
+      >
+        <button
+          v-for="kind in kinds"
+          :key="kind"
+          type="button"
+          :aria-pressed="pickedKind === kind"
+          class="dark:focus-visible:ring-offset-surface-raised cursor-pointer rounded-[14px] border-2 px-1 pt-2.5 pb-2 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#AED6F1] focus-visible:ring-offset-2 motion-reduce:transition-none"
+          :class="pickedKind === kind ? TILE_SELECTED : TILE_AT_REST"
+          @click="togglePick(kind)"
         >
           <span aria-hidden="true" class="block text-xl leading-none">{{
             MAGIC_DESTINATIONS[kind].emoji
           }}</span>
           <span
-            class="font-outfit text-secondary-400 dark:text-ink-faint mt-1.5 block text-xs font-semibold"
+            class="font-outfit mt-1.5 block text-xs font-semibold"
+            :class="
+              pickedKind === kind
+                ? 'text-primary-500 dark:text-accent-lift'
+                : 'text-secondary-400 dark:text-ink-faint'
+            "
           >
             {{ t(`ai.capture.dest.${kind}`) }}
           </span>
-        </div>
-      </li>
-    </ul>
+        </button>
+      </div>
+      <!-- Two interpolations, never a concatenation: each string is its own translation unit. -->
+      <p
+        class="font-outfit mt-2 mb-0 text-xs font-semibold"
+        :class="
+          hint ? 'text-primary-500 dark:text-accent-lift' : 'text-secondary-400 dark:text-ink-faint'
+        "
+      >
+        <template v-if="hint">
+          {{ t(`ai.capture.pick.as.${hint}`) }} {{ t('ai.capture.pick.undo') }}
+        </template>
+        <template v-else>{{ t('ai.capture.pick.idle') }}</template>
+      </p>
+    </div>
   </BeanieFormModal>
 </template>

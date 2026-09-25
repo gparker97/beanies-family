@@ -1768,7 +1768,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip or a recipe.',
     icon: '\u{1F4E4}',
     readTime: 5,
-    updatedDate: '2026-09-03',
+    updatedDate: '2026-09-25',
     sections: [
       {
         type: 'heading',
@@ -1946,6 +1946,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'The same thing that happens with the readers inside the app: the document is sent to be read, and nothing else about your family goes with it. You are asked for permission the first time, and the details are in the note that appears \u2014 there is more in <strong>How beanies AI handles your photos</strong>.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip or recipe) before you read it and beanies reads it as that straight away. Leave them alone and beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
+        title: 'Tell beanies what it is first, if you like',
+        icon: '\u2728',
       },
     ],
   },

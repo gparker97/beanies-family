@@ -20,6 +20,7 @@ import type {
   RecipeFieldConfidence,
   RecipeLine,
   ShareExtractionResult,
+  HintReason,
   ShareKindHint,
   TravelExtractionResult,
   TravelSegmentDraft,
@@ -671,18 +672,35 @@ export const SHARE_REQUIRED_KEYS = ['kind'] as const;
  * describe an event differently from the event task does.
  */
 /**
- * `kindHint` is a correction: the user has SEEN a wrong answer and said what the thing actually
- * is, and the server has already spent a grant to allow it. It is honoured only in that case.
+ * `kindHint` is a kind the person STATED. `hintReason` says when:
+ *   - `'correction'` (the default): they have SEEN a wrong answer and said what the thing
+ *     actually is, and on the managed tier the server has already spent a grant to allow it.
+ *   - `'stated'`: they told us BEFORE the first read, from the magic-beans sheet's optional
+ *     pick (#108). A normal billable read; nothing about it reaches the server.
+ * The classification rules are replaced either way. The ONLY difference is one clause telling
+ * the model whether an earlier reading exists — `HINT_CONTEXT` below — so the `correction`
+ * prompt is byte-identical to what it was before the second reason existed.
  *
  * ⚠️ This is NOT the per-surface hint the one-surface work exists to remove. That would bias
  * every extraction by where the user happened to be standing, before the model had looked. A
- * user-stated kind AFTER seeing a wrong answer is a categorically different thing, and the
- * server enforces the difference: `openRead` passes a hint only when a grant was consumed.
+ * kind the person stated themselves — after a wrong answer, or up front for one capture — is
+ * a categorically different thing. On the plaintext arm the server still enforces it for
+ * corrections: `openRead` passes a hint only when a grant was consumed.
+ *
+ * Four positional arguments is the ceiling here. The Lambda's legacy arm calls with three, so
+ * a fifth fact about the hint means folding the third and fourth into one object across all
+ * three copies and that call site, not a fifth positional.
  */
+const HINT_CONTEXT: Record<HintReason, string> = {
+  correction: ' An earlier reading got that wrong.',
+  stated: '',
+};
+
 export function buildShareExtractionMessages(
   source: ExtractionSource,
   todayIso: string,
-  kindHint?: ShareKindHint
+  kindHint?: ShareKindHint,
+  hintReason: HintReason = 'correction'
 ): ChatMessage[] {
   const system = [
     'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, or a recipe.',
@@ -692,9 +710,9 @@ export function buildShareExtractionMessages(
         // wrong guess», which argues directly against the hint sitting in the user message —
         // and the system message wins. Tested live against gemma4-31b: a correction the model
         // disagreed with came back as the original kind, the wrong-kind guard 502'd it, and the
-        // family lost both the grant and the answer. The user has already SEEN a wrong result
-        // and said what the thing is; the model's job here is extraction, not adjudication.
-        `The person who shared this has told us what it is: a ${kindHint}. An earlier reading got that wrong. Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields. Only if the document contains nothing at all that could fill them, set kind="none".`
+        // family lost both the grant and the answer. The person has said what the thing is;
+        // the model's job here is extraction, not adjudication.
+        `The person who shared this has told us what it is: a ${kindHint}.${HINT_CONTEXT[hintReason]} Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields. Only if the document contains nothing at all that could fill them, set kind="none".`
       : 'First decide which ONE of these the document is, then extract it.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
@@ -799,7 +817,8 @@ export interface ExtractionTaskEntry {
   buildMessages: (
     source: ExtractionSource,
     todayIso: string,
-    kindHint?: ShareKindHint
+    kindHint?: ShareKindHint,
+    hintReason?: HintReason
   ) => ChatMessage[];
   requiredKeys: readonly string[];
   jsonShape: Record<string, string>;

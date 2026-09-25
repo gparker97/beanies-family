@@ -153,6 +153,7 @@ import {
   ingestInAppSource,
   ingestSharedContent,
   isReadingSharedDocument,
+  magicIngestState,
 } from '../useSharedDocumentIngest';
 import { __resetAttemptBudgetForTests } from '@/utils/attemptBudget';
 import { MAX_LINK_NOTE_CHARS, MAX_SHARE_TEXT_CHARS } from '@/services/share/types';
@@ -1267,6 +1268,271 @@ describe('ingestInAppSource (#84)', () => {
       extractShareFromText.mockResolvedValue(EVENT_RESULT);
       await paste(REAL);
       expect(dispatchSharePayload).toHaveBeenCalled();
+    });
+  });
+
+  describe('the optional pick (#108)', () => {
+    const pasteAs = (text: string, hint: 'event' | 'travel' | 'recipe') =>
+      ingestInAppSource({ kind: 'paste', text, hint }, doorGrant);
+    const pickAs = (file: File, hint: 'event' | 'travel' | 'recipe') =>
+      ingestInAppSource({ kind: 'file', file, hint }, doorGrant);
+    const TRAVEL_RESULT = {
+      ...EVENT_RESULT,
+      data: { kind: 'travel', travel: { segments: [] } },
+    };
+    const NONE_RESULT = { ...EVENT_RESULT, data: { kind: 'none' } };
+
+    it('sends the pick down the CORRECTION channel, token-less and marked `stated`', async () => {
+      // Same prompt path a "not right?" re-read takes — `to` is what makes a read targeted —
+      // but with no token (nothing reaches the meter; it is billed like any first read) and a
+      // reason, so the prompt does not claim an earlier reading existed.
+      extractShareFromText.mockResolvedValue(TRAVEL_RESULT);
+      await pasteAs(REAL, 'travel');
+
+      const opts = extractShareFromText.mock.calls[0][1] as {
+        correction?: { to: string; token?: string; reason?: string };
+      };
+      expect(opts.correction).toEqual({ to: 'travel', reason: 'stated' });
+      expect(opts.correction?.token).toBeUndefined();
+    });
+
+    it('keeps the pick on a pasted LINK — the hint is a property of the source, not the arm', async () => {
+      // `sourceFromText` turns a URL into the link arm, whose page text reaches the model
+      // through the same `readText` the text arm uses. Attaching the hint per arm is how this
+      // case was missed in the first draft.
+      extractShareFromText.mockResolvedValue(TRAVEL_RESULT);
+      await pasteAs('https://example.com/cake', 'travel');
+
+      expect(resolveRecipeSource).toHaveBeenCalledWith('https://example.com/cake');
+      expect(extractShareFromText).toHaveBeenCalledWith(
+        'page text',
+        expect.objectContaining({ correction: { to: 'travel', reason: 'stated' } })
+      );
+    });
+
+    it('keeps the pick on a picked FILE', async () => {
+      await pickAs(img(), 'event');
+      expect(extractShareFromDocuments).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ correction: { to: 'event', reason: 'stated' } })
+      );
+    });
+
+    it('sends NO correction at all when nothing was picked — the blind read is byte-identical', async () => {
+      await paste(REAL);
+      expect(extractShareFromText.mock.calls[0][1]).not.toHaveProperty('correction');
+      const classified = logEvent.mock.calls.find((c) => c[0].context?.action === 'classified');
+      expect(classified?.[0].context).toEqual({
+        action: 'classified',
+        kind: 'event',
+        detail: 'unhinted',
+      });
+      expect(actions()).not.toContain('hinted');
+    });
+
+    it('records the pick as its own denominator, and tags the classification', async () => {
+      extractShareFromText.mockResolvedValue(TRAVEL_RESULT);
+      await pasteAs(REAL, 'travel');
+
+      const seen = actions();
+      expect(seen.indexOf('hinted')).toBeLessThan(seen.indexOf('classified'));
+      expect(logEvent.mock.calls.find((c) => c[0].context?.action === 'hinted')?.[0]).toEqual(
+        expect.objectContaining({
+          surface: 'magic-beans-capture',
+          context: { action: 'hinted', kind: 'travel' },
+        })
+      );
+      const classified = logEvent.mock.calls.find((c) => c[0].context?.action === 'classified');
+      expect(classified?.[0].context).toEqual({
+        action: 'classified',
+        kind: 'travel',
+        detail: 'hinted',
+      });
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+    });
+
+    it('lights the picked tile from the FIRST frame of the read', async () => {
+      let release: (v: unknown) => void = () => {};
+      extractShareFromText.mockReturnValueOnce(
+        new Promise((r) => {
+          release = r;
+        })
+      );
+      const inFlight = pasteAs(REAL, 'recipe');
+      // Past the lock and the (async) text triage, into the model call.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(magicIngestState.value).toEqual({
+        phase: 'reading',
+        presentation: 'global',
+        hint: 'recipe',
+      });
+      release({ ...EVENT_RESULT, data: { kind: 'recipe', recipe: { name: 'Cake' } } });
+      await inFlight;
+      expect(magicIngestState.value).toEqual({ phase: 'idle' });
+    });
+
+    it('says WHICH kind it could not find when the model answers none under a pick', async () => {
+      extractShareFromText.mockResolvedValue(NONE_RESULT);
+      await pasteAs(REAL, 'recipe');
+
+      // (`t` is mocked to its key here, so the `{kind}` fill — the quoted tile name, never
+      // "a Recipe" — is pinned by the string's own comment and the uiStrings floor test.)
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'ai.capture.pick.none.title',
+        'ai.capture.pick.none.message'
+      );
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'shareTarget.unrecognised.title',
+        expect.anything()
+      );
+      expect(
+        logEvent.mock.calls.find((c) => c[0].context?.action === 'hint_disagreed')?.[0]
+      ).toEqual(
+        expect.objectContaining({
+          level: 'info',
+          context: { action: 'hint_disagreed', kind: 'recipe' },
+        })
+      );
+      expect(dispatchSharePayload).not.toHaveBeenCalled();
+    });
+
+    it('still uses the plain "unrecognised" toast for none WITHOUT a pick', async () => {
+      extractShareFromText.mockResolvedValue(NONE_RESULT);
+      await paste(REAL);
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.unrecognised.title',
+        expect.anything()
+      );
+      expect(actions()).not.toContain('hint_disagreed');
+    });
+
+    it('DELIVERS a result the model overruled, but never silently', async () => {
+      // The bean is spent and the extraction is real; "not right?" is at the foot of the modal
+      // that opens. Silence here is the "never silently reclassified" acceptance criterion.
+      await pasteAs(REAL, 'recipe'); // the mock answers `event`
+
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'ai.capture.pick.overruled.title',
+        'ai.capture.pick.overruled.message'
+      );
+      expect(
+        logEvent.mock.calls.find((c) => c[0].context?.action === 'hint_overruled')?.[0]
+      ).toEqual(
+        expect.objectContaining({
+          level: 'warn',
+          context: { action: 'hint_overruled', kind: 'event', detail: 'recipe' },
+        })
+      );
+    });
+
+    it('reports an overruled kind whose reader is OFF exactly once — as the reader, not the pick', async () => {
+      // The overruled toast promises a review that only exists past the reader gate. Firing it
+      // before the gate would show two toasts for one read, and the first would be false.
+      readerEnabled = false;
+      await pasteAs(REAL, 'recipe');
+
+      expect(actions()).toContain('reader_disabled');
+      expect(actions()).not.toContain('hint_overruled');
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'shareTarget.readerOff.title',
+        expect.anything()
+      );
+      expect(dispatchSharePayload).not.toHaveBeenCalled();
+    });
+
+    it('never reports a page that answered WITHOUT the model as overruling the pick', async () => {
+      // A schema.org page IS a recipe and the model never runs, so a "trip" pick was never
+      // consulted: the honest events are `hint_unused` + an unhinted classification, and no
+      // toast promising a "not right?" that does not exist on a JSON-LD result.
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'jsonld',
+        recipe: { name: 'Cake', imageUrl: 'https://example.com/cake.jpg' },
+        path: 'jsonld',
+        sourceUrl: 'https://example.com/cake',
+      });
+      await pasteAs('https://example.com/cake', 'travel');
+
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(actions()).toContain('hint_unused');
+      expect(actions()).not.toContain('hint_overruled');
+      // Never silently: one light line, and NOT the overruled toast (whose promise of a
+      // "not right?" a page-declared result cannot keep).
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith('info', 'ai.capture.title', 'ai.capture.pick.unused');
+      const classified = logEvent.mock.calls.find((c) => c[0].context?.action === 'classified');
+      expect(classified?.[0].context.detail).toBe('unhinted');
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats a title-only link under a NON-recipe pick as "could not read it that way"', async () => {
+      // A title-only stub is an evidence-free recipe fallback. Under an "activity" pick it is
+      // simply wrong, so the spine says so (hintDisagreed) rather than opening a recipe named
+      // after a video and toasting about spoken recipes.
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'titleOnly',
+        title: 'Sports Day 2026',
+        path: 'title_only',
+        sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      });
+      await pasteAs('https://youtu.be/dQw4w9WgXcQ', 'event');
+
+      expect(extractShareFromText).not.toHaveBeenCalled();
+      expect(dispatchSharePayload).not.toHaveBeenCalled();
+      expect(actions()).toContain('hint_disagreed');
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'ai.capture.pick.none.title',
+        'ai.capture.pick.none.message'
+      );
+    });
+
+    it('keeps the title-only recipe fallback under a RECIPE pick, and without a pick', async () => {
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'titleOnly',
+        title: "Grandma's Cake",
+        path: 'title_only',
+        sourceUrl: 'https://youtu.be/dQw4w9WgXcQ',
+      });
+      await pasteAs('https://youtu.be/dQw4w9WgXcQ', 'recipe');
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith(
+        'info',
+        'recipeExtract.titleOnly.title',
+        expect.anything()
+      );
+      expect(actions()).not.toContain('hint_disagreed');
+    });
+
+    it('does not tag a matching pick as overruled', async () => {
+      extractShareFromText.mockResolvedValue(TRAVEL_RESULT);
+      await pasteAs(REAL, 'travel');
+      expect(actions()).not.toContain('hint_overruled');
+      expect(actions()).not.toContain('hint_disagreed');
+    });
+
+    it('still hands the review surface its "not right?" after a hinted read', async () => {
+      // A stated first read is billed and granted like any other, so the banner must still be
+      // offered afterwards — the envelope's `correction` comes off the result exactly as today.
+      extractShareFromText.mockResolvedValue({
+        ...TRAVEL_RESULT,
+        preparedSource: { kind: 'text', text: REAL },
+        data: { ...TRAVEL_RESULT.data, correction: { token: 'grant-1' } },
+      });
+      await pasteAs(REAL, 'travel');
+      expect(dispatchSharePayload.mock.calls[0][0].env.correction).toEqual({
+        source: { kind: 'text', text: REAL },
+        token: 'grant-1',
+      });
     });
   });
 

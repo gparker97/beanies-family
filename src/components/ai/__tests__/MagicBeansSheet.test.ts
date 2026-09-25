@@ -58,9 +58,19 @@ const stubs = {
 
 beforeEach(() => vi.clearAllMocks());
 
-function mountSheet(open = true) {
-  return mount(MagicBeansSheet, { props: { open }, global: { stubs }, attachTo: document.body });
+/** The sheet draws what it is GIVEN — the door filters by permission and flag, not the sheet. */
+const ALL_KINDS = ['event', 'travel', 'recipe'] as const;
+
+function mountSheet(open = true, kinds: readonly string[] = ALL_KINDS) {
+  return mount(MagicBeansSheet, {
+    props: { open, kinds: [...kinds] as never },
+    global: { stubs },
+    attachTo: document.body,
+  });
 }
+
+/** The pick tiles, in order. */
+const tiles = (w: ReturnType<typeof mountSheet>) => w.findAll('[role="group"] button');
 
 describe('MagicBeansSheet', () => {
   it('leads with the paste field — a textarea, not a single-line input', () => {
@@ -116,7 +126,7 @@ describe('MagicBeansSheet', () => {
       await w.find('textarea').setValue('Soccer 4pm');
       expect(w.find('[data-test="save"]').attributes('disabled')).toBeUndefined();
       await w.find('[data-test="save"]').trigger('click');
-      expect(w.emitted('submit')?.[0]).toEqual(['Soccer 4pm']);
+      expect(w.emitted('submit')?.[0]).toEqual(['Soccer 4pm', undefined]);
     });
 
     it('accepts a LINK without validating it — the orchestrator routes it', async () => {
@@ -125,14 +135,14 @@ describe('MagicBeansSheet', () => {
       const w = mountSheet();
       await w.find('textarea').setValue('https://example.com/cake');
       await w.find('[data-test="save"]').trigger('click');
-      expect(w.emitted('submit')?.[0]).toEqual(['https://example.com/cake']);
+      expect(w.emitted('submit')?.[0]).toEqual(['https://example.com/cake', undefined]);
     });
 
     it('trims what it submits, so trailing whitespace never reaches a band check', async () => {
       const w = mountSheet();
       await w.find('textarea').setValue('  Sports day on Tuesday at 9am  ');
       await w.find('[data-test="save"]').trigger('click');
-      expect(w.emitted('submit')?.[0]).toEqual(['Sports day on Tuesday at 9am']);
+      expect(w.emitted('submit')?.[0]).toEqual(['Sports day on Tuesday at 9am', undefined]);
     });
   });
 
@@ -141,8 +151,96 @@ describe('MagicBeansSheet', () => {
     const sources = w.findComponent({ name: 'AiSourceButtons' });
     sources.vm.$emit('camera');
     sources.vm.$emit('file');
-    expect(w.emitted('camera')).toHaveLength(1);
-    expect(w.emitted('file')).toHaveLength(1);
+    expect(w.emitted('camera')).toEqual([[undefined]]);
+    expect(w.emitted('file')).toEqual([[undefined]]);
+  });
+
+  describe('the optional pick (#108)', () => {
+    it('draws exactly the kinds it is given, in order — it does no gating of its own', () => {
+      // The door decides availability (permission × flag) through `availableShareKinds`. A
+      // sheet that re-decided it would be a second copy of that rule.
+      expect(tiles(mountSheet(true, ['travel', 'recipe'])).map((b) => b.text())).toEqual([
+        expect.stringContaining('ai.capture.dest.travel'),
+        expect.stringContaining('ai.capture.dest.recipe'),
+      ]);
+    });
+
+    it('starts with nothing picked, and says so', () => {
+      const w = mountSheet();
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'false',
+      ]);
+      expect(w.text()).toContain('ai.capture.pick.idle');
+      expect(w.text()).not.toContain('ai.capture.pick.as.');
+    });
+
+    it('is single-select: a tap picks, a second tap on the same tile clears', async () => {
+      const w = mountSheet();
+      await tiles(w)[1]!.trigger('click');
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual(['false', 'true', 'false']);
+      expect(w.text()).toContain('ai.capture.pick.as.travel');
+      expect(w.text()).toContain('ai.capture.pick.undo');
+
+      await tiles(w)[2]!.trigger('click');
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual(['false', 'false', 'true']);
+
+      await tiles(w)[2]!.trigger('click');
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'false',
+      ]);
+      expect(w.text()).toContain('ai.capture.pick.idle');
+    });
+
+    it('never gates Save on a pick — the pick is an offer, not a question', async () => {
+      const w = mountSheet();
+      await w.find('textarea').setValue('Sports day Tuesday 9am');
+      expect(w.find('[data-test="save"]').attributes('disabled')).toBeUndefined();
+    });
+
+    it('carries the pick as `hint` on every intent: paste, camera and file', async () => {
+      const w = mountSheet();
+      await tiles(w)[0]!.trigger('click');
+      await w.find('textarea').setValue('Sports day Tuesday 9am');
+      await w.find('[data-test="save"]').trigger('click');
+      expect(w.emitted('submit')?.[0]).toEqual(['Sports day Tuesday 9am', 'event']);
+
+      const sources = w.findComponent({ name: 'AiSourceButtons' });
+      sources.vm.$emit('camera');
+      sources.vm.$emit('file');
+      expect(w.emitted('camera')).toEqual([['event']]);
+      expect(w.emitted('file')).toEqual([['event']]);
+    });
+
+    it('drops a pick whose tile disappears, so it can never be emitted for an unoffered kind', async () => {
+      // `kinds` shrinks while the sheet is open (a permission change). A stale pick would buy a
+      // read the reader gate refuses — the waste the door's filtering exists to prevent.
+      const w = mountSheet();
+      await tiles(w)[1]!.trigger('click');
+      await w.setProps({ kinds: ['event', 'recipe'] as never });
+      await nextTick();
+      expect(tiles(w)).toHaveLength(2);
+      expect(w.text()).toContain('ai.capture.pick.idle');
+      await w.find('textarea').setValue('BA123 LHR-SIN 4 Oct');
+      await w.find('[data-test="save"]').trigger('click');
+      expect(w.emitted('submit')?.[0]).toEqual(['BA123 LHR-SIN 4 Oct', undefined]);
+    });
+
+    it('forgets the pick when it reopens — a pick is for ONE capture', async () => {
+      const w = mountSheet();
+      await tiles(w)[1]!.trigger('click');
+      await w.setProps({ open: false });
+      await w.setProps({ open: true });
+      await nextTick();
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'false',
+      ]);
+    });
   });
 
   it('opens ABOVE every host it can be opened from, at the TOP layer', () => {

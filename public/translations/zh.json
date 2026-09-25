@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-24",
-    "translationCount": 4944
+    "lastUpdated": "2026-09-25",
+    "translationCount": 4963
   },
   "translations": {
     "app.name": {
@@ -23692,7 +23692,7 @@
       "lastUpdated": "2026-09-15"
     },
     "ai.capture.dest.event": {
-      "translation": "活跃度",
+      "translation": "活动",
       "hash": "qbfkk1",
       "lastUpdated": "2026-09-15"
     },
@@ -23702,7 +23702,7 @@
       "lastUpdated": "2026-09-15"
     },
     "ai.capture.dest.recipe": {
-      "translation": "配方",
+      "translation": "食谱",
       "hash": "um2dea",
       "lastUpdated": "2026-09-15"
     },
@@ -24619,7 +24619,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-24"
+      "lastUpdated": "2026-09-25"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -24725,6 +24725,101 @@
       "translation": "该代码与此家庭的任何实时恢复工具包都不匹配。从管理套件中失效的套件不再打开您的家庭数据。",
       "hash": "fz9p65",
       "lastUpdated": "2026-09-24"
+    },
+    "recovery.kitCreateTitle": {
+      "translation": "要新建一个套件吗？",
+      "hash": "iwpygk",
+      "lastUpdated": "2026-09-25"
+    },
+    "recovery.kitCreateBody": {
+      "translation": "新套件是您家庭数据的另一个完整密钥。它不会关闭您已有的套件，因此请在“管理套件”中使您不再信任的任何套件失效。",
+      "hash": "tj74bx",
+      "lastUpdated": "2026-09-25"
+    },
+    "recovery.kitCreateHaveNone": {
+      "translation": "您还没有有效的恢复套件。",
+      "hash": "3489v5",
+      "lastUpdated": "2026-09-25"
+    },
+    "recovery.kitCreateHaveOne": {
+      "translation": "您已经有 1 个有效的恢复套件。",
+      "hash": "bmetqr",
+      "lastUpdated": "2026-09-25"
+    },
+    "recovery.kitCreateHaveMany": {
+      "translation": "您已经有 {count} 个有效的恢复套件。",
+      "hash": "925904",
+      "lastUpdated": "2026-09-25"
+    },
+    "recovery.kitCreateConfirm": {
+      "translation": "创建套件",
+      "hash": "fg00ge",
+      "lastUpdated": "2026-09-25"
+    },
+    "nook.criticalHint": {
+      "translation": "有用的提示： {task}",
+      "hash": "7udwaa",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.title": {
+      "translation": "请告诉我们这是什么",
+      "hash": "8ynfk3",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.optional": {
+      "translation": "可选",
+      "hash": "8k29s",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.idle": {
+      "translation": "选择一个，或者让 beanies 来判断。",
+      "hash": "hnu36u",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.as.event": {
+      "translation": "我们会将此作为一项活动来阅读。",
+      "hash": "v05j6t",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.as.travel": {
+      "translation": "我们会将此视为行程。",
+      "hash": "5pgu7v",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.as.recipe": {
+      "translation": "我们将把这当作食谱来阅读。",
+      "hash": "k4x0we",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.undo": {
+      "translation": "再次轻触即可让 beanies 决定。",
+      "hash": "8t0f1c",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.unused": {
+      "translation": "这个页面已经说明了它是什么，所以不需要您的选择。",
+      "hash": "f3g8pt",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.none.title": {
+      "translation": "beanies 无法那样读取",
+      "hash": "9zw0vm",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.none.message": {
+      "translation": "您选择了“{kind}”，但 beanies 在这里找不到。请不选任何图块再交一次，或换一个图块。",
+      "hash": "nd5r6b",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.overruled.title": {
+      "translation": "beanies 读到的不一样",
+      "hash": "dqhfwe",
+      "lastUpdated": "2026-09-25"
+    },
+    "ai.capture.pick.overruled.message": {
+      "translation": "您选择了“{picked}”，但 beanies 将其读作“{actual}”。保存前请检查详细信息。",
+      "hash": "pqa7xd",
+      "lastUpdated": "2026-09-25"
     }
   }
 }

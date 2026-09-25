@@ -27,6 +27,8 @@ vi.mock('@/composables/usePermissions', () => ({
 }));
 vi.mock('@/composables/useQuickAddIntent', () => ({ useQuickAddIntent: vi.fn() }));
 vi.mock('@/composables/useMagicReader', () => ({
+  // The magic-beans door asks which kinds the sheet may offer (#108); none, in this page's tests.
+  availableShareKinds: () => [],
   useMagicReader: () => ({ canReadTravelDoc: { value: false } }),
   useMagicReaderConsumer: vi.fn(),
 }));

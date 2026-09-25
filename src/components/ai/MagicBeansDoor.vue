@@ -42,14 +42,14 @@
  * The trigger lives INSIDE the slot so the gate removes the affordance and its tap together.
  * A rendered button whose `open()` optional-chains into nothing is a dead tap with no trace.
  */
-import { onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
 import { useDocumentConsent } from '@/composables/useDocumentConsent';
-import { useMagicReader } from '@/composables/useMagicReader';
+import { availableShareKinds, useMagicReader } from '@/composables/useMagicReader';
 import {
   IN_APP_ENV,
   ingestInAppSource,
@@ -58,6 +58,7 @@ import {
 } from '@/composables/useSharedDocumentIngest';
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
 import type { InAppDestination } from '@/composables/useSharedDocumentIngest';
+import type { ShareKind } from '@/types/magicPayload';
 
 const emit = defineEmits<{
   /**
@@ -81,6 +82,13 @@ const { canReadAny } = useMagicReader();
 const { showToast } = useToast();
 const { t } = useTranslation();
 
+/**
+ * Which kinds the sheet may offer as an optional pick (#108): permission × flag, the same rule
+ * the "not right?" banner uses. Decided HERE, not in the sheet, which is a view and knows
+ * nothing about readers. Re-evaluates on a permission change; flags are reload-to-apply.
+ */
+const kinds = computed(availableShareKinds);
+
 /** Built per capture so a `claim` swapped at runtime cannot be captured stale. */
 const destination = (): InAppDestination | undefined =>
   props.claim ? { claim: props.claim } : undefined;
@@ -101,20 +109,24 @@ const picker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
  * Three clearing rules, because the picker cannot tell us which one will fire: consumed by
  * `@file`, cleared on close/unmount, and expired by this timer. The timer is the only one that
  * covers a silent cancel.
+ *
+ * The person's optional pick (#108) is held IN THE SAME VALUE as the grant, so the three rules
+ * cover it by construction: a grant that expires takes its hint with it, and a hint can never
+ * outlive the consent it was made under.
  */
 const PICKER_GRANT_TTL_MS = 2 * 60_000;
-let pendingGrant: ConsentGrant | null = null;
+let pending: { grant: ConsentGrant; hint?: ShareKind } | null = null;
 let grantTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearGrant(): void {
-  pendingGrant = null;
+  pending = null;
   if (grantTimer) clearTimeout(grantTimer);
   grantTimer = null;
 }
 
-function holdGrant(grant: ConsentGrant): void {
+function holdGrant(grant: ConsentGrant, hint?: ShareKind): void {
   clearGrant();
-  pendingGrant = grant;
+  pending = { grant, hint };
   grantTimer = setTimeout(clearGrant, PICKER_GRANT_TTL_MS);
 }
 
@@ -152,36 +164,33 @@ async function commit(): Promise<ConsentGrant | null> {
   return granted ?? null;
 }
 
-async function handlePaste(text: string): Promise<void> {
+async function handlePaste(text: string, hint?: ShareKind): Promise<void> {
   const grant = await commit();
   if (!grant) return;
   sheetOpen.value = false;
   // Deliberately not awaited: the ingest owns its own errors and runs for several seconds
   // behind the global reading overlay. Awaiting would keep this handler alive across a
   // navigation for no benefit.
-  void ingestInAppSource({ kind: 'paste', text }, grant, destination());
+  void ingestInAppSource({ kind: 'paste', text, hint }, grant, destination());
 }
 
-async function handleCamera(): Promise<void> {
+/**
+ * Camera and file are one path with one difference — which picker opens — so they are one
+ * function. The grant (and the pick) are held for the picker, which comes back later, if at all.
+ */
+async function commitToPicker(pick: 'pickCamera' | 'pickFile', hint?: ShareKind): Promise<void> {
   const grant = await commit();
   if (!grant) return;
-  holdGrant(grant);
+  holdGrant(grant, hint);
   sheetOpen.value = false;
-  // The image-only `capture` input, NOT the mixed accept: in a Capacitor WebView an
-  // `image/*,application/pdf` accept routes to the documents picker, which has no camera entry.
-  picker.value?.pickCamera();
-}
-
-async function handleFile(): Promise<void> {
-  const grant = await commit();
-  if (!grant) return;
-  holdGrant(grant);
-  sheetOpen.value = false;
-  picker.value?.pickFile();
+  // `pickCamera` is the image-only `capture` input, NOT the mixed accept: in a Capacitor
+  // WebView an `image/*,application/pdf` accept routes to the documents picker, which has no
+  // camera entry.
+  picker.value?.[pick]();
 }
 
 function handlePickedFile(file: File): void {
-  const grant = pendingGrant;
+  const held = pending;
   clearGrant();
   // No grant means it expired or was cleared while the picker was open.
   //
@@ -193,7 +202,7 @@ function handlePickedFile(file: File): void {
   //
   // Telling them costs one toast, and the event is what makes the TTL's real rate measurable
   // before anyone argues about its length.
-  if (!grant) {
+  if (!held) {
     logEvent({
       level: 'warn',
       surface: IN_APP_ENV.surface,
@@ -203,7 +212,7 @@ function handlePickedFile(file: File): void {
     showToast('info', t('ai.picker.expired.title'), t('ai.picker.expired.message'));
     return;
   }
-  void ingestInAppSource({ kind: 'file', file }, grant, destination());
+  void ingestInAppSource({ kind: 'file', file, hint: held.hint }, held.grant, destination());
 }
 
 defineExpose({ open });
@@ -216,10 +225,11 @@ defineExpose({ open });
     <AiDocumentPicker ref="picker" @file="handlePickedFile" />
     <MagicBeansSheet
       :open="sheetOpen"
+      :kinds="kinds"
       @close="closeSheet"
-      @submit="(text: string) => void handlePaste(text)"
-      @camera="() => void handleCamera()"
-      @file="() => void handleFile()"
+      @submit="(text: string, hint?: ShareKind) => void handlePaste(text, hint)"
+      @camera="(hint?: ShareKind) => void commitToPicker('pickCamera', hint)"
+      @file="(hint?: ShareKind) => void commitToPicker('pickFile', hint)"
     />
   </template>
 </template>

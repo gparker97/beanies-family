@@ -46,6 +46,9 @@ export interface AttestedResult {
 /** The kinds a correction may assert. Kept in step with `ShareKind` by the meter's own tests. */
 export type ShareKindHint = 'event' | 'travel' | 'recipe';
 
+/** Why a kind was stated: after a wrong answer, or before the first read. See `correction`. */
+export type HintReason = 'correction' | 'stated';
+
 /**
  * What the model is given. Discriminated so a text-only task can never be handed images
  * by mistake, and so adding a third input kind is a compile error at every switch rather
@@ -86,6 +89,16 @@ export interface ExtractionRequest {
      */
     token?: string;
     to: ShareKindHint;
+    /**
+     * WHY the kind was stated, which is the only thing the prompt phrases differently:
+     *   - `correction` (the default when absent): the person has SEEN a wrong answer and
+     *     said what the thing actually is — a re-read, grant-backed on the managed tier.
+     *   - `stated`: the person told us BEFORE the first read, from the magic-beans sheet's
+     *     optional pick (#108). A normal billable read that never carries a token.
+     * Never sent on the wire: the managed body carries only `token`, and `sourceHash` never
+     * reads `correction`, so a later correction still fingerprints the same bytes.
+     */
+    reason?: HintReason;
   };
   /** Current date `YYYY-MM-DD`, so the model can resolve relative/partial dates. */
   todayIso: string;
