@@ -33,8 +33,47 @@ export type ConsentGrant = { readonly [consentBrand]: 'document-consent' };
 
 const GRANT = {} as ConsentGrant;
 
+declare const deferredBrand: unique symbol;
+
+/**
+ * "Consent will be asked LATER, once the statement's page count is known" (#107).
+ *
+ * The magic-beans door asks consent before the picker opens, when a statement's cost is still
+ * unknown. For the Transactions pick it passes this instead, so the statement sheet can say
+ * "5 reads". It is its own brand, not a `ConsentGrant`, so it can never reach the extraction
+ * service: `runIngest` narrows it away in its first lines and the statement branch always
+ * mints a real grant with `requestConsent({ kind: 'transactions', reads })`.
+ */
+export type DeferredStatementConsent = { readonly [deferredBrand]: 'deferred-statement-consent' };
+
+const DEFERRED = {} as DeferredStatementConsent;
+
+/** Mint the deferred marker. Only the door's Transactions path should call this. */
+export function deferConsentForStatement(): DeferredStatementConsent {
+  return DEFERRED;
+}
+
+/** True for the deferred marker, false for a real grant. */
+export function isDeferredStatementConsent(
+  consent: ConsentGrant | DeferredStatementConsent
+): consent is DeferredStatementConsent {
+  return consent === DEFERRED;
+}
+
+/**
+ * What a prompt is about, when it is not the generic one. Only the statement read has a
+ * variant: it discloses the merchant list and states the read count (#107).
+ */
+export interface ConsentRequest {
+  kind: 'transactions';
+  reads: number;
+}
+
 /** Whether the consent modal is showing. Read by the single global modal mount. */
 export const consentOpen = ref(false);
+
+/** The current prompt's variant, or null for the generic prompt. Read by the modal. */
+export const consentRequest = ref<ConsentRequest | null>(null);
 
 /**
  * The resolver for the CURRENT prompt, and a tail that SERIALIZES overlapping requests.
@@ -76,8 +115,21 @@ const WAIT_TIMEOUT_MS = 60_000;
  * `useSettingsStore()` is called HERE rather than at module scope on purpose: Pinia is not
  * active at import time, so a module-scope call would throw at app boot for every importer.
  */
-export function requestConsent(): Promise<ConsentGrant | null> {
-  if (useSettingsStore().skipDocumentConsentPrompt) return Promise.resolve(GRANT);
+/**
+ * THE one rule for whether a prompt may be skipped. "Don't ask again" covers the prompt the
+ * family actually saw. The statement prompt discloses something the generic one never did (the
+ * merchant list), so a family that skips the generic prompt still sees the statement one ONCE;
+ * after they confirm it, their skip applies to it too.
+ */
+function shouldSkipPrompt(request?: ConsentRequest): boolean {
+  const settings = useSettingsStore();
+  if (!settings.skipDocumentConsentPrompt) return false;
+  if (request?.kind === 'transactions') return Boolean(settings.aiStatementConsentAcknowledgedAt);
+  return true;
+}
+
+export function requestConsent(request?: ConsentRequest): Promise<ConsentGrant | null> {
+  if (shouldSkipPrompt(request)) return Promise.resolve(GRANT);
 
   const ahead = Promise.race([
     tail,
@@ -87,6 +139,7 @@ export function requestConsent(): Promise<ConsentGrant | null> {
     () =>
       new Promise<ConsentGrant | null>((resolve) => {
         consentResolver = resolve;
+        consentRequest.value = request ?? null;
         consentOpen.value = true;
       })
   );
@@ -110,7 +163,16 @@ export function resolveConsent(granted: boolean): void {
  */
 export async function onConsentConfirm(remember: boolean): Promise<void> {
   try {
-    if (remember) await useSettingsStore().setSkipDocumentConsentPrompt(true);
+    const settings = useSettingsStore();
+    // The statement disclosure is acknowledged once per family, so a later "don't ask again"
+    // family is not shown it forever. Written first: it is the one that changes what is asked.
+    if (
+      consentRequest.value?.kind === 'transactions' &&
+      !settings.aiStatementConsentAcknowledgedAt
+    ) {
+      await settings.acknowledgeStatementConsent();
+    }
+    if (remember) await settings.setSkipDocumentConsentPrompt(true);
   } catch (e) {
     reportError({
       surface: 'ai-consent',
@@ -127,5 +189,5 @@ export async function onConsentConfirm(remember: boolean): Promise<void> {
  * additionally reads `consentOpen` and calls `onConsentConfirm` / `resolveConsent`.
  */
 export function useDocumentConsent() {
-  return { consentOpen, requestConsent, resolveConsent, onConsentConfirm };
+  return { consentOpen, consentRequest, requestConsent, resolveConsent, onConsentConfirm };
 }

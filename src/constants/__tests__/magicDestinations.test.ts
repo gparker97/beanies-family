@@ -1,5 +1,5 @@
 /**
- * The three things magic beans can make, and the ONE way each is drawn.
+ * The four things magic beans can make, and the ONE way each is drawn.
  *
  * This module is the add-a-new-kind checklist (see its header), and the whole point of that
  * checklist is that every item fails the BUILD. What a build cannot catch is a kind that has an

@@ -10,8 +10,9 @@
 // branded `ConsentGrant` that only `requestConsent()` can mint, so reaching this funnel
 // without having awaited the ADR-030 gate does not compile. It used to be a convention in
 // this comment, and a new entry point duly shipped without the gate. The service never
-// inspects the token — it only demands it. Data-minimization is unchanged: only the
-// compressed document leaves the device, never the family dataset.
+// inspects the token — it only demands it. Data-minimization: only the compressed document
+// leaves the device, never the family dataset — with ONE named exception, the `statement`
+// task's merchant memory (`ExtractOptions.context`, ADR-030's 2026-09-25 update, #107).
 
 import {
   compress,
@@ -19,7 +20,7 @@ import {
   type CompressOptions,
 } from '@/services/photos/photoCompression';
 import type { ConsentGrant } from '@/composables/useDocumentConsent';
-import type { HintReason, ShareKindHint } from './types';
+import type { ExtractionContext, HintReason, ShareKindHint } from './types';
 import { assertNever } from '@/utils/assertNever';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { MAX_EXTRACT_PAGES, isPdfFile, pdfToExtractionImages } from '@/utils/pdfExtractionImages';
@@ -37,6 +38,7 @@ import {
   type ExtractionTask,
   type RecipeExtractionResult,
   type ShareExtractionResult,
+  type StatementExtractionResult,
 } from './types';
 
 /**
@@ -92,6 +94,11 @@ export interface ExtractOptions {
    * is billed like any other. Mirrors `ExtractionRequest.correction`.
    */
   correction?: { token?: string; to: ShareKindHint; reason?: HintReason };
+  /**
+   * The `statement` task's merchant memory (#107): the ONLY family data any read carries,
+   * disclosed on the statement consent sheet. Every other task ignores it.
+   */
+  context?: ExtractionContext;
 }
 
 function selectProvider(opts: ExtractOptions): ExtractionProvider {
@@ -266,6 +273,7 @@ async function runWithSource<T extends ExtractionTask>(
     signal: opts.signal,
     familyId: opts.familyId,
     ...(opts.correction ? { correction: opts.correction } : {}),
+    ...(opts.context ? { context: opts.context } : {}),
   };
   try {
     const data = await provider.run(task, request);
@@ -356,4 +364,33 @@ export function extractShareFromText(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<ShareExtractionResult>> {
   return runExtraction(text, opts, 'share');
+}
+
+/**
+ * Compress ONE rendered page or photo into the wire source a statement read sends (#107).
+ *
+ * The statement reader renders and classifies pages itself (it must know the page count
+ * before consent, and it keeps dropped pages for "read it anyway"), so it cannot go through
+ * `prepareImageDataUrls`, whose `MAX_EXTRACT_PAGES` cap and first-N rasterisation are exactly
+ * what a statement must not have. It still uses the same compressor and the same defaults, so
+ * a statement page is the same size on the wire as any other page. Throws `CompressionError`.
+ */
+export async function prepareImageSource(
+  image: File,
+  compression: CompressOptions = DEFAULT_COMPRESSION
+): Promise<ExtractionSource> {
+  const compressed = await compress(image, compression);
+  return { kind: 'images', imageDataUrls: [await readImageDataUrl(compressed.blob)] };
+}
+
+/**
+ * Read ONE unit of a statement (#107): a rendered page, a photo, or a text chunk of a pasted
+ * statement or CSV export. Text is untrusted and fenced as data by the shared prompt builder.
+ * Always resolves with a classified outcome.
+ */
+export function extractStatementFromSource(
+  source: ExtractionSource,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<StatementExtractionResult>> {
+  return runWithSource(source, opts, 'statement', undefined, false);
 }

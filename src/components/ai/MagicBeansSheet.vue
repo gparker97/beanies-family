@@ -23,8 +23,10 @@
  * lets them help beanies out in advance, for this one capture. Nothing selected is the default
  * and stays the common case — Save never waits on a pick, and the tiles never ask. A pick is
  * emitted as `hint` and is authoritative for that read (the orchestrator sends it down the same
- * channel a "not right?" correction uses). This is NOT the per-surface positional hint the
- * 2026-09-14 plan rejected: nothing about WHERE the sheet was opened is ever sent.
+ * channel a "not right?" correction uses). A door on a page opens the sheet with that page's
+ * tile already picked (`initialHint`: greg's call, 2026-09-25, reversing the 2026-09-14 plan's
+ * "nothing about WHERE the sheet was opened is ever sent"); it is shown lit, so the person sees
+ * it and can clear it, and the ingest logs it apart from a pick the person made.
  *
  * The sheet is a VIEW. It draws the `kinds` it is given — the door filters them by permission
  * and flag through `availableShareKinds` — and knows nothing about readers itself.
@@ -64,6 +66,8 @@ const props = defineProps<{
   open: boolean;
   /** The tiles to draw, in order, already filtered to what this member can be routed to. */
   kinds: ShareKind[];
+  /** A kind picked for the person when the sheet opens (#107, the Budget page's import tile). */
+  initialHint?: ShareKind;
 }>();
 /**
  * Every capture intent carries the optional pick as `hint` — `undefined` is "no pick", and
@@ -140,8 +144,9 @@ watch(
   async (isOpen) => {
     if (!isOpen) return;
     text.value = '';
-    // A pick is for ONE capture. Remembering it across opens is explicitly out of scope (#108).
-    pickedKind.value = undefined;
+    // A pick is for ONE capture. Remembering it across opens is explicitly out of scope (#108);
+    // a door that opens pre-picked (#107) seeds it fresh on every open instead.
+    pickedKind.value = props.initialHint;
     // Focused on open — the whole point of this layout is that you can paste immediately.
     // Guarded because BaseTextarea may not have mounted on the first tick.
     await nextTick();

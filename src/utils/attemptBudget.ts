@@ -193,6 +193,27 @@ export function consumeAttempt(key: string, policy: BudgetPolicy): BudgetVerdict
 }
 
 /**
+ * Take `n` attempts at once, or NONE (#107). A statement pasted as text is read in several
+ * chunks, and taking them one by one would spend the first few and then refuse mid-run, having
+ * burned budget on reads that never happened. All-or-nothing keeps a refusal free.
+ */
+export function consumeAttempts(key: string, policy: BudgetPolicy, n: number): BudgetVerdict {
+  if (n <= 0) return { ok: true };
+  const now = Date.now();
+  const entry = entryFor(key, policy, now);
+  if (entry.t.length + n > policy.max) {
+    // The first slot this run needs frees when the attempt `n` places from the newest ages out;
+    // when the window alone cannot fit `n`, the earliest free slot is still the honest answer.
+    const sorted = [...entry.t].sort((a, b) => a - b);
+    const freeAt = sorted[Math.max(0, entry.t.length + n - policy.max - 1)];
+    return { ok: false, reason: 'quota', resetsAt: (freeAt ?? now) + policy.windowMs };
+  }
+  for (let i = 0; i < n; i += 1) entry.t.push(now);
+  persist(now);
+  return { ok: true };
+}
+
+/**
  * Forget one key's attempts.
  *
  * Edits storage DIRECTLY rather than going through `persist`. Since `persist` now merges over

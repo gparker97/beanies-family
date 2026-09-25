@@ -17,6 +17,8 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
+import TickButton from '@/components/ui/TickButton.vue';
+import { REVIEW_CHIP_TONES } from '@/constants/reviewChipTones';
 import type { ImportCandidate } from '@/utils/calendar/planImport';
 
 const props = defineProps<{
@@ -37,33 +39,17 @@ const repeats = computed(() => {
   return rule ? describe(rule, date) : '';
 });
 
-/**
- * Chip tones. Kept local rather than shared: the only other chip in the app that
- * looks like this is the travel row's, which uses a different hue on a different
- * ground, so a shared map would restyle that surface for no reason.
- *
- * ⚠️ The text colour is NOT the accent colour. Heritage Orange on its own 50-tint
- * measures 3.06:1, which fails AA for a 12px semibold chip; primary-700 on the
- * same tint is 5.14:1. Dark mode uses the `-lift` accents, which are built for
- * that ladder. Do not "simplify" these to `text-primary-500`.
- */
-const TONES = {
-  accent: 'bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift',
-  silk: 'bg-sky-silk-50 text-[#1f5f80] dark:bg-silk-lift/15 dark:text-silk-lift',
-  muted: 'bg-secondary-50 text-secondary-400 dark:bg-surface-hover dark:text-ink-faint',
-} as const;
-
 const chip = computed(() => {
   if (props.candidate.alreadyImported) {
-    return { label: t('calendarImport.chip.already'), tone: TONES.muted };
+    return { label: t('calendarImport.chip.already'), tone: REVIEW_CHIP_TONES.muted };
   }
   if (props.candidate.outcome === 'adopt') {
-    return { label: t('calendarImport.chip.adopt'), tone: TONES.accent };
+    return { label: t('calendarImport.chip.adopt'), tone: REVIEW_CHIP_TONES.accent };
   }
   if (props.candidate.outcome === 'unsupported-recurrence') {
-    return { label: t('calendarImport.chip.once'), tone: TONES.muted };
+    return { label: t('calendarImport.chip.once'), tone: REVIEW_CHIP_TONES.muted };
   }
-  return { label: t('calendarImport.chip.copy'), tone: TONES.silk };
+  return { label: t('calendarImport.chip.copy'), tone: REVIEW_CHIP_TONES.silk };
 });
 
 /** Local `HH:mm` for a timed event, or the all-day label. */
@@ -82,21 +68,12 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
        (BeanieFormModal), so a row painting those same tokens would be invisible
        against its own container. -->
   <li class="dark:bg-surface-overlay flex items-center gap-3 rounded-[14px] bg-[#f8f9fa] px-3 py-2">
-    <button
-      type="button"
-      class="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 text-xs"
-      :class="
-        selected
-          ? 'border-primary-500 bg-primary-500 dark:border-accent-lift dark:bg-accent-lift dark:text-surface-ground text-white'
-          : 'border-secondary-100 dark:border-line-strong text-transparent'
-      "
+    <TickButton
+      :selected="selected"
       :disabled="candidate.alreadyImported"
-      :aria-pressed="selected"
-      :aria-label="title"
-      @click="emit('toggle')"
-    >
-      <span aria-hidden="true">✓</span>
-    </button>
+      :label="title"
+      @toggle="emit('toggle')"
+    />
 
     <!-- `items-start` in the column layout, or the chip and the location stretch
          to the full row width instead of hugging their text. -->
@@ -125,7 +102,8 @@ const title = computed(() => props.candidate.draft.title || t('calendarImport.no
       >
       <span
         v-if="repeats"
-        class="bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap"
+        class="font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap"
+        :class="REVIEW_CHIP_TONES.accent"
       >
         <!-- `whitespace-nowrap`: on the stacked phone layout "every 2 weeks on thu"
              wrapped to two lines and turned a 40px row into a 100px one, exactly

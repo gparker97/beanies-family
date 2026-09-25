@@ -8,31 +8,10 @@
 
 import type { CreateFamilyActivityInput, FamilyActivity } from '@/types/models';
 import { mergeNotes } from './segmentMerge';
+import { tokenSimilarity } from './textSimilarity';
 
-/** Lowercased alphanumeric word tokens of a title (drops punctuation + empties). */
-function titleTokens(title: string): Set<string> {
-  return new Set(
-    title
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter(Boolean)
-  );
-}
-
-/**
- * Jaccard token-overlap of two titles in [0, 1]. 1 when the token sets are equal; 0 when either
- * side has no tokens. Word-level (not character-level) so "Piano Lesson" vs "Piano lesson!" → 1
- * but two distinct same-day titles stay well below the match threshold.
- */
-export function titleSimilarity(a: string, b: string): number {
-  const ta = titleTokens(a);
-  const tb = titleTokens(b);
-  if (ta.size === 0 || tb.size === 0) return 0;
-  let intersection = 0;
-  for (const t of ta) if (tb.has(t)) intersection++;
-  const union = ta.size + tb.size - intersection;
-  return union === 0 ? 0 : intersection / union;
-}
+/** Jaccard token-overlap of two titles in [0, 1]. Alias kept so existing callers and tests read unchanged. */
+export const titleSimilarity = tokenSimilarity;
 
 /**
  * Find the single existing activity an extracted prefill most likely duplicates, or `null`.

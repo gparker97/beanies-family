@@ -352,7 +352,7 @@ async function handleSaved(id: string): Promise<void> {
           <!-- The cookbook's door now opens the SAME sheet as every other, so a recipe link,
                a photo, a PDF or pasted text all arrive here — and something that turns out not
                to be a recipe routes to the page that owns it instead of failing. -->
-          <MagicBeansDoor>
+          <MagicBeansDoor hint="recipe">
             <template #trigger="{ open }">
               <MagicReaderPill
                 :label="t('ai.magic.perform')"

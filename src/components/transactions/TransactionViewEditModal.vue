@@ -618,10 +618,21 @@ async function handleDelete() {
       <!-- Reconciled badge -->
       <FormFieldGroup v-if="transaction.isReconciled" :label="t('transactions.status')">
         <span
-          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-green-700"
+          class="font-outfit dark:text-success-lift inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-green-700"
           style="background: var(--tint-success-10)"
         >
           ✓ {{ t('transactions.reconciled') }}
+        </span>
+      </FormFieldGroup>
+
+      <!-- The bank's own wording, kept by a statement import (#107). The row keeps the family's
+           name; this is how they recognise it on the next statement. -->
+      <FormFieldGroup
+        v-if="transaction.statementDescription"
+        :label="t('transactions.onStatementAs')"
+      >
+        <span class="font-inter text-secondary-500 dark:text-ink-soft text-sm break-words">
+          {{ transaction.statementDescription }}
         </span>
       </FormFieldGroup>
     </div>

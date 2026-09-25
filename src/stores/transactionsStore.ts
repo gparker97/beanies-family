@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
+import { recurringInstanceKey } from '@/utils/recurringInstance';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -21,13 +22,7 @@ import type {
   Asset,
   CurrencyCode,
 } from '@/types/models';
-import {
-  getStartOfMonth,
-  getEndOfMonth,
-  toDateInputValue,
-  isDateBetween,
-  extractDatePart,
-} from '@/utils/date';
+import { getStartOfMonth, getEndOfMonth, toDateInputValue, isDateBetween } from '@/utils/date';
 import { normalizeCategoryId } from '@/constants/categories';
 import { trackFeature } from '@/services/analytics/plausible';
 
@@ -41,8 +36,9 @@ function deduplicateRecurring<T extends Transaction>(txns: T[]): T[] {
   const seen = new Map<string, T>();
   const duplicateIds = new Set<string>();
   for (const tx of txns) {
-    if (!tx.recurringItemId) continue;
-    const key = `${tx.recurringItemId}|${extractDatePart(tx.date)}`;
+    // Keyed on the due date a row STANDS FOR (#107), not only its own date.
+    const key = recurringInstanceKey(tx);
+    if (!key) continue;
     const existing = seen.get(key);
     if (existing) {
       if (tx.createdAt < existing.createdAt) {
@@ -717,6 +713,10 @@ export const useTransactionsStore = defineStore('transactions', () => {
     transactionsForAccount,
     transactionsForGoal,
     getTransactionsByDateRange,
+    // Exposed for the statement import (#107), which builds its adds as one batch and must
+    // convert a transfer's destination amount with the SAME authority (and the same
+    // missing-rate refusal) the single-row cascade uses.
+    resolveTransferToAmount,
     resetState,
   };
 });

@@ -152,6 +152,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const skipDocumentConsentPrompt = computed<boolean>(
     () => settings.value.skipDocumentConsentPrompt ?? false
   );
+  // #107: when the family first confirmed the bank-statement consent, or null.
+  const aiStatementConsentAcknowledgedAt = computed<string | null>(
+    () => settings.value.aiStatementConsentAcknowledgedAt ?? null
+  );
   // #34: warn when an activity clashes with a connected calendar's free/busy.
   // Family-scoped (synced); default ON (the freebusy scope is granted upfront).
   const calendarClashNudgeEnabled = computed<boolean>(
@@ -753,6 +757,13 @@ export const useSettingsStore = defineStore('settings', () => {
       settingsRepo.setSkipDocumentConsentPrompt(skip)
     );
 
+  // #107: stamp the one-time statement-consent acknowledgement. Throws on failure (same
+  // contract as the skip above); the consent flow catches it and still proceeds.
+  const acknowledgeStatementConsent = () =>
+    persistAiSetting('ai.consent.statement.title', 'aiStatementConsentAcknowledgedAt', () =>
+      settingsRepo.setAiStatementConsentAcknowledgedAt(toISODateString(new Date()))
+    );
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -1007,6 +1018,8 @@ export const useSettingsStore = defineStore('settings', () => {
     country,
     showPublicHolidays,
     skipDocumentConsentPrompt,
+    aiStatementConsentAcknowledgedAt,
+    acknowledgeStatementConsent,
     calendarClashNudgeEnabled,
     helpfulHintsEnabled,
     helpfulHintNotifyByType,

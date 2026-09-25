@@ -2431,6 +2431,10 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Update 2026-09-25 (session 2 start, greg):** blog #56 Substack cross-post is PUBLISHED, and
+> greg's manual testing for #100 (clear-data sign-out) and #99 (manage recovery kits) is COMPLETE.
+> Those three "owed" items below are closed.
+>
 > **Validated 2026-09-25 (session 1 close).** Pending block re-checked by fingerprint. **1 updated,
 > 0 dropped.** Blog #56 is now DEPLOYED to web (`Deploy web` on `db91f0c7`, success); its Notion
 > close-out (URL, Publish Date, Status=Published) and the Substack copy may still be owed, check the

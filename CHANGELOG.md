@@ -14,11 +14,19 @@ _Not yet released:_
 
 ### Added
 
+- **Magic beans reads bank statements.** Hand over a statement as a PDF, a screenshot or photo,
+  a CSV or pasted text, and beanies lists every transaction to check before anything is added.
+  It suggests the account, spots lines already in beanies (merge, keep both or skip) and flags
+  possible duplicates. Importing the same statement twice never adds a line twice.
+- **Interest** is now an income category.
+- The Transactions page and the add-transaction drawer have a **magic beans** button, and every
+  magic beans button opens with that page's tile already picked.
 - **Tell magic beans what you're sharing.** The magic beans sheet has an optional row to say
   whether it's a trip, a recipe or something else, so beanies reads it the right way first time.
 
 ### Changed
 
+- On Budgets, **Import a statement** now sits first in "Add transactions".
 - **Save tells you what is missing.** In the activity, transaction, account, goal, recipe, family
   member and travel drawers, and step 1 of the trip wizard, Save now looks muted until the
   required fields are filled. Tapping it early takes you to the first missing field, marks

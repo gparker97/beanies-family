@@ -7,7 +7,7 @@
  * through" had to be maintained by hand across four call sites. Now every door feeds the same
  * ingest, so the overlay reads the ingest's own state directly rather than taking `:open`.
  *
- * THE RESOLVE. The three destination tiles are the same three the sheet shows at rest, and
+ * THE RESOLVE. The destination tiles are the same three the sheet shows at rest, and
  * carrying them across that transition is the whole idea: the sheet says what beanies CAN
  * make, and this says what it DID. Two fade, one lifts into the brand gradient with a single
  * sheen pass. The beat that makes it visible is held in the spine (`RESOLVE_HOLD_MS`), not
@@ -29,6 +29,7 @@
 import { magicIngestState } from '@/composables/useSharedDocumentIngest';
 import { isReadingSharedDocument } from '@/composables/useSharedDocumentIngest';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { MAGIC_DESTINATIONS, MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 
@@ -49,6 +50,19 @@ const litKind = () => {
   const state = magicIngestState.value;
   if (state.phase === 'resolved') return state.kind;
   return state.phase === 'reading' ? (state.hint ?? null) : null;
+};
+
+/**
+ * "page 3 of 5" while a statement is read page by page (#107), or null. Only the statement
+ * branch writes `progress`, so every other read keeps its single line.
+ */
+const progressLine = () => {
+  const state = magicIngestState.value;
+  if (state.phase !== 'reading' || !state.progress || state.progress.total < 2) return null;
+  return fillTemplate(t('ai.reading.progress'), {
+    done: String(Math.min(state.progress.done + 1, state.progress.total)),
+    total: String(state.progress.total),
+  });
 };
 </script>
 
@@ -109,7 +123,10 @@ const litKind = () => {
            reading; on resolve the others fall back and one lifts. A read the person pre-labelled
            starts with that tile lit and nothing ticking (`litKind`). Visually unlabelled by
            design — the strings are their accessible names. -->
-        <ul class="flex list-none gap-2.5 p-0">
+        <!-- Two by two on a phone, one row of four from `sm`. Every tile is the same rem width,
+             sized for the longest label ("Transactions") with padding either side, so it scales
+             with Large reading mode instead of running into the tile's edges. -->
+        <ul class="grid list-none grid-cols-2 gap-2.5 p-0 sm:grid-cols-4">
           <!-- `magic-tick` on the LI, not the tile: its stagger is `:nth-child`, so it has to sit
              on the element that is actually the nth child of this list. -->
           <li
@@ -118,7 +135,7 @@ const litKind = () => {
             :class="litKind() ? '' : 'magic-tick'"
           >
             <div
-              class="flex h-16 w-16 flex-col items-center justify-center rounded-[14px] transition-all duration-300"
+              class="flex h-16 w-22 flex-col items-center justify-center rounded-[14px] px-1.5 transition-all duration-300"
               :class="
                 litKind() === kind
                   ? 'from-primary-500 to-terracotta-400 magic-shimmer magic-shimmer-once scale-110 bg-gradient-to-br shadow-[0_12px_26px_-10px_rgba(241,93,34,0.65)]'
@@ -150,7 +167,14 @@ const litKind = () => {
         <!-- No text colour utility here on purpose: `.magic-text-shimmer` owns the colour in both
              themes, because the gradient and the fallback have to agree. -->
         <p class="font-outfit magic-text-shimmer text-sm font-semibold">
-          {{ t('ai.processing') }}
+          {{ litKind() === 'transactions' ? t('ai.reading.statement') : t('ai.processing') }}
+        </p>
+        <p
+          v-if="progressLine()"
+          class="text-secondary-500 dark:text-ink-soft -mt-2 text-xs tabular-nums"
+          aria-live="polite"
+        >
+          {{ progressLine() }}
         </p>
       </div>
     </div>

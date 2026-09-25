@@ -2178,3 +2178,20 @@ This is the same family as [never `git reset` with a concurrent session running]
 always a git command that writes the working tree from a ref, used as if it were an editor undo.
 And take the `git stash create` + `git update-ref refs/backup/<name>` snapshot BEFORE any session
 that touches a large uncommitted tree -- it costs one command and it is what saved this one.
+
+---
+
+## Pass the /code-review level as a bare first word, and size the review to the change
+
+**2026-09-25** -- greg asked for a medium review of a handful of follow-up fixes. I invoked the
+skill with args `"medium. Scope: ONLY ..."`. The trailing period meant `medium.` was not read
+as a level, so the skill fell back to the LAST level used (max): eight finder agents plus
+fourteen verifier runs, ~460k subagent tokens and 34 minutes on a small diff. greg noticed it
+running away and asked to stop it.
+
+**Rule:** the level is the first bare token of the args, no punctuation (`medium Scope: ...`),
+and after launching, check the skill's first line confirms the level it is running at. For a
+small follow-up diff, prefer `low` or `medium` explicitly, or scan the diff directly; say the
+expected cost when proposing a review. If a review starts spawning far more agents than the
+change warrants, stop it early (TaskStop the finders, ask the parent for findings so far)
+rather than letting it finish.

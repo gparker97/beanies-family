@@ -8880,6 +8880,7 @@ const STRING_DEFS = {
   // Transactions — View modal
   'transactions.viewTransaction': { en: 'Transaction Details', beanie: 'transaction details' },
   'transactions.reconciled': { en: 'Reconciled', beanie: 'reconciled' },
+  'transactions.onStatementAs': { en: 'On Your Statement As', beanie: 'on your statement as' },
   'transactions.status': { en: 'Status', beanie: 'status' },
 
   // ───── Budget Page ─────
@@ -8942,7 +8943,15 @@ const STRING_DEFS = {
 
   // Budget — Batch / CSV (coming soon)
   'budget.batchAdd.title': { en: 'Batch Add', beanie: 'batch add' },
-  'budget.csvUpload.title': { en: 'CSV Upload', beanie: 'csv upload' },
+  'budget.importStatement.title': { en: 'Import a Statement', beanie: 'import a statement' },
+  'transactions.magicHint': {
+    en: 'Import a bank statement: a PDF, screenshot, CSV or pasted text',
+    beanie: 'import a bank statement: a pdf, screenshot, csv or pasted text',
+  },
+  'transactions.magicAria': {
+    en: 'Magic beans: import a bank statement',
+    beanie: 'magic beans: import a bank statement',
+  },
   'budget.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
 
   // Budget — Settings modal
@@ -9026,9 +9035,9 @@ const STRING_DEFS = {
     en: 'Add multiple transactions at once',
     beanie: 'add multiple transactions at once',
   },
-  'budget.csvUpload.subtitle': {
-    en: 'Import from your bank statement',
-    beanie: 'import from your bank statement',
+  'budget.importStatement.subtitle': {
+    en: 'PDF, screenshot, CSV or pasted text',
+    beanie: 'pdf, screenshot, csv or pasted text',
   },
 
   // Upcoming transactions
@@ -10525,9 +10534,9 @@ const STRING_DEFS = {
     beanie: 'not sure what that is',
   },
   'shareTarget.unrecognised.message': {
-    en: "beanies couldn't work out whether that was an activity, a trip or a recipe. You can still add it yourself.",
+    en: "beanies couldn't work out whether that was an activity, a trip, a recipe or a bank statement. You can still add it yourself.",
     beanie:
-      "beanies couldn't work out whether that was an activity, a trip or a recipe. you can still add it yourself.",
+      "beanies couldn't work out whether that was an activity, a trip, a recipe or a bank statement. you can still add it yourself.",
   },
   'shareTarget.readerOff.title': { en: 'Reader Unavailable', beanie: 'reader unavailable' },
   'shareTarget.readerOff.message': {
@@ -10557,9 +10566,9 @@ const STRING_DEFS = {
   },
   'shareTarget.text.tooLong.title': { en: 'That’s a Lot of Text', beanie: 'that’s a lot of text' },
   'shareTarget.text.tooLong.message': {
-    en: 'That is more text than beanies can read at once. Pick out the part with the details and try again.',
+    en: 'That is more text than beanies can read at once. Pick out the part with the details and try again. If it is a bank statement, choose Transactions first: statements are read in parts.',
     beanie:
-      'that is more text than beanies can read at once. pick out the part with the details and try again.',
+      'that is more text than beanies can read at once. pick out the part with the details and try again. if it is a bank statement, choose transactions first: statements are read in parts.',
   },
   'shareTarget.text.truncated.title': { en: 'Read the First Part', beanie: 'read the first part' },
   'shareTarget.text.truncated.message': {
@@ -10900,12 +10909,19 @@ const STRING_DEFS = {
     en: "give us something to read and we'll work out the rest",
     beanie: "give us something to read and we'll work out the rest",
   },
-  // The three destination tiles' ACCESSIBLE names — the tiles are visually unlabelled, but an
+  // The destination tiles' ACCESSIBLE names — the tiles are visually unlabelled, but an
   // icon-only tile with no name is unusable with a screen reader. Keyed by ShareKind so the
   // label is `t(\`ai.capture.dest.${kind}\`)`, derived rather than looked up in a parallel map.
   'ai.capture.dest.event': { en: 'Activity', beanie: 'activity' },
   'ai.capture.dest.travel': { en: 'Trip', beanie: 'trip' },
   'ai.capture.dest.recipe': { en: 'Recipe', beanie: 'recipe' },
+  'ai.capture.dest.transactions': { en: 'Transactions', beanie: 'transactions' },
+  // The same four kinds as a noun inside a sentence ("reading it again as a bank statement").
+  // The tile labels above are nouns on their own and read wrongly there ("as a Transactions").
+  'ai.capture.noun.event': { en: 'an activity', beanie: 'an activity' },
+  'ai.capture.noun.travel': { en: 'a trip', beanie: 'a trip' },
+  'ai.capture.noun.recipe': { en: 'a recipe', beanie: 'a recipe' },
+  'ai.capture.noun.transactions': { en: 'a bank statement', beanie: 'a bank statement' },
   // ── the optional pick (#108) ──────────────────────────────────────────────────────────
   // The tiles are tappable: "tell us what this is" is an invitation to help beanies out in
   // advance, never a question that has to be answered. Nothing selected is the default.
@@ -10929,6 +10945,209 @@ const STRING_DEFS = {
     en: "We'll read this as a recipe.",
     beanie: "we'll read this as a recipe.",
   },
+  'ai.capture.pick.as.transactions': {
+    en: "We'll read this as a bank statement.",
+    beanie: "we'll read this as a bank statement.",
+  },
+  // ── Bank statements (#107) ───────────────────────────────────────────────────────────
+  'ai.correct.statementNotFree': {
+    en: 'Reading it as a bank statement costs one bean per page.',
+    beanie: 'reading it as a bank statement costs one bean per page.',
+  },
+  'ai.reading.statement': { en: 'Reading your statement…', beanie: 'reading your statement…' },
+  'ai.reading.progress': { en: 'Page {done} of {total}', beanie: 'page {done} of {total}' },
+  'ai.consent.statement.title': {
+    en: 'This Looks Like a Bank Statement',
+    beanie: 'this looks like a bank statement',
+  },
+  'ai.consent.statement.intro': {
+    en: 'beanies will read each page with secure, private AI and list the transactions it finds for you to check.',
+    beanie:
+      'beanies will read each page with secure, private ai and list the transactions it finds for you to check.',
+  },
+  'ai.consent.statement.whatValue': {
+    en: 'The pages of this statement, plus the names of shops and payees your family has filed before and the category each went under, so the suggestions match yours. Never amounts, dates, accounts or people.',
+    beanie:
+      'the pages of this statement, plus the names of shops and payees your family has filed before and the category each went under, so the suggestions match yours. never amounts, dates, accounts or people.',
+  },
+  'ai.consent.statement.readsLabel': { en: 'What It Costs', beanie: 'what it costs' },
+  'ai.consent.statement.reads.one': { en: '1 read, one bean.', beanie: '1 read, one bean.' },
+  'ai.consent.statement.reads.other': {
+    en: '{count} reads, one bean per page.',
+    beanie: '{count} reads, one bean per page.',
+  },
+  'ai.consent.statement.afterValue': {
+    en: 'Nothing is saved until you confirm the list. The statement itself is not kept, by the AI service or by beanies.',
+    beanie:
+      'nothing is saved until you confirm the list. the statement itself is not kept, by the ai service or by beanies.',
+  },
+  'ai.consent.statement.confirm': { en: 'Read My Statement', beanie: 'read my statement' },
+  'statementImport.title': { en: 'Your Statement, Read', beanie: 'your statement, read' },
+  'statementImport.lines.one': { en: '{count} line', beanie: '{count} line' },
+  'statementImport.lines.other': { en: '{count} lines', beanie: '{count} lines' },
+  'statementImport.period': { en: '{from} to {to}', beanie: '{from} to {to}' },
+  'statementImport.account.label': { en: 'Into', beanie: 'into' },
+  'statementImport.account.note': {
+    en: 'Changing the account re-checks every line.',
+    beanie: 'changing the account re-checks every line.',
+  },
+  'statementImport.account.none': {
+    en: 'Choose the account this statement is for.',
+    beanie: 'choose the account this statement is for.',
+  },
+  'statementImport.totals.add': { en: '{count} to add', beanie: '{count} to add' },
+  'statementImport.totals.familiar': {
+    en: '{count} look familiar',
+    beanie: '{count} look familiar',
+  },
+  'statementImport.totals.skipped': { en: '{count} skipped', beanie: '{count} skipped' },
+  'statementImport.totals.possible.one': {
+    en: '1 possible duplicate',
+    beanie: '1 possible duplicate',
+  },
+  'statementImport.totals.possible.other': {
+    en: '{count} possible duplicates',
+    beanie: '{count} possible duplicates',
+  },
+  'statementImport.bulk.tickAll': { en: 'Tick All', beanie: 'tick all' },
+  'statementImport.bulk.untickAll': { en: 'Untick All', beanie: 'untick all' },
+  'statementImport.bulk.familiar': { en: 'Familiar:', beanie: 'familiar:' },
+  'statementImport.bulk.mergeAll': { en: 'Merge All', beanie: 'merge all' },
+  'statementImport.bulk.keepAll': { en: 'Keep All', beanie: 'keep all' },
+  'statementImport.bulk.skipAll': { en: 'Skip All', beanie: 'skip all' },
+  'statementImport.day.tick': { en: 'Add every line on {day}', beanie: 'add every line on {day}' },
+  'statementImport.row.tick': { en: 'Add {name}', beanie: 'add {name}' },
+  'statementImport.row.edit': { en: 'Edit {name}', beanie: 'edit {name}' },
+  'statementImport.row.already': { en: 'Already added {date}', beanie: 'already added {date}' },
+  'statementImport.row.transferFrom': {
+    en: 'Transfer from {account}',
+    beanie: 'transfer from {account}',
+  },
+  'statementImport.row.transferTo': {
+    en: 'Transfer to {account}',
+    beanie: 'transfer to {account}',
+  },
+  'statementImport.row.offer': { en: 'Paid from?', beanie: 'paid from?' },
+  'statementImport.row.offerNone': { en: 'Not a transfer', beanie: 'not a transfer' },
+  'statementImport.pair.statement': { en: 'On Your Statement', beanie: 'on your statement' },
+  'statementImport.pair.existing': { en: 'Already in beanies', beanie: 'already in beanies' },
+  'statementImport.pair.possible': {
+    en: 'Possibly already in beanies',
+    beanie: 'possibly already in beanies',
+  },
+  'statementImport.pair.possibleSkipWhy': {
+    en: 'An earlier import already added this. Skipped unless you keep both.',
+    beanie: 'an earlier import already added this. skipped unless you keep both.',
+  },
+  'statementImport.pair.possibleWhy': {
+    en: 'Looks close to one you have. Both are kept unless you merge or skip.',
+    beanie: 'looks close to one you have. both are kept unless you merge or skip.',
+  },
+  'statementImport.pair.merge': { en: 'Merge', beanie: 'merge' },
+  'statementImport.pair.keepBoth': { en: 'Keep Both', beanie: 'keep both' },
+  'statementImport.pair.skip': { en: 'Skip', beanie: 'skip' },
+  'statementImport.pair.estimated': { en: 'estimated', beanie: 'estimated' },
+  'statementImport.pair.mergeWhy': {
+    en: "Keeps your name and links, takes the statement's amount and date.",
+    beanie: "keeps your name and links, takes the statement's amount and date.",
+  },
+  'statementImport.pair.transferWhy': {
+    en: 'Records it as one transfer between the two accounts.',
+    beanie: 'records it as one transfer between the two accounts.',
+  },
+  'statementImport.editor.in': { en: 'Money In', beanie: 'money in' },
+  'statementImport.editor.out': { en: 'Money Out', beanie: 'money out' },
+  'statementImport.editor.transfer': { en: 'Transfer', beanie: 'transfer' },
+  'statementImport.editor.transferFrom': { en: 'From Account', beanie: 'from account' },
+  'statementImport.editor.transferTo': { en: 'To Account', beanie: 'to account' },
+  'statementImport.notice.dropped.one': {
+    en: '1 page looked like terms or marketing and was not read.',
+    beanie: '1 page looked like terms or marketing and was not read.',
+  },
+  'statementImport.notice.dropped.other': {
+    en: '{count} pages looked like terms or marketing and were not read.',
+    beanie: '{count} pages looked like terms or marketing and were not read.',
+  },
+  'statementImport.notice.readAnyway': {
+    en: 'Read page {page} anyway',
+    beanie: 'read page {page} anyway',
+  },
+  'statementImport.notice.beyondCap': {
+    en: 'Only the first {count} pages were read. Import the rest separately.',
+    beanie: 'only the first {count} pages were read. import the rest separately.',
+  },
+  'statementImport.notice.failed.one': {
+    en: '1 page could not be read. Its lines are missing from this list.',
+    beanie: '1 page could not be read. its lines are missing from this list.',
+  },
+  'statementImport.notice.failed.other': {
+    en: '{count} pages could not be read. Their lines are missing from this list.',
+    beanie: '{count} pages could not be read. their lines are missing from this list.',
+  },
+  'statementImport.notice.capped': {
+    en: 'A page had more lines than beanies reads at once. Check the end of each page against your statement.',
+    beanie:
+      'a page had more lines than beanies reads at once. check the end of each page against your statement.',
+  },
+  'statementImport.notice.overlap.one': {
+    en: '1 line is already in beanies and is unticked.',
+    beanie: '1 line is already in beanies and is unticked.',
+  },
+  'statementImport.notice.overlap.other': {
+    en: '{count} lines are already in beanies and are unticked.',
+    beanie: '{count} lines are already in beanies and are unticked.',
+  },
+  'statementImport.confirm.add': { en: 'Add {add}', beanie: 'add {add}' },
+  'statementImport.confirm.merge': { en: 'Merge {merge}', beanie: 'merge {merge}' },
+  'statementImport.confirm.both': {
+    en: 'Add {add}, Merge {merge}',
+    beanie: 'add {add}, merge {merge}',
+  },
+  'statementImport.confirm.nothing': { en: 'Nothing to Add', beanie: 'nothing to add' },
+  'statementImport.done.title': { en: 'Statement Imported', beanie: 'statement imported' },
+  'statementImport.done.body': {
+    en: '{added} added and {merged} matched to what you already had.',
+    beanie: '{added} added and {merged} matched to what you already had.',
+  },
+  'statementImport.partial.title': { en: 'Mostly Imported', beanie: 'mostly imported' },
+  'statementImport.partial.body': {
+    en: '{added} added and {merged} matched, but {failed} could not be updated. Those transactions are unchanged; import the statement again to retry them.',
+    beanie:
+      '{added} added and {merged} matched, but {failed} could not be updated. those transactions are unchanged; import the statement again to retry them.',
+  },
+  'statementImport.failed.title': { en: "Couldn't Import That", beanie: "couldn't import that" },
+  'statementImport.failed.body': {
+    en: 'Nothing was saved. Try again.',
+    beanie: 'nothing was saved. try again.',
+  },
+  'statementImport.unverified.title': {
+    en: 'Import Not Confirmed Yet',
+    beanie: 'import not confirmed yet',
+  },
+  'statementImport.unverified.body': {
+    en: 'The new transactions were saved but could not be confirmed, and the familiar lines were not updated. Check Transactions before importing this statement again; lines already added will show as already added.',
+    beanie:
+      'the new transactions were saved but could not be confirmed, and the familiar lines were not updated. check transactions before importing this statement again; lines already added will show as already added.',
+  },
+  'statementImport.planFailed.title': {
+    en: "Couldn't Review That Statement",
+    beanie: "couldn't review that statement",
+  },
+  'statementImport.planFailed.body': {
+    en: 'beanies read it but could not build the list. Try again, and tell us if it keeps happening.',
+    beanie:
+      'beanies read it but could not build the list. try again, and tell us if it keeps happening.',
+  },
+  'statementImport.readAnywayFailed': {
+    en: 'That page could not be read.',
+    beanie: 'that page could not be read.',
+  },
+  'statementImport.rateMissing.title': { en: 'No Exchange Rate', beanie: 'no exchange rate' },
+  'statementImport.rateMissing.body': {
+    en: 'Moving this line to that account needs an exchange rate between the two currencies. Add one in Settings, then try again.',
+    beanie:
+      'moving this line to that account needs an exchange rate between the two currencies. add one in settings, then try again.',
+  },
   'ai.capture.pick.undo': {
     en: 'Tap again to let beanies decide.',
     beanie: 'tap again to let beanies decide.',
@@ -10948,9 +11167,9 @@ const STRING_DEFS = {
     beanie: "beanies couldn't read it that way",
   },
   'ai.capture.pick.none.message': {
-    en: 'You picked "{kind}", but beanies couldn\'t find one in this. Hand it over again without a pick, or choose a different tile.',
+    en: 'You picked "{kind}", but beanies couldn\'t find {noun} in this. Hand it over again without a pick, or choose a different tile.',
     beanie:
-      'you picked "{kind}", but beanies couldn\'t find one in this. hand it over again without a pick, or choose a different tile.',
+      'you picked "{kind}", but beanies couldn\'t find {noun} in this. hand it over again without a pick, or choose a different tile.',
   },
   'ai.capture.pick.overruled.title': {
     en: 'beanies Read It Differently',
@@ -11001,10 +11220,10 @@ const STRING_DEFS = {
     beanie:
       'that free re-read has already been used, or it was for a different document. nothing was charged. hand the document over again to have another go.',
   },
-  /** `{kind}` is filled from `ai.capture.dest.*` via `fillTemplate`. */
+  /** `{noun}` is filled from `ai.capture.noun.*` via `fillTemplate`. */
   'ai.correct.picked': {
-    en: 'Reading it again as a {kind}…',
-    beanie: 'reading it again as a {kind}…',
+    en: 'Reading it again as {noun}…',
+    beanie: 'reading it again as {noun}…',
   },
   // The consent grant timed out while the picker was open. Real nouns — the user is being
   // told their photo was not read and what to do about it.
@@ -11110,8 +11329,9 @@ const STRING_DEFS = {
     beanie: 'ask before reading photos',
   },
   'settings.ai.askBeforePhotosHint': {
-    en: 'Show a privacy check before sending a photo, document or selected text to beanies AI.',
-    beanie: 'show a privacy check before sending a photo, document or selected text to beanies ai.',
+    en: 'Show a privacy check before sending a photo, document or selected text to beanies AI. A bank statement always asks the first time.',
+    beanie:
+      'show a privacy check before sending a photo, document or selected text to beanies ai. a bank statement always asks the first time.',
   },
   // #133 Phase 4 — AI tier settings
   'settings.card.ai': { en: 'beanies AI', beanie: 'beanies ai' },
@@ -11953,6 +12173,7 @@ const STRING_DEFS = {
   'category.consultancy': { en: 'Consultancy', beanie: 'consultancy' },
   'category.other_employment': { en: 'Other Employment Income', beanie: 'other employment income' },
   'category.dividends': { en: 'Dividends', beanie: 'dividends' },
+  'category.interest': { en: 'Interest', beanie: 'interest' },
   'category.investments': { en: 'Investment Returns', beanie: 'investment returns' },
   'category.other_investment': { en: 'Other Investment Income', beanie: 'other investment income' },
   'category.rental': { en: 'Rental Income', beanie: 'rental income' },

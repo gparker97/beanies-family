@@ -17,13 +17,15 @@ import { computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import CalendarImportRow from '@/components/settings/CalendarImportRow.vue';
+import TickButton from '@/components/ui/TickButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDayLong } from '@/utils/date';
+import { groupByDay } from '@/utils/groupByDay';
+import { REVIEW_CHIP_TONES } from '@/constants/reviewChipTones';
 import { useCalendarImportStore, IMPORT_MAX_CANDIDATES } from '@/stores/calendarImportStore';
-import type { ImportCandidate } from '@/utils/calendar/planImport';
 
 const props = defineProps<{ open: boolean; connectionId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -32,16 +34,7 @@ const { t } = useTranslation();
 const store = useCalendarImportStore();
 
 /** Candidates grouped by their start date, preserving the store's date order. */
-const days = computed(() => {
-  const groups: Array<{ ymd: string; rows: ImportCandidate[] }> = [];
-  for (const c of store.candidates) {
-    const ymd = c.draft.date;
-    const last = groups[groups.length - 1];
-    if (last && last.ymd === ymd) last.rows.push(c);
-    else groups.push({ ymd, rows: [c] });
-  }
-  return groups;
-});
+const days = computed(() => groupByDay(store.candidates, (c) => c.draft.date));
 
 /** Plural-correct label for the primary button. */
 const importLabel = computed(() =>
@@ -164,21 +157,12 @@ async function onCommit(): Promise<void> {
           :key="cal.id"
           class="border-secondary-50 dark:border-line flex items-center gap-3 border-b px-2 py-3 last:border-b-0"
         >
-          <button
-            type="button"
-            class="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 text-xs"
-            :class="
-              store.chosenCalendarIds.has(cal.id)
-                ? 'border-primary-500 bg-primary-500 dark:border-accent-lift dark:bg-accent-lift dark:text-surface-ground text-white'
-                : 'border-secondary-100 dark:border-line-strong text-transparent'
-            "
+          <TickButton
+            :selected="store.chosenCalendarIds.has(cal.id)"
             :disabled="!store.isReadable(cal)"
-            :aria-pressed="store.chosenCalendarIds.has(cal.id)"
-            :aria-label="cal.summary || t('calendarImport.choose.untitled')"
-            @click="store.toggleCalendar(cal.id)"
-          >
-            <span aria-hidden="true">✓</span>
-          </button>
+            :label="cal.summary || t('calendarImport.choose.untitled')"
+            @toggle="store.toggleCalendar(cal.id)"
+          />
           <div class="min-w-0">
             <!-- A fainter ink, never `opacity-*`: an opacity modifier on text is
                  the CIG's fourth dark-mode trap. -->
@@ -253,13 +237,16 @@ async function onCommit(): Promise<void> {
         >
           <div class="flex items-baseline gap-2">
             <span
-              class="bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              class="font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              :class="REVIEW_CHIP_TONES.accent"
               >{{ t('calendarImport.chip.adopt') }}</span
             >
             <span class="text-secondary-400 dark:text-ink-soft text-xs">{{
               t('calendarImport.legend.adopt')
             }}</span>
           </div>
+          <!-- Not `REVIEW_CHIP_TONES.silk`: the legend already sits on the Sky Silk
+               tint, so this chip grounds on white to stay visible against it. -->
           <div class="flex items-baseline gap-2">
             <span
               class="dark:bg-silk-lift/15 dark:text-silk-lift font-outfit shrink-0 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-[#1f5f80]"
@@ -273,7 +260,8 @@ async function onCommit(): Promise<void> {
                explains something nobody can see. -->
           <div v-if="hasUnsupported" class="flex items-baseline gap-2">
             <span
-              class="bg-secondary-50 text-secondary-400 dark:bg-surface-hover dark:text-ink-faint font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              class="font-outfit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              :class="REVIEW_CHIP_TONES.muted"
               >{{ t('calendarImport.chip.once') }}</span
             >
             <span class="text-secondary-400 dark:text-ink-soft text-xs">{{

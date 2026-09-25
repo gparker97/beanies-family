@@ -74,7 +74,13 @@ describe('share task registry (#64)', () => {
 
   it('composes the three task shapes rather than restating their fields', () => {
     // If a field list were copied in here it would drift from the task that owns it.
-    expect(Object.keys(SHARE_JSON_SHAPE)).toEqual(['kind', 'event', 'travel', 'recipe']);
+    expect(Object.keys(SHARE_JSON_SHAPE)).toEqual([
+      'kind',
+      'event',
+      'travel',
+      'recipe',
+      'transactions',
+    ]);
   });
 
   it('describes all three nested shapes in one prompt, and asks for exactly one', () => {
@@ -86,7 +92,8 @@ describe('share task registry (#64)', () => {
     expect(content).toContain('kind="event"');
     expect(content).toContain('kind="travel"');
     expect(content).toContain('kind="recipe"');
-    expect(content).toContain('Omit the other two entirely.');
+    expect(content).toContain('Omit the others entirely.');
+    expect(content).toContain('kind="transactions"');
     // "none" must be offered explicitly, or the model will force a wrong classification.
     expect(content).toContain('kind="none"');
   });

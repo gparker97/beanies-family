@@ -40,7 +40,12 @@ beforeEach(() => {
 describe('AiProcessingOverlay', () => {
   it('while reading blind: every tile ticks, none is lit, the spinner shows', () => {
     const w = mountOverlay();
-    expect(tiles(w).map((li) => li.classes().includes('magic-tick'))).toEqual([true, true, true]);
+    expect(tiles(w).map((li) => li.classes().includes('magic-tick'))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
     expect(lit(w)).toEqual([]);
     expect(w.find('[data-test="spinner"]').exists()).toBe(true);
   });
@@ -50,6 +55,7 @@ describe('AiProcessingOverlay', () => {
     const w = mountOverlay();
     expect(lit(w)).toEqual([expect.stringContaining('ai.capture.dest.travel')]);
     expect(tiles(w).map((li) => li.classes().includes('magic-tick'))).toEqual([
+      false,
       false,
       false,
       false,
@@ -68,7 +74,7 @@ describe('AiProcessingOverlay', () => {
     expect(lit(w)).toEqual([expect.stringContaining('ai.capture.dest.recipe')]);
     expect(w.find('[data-test="spinner"]').exists()).toBe(false);
     expect(tiles(w).filter((li) => li.find('div').classes().includes('opacity-30'))).toHaveLength(
-      2
+      3
     );
   });
 });

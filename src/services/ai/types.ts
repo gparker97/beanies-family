@@ -44,7 +44,7 @@ export interface AttestedResult {
 }
 
 /** The kinds a correction may assert. Kept in step with `ShareKind` by the meter's own tests. */
-export type ShareKindHint = 'event' | 'travel' | 'recipe';
+export type ShareKindHint = 'event' | 'travel' | 'recipe' | 'transactions';
 
 /** Why a kind was stated: after a wrong answer, or before the first read. See `correction`. */
 export type HintReason = 'correction' | 'stated';
@@ -65,8 +65,28 @@ export type ExtractionSource =
   { kind: 'images'; imageDataUrls: string[] } | { kind: 'text'; text: string };
 
 /**
+ * Family context a task may read alongside its document. ONLY the `statement` task reads it
+ * (#107), and only this one field: the family's own merchant names with the category each was
+ * last filed under, so a suggested category is one the family already uses. Never amounts,
+ * dates, accounts or members. This is the dated exception to ADR-030's data-minimisation
+ * principle, recorded in the ADR itself; every other task ignores it and is sent the document
+ * alone.
+ */
+export interface ExtractionContext {
+  merchants: { name: string; category: string }[];
+  /**
+   * The app's transaction category ids, per direction, so the model picks a real id. App
+   * taxonomy, not family data. Carried here rather than hardcoded into the three prompt copies
+   * (the way the activity taxonomy is) so the Lambda and spike copies never need a sync test
+   * against `constants/categories.ts`.
+   */
+  categories: { expense: string[]; income: string[] };
+}
+
+/**
  * A single document to extract from. Data-minimization: this is one document, never the
- * family dataset.
+ * family dataset, with the one named exception of {@link ExtractionContext} for the
+ * `statement` task (ADR-030, 2026-09-25 update).
  *
  * NOTE: there is deliberately no `task` field. The task is `run`'s first argument, and
  * carrying it in both places creates two sources of truth that can disagree.
@@ -122,6 +142,8 @@ export interface ExtractionRequest {
    * must start passing it, or image extractions will silently count against the IP limit only.
    */
   familyId?: string;
+  /** The `statement` task's merchant memory (#107). Ignored by every other task. */
+  context?: ExtractionContext;
 }
 
 /**
@@ -141,6 +163,10 @@ export type ShareExtractionResult = AttestedResult &
     | { kind: 'event'; event: ExtractionResult }
     | { kind: 'travel'; travel: TravelExtractionResult }
     | { kind: 'recipe'; recipe: RecipeExtractionResult }
+    // A bank statement (#107). Deliberately LINELESS: the share read only recognises one, and
+    // the lines are read afterwards by the per-page `statement` task under the statement
+    // consent (which discloses the merchant list this classify call never had).
+    | { kind: 'transactions'; transactions: StatementIdentity }
     | { kind: 'none' }
   );
 
@@ -150,6 +176,8 @@ export interface ExtractionResultByTask {
   recipe: RecipeExtractionResult;
   /** One call that classifies AND extracts, for the mobile share target (#64). */
   share: ShareExtractionResult;
+  /** One page (or text chunk) of a bank or card statement (#107). */
+  statement: StatementExtractionResult;
 }
 
 /** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
@@ -299,6 +327,93 @@ export interface RecipeExtractionResult extends AttestedResult {
    * the field removes the class of risk rather than defending against it.
    */
   confidence: RecipeFieldConfidence;
+}
+
+/** What kind of line a statement row is. Decides direction defaults and transfer offers. */
+export type StatementLineKind =
+  'purchase' | 'payment' | 'refund' | 'fee' | 'interest' | 'transfer' | 'other';
+
+/**
+ * One statement line as the model read it (#107). Direction is ASKED for, never inferred from
+ * a sign: SCB prints unsigned purchases with a `CR` suffix on credits, Chase prints signed
+ * amounts, BofA prints sections, so a sign means different things per bank.
+ */
+export interface StatementLineDraft {
+  /** `YYYY-MM-DD`, the TRANSACTION date (not the posting date). */
+  date: string;
+  postedDate?: string;
+  /** The raw line text as printed. */
+  description: string;
+  /** A friendly merchant name, when the model could produce one. */
+  merchant?: string;
+  /** Magnitude, in the account's currency. Always ≥ 0. */
+  amount: number;
+  /** `out` = money leaving the family; `in` = money arriving. */
+  direction: 'out' | 'in';
+  currency?: string;
+  /** The original foreign amount when the statement shows one (display only in v1). */
+  original?: { amount: number; currency: string };
+  /** The bank's per-line reference, when printed. */
+  reference?: string;
+  kind: StatementLineKind;
+  /** One of the family's category ids. Validated client-side; never trusted blindly. */
+  categoryHint?: string;
+}
+
+/** Which account a statement is for, as far as the statement itself says. */
+export interface StatementIdentity {
+  account: {
+    institution?: string;
+    /** The last four digits only. The prompt forbids returning more. */
+    last4?: string;
+    currency?: string;
+    kind?: 'bank' | 'card';
+  };
+  period: { from?: string; to?: string };
+}
+
+/** The result of reading one statement page or text chunk. Mirrors STATEMENT_JSON_SHAPE. */
+export interface StatementExtractionResult extends AttestedResult, StatementIdentity {
+  /** False when the unit is not a statement page with transactions. Never invented. */
+  isStatement: boolean;
+  balances: { opening?: number; closing?: number };
+  lines: StatementLineDraft[];
+  /** Overall 0..1 confidence for the unit. */
+  confidence: number;
+}
+
+/** How one unit (a page or a text chunk) of a statement read went. */
+export interface StatementUnitOutcome {
+  /** 0-based unit index in send order. */
+  unit: number;
+  /** 1-based PDF page, when the unit is a page. */
+  page?: number;
+  status: 'read' | 'failed' | 'capped';
+  errorCode?: ExtractionErrorCode;
+}
+
+/** A page the classifier set aside, already rendered, so "read it anyway" needs no re-open. */
+export interface StatementDroppedPage {
+  /** 1-based PDF page. */
+  page: number;
+  source: ExtractionSource;
+}
+
+/**
+ * Everything a statement read produced (#107): the merged extraction plus the facts the review
+ * must show about what was and was not read. This, not a bare extraction result, is what the
+ * `transactions` payload carries, so the review can say "read 5 of 6 pages" and read a dropped
+ * page without a second trip through the ingest spine.
+ */
+export interface StatementReadResult {
+  result: StatementExtractionResult;
+  units: StatementUnitOutcome[];
+  droppedPages: StatementDroppedPage[];
+  /** Pages (or text chunks) past `STATEMENT_MAX_UNITS`, never rendered or read. */
+  unitsBeyondCap: number;
+  /** Total pages in the PDF (absent for images and text). */
+  pageCount?: number;
+  source: 'pdf' | 'image' | 'csv' | 'text';
 }
 
 /**

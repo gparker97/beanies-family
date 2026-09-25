@@ -37,6 +37,16 @@ vi.mock('../useAiCapability', () => ({
     },
     byokConfig: { value: null },
     isConfigured: { value: aiConfigured },
+    // The ONE options assembly (#107). Mirrors the real shape closely enough that the
+    // byte-identical assertions below still see exactly what `read()` sends.
+    extractOptions: (a: { grant: unknown; familyId: string; context?: unknown }) => ({
+      tier: aiTier,
+      todayIso: '2026-06-03',
+      byok: undefined,
+      grant: a.grant,
+      familyId: a.familyId,
+      ...(a.context ? { context: a.context } : {}),
+    }),
   }),
 }));
 
@@ -59,6 +69,8 @@ vi.mock('@/stores/familyStore', () => ({
     get currentMember() {
       return currentMember;
     },
+    // Read by the statement branch to screen member names out of the merchant memory (#107).
+    members: [{ name: 'Test Parent' }],
   }),
 }));
 
@@ -98,10 +110,38 @@ const requestConsent = vi.fn();
 const doorGrant = {} as never;
 // `vi.hoisted` because the mock factory is lifted above ordinary top-level consts, and the
 // module under test reads `consentOpen` at import time.
-const { consentOpen } = vi.hoisted(() => ({ consentOpen: { value: false } }));
+const { consentOpen, DEFERRED } = vi.hoisted(() => ({
+  consentOpen: { value: false },
+  DEFERRED: { deferred: true },
+}));
 vi.mock('../useDocumentConsent', () => ({
-  requestConsent: () => requestConsent(),
+  requestConsent: (...a: unknown[]) => requestConsent(...a),
+  isDeferredStatementConsent: (c: unknown) => c === DEFERRED,
   consentOpen,
+}));
+
+// ── The statement branch (#107) ─────────────────────────────────────────────────────────
+// The reader itself is covered by `statementExtraction.test.ts`; here it is a seam, so these
+// tests pin only what the SPINE decides: when the branch is entered, what consent it asks for,
+// what budget it spends, and what it dispatches.
+const prepareStatementUnits = vi.fn();
+const readStatement = vi.fn();
+vi.mock('@/services/ai/statementExtraction', () => ({
+  prepareStatementUnits: (i: unknown) => prepareStatementUnits(i),
+  readStatement: (p: unknown, o: unknown, cb: unknown) => readStatement(p, o, cb),
+  looksLikeCsv: () => false,
+}));
+vi.mock('@/stores/transactionsStore', () => ({
+  useTransactionsStore: () => ({
+    transactions: [
+      {
+        type: 'expense',
+        description: 'Cold Storage',
+        category: 'groceries',
+        date: '2026-08-01',
+      },
+    ],
+  }),
 }));
 
 const extractShareFromDocuments = vi.fn();
@@ -146,7 +186,8 @@ vi.mock('../useMagicReader', () => ({
   dispatchSharePayload: (p: unknown) => dispatchSharePayload(p),
   clearPendingMagic: () => clearPendingMagic(),
   isReaderEnabled: () => readerEnabled,
-  readerForShareKind: (k: string) => ({ event: 'photo', travel: 'document', recipe: 'recipe' })[k],
+  readerForShareKind: (k: string) =>
+    ({ event: 'photo', travel: 'document', recipe: 'recipe', transactions: 'statement' })[k],
 }));
 
 import {
@@ -1473,6 +1514,31 @@ describe('ingestInAppSource (#84)', () => {
       expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
     });
 
+    it("a surface's own pre-pick is logged apart and never toasted as an unneeded pick", async () => {
+      // Review finding: the cookbook pre-picks "recipe", so every JSON-LD recipe link toasted
+      // "your pick wasn't needed" for a pick nobody made, and the #108 pick metrics counted it.
+      resolveRecipeSource.mockResolvedValue({
+        kind: 'jsonld',
+        recipe: { name: 'Cake', imageUrl: 'https://example.com/cake.jpg' },
+        path: 'jsonld',
+        sourceUrl: 'https://example.com/cake',
+      });
+      await ingestInAppSource(
+        { kind: 'paste', text: 'https://example.com/cake', hint: 'recipe', hintFromSurface: true },
+        doorGrant
+      );
+      expect(actions()).toContain('surface_hinted');
+      expect(actions()).not.toContain('hinted');
+      const unused = logEvent.mock.calls.find((c) => c[0].context?.action === 'hint_unused');
+      expect(unused?.[0].context.detail).toBe('surface');
+      expect(showToast).not.toHaveBeenCalledWith(
+        'info',
+        'ai.capture.title',
+        'ai.capture.pick.unused'
+      );
+      expect(dispatchSharePayload).toHaveBeenCalledTimes(1);
+    });
+
     it('treats a title-only link under a NON-recipe pick as "could not read it that way"', async () => {
       // A title-only stub is an evidence-free recipe fallback. Under an "activity" pick it is
       // simply wrong, so the spine says so (hintDisagreed) rather than opening a recipe named
@@ -2069,5 +2135,203 @@ describe('a correction (the third InAppInput arm)', () => {
     expect(extractShareFromPreparedSource).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalled();
     expect(actions()).toContain('not_ready');
+  });
+});
+
+describe('the statement branch (#107)', () => {
+  const REAL_TEXT = 'Sports day Tuesday the 4th at 9am, meet at the school gate';
+  const STATEMENT_TEXT = Array.from(
+    { length: 400 },
+    (_, i) => `2026-08-${String((i % 28) + 1).padStart(2, '0')} COLD STORAGE ${i} 12.50`
+  ).join('\n');
+  const TEXT_UNITS = (n: number) => ({
+    units: Array.from({ length: n }, () => ({ source: { kind: 'text', text: 'chunk' } })),
+    droppedPages: [],
+    unitsBeyondCap: 0,
+    textUnits: n,
+    source: 'text',
+  });
+  const READ_OK = {
+    ok: true,
+    read: {
+      result: {
+        isStatement: true,
+        account: { last4: '9086' },
+        period: {},
+        balances: {},
+        lines: [
+          {
+            date: '2026-08-01',
+            description: 'COLD STORAGE',
+            amount: 12.5,
+            direction: 'out',
+            kind: 'purchase',
+          },
+        ],
+        confidence: 0.9,
+      },
+      units: [{ unit: 0, status: 'read' }],
+      droppedPages: [],
+      unitsBeyondCap: 0,
+      source: 'text',
+    },
+  };
+
+  beforeEach(() => {
+    prepareStatementUnits.mockReset().mockResolvedValue(TEXT_UNITS(2));
+    readStatement.mockReset().mockResolvedValue(READ_OK);
+  });
+
+  it('a pasted statement under the Transactions pick skips the 10k cap and the classify read', async () => {
+    expect(STATEMENT_TEXT.length).toBeGreaterThan(MAX_SHARE_TEXT_CHARS);
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+
+    expect(extractShareFromText).not.toHaveBeenCalled();
+    expect(prepareStatementUnits).toHaveBeenCalledWith({
+      kind: 'text',
+      text: STATEMENT_TEXT.trim(),
+      source: 'text',
+    });
+    // The statement consent, with the count, asked once the count is known.
+    expect(requestConsent).toHaveBeenCalledWith({ kind: 'transactions', reads: 2 });
+    // The merchant memory and the category ids ride the read's options.
+    const opts = readStatement.mock.calls[0][1] as {
+      context?: { merchants: { name: string }[]; categories: { expense: string[] } };
+    };
+    expect(opts.context?.merchants.length).toBe(1);
+    expect(opts.context?.categories.expense).toContain('groceries');
+    expect(dispatchSharePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transactions' })
+    );
+  });
+
+  it('a deferred marker on a NON-statement read refuses out loud and reads nothing', async () => {
+    await ingestInAppSource({ kind: 'paste', text: REAL_TEXT }, DEFERRED as never);
+    expect(extractShareFromText).not.toHaveBeenCalled();
+    expect(prepareStatementUnits).not.toHaveBeenCalled();
+    const notReady = logEvent.mock.calls.find((c) => c[0].context?.action === 'not_ready');
+    expect(notReady?.[0].context.detail).toBe('consent_deferred_wrong_kind');
+  });
+
+  it('an unhinted read that turns out to be a statement enters the branch under its own consent', async () => {
+    extractShareFromText.mockResolvedValueOnce({
+      ...EVENT_RESULT,
+      data: { kind: 'transactions', transactions: { account: {}, period: {} } },
+    });
+    await ingestInAppSource({ kind: 'paste', text: REAL_TEXT }, doorGrant);
+
+    expect(extractShareFromText).toHaveBeenCalledTimes(1);
+    expect(prepareStatementUnits).toHaveBeenCalledTimes(1);
+    expect(requestConsent).toHaveBeenCalledWith({ kind: 'transactions', reads: 2 });
+    const reclassified = logEvent.mock.calls.find((c) => c[0].context?.action === 'reclassified');
+    expect(reclassified?.[0].context.detail).toBe('unhinted');
+    expect(dispatchSharePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transactions' })
+    );
+  });
+
+  it('spends the text budget for every chunk at once, or not at all', async () => {
+    // 21 chunks against a 20-per-hour budget: refused BEFORE any read, nothing spent.
+    prepareStatementUnits.mockResolvedValueOnce(TEXT_UNITS(21));
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(readStatement).not.toHaveBeenCalled();
+    expect(actions()).toContain('refused');
+  });
+
+  it('a member without finance access is refused before any page is prepared or consent asked', async () => {
+    readerEnabled = false;
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(prepareStatementUnits).not.toHaveBeenCalled();
+    expect(requestConsent).not.toHaveBeenCalled();
+    expect(actions()).toContain('reader_disabled');
+  });
+
+  it('declining the statement consent reads nothing', async () => {
+    requestConsent.mockResolvedValueOnce(null);
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(readStatement).not.toHaveBeenCalled();
+    expect(dispatchSharePayload).not.toHaveBeenCalled();
+  });
+
+  it('a statement with no lines is "not that", said once, and nothing is dispatched', async () => {
+    readStatement.mockResolvedValueOnce({
+      ok: true,
+      read: { ...READ_OK.read, result: { ...READ_OK.read.result, lines: [] } },
+    });
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(dispatchSharePayload).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'info',
+      'ai.capture.pick.none.title',
+      expect.any(String)
+    );
+  });
+
+  it('every unit failing is reported once through the shared mapping', async () => {
+    readStatement.mockResolvedValueOnce({ ok: false, errorCode: 'provider_error' });
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(reportExtractionFailure).toHaveBeenCalledWith('provider_error');
+    expect(dispatchSharePayload).not.toHaveBeenCalled();
+  });
+
+  it('a correction to Transactions skips the share re-read and uses the prepared source', async () => {
+    const prepared = { kind: 'images', imageDataUrls: ['data:image/jpeg;base64,AAAA'] };
+    await ingestInAppSource(
+      {
+        kind: 'correction',
+        env: { sourceFile: null, correction: { source: prepared as never } },
+        from: 'event',
+        to: 'transactions',
+      },
+      DEFERRED as never
+    );
+    expect(extractShareFromPreparedSource).not.toHaveBeenCalled();
+    expect(prepareStatementUnits).toHaveBeenCalledWith({ kind: 'prepared', source: prepared });
+    const reclassified = logEvent.mock.calls.find((c) => c[0].context?.action === 'reclassified');
+    expect(reclassified?.[0].context.detail).toBe('corrected');
+  });
+
+  it('reads every screenshot a person hands over, not only the first (#107 review)', async () => {
+    await ingestInAppSource(
+      { kind: 'file', file: img('one.jpg'), hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(prepareStatementUnits).toHaveBeenCalledWith({
+      kind: 'image',
+      files: [expect.objectContaining({ name: 'one.jpg' })],
+    });
+  });
+
+  it('a correction to Transactions re-reads the ORIGINAL file, not the capped prepared pages', async () => {
+    const original = new File(['%PDF'], 'statement.pdf', { type: 'application/pdf' });
+    const prepared = { kind: 'images', imageDataUrls: ['data:image/jpeg;base64,AAAA'] };
+    await ingestInAppSource(
+      {
+        kind: 'correction',
+        env: { sourceFile: original, correction: { source: prepared as never } },
+        from: 'travel',
+        to: 'transactions',
+      },
+      DEFERRED as never
+    );
+    expect(prepareStatementUnits).toHaveBeenCalledWith({ kind: 'pdf', file: original });
   });
 });

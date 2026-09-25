@@ -4,10 +4,12 @@ import BudgetSettingsModal from '@/components/budget/BudgetSettingsModal.vue';
 import QuickAddTransactionModal from '@/components/budget/QuickAddTransactionModal.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMagicReader } from '@/composables/useMagicReader';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
@@ -39,6 +41,8 @@ const { syncHighlightClass } = useSyncHighlight();
 // Modals
 const showSettingsModal = ref(false);
 const showQuickAddModal = ref(false);
+// The statement reader writes transactions, so the tile follows `canViewFinances` (#107).
+const { canReadStatement } = useMagicReader();
 
 // Quick-add FAB → open Budget Settings in create mode. BudgetSettingsModal
 // accepts an absent `editing` prop as "create a new budget"; the existing
@@ -623,6 +627,39 @@ async function handleQuickAdd(data: CreateTransactionInput) {
             {{ t('budget.addTransactions.subtitle') }}
           </p>
           <div class="space-y-3">
+            <!-- Import a statement (#107), first: the magic-beans door, opened with Transactions already
+                 picked. Finance-gated like the reader it opens. -->
+            <MagicBeansDoor v-if="canReadStatement" hint="transactions">
+              <template #trigger="{ open }">
+                <button
+                  type="button"
+                  class="dark:bg-surface-overlay dark:hover:bg-surface-hover flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 text-left transition-colors hover:bg-[var(--tint-slate-10)]"
+                  @click="open"
+                >
+                  <!-- The magic-beans mark (✨ on the shimmering gradient), not a bank: this is a
+                       magic beans read, like the pill and cards on every other surface. -->
+                  <div
+                    class="magic-shimmer from-primary-500 to-terracotta-400 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br"
+                  >
+                    <span class="relative z-[1] text-sm" aria-hidden="true">✨</span>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="dark:text-ink text-sm font-semibold text-slate-700">
+                      {{ t('budget.importStatement.title') }}
+                    </p>
+                    <p class="dark:text-ink-faint text-xs text-slate-400">
+                      {{ t('budget.importStatement.subtitle') }}
+                    </p>
+                  </div>
+                  <BeanieIcon
+                    name="chevron-right"
+                    size="sm"
+                    class="dark:text-ink-faint flex-shrink-0 text-slate-300"
+                  />
+                </button>
+              </template>
+            </MagicBeansDoor>
+
             <!-- Quick Add (functional) -->
             <button
               class="dark:bg-surface-overlay/30 dark:hover:bg-surface-hover/50 flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 text-left transition-colors hover:bg-slate-100"
@@ -663,30 +700,6 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 </p>
                 <p class="dark:text-ink-faint text-xs text-slate-400">
                   {{ t('budget.batchAdd.subtitle') }}
-                </p>
-              </div>
-              <span
-                class="ml-auto flex-shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
-              >
-                {{ t('budget.comingSoon') }}
-              </span>
-            </div>
-
-            <!-- CSV Upload (coming soon) -->
-            <div
-              class="dark:bg-surface-overlay/30 relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60"
-            >
-              <div
-                class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-slate-5)]"
-              >
-                <span class="text-sm">📄</span>
-              </div>
-              <div class="min-w-0 flex-1">
-                <p class="dark:text-ink-soft text-sm font-semibold text-slate-600">
-                  {{ t('budget.csvUpload.title') }}
-                </p>
-                <p class="dark:text-ink-faint text-xs text-slate-400">
-                  {{ t('budget.csvUpload.subtitle') }}
                 </p>
               </div>
               <span

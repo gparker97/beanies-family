@@ -264,7 +264,7 @@ onBeforeUnmount(() => {
                affordance and its tap together. The old per-kind gate is gone: every door can
                now produce every kind, so gating this one on the photo reader would hide a
                button that still works. -->
-          <MagicBeansDoor>
+          <MagicBeansDoor hint="event">
             <template #trigger="{ open }">
               <MagicReaderPill :label="t('ai.magic.perform')" @click="open" />
             </template>

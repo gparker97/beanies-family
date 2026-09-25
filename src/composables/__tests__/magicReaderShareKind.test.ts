@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { readerForShareKind, type MagicReader } from '../useMagicReader';
 import type { ShareKind } from '@/types/magicPayload';
 
-const KINDS: ShareKind[] = ['event', 'travel', 'recipe'];
+const KINDS: ShareKind[] = ['event', 'travel', 'recipe', 'transactions'];
 
 describe('share kind ↔ magic reader mapping (#64)', () => {
   it('maps every kind to a reader', () => {
@@ -29,6 +29,7 @@ describe('share kind ↔ magic reader mapping (#64)', () => {
       event: 'photo',
       travel: 'document',
       recipe: 'recipe',
+      transactions: 'statement',
     };
     for (const kind of KINDS) {
       expect(readerForShareKind(kind)).toBe(expected[kind]);

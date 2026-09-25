@@ -46,7 +46,6 @@ import type {
 } from '@/types/magicPayload';
 import { toShareLink } from '@/utils/shareLink';
 import { attachDishImage } from '@/services/ai/attachDishImage';
-import { toDateInputValue } from '@/utils/date';
 import type { UUID } from '@/types/models';
 
 const SURFACE = 'recipe-extract';
@@ -107,7 +106,7 @@ export interface UseRecipeCaptureOptions {
 }
 
 export function useRecipeCapture(options: UseRecipeCaptureOptions) {
-  const { tier, byokConfig } = useAiCapability();
+  const { extractOptions } = useAiCapability();
   const { isOnline } = useOnline();
   const { showToast } = useToast();
   const { t } = useTranslation();
@@ -441,13 +440,10 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           return;
         }
         case 'text': {
-          const result = await extractRecipeFromText(resolved.text, {
-            tier: tier.value,
-            todayIso: toDateInputValue(new Date()),
-            byok: byokConfig.value ?? undefined,
-            grant,
-            familyId,
-          });
+          const result = await extractRecipeFromText(
+            resolved.text,
+            extractOptions({ grant, familyId })
+          );
           if (!result.success || !result.data) {
             logEvent({
               level: 'error',

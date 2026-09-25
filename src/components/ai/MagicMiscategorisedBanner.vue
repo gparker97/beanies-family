@@ -43,7 +43,7 @@
 import { computed, nextTick, ref } from 'vue';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import { useAiCapability } from '@/composables/useAiCapability';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { deferConsentForStatement, useDocumentConsent } from '@/composables/useDocumentConsent';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { IN_APP_ENV, ingestInAppSource, refuseIfBusy } from '@/composables/useSharedDocumentIngest';
@@ -107,7 +107,9 @@ function openPicker(): void {
 async function pick(to: ShareKind): Promise<void> {
   open.value = false;
 
-  const grant = await requestConsent();
+  // A bank statement (#107) is read page by page under its OWN consent, which states the read
+  // count and the merchant list, so it is deferred to the spine rather than asked twice here.
+  const grant = to === 'transactions' ? deferConsentForStatement() : await requestConsent();
   // Declined. The grant is only ever consumed server-side, so it stays spendable and the
   // banner stays offered — a decline costs the family nothing at all.
   if (!grant) return;
@@ -117,7 +119,7 @@ async function pick(to: ShareKind): Promise<void> {
   showToast(
     'info',
     t('ai.capture.title'),
-    fillTemplate(t('ai.correct.picked'), { kind: t(`ai.capture.dest.${to}`) })
+    fillTemplate(t('ai.correct.picked'), { noun: t(`ai.capture.noun.${to}`) })
   );
 
   emit('close');
@@ -172,6 +174,14 @@ async function pick(to: ShareKind): Promise<void> {
              promise is load-bearing. Shown only when the server actually issued a grant. -->
         <p v-if="isFree" class="text-secondary-400 dark:text-ink-faint mt-2 text-xs">
           {{ t('ai.correct.free') }}
+        </p>
+        <!-- A statement re-read is NOT the free correction: it is read page by page, one bean
+             each (#107), so the free promise above must not be read as covering it. -->
+        <p
+          v-if="options.includes('transactions')"
+          class="text-secondary-400 dark:text-ink-faint mt-1 text-xs"
+        >
+          {{ t('ai.correct.statementNotFree') }}
         </p>
       </div>
     </SmoothHeight>

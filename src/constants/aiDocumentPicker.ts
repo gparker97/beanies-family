@@ -1,4 +1,4 @@
-import { isPdfFile } from '@/utils/pdfExtractionImages';
+import { isPdfFile, isTextLikeFile } from '@/utils/pdfExtractionImages';
 import { sniffFileType } from '@/utils/sniffFileType';
 
 /**
@@ -23,8 +23,11 @@ import { sniffFileType } from '@/utils/sniffFileType';
  * camera on native: `AiDocumentPicker.vue` shows a Take-a-photo / Choose-a-file
  * chooser on touch-primary devices, with a dedicated image-only `capture` input
  * for the camera and THIS accept for the file path.
+ *
+ * - `text/csv,.csv,text/plain,.txt` (#107): a bank statement exported from a banking app. Read
+ *   as TEXT, never compressed; the other readers treat a picked `.txt` like a paste.
  */
-export const AI_PICKER_ACCEPT = 'image/*,application/pdf,.pdf';
+export const AI_PICKER_ACCEPT = 'image/*,application/pdf,.pdf,text/csv,.csv,text/plain,.txt';
 
 /**
  * Per-file size cap for anything entering the AI readers (#64, plan §6.2).
@@ -60,5 +63,5 @@ export async function isAiPickerAcceptedFile(file: File): Promise<boolean> {
     // An unreadable slice is itself a reason to distrust the file; fall through to the
     // declared type rather than treating a read failure as acceptance.
   }
-  return file.type.startsWith('image/') || isPdfFile(file);
+  return file.type.startsWith('image/') || isPdfFile(file) || isTextLikeFile(file);
 }

@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { processRecurringItems, deduplicateRecurringTransactions } from './recurringProcessor';
-import type { RecurringItem, Account, Asset } from '@/types/models';
+import {
+  processRecurringItems,
+  deduplicateRecurringTransactions,
+  projectRecurringTransactions,
+} from './recurringProcessor';
+import type { RecurringItem, Account, Asset, Transaction } from '@/types/models';
 
 // Mock the repositories
 vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
@@ -825,5 +829,178 @@ describe('deduplicateRecurringTransactions', () => {
 
     expect(deleted).toBe(0);
     expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('recurringProcessor - a row that stands for a due date (#107)', () => {
+  const mortgage: RecurringItem = {
+    id: 'recurring-mortgage',
+    accountId: 'test-account-1',
+    type: 'expense',
+    amount: 2000,
+    currency: 'USD',
+    category: 'mortgage',
+    description: 'Mortgage',
+    frequency: 'monthly',
+    dayOfMonth: 1,
+    startDate: '2024-01-01',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+
+  function existing(date: string, isReconciled: boolean, recurringDueDate?: string): Transaction {
+    return {
+      ...(recurringDueDate ? { recurringDueDate } : {}),
+      id: `tx-${date}`,
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 2305.17,
+      currency: 'USD',
+      category: 'mortgage',
+      date,
+      description: 'Mortgage',
+      recurringItemId: mortgage.id,
+      isReconciled,
+      createdAt: '2024-01-14T00:00:00.000Z',
+      updatedAt: '2024-01-14T00:00:00.000Z',
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    // Due date in range: 2024-01-01 only.
+    vi.setSystemTime(new Date('2024-01-20T12:00:00.000Z'));
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([mortgage]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(existing('2024-01-01', false));
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([]);
+    vi.useRealTimers();
+  });
+
+  it('suppresses the due date a merged statement row stands for', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      existing('2024-01-14', true, '2024-01-01'),
+    ]);
+    const result = await processRecurringItems();
+    expect(result.processed).toBe(0);
+    expect(transactionRepo.createTransaction).not.toHaveBeenCalled();
+  });
+
+  it('a reconciled row in the month with NO due date does not suppress anything', async () => {
+    // The old month-wide rule would have skipped this; for a weekly item it skipped every other
+    // instance in the month.
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([existing('2024-01-14', true)]);
+    const result = await processRecurringItems();
+    expect(result.processed).toBe(1);
+  });
+
+  it('a weekly item keeps its other instances when one is merged', async () => {
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([
+      { ...mortgage, frequency: 'daily', startDate: '2024-01-18' },
+    ]);
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      // Charged the day before it was due, merged into the 18th's instance.
+      existing('2024-01-17', true, '2024-01-18'),
+    ]);
+    const result = await processRecurringItems();
+    // 18th stood for by the merged row; 19th and 20th still materialise.
+    expect(result.processed).toBe(2);
+  });
+
+  it('one merged row stands for ONE due date: its own date is not also treated as done', async () => {
+    // Review round 2: `date === d || recurringDueDate === d` let a row dated the 19th that
+    // stands for the 20th also suppress the 19th.
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([
+      { ...mortgage, frequency: 'daily', startDate: '2024-01-19' },
+    ]);
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      existing('2024-01-19', true, '2024-01-20'),
+    ]);
+    const result = await processRecurringItems();
+    // The 20th is stood for; the 19th still materialises.
+    expect(result.processed).toBe(1);
+  });
+
+  it('the duplicate sweep keys on the due date a row stands for', async () => {
+    // A merged row dated the 24th standing for the 28th, and a real row ON the 24th: two
+    // different instances, neither may be deleted.
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      { ...existing('2024-01-24', true, '2024-01-28'), id: 'merged' },
+      { ...existing('2024-01-24', false), id: 'real-24' },
+    ]);
+    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true as never);
+    expect(await deduplicateRecurringTransactions()).toBe(0);
+    // And a merged row standing for the 28th plus a device-created row ON the 28th ARE the
+    // same instance: one is swept.
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      {
+        ...existing('2024-01-24', true, '2024-01-28'),
+        id: 'merged',
+        createdAt: '2024-01-24T00:00:00.000Z',
+      },
+      { ...existing('2024-01-28', false), id: 'device-b', createdAt: '2024-01-28T00:00:00.000Z' },
+    ]);
+    expect(await deduplicateRecurringTransactions()).toBe(1);
+    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('device-b');
+  });
+
+  it('keeps the original same-date rule', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      existing('2024-01-01', false),
+    ]);
+    const result = await processRecurringItems();
+    expect(result.processed).toBe(0);
+  });
+});
+
+describe('projectRecurringTransactions', () => {
+  const item: RecurringItem = {
+    id: 'rec-1',
+    accountId: 'acc-1',
+    type: 'expense',
+    amount: 50,
+    currency: 'USD',
+    category: 'subscription',
+    description: 'Netflix',
+    frequency: 'monthly',
+    dayOfMonth: 15,
+    startDate: '2024-01-01',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+
+  it('emits one projected row per due date with the stable id shape', () => {
+    const rows = projectRecurringTransactions([item], new Date(2024, 1, 1), new Date(2024, 2, 31));
+    expect(rows.map((r) => r.id)).toEqual([
+      'projected-rec-1-2024-02-15',
+      'projected-rec-1-2024-03-15',
+    ]);
+    expect(rows[0]).toMatchObject({
+      accountId: 'acc-1',
+      type: 'expense',
+      amount: 50,
+      currency: 'USD',
+      category: 'subscription',
+      date: '2024-02-15',
+      description: 'Netflix',
+      recurringItemId: 'rec-1',
+      isReconciled: false,
+      isProjected: true,
+    });
+  });
+
+  it('honours an id prefix (the next-month preview namespace)', () => {
+    const rows = projectRecurringTransactions([item], new Date(2024, 1, 1), new Date(2024, 1, 29), {
+      idPrefix: 'next-projected',
+    });
+    expect(rows.map((r) => r.id)).toEqual(['next-projected-rec-1-2024-02-15']);
   });
 });

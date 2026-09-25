@@ -290,6 +290,16 @@ describe('TransactionModal — Save Flow', () => {
       expect(wrapper.emitted('save-recurring')).toBeFalsy();
     });
 
+    it('preserves a reconciled flag on edit (#107): editing never un-reconciles a row', async () => {
+      const wrapper = await mountAndOpen({
+        transaction: { ...existingTransaction, isReconciled: true },
+      });
+      wrapper.vm.description = 'Renamed';
+      wrapper.vm.handleSave();
+      const payload = wrapper.emitted('save')![0][0] as { data: Record<string, unknown> };
+      expect(payload.data.isReconciled).toBe(true);
+    });
+
     it('should populate form fields from existing transaction', async () => {
       const wrapper = await mountAndOpen({ transaction: existingTransaction });
 

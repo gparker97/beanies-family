@@ -28,6 +28,8 @@ bumps the `versionCode`, so it installs cleanly over the previous one.
 - [ ] **AI: photo → activity** — "Magic beans" on an invite photo; consent prompt → extracted activity prefilled; prep details land in the **Notes** field (one per line); category is sensible.
 - [ ] **AI: duplicate detection** — scan the _same_ invite again → the "Already on your calendar?" prompt appears → "Update existing" merges into the existing activity (no duplicate); "Add anyway" creates a new one.
 - [ ] **AI: document → trip** — "Magic beans" on a travel booking (image or PDF) → trip/segments extracted and reviewable.
+- [ ] **AI: recipe** — "Magic beans" on the Cookbook with a recipe photo or link → recipe form prefilled.
+- [ ] **AI: bank statement → transactions** — "Magic beans" on Transactions (Transactions tile pre-picked) with a statement PDF, a phone photo of a paper statement, and a CSV → statement consent shows the page count → review lists the lines against the suggested account; a line already in beanies shows as a merge card, a near-duplicate as a dashed "Possibly already in beanies" card; confirm adds/merges; re-importing the same statement offers nothing new.
 - [ ] **Notifications** — the in-app bell shows what's-new / nudges; (native push is separate — see below).
 - [ ] **Other tabs** — Piggy Bank (accounts/transactions), Treehouse, Family — each opens and renders without error.
 

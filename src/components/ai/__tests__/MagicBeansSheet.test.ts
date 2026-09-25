@@ -59,7 +59,7 @@ const stubs = {
 beforeEach(() => vi.clearAllMocks());
 
 /** The sheet draws what it is GIVEN — the door filters by permission and flag, not the sheet. */
-const ALL_KINDS = ['event', 'travel', 'recipe'] as const;
+const ALL_KINDS = ['event', 'travel', 'recipe', 'transactions'] as const;
 
 function mountSheet(open = true, kinds: readonly string[] = ALL_KINDS) {
   return mount(MagicBeansSheet, {
@@ -171,6 +171,7 @@ describe('MagicBeansSheet', () => {
         'false',
         'false',
         'false',
+        'false',
       ]);
       expect(w.text()).toContain('ai.capture.pick.idle');
       expect(w.text()).not.toContain('ai.capture.pick.as.');
@@ -179,15 +180,26 @@ describe('MagicBeansSheet', () => {
     it('is single-select: a tap picks, a second tap on the same tile clears', async () => {
       const w = mountSheet();
       await tiles(w)[1]!.trigger('click');
-      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual(['false', 'true', 'false']);
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'true',
+        'false',
+        'false',
+      ]);
       expect(w.text()).toContain('ai.capture.pick.as.travel');
       expect(w.text()).toContain('ai.capture.pick.undo');
 
       await tiles(w)[2]!.trigger('click');
-      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual(['false', 'false', 'true']);
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'true',
+        'false',
+      ]);
 
       await tiles(w)[2]!.trigger('click');
       expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
         'false',
         'false',
         'false',
@@ -239,7 +251,31 @@ describe('MagicBeansSheet', () => {
         'false',
         'false',
         'false',
+        'false',
       ]);
+    });
+
+    it("opens with its door's surface pre-picked, fresh on every open, and still clearable", async () => {
+      const w = mount(MagicBeansSheet, {
+        props: { open: false, kinds: [...ALL_KINDS] as never, initialHint: 'recipe' },
+        global: { stubs },
+        attachTo: document.body,
+      });
+      await w.setProps({ open: true });
+      await nextTick();
+      expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([
+        'false',
+        'false',
+        'true',
+        'false',
+      ]);
+      await tiles(w)[2]!.trigger('click');
+      expect(w.text()).toContain('ai.capture.pick.idle');
+      // Cleared for this capture only: the next open is pre-picked again.
+      await w.setProps({ open: false });
+      await w.setProps({ open: true });
+      await nextTick();
+      expect(tiles(w)[2]!.attributes('aria-pressed')).toBe('true');
     });
   });
 

@@ -431,7 +431,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Track income, expenses, and transfers between accounts with categories and recurring schedules.',
     icon: '\u{1F4B8}',
     readTime: 3,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-09-25',
     sections: [
       {
         type: 'heading',
@@ -464,6 +464,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Select the account, enter the amount, and pick a category',
           'Add a date and optional description',
         ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Have a bank statement? Import it instead of typing: beanies reads it and shows you every line to check first. See <a href="/help/features/import-a-bank-statement">Import a Bank Statement with Magic Beans</a>.',
+        title: 'Import instead of typing',
+        icon: '\u{1F3E6}',
       },
       {
         type: 'heading',
@@ -1765,7 +1772,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     category: 'features',
     title: 'Share Something Straight to beanies',
     excerpt:
-      'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip or a recipe.',
+      'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip, a recipe or a bank statement.',
     icon: '\u{1F4E4}',
     readTime: 5,
     updatedDate: '2026-09-25',
@@ -1824,7 +1831,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'beanies decides for itself which of three things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), or a <strong>recipe</strong>. If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
+          'beanies decides for itself which of four things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), a <strong>recipe</strong>, or a <strong>bank statement</strong> (its lines become transactions for you to check). If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
       },
       {
         type: 'heading',
@@ -1840,7 +1847,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'A whole message is fine \u2014 you do not need to trim it down to the useful part. beanies reads what you send and works out for itself whether it is an activity, a trip or a recipe, exactly as it does for a photo. A tighter selection is still read a little more precisely, so it is worth trimming an enormous thread.',
+          'A whole message is fine \u2014 you do not need to trim it down to the useful part. beanies reads what you send and works out for itself whether it is an activity, a trip, a recipe or a bank statement, exactly as it does for a photo. A tighter selection is still read a little more precisely, so it is worth trimming an enormous thread.',
       },
       {
         type: 'callout',
@@ -1950,9 +1957,99 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip or recipe) before you read it and beanies reads it as that straight away. Leave them alone and beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
+          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip, recipe or bank statement) before you read it and beanies reads it as that straight away. Opened from a page, the sheet picks that page\u2019s tile for you (Transactions on the Transactions page, Trip on Travel Plans); tap it again to clear it. With no tile picked, beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
         title: 'Tell beanies what it is first, if you like',
         icon: '\u2728',
+      },
+    ],
+  },
+  {
+    slug: 'import-a-bank-statement',
+    category: 'features',
+    title: 'Import a Bank Statement with Magic Beans',
+    excerpt:
+      'Hand beanies a bank or card statement and check the transactions it finds before anything is added, with the ones you already entered matched up instead of doubled.',
+    icon: '\u{1F3E6}',
+    readTime: 5,
+    updatedDate: '2026-09-25',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Typing every transaction by hand is the fastest way to stop keeping track at all. Instead, give beanies your statement: a PDF from your bank, a photo or screenshot of your recent transactions, a CSV export, or text copied from your banking app. beanies reads it, lines it up against what you have already entered, and shows you everything before a single transaction is added.',
+      },
+      {
+        type: 'callout',
+        content:
+          'Nothing is saved until you confirm the list. The statement itself is not kept, by the AI service or by beanies.',
+        title: 'You check everything first',
+        icon: '\u{1F9FE}',
+      },
+      {
+        type: 'heading',
+        content: 'Importing a statement',
+        level: 2,
+        id: 'how-to-import',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Budgets</strong> and tap <strong>Import a statement</strong>, or tap <strong>✨ Magic beans</strong> anywhere and choose the <strong>Transactions</strong> tile',
+          'Paste the text, take a photo, or choose the file',
+          'beanies tells you how many pages it will read and what it sends. Tap <strong>Read my statement</strong> (with the privacy check switched off in Settings, this step appears only the first time)',
+          'Check the account at the top. beanies picks it from the statement when it can; change it if it is wrong',
+          'Go through the list, change anything you need to, and tap <strong>Add</strong> at the bottom',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'What the list shows',
+        level: 2,
+        id: 'the-list',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>A plain line</strong> is new. It is ticked, so it will be added. Untick it to leave it out, or tap its name to change the date, amount, category or account.',
+          '<strong>A card with two sides</strong> looks like something you already entered: the statement on the left, your entry on the right. <strong>Merge</strong> keeps your entry (its name, its link to a recurring payment or an activity) and updates it with the amount and date from the statement. <strong>Keep both</strong> adds the statement line as well. <strong>Skip</strong> leaves it out. A card with a <strong>dashed border</strong> says <strong>Possibly already in beanies</strong>: the amount is close to something you have (often a charge entered twice, or one added by an earlier import), but not close enough to be sure. Both are kept unless you choose Merge or Skip, and Merge all never touches these cards.',
+          "<strong>A dashed line</strong> was added by an earlier import, so it is unticked. Overlapping imports (last week's screenshot and this week's) never add the same line twice.",
+          '<strong>Tick all</strong>, <strong>Untick all</strong> and <strong>Merge all</strong> (and friends) work on the whole list, and the tick beside each day works on that day. You can still change any line afterwards.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'A recurring payment you set up for the 1st often leaves your account mid-month, and not always for the exact amount. beanies still offers to merge it, as long as it lands in the same month. One charged in a different month from when it was due shows as a new line instead, so check it before you add it.',
+        title: 'Recurring payments',
+        icon: '\u{1F501}',
+      },
+      {
+        type: 'heading',
+        content: 'Long statements, and what each read costs',
+        level: 2,
+        id: 'long-statements',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies reads a statement one page at a time, and each page is one magic bean. Pages that are only terms, adverts or a payment slip are left out, and the list says so, with a <strong>Read it anyway</strong> button in case beanies got one wrong. If a page could not be read, the list tells you that too, so you know which lines to look for.',
+      },
+      {
+        type: 'heading',
+        content: 'After you import',
+        level: 2,
+        id: 'afterwards',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every added or merged transaction is marked <strong>reconciled</strong>: it matches your bank. Its details show what it said on your statement, so you can recognise it next month. A reconciled transaction that belongs to a recurring payment no longer changes when you edit that recurring payment, because it now records what the bank actually took.',
+      },
+      {
+        type: 'paragraph',
+        content: 'Only family members who can see the finances can import a statement.',
       },
     ],
   },

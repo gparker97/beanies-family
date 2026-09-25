@@ -19,6 +19,21 @@ export function isPdfFile(file: File): boolean {
 }
 
 /**
+ * True for a plain-text or CSV file by mime or extension (#107): a statement exported from a
+ * banking app. Read as TEXT, never compressed as an image. `sniffFileType` recognises no text
+ * signature, so the declared type and the name are the only evidence, and that is enough:
+ * mislabelled bytes simply fail to read as a statement and say so.
+ */
+export function isTextLikeFile(file: File): boolean {
+  return (
+    file.type === 'text/plain' ||
+    file.type === 'text/csv' ||
+    file.type === 'application/csv' ||
+    /\.(csv|txt)$/i.test(file.name)
+  );
+}
+
+/**
  * Max PDF pages read per extraction. This is the PRODUCT cap — it bounds cost,
  * latency, and request payload. It is intentionally decoupled from the Lambda's
  * looser `MAX_IMAGES` server-side backstop; do not "reconcile" the two to match.
@@ -29,7 +44,7 @@ export const MAX_EXTRACT_PAGES = 5;
  * Long-edge px for each rendered page. 1600px is ample for document OCR and keeps a
  * full MAX_EXTRACT_PAGES payload comfortably under the Lambda body cap.
  */
-const EXTRACT_LONG_EDGE = 1600;
+export const EXTRACT_LONG_EDGE = 1600;
 
 export interface ExtractionImages {
   /** One JPEG File per rendered page, in page order (always ≥1). */

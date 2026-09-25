@@ -117,7 +117,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'one-magic-bean',
     q: 'what counts as one magic bean?',
-    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. with the trial you get one per day, beanies + magic beans gives you ten a day, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
+    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. a bank statement is read page by page, so it's one bean per page, and beanies tells you how many before it reads. with the trial you get one per day, beanies + magic beans gives you ten a day, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
   },
   {
     id: 'compare-to-cozi',
