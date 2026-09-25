@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-25
 
-_Not yet released:_
+_Released in 0.23 (web, Android production; iOS in App Store review)._
 
 ### Added
 
