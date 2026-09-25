@@ -17,6 +17,70 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.25',
+    date: '2026-09-25',
+    month: '25 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Magic beans can now read your bank statements.',
+      beanie: 'magic beans can now read your bank statements.',
+    },
+    features: [
+      {
+        icon: '\u{1F3E6}',
+        title: { en: 'Import a bank statement', beanie: 'import a bank statement' },
+        description: {
+          en: 'Hand magic beans a statement as a PDF, a photo, a CSV or pasted text, and beanies lists every transaction for you to check before anything is added. It spots the ones already in beanies and flags possible duplicates, so nothing is counted twice.',
+          beanie:
+            'hand magic beans a statement as a pdf, a photo, a csv or pasted text, and beanies lists every transaction for you to check before anything is added. it spots the ones already in beanies and flags possible duplicates, so nothing is counted twice.',
+        },
+        tryItRoute: '/transactions',
+      },
+      {
+        title: { en: 'Tell magic beans what it is', beanie: 'tell magic beans what it is' },
+        description: {
+          en: "Tap a tile to say what you're sharing, and each page picks its own for you.",
+          beanie: "tap a tile to say what you're sharing, and each page picks its own for you.",
+        },
+      },
+      {
+        title: { en: "Save tells you what's missing", beanie: "save tells you what's missing" },
+        description: {
+          en: 'Every drawer now shows what still needs filling in before you save.',
+          beanie: 'every drawer now shows what still needs filling in before you save.',
+        },
+      },
+      {
+        title: { en: 'Manage your recovery kits', beanie: 'manage your recovery kits' },
+        description: {
+          en: "See every recovery kit you've made and cancel any you no longer trust.",
+          beanie: "see every recovery kit you've made and cancel any you no longer trust.",
+        },
+      },
+      {
+        title: { en: 'Also new', beanie: 'also new' },
+        description: {
+          en: 'An Interest income category, helpful hints in your daily briefing, and Import a statement now comes first on Budgets.',
+          beanie:
+            'an interest income category, helpful hints in your daily briefing, and import a statement now comes first on budgets.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.24',
     date: '2026-09-24',
     month: '24 september 2026',
