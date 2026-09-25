@@ -77,4 +77,44 @@ describe('BeanieFormModal', () => {
     expect(body).toContain('🗑️');
     expect(body).toContain('action.save');
   });
+
+  describe('saveReady — the not-ready Save still answers a tap', () => {
+    // The panel teleports to <body>, so the button is found in the document, not the wrapper.
+    const saveButton = () =>
+      [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('action.save'))!;
+
+    it('draws a not-ready Save neutral, with no white ink, gradient or hover shadow', () => {
+      for (const saveGradient of ['orange', 'purple', 'teal'] as const) {
+        const w = mount(BeanieFormModal, {
+          props: { ...baseProps, saveReady: false, saveGradient },
+          attachTo: document.body,
+        });
+        const cls = [...saveButton().classList];
+        expect(cls).toContain('bg-[var(--tint-slate-10)]');
+        expect(cls).not.toContain('text-white');
+        expect(cls).not.toContain('hover:shadow-md');
+        expect(cls).not.toContain('bg-gradient-to-r');
+        w.unmount();
+        document.body.innerHTML = '';
+      }
+    });
+
+    it('is still clickable and still emits save — it is not disabled', async () => {
+      const w = mount(BeanieFormModal, {
+        props: { ...baseProps, saveReady: false },
+        attachTo: document.body,
+      });
+      const btn = saveButton();
+      expect(btn.hasAttribute('disabled')).toBe(false);
+      btn.click();
+      expect(w.emitted('save')).toHaveLength(1);
+    });
+
+    it("keeps today's gradient when ready", () => {
+      mount(BeanieFormModal, { props: baseProps, attachTo: document.body });
+      const cls = [...saveButton().classList];
+      expect(cls).toContain('text-white');
+      expect(cls).toContain('bg-gradient-to-r');
+    });
+  });
 });

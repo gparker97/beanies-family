@@ -73,7 +73,6 @@ const { isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit(trans) {
-      validation.reset();
       status.value = trans.status ?? 'pending';
       bookingReference.value = trans.bookingReference ?? '';
       pickupDate.value = trans.pickupDate ?? '';
@@ -93,7 +92,6 @@ const { isSubmitting } = useFormModal(
       travellerIds.value = resolveSegmentTravellers(trans.travellerIds, tripAssigneeIds.value);
     },
     onNew() {
-      validation.reset();
       status.value = 'pending';
       bookingReference.value = '';
       pickupDate.value = '';
@@ -173,7 +171,10 @@ const rules = computed<BookingValidationRules<TransportationField>>(() => {
   return { alwaysRequired: {}, requiredWhenBooked: {} };
 });
 
-const validation = useBookingValidation<TransportationField>(status, rules);
+const validation = useBookingValidation<TransportationField>(status, rules, {
+  formName: 'transportation',
+  open: () => props.open,
+});
 
 // --- Booking-document attachments (images + PDFs) --------------------
 const segmentPhotoIds = computed<string[]>(
@@ -251,6 +252,7 @@ async function handleSave() {
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
     :is-submitting="isSubmitting"
+    :save-ready="validation.canSave.value"
     @close="$emit('close')"
     @save="handleSave"
   >
@@ -289,15 +291,13 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.departureDate')"
-            :required="validation.isRequired('departureDate')"
-            :error="validation.showError('departureDate')"
+            v-bind="validation.bind('departureDate')"
           >
             <BeanieDatePicker v-model="departureDate" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.departureTime')"
-            :required="validation.isRequired('departureTime')"
-            :error="validation.showError('departureTime')"
+            v-bind="validation.bind('departureTime')"
           >
             <BeanieTimeInput v-model="departureTime" />
           </FormFieldGroup>
@@ -308,8 +308,7 @@ async function handleSave() {
       <template v-if="isRentalCar">
         <FormFieldGroup
           :label="t('vacation.field.agencyName')"
-          :required="validation.isRequired('agencyName')"
-          :error="validation.showError('agencyName')"
+          v-bind="validation.bind('agencyName')"
         >
           <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
         </FormFieldGroup>
@@ -323,8 +322,7 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.pickupDate')"
-            :required="validation.isRequired('pickupDate')"
-            :error="validation.showError('pickupDate')"
+            v-bind="validation.bind('pickupDate')"
           >
             <BeanieDatePicker v-model="pickupDate" />
           </FormFieldGroup>
@@ -335,8 +333,7 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.returnDate')"
-            :required="validation.isRequired('returnDate')"
-            :error="validation.showError('returnDate')"
+            v-bind="validation.bind('returnDate')"
           >
             <BeanieDatePicker v-model="returnDate" />
           </FormFieldGroup>
@@ -351,15 +348,13 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.pickupDate')"
-            :required="validation.isRequired('pickupDate')"
-            :error="validation.showError('pickupDate')"
+            v-bind="validation.bind('pickupDate')"
           >
             <BeanieDatePicker v-model="pickupDate" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.pickupTime')"
-            :required="validation.isRequired('pickupTime')"
-            :error="validation.showError('pickupTime')"
+            v-bind="validation.bind('pickupTime')"
           >
             <BeanieTimeInput v-model="pickupTime" />
           </FormFieldGroup>

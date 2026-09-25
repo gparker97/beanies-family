@@ -17,6 +17,8 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { useFormValidation } from '@/composables/useFormValidation';
 import {
   useInstitutionOptions,
   persistCustomInstitutionIfNeeded,
@@ -104,11 +106,22 @@ const loanPayFromAccountId = ref('');
 const details = reactive<AccountDetails>(emptyAccountDetails());
 const detailErrors = computed(() => validateAccountDetails(details, type.value));
 const detailsValid = computed(() => Object.keys(detailErrors.value).length === 0);
-// A detail-field error must never be hidden behind a collapsed section — Save is
-// disabled while invalid, so force "More Details" open so the user can see + fix it.
+// A detail-field error must never be hidden behind a collapsed section: the section renders
+// open whenever details are invalid (so it cannot be collapsed over an error, and Save can
+// scroll to it), and the watch keeps it open while the person finishes fixing it.
+const detailsOpen = computed(() => showMoreDetails.value || !detailsValid.value);
 watch(detailsValid, (valid) => {
   if (!valid) showMoreDetails.value = true;
 });
+/** Collapsing is refused while a detail is invalid. Flipping `showMoreDetails` then would do
+ *  nothing visible, and the section would vanish under the person the moment the value
+ *  became valid, taking the focused input (and the phone keyboard) with it. */
+const detailsSection = ref<HTMLElement | null>(null);
+function toggleMoreDetails() {
+  if (detailsValid.value) showMoreDetails.value = !showMoreDetails.value;
+  // Refused, never silently: point at the section whose error is holding it open.
+  else useAttentionPulse().pulse(detailsSection.value);
+}
 
 // MRU: find most recent institution/country from existing accounts
 function getMruDefaults() {
@@ -182,8 +195,15 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-const canSave = computed(
-  () => name.value.trim().length > 0 && type.value !== '' && memberId.value !== ''
+const v = useFormValidation(
+  'account',
+  () => ({
+    owner: () => memberId.value !== '',
+    name: () => name.value.trim().length > 0,
+    category: () => type.value !== '',
+    details: () => detailsValid.value,
+  }),
+  { open: () => props.open }
 );
 
 const modalTitle = computed(() =>
@@ -201,7 +221,6 @@ async function handleRemoveCustomInstitution(instName: string) {
 }
 
 async function handleSave() {
-  if (!canSave.value || !detailsValid.value) return;
   isSubmitting.value = true;
   try {
     const data = {
@@ -273,15 +292,15 @@ function handleDelete() {
     :icon="modalIcon"
     icon-bg="var(--tint-silk-20)"
     :save-label="saveLabel"
-    :save-disabled="!canSave || !detailsValid"
+    :save-ready="v.canSave.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"
-    @save="handleSave"
+    @save="v.attemptSave(handleSave)"
     @delete="handleDelete"
   >
     <!-- 1. Account Owner -->
-    <FormFieldGroup :label="t('modal.accountOwner')" required>
+    <FormFieldGroup :label="t('modal.accountOwner')" v-bind="v.bind('owner')">
       <FamilyChipPicker v-model="memberId" mode="single" />
     </FormFieldGroup>
 
@@ -334,7 +353,7 @@ function handleDelete() {
     </div>
 
     <!-- 3. Account Name (styled like TransactionModal description) -->
-    <FormFieldGroup :label="t('modal.accountName')" required>
+    <FormFieldGroup :label="t('modal.accountName')" v-bind="v.bind('name')">
       <div
         class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >
@@ -348,7 +367,7 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 4. Category / Type (two-level picker) -->
-    <FormFieldGroup :label="t('modal.selectCategory')" required>
+    <FormFieldGroup :label="t('modal.selectCategory')" v-bind="v.bind('category')">
       <AccountCategoryPicker v-model="type" />
     </FormFieldGroup>
 
@@ -392,22 +411,20 @@ function handleDelete() {
       />
     </div>
 
-    <!-- 7. "More Details..." collapsible -->
-    <div>
+    <!-- 7. "More Details..." collapsible (stays open while a detail field is invalid) -->
+    <div ref="detailsSection" v-bind="v.hook('details', t('modal.moreDetails'))">
       <button
         type="button"
         class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
-        @click="showMoreDetails = !showMoreDetails"
+        @click="toggleMoreDetails"
       >
         {{ t('modal.moreDetails') }}
-        <span
-          class="ml-1 inline-block transition-transform"
-          :class="{ 'rotate-180': showMoreDetails }"
+        <span class="ml-1 inline-block transition-transform" :class="{ 'rotate-180': detailsOpen }"
           >&#9662;</span
         >
       </button>
 
-      <div v-if="showMoreDetails" class="mt-3 space-y-3">
+      <div v-if="detailsOpen" class="mt-3 space-y-3">
         <!-- Optional account details (reference info) -->
         <AccountDetailsFields :details="details" :type="type" :currency="currency" />
 

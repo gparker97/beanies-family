@@ -12,8 +12,10 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ExtractedSegmentRow from './ExtractedSegmentRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormValidation } from '@/composables/useFormValidation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatDateShort } from '@/utils/date';
@@ -207,10 +209,17 @@ const saveLabel = computed(() =>
   isNewTrip.value ? t('travelExtract.createTrip') : t('travelExtract.addToTrip')
 );
 
-const saveDisabled = computed(() => {
-  if (rows.value.length === 0) return true;
-  return isNewTrip.value ? tripName.value.trim() === '' : chosenVacationId.value === '';
-});
+const v = useFormValidation(
+  'travel-extract',
+  () =>
+    isNewTrip.value
+      ? { tripName: () => tripName.value.trim() !== '' }
+      : { trip: () => chosenVacationId.value !== '' },
+  { open: () => props.open }
+);
+
+/** Nothing extracted means there is nothing to save: genuinely unavailable, not missing input. */
+const saveDisabled = computed(() => rows.value.length === 0);
 
 function onSave(): void {
   const travellerMap = { ...nameToMemberId.value };
@@ -240,10 +249,11 @@ function onSave(): void {
     size="default"
     save-gradient="teal"
     :save-label="saveLabel"
+    :save-ready="v.canSave.value"
     :save-disabled="saveDisabled"
     :is-submitting="submitting"
     @close="emit('close')"
-    @save="onSave"
+    @save="v.attemptSave(onSave)"
   >
     <div class="space-y-4">
       <p class="font-inter text-xs text-gray-400">
@@ -336,24 +346,26 @@ function onSave(): void {
         </div>
 
         <!-- New trip: editable name -->
-        <div v-if="isNewTrip">
-          <label class="font-inter mb-1.5 block text-xs text-gray-400">
-            {{ t('travelExtract.newTripNameLabel') }}
-          </label>
+        <FormFieldGroup
+          v-if="isNewTrip"
+          :label="t('travelExtract.newTripNameLabel')"
+          v-bind="v.bind('tripName')"
+        >
           <BaseInput v-model="tripName" :placeholder="t('travelExtract.tripNamePlaceholder')" />
-        </div>
+        </FormFieldGroup>
 
         <!-- Existing trip: dropdown of current / upcoming trips -->
-        <div v-else>
-          <label class="font-inter mb-1.5 block text-xs text-gray-400">
-            {{ t('travelExtract.addToTripLabel') }}
-          </label>
+        <FormFieldGroup
+          v-else
+          :label="t('travelExtract.addToTripLabel')"
+          v-bind="v.bind('trip', t('travelExtract.tripLabel'))"
+        >
           <BaseSelect
             v-model="chosenVacationId"
             :options="tripOptions"
             :placeholder="t('travelExtract.selectTripPlaceholder')"
           />
-        </div>
+        </FormFieldGroup>
       </div>
 
       <!-- "not right?" — at the FOOT, where someone ends up after scanning the segments and

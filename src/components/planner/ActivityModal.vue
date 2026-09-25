@@ -32,6 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useMagicReader } from '@/composables/useMagicReader';
 import { useFormModal } from '@/composables/useFormModal';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { useFormValidation } from '@/composables/useFormValidation';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import {
@@ -174,7 +175,6 @@ const link = ref('');
 const isActive = ref(true);
 const color = ref('');
 const showMoreDetails = ref(false);
-const showErrors = ref(false);
 
 // --- Document-extraction prefill (#133) ---
 // Below this per-field confidence we visually flag the field for the user to double-check.
@@ -391,7 +391,6 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = activity.isActive;
       color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
-      showErrors.value = false;
       wasPrefilled.value = false; // editing an existing activity is never a prefill
       // Usually null, but the AI "update existing" flow opens an existing activity in edit mode
       // WITH a source document to attach — stage it symmetrically with onNew so it binds to this
@@ -433,7 +432,6 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       color.value = '';
       showMoreDetails.value = false;
-      showErrors.value = false;
       // Apply an extraction prefill, if any, over the defaults just set above.
       applyPrefill();
       // Stage the source document; maybeAttachSourcePhoto() attaches it once the gate clears.
@@ -654,23 +652,26 @@ const perSessionCost = computed(() => {
   return Math.round((Math.abs(feeAmount.value ?? 0) / totalSessions.value) * 100) / 100;
 });
 
-const canSave = computed(() => {
-  if (!title.value.trim() || !date.value) return false;
-  if (assigneeIds.value.length === 0) return false;
-  if (hasCost.value && feeSchedule.value === 'none') return false;
-  if (
-    hasCost.value &&
-    feeSchedule.value === 'custom' &&
-    (!feeCustomPeriod.value || feeCustomPeriod.value <= 0)
-  )
-    return false;
-  return true;
-});
+// Required fields. The fee rules apply only while their controls are on screen (a recurring
+// activity with a cost), so a one-off activity is never blocked by a hidden fee field.
+const v = useFormValidation(
+  'activity',
+  () => ({
+    title: () => title.value.trim().length > 0,
+    date: () => !!date.value,
+    assignees: () => assigneeIds.value.length > 0,
+    ...(isRecurring.value && hasCost.value
+      ? {
+          feeSchedule: () => feeSchedule.value !== 'none',
+          customPeriod: () => feeSchedule.value !== 'custom' || (feeCustomPeriod.value ?? 0) > 0,
+        }
+      : {}),
+  }),
+  { open: () => props.open }
+);
 
-// Per-field error flags (only visible after attempted save)
-const errorAssignees = computed(() => showErrors.value && assigneeIds.value.length === 0);
-const errorTitle = computed(() => showErrors.value && !title.value.trim());
-const errorDate = computed(() => showErrors.value && !date.value);
+/** The eager-create / photo gate's fields (the fee rules are deliberately not part of it). */
+const EAGER_CREATE_FIELDS = ['title', 'date', 'assignees'] as const;
 
 const modalTitle = computed(() =>
   isEditing.value ? t('planner.editActivity') : t('planner.newActivity')
@@ -735,8 +736,8 @@ function buildPayload(): CreateFamilyActivityInput {
 /**
  * Eager-create + photo-binding wiring.
  *
- * Eager-create gates on the same `canSave` predicate as the final Save
- * (title + date + at least one assignee). The "Add photos" placeholder
+ * Eager-create gates on the same required-field rules as the final Save
+ * (title + date + at least one assignee, `EAGER_CREATE_FIELDS`). The "Add photos" placeholder
  * stays disabled until those minimums are met so the user can't end up
  * with an orphan, ill-formed activity record.
  *
@@ -754,16 +755,13 @@ const photoAttachmentsRef = ref<{
 } | null>(null);
 
 /**
- * Reactive gate predicate. Same fields as `canSave` — keeps the photo
- * placeholder's disabled state and the inline hint visibility in lock-
- * step with the form-level Save button.
+ * Reactive gate predicate. Reads the same rules as Save (`v.missing`) — keeps the photo
+ * placeholder's disabled state and the inline hint visibility in lockstep with the
+ * form-level Save button.
  */
-const firstMissingFieldKey = computed<string | null>(() => {
-  if (!title.value.trim()) return 'title';
-  if (!date.value) return 'date';
-  if (assigneeIds.value.length === 0) return 'assignees';
-  return null;
-});
+const firstMissingFieldKey = computed<string | null>(
+  () => EAGER_CREATE_FIELDS.find((f) => v.missing.value.has(f)) ?? null
+);
 
 const addPhotosHint = computed(() =>
   firstMissingFieldKey.value !== null ? t('activities.photoGate.fillFirst') : null
@@ -846,13 +844,16 @@ watch(
   { immediate: true }
 );
 
-function handleSave() {
-  if (!canSave.value) {
-    showErrors.value = true;
+/** Save doubles as Close in read-only mode; otherwise validate, then save. */
+function onSaveClick() {
+  if (props.readOnly) {
+    emit('close');
     return;
   }
-  showErrors.value = false;
+  return v.attemptSave(handleSave);
+}
 
+function handleSave() {
   const payload = buildPayload();
   const existingId = eager.entityId.value;
 
@@ -900,11 +901,11 @@ function handleSave() {
     :icon="icon || '📋'"
     icon-bg="var(--tint-orange-8)"
     :save-label="readOnly ? t('action.close') : saveLabel"
-    :save-disabled="false"
+    :save-ready="readOnly || v.canSave.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing && !readOnly"
     @close="emit('close')"
-    @save="readOnly ? emit('close') : handleSave()"
+    @save="onSaveClick"
     @delete="emit('delete')"
   >
     <div class="space-y-5" :class="readOnly ? 'pointer-events-none opacity-60' : ''">
@@ -1025,7 +1026,7 @@ function handleSave() {
       </div>
 
       <!-- 2. Activity title -->
-      <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
+      <FormFieldGroup :label="t('modal.whatsTheActivity')" v-bind="v.bind('title')">
         <div
           class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
         >
@@ -1073,7 +1074,7 @@ function handleSave() {
         <!-- (#70) The recurrence end moved into RecurrencePicker's "ends"
              control, so this row is a single full-width start date rather than
              a half-empty two-column grid. -->
-        <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
+        <FormFieldGroup :label="t('planner.field.date')" v-bind="v.bind('date')">
           <BeanieDatePicker v-model="date" required />
         </FormFieldGroup>
         <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
@@ -1088,7 +1089,7 @@ function handleSave() {
       <!-- One-off: Date (+ optional end date if all-day), or Date + times -->
       <template v-else>
         <div v-if="isAllDay" class="grid grid-cols-2 gap-4">
-          <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
+          <FormFieldGroup :label="t('planner.field.dateOnly')" v-bind="v.bind('date')">
             <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
           <FormFieldGroup :label="t('planner.field.endDate')" optional>
@@ -1096,7 +1097,7 @@ function handleSave() {
           </FormFieldGroup>
         </div>
         <div v-else class="space-y-3">
-          <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
+          <FormFieldGroup :label="t('planner.field.dateOnly')" v-bind="v.bind('date')">
             <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
           <div class="grid grid-cols-2 gap-3">
@@ -1111,7 +1112,7 @@ function handleSave() {
       </template>
 
       <!-- 6. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
+      <FormFieldGroup :label="t('modal.whosGoing')" v-bind="v.bind('assignees')">
         <FamilyChipPicker v-model="assigneeIds" mode="multi" include-pets />
       </FormFieldGroup>
 
@@ -1153,7 +1154,7 @@ function handleSave() {
       </FormFieldGroup>
       <!-- Fee schedule chips (recurring only — one-off activities just have a flat cost) -->
       <template v-if="isRecurring">
-        <FormFieldGroup :label="t('planner.field.feeSchedule')">
+        <FormFieldGroup :label="t('planner.field.feeSchedule')" v-bind="v.bind('feeSchedule')">
           <template #label-extra>
             <InfoHintBadge
               :text="t('planner.fee.scheduleHintIntro')"
@@ -1171,19 +1172,25 @@ function handleSave() {
         </FormFieldGroup>
 
         <!-- Custom period inputs -->
-        <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
-          <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-            t('planner.fee.customPeriod')
-          }}</span>
-          <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
-          <TogglePillGroup
-            v-model="feeCustomPeriodUnit"
-            :options="[
-              { value: 'weeks', label: t('planner.fee.weeks') },
-              { value: 'months', label: t('planner.fee.months') },
-            ]"
-          />
-        </div>
+        <FormFieldGroup
+          v-if="feeSchedule === 'custom'"
+          :label="t('planner.fee.customPeriodLabel')"
+          v-bind="v.bind('customPeriod')"
+        >
+          <div class="flex items-center gap-2">
+            <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+              t('planner.fee.customPeriod')
+            }}</span>
+            <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+            <TogglePillGroup
+              v-model="feeCustomPeriodUnit"
+              :options="[
+                { value: 'weeks', label: t('planner.fee.weeks') },
+                { value: 'months', label: t('planner.fee.months') },
+              ]"
+            />
+          </div>
+        </FormFieldGroup>
 
         <!-- Per-session breakdown for 'all' schedule -->
         <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">

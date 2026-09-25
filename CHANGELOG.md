@@ -8,6 +8,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-25
+
+_Not yet released:_
+
+### Added
+
+- **Tell magic beans what you're sharing.** The magic beans sheet has an optional row to say
+  whether it's a trip, a recipe or something else, so beanies reads it the right way first time.
+
+### Changed
+
+- **Save tells you what is missing.** In the activity, transaction, account, goal, recipe, family
+  member and travel drawers, and step 1 of the trip wizard, Save now looks muted until the
+  required fields are filled. Tapping it early takes you to the first missing field, marks
+  every one, and lists what is still needed.
+
+---
+
 ## 2026-09-24
 
 _Merged after 0.22.1, not yet released:_

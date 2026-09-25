@@ -1,8 +1,11 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { nextTick } from 'vue';
 import TransactionModal from './TransactionModal.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import { showToast } from '@/composables/useToast';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type {
@@ -11,6 +14,13 @@ import type {
   CreateTransactionInput,
   CreateRecurringItemInput,
 } from '@/types/models';
+
+// An invalid Save toasts and logs (useFormValidation); keep both out of the real pipeline.
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+vi.mock('@/composables/useToast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/composables/useToast')>()),
+  showToast: vi.fn(),
+}));
 
 // Mock repositories
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
@@ -597,37 +607,61 @@ describe('TransactionModal — Save Flow', () => {
   });
 
   describe('Validation', () => {
-    it('should not emit save when description is empty', () => {
+    // A tap on a not-ready Save still reaches the modal (Save is never disabled for missing
+    // input); useFormValidation blocks the save, marks the field, scrolls and toasts.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function tapSave(wrapper: any) {
+      wrapper.findComponent(BeanieFormModal).vm.$emit('save');
+      await flushPromises();
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function fieldGroup(wrapper: any, label: string) {
+      return (
+        wrapper
+          .findAllComponents(FormFieldGroup)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .find((c: any) => c.props('label') === label)!
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function expectBlocked(wrapper: any, label: string) {
+      expect(wrapper.emitted('save')).toBeFalsy();
+      expect(wrapper.emitted('save-recurring')).toBeFalsy();
+      expect(wrapper.findComponent(BeanieFormModal).props('saveReady')).toBe(false);
+      expect(fieldGroup(wrapper, label).props('error')).toBe(true);
+      expect(showToast).toHaveBeenCalledTimes(1);
+    }
+
+    it('should not emit save when description is empty', async () => {
       const wrapper = mountModal();
       wrapper.vm.amount = 10;
       wrapper.vm.description = '';
 
-      wrapper.vm.handleSave();
+      await tapSave(wrapper);
 
-      expect(wrapper.emitted('save')).toBeFalsy();
-      expect(wrapper.emitted('save-recurring')).toBeFalsy();
+      expectBlocked(wrapper, 'form.description');
     });
 
-    it('should not emit save when amount is zero', () => {
+    it('should not emit save when amount is zero', async () => {
       const wrapper = mountModal();
       wrapper.vm.description = 'Test';
       wrapper.vm.amount = 0;
 
-      wrapper.vm.handleSave();
+      await tapSave(wrapper);
 
-      expect(wrapper.emitted('save')).toBeFalsy();
-      expect(wrapper.emitted('save-recurring')).toBeFalsy();
+      expectBlocked(wrapper, 'form.amount');
     });
 
-    it('should not emit save when amount is undefined', () => {
+    it('should not emit save when amount is undefined', async () => {
       const wrapper = mountModal();
       wrapper.vm.description = 'Test';
       wrapper.vm.amount = undefined;
 
-      wrapper.vm.handleSave();
+      await tapSave(wrapper);
 
-      expect(wrapper.emitted('save')).toBeFalsy();
-      expect(wrapper.emitted('save-recurring')).toBeFalsy();
+      expectBlocked(wrapper, 'form.amount');
     });
   });
 });

@@ -32,6 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { useFormValidation } from '@/composables/useFormValidation';
 
 import type {
   Transaction,
@@ -313,27 +314,37 @@ const lockedRecurrenceSummary = computed(() =>
   rule.value ? describe(rule.value, extractDatePart(startDate.value)) : ''
 );
 
-const canSave = computed(() => {
-  const hasAmount = amount.value !== undefined && amount.value > 0;
-  if (isTransfer.value) {
-    // Transfers need source + a distinct destination, a positive amount, and (if
-    // cross-currency) an available rate. Description is optional.
-    return (
-      hasAmount &&
-      !!accountId.value &&
-      !!toAccountId.value &&
-      !transferSameAccount.value &&
-      transferHasRate.value
-    );
-  }
-  const base = description.value.trim().length > 0 && hasAmount && !!accountId.value;
-  // #70: a recurring save must carry a structurally valid rule (belt-and-braces —
-  // the picker can't normally emit an invalid one).
-  if (base && (recurrenceMode.value === 'recurring' || isEditingRecurring.value)) {
-    return isRuleComplete(buildEffectiveRule(startDate.value || toDateInputValue(new Date())));
-  }
-  return base;
-});
+// Required fields. Category shows an asterisk but has never blocked Save, so it is not a rule.
+const v = useFormValidation(
+  'transaction',
+  () => ({
+    account: () => !!accountId.value,
+    amount: () => amount.value !== undefined && amount.value > 0,
+    ...(isTransfer.value
+      ? {
+          // Transfers need a distinct destination and (if cross-currency) an available rate.
+          // `transferHasRate` is true for same-currency pairs, so this can only fail while the
+          // no-rate notice (its hook) renders. Description is optional.
+          toAccount: () => !!toAccountId.value && !transferSameAccount.value,
+          transferRate: () => transferHasRate.value,
+        }
+      : {
+          description: () => description.value.trim().length > 0,
+          // #70: a recurring save must carry a structurally valid rule (belt-and-braces —
+          // the picker can't normally emit an invalid one). Conditioned on the recurring
+          // ConditionalSection's own `show`, because that section hides by CSS.
+          ...(recurrenceMode.value === 'recurring' || isEditingRecurring.value
+            ? {
+                schedule: () =>
+                  isRuleComplete(
+                    buildEffectiveRule(startDate.value || toDateInputValue(new Date()))
+                  ),
+              }
+            : {}),
+        }),
+  }),
+  { open: () => props.open }
+);
 
 const modalTitle = computed(() => {
   if (isEditingRecurring.value)
@@ -537,7 +548,6 @@ function buildEffectiveRule(startYmd: string): RecurrenceRule {
 }
 
 function handleSave() {
-  if (!canSave.value) return;
   isSubmitting.value = true;
 
   try {
@@ -686,7 +696,7 @@ const showLinkPrompt = computed(
     (hasLinkableLoans.value || hasLinkableActivities.value)
 );
 
-const { pulse } = useAttentionPulse();
+const { reveal } = useAttentionPulse();
 
 async function selectQuickLink(type: 'loan' | 'activity') {
   linkType.value = type;
@@ -695,8 +705,7 @@ async function selectQuickLink(type: 'loan' | 'activity') {
   const root = (linkDropdownRef.value as any)?.$el as HTMLElement | undefined;
   // Target the clickable button inside the dropdown for a tight pulse
   const target = root?.querySelector('button') ?? root;
-  target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  setTimeout(() => pulse(target as HTMLElement | undefined), 400);
+  reveal(target as HTMLElement | undefined);
 }
 
 function dismissLinkPrompt() {
@@ -717,11 +726,11 @@ function dismissLinkPrompt() {
         : 'var(--tint-orange-8)'
     "
     :save-label="saveLabel"
-    :save-disabled="!canSave"
+    :save-ready="v.canSave.value"
     :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"
-    @save="handleSave"
+    @save="v.attemptSave(handleSave)"
     @delete="handleDelete"
   >
     <!-- Projected date banner for recurring transaction occurrence edits -->
@@ -820,7 +829,10 @@ function dismissLinkPrompt() {
     </FormFieldGroup>
 
     <!-- 2. Account select (source; "From" in transfer mode) -->
-    <FormFieldGroup :label="isTransfer ? t('transfer.from') : t('form.account')" required>
+    <FormFieldGroup
+      :label="isTransfer ? t('transfer.from') : t('form.account')"
+      v-bind="v.bind('account', isTransfer ? t('form.fromAccount') : undefined)"
+    >
       <AccountSelect
         v-model="accountId"
         :groups="isTransfer ? transferSourceGroups : accountGroups"
@@ -831,7 +843,7 @@ function dismissLinkPrompt() {
 
     <!-- 2b. Transfer destination + conversion (transfer mode only) -->
     <template v-if="isTransfer">
-      <FormFieldGroup :label="t('transfer.to')" required>
+      <FormFieldGroup :label="t('transfer.to')" v-bind="v.bind('toAccount', t('form.toAccount'))">
         <AccountSelect
           v-model="toAccountId"
           :groups="transferDestGroups"
@@ -873,6 +885,7 @@ function dismissLinkPrompt() {
       <!-- No exchange rate — Heritage Orange (routine block), never Alert Red -->
       <div
         v-else-if="transferIsCrossCurrency && !transferHasRate"
+        v-bind="v.hook('transferRate', t('settings.exchangeRates'))"
         class="flex items-start gap-2.5 rounded-[16px] border border-orange-300/60 bg-[var(--tint-orange-8)] px-4 py-3"
       >
         <span aria-hidden="true">🧡</span>
@@ -921,7 +934,7 @@ function dismissLinkPrompt() {
     </div>
 
     <!-- 3. Description -->
-    <FormFieldGroup :label="t('form.description')" :required="!isTransfer">
+    <FormFieldGroup :label="t('form.description')" v-bind="v.bind('description')">
       <div
         class="focus-within:border-primary-500 dark:bg-surface-overlay rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]"
       >
@@ -935,7 +948,7 @@ function dismissLinkPrompt() {
     </FormFieldGroup>
 
     <!-- 4. Amount + Currency (inline row) -->
-    <FormFieldGroup :label="t('form.amount')" required>
+    <FormFieldGroup :label="t('form.amount')" v-bind="v.bind('amount')">
       <!-- Amount field with optional locking -->
       <div v-if="isAmountLocked" class="space-y-1">
         <div
@@ -977,7 +990,7 @@ function dismissLinkPrompt() {
       <div class="space-y-4">
         <!-- Linked (activity/loan fee) items keep a locked, read-only schedule -->
         <template v-if="hasActiveLink">
-          <FormFieldGroup :label="t('modal.howOften')">
+          <FormFieldGroup :label="t('modal.howOften')" v-bind="v.bind('schedule')">
             <div
               class="dark:bg-surface-overlay flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3"
             >
@@ -1003,7 +1016,7 @@ function dismissLinkPrompt() {
         <!-- Editable: start date + the unified recurrence picker (#70) -->
         <template v-else>
           <BeanieDatePicker v-model="startDate" :label="t('form.startDate')" required />
-          <FormFieldGroup :label="t('modal.howOften')">
+          <FormFieldGroup :label="t('modal.howOften')" v-bind="v.bind('schedule')">
             <RecurrencePicker v-model="rule" :start-date="startDate" accent="orange" />
           </FormFieldGroup>
         </template>
