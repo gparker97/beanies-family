@@ -27,7 +27,7 @@ async function shot(page: Page, name: string) {
 }
 
 /** A synthetic SCB-shaped read: a familiar utility bill, a counterpart payment, a foreign
- *  amount, two identical same-day lines, a refund, and a possible duplicate (JustCo, against a
+ *  amount, two identical same-day lines, a refund, and a possible duplicate (Cowork Hub, against a
  *  hand-entered row 15 days later with a slightly different amount). */
 const STATEMENT_READ = {
   isStatement: true,
@@ -43,7 +43,7 @@ const STATEMENT_READ = {
     {
       date: '2026-08-24',
       description: 'SKYWAYAIR0001234 SINGAPORE SG',
-      merchant: 'Singapore Airlines',
+      merchant: 'Skyway Air',
       amount: 91,
       direction: 'in',
       kind: 'refund',
@@ -62,7 +62,7 @@ const STATEMENT_READ = {
       date: '2026-09-01',
       description: 'COWORK HUB CENTRAL SINGAPORE SG',
       merchant: 'Cowork Hub Central',
-      amount: 348.8,
+      amount: 352.4,
       direction: 'out',
       kind: 'purchase',
       category: 'other_expense',
@@ -71,10 +71,10 @@ const STATEMENT_READ = {
       date: '2026-09-02',
       description: 'RIDEGO RIDES KUALA LUMPUR MY',
       merchant: 'RideGo rides',
-      amount: 35.76,
+      amount: 33.18,
       direction: 'out',
       kind: 'purchase',
-      original: { amount: 101.30, currency: 'MYR' },
+      original: { amount: 101.3, currency: 'MYR' },
       category: 'taxi',
     },
     {
@@ -112,7 +112,7 @@ const PASTED = [
   '20 Aug 24 Aug SKYWAYAIR0001234 SINGAPORE SG 91.00CR',
   '01 Sep 03 Sep CITYPOWER UTIL SINGAPORE SG 604.12',
   '01 Sep 02 Sep COWORK HUB CENTRAL SINGAPORE SG 352.40',
-  '02 Sep 03 Sep RIDEGO RIDES KUALA LUMPUR MY MYR 101.30 35.76',
+  '02 Sep 03 Sep RIDEGO RIDES KUALA LUMPUR MY MYR 101.30 33.18',
   '11 Sep 11 Sep GIRO PAYMENT 4,820.55CR',
   '12 Sep 14 Sep BURGER BARN SINGAPORE SG 27.50',
   '12 Sep 14 Sep BURGER BARN SINGAPORE SG 27.50',
@@ -231,7 +231,7 @@ test('statement import walk', async ({ page }) => {
         id: 'tx-desk-by-hand',
         accountId: 'acc-card',
         type: 'expense',
-        amount: 348,
+        amount: 352,
         currency: 'SGD',
         category: 'rent',
         date: '2026-09-16',
@@ -373,7 +373,7 @@ test('statement import walk', async ({ page }) => {
   expect(bill.toAccountId).toBe('acc-card');
   // The possible duplicate kept both: the hand-entered row is untouched.
   const desk = after.transactions.find((t) => t.id === 'tx-desk-by-hand')!;
-  expect(desk).toMatchObject({ amount: 348, description: 'Coworking desk' });
+  expect(desk).toMatchObject({ amount: 352, description: 'Coworking desk' });
   expect(desk.importFingerprint).toBeUndefined();
   // The two identical Burger Barn lines are two transactions.
   expect(after.transactions.filter((t) => t.description === 'Burger Barn').length).toBe(2);

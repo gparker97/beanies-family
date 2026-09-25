@@ -135,7 +135,7 @@ function readOf(
 
 const ENV = {} as ResultEnvelope;
 const SHA256_HEX = expect.stringMatching(/^[0-9a-f]{64}$/);
-const CARD_ID = { last4: '4000-12XX-XXXX-', currency: 'SGD', kind: 'card' as const };
+const CARD_ID = { last4: '4000-12XX-XXXX-0042', currency: 'SGD', kind: 'card' as const };
 
 let order: string[];
 let stores: {
