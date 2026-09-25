@@ -105,7 +105,7 @@ describe('parseStatementExtractionResult', () => {
     const out = parseStatementExtractionResult(
       reply({
         lines: [
-          goodLine({ amount: '1,613.00' }),
+          goodLine({ amount: '1,234.56' }),
           goodLine({ amount: -42.5 }),
           goodLine({ amount: '-2,305.17' }),
           goodLine({ amount: ' 7.1 ' }),
@@ -113,7 +113,7 @@ describe('parseStatementExtractionResult', () => {
         balances: { opening: '-1,000.50', closing: 'n/a' },
       })
     );
-    expect(out.lines.map((l) => l.amount)).toEqual([1613, 42.5, 2305.17, 7.1]);
+    expect(out.lines.map((l) => l.amount)).toEqual([1234.56, 42.5, 2305.17, 7.1]);
     expect(out.balances).toEqual({ opening: 1000.5 });
   });
 
@@ -163,17 +163,17 @@ describe('parseStatementExtractionResult', () => {
 describe('parseStatementIdentity', () => {
   it('keeps only the last 4 digits of a masked card number', () => {
     expect(
-      parseStatementIdentity({ account: { last4: '4231-79XX-XXXX-9086' } }).account.last4
-    ).toBe('9086');
+      parseStatementIdentity({ account: { last4: '4000-12XX-XXXX-0042' } }).account.last4
+    ).toBe('0042');
   });
 
   it('keeps only the last 4 digits of a full 16-digit number', () => {
-    expect(parseStatementIdentity({ account: { last4: '4231791234569086' } }).account.last4).toBe(
-      '9086'
+    expect(parseStatementIdentity({ account: { last4: '4000121234560042' } }).account.last4).toBe(
+      '0042'
     );
     expect(
-      parseStatementIdentity({ account: { last4: '4231 7912 3456 9086' } }).account.last4
-    ).toBe('9086');
+      parseStatementIdentity({ account: { last4: '4000 1212 3456 0042' } }).account.last4
+    ).toBe('0042');
   });
 
   it('omits last4 when there are no digits, and an unknown account kind', () => {
@@ -202,14 +202,14 @@ describe('parseShareExtractionResult: transactions', () => {
     const out = parseShareExtractionResult({
       kind: 'transactions',
       transactions: {
-        account: { institution: 'Standard Chartered', last4: '4231-79XX-XXXX-9086', kind: 'card' },
+        account: { institution: 'Standard Chartered', last4: '4000-12XX-XXXX-0042', kind: 'card' },
         period: { from: '2026-03-01', to: '2026-03-31' },
       },
     });
     expect(out).toEqual({
       kind: 'transactions',
       transactions: {
-        account: { institution: 'Standard Chartered', last4: '9086', kind: 'card' },
+        account: { institution: 'Standard Chartered', last4: '0042', kind: 'card' },
         period: { from: '2026-03-01', to: '2026-03-31' },
       },
     });

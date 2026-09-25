@@ -1033,7 +1033,7 @@ const STATEMENT_LINE_KINDS = new Set<StatementLineKind>([
   'other',
 ]);
 
-/** A money amount the model returned as a number or a printed string ("1,613.00"). */
+/** A money amount the model returned as a number or a printed string ("1,234.56"). */
 function asMoney(v: unknown): number | null {
   // An empty or blank string is NO amount: `Number('')` is 0, which would pass `isFinite` and
   // put a 0.00 transaction in front of the family.

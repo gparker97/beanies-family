@@ -2156,7 +2156,7 @@ describe('the statement branch (#107)', () => {
     read: {
       result: {
         isStatement: true,
-        account: { last4: '9086' },
+        account: { last4: '0042' },
         period: {},
         balances: {},
         lines: [

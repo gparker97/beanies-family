@@ -2195,3 +2195,21 @@ small follow-up diff, prefer `low` or `medium` explicitly, or scan the diff dire
 expected cost when proposing a review. If a review starts spawning far more agents than the
 change warrants, stop it early (TaskStop the finders, ask the parent for findings so far)
 rather than letting it finish.
+
+---
+
+## "Synthetic" fixtures were copied from a real bank statement
+
+**2026-09-25** -- while building #107 I read greg's three real sample statements (Drive,
+`AI/Test bank statements`) to learn their shape, then wrote "synthetic" fixtures, a browser
+harness and a mockup from them. They were not synthetic: the masked card number (first six +
+last four), real merchant lines and real amounts went into test files, the harness, the plan
+and a mockup, and were pushed to this PUBLIC repo in two commits before an end-session sweep
+caught it. The fixtures file even carried a "never real statement data" header.
+
+**Rule:** after reading real PII to learn a format, write fixtures from INVENTED values only
+(fictional merchants, round-number amounts, a test card such as `4000-12XX-XXXX-0042`), and
+before committing anything derived from a real document, run a mechanical check: extract the
+source's text and grep the staged files for every card fragment, amount and all-caps merchant
+line in it. A header comment saying "synthetic" is not evidence. Plans may describe a document's
+FORMAT (columns, suffixes, page counts); never its values, account product names or periods.

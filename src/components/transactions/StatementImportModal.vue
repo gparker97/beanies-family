@@ -58,7 +58,7 @@ const days = computed(() =>
 
 const lines = computed(() => result.value?.lines ?? []);
 
-/** "SCB Visa ••9086 · 20 Aug to 18 Sep · 178 lines" */
+/** "SCB Visa ••0042 · 20 Aug to 18 Sep · 178 lines" */
 const subtitle = computed(() => {
   const r = result.value;
   if (!r) return '';

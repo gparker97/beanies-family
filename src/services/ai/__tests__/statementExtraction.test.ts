@@ -175,7 +175,7 @@ describe('mergeUnitResults', () => {
 
   it('takes each identity field from the first unit that has it, independently', () => {
     const merged = mergeUnitResults([
-      result({ account: { last4: '9086' }, period: { to: '2026-03-31' }, balances: {} }),
+      result({ account: { last4: '0042' }, period: { to: '2026-03-31' }, balances: {} }),
       result({
         account: { last4: '1111', institution: 'SCB', currency: 'SGD', kind: 'card' },
         period: { from: '2026-03-01', to: '2026-04-30' },
@@ -187,7 +187,7 @@ describe('mergeUnitResults', () => {
       }),
     ]);
     expect(merged.account).toEqual({
-      last4: '9086',
+      last4: '0042',
       institution: 'SCB',
       currency: 'SGD',
       kind: 'card',

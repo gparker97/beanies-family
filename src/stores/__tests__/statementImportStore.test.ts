@@ -78,7 +78,7 @@ const CARD = account({
   type: 'credit_card',
   currency: 'SGD',
   institution: 'Standard Chartered',
-  cardLast4: '9086',
+  cardLast4: '0042',
 });
 const SAVINGS = account({ id: 'acc-savings', type: 'savings', currency: 'SGD' });
 
@@ -135,7 +135,7 @@ function readOf(
 
 const ENV = {} as ResultEnvelope;
 const SHA256_HEX = expect.stringMatching(/^[0-9a-f]{64}$/);
-const CARD_ID = { last4: '4231-79XX-XXXX-9086', currency: 'SGD', kind: 'card' as const };
+const CARD_ID = { last4: '4000-12XX-XXXX-0042', currency: 'SGD', kind: 'card' as const };
 
 let order: string[];
 let stores: {

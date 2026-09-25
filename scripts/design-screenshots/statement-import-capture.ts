@@ -27,23 +27,23 @@ async function shot(page: Page, name: string) {
 }
 
 /** A synthetic SCB-shaped read: a familiar utility bill, a counterpart payment, a foreign
- *  amount, two identical same-day lines, a refund, and a possible duplicate (JustCo, against a
+ *  amount, two identical same-day lines, a refund, and a possible duplicate (Cowork Hub, against a
  *  hand-entered row 15 days later with a slightly different amount). */
 const STATEMENT_READ = {
   isStatement: true,
   account: {
     institution: 'Standard Chartered',
-    last4: '9086',
+    last4: '0042',
     currency: 'SGD',
     kind: 'card',
   },
   period: { from: '2026-08-20', to: '2026-09-18' },
-  balances: { opening: 5513.74, closing: 3000 },
+  balances: { opening: 4820.55, closing: 3000 },
   lines: [
     {
       date: '2026-08-24',
-      description: 'SINGAPOREAIR6182480 SINGAPORE SG',
-      merchant: 'Singapore Airlines',
+      description: 'SKYWAYAIR0001234 SINGAPORE SG',
+      merchant: 'Skyway Air',
       amount: 91,
       direction: 'in',
       kind: 'refund',
@@ -51,45 +51,45 @@ const STATEMENT_READ = {
     },
     {
       date: '2026-09-01',
-      description: 'SP DIGITAL PL-UTIL- SINGAPORE SG',
-      merchant: 'SP Digital utilities',
-      amount: 617.69,
+      description: 'CITYPOWER UTIL SINGAPORE SG',
+      merchant: 'CityPower utilities',
+      amount: 604.12,
       direction: 'out',
       kind: 'purchase',
       category: 'utilities',
     },
     {
       date: '2026-09-01',
-      description: 'JUSTCO MARINA ONE SINGAPORE SG',
-      merchant: 'JustCo Marina One',
-      amount: 348.8,
+      description: 'COWORK HUB CENTRAL SINGAPORE SG',
+      merchant: 'Cowork Hub Central',
+      amount: 352.4,
       direction: 'out',
       kind: 'purchase',
       category: 'other_expense',
     },
     {
       date: '2026-09-02',
-      description: 'GRAB RIDES-EC PETALING JA MY',
-      merchant: 'Grab rides',
-      amount: 35.76,
+      description: 'RIDEGO RIDES KUALA LUMPUR MY',
+      merchant: 'RideGo rides',
+      amount: 33.18,
       direction: 'out',
       kind: 'purchase',
-      original: { amount: 109.18, currency: 'MYR' },
+      original: { amount: 101.3, currency: 'MYR' },
       category: 'taxi',
     },
     {
       date: '2026-09-11',
       description: 'GIRO PAYMENT',
       merchant: 'GIRO payment',
-      amount: 5513.74,
+      amount: 4820.55,
       direction: 'in',
       kind: 'payment',
       category: '',
     },
     {
       date: '2026-09-12',
-      description: 'FIVE GUYS SINGAPORE SG',
-      merchant: 'Five Guys',
+      description: 'BURGER BARN SINGAPORE SG',
+      merchant: 'Burger Barn',
       amount: 27.5,
       direction: 'out',
       kind: 'purchase',
@@ -97,8 +97,8 @@ const STATEMENT_READ = {
     },
     {
       date: '2026-09-12',
-      description: 'FIVE GUYS SINGAPORE SG',
-      merchant: 'Five Guys',
+      description: 'BURGER BARN SINGAPORE SG',
+      merchant: 'Burger Barn',
       amount: 27.5,
       direction: 'out',
       kind: 'purchase',
@@ -109,13 +109,13 @@ const STATEMENT_READ = {
 };
 
 const PASTED = [
-  '20 Aug 24 Aug SINGAPOREAIR6182480 SINGAPORE SG 91.00CR',
-  '01 Sep 03 Sep SP DIGITAL PL-UTIL- SINGAPORE SG 617.69',
-  '01 Sep 02 Sep JUSTCO MARINA ONE SINGAPORE SG 348.80',
-  '02 Sep 03 Sep GRAB RIDES-EC PETALING JA MY MYR 109.18 35.76',
-  '11 Sep 11 Sep GIRO PAYMENT 5,513.74CR',
-  '12 Sep 14 Sep FIVE GUYS SINGAPORE SG 27.50',
-  '12 Sep 14 Sep FIVE GUYS SINGAPORE SG 27.50',
+  '20 Aug 24 Aug SKYWAYAIR0001234 SINGAPORE SG 91.00CR',
+  '01 Sep 03 Sep CITYPOWER UTIL SINGAPORE SG 604.12',
+  '01 Sep 02 Sep COWORK HUB CENTRAL SINGAPORE SG 352.40',
+  '02 Sep 03 Sep RIDEGO RIDES KUALA LUMPUR MY MYR 101.30 33.18',
+  '11 Sep 11 Sep GIRO PAYMENT 4,820.55CR',
+  '12 Sep 14 Sep BURGER BARN SINGAPORE SG 27.50',
+  '12 Sep 14 Sep BURGER BARN SINGAPORE SG 27.50',
 ].join('\n');
 
 /** The BYOK provider endpoint, answered locally. Counts statement reads. */
@@ -179,7 +179,7 @@ test('statement import walk', async ({ page }) => {
     name,
     type,
     currency: 'SGD',
-    balance: type === 'credit_card' ? 5513.74 : 20000,
+    balance: type === 'credit_card' ? 4820.55 : 20000,
     isActive: true,
     includeInNetWorth: true,
     createdAt: now,
@@ -190,7 +190,7 @@ test('statement import walk', async ({ page }) => {
     accounts: [
       account('acc-card', 'SCB Visa Infinite', 'credit_card', {
         institution: 'Standard Chartered',
-        cardLast4: '9086',
+        cardLast4: '0042',
       }),
       account('acc-savings', 'DBS Savings', 'savings', { institution: 'DBS' }),
     ] as never,
@@ -216,7 +216,7 @@ test('statement import walk', async ({ page }) => {
         id: 'tx-card-bill',
         accountId: 'acc-savings',
         type: 'expense',
-        amount: 5513.74,
+        amount: 4820.55,
         currency: 'SGD',
         category: 'debt_payment',
         date: '2026-09-10',
@@ -231,7 +231,7 @@ test('statement import walk', async ({ page }) => {
         id: 'tx-desk-by-hand',
         accountId: 'acc-card',
         type: 'expense',
-        amount: 348,
+        amount: 352,
         currency: 'SGD',
         category: 'rent',
         date: '2026-09-16',
@@ -306,7 +306,7 @@ test('statement import walk', async ({ page }) => {
   await expect(drawer.getByText('Credit card bill')).toBeVisible();
   await drawer.getByText('Credit card bill').scrollIntoViewIfNeeded();
   await shot(page, 'light-phone-3-pairs');
-  await drawer.getByText('Five Guys').first().scrollIntoViewIfNeeded();
+  await drawer.getByText('Burger Barn').first().scrollIntoViewIfNeeded();
   await shot(page, 'light-phone-4-rows');
   // The hand-entered desk is a POSSIBLE duplicate: shown, counted, kept both by default.
   await expect(drawer.getByText(ui('statementImport.pair.possible'))).toBeVisible();
@@ -326,7 +326,7 @@ test('statement import walk', async ({ page }) => {
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await drawer.getByText('Electricity & water').scrollIntoViewIfNeeded();
   await shot(page, 'dark-phone-3-pairs');
-  await drawer.getByText('Five Guys').first().scrollIntoViewIfNeeded();
+  await drawer.getByText('Burger Barn').first().scrollIntoViewIfNeeded();
   await shot(page, 'dark-phone-4-rows');
   await drawer.getByText('Coworking desk').scrollIntoViewIfNeeded();
   await shot(page, 'dark-phone-4b-possible');
@@ -364,8 +364,8 @@ test('statement import walk', async ({ page }) => {
   // The recurring bill was merged, not duplicated: one September instance, statement amount.
   const utilities = after.transactions.filter((t) => t.recurringItemId === 'rec-utilities');
   expect(utilities.length).toBe(1);
-  expect(utilities[0]!.amount).toBe(617.69);
-  expect(utilities[0]!.statementDescription).toBe('SP DIGITAL PL-UTIL- SINGAPORE SG');
+  expect(utilities[0]!.amount).toBe(604.12);
+  expect(utilities[0]!.statementDescription).toBe('CITYPOWER UTIL SINGAPORE SG');
   // The card bill became ONE transfer from savings to the card.
   const bill = after.transactions.find((t) => t.id === 'tx-card-bill')!;
   expect(bill.type).toBe('transfer');
@@ -373,10 +373,10 @@ test('statement import walk', async ({ page }) => {
   expect(bill.toAccountId).toBe('acc-card');
   // The possible duplicate kept both: the hand-entered row is untouched.
   const desk = after.transactions.find((t) => t.id === 'tx-desk-by-hand')!;
-  expect(desk).toMatchObject({ amount: 348, description: 'Coworking desk' });
+  expect(desk).toMatchObject({ amount: 352, description: 'Coworking desk' });
   expect(desk.importFingerprint).toBeUndefined();
-  // The two identical Five Guys lines are two transactions.
-  expect(after.transactions.filter((t) => t.description === 'Five Guys').length).toBe(2);
+  // The two identical Burger Barn lines are two transactions.
+  expect(after.transactions.filter((t) => t.description === 'Burger Barn').length).toBe(2);
 
   // 6. Re-import the same statement: every line is already added, nothing is offered.
   await importStatement(page);
@@ -388,7 +388,7 @@ test('statement import walk', async ({ page }) => {
     page.getByRole('button', { name: ui('statementImport.confirm.nothing') })
   ).toBeDisabled();
   await shot(page, 'light-phone-6-reimport');
-  await drawer.getByText('Five Guys').first().scrollIntoViewIfNeeded();
+  await drawer.getByText('Burger Barn').first().scrollIntoViewIfNeeded();
   await shot(page, 'light-phone-7-reimport-rows');
   await page.keyboard.press('Escape');
   await drawer.waitFor({ state: 'hidden' });
