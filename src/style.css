@@ -974,6 +974,10 @@ html.dark .magic-text-shimmer {
   animation-delay: 0.32s;
 }
 
+.magic-tick:nth-child(4) {
+  animation-delay: 0.48s;
+}
+
 /* ───── Magic tagline band ───────────────────────────────────────────────────
    The Caveat tagline's home in the magic-beans sheet: a soft Heritage Orange →
    Terracotta tint the sheen travels across, rather than the textarea (a shimmer

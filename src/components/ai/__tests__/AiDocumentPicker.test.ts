@@ -48,7 +48,10 @@ describe('AiDocumentPicker', () => {
     const { camera, file } = inputs(w);
     expect(camera?.attributes('accept')).toBe('image/*');
     expect(camera?.attributes('capture')).toBe('environment');
-    expect(file?.attributes('accept')).toBe('image/*,application/pdf,.pdf');
+    // Text and CSV join images and PDFs so a bank statement export can be picked (#107).
+    expect(file?.attributes('accept')).toBe(
+      'image/*,application/pdf,.pdf,text/csv,.csv,text/plain,.txt'
+    );
     expect(file?.attributes('capture')).toBeUndefined();
   });
 

@@ -18,7 +18,12 @@ import { useExtractionErrorToast } from './useExtractionErrorToast';
 import { useOnline } from './useOnline';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
-import { consentOpen, requestConsent } from './useDocumentConsent';
+import {
+  consentOpen,
+  isDeferredStatementConsent,
+  requestConsent,
+  type DeferredStatementConsent,
+} from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { AI_PICKER_MAX_BYTES, isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
 import {
@@ -32,7 +37,7 @@ import {
   type SharedContent,
 } from '@/services/share/types';
 import { boundText } from '@/utils/boundText';
-import { consumeAttempt, peekAttempt } from '@/utils/attemptBudget';
+import { consumeAttempt, consumeAttempts, peekAttempt } from '@/utils/attemptBudget';
 import { resolveBillableFamilyId } from '@/composables/useMagicBeanScope';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -44,6 +49,16 @@ import {
   extractShareFromPreparedSource,
   extractShareFromText,
 } from '@/services/ai/documentExtractionService';
+import {
+  looksLikeCsv,
+  prepareStatementUnits,
+  readStatement,
+  type StatementInput,
+} from '@/services/ai/statementExtraction';
+import { CompressionError } from '@/services/photos/photoCompression';
+import { isPdfFile, isTextLikeFile } from '@/utils/pdfExtractionImages';
+import { buildStatementContext } from '@/utils/statement/merchantMemory';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -51,7 +66,6 @@ import { isBeanpodFileName } from '@/constants/beanpodFile';
 import { getPlatform } from '@/services/sync/capabilities';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { reportError } from '@/utils/errorReporter';
-import { toDateInputValue } from '@/utils/date';
 import { assertNever } from '@/utils/assertNever';
 import type { ResultEnvelope, SharePayload, ShareKind } from '@/types/magicPayload';
 import type {
@@ -130,7 +144,13 @@ type IngestState =
   | { phase: 'idle' }
   /** `hint`: the kind the person picked in the sheet (#108), so the overlay lights that tile
    *  from the first frame. Absent on a share, a correction, and an unpicked capture. */
-  | { phase: 'reading'; presentation: 'global' | 'local'; hint?: ShareKind }
+  | {
+      phase: 'reading';
+      presentation: 'global' | 'local';
+      hint?: ShareKind;
+      /** A statement is read page by page (#107); the overlay says "page 3 of 5". */
+      progress?: { done: number; total: number };
+    }
   | { phase: 'resolved'; presentation: 'global' | 'local'; kind: ShareKind };
 
 /**
@@ -410,8 +430,17 @@ function refuseForQuota(env: IngestEnv, resetsAt: number): void {
 type FirstReadSource = (
   | { kind: 'documents'; files: File[] }
   | { kind: 'link'; url: string }
-  | { kind: 'text'; text: string; truncated: boolean }
-) & { hint?: ShareKind };
+  /**
+   * `full` is the untruncated trimmed text, set ONLY when `text` was capped. A statement read
+   * (#107) reads the whole thing in chunks, so a pasted statement that turns out to be one
+   * must not be judged on its first 10 000 characters.
+   */
+  | { kind: 'text'; text: string; truncated: boolean; full?: string }
+) & {
+  hint?: ShareKind;
+  /** The hint is the door's own pre-pick, left as it was: the surface's default, not a pick. */
+  hintFromSurface?: boolean;
+};
 
 type ShareSource =
   | FirstReadSource
@@ -472,7 +501,7 @@ function statedKind(source: ShareSource): ShareKind | undefined {
  * and the pairing lives here. Both interpolate the QUOTED tile name (`ai.capture.dest.*`), which
  * carries no article — "a Activity" is the bug the quoting avoids.
  */
-function hintDisagreed(env: IngestEnv, hint: ShareKind): void {
+function hintDisagreed(env: IngestEnv, hint: ShareKind, bySurface: boolean): void {
   const { showToast } = useToast();
   const { t } = useTranslation();
   logEvent({
@@ -480,25 +509,39 @@ function hintDisagreed(env: IngestEnv, hint: ShareKind): void {
     surface: env.surface,
     // A model OUTCOME, not a fault: the document genuinely holds nothing of that kind.
     message: 'the model could not read it as the stated kind',
-    context: { action: 'hint_disagreed', kind: hint },
+    context: { action: bySurface ? 'surface_hint_disagreed' : 'hint_disagreed', kind: hint },
   });
   showToast(
     'info',
     t('ai.capture.pick.none.title'),
-    fillTemplate(t('ai.capture.pick.none.message'), { kind: t(`ai.capture.dest.${hint}`) })
+    fillTemplate(t('ai.capture.pick.none.message'), {
+      kind: t(`ai.capture.dest.${hint}`),
+      noun: t(`ai.capture.noun.${hint}`),
+    })
   );
 }
 
-function hintOverruled(env: IngestEnv, hint: ShareKind, actual: ShareKind): void {
+function hintOverruled(
+  env: IngestEnv,
+  hint: ShareKind,
+  actual: ShareKind,
+  bySurface: boolean
+): void {
   const { showToast } = useToast();
   const { t } = useTranslation();
   logEvent({
     // `warn`: the prompt told the model not to re-decide and it did anyway. A rising rate is the
     // first thing to look at before touching the prompt.
-    level: 'warn',
+    // A surface's pre-pick being overruled is usually the right call (a booking dropped on the
+    // calendar), so it is `info` and logged apart from a person's pick.
+    level: bySurface ? 'info' : 'warn',
     surface: env.surface,
     message: 'the model overruled the stated kind',
-    context: { action: 'hint_overruled', kind: actual, detail: hint },
+    context: {
+      action: bySurface ? 'surface_hint_overruled' : 'hint_overruled',
+      kind: actual,
+      detail: hint,
+    },
   });
   showToast(
     'info',
@@ -736,7 +779,39 @@ async function sourceFromText(
   logReceivedKind(env, 'text', 0, candidates.length ? OUTWEIGHED_LINKS : undefined);
   // `boundText`, not `slice`: cutting UTF-16 code units can split a surrogate pair and hand
   // the model a U+FFFD where an emoji was.
-  return { kind: 'text', text: boundText(trimmed, MAX_SHARE_TEXT_CHARS), truncated };
+  return {
+    kind: 'text',
+    text: boundText(trimmed, MAX_SHARE_TEXT_CHARS),
+    truncated,
+    ...(truncated ? { full: trimmed } : {}),
+  };
+}
+
+/**
+ * Read a shared or picked TEXT file (a `.txt`, or a `.csv` statement export, #107).
+ *
+ * Decides the ceiling from `File.size` BEFORE decoding, so a 50 000-character file is never
+ * silently read as its first slice. The verdict is a FLAG, not a refusal: iOS delivers a
+ * shared URL as a `.txt`, and a `.txt` that begins with a link must keep taking the link path.
+ * One function for both entry points, so `prepare` and `inAppSource` cannot drift into two
+ * text-file policies.
+ *
+ * @param uncapped read the whole file regardless of the ceiling (a statement read bounds
+ *   itself, in chunks).
+ */
+async function readTextFile(
+  file: File,
+  uncapped = false
+): Promise<{ text: string; overCeilingByBytes: boolean }> {
+  const overCeilingByBytes = file.size > MAX_SHARE_TEXT_BYTES;
+  if (uncapped) return { text: await file.text(), overCeilingByBytes };
+  // The slice in the non-over-ceiling arm is belt-and-braces against a lying `File.size`, NOT
+  // the working bound: the two numbers are equal, so it never clips a file that is actually
+  // used and can never split a UTF-8 sequence. Deliberate; not dead code.
+  const text = await file
+    .slice(0, overCeilingByBytes ? MAX_SHARE_TEXT_CHARS * 4 : MAX_SHARE_TEXT_BYTES)
+    .text();
+  return { text, overCeilingByBytes };
 }
 
 /**
@@ -789,7 +864,9 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<FirstRe
   }
 
   const verdicts = await Promise.all(stamped.map((f) => isAiPickerAcceptedFile(f)));
-  const usable = stamped.filter((_, i) => verdicts[i]);
+  // A text or CSV file is accepted (#107) but is never a DOCUMENT to compress as an image; it is
+  // read below as text, exactly like the iOS `.txt` path always has been.
+  const usable = stamped.filter((f, i) => verdicts[i] && !isTextLikeFile(f));
 
   // iOS hands a shared URL over as a `.txt` file in the app-group inbox. Normalising here
   // rather than in that one adapter means a `.txt` shared from ANY platform works, and keeps
@@ -804,26 +881,10 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<FirstRe
   // this is a flag and not an early return.
   let overCeilingByBytes = false;
   if (!usable.length && !text) {
-    const textFile = stamped.find((f) => f.type === 'text/plain');
+    const textFile = stamped.find((f) => isTextLikeFile(f));
     if (textFile) {
-      // Decide the band from `File.size` BEFORE decoding. Reading a fixed
-      // `MAX_SHARE_TEXT_CHARS * 4` slice — as this did until #83 — silently reduced a
-      // 50,000-character iOS share to 4,000 characters before any band logic could see it,
-      // so it could never be classified `over_ceiling` and looked like an ordinary under-cap
-      // share. That is exactly the "silently reads the first slice of a wall of text"
-      // behaviour the size policy exists to prevent.
-      //
-      // ⚠️ This sets a FLAG rather than returning. iOS delivers a shared URL as a `.txt`, and
-      // a mail-app selection can exceed the byte bound, so refusing here would break a `.txt`
-      // that BEGINS WITH A LINK — which takes the link path today and must keep doing so. The
-      // verdict is applied only in the no-URL fallback below.
-      overCeilingByBytes = textFile.size > MAX_SHARE_TEXT_BYTES;
-      // The slice in the non-over-ceiling arm is belt-and-braces against a lying `File.size`,
-      // NOT the working bound — the two numbers are equal, so it never clips a file that is
-      // actually used and can never split a UTF-8 sequence. Deliberate; not dead code.
-      text = await textFile
-        .slice(0, overCeilingByBytes ? MAX_SHARE_TEXT_CHARS * 4 : MAX_SHARE_TEXT_BYTES)
-        .text();
+      // The ceiling is decided from `File.size` before decoding; see `readTextFile`.
+      ({ text, overCeilingByBytes } = await readTextFile(textFile));
       textFromFile = true;
     }
   }
@@ -915,7 +976,17 @@ async function prepare(content: SharedContent, meta: ShareMeta): Promise<FirstRe
  * paths it was never consulted — and `runIngest` must not report the page's own answer as the
  * model overruling the pick.
  */
-type ReadOutcome = { kind: 'none' } | { kind: ShareKind; payload: SharePayload; model: boolean };
+type DispatchOutcome = { kind: ShareKind; payload: SharePayload; model: boolean };
+/**
+ * `statement_detected` (#107) is the unhinted classify answer "this is a bank statement". It is
+ * a SIGNAL, never something to dispatch: the classify read was made under the generic consent,
+ * without the merchant list, and returns no lines, so `runIngest` hands it to the statement
+ * branch. It is not named `transactions` so the compiler can never confuse it with a
+ * dispatchable transactions outcome.
+ */
+type ReadOutcome = { kind: 'none' } | { kind: 'statement_detected' } | DispatchOutcome;
+/** What reaches the shared tail: a statement has been read by then, or was never one. */
+type FinalOutcome = { kind: 'none' } | DispatchOutcome;
 
 async function read(
   source: ShareSource,
@@ -931,18 +1002,13 @@ async function read(
   const familyId = resolveBillableFamilyId(env);
   if (!familyId) return null;
 
-  const { tier, byokConfig } = useAiCapability();
   const detail = sourceDetail(source);
   const hint = statedKind(source);
   const opts = {
-    tier: tier.value,
-    todayIso: toDateInputValue(new Date()),
-    byok: byokConfig.value ?? undefined,
-    grant,
-    // REQUIRED, not optional. Absent used to degrade to the proxy's IP limit; under the meter
-    // it would be an UNCOUNTED read — the Lambda has no partition key to write under — which is
-    // the loophole the meter exists to close. Resolved (and refused) above, before the model.
-    familyId,
+    // `familyId` is REQUIRED, not optional. Absent used to degrade to the proxy's IP limit;
+    // under the meter it would be an UNCOUNTED read — the Lambda has no partition key to write
+    // under — which is the loophole the meter exists to close. Resolved (and refused) above.
+    ...useAiCapability().extractOptions({ grant, familyId }),
     // The person's pick (#108) rides the SAME channel a correction does — `to` is what makes
     // a read targeted — but with no token and `reason: 'stated'`, so it is billed like any
     // first read, never reaches the meter, and the prompt does not claim an earlier reading
@@ -1302,6 +1368,207 @@ async function withIngestLock(
   }
 }
 
+// ─── The statement branch (#107) ───────────────────────────────────────────────────────
+
+/** Did the person SAY this is a statement (the Transactions tile, or a correction to it)? */
+function isStatedStatement(source: ShareSource): boolean {
+  return source.kind === 'correction'
+    ? source.to === 'transactions'
+    : source.hint === 'transactions';
+}
+
+/**
+ * What the statement reader should be given for this source, or `null` when it cannot be read
+ * as a statement at all (a link: a statement is never a web page we fetch).
+ *
+ * Several shared screenshots are ALL read, one unit each (a week of transactions is often more
+ * than one screen). A statement is one PDF, so with a PDF among the files the first PDF is the
+ * statement. A correction of a PDF re-reads the ORIGINAL file, because the prepared source it
+ * carries is what the classify read sent, capped at the first five pages. Photos keep the
+ * prepared source: it carries EVERY image the first read sent, where the envelope's file is only
+ * the first. (A corrected long paste is still the first 10 000 characters: the envelope keeps no
+ * fuller copy. Choosing Transactions before reading avoids it, and the too-long toast says so.)
+ */
+function statementInputFrom(source: ShareSource): StatementInput | null {
+  const fromFiles = (files: File[]): StatementInput | null => {
+    const pdf = files.find((f) => isPdfFile(f));
+    if (pdf) return { kind: 'pdf', file: pdf };
+    return files.length ? { kind: 'image', files } : null;
+  };
+  switch (source.kind) {
+    case 'documents':
+      return fromFiles(source.files);
+    case 'text': {
+      const text = source.full ?? source.text;
+      return { kind: 'text', text, source: looksLikeCsv(text) ? 'csv' : 'text' };
+    }
+    case 'correction': {
+      const original = source.env.sourceFile;
+      return original && isPdfFile(original)
+        ? { kind: 'pdf', file: original }
+        : { kind: 'prepared', source: source.prepared };
+    }
+    case 'link':
+      return null;
+    default:
+      return assertNever(source, 'statementInputFrom');
+  }
+}
+
+/**
+ * Read a statement, page by page, into a `transactions` payload (#107).
+ *
+ * Kept to one shape, prepare units → consent → budget → read → map, so the whole branch fits on
+ * one screen. Anything that wants to grow here belongs in `statementExtraction.ts` (reading) or
+ * `statementImportStore` (review), not in the spine.
+ *
+ * Returns into `runIngest`'s shared tail, which runs the reader gate, the resolve hold and the
+ * dispatch for this kind exactly as for the others. `null` means already logged and toasted.
+ */
+async function runStatementBranch(
+  source: ShareSource,
+  env: IngestEnv,
+  entry: 'hinted' | 'corrected' | 'unhinted'
+): Promise<FinalOutcome | null> {
+  const { showToast } = useToast();
+  const { t } = useTranslation();
+  const { reportExtractionFailure } = useExtractionErrorToast();
+
+  // The reader gate BEFORE any page is rendered or any bean spent. The tail checks it again,
+  // but by then an unhinted statement from a member without finance access would already have
+  // been read and paid for.
+  if (!isReaderEnabled('statement')) {
+    logEvent({
+      level: 'warn',
+      surface: env.surface,
+      message: 'target reader unavailable',
+      context: { action: 'reader_disabled', kind: 'transactions' },
+    });
+    showToast('info', t('shareTarget.readerOff.title'), t('shareTarget.readerOff.message'));
+    return null;
+  }
+  if (entry !== 'hinted') {
+    logEvent({
+      level: 'info',
+      surface: 'statement-import',
+      message: 'reclassified',
+      context: { action: 'reclassified', detail: entry },
+    });
+  }
+
+  const input = statementInputFrom(source);
+  if (!input) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'this cannot be read as a statement',
+      context: { action: 'rejected_type', detail: 'unsupported' },
+    });
+    showToast('info', t('shareTarget.unsupported.title'), t('shareTarget.unsupported.message'));
+    return null;
+  }
+
+  let prepared: Awaited<ReturnType<typeof prepareStatementUnits>>;
+  try {
+    prepared = await prepareStatementUnits(input);
+  } catch (err) {
+    // A corrupt or password-protected PDF, an undecodable image, an out-of-memory render. The
+    // shared mapping shows the `compression` toast; the console carries what to check.
+    console.error(
+      '[statement-import] could not prepare the statement for reading: a corrupt or ' +
+        'password-protected PDF, an undecodable image, or an out-of-memory render.',
+      err
+    );
+    const code = err instanceof CompressionError ? 'compression' : 'provider_error';
+    logEvent({
+      level: 'warn',
+      surface: 'statement-import',
+      message: 'prepare_failed',
+      context: { action: 'failed', error_code: code, detail: input.kind },
+    });
+    reportExtractionFailure(code);
+    return null;
+  }
+  if (prepared.units.length === 0) return { kind: 'none' };
+
+  // The statement consent, now that the cost is known. Asked on EVERY path into this branch:
+  // a generic grant never covered the merchant list this read sends.
+  const grant = await requestConsent({ kind: 'transactions', reads: prepared.units.length });
+  if (!grant) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'consent declined',
+      context: { action: 'consent_declined', kind: 'transactions' },
+    });
+    return null;
+  }
+
+  // The text budget, all at once and before any call: refusing on chunk 3 of 5 would have spent
+  // two slots on reads that never happen. Image units are not text-budgeted, exactly as today.
+  const budgetKey = prepared.textUnits > 0 ? textBudgetKey() : null;
+  if (budgetKey) {
+    const allowed = consumeAttempts(budgetKey, SHARE_TEXT_BUDGET, prepared.textUnits);
+    if (!allowed.ok) {
+      refuseForQuota(env, allowed.resetsAt);
+      return null;
+    }
+  }
+
+  const familyId = resolveBillableFamilyId(env);
+  if (!familyId) return null; // already logged and toasted
+
+  const context = buildStatementContext(
+    useTransactionsStore().transactions,
+    useFamilyStore().members.map((m) => m.name)
+  );
+  logEvent({
+    level: 'info',
+    surface: 'statement-import',
+    message: 'merchant_memory',
+    context: { action: 'merchant_memory', count: context.merchants.length },
+  });
+
+  const outcome = await readStatement(
+    prepared,
+    useAiCapability().extractOptions({ grant, familyId, context }),
+    (progress) => {
+      const state = ingestState.value;
+      if (state.phase === 'reading') ingestState.value = { ...state, progress };
+    }
+  );
+  if (!outcome.ok) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'share extraction failed',
+      context: { action: 'failed', error_code: outcome.errorCode, kind: 'transactions' },
+    });
+    reportExtractionFailure(outcome.errorCode);
+    return null;
+  }
+  const { result } = outcome.read;
+  if (!result.isStatement || result.lines.length === 0) return { kind: 'none' };
+
+  // The first unit's source is what a "not right?" re-reads as another kind. No token: a
+  // statement read is never granted a free correction, and the banner says so.
+  const firstUnit = prepared.units[0]!.source;
+  return {
+    kind: 'transactions',
+    model: true,
+    payload: {
+      kind: 'transactions',
+      data: outcome.read,
+      env: {
+        sourceFile:
+          input.kind === 'pdf' ? input.file : input.kind === 'image' ? input.files[0]! : null,
+        origin: env.origin,
+        correction: { source: firstUnit },
+      },
+    },
+  };
+}
+
 /**
  * The shared tail: offline → consent → read → classify → none → reader gate → dispatch.
  *
@@ -1312,7 +1579,7 @@ async function withIngestLock(
 async function runIngest(
   source: ShareSource,
   env: IngestEnv,
-  grant: ConsentGrant,
+  consent: ConsentGrant | DeferredStatementConsent,
   destination?: InAppDestination
 ): Promise<void> {
   const { showToast } = useToast();
@@ -1338,7 +1605,29 @@ async function runIngest(
   // points now mint at the same point in their own flow (the in-app door at the commit, before
   // its picker; the share path as soon as `prepare` yields a usable source), which is what
   // makes them one rule rather than two orderings that can drift.
-  const outcome = await read(source, grant, env);
+  //
+  // A STATEMENT (#107) is the one exception, and it is settled HERE, in these few lines, so
+  // `read()` and everything below it keep their plain `ConsentGrant`. A source the person
+  // labelled a statement (the Transactions tile, or "not right? → Transactions") goes straight
+  // to the statement branch, which asks its own consent once the page count is known. A
+  // deferred marker anywhere else refuses out loud: it is not a grant, and nothing is read.
+  let outcome: FinalOutcome | null;
+  if (isStatedStatement(source)) {
+    outcome = await runStatementBranch(
+      source,
+      env,
+      source.kind === 'correction' ? 'corrected' : 'hinted'
+    );
+  } else if (isDeferredStatementConsent(consent)) {
+    notReady(env, 'consent_deferred_wrong_kind', 'ai.error.title', 'ai.error.generic');
+    return;
+  } else {
+    const first = await read(source, consent, env);
+    outcome =
+      first?.kind === 'statement_detected'
+        ? await runStatementBranch(source, env, 'unhinted')
+        : first;
+  }
   if (!outcome) return; // already logged and toasted
 
   // The stated kind (#108) counts only where the model actually saw it. A JSON-LD or
@@ -1346,17 +1635,21 @@ async function runIngest(
   // once, and treat the read as unhinted from here on — the page's answer is not the model
   // overruling anything, and the "not right?" the overruled toast promises does not exist.
   const stated = statedKind(source);
+  const bySurface = source.kind !== 'correction' && !!source.hintFromSurface;
   const hint = stated && outcome.kind !== 'none' && !outcome.model ? undefined : stated;
   if (stated && !hint) {
     logEvent({
       level: 'info',
       surface: env.surface,
       message: 'the stated kind was not consulted: the link answered without the model',
-      context: { action: 'hint_unused', kind: stated },
+      context: { action: 'hint_unused', kind: stated, detail: bySurface ? 'surface' : 'person' },
     });
     // Never silently: the overlay lit their tile and the answer is about to land somewhere
-    // else. One line, no promise of a "not right?" (a page-declared result has none).
-    showToast('info', t('ai.capture.title'), t('ai.capture.pick.unused'));
+    // else. One line, no promise of a "not right?" (a page-declared result has none). Not for a
+    // surface's own pre-pick the page agrees with: nobody picked anything, and nothing moved.
+    if (!bySurface || outcome.kind !== stated) {
+      showToast('info', t('ai.capture.title'), t('ai.capture.pick.unused'));
+    }
   }
   logEvent({
     level: 'info',
@@ -1367,13 +1660,20 @@ async function runIngest(
     context: {
       action: 'classified',
       kind: outcome.kind,
-      detail: source.kind === 'correction' ? 'corrected' : hint ? 'hinted' : 'unhinted',
+      detail:
+        source.kind === 'correction'
+          ? 'corrected'
+          : hint
+            ? bySurface
+              ? 'surface_hinted'
+              : 'hinted'
+            : 'unhinted',
     },
   });
 
   if (outcome.kind === 'none') {
     // Under a stated kind, "none" means "not that" — say which, and what to do (#108).
-    if (hint) hintDisagreed(env, hint);
+    if (hint) hintDisagreed(env, hint, bySurface);
     else {
       showToast('info', t('shareTarget.unrecognised.title'), t('shareTarget.unrecognised.message'));
     }
@@ -1399,7 +1699,7 @@ async function runIngest(
   // and "not right?" is at the foot of the modal that opens. Deliberately AFTER the reader gate:
   // that toast promises a review, which only exists once the gate has passed, and a kind whose
   // reader is off has already been reported once above.
-  if (hint && outcome.kind !== hint) hintOverruled(env, hint, outcome.kind);
+  if (hint && outcome.kind !== hint) hintOverruled(env, hint, outcome.kind, bySurface);
 
   // Hold the resolved tile long enough to be seen. Only on a DISPATCHED outcome — never on
   // `none`, never on a refusal, where there is nothing to resolve to.
@@ -1461,8 +1761,8 @@ export type InAppInput =
    * (#108). Authoritative for the prompt; never sent to the meter. Absent = "let beanies
    * work it out", which is the default and the common case.
    */
-  | { kind: 'file'; file: File; hint?: ShareKind }
-  | { kind: 'paste'; text: string; hint?: ShareKind }
+  | { kind: 'file'; file: File; hint?: ShareKind; hintFromSurface?: boolean }
+  | { kind: 'paste'; text: string; hint?: ShareKind; hintFromSurface?: boolean }
   /**
    * A re-read of a document the spine has ALREADY resolved, as the kind the user says it
    * actually is. Raised by `MagicMiscategorisedBanner` from inside a review modal.
@@ -1537,7 +1837,12 @@ export function logCaptureOpened(): void {
  */
 export async function ingestInAppSource(
   input: InAppInput,
-  grant: ConsentGrant,
+  /**
+   * A real grant, or (#107) the deferred marker the door passes for the Transactions pick,
+   * whose consent is asked once the statement's page count is known. `runIngest` settles which
+   * in its first lines; nothing below it ever sees the marker.
+   */
+  consent: ConsentGrant | DeferredStatementConsent,
   destination?: InAppDestination
 ): Promise<void> {
   const { showToast } = useToast();
@@ -1575,19 +1880,22 @@ export async function ingestInAppSource(
       // The pick's DENOMINATOR (#108), beside the correction's for the same reason: emitted
       // before triage, so it counts every stated read, including one triage then refuses.
       // `classified` carries `detail: 'hinted'` for the post-triage count.
+      // A surface's own pre-pick is logged apart (`surface_hinted`), so this stays a count of
+      // PEOPLE telling beanies what a thing is.
       if (hint) {
+        const bySurface = input.kind !== 'correction' && !!input.hintFromSurface;
         logEvent({
           level: 'info',
           surface: IN_APP_ENV.surface,
-          message: 'the person told us what this is',
-          context: { action: 'hinted', kind: hint },
+          message: bySurface ? 'the surface said what this is' : 'the person told us what this is',
+          context: { action: bySurface ? 'surface_hinted' : 'hinted', kind: hint },
         });
       }
 
       const source = await inAppSource(input, showToast, t);
       if (!source) return; // already logged and toasted
 
-      await runIngest(source, IN_APP_ENV, grant, destination);
+      await runIngest(source, IN_APP_ENV, consent, destination);
     },
     {
       // A door that will CLAIM the payload is by definition the door the user is looking at,
@@ -1613,10 +1921,17 @@ async function inAppSource(
   t: ReturnType<typeof useTranslation>['t']
 ): Promise<ShareSource | null> {
   if (input.kind === 'paste') {
+    // A statement the person SAID is a statement (#107) skips the share text policy: that
+    // policy caps a message at 10 000 characters and refuses past 32 000, and a month of
+    // transactions is routinely both. The statement reader bounds itself, in chunks, and its
+    // consent states the read count. Only the floor still applies.
+    if (input.hint === 'transactions') {
+      return statedStatementText(input.text, input.hintFromSurface);
+    }
     // The pick rides on whatever `sourceFromText` decided — text OR a link — so a pasted URL
     // keeps it too. Attached here, once, rather than inside the shared text policy.
     const source = await sourceFromText(input.text, IN_APP_ENV);
-    return source && { ...source, hint: input.hint };
+    return source && { ...source, hint: input.hint, hintFromSurface: input.hintFromSurface };
   }
 
   if (input.kind === 'correction') {
@@ -1668,8 +1983,45 @@ async function inAppSource(
     return null;
   }
 
+  // A text or CSV file (#107) is TEXT, never an image to compress. Through the same text
+  // policy a paste gets, unless it is a stated statement, which bounds itself.
+  if (isTextLikeFile(stamped)) {
+    const stated = input.hint === 'transactions';
+    const { text, overCeilingByBytes } = await readTextFile(stamped, stated);
+    if (stated) return statedStatementText(text, input.hintFromSurface);
+    const source = await sourceFromText(text, IN_APP_ENV, overCeilingByBytes);
+    return source && { ...source, hint: input.hint, hintFromSurface: input.hintFromSurface };
+  }
+
   logReceivedKind(IN_APP_ENV, 'file', 1);
-  return { kind: 'documents', files: [stamped], hint: input.hint };
+  return {
+    kind: 'documents',
+    files: [stamped],
+    hint: input.hint,
+    hintFromSurface: input.hintFromSurface,
+  };
+}
+
+/**
+ * A statement's text, as the person handed it over (#107). Only the floor applies here; see the
+ * paste arm for why the share text policy's cap and ceiling do not.
+ */
+function statedStatementText(text: string, hintFromSurface?: boolean): ShareSource | null {
+  const trimmed = text.trim();
+  if (trimmed.length < MIN_SHARE_TEXT_CHARS) {
+    const { showToast } = useToast();
+    const { t } = useTranslation();
+    logEvent({
+      level: 'info',
+      surface: IN_APP_ENV.surface,
+      message: 'shared text was too short to read',
+      context: { action: 'rejected_type', detail: 'too_short', kind: 'transactions' },
+    });
+    showToast('info', t('shareTarget.text.tooShort.title'), t('shareTarget.text.tooShort.message'));
+    return null;
+  }
+  logReceivedKind(IN_APP_ENV, 'text', 0);
+  return { kind: 'text', text: trimmed, truncated: false, hint: 'transactions', hintFromSurface };
 }
 
 /**
@@ -1690,6 +2042,9 @@ function classify(data: ShareExtractionResult, env: ResultEnvelope): ReadOutcome
         model: true,
         payload: { kind: 'recipe', source: { via: 'extraction', data: data.recipe }, env },
       };
+    case 'transactions':
+      // Lineless on purpose; the statement branch reads the lines (see `ReadOutcome`).
+      return { kind: 'statement_detected' };
     default:
       return assertNever(data, 'shareKind');
   }

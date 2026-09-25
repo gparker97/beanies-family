@@ -829,7 +829,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
     icon: '\u{1FAD8}',
     readTime: 5,
-    updatedDate: '2026-09-14',
+    updatedDate: '2026-09-25',
     sections: [
       {
         type: 'heading',
@@ -840,7 +840,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "Tap <strong>✨ Magic beans</strong> and give beanies one thing — a photo, a file, a link, or some text you pasted. A party invitation, a flight itinerary, a hotel confirmation, the details from a class-group message. beanies works out what it is for you, pulls out the key details, and opens a pre-filled activity, trip or recipe to check and save. You never have to say which it is first. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one thing you pick, and only when you ask.",
+          "Tap <strong>✨ Magic beans</strong> and give beanies one thing — a photo, a file, a link, or some text you pasted. A party invitation, a flight itinerary, a hotel confirmation, the details from a class-group message. beanies works out what it is for you, pulls out the key details, and opens a pre-filled activity, trip or recipe to check and save, or, for a bank statement, a list of its transactions to check before anything is added. You never have to say which it is first. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one thing you pick, and only when you ask.",
       },
       {
         type: 'callout',
@@ -857,12 +857,12 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every time beanies reads something for you, that counts as <strong>one magic bean</strong> — one photo, one document, one link, one piece of pasted text. Several photos of the same invitation are one thing, so they are one bean. It counts even when beanies cannot work out what it is: we still read it for you, and counting it is what keeps "paste it again and again until something sticks" from being free for everyone else.',
+          'Every time beanies reads something for you, that counts as <strong>one magic bean</strong> — one photo, one document, one link, one piece of pasted text. Several photos of the same invitation are one thing, so they are one bean. (A bank statement is the exception: it is read page by page, one bean per page, see <strong>Bank statements</strong> below.) It counts even when beanies cannot work out what it is: we still read it for you, and counting it is what keeps "paste it again and again until something sticks" from being free for everyone else.',
       },
       {
         type: 'callout',
         content:
-          'If beanies decides your recipe is a trip, or your invitation is a recipe, tap <strong>Tell beanies what it is</strong> on the review screen and pick the right one. beanies reads it again, properly this time — and that second read is <strong>free</strong>, because the mistake was ours, not yours. One free correction per thing you hand over. (A read where beanies simply could not tell has no free retry — nothing was got wrong, so there is nothing to correct.)',
+          'If beanies decides your recipe is a trip, or your invitation is a recipe, tap <strong>Tell beanies what it is</strong> on the review screen and pick the right one. beanies reads it again, properly this time — and that second read is <strong>free</strong>, because the mistake was ours, not yours. One free correction per thing you hand over. (Re-reading something as a bank statement is not free: it costs one bean per page, and beanies says so before it starts. A read where beanies simply could not tell has no free retry — nothing was got wrong, so there is nothing to correct.)',
         title: 'Got it wrong? Putting it right is free',
         icon: '\u{2728}',
       },
@@ -883,8 +883,15 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         items: [
           '<strong>Only the one photo, document or piece of text</strong> you chose for that action.',
           "<strong>Never the rest of your family's data</strong> — your accounts, activities, trips, members, and notes never leave your device for this.",
-          'Nothing is sent until you confirm. You can decline and fill the activity or trip in by hand.',
+          'Nothing is sent until you confirm. You can decline and fill it in by hand.',
         ],
+      },
+      {
+        type: 'callout',
+        content:
+          "Bank statements are the one exception, and beanies asks you about it first. To suggest categories you already use, beanies sends the names of shops and payees your family has filed before, and the category each went under. It never sends amounts, dates, account numbers or anyone's name. A statement is read page by page, so each page is one bean, and the statement sheet tells you how many before anything is sent. (If you have switched off the privacy check in Settings, that sheet appears only for your first statement; after that the page count shows as each page is read.) The statement itself is not kept, by the AI service or by beanies.",
+        title: 'Bank statements',
+        icon: '\u{1F3E6}',
       },
       {
         type: 'heading',

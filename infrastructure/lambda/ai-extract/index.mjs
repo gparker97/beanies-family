@@ -434,7 +434,7 @@ export async function handler(event) {
     const call = await callUpstream({
       body: JSON.stringify({
         model: TINFOIL_MODEL,
-        messages: taskConfig.buildMessages(source, todayDate, read.kindHint),
+        messages: taskConfig.buildMessages(source, todayDate, { kindHint: read.kindHint }),
         temperature: 0,
       }),
     });

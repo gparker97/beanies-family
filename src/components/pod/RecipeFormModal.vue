@@ -595,7 +595,7 @@ const LIST_TEXTAREA_CLASS =
          overlay that silently anchors to the viewport in one of them is the kind of bug
          that only shows up on one variant. -->
     <div class="relative">
-      <MagicBeansDoor v-if="showSourceStrip" :claim="claimRecipe">
+      <MagicBeansDoor v-if="showSourceStrip" hint="recipe" :claim="claimRecipe">
         <template #trigger="{ open }">
           <RecipeSourceStrip @start="open" />
         </template>

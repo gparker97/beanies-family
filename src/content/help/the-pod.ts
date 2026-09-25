@@ -667,7 +667,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The recipe you hand over is sent to be read through the same private path beanies uses for reading invitations and travel bookings — and only that one recipe. Your family’s data isn’t sent, nothing is kept after it’s read, and beanies asks your permission each time before anything leaves your device.',
+          'The recipe you hand over is sent to be read through the same private path beanies uses for reading invitations, travel bookings and bank statements — and only that one recipe. Your family’s data isn’t sent, nothing is kept after it’s read, and beanies asks your permission each time before anything leaves your device.',
       },
       {
         type: 'paragraph',

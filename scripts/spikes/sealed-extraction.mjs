@@ -119,7 +119,7 @@ step(3, 'building the chat body through the shipped EXTRACTION_TASKS builder');
 // The exact shape `index.mjs:267` builds — `kind` drives the builder, `text` the fingerprint.
 const source = { kind: 'text', text: TEXT };
 const todayIso = new Date().toISOString().slice(0, 10);
-const messages = EXTRACTION_TASKS.share.buildMessages(source, todayIso, undefined);
+const messages = EXTRACTION_TASKS.share.buildMessages(source, todayIso);
 const payload = { model, messages, temperature: 0 };
 console.log(`    ${messages.length} messages, model present = ${Boolean(payload.model)}`);
 

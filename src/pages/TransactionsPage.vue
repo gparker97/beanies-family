@@ -5,6 +5,9 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
+import StatementImportModal from '@/components/transactions/StatementImportModal.vue';
+import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
+import MagicReaderPill from '@/components/ai/MagicReaderPill.vue';
 import { BaseCard } from '@/components/ui';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
@@ -27,7 +30,10 @@ import { useAccountMemberInfo } from '@/composables/useAccountMemberInfo';
 import { showToast } from '@/composables/useToast';
 import { useCategoryLabel } from '@/composables/useCategoryLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
-import { getDueDatesInRange, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import {
+  processRecurringItems,
+  projectRecurringTransactions,
+} from '@/services/recurring/recurringProcessor';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { recurringToTransactionFields, recurringTemplateFields } from '@/utils/recurringItemFields';
 import { reportRecurringItemActionFailed } from '@/utils/actionFailure';
@@ -39,6 +45,9 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useStatementImportStore } from '@/stores/statementImportStore';
+import { recurringInstanceKey } from '@/utils/recurringInstance';
+import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import type {
   Transaction,
   DisplayTransaction,
@@ -72,6 +81,25 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId, getMemberColorByAccountId } = useAccountMemberInfo();
 const { t } = useTranslation();
+
+// A bank statement read by magic beans (#107) arrives here and opens the review drawer. The
+// "not a statement" and "no lines" cases never reach this page: the ingest spine maps them to
+// its own `none` handling. A plan that cannot be built is the store's own `start()` result.
+const statementImport = useStatementImportStore();
+const { canReadStatement } = useMagicReader();
+useMagicReaderConsumer(
+  'statement',
+  async (payload) => {
+    if (payload && !(await statementImport.start(payload.data, payload.env))) {
+      showToast(
+        'error',
+        t('statementImport.planFailed.title'),
+        t('statementImport.planFailed.body')
+      );
+    }
+  },
+  canReadStatement
+);
 const { categoryLabel } = useCategoryLabel();
 const { describeRecurringItem } = useRecurrenceLabel();
 const { syncHighlightClass } = useSyncHighlight();
@@ -209,8 +237,9 @@ const monthTransactions = computed<DisplayTransaction[]>(() => {
   const seen = new Map<string, DisplayTransaction>();
   const duplicateIds = new Set<string>();
   for (const tx of actual) {
-    if (!tx.recurringItemId) continue;
-    const key = `${tx.recurringItemId}|${toDateInputValue(new Date(tx.date))}`;
+    // The due date a row STANDS FOR (#107): the same key the recurring processor dedupes on.
+    const key = recurringInstanceKey(tx);
+    if (!key) continue;
     const existing = seen.get(key);
     if (existing) {
       // Keep the earlier-created one, mark the other as duplicate
@@ -351,27 +380,12 @@ const nextMonthProjected = computed<DisplayTransaction[]>(() => {
   const nextMonth = new Date(viewingYear, viewingMonth + 1, 1);
   const nextStart = getStartOfMonth(nextMonth);
   const nextEnd = getEndOfMonth(nextMonth);
-  const projected: DisplayTransaction[] = [];
-
-  for (const item of recurringStore.filteredActiveItems) {
-    for (const date of getDueDatesInRange(item, nextStart, nextEnd)) {
-      projected.push({
-        id: `next-projected-${item.id}-${toDateInputValue(date)}`,
-        accountId: item.accountId,
-        type: item.type,
-        amount: item.amount,
-        currency: item.currency,
-        category: item.category,
-        date: toDateInputValue(date),
-        description: item.description,
-        recurringItemId: item.id,
-        isReconciled: false,
-        isProjected: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  }
+  const projected = projectRecurringTransactions(
+    recurringStore.filteredActiveItems,
+    nextStart,
+    nextEnd,
+    { idPrefix: 'next-projected' }
+  );
 
   projected.sort((a, b) => a.date.localeCompare(b.date));
   return projected;
@@ -459,6 +473,15 @@ useQuickAddIntent((action) => {
       break;
   }
 });
+
+// A statement read from the add drawer's magic beans card opens the review: the drawer it came
+// from gives way, so the two never stack.
+watch(
+  () => statementImport.phase,
+  (phase) => {
+    if (phase === 'reviewing' && showAddModal.value) closeAddModal();
+  }
+);
 
 function openEditModal(transaction: Transaction) {
   editingTransaction.value = transaction;
@@ -933,13 +956,26 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <p class="text-sm text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
-      <button
-        type="button"
-        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-        @click="openAddModal"
-      >
-        {{ t('transactions.addTransaction') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Magic beans (#107): the same pill the calendar and travel headers carry, opened with
+             Transactions already picked. Finance-gated like the reader it opens. -->
+        <MagicBeansDoor v-if="canReadStatement" hint="transactions">
+          <template #trigger="{ open }">
+            <MagicReaderPill
+              :label="t('ai.magic.perform')"
+              :aria-label="t('transactions.magicAria')"
+              @click="open"
+            />
+          </template>
+        </MagicBeansDoor>
+        <button
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          @click="openAddModal"
+        >
+          {{ t('transactions.addTransaction') }}
+        </button>
+      </div>
     </div>
 
     <!-- Secondary toolbar: filters + search + month -->
@@ -1445,6 +1481,9 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       @view-activity="handleViewActivity"
       @view-loan="handleViewLoan"
     />
+
+    <!-- Statement import review (#107): opens itself when a statement is read. -->
+    <StatementImportModal />
 
     <!-- Transaction Created Confirmation -->
     <CreatedConfirmModal

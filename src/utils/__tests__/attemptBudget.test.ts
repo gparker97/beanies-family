@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   peekAttempt,
   consumeAttempt,
+  consumeAttempts,
   clearAttempts,
   __resetAttemptBudgetForTests,
   type BudgetPolicy,
@@ -318,6 +319,30 @@ describe('attemptBudget', () => {
       expect(peekAttempt(KEY, POLICY).ok).toBe(true);
       expect(stored()[KEY]).toBeUndefined();
       expect(stored()['share-text:fam-2']?.t).toHaveLength(1);
+    });
+  });
+
+  // A statement pasted as text is read in several chunks (#107). Taking them one at a time
+  // would spend some and then refuse, burning budget on reads that never happen.
+  describe('consumeAttempts (all or nothing)', () => {
+    it('takes n attempts at once when they fit', () => {
+      expect(consumeAttempts('k', POLICY, 2)).toEqual({ ok: true });
+      expect(consumeAttempt('k', POLICY)).toEqual({ ok: true });
+      expect(peekAttempt('k', POLICY).ok).toBe(false);
+    });
+
+    it('takes NONE when n does not fit, and says when a slot frees', () => {
+      consumeAttempt('k', POLICY);
+      const refused = consumeAttempts('k', POLICY, 3);
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) expect(refused.resetsAt).toBeGreaterThan(Date.now());
+      // Nothing was spent by the refusal: two attempts are still available.
+      expect(consumeAttempts('k', POLICY, 2)).toEqual({ ok: true });
+    });
+
+    it('zero is a no-op', () => {
+      expect(consumeAttempts('k', POLICY, 0)).toEqual({ ok: true });
+      expect(consumeAttempts('k', POLICY, 3)).toEqual({ ok: true });
     });
   });
 });

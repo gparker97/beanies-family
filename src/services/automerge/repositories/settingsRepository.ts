@@ -105,6 +105,10 @@ export async function setSkipDocumentConsentPrompt(skip: boolean): Promise<Setti
   return saveSettings({ skipDocumentConsentPrompt: skip });
 }
 
+export async function setAiStatementConsentAcknowledgedAt(date: ISODateString): Promise<Settings> {
+  return saveSettings({ aiStatementConsentAcknowledgedAt: date });
+}
+
 export async function setSyncEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ syncEnabled: enabled });
 }
