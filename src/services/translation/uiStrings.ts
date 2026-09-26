@@ -12955,6 +12955,218 @@ const STRING_DEFS = {
   'whoOwnsWhat.emoji.people': { en: 'People', beanie: 'people' },
   'whoOwnsWhat.emoji.me': { en: 'Just for Me', beanie: 'just for me' },
 
+  // Who Owns What: the deal pile (#109). The pile question is Outfit, never Caveat.
+  'whoOwnsWhat.pile.toGo.one': { en: '{count} card to go', beanie: '{count} card to go' },
+  'whoOwnsWhat.pile.toGo.other': { en: '{count} cards to go', beanie: '{count} cards to go' },
+  'whoOwnsWhat.pile.tally': {
+    en: 'Kept {kept} · Skipped {skipped}',
+    beanie: 'kept {kept} · skipped {skipped}',
+  },
+  'whoOwnsWhat.pile.question': {
+    en: 'Keep this card, or skip it?',
+    beanie: 'keep this card, or skip it?',
+  },
+  'whoOwnsWhat.pile.keep': { en: 'Keep', beanie: 'keep' },
+  'whoOwnsWhat.pile.skip': { en: 'Skip', beanie: 'skip' },
+  'whoOwnsWhat.pile.kept': { en: 'Kept! Who owns it?', beanie: 'kept! who owns it?' },
+  'whoOwnsWhat.pile.whoOwns': { en: 'Who owns it?', beanie: 'who owns it?' },
+  'whoOwnsWhat.pile.decideLater': { en: 'Decide later', beanie: 'decide later' },
+  'whoOwnsWhat.pile.split': { en: 'Split it', beanie: 'split it' },
+  'whoOwnsWhat.pile.skipped': { en: 'Skipped', beanie: 'skipped' },
+  'whoOwnsWhat.pile.noMembers': {
+    en: 'Add someone to your family to deal cards to.',
+    beanie: 'add someone to your pod to deal cards to.',
+  },
+  'whoOwnsWhat.pile.group.car': { en: 'No car?', beanie: 'no car?' },
+  'whoOwnsWhat.pile.group.yard': { en: 'No yard?', beanie: 'no yard?' },
+  'whoOwnsWhat.pile.group.pool': { en: 'No pool?', beanie: 'no pool?' },
+  'whoOwnsWhat.pile.group.baby': { en: 'No little ones?', beanie: 'no little ones?' },
+  'whoOwnsWhat.pile.group.pet': { en: 'No pets?', beanie: 'no pets?' },
+  'whoOwnsWhat.pile.group.school': { en: 'No school kids?', beanie: 'no school kids?' },
+  'whoOwnsWhat.pile.groupBody': {
+    en: 'Skip all {count} of these cards at once',
+    beanie: 'skip all {count} of these cards at once',
+  },
+  'whoOwnsWhat.pile.groupAction': { en: 'Skip {count}', beanie: 'skip {count}' },
+  'whoOwnsWhat.pile.empty': {
+    en: 'Nothing left to deal here.',
+    beanie: 'nothing left to deal here.',
+  },
+  'whoOwnsWhat.pile.doneTitle': { en: "That's the deck! ✨", beanie: "that's the deck! ✨" },
+  'whoOwnsWhat.pile.doneWaiting.one': {
+    en: 'Every card is sorted. 1 card is still waiting for a holder.',
+    beanie: 'every card is sorted. 1 card is still waiting for a holder.',
+  },
+  'whoOwnsWhat.pile.doneWaiting.other': {
+    en: 'Every card is sorted. {count} cards are still waiting for a holder.',
+    beanie: 'every card is sorted. {count} cards are still waiting for a holder.',
+  },
+  'whoOwnsWhat.pile.dealWaiting': {
+    en: 'Deal the Waiting Cards',
+    beanie: 'deal the waiting cards',
+  },
+  'whoOwnsWhat.pile.seeOverview': { en: 'See the Overview', beanie: 'see the overview' },
+  'whoOwnsWhat.pile.celebrateTitle': {
+    en: 'Every card has a holder! 🎉',
+    beanie: 'every card has a holder! 🎉',
+  },
+  'whoOwnsWhat.pile.celebrateBody': {
+    en: '{count} jobs, each one with a name on it. Nobody has to keep the whole list in their head anymore.',
+    beanie:
+      '{count} jobs, each one with a name on it. nobody has to keep the whole list in their head anymore.',
+  },
+  'whoOwnsWhat.pile.pillSplit.one': { en: '1 split card', beanie: '1 split card' },
+  'whoOwnsWhat.pile.pillSplit.other': { en: '{count} split cards', beanie: '{count} split cards' },
+  'whoOwnsWhat.pile.pillKids.one': { en: '1 kid pitching in', beanie: '1 little bean pitching in' },
+  'whoOwnsWhat.pile.pillKids.other': {
+    en: '{count} kids pitching in',
+    beanie: '{count} little beans pitching in',
+  },
+  'whoOwnsWhat.pile.pillSkipped': { en: '{count} skipped', beanie: '{count} skipped' },
+  'whoOwnsWhat.pile.nextCheckIn': {
+    en: 'Next up: a family check-in on {date}',
+    beanie: 'next up: a family check-in on {date}',
+  },
+  'whoOwnsWhat.pile.useBoard': { en: 'Use the Board Instead', beanie: 'use the board instead' },
+  'whoOwnsWhat.pile.imageAlt': {
+    en: 'The beanies celebrating',
+    beanie: 'the beanies celebrating',
+  },
+
+  // Who Owns What: the desktop deal board (#109).
+  'whoOwnsWhat.board.title': { en: 'The Deck', beanie: 'the deck' },
+  'whoOwnsWhat.board.toDeal.one': {
+    en: '1 card still to deal',
+    beanie: '1 card still to deal',
+  },
+  'whoOwnsWhat.board.toDeal.other': {
+    en: '{count} cards still to deal',
+    beanie: '{count} cards still to deal',
+  },
+  'whoOwnsWhat.board.allDealt': { en: 'Every card is dealt', beanie: 'every card is dealt' },
+  'whoOwnsWhat.board.search': {
+    en: 'Search all {count} cards…',
+    beanie: 'search all {count} cards…',
+  },
+  'whoOwnsWhat.board.filterToDeal': { en: 'To Deal', beanie: 'to deal' },
+  'whoOwnsWhat.board.filterAll': { en: 'All', beanie: 'all' },
+  'whoOwnsWhat.board.newCard': { en: 'New Card', beanie: 'new card' },
+  'whoOwnsWhat.board.tip': {
+    en: 'Drag a card onto someone to deal it, or onto Skipped to skip it. Or tap a card to pick.',
+    beanie:
+      'drag a card onto someone to deal it, or onto skipped to skip it. or tap a card to pick.',
+  },
+  'whoOwnsWhat.board.noMatch': { en: 'No cards match.', beanie: 'no cards match.' },
+  'whoOwnsWhat.board.nothingToDeal': {
+    en: 'Nothing left to deal. Switch to All to re-deal a card.',
+    beanie: 'nothing left to deal. switch to all to re-deal a card.',
+  },
+  'whoOwnsWhat.board.skippedRow': { en: 'Skipped', beanie: 'skipped' },
+  'whoOwnsWhat.board.dropDeal': { en: 'Drop to deal', beanie: 'drop to deal' },
+  'whoOwnsWhat.board.dropSkip': { en: 'Drop to skip', beanie: 'drop to skip' },
+  'whoOwnsWhat.board.more': { en: '+{count} more', beanie: '+{count} more' },
+  'whoOwnsWhat.board.less': { en: 'Show less', beanie: 'show less' },
+  'whoOwnsWhat.board.dealCard': { en: 'Deal {card}', beanie: 'deal {card}' },
+  'whoOwnsWhat.board.rowLabel': { en: "{name}'s cards", beanie: "{name}'s cards" },
+
+  // Who Owns What: the family check-in drawer (#109).
+  'whoOwnsWhat.checkinDrawer.title': { en: 'Family Check-in', beanie: 'family check-in' },
+  'whoOwnsWhat.checkinDrawer.intro': {
+    en: 'About ten minutes, together. No scores, just a chance to talk.',
+    beanie: 'about ten minutes, together. no scores, just a chance to talk.',
+  },
+  'whoOwnsWhat.checkinDrawer.finish': { en: 'Finish Check-in', beanie: 'finish check-in' },
+  'whoOwnsWhat.checkinDrawer.nobody': { en: 'Still Nobody', beanie: 'still nobody' },
+  'whoOwnsWhat.checkinDrawer.moved': {
+    en: 'Moved Since Last Time',
+    beanie: 'moved since last time',
+  },
+  'whoOwnsWhat.checkinDrawer.unchanged': {
+    en: "Haven't Moved in a While",
+    beanie: "haven't moved in a while",
+  },
+  'whoOwnsWhat.checkinDrawer.dealNow': { en: 'Deal Now', beanie: 'deal now' },
+  'whoOwnsWhat.checkinDrawer.settling': { en: 'Settling In', beanie: 'settling in' },
+  'whoOwnsWhat.checkinDrawer.talk': { en: "Let's Talk", beanie: "let's talk" },
+  'whoOwnsWhat.checkinDrawer.stillWorks': { en: 'Still Works', beanie: 'still works' },
+  'whoOwnsWhat.checkinDrawer.redeal': { en: 'Re-deal', beanie: 're-deal' },
+  'whoOwnsWhat.checkinDrawer.movedLine': {
+    en: '{from} to {to} on {date}',
+    beanie: '{from} to {to} on {date}',
+  },
+  'whoOwnsWhat.checkinDrawer.heldSince': {
+    en: '{name} since {date}',
+    beanie: '{name} since {date}',
+  },
+  'whoOwnsWhat.checkinDrawer.dealt': { en: 'Dealt to {name}', beanie: 'dealt to {name}' },
+  'whoOwnsWhat.checkinDrawer.empty': {
+    en: 'Nothing on the agenda this time. Every card has a holder and nothing has moved.',
+    beanie: 'nothing on the agenda this time. every card has a holder and nothing has moved.',
+  },
+  'whoOwnsWhat.checkinDrawer.doneTitle': { en: 'Deck checked ✨', beanie: 'deck checked ✨' },
+  'whoOwnsWhat.checkinDrawer.doneBody': {
+    en: 'Thanks for talking it through.',
+    beanie: 'thanks for talking it through.',
+  },
+  'whoOwnsWhat.checkinDrawer.doneTalk': {
+    en: 'On your list to chat about this week: {cards}.',
+    beanie: 'on your list to chat about this week: {cards}.',
+  },
+  'whoOwnsWhat.checkinDrawer.doneNext': {
+    en: 'Next check-in {date}. It will show in your briefing when it is due.',
+    beanie: 'next check-in {date}. it will show in your briefing when it is due.',
+  },
+  'whoOwnsWhat.checkinDrawer.count.stillWorks.one': {
+    en: '1 still works',
+    beanie: '1 still works',
+  },
+  'whoOwnsWhat.checkinDrawer.count.stillWorks.other': {
+    en: '{count} still work',
+    beanie: '{count} still work',
+  },
+  'whoOwnsWhat.checkinDrawer.count.talk.one': { en: '1 to talk about', beanie: '1 to talk about' },
+  'whoOwnsWhat.checkinDrawer.count.talk.other': {
+    en: '{count} to talk about',
+    beanie: '{count} to talk about',
+  },
+  'whoOwnsWhat.checkinDrawer.count.redealt.one': { en: '1 re-dealt', beanie: '1 re-dealt' },
+  'whoOwnsWhat.checkinDrawer.count.redealt.other': {
+    en: '{count} re-dealt',
+    beanie: '{count} re-dealt',
+  },
+  'whoOwnsWhat.checkinDrawer.count.dealtNow.one': { en: '1 dealt now', beanie: '1 dealt now' },
+  'whoOwnsWhat.checkinDrawer.count.dealtNow.other': {
+    en: '{count} dealt now',
+    beanie: '{count} dealt now',
+  },
+
+  // Who Owns What: the fridge sheet (#109). Rendered into the picture / PDF.
+  'whoOwnsWhat.export.building': { en: 'Preparing…', beanie: 'preparing…' },
+  'whoOwnsWhat.export.heading': { en: 'Who Owns What', beanie: 'who owns what' },
+  'whoOwnsWhat.export.accent': {
+    en: 'every job has a name on it ✨',
+    beanie: 'every job has a name on it ✨',
+  },
+  'whoOwnsWhat.export.dealtAsOf': { en: 'dealt as of', beanie: 'dealt as of' },
+  'whoOwnsWhat.export.page': {
+    en: 'Who Owns What · page {page} of {total}',
+    beanie: 'who owns what · page {page} of {total}',
+  },
+  'whoOwnsWhat.export.holders': { en: 'Holders', beanie: 'holders' },
+  'whoOwnsWhat.export.writeIn': {
+    en: '- - - still to deal, write a name in',
+    beanie: '- - - still to deal, write a name in',
+  },
+  'whoOwnsWhat.export.shareTitle': { en: 'Who Owns What', beanie: 'who owns what' },
+  'whoOwnsWhat.export.failed': {
+    en: "Couldn't create the file",
+    beanie: "couldn't create the file",
+  },
+  'whoOwnsWhat.export.failedHelp': {
+    en: 'Something went wrong preparing your fridge sheet. Please try again.',
+    beanie: 'something went wrong preparing your fridge sheet. please try again.',
+  },
+
   // Who Owns What: card deck (#109). Names are Title Case in `en`; done lines have no
   // trailing period. American English. Ids in `responsibilityCards.ts` never change.
   'cards.cookingDinner.name': { en: 'Cooking Dinner', beanie: 'cooking dinner' },
