@@ -12958,10 +12958,6 @@ const STRING_DEFS = {
   // Who Owns What: the deal pile (#109). The pile question is Outfit, never Caveat.
   'whoOwnsWhat.pile.toGo.one': { en: '{count} card to go', beanie: '{count} card to go' },
   'whoOwnsWhat.pile.toGo.other': { en: '{count} cards to go', beanie: '{count} cards to go' },
-  'whoOwnsWhat.pile.tally': {
-    en: 'Kept {kept} · Skipped {skipped}',
-    beanie: 'kept {kept} · skipped {skipped}',
-  },
   'whoOwnsWhat.pile.question': {
     en: 'Keep this card, or skip it?',
     beanie: 'keep this card, or skip it?',
@@ -13027,7 +13023,27 @@ const STRING_DEFS = {
     en: 'Next up: a family check-in on {date}',
     beanie: 'next up: a family check-in on {date}',
   },
-  'whoOwnsWhat.pile.useBoard': { en: 'Use the Board Instead', beanie: 'use the board instead' },
+  // Round 7: the pile's position line, arrows, revisit banner and lists.
+  'whoOwnsWhat.pile.position': {
+    en: '{category} · card {n} of {total}',
+    beanie: '{category} · card {n} of {total}',
+  },
+  'whoOwnsWhat.pile.prev': { en: 'Previous card', beanie: 'previous card' },
+  'whoOwnsWhat.pile.next': { en: 'Next card', beanie: 'next card' },
+  'whoOwnsWhat.pile.withSince': {
+    en: 'With {name} since {date}',
+    beanie: 'with {name} since {date}',
+  },
+  'whoOwnsWhat.pile.waitingBanner': { en: 'Waiting for a holder', beanie: 'waiting for a holder' },
+  'whoOwnsWhat.pile.giveToSomeoneElse': {
+    en: 'Give it to someone else',
+    beanie: 'give it to someone else',
+  },
+  'whoOwnsWhat.pile.skipInstead': { en: 'Skip instead', beanie: 'skip instead' },
+  'whoOwnsWhat.pile.backTo': { en: 'Back to {card}', beanie: 'back to {card}' },
+  'whoOwnsWhat.pile.boardView': { en: 'Board view', beanie: 'board view' },
+  'whoOwnsWhat.pile.listKept': { en: 'Kept', beanie: 'kept' },
+  'whoOwnsWhat.board.cardByCard': { en: 'Card by card', beanie: 'card by card' },
   'whoOwnsWhat.pile.imageAlt': {
     en: 'The beanies celebrating',
     beanie: 'the beanies celebrating',

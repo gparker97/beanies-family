@@ -9,10 +9,11 @@
  * them. All writes go through `responsibilityStore` (MVO); children see everything
  * read-only, and the store guard is the backstop.
  *
- * The Deal view is `DealBoard` at md+ and `DealPile` below it, both opened on
- * `dealRequest`. The first deal (`scope: 'unsorted'`) is the pile at every width, because
- * keep-or-skip is a one-card-at-a-time decision; md+ offers the board from there. The
- * check-in is `CheckInDrawer`, and the fridge sheet (Share / Export as PDF, from the ⋯ menu
+ * The Deal view is `DealPile` (card by card) at every width, the default. At md+ one toggle
+ * at the top right of the Deal view switches to `DealBoard` and back; that choice is
+ * remembered per device (`dealMode`) and only the toggle changes it. Every `openDeal`
+ * request (the first deal, "Deal the last N", a card's Deal button) shows the pile at that
+ * card without touching the saved choice; phones never see the board. The check-in is `CheckInDrawer`, and the fridge sheet (Share / Export as PDF, from the ⋯ menu
  * and the Overview) runs on `useSheetExportRunner` (surface `deck-export`) with one
  * `ExportSheet` per page off-screen.
  */
@@ -96,7 +97,7 @@ const viewOptions = computed(() =>
 );
 function setView(value: string): void {
   if (!(VIEWS as readonly string[]).includes(value)) return;
-  // A tap on the switch opens the Deal view fresh (the board at md+), never a stale request.
+  // A tap on the switch opens the Deal view fresh (the saved mode), never a stale request.
   if (value === 'deal') {
     dealRequest.value = null;
     pileKey.value += 1;
@@ -180,13 +181,31 @@ function openDeal(request: DealRequest): void {
 }
 
 const { isMobile } = useBreakpoint();
-/** The pile on a phone, and for the first deal at every width; the board otherwise. */
-const showPile = computed(() => isMobile.value || dealRequest.value?.scope === 'unsorted');
+const DEAL_MODES = ['pile', 'board'] as const;
+/** md+ only: card by card (the default) or the board. Changed only by the toggle. */
+const dealMode = usePersistedChoice<(typeof DEAL_MODES)[number]>(
+  STORAGE_KEYS.WHO_OWNS_WHAT_DEAL_MODE,
+  DEAL_MODES,
+  'pile'
+);
+/** A deal request (a card, "Deal the last N") always opens the pile at it. */
+const showBoard = computed(
+  () => !isMobile.value && dealMode.value === 'board' && dealRequest.value === null
+);
 const pileScope = computed<DealRequest['scope']>(
   () => dealRequest.value?.scope ?? (store.stats.unsorted > 0 ? 'unsorted' : 'waiting')
 );
-function useBoard(): void {
+function toggleDealMode(): void {
+  const next = showBoard.value ? 'pile' : 'board';
+  dealMode.value = next;
   dealRequest.value = null;
+  pileKey.value += 1;
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'deal_mode_set',
+    context: { detail: next },
+  });
 }
 
 /** Children see the cards still to deal, read-only. */
@@ -387,6 +406,17 @@ async function restoreDefaults(): Promise<void> {
         data-testid="who-owns-what-views"
         @update:model-value="setView"
       />
+      <!-- md+: card by card (the default) or the board. -->
+      <button
+        v-if="view === 'deal' && canDeal && !isMobile"
+        type="button"
+        class="deal-mode font-outfit dark:text-ink-soft text-sm font-semibold text-[var(--color-text-muted)]"
+        data-testid="who-owns-what-deal-mode"
+        @click="toggleDealMode"
+      >
+        {{ showBoard ? t('whoOwnsWhat.board.cardByCard') : t('whoOwnsWhat.pile.boardView') }}
+        <span aria-hidden="true">›</span>
+      </button>
       <!-- The fridge sheet's two conventional actions, as on the meal planner. -->
       <div v-if="view === 'overview' && hasKept" class="flex flex-wrap gap-2">
         <button
@@ -441,27 +471,19 @@ async function restoreDefaults(): Promise<void> {
       />
     </template>
 
-    <!-- Deal: the board at md+, the pile on a phone and for the first deal. Children see
+    <!-- Deal: card by card at every width, or the board at md+ by choice. Children see
          the cards still to deal, read-only. -->
     <section v-else-if="view === 'deal'" data-testid="who-owns-what-deal">
       <template v-if="canDeal">
+        <DealBoard v-if="showBoard" @open="openCard" @edit="editCard" @new-card="newCard" />
         <DealPile
-          v-if="showPile"
+          v-else
           :key="pileKey"
           :scope="pileScope"
           :start-card-id="dealRequest?.cardId"
-          :show-board-link="!isMobile"
           @split="editCard"
           @overview="view = 'overview'"
           @deal-waiting="openDeal({ scope: 'waiting' })"
-          @use-board="useBoard"
-        />
-        <DealBoard
-          v-else
-          :focus-card-id="dealRequest?.cardId"
-          @open="openCard"
-          @edit="editCard"
-          @new-card="newCard"
         />
       </template>
       <DeckGrid v-else :cards="toDeal" :filter="null" :show-pills="false" @open="openCard" />
@@ -520,6 +542,14 @@ async function restoreDefaults(): Promise<void> {
 </template>
 
 <style scoped>
+.deal-mode {
+  border-bottom: 1.5px dotted rgb(44 62 80 / 30%);
+}
+
+html.dark .deal-mode {
+  border-bottom-color: var(--color-line-strong);
+}
+
 /* Off-screen host for the fridge sheet: in the layout (so fonts and images load and it has
    real dimensions to rasterise) but far off-screen and out of the a11y tree. Mirrors
    MealPlannerPage. */

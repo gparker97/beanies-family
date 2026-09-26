@@ -451,6 +451,7 @@
   .bell-ring,
   .card-bounce,
   .drop-flash,
+  .key-press,
   .magic-tick,
   .magic-text-shimmer,
   .magic-shimmer::after {
@@ -774,6 +775,25 @@
 
 .drop-flash {
   animation: drop-flash 900ms ease-out;
+}
+
+/* ───── Key press (#109, round 7) ───────────────────────────────────────────
+   One-shot feedback when a keyboard shortcut presses a deal-pile button or face:
+   the button lights with the tint it shows on hover, then fades. It is a keyframe
+   (never a static rule) so the class can't leave a button stuck lit: pulse()
+   removes it on animationend, and under reduced motion it paints nothing at all.
+   The colours come from --press-bg / --press-edge, which DeckActionButton sets
+   for both themes; anything else gets the light fallback. */
+@keyframes key-press {
+  0%,
+  40% {
+    background-color: var(--press-bg, rgb(241 93 34 / 12%));
+    border-color: var(--press-edge, #f15d22);
+  }
+}
+
+.key-press {
+  animation: key-press 450ms ease-out;
 }
 
 /* ───── Magic Shimmer ───────────────────────────────────────────────────────

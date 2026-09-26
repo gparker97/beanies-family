@@ -1,15 +1,30 @@
 <script setup lang="ts">
 /**
- * Who Owns What (#109): the small outlined action button beside a "Who owns it?" picker
- * (Split It, Skip), shared by the deal pile, the deal board's tap picker and the check-in
- * drawer so the three stay one look. Sits on a raised or overlay surface in both modes.
+ * Who Owns What (#109): the outlined deck action button, shared by the deal pile, the deal
+ * board's tap picker and the check-in drawer so they stay one look. Sits on a raised or
+ * overlay surface in both modes.
+ *
+ * `variant="choice"` is the deal pile's Keep / Skip / revisit buttons (round 7): larger, and
+ * every choice looks equally unselected until it is hovered (pointer devices only, so a tap
+ * can't leave it lit), focused from the keyboard, or its shortcut is pressed (the one-shot
+ * `key-press` animation in `style.css`, which paints the tint through `--press-*` so it can
+ * never stick, and is killed under reduced motion).
  */
-withDefaults(defineProps<{ disabled?: boolean }>(), { disabled: false });
+withDefaults(defineProps<{ disabled?: boolean; variant?: 'default' | 'choice' }>(), {
+  disabled: false,
+  variant: 'default',
+});
 defineEmits<{ click: [] }>();
 </script>
 
 <template>
-  <button type="button" class="deck-action" :disabled="disabled" @click="$emit('click')">
+  <button
+    type="button"
+    class="deck-action"
+    :class="{ 'is-choice': variant === 'choice' }"
+    :disabled="disabled"
+    @click="$emit('click')"
+  >
     <slot />
   </button>
 </template>
@@ -47,5 +62,63 @@ html.dark .deck-action {
 
 html.dark .deck-action:hover:not(:disabled) {
   background: var(--color-surface-hover);
+}
+
+/* ── choice ─────────────────────────────────────────────────────────────── */
+.deck-action.is-choice {
+  --press-bg: rgb(241 93 34 / 8%);
+  --press-edge: #f15d22;
+
+  align-items: center;
+  border: 1.5px solid rgb(44 62 80 / 22%);
+  border-radius: 1rem;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0.75rem 0.625rem;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.deck-action.is-choice:focus-visible {
+  background: var(--press-bg);
+  border-color: var(--press-edge);
+}
+
+html.dark .deck-action.is-choice {
+  --press-bg: rgb(255 139 94 / 14%);
+  --press-edge: var(--color-accent-lift);
+
+  background: var(--color-surface-raised);
+  border-color: var(--color-line-strong);
+}
+
+html.dark .deck-action.is-choice:focus-visible {
+  background: var(--press-bg);
+  border-color: var(--press-edge);
+}
+
+@media (hover: hover) {
+  .deck-action.is-choice:hover:not(:disabled) {
+    background: var(--press-bg);
+    border-color: var(--press-edge);
+  }
+
+  html.dark .deck-action.is-choice:hover:not(:disabled) {
+    background: var(--press-bg);
+    border-color: var(--press-edge);
+  }
+}
+
+@media (hover: none) {
+  .deck-action.is-choice:hover:not(:disabled) {
+    background: #fff;
+  }
+
+  html.dark .deck-action.is-choice:hover:not(:disabled) {
+    background: var(--color-surface-raised);
+  }
 }
 </style>

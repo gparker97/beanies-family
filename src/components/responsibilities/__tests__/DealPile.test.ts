@@ -1,29 +1,34 @@
 /**
- * DealPile: the first deal's contracts.
- *  - Keep → pick is ONE `deal` call (never keep + deal), the card flies to the picked face,
- *    and the card's emoji joins that face's row. Undo from the toast removes it again.
+ * DealPile (round 7): the wiring between the cursor, the actions and the flights. Cursor
+ * edge cases live in `usePileCursor.test.ts`; these cover what only a mount can show:
+ *  - Keep → pick is ONE `deal` call (never keep + deal), flies to the face, and advances.
  *  - "Decide later" is the only path that calls `keep`.
- *  - Skip flies into the skipped tray and its emoji joins the tray.
+ *  - Skip flies to the Skipped list's heading.
+ *  - An Undo during the flight keeps the card; an Undo after it jumps back to the card.
+ *  - Revisiting a decided card shows its banner, and each change stays on the card.
+ *  - The keyboard shortcuts call the same guarded functions as the buttons.
  * The store is a live stand-in: its actions flip card statuses the way the real store's
- * projection would, so the pile advances off the store, not off its own bookkeeping.
+ * projection would, so the pile moves off the store, not off its own bookkeeping.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, h, reactive } from 'vue';
 import { getResponsibilityCard } from '@/constants/responsibilityCards';
-import type { ResolvedCard } from '@/utils/responsibilityDeck';
+import type { CardStatus, ResolvedCard } from '@/utils/responsibilityDeck';
 import type { UndoToken } from '@/utils/responsibilityOps';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 vi.mock('@/utils/prefersReducedMotion', () => ({ prefersReducedMotion: () => true }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 const fly = vi.hoisted(() => ({ flyTo: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/composables/useFlyTo', () => ({ flyTo: fly.flyTo }));
-const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn() }));
+const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn(), invoke: vi.fn() }));
 vi.mock('@/composables/useToast', () => ({
   showToast: toast.show,
   dismissToast: toast.dismiss,
+  invokeToastAction: toast.invoke,
 }));
 
 const family = reactive({
@@ -37,18 +42,28 @@ const family = reactive({
 });
 vi.mock('@/stores/familyStore', () => ({ useFamilyStore: () => family }));
 
-function unsorted(id: string, category: ResolvedCard['category'] = 'home'): ResolvedCard {
+function makeCard(id: string, status: CardStatus = 'unsorted', holderId?: string): ResolvedCard {
   const def = getResponsibilityCard(id)!;
   return {
     id,
     def,
     isCustom: false,
-    category,
+    category: 'home',
     emoji: def.emoji,
-    status: 'unsorted',
+    status,
     splitMode: 'single',
-    parts: [{ key: 'main' }],
-    state: null,
+    parts: [{ key: 'main', holderId }],
+    state:
+      status === 'unsorted'
+        ? null
+        : {
+            id,
+            status: status === 'skipped' ? 'skipped' : 'kept',
+            splitMode: 'single',
+            parts: [{ key: 'main', holderId }],
+            createdAt: '2026-09-01T12:00:00.000Z',
+            updatedAt: '2026-09-01T12:00:00.000Z',
+          },
   };
 }
 
@@ -84,23 +99,19 @@ const store = reactive({
 });
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
-// A light InlineMemberPicker: the real one's tiles, testids, badge slot and back chip.
+// A light InlineMemberPicker: the real one's tiles, testids and back chip.
 const PickerStub = defineComponent({
   props: ['members', 'title', 'backLabel', 'tileTestidPrefix'],
   emits: ['pick', 'cancel'],
-  setup(props, { emit, slots }) {
+  setup(props, { emit }) {
     return () =>
-      h('section', [
+      h('section', { 'data-testid': 'picker', 'data-back': props.backLabel }, [
         h('button', { 'data-testid': 'picker-back', onClick: () => emit('cancel') }),
         ...props.members.map((m: { id: string }) =>
-          h(
-            'button',
-            {
-              'data-testid': `${props.tileTestidPrefix}${m.id}`,
-              onClick: () => emit('pick', m.id),
-            },
-            slots.badge?.({ member: m })
-          )
+          h('button', {
+            'data-testid': `${props.tileTestidPrefix}${m.id}`,
+            onClick: () => emit('pick', m.id),
+          })
         ),
       ]);
   },
@@ -109,18 +120,29 @@ const PickerStub = defineComponent({
 import DealPile from '../DealPile.vue';
 import { resetDealActionsForTest } from '../useDealActions';
 
-function mountPile() {
-  return mount(DealPile, {
-    props: { scope: 'unsorted' },
-    global: { stubs: { InlineMemberPicker: PickerStub } },
+let wrapper: VueWrapper | null = null;
+function mountPile(props: Record<string, unknown> = {}) {
+  wrapper = mount(DealPile, {
+    props: { scope: 'unsorted', ...props },
+    attachTo: document.body,
+    global: { stubs: { InlineMemberPicker: PickerStub, MemberChip: true } },
   });
+  return wrapper;
+}
+const has = (w: VueWrapper, id: string) => w.find(`[data-testid="${id}"]`).exists();
+const click = (w: VueWrapper, id: string) => w.find(`[data-testid="${id}"]`).trigger('click');
+function press(key: string): void {
+  window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+}
+function lastUndo(): () => Promise<void> {
+  return toast.show.mock.calls.filter((c) => c[3]?.actionFn).at(-1)![3].actionFn;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   resetDealActionsForTest();
   toast.show.mockImplementation(() => 1);
-  store.resolved = [unsorted('laundry'), unsorted('dishes')];
+  store.resolved = [makeCard('laundry'), makeCard('dishes')];
   store.deal.mockImplementation(async (id: string, _part: string, memberId: string) => {
     store.set(id, { status: 'held', parts: [{ key: 'main', holderId: memberId }] });
     return { result: store.cardById(id), undo: TOKEN };
@@ -133,45 +155,44 @@ beforeEach(() => {
     for (const id of ids) store.set(id, { status: 'skipped' });
     return { result: ids, undo: TOKEN };
   });
+  store.bringBack.mockImplementation(async (id: string) => {
+    store.set(id, { status: 'held', parts: [{ key: 'main', holderId: 'greg' }] });
+    return { result: store.cardById(id), undo: TOKEN };
+  });
+});
+afterEach(() => {
+  wrapper?.unmount();
+  wrapper = null;
 });
 
-describe('DealPile', () => {
-  it('keep → pick deals once, flies to the face, adds the emoji, and undo removes it', async () => {
+describe('DealPile: first decisions', () => {
+  it('keep → pick deals once, flies to the face, advances, and Undo jumps back', async () => {
     const w = mountPile();
-    expect(w.find('[data-testid="deal-pile-card-laundry"]').exists()).toBe(true);
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
 
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    await w.find('[data-testid="deal-pick-sofia"]').trigger('click');
+    await click(w, 'deal-pile-keep');
+    await click(w, 'deal-pick-sofia');
     await flushPromises();
 
     expect(store.deal).toHaveBeenCalledTimes(1);
     expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'sofia');
     expect(store.keep).not.toHaveBeenCalled();
-    expect(fly.flyTo).toHaveBeenCalledTimes(1);
     const [, target] = fly.flyTo.mock.calls[0]! as unknown as [HTMLElement, HTMLElement];
     expect(target.getAttribute('data-testid')).toBe('deal-pick-sofia');
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    expect(has(w, 'deal-list-kept-laundry')).toBe(true);
 
-    // The next card is on top; its picker shows sofia's session row.
-    expect(w.find('[data-testid="deal-pile-card-dishes"]').exists()).toBe(true);
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('🧺');
-
-    // Undo from the toast: the store restores the card, the emoji leaves the row.
     store.undo.mockImplementation(async () => {
       store.set('laundry', { status: 'unsorted', parts: [{ key: 'main' }] });
       return true;
     });
-    const opts = toast.show.mock.calls.find((c) => c[3]?.actionFn)![3];
-    await opts.actionFn();
+    await lastUndo()();
     await flushPromises();
-
-    expect(store.undo).toHaveBeenCalledWith(TOKEN);
-    expect(w.find('[data-testid="deal-pile-card-laundry"]').exists()).toBe(true);
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-pile-question')).toBe(true);
   });
 
-  it('an Undo tapped while the card is still flying leaves no emoji behind', async () => {
+  it('an Undo while the card is still flying keeps it on screen, asking again', async () => {
     let land!: () => void;
     fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
     store.undo.mockImplementation(async () => {
@@ -179,24 +200,65 @@ describe('DealPile', () => {
       return true;
     });
     const w = mountPile();
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    await w.find('[data-testid="deal-pick-sofia"]').trigger('click');
+    await click(w, 'deal-pile-keep');
+    await click(w, 'deal-pick-sofia');
     await flushPromises();
 
-    // The write resolved, so the toast is up; the flight has not landed yet.
-    const opts = toast.show.mock.calls.find((c) => c[3]?.actionFn)![3];
-    await opts.actionFn();
+    await lastUndo()();
     await flushPromises();
     land();
     await flushPromises();
 
-    expect(store.undo).toHaveBeenCalledWith(TOKEN);
-    // The same card is back on top, asking "Keep this card, or skip it?" again (it is
-    // unsorted again), with nothing under sofia once Keep is tapped.
-    expect(w.find('[data-testid="deal-pile-card-laundry"]').exists()).toBe(true);
-    expect(w.find('[data-testid="deal-pick-sofia"]').exists()).toBe(false);
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-pick-sofia')).toBe(false);
+    expect(has(w, 'deal-pile-question')).toBe(true);
+    expect(w.find('[data-testid="deal-pile-card-laundry"]').classes()).not.toContain('is-leaving');
+  });
+
+  it('"Decide later" is the only path that calls keep, and moves on', async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-keep');
+    await click(w, 'picker-back');
+    await flushPromises();
+
+    expect(store.keep).toHaveBeenCalledWith('laundry');
+    expect(store.deal).not.toHaveBeenCalled();
+    expect(fly.flyTo).not.toHaveBeenCalled();
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+  });
+
+  it('skip flies the card to the Skipped list heading and lists it there', async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-skip');
+    await flushPromises();
+
+    expect(store.skip).toHaveBeenCalledWith(['laundry']);
+    const [, target] = fly.flyTo.mock.calls[0]! as unknown as [HTMLElement, HTMLElement];
+    expect(target.getAttribute('data-testid')).toBe('deal-lists-skipped-heading');
+    expect(has(w, 'deal-list-skipped-laundry')).toBe(true);
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+  });
+
+  it('skip works from the faces view too', async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-keep');
+    await click(w, 'deal-pile-skip-pick');
+    await flushPromises();
+    expect(store.skip).toHaveBeenCalledWith(['laundry']);
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+  });
+
+  it('a refused deal leaves the card on the pile with the faces still open', async () => {
+    store.deal.mockResolvedValueOnce(null);
+    const w = mountPile();
+    await click(w, 'deal-pile-keep');
+    await click(w, 'deal-pick-greg');
+    await flushPromises();
+
+    const card = w.find('[data-testid="deal-pile-card-laundry"]');
+    expect(card.exists()).toBe(true);
+    expect(card.classes()).not.toContain('is-leaving');
+    expect(has(w, 'deal-pick-greg')).toBe(true);
   });
 
   it('an all-skipped deck ends on the plain done card, not "every card has a holder"', async () => {
@@ -210,12 +272,13 @@ describe('DealPile', () => {
       splitCount: 0,
     };
     const w = mountPile();
-    await w.find('[data-testid="deal-pile-skip"]').trigger('click');
+    await click(w, 'deal-pile-skip');
     await flushPromises();
-    await w.find('[data-testid="deal-pile-skip"]').trigger('click');
+    await click(w, 'deal-pile-skip');
     await flushPromises();
-    expect(w.find('[data-testid="deal-pile-celebrate"]').exists()).toBe(false);
-    expect(w.find('[data-testid="deal-pile-done"]').exists()).toBe(true);
+    expect(has(w, 'deal-pile-celebrate')).toBe(false);
+    expect(has(w, 'deal-pile-done')).toBe(true);
+    expect(has(w, 'deal-lists')).toBe(true);
     store.stats = {
       total: 2,
       deck: 0,
@@ -227,40 +290,138 @@ describe('DealPile', () => {
     };
   });
 
-  it('"Decide later" is the only path that calls keep', async () => {
-    const w = mountPile();
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    await w.find('[data-testid="picker-back"]').trigger('click');
-    await flushPromises();
+  it('startCardId opens the pile at that card', () => {
+    store.resolved = [makeCard('laundry', 'waiting'), makeCard('dishes', 'waiting')];
+    const w = mountPile({ scope: 'waiting', startCardId: 'dishes' });
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    expect(has(w, 'picker')).toBe(true);
+  });
+});
 
-    expect(store.keep).toHaveBeenCalledWith('laundry');
+describe('DealPile: stepping and revisiting', () => {
+  beforeEach(() => {
+    store.resolved = [makeCard('laundry', 'held', 'sofia'), makeCard('dishes')];
+  });
+
+  it('the back arrow reaches a decided card, and "Back to" returns to the next one', async () => {
+    const w = mountPile({ scope: 'unsorted' });
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    await click(w, 'deal-list-kept-laundry');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(w.find('[data-testid="deal-list-kept-laundry"]').attributes('aria-current')).toBe(
+      'true'
+    );
+    expect(has(w, 'deal-pile-banner')).toBe(true);
+    await click(w, 'deal-pile-back-to');
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    // Arrows step through decided cards too (dishes' queue now includes laundry).
+    await click(w, 'deal-pile-prev');
+    await click(w, 'deal-pile-next');
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+  });
+
+  it('arrows and list jumps are disabled while an action is in flight', async () => {
+    let land!: () => void;
+    fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
+    const w = mountPile();
+    await click(w, 'deal-list-kept-laundry');
+    await click(w, 'deal-pile-next');
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    await click(w, 'deal-pile-skip');
+    await flushPromises();
+    expect(w.find('[data-testid="deal-pile-prev"]').attributes('disabled')).toBeDefined();
+    expect(w.find('[data-testid="deal-list-kept-laundry"]').attributes('disabled')).toBeDefined();
+    land();
+    await flushPromises();
+  });
+
+  it('Give it to someone else excludes the holder; Cancel returns with no write', async () => {
+    const w = mountPile();
+    await click(w, 'deal-list-kept-laundry');
+    await click(w, 'deal-banner-give');
+    expect(has(w, 'deal-pick-sofia')).toBe(false);
+    expect(has(w, 'deal-pick-greg')).toBe(true);
+    expect(w.find('[data-testid="picker"]').attributes('data-back')).toBe('action.cancel');
+    await click(w, 'picker-back');
+    expect(has(w, 'deal-pile-banner')).toBe(true);
     expect(store.deal).not.toHaveBeenCalled();
+    expect(store.keep).not.toHaveBeenCalled();
+  });
+
+  it('Give deals to the new holder and stays on the card, without a flight', async () => {
+    const w = mountPile();
+    await click(w, 'deal-list-kept-laundry');
+    await click(w, 'deal-banner-give');
+    await click(w, 'deal-pick-greg');
+    await flushPromises();
+    expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'greg');
     expect(fly.flyTo).not.toHaveBeenCalled();
-    expect(w.find('[data-testid="deal-pile-card-dishes"]').exists()).toBe(true);
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-pile-banner')).toBe(true);
   });
 
-  it('skip flies the card into the tray and adds its emoji there', async () => {
+  it('Skip instead, then Bring back, both stay on the card with the new banner', async () => {
     const w = mountPile();
-    await w.find('[data-testid="deal-pile-skip"]').trigger('click');
+    await click(w, 'deal-list-kept-laundry');
+    await click(w, 'deal-banner-skip-instead');
     await flushPromises();
-
     expect(store.skip).toHaveBeenCalledWith(['laundry']);
-    const [, target] = fly.flyTo.mock.calls[0]! as unknown as [HTMLElement, HTMLElement];
-    expect(target.getAttribute('data-testid')).toBe('deal-pile-tray');
-    expect(w.find('[data-testid="deal-pile-tray-emojis"]').text()).toBe('🧺');
-    expect(w.find('[data-testid="deal-pile-card-dishes"]').exists()).toBe(true);
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-banner-bring-back')).toBe(true);
+
+    await click(w, 'deal-banner-bring-back');
+    await flushPromises();
+    expect(store.bringBack).toHaveBeenCalledWith('laundry');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-banner-give')).toBe(true);
+    expect(fly.flyTo).not.toHaveBeenCalled();
   });
 
-  it('a refused deal leaves the card on the pile and records nothing', async () => {
-    store.deal.mockResolvedValueOnce(null);
+  it('a Split save while the faces are open does not open the Give picker', async () => {
     const w = mountPile();
-    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
-    await w.find('[data-testid="deal-pick-greg"]').trigger('click');
+    await click(w, 'deal-pile-keep');
+    expect(has(w, 'picker')).toBe(true);
+    // The edit drawer saved: the card is now held (by someone, on another path).
+    store.set('dishes', { status: 'held', parts: [{ key: 'main', holderId: 'greg' }] });
     await flushPromises();
+    expect(has(w, 'picker')).toBe(false);
+    expect(has(w, 'deal-pile-banner')).toBe(true);
+  });
+});
 
-    const card = w.find('[data-testid="deal-pile-card-laundry"]');
-    expect(card.exists()).toBe(true);
-    expect(card.classes()).not.toContain('is-leaving');
-    expect(w.find('[data-testid="deal-pick-greg"]').text()).toBe('');
+describe('DealPile: keyboard shortcuts', () => {
+  it('K keeps, a digit picks that face', async () => {
+    const w = mountPile();
+    press('k');
+    await flushPromises();
+    expect(has(w, 'picker')).toBe(true);
+    press('2');
+    await flushPromises();
+    expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'sofia');
+  });
+
+  it('S skips an undecided card but does nothing on a held one', async () => {
+    store.resolved = [makeCard('laundry', 'held', 'sofia'), makeCard('dishes')];
+    const w = mountPile();
+    await click(w, 'deal-list-kept-laundry');
+    press('s');
+    await flushPromises();
+    expect(store.skip).not.toHaveBeenCalled();
+    press('ArrowRight');
+    await flushPromises();
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    press('S');
+    await flushPromises();
+    expect(store.skip).toHaveBeenCalledWith(['dishes']);
+  });
+
+  it('U taps the live Undo', async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-skip');
+    await flushPromises();
+    press('u');
+    await flushPromises();
+    expect(toast.invoke).toHaveBeenCalledWith(1);
+    expect(w.exists()).toBe(true);
   });
 });

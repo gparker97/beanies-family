@@ -18,4 +18,6 @@ export const STORAGE_KEYS = {
   /** Who Owns What (#109): the last-used view (overview / deal / deck). Device-local;
    *  not read by the `index.html` bootstrap. */
   WHO_OWNS_WHAT_VIEW: 'beanies:whoOwnsWhatView',
+  /** Who Owns What (#109): the Deal view at md+, card by card (`pile`) or the board. */
+  WHO_OWNS_WHAT_DEAL_MODE: 'beanies:whoOwnsWhatDealMode',
 } as const;
