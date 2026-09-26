@@ -90,6 +90,7 @@ const store = reactive({
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
 import { showToast } from '@/composables/useToast';
+import { confirm } from '@/composables/useConfirm';
 import CardEditDrawer from '../CardEditDrawer.vue';
 import CardSplitEditor from '../CardSplitEditor.vue';
 import CardViewDrawer from '../CardViewDrawer.vue';
@@ -302,6 +303,25 @@ describe('CardViewDrawer', () => {
       'whoOwnsWhat.error.cardGone',
     ]);
     expect(w.emitted('close')).toHaveLength(1);
+    w.unmount();
+    store.cards['custom-swim'] = saved;
+  });
+
+  it('a card deleted elsewhere while the delete confirm is up still says so and closes', async () => {
+    const saved = store.cards['custom-swim']!;
+    let answer!: (ok: boolean) => void;
+    vi.mocked(confirm).mockImplementationOnce(() => new Promise<boolean>((r) => (answer = r)));
+    const w = mountView(true, 'custom-swim');
+    await w.find('[data-testid="delete"]').trigger('click');
+    delete store.cards['custom-swim']; // another device, while the confirm is open
+    await flushPromises();
+    expect(vi.mocked(showToast).mock.calls.map((c) => c[1])).toEqual([
+      'whoOwnsWhat.error.cardGone',
+    ]);
+    expect(w.emitted('close')).toHaveLength(1);
+    answer(false);
+    await flushPromises();
+    expect(store.deleteCustom).not.toHaveBeenCalled();
     w.unmount();
     store.cards['custom-swim'] = saved;
   });
