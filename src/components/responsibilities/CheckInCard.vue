@@ -12,7 +12,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
-import { ymdOf, type CheckInAgenda } from '@/utils/responsibilityDeck';
+import { checkInYmd, ymdOf, type CheckInAgenda } from '@/utils/responsibilityDeck';
 import type { ResponsibilityCheckIn } from '@/types/models';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import DeckPanel from './DeckPanel.vue';
@@ -42,7 +42,9 @@ const lines = computed(() => {
   const out: string[] = [];
   out.push(
     props.lastCheckIn
-      ? fillTemplate(t('whoOwnsWhat.checkin.last'), { date: formatNookDate(props.lastCheckIn.id) })
+      ? fillTemplate(t('whoOwnsWhat.checkin.last'), {
+          date: formatNookDate(checkInYmd(props.lastCheckIn)),
+        })
       : t('whoOwnsWhat.checkin.none')
   );
   if (props.due) out.push(t('whoOwnsWhat.checkin.due'));

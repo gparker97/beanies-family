@@ -419,11 +419,17 @@ export function firstDealtAt(moves: readonly ResponsibilityMove[]): string | und
   return first;
 }
 
+/** The local day a check-in was finished. The ONE reader: ids are opaque. */
+export function checkInYmd(checkIn: ResponsibilityCheckIn): string {
+  return ymdOf(checkIn.completedAt);
+}
+
+/** The most recently finished check-in (by `completedAt`; several may share a day). */
 export function latestCheckIn(
   checkIns: readonly ResponsibilityCheckIn[]
 ): ResponsibilityCheckIn | undefined {
   let last: ResponsibilityCheckIn | undefined;
-  for (const c of checkIns) if (!last || c.id > last.id) last = c;
+  for (const c of checkIns) if (!last || c.completedAt > last.completedAt) last = c;
   return last;
 }
 
@@ -435,7 +441,7 @@ export function nextCheckInDate(
 ): string | null {
   if (!weeks) return null;
   const last = latestCheckIn(checkIns);
-  if (last) return addDaysYmd(last.id, weeks * 7);
+  if (last) return addDaysYmd(checkInYmd(last), weeks * 7);
   return dealtAt ? addDaysYmd(ymdOf(dealtAt), weeks * 7) : null;
 }
 

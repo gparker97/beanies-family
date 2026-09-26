@@ -390,16 +390,15 @@ describe('buildRestoreDefaults', () => {
 });
 
 describe('buildCheckIn', () => {
-  it('records a write-once check-in keyed by the local day', () => {
-    const r = buildCheckIn(
-      { stillWorks: 2, talkAbout: 1, redealt: 1, dealtNow: 3 },
-      'greg',
-      NOW,
-      '2026-09-26'
-    );
+  it('records a write-once check-in with its own id, dated by the local day', () => {
+    const outcomes = { stillWorks: 2, talkAbout: 1, redealt: 1, dealtNow: 3 };
+    const r = buildCheckIn(outcomes, 'greg', NOW, '2026-09-26');
     expect(r.ops).toEqual([{ op: 'setCheckIn', checkIn: r.checkIn }]);
-    expect(r.checkIn).toMatchObject({ id: '2026-09-26', completedAt: NOW, byId: 'greg' });
+    expect(r.checkIn).toMatchObject({ completedAt: NOW, byId: 'greg' });
+    expect(r.checkIn.id).toMatch(/^2026-09-26-[0-9a-f]{8}$/);
     expect(r.telemetry[0]!.context.count).toBe(7);
+    // A second check-in the same day is a second record, never an overwrite.
+    expect(buildCheckIn(outcomes, 'sofia', NOW, '2026-09-26').checkIn.id).not.toBe(r.checkIn.id);
   });
 });
 
