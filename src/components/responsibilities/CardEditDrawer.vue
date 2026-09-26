@@ -11,7 +11,8 @@
  * Built-in cards keep their name, emoji and category (shown, not editable); family-made
  * cards edit all three. The done line is an override on built-ins: blank restores the
  * default. Delete (family-made cards only) goes through the shared `useCardDeletion`;
- * built-ins show the disabled tile with its reason.
+ * built-ins show the disabled tile with its reason. A card that disappears while open says
+ * so and closes (shared with the view drawer via `useCardDrawerEnd`).
  *
  * Mounted unconditionally by the page (never `v-if`-gated) so `useFormModal` seeds it.
  */
@@ -36,7 +37,7 @@ import type { CardDraft } from '@/utils/responsibilityOps';
 import type { ListCategory } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import CardSplitEditor, { type SplitDraft } from './CardSplitEditor.vue';
-import { useCardDeletion } from './useCardDeletion';
+import { useCardDrawerEnd } from './useCardDeletion';
 
 const props = defineProps<{
   open: boolean;
@@ -50,7 +51,6 @@ const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
 const { cardName, cardEmoji } = useResponsibilityCardLabel();
-const { confirmAndDeleteCard } = useCardDeletion();
 
 /** The curated emoji for a family-made card. Labels are translation keys. */
 const EMOJI_CHOICES: { emoji: string; labelKey: UIStringKey }[] = [
@@ -122,6 +122,8 @@ const { isSubmitting } = useFormModal(
       skipped.value = false;
       openedHolderId.value = undefined;
     },
+    // Retargeted while open (Edit on another card, or New): refill for the new target.
+    entityKey: () => props.cardId,
   }
 );
 
@@ -207,9 +209,15 @@ async function handleSave(): Promise<void> {
   }
 }
 
-async function onDelete(): Promise<void> {
-  if (card.value && (await confirmAndDeleteCard(card.value))) emit('close');
-}
+// A card that vanishes while open (deleted elsewhere, or a delete refused because it is
+// already gone) closes the drawer through the page, so `editOpen` resets and the next Edit
+// seeds fresh rather than showing, and saving, this card's stale form.
+const { onDelete } = useCardDrawerEnd({
+  card,
+  isOpen: () => props.open,
+  close: () => emit('close'),
+  source: 'CardEditDrawer',
+});
 </script>
 
 <template>

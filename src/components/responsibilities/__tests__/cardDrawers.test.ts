@@ -8,8 +8,8 @@
  *  - Children see everything read-only: no Edit, no delete, no Add, no write menu items.
  */
 import { setActivePinia, createPinia } from 'pinia';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 import { getResponsibilityCard } from '@/constants/responsibilityCards';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
@@ -137,6 +137,10 @@ async function openEdit(cardId: string | null) {
   return w;
 }
 
+// Drawers now watch their card: a wrapper leaked from an earlier test would react to this
+// one's store edits.
+enableAutoUnmount(afterEach);
+
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
@@ -218,6 +222,47 @@ describe('CardEditDrawer', () => {
       expect.objectContaining({ name: 'Swim gear', category: 'home' })
     );
     expect(store.saveCard).not.toHaveBeenCalled();
+  });
+
+  it('a card that vanishes while open says so and emits close, so the page resets', async () => {
+    const saved = store.cards['custom-swim']!;
+    try {
+      const w = await openEdit('custom-swim');
+      delete store.cards['custom-swim']; // another device deleted it
+      await flushPromises();
+      expect(vi.mocked(showToast).mock.calls.map((c) => c[1])).toEqual([
+        'whoOwnsWhat.error.cardGone',
+      ]);
+      expect(w.emitted('close')).toHaveLength(1);
+    } finally {
+      store.cards['custom-swim'] = saved;
+    }
+  });
+
+  it('retargeted while open, the form refills for the new card (never saves the old draft)', async () => {
+    const w = await openEdit('custom-swim');
+    expect((w.find('[data-testid="card-edit-name-input"]').element as HTMLInputElement).value).toBe(
+      'Swim gear'
+    );
+    // Edit on another card while `open` stays true: no open transition to seed on.
+    await w.setProps({ cardId: 'laundry' });
+    await flushPromises();
+    expect(w.findComponent(SplitEditorStub).props('modelValue')).toEqual({
+      splitMode: 'single',
+      parts: [{ key: 'main', holderId: 'greg' }],
+    });
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard).toHaveBeenCalledTimes(1);
+    const [id, draft] = store.saveCard.mock.calls[0]!;
+    expect(id).toBe('laundry');
+    expect(draft.custom).toBeUndefined();
+    // And to New: the identity fields reset.
+    await w.setProps({ cardId: null });
+    await flushPromises();
+    expect((w.find('[data-testid="card-edit-name-input"]').element as HTMLInputElement).value).toBe(
+      ''
+    );
   });
 
   it('built-in: the delete tile is disabled with the reason; custom: a real delete', async () => {
