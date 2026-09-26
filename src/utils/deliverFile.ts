@@ -29,7 +29,14 @@ import { useTranslationStore } from '@/stores/translationStore';
 
 /** Which deliverable this is. A PII-free enum — carried as the `kind` context key. */
 export type FileKind =
-  'recovery-kit-pdf' | 'meal-plan-pdf' | 'meal-plan-png' | 'beanpod' | 'readable-json' | 'photo';
+  | 'recovery-kit-pdf'
+  | 'meal-plan-pdf'
+  | 'meal-plan-png'
+  | 'responsibility-deck-pdf'
+  | 'responsibility-deck-png'
+  | 'beanpod'
+  | 'readable-json'
+  | 'photo';
 
 const SURFACE = 'file-delivery';
 
