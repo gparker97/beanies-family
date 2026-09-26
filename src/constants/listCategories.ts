@@ -86,6 +86,17 @@ export function getListCategory(id: ListCategory): ListCategoryDef | undefined {
   return _byId.get(id);
 }
 
+/** The neutral slate a card or row falls back to when its category is unknown (a newer client). */
+export const CATEGORY_FALLBACK_TINT = '#94A3B8';
+
+/**
+ * A category's decorative tint (the `--cat` slab / dot / thumb colour), or a neutral slate for
+ * a category this build doesn't know. Who Owns What's card surfaces all read it from here.
+ */
+export function categoryTint(id: ListCategory): string {
+  return getListCategory(id)?.color ?? CATEGORY_FALLBACK_TINT;
+}
+
 /**
  * Is this a category this build knows? A list or card synced from a NEWER client can
  * carry a category added after this build shipped; every surface that groups by
