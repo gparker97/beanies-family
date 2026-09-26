@@ -31,14 +31,21 @@ withDefaults(
     dateRange: string;
     /** Wordmark tagline (t('app.tagline')). */
     tagline?: string;
+    /**
+     * Optional page marker under the date range, e.g. "page 2 of 3", for a sheet
+     * exported as several pages. Already t()-resolved.
+     */
+    pageLabel?: string;
+    /** A shorter header (smaller mark, tighter padding) for continuation pages. */
+    compact?: boolean;
   }>(),
-  { accent: '', tagline: '' }
+  { accent: '', tagline: '', pageLabel: '', compact: false }
 );
 </script>
 
 <template>
   <div class="export-sheet">
-    <header class="export-header">
+    <header class="export-header" :class="{ 'export-header-compact': compact }">
       <img
         class="export-mark"
         src="/brand/beanies_family_hugging_transparent_192x192.png"
@@ -50,6 +57,7 @@ withDefaults(
       <span class="export-dates">
         <span class="export-dates-label">{{ dateLabel }}</span>
         <span class="export-dates-range">{{ dateRange }}</span>
+        <span v-if="pageLabel" class="export-page-label">{{ pageLabel }}</span>
       </span>
     </header>
 
@@ -98,6 +106,10 @@ withDefaults(
   padding: 22px 30px;
 }
 
+.export-header-compact {
+  padding: 12px 30px;
+}
+
 .export-mark {
   flex-shrink: 0;
   height: 54px;
@@ -119,6 +131,11 @@ withDefaults(
   font-family: Caveat, cursive;
   font-size: 22px;
   font-weight: 700;
+}
+
+.export-header-compact .export-mark {
+  height: 36px;
+  width: 36px;
 }
 
 .export-spacer {
@@ -147,6 +164,14 @@ withDefaults(
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.01em;
+}
+
+.export-page-label {
+  color: rgb(44 62 80 / 55%);
+  font-family: Outfit, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 2px;
 }
 
 .export-body {

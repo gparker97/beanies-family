@@ -5,8 +5,7 @@
  * the single MealEditModal + MealPickerSheet, copy-week (overwrite-warned), and
  * day/week share. All CRDT work goes through mealPlanStore (MVO).
  */
-import { ref, computed, nextTick, onMounted } from 'vue';
-import { resolveMemberColor } from '@/constants/memberColors';
+import { ref, computed } from 'vue';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import RecipeRail from '@/components/mealplan/RecipeRail.vue';
 import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
@@ -17,7 +16,6 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { useTranslation } from '@/composables/useTranslation';
@@ -27,38 +25,22 @@ import { showToast } from '@/composables/useToast';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import ExportSheet from '@/components/export/ExportSheet.vue';
 import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
-import MealExportLegend from '@/components/export/MealExportLegend.vue';
-import {
-  exportElementToPng,
-  pngBlobToPdf,
-  prewarmSheetExport,
-  ExportError,
-  type ExportStage,
-} from '@/composables/useSheetExport';
-import { deliverFile } from '@/utils/deliverFile';
+import ExportPeopleLegend from '@/components/export/ExportPeopleLegend.vue';
+import { useSheetExportRunner } from '@/composables/useSheetExportRunner';
+import { useExportMemberResolver } from '@/composables/useExportMemberResolver';
 import {
   buildMealExportRows,
   type MealResolvers,
   type MealExportRows,
 } from '@/utils/mealExportModel';
-import { record as recordPerf } from '@/utils/perfTiming';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
 import type { MealPlanEntry, MealSlot, LanguageCode } from '@/types/models';
 
-/** Every Outfit/Inter/Caveat face the export sheet renders — each forced into
- *  flight before capture so the fonts-ready gate actually covers them (no FOUT).
- *  Weights/styles must match what ExportSheet + MealPlanExportBody + the legend
- *  actually use. */
-const EXPORT_FONTS = [
+/** The meal body's faces beyond the shared shell's `SHEET_EXPORT_FONTS`. */
+const MEAL_EXPORT_FONTS = [
   '500 15px Outfit', // .day-num
-  '600 15px Outfit', // labels, meta
-  '700 16px Outfit', // headings, names, chips
-  '800 24px Outfit', // heading, date range
-  'italic 400 14px Outfit', // .export-tagline
   'italic 600 14px Outfit', // .dish.type name
-  '400 14px Inter', // body
-  '700 22px Caveat', // header accent
 ];
 
 /** UI language → BCP-47 locale for the exported weekday headers. */
@@ -68,7 +50,7 @@ const { t } = useTranslation();
 const translationStore = useTranslationStore();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
-const familyStore = useFamilyStore();
+const { resolveMember } = useExportMemberResolver();
 
 /** Short weekday + day-of-month for the grid header, localized to the UI
  *  language so a shared picture isn't half-translated (day number is locale-
@@ -81,10 +63,6 @@ function dayHeading(dateISO: string): { weekday: string; dayNum: string } {
     dayNum: String(d.getDate()),
   };
 }
-
-// Warm the code-split export deps so a later Share tap doesn't lose its iOS
-// user-activation window awaiting the chunk fetch.
-onMounted(() => prewarmSheetExport());
 
 // ── Week navigation (desktop) + day navigation (mobile) ─────────────────────
 const referenceDate = ref(new Date());
@@ -225,123 +203,45 @@ const exportHint = computed(() => {
   if (rows.hasGuests) parts.push(t('mealPlanner.export.legendGuests'));
   return parts.join(' · ');
 });
-function cook(id?: string): { name: string; color?: string; initial?: string } | undefined {
-  const m = id ? familyStore.members.find((mm) => mm.id === id) : undefined;
-  if (!m) return undefined;
-  return {
-    name: m.name,
-    // `resolveMemberColor`, not the raw field: a member with no colour set was falling
-    // through to the export's own `|| '#2C3E50'`, so two colourless cooks rendered
-    // identical Deep Slate discs in every cell AND in the legend.
-    color: resolveMemberColor(m.color),
-    // Roster-wide collision map — the same source the on-screen card uses. The printed
-    // chip carries no name, so on a mono printer this letter is all that is left.
-    initial: familyStore.initialsById.get(m.id),
-  };
-}
-
 // Resolver object handed to `buildMealExportRows` so a meal is named/attributed
 // identically across the exported grid.
 const mealResolvers = computed<MealResolvers>(() => ({
   dayHeading,
   slotLabel: (s: MealSlot) => t(SLOT_LABEL_KEYS[s]),
   mealName: (m) => mealDisplayName(m, recipesStore.recipes, t),
-  cook,
+  cook: resolveMember,
 }));
 
 // ── Export the week as an image / PDF ────────────────────────────────────────
 // One layout source (the off-screen ExportSheet) → PNG (Share → OS share sheet)
 // or PDF (download on desktop/Android; share sheet on iOS, where <a download>
 // can't save). The sheet always renders the whole viewed WEEK.
-type ExportFormat = 'image' | 'pdf';
-
-const exportMounting = ref(false); // gates the declarative off-screen host
 const exportRows = ref<MealExportRows | null>(null);
-// Which format is currently exporting (null = idle). Drives a per-button busy
-// state so triggering one button doesn't flip the other to "Preparing…".
-const exportingFormat = ref<ExportFormat | null>(null);
-const exporting = computed(() => exportingFormat.value !== null);
 const sheetComp = ref<{ $el: HTMLElement } | null>(null);
 
-async function runExport(format: ExportFormat): Promise<void> {
-  if (exportingFormat.value) return;
-  exportingFormat.value = format;
-  // `stage` is declared before the try so the catch can read it. Everything
-  // else (incl. the start log) lives INSIDE the try so any throw still hits the
-  // finally that clears the busy flag.
-  let stage: ExportStage = 'render';
-  try {
-    const started = performance.now();
-    logEvent({
-      level: 'info',
-      surface: 'plan-export',
-      message: 'export started',
-      context: { action: 'export-start', format },
-    });
-
-    // 1. Build the row view-model + mount the sheet off-screen.
+const {
+  exportMounting,
+  exportingFormat,
+  exporting,
+  run: runExport,
+} = useSheetExportRunner({
+  surface: 'plan-export',
+  perfName: 'plan-export',
+  build: () => {
     exportRows.value = buildMealExportRows(
       mealPlanStore.mealsForWeek(weekDates.value),
       weekDates.value,
       mealResolvers.value
     );
-    exportMounting.value = true;
-    await nextTick();
-    const el = sheetComp.value?.$el;
-    if (!el) throw new ExportError('render', new Error('export sheet did not mount'));
-
-    // 2. Rasterize (fonts-ready gated inside the engine).
-    stage = 'rasterize';
-    const png = await exportElementToPng(el, { fonts: EXPORT_FONTS, backgroundColor: '#F8F9FA' });
-    recordPerf('plan-export', performance.now() - started);
-
-    // 3. Pick the delivered blob per format (PDF wraps the same PNG).
-    let blob = png;
-    let ext = 'png';
-    let mime = 'image/png';
-    if (format === 'pdf') {
-      stage = 'pdf';
-      blob = await pngBlobToPdf(png);
-      ext = 'pdf';
-      mime = 'application/pdf';
-    }
-
-    // 4. Deliver. The seam decides the mechanism per platform — the old
-    //    `format === 'pdf' && !isIosOrIpadOs()` branch sent Android PDFs to a
-    //    `<a download>` that does nothing in a WebView. `deliverFile` also owns
-    //    the toast, the report and the delivery telemetry (surface
-    //    `file-delivery`), so the three export-* logEvents that used to live
-    //    here are gone; `export-start` above is retained and is what the
-    //    absence-detection triage keys off.
-    stage = 'deliver';
-    const filename = `beanies-meal-plan-${weekDates.value[0]}.${ext}`;
-    // The return value is deliberately unused: `deliverFile` owns the toast,
-    // the report and the telemetry for every outcome, and there is nothing
-    // after this step to gate. (The `if (!result.delivered) return` that used
-    // to sit below was the try block's last statement, so it read as a gate
-    // while doing nothing.)
-    await deliverFile({
-      blob,
-      filename,
-      mimeType: mime,
-      title: t('mealPlanner.share.title'),
-      kind: format === 'pdf' ? 'meal-plan-pdf' : 'meal-plan-png',
-    });
-  } catch (err) {
-    const failStage = err instanceof ExportError ? err.stage : stage;
-    // ONE call: showToast('error') auto-invokes reportError with this
-    // surface/error/context, so a separate reportError would double-report.
-    showToast('error', t('mealPlanner.export.failed'), t('mealPlanner.export.failedHelp'), {
-      surface: 'plan-export',
-      error: err,
-      context: { format, stage: failStage },
-    });
-  } finally {
-    // Unmounting the host in `finally` means a thrown error can never leak it.
-    exportMounting.value = false;
-    exportingFormat.value = null;
-  }
-}
+  },
+  el: () => sheetComp.value?.$el,
+  filename: () => `beanies-meal-plan-${weekDates.value[0]}`,
+  kind: { image: 'meal-plan-png', pdf: 'meal-plan-pdf' },
+  shareTitle: () => t('mealPlanner.share.title'),
+  failedKey: 'mealPlanner.export.failed',
+  failedHelpKey: 'mealPlanner.export.failedHelp',
+  fonts: MEAL_EXPORT_FONTS,
+});
 </script>
 
 <template>
@@ -490,8 +390,8 @@ async function runExport(format: ExportFormat): Promise<void> {
     />
 
     <!-- Off-screen export sheet: rendered declaratively so it inherits Pinia /
-         i18n / theme; unmounted by flipping `exportMounting` in the handler's
-         `finally`, so a thrown error can never leak it. -->
+         i18n / theme; unmounted by useSheetExportRunner's `finally`, so a thrown
+         error can never leak it. -->
     <div v-if="exportMounting" class="export-host" aria-hidden="true">
       <ExportSheet
         ref="sheetComp"
@@ -503,10 +403,10 @@ async function runExport(format: ExportFormat): Promise<void> {
       >
         <MealPlanExportBody v-if="exportRows" :rows="exportRows" />
         <template #legend>
-          <MealExportLegend
+          <ExportPeopleLegend
             v-if="exportRows"
-            :cooks-label="t('mealPlanner.export.cooksLabel')"
-            :cooks="exportRows.cooks"
+            :label="t('mealPlanner.export.cooksLabel')"
+            :people="exportRows.cooks"
             :hint="exportHint"
           />
         </template>

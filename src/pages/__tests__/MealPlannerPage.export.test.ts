@@ -30,6 +30,7 @@ vi.mock('@/composables/useSheetExport', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/composables/useSheetExport')>()),
   exportElementToPng: vi.fn(),
   pngBlobToPdf: vi.fn(),
+  pngBlobsToPdf: vi.fn(),
   prewarmSheetExport: vi.fn(),
 }));
 vi.mock('@/stores/mealPlanStore', () => ({
@@ -52,6 +53,7 @@ const STUBS = {
 
 const exportElementToPng = vi.mocked(sheetExport.exportElementToPng);
 const pngBlobToPdf = vi.mocked(sheetExport.pngBlobToPdf);
+const pngBlobsToPdf = vi.mocked(sheetExport.pngBlobsToPdf);
 
 const mounted: VueWrapper[] = [];
 function factory() {
@@ -95,6 +97,7 @@ describe('MealPlannerPage export — failure contract', () => {
     vi.clearAllMocks();
     exportElementToPng.mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
     pngBlobToPdf.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
+    pngBlobsToPdf.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }));
     vi.mocked(deliverFile).mockResolvedValue({ delivered: true } as never);
   });
   afterEach(() => {
@@ -131,6 +134,7 @@ describe('MealPlannerPage export — failure contract', () => {
 
   it('pdf failure: one toast at stage pdf, busy flag cleared', async () => {
     pngBlobToPdf.mockRejectedValue(new sheetExport.ExportError('pdf', new Error('x')));
+    pngBlobsToPdf.mockRejectedValue(new sheetExport.ExportError('pdf', new Error('x')));
     const wrapper = factory();
     await button(wrapper, 'mealPlanner.export.exportPdf').trigger('click');
     await flushPromises();

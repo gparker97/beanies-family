@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import ExportSheet from '@/components/export/ExportSheet.vue';
 import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
-import MealExportLegend from '@/components/export/MealExportLegend.vue';
+import ExportPeopleLegend from '@/components/export/ExportPeopleLegend.vue';
 import type { MealExportRows } from '@/utils/mealExportModel';
 
 describe('ExportSheet', () => {
@@ -40,6 +40,23 @@ describe('ExportSheet', () => {
       props: { heading: 'x', dateLabel: 'week of', dateRange: 'y' },
     });
     expect(wrapper.find('.export-accent').exists()).toBe(false);
+    // Page marker + compact header are opt-in.
+    expect(wrapper.find('.export-page-label').exists()).toBe(false);
+    expect(wrapper.find('.export-header').classes()).not.toContain('export-header-compact');
+  });
+
+  it('renders a page label and a compact header when asked', () => {
+    const wrapper = mount(ExportSheet, {
+      props: {
+        heading: 'x',
+        dateLabel: 'd',
+        dateRange: 'y',
+        pageLabel: 'page 2 of 3',
+        compact: true,
+      },
+    });
+    expect(wrapper.find('.export-page-label').text()).toBe('page 2 of 3');
+    expect(wrapper.find('.export-header').classes()).toContain('export-header-compact');
   });
 });
 
@@ -113,29 +130,29 @@ describe('MealPlanExportBody', () => {
   });
 });
 
-describe('MealExportLegend', () => {
-  it('renders the cooks label, each cook chip, and the hint', () => {
-    const wrapper = mount(MealExportLegend, {
+describe('ExportPeopleLegend', () => {
+  it('renders the label, each person chip, and the hint', () => {
+    const wrapper = mount(ExportPeopleLegend, {
       props: {
-        cooksLabel: 'Cooks',
-        cooks: [
+        label: 'Cooks',
+        people: [
           { initial: 'A', name: 'Alice', color: '#F15D22' },
           { initial: 'B', name: 'ben' },
         ],
         hint: '⏰ serve time · 👥 guests',
       },
     });
-    expect(wrapper.find('.cooks-label').text()).toBe('Cooks');
+    expect(wrapper.find('.people-label').text()).toBe('Cooks');
     expect(wrapper.findAll('.chip')).toHaveLength(2);
     expect(wrapper.findAll('.dot').map((n) => n.text())).toEqual(['A', 'B']);
     expect(wrapper.find('.hint').text()).toBe('⏰ serve time · 👥 guests');
   });
 
-  it('hides the cooks group when there are none but still shows the hint', () => {
-    const wrapper = mount(MealExportLegend, {
-      props: { cooksLabel: 'Cooks', cooks: [], hint: 'H' },
+  it('hides the people group when there are none but still shows the hint', () => {
+    const wrapper = mount(ExportPeopleLegend, {
+      props: { label: 'Cooks', people: [], hint: 'H' },
     });
-    expect(wrapper.find('.cooks').exists()).toBe(false);
+    expect(wrapper.find('.people').exists()).toBe(false);
     expect(wrapper.find('.hint').text()).toBe('H');
   });
 });

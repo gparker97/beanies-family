@@ -261,30 +261,39 @@ export interface PdfExportOptions {
 }
 
 /**
- * Wrap a PNG blob in a single landscape-A4 PDF page, scaled-to-fit and centred,
- * so a full week never clips or spills onto a second page. Throws
- * `ExportError('pdf', …)` on any failure.
+ * Wrap PNG blobs in a landscape-A4 PDF, one page per blob, each scaled-to-fit and
+ * centred, so a page never clips or spills. A multi-page sheet renders each page
+ * element separately and passes them in order. Throws `ExportError('pdf', …)` on
+ * any failure, including an empty list.
  */
-export async function pngBlobToPdf(pngBlob: Blob, opts: PdfExportOptions = {}): Promise<Blob> {
+export async function pngBlobsToPdf(pngBlobs: Blob[], opts: PdfExportOptions = {}): Promise<Blob> {
   try {
+    if (pngBlobs.length === 0) throw new Error('no pages to export');
     const { jsPDF } = await loadJsPdf();
-    const dataUrl = await blobToDataUrl(pngBlob);
-    const { width: imgW, height: imgH } = await imageSize(dataUrl);
-
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const margin = opts.margin ?? 24;
 
-    const scale = Math.min((pageW - margin * 2) / imgW, (pageH - margin * 2) / imgH);
-    const w = imgW * scale;
-    const h = imgH * scale;
-    pdf.addImage(dataUrl, 'PNG', (pageW - w) / 2, (pageH - h) / 2, w, h);
+    for (const [i, pngBlob] of pngBlobs.entries()) {
+      const dataUrl = await blobToDataUrl(pngBlob);
+      const { width: imgW, height: imgH } = await imageSize(dataUrl);
+      if (i > 0) pdf.addPage('a4', 'landscape');
+      const scale = Math.min((pageW - margin * 2) / imgW, (pageH - margin * 2) / imgH);
+      const w = imgW * scale;
+      const h = imgH * scale;
+      pdf.addImage(dataUrl, 'PNG', (pageW - w) / 2, (pageH - h) / 2, w, h);
+    }
     return pdf.output('blob');
   } catch (err) {
     if (err instanceof ExportError) throw err;
     throw new ExportError('pdf', err);
   }
+}
+
+/** A single PNG on a single page — `pngBlobsToPdf` with one item. */
+export function pngBlobToPdf(pngBlob: Blob, opts: PdfExportOptions = {}): Promise<Blob> {
+  return pngBlobsToPdf([pngBlob], opts);
 }
 
 function imageSize(dataUrl: string): Promise<{ width: number; height: number }> {
@@ -298,5 +307,5 @@ function imageSize(dataUrl: string): Promise<{ width: number; height: number }> 
 
 /** Thin composable wrapper so Views can `const { exportElementToPng } = useSheetExport()`. */
 export function useSheetExport() {
-  return { exportElementToPng, pngBlobToPdf };
+  return { exportElementToPng, pngBlobToPdf, pngBlobsToPdf };
 }
