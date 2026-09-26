@@ -76,7 +76,7 @@ const reassuranceKey = computed(() => {
 });
 
 // ── Open / position (shared teleport + getBoundingClientRect + drop-up +
-// viewport-clamp idiom — see TodoSortMenu.vue:32 TODO(consolidation)). ──
+// viewport-clamp idiom — see useAnchoredPopover.ts TODO(consolidation)). ──
 function positionPopover() {
   if (!el.value) return;
   const rect = el.value.getBoundingClientRect();
