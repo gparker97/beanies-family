@@ -10,7 +10,8 @@
  * and Close. Children get Close only: the drawer is view-only for them.
  *
  * If the card disappears while open (deleted or restored on another device) the drawer
- * says so and closes, rather than rendering an empty shell.
+ * says so and closes, rather than rendering an empty shell. A delete from this drawer's
+ * own tile is not a surprise: it has its own success toast, so the notice is skipped.
  */
 import { computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -87,12 +88,21 @@ const uses = computed(() => {
   return lines;
 });
 
+/** True while THIS drawer is deleting its card, so the disappearance below is expected. */
+let deleting = false;
+
 async function onDelete(): Promise<void> {
-  if (card.value && (await confirmAndDeleteCard(card.value))) emit('close');
+  if (!card.value) return;
+  deleting = true;
+  try {
+    if (await confirmAndDeleteCard(card.value)) emit('close');
+  } finally {
+    deleting = false;
+  }
 }
 
 watch(card, (next, prev) => {
-  if (props.open && prev && !next) {
+  if (props.open && prev && !next && !deleting) {
     console.warn('[CardViewDrawer] card disappeared while the drawer was open:', prev.id);
     showToast('info', t('whoOwnsWhat.error.cardGone'), t('whoOwnsWhat.error.cardGoneHelp'));
     emit('close');

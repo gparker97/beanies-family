@@ -385,14 +385,19 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     });
   }
 
-  /** Surface a builder throw through the same one-toast-one-report path as a write failure. */
-  async function failBuild(action: string, e: unknown): Promise<null> {
-    await wrapAsync(
-      isLoading,
-      error,
-      () => Promise.reject(e instanceof Error ? e : new Error(String(e))),
-      { action: `responsibilityStore:${action}`, surface: SURFACE }
-    );
+  /**
+   * Surface a builder throw: ONE translated toast and ONE report. A builder's message is a
+   * developer string ("buildSaveCard: ..."), so it goes to the report (as the error, with
+   * its stack) and never into the toast a family reads.
+   */
+  function failBuild(action: string, e: unknown): null {
+    const err = e instanceof Error ? e : new Error(String(e));
+    error.value = err.message;
+    showToast('error', t('whoOwnsWhat.error.saveFailed'), undefined, {
+      error: err,
+      surface: SURFACE,
+      context: { action: `responsibilityStore:${action}` },
+    });
     return null;
   }
 

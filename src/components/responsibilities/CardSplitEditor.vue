@@ -4,7 +4,9 @@
  * section 6). Edits a local draft only; the edit drawer saves it once.
  *
  *  - One holder: a single `FamilyChipPicker`.
- *  - By child: one row per current child (a new child gets a row with nobody).
+ *  - By child: one row per current child (a new child gets a row with nobody). Offered only
+ *    while the family has a child; the drawer's validation still refuses a split with no
+ *    parts (the last child removed while the drawer is open).
  *  - By label: rows the family names itself ("upstairs", "the apartment"), add / rename /
  *    remove.
  *
@@ -21,6 +23,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { draftPartsForMode, newLabelPartKey } from '@/utils/responsibilityOps';
+import { childMembers } from '@/utils/responsibilityDeck';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { CardPart, CardSplitMode, FamilyMember } from '@/types/models';
 
@@ -50,9 +53,13 @@ const { t } = useTranslation();
 const { getMemberById, getMemberName } = useMemberInfo();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
+/** "By child" is offered only when there is a child to split for (else it has no parts). */
+const hasChildren = computed(() => childMembers(props.members).length > 0);
 const modeOptions = computed(() => [
   { value: 'single', label: t('whoOwnsWhat.edit.split.single'), variant: 'orange' as const },
-  { value: 'child', label: t('whoOwnsWhat.edit.split.child'), variant: 'orange' as const },
+  ...(hasChildren.value || props.modelValue.splitMode === 'child'
+    ? [{ value: 'child', label: t('whoOwnsWhat.edit.split.child'), variant: 'orange' as const }]
+    : []),
   { value: 'label', label: t('whoOwnsWhat.edit.split.label'), variant: 'orange' as const },
 ]);
 
