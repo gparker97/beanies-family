@@ -399,11 +399,13 @@ describe('check-in rhythm', () => {
     dealtNow: 0,
   });
   const started = [ci('2026-08-01', 'start')];
+  /** A deck with something kept in it, so the clock runs. */
+  const KEPT = resolve([state('laundry')]).cards;
 
   it('is never due when off or before the cycle has started', () => {
-    expect(nextCheckInDate(0, started)).toBeNull();
-    expect(isCheckInDue(0, [ci('2026-01-01')], '2026-12-01')).toBe(false);
-    expect(isCheckInDue(4, [], '2026-12-01')).toBe(false);
+    expect(nextCheckInDate(0, started, KEPT)).toBeNull();
+    expect(isCheckInDue(0, [ci('2026-01-01')], KEPT, '2026-12-01')).toBe(false);
+    expect(isCheckInDue(4, [], KEPT, '2026-12-01')).toBe(false);
   });
 
   it.each([
@@ -411,22 +413,22 @@ describe('check-in rhythm', () => {
     [4, '2026-08-29', '2026-08-28'],
     [8, '2026-09-26', '2026-09-25'],
   ])('the first check-in is due %i weeks after the cycle start', (weeks, due, dayBefore) => {
-    expect(nextCheckInDate(weeks, started)).toBe(due);
-    expect(isCheckInDue(weeks, started, dayBefore)).toBe(false);
-    expect(isCheckInDue(weeks, started, due)).toBe(true);
+    expect(nextCheckInDate(weeks, started, KEPT)).toBe(due);
+    expect(isCheckInDue(weeks, started, KEPT, dayBefore)).toBe(false);
+    expect(isCheckInDue(weeks, started, KEPT, due)).toBe(true);
   });
 
   it('later check-ins count from the latest record of either kind', () => {
     const checkIns = [...started, ci('2026-09-01'), ci('2026-09-10', 'checkin')];
-    expect(nextCheckInDate(2, checkIns)).toBe('2026-09-24');
-    expect(isCheckInDue(2, checkIns, '2026-09-23')).toBe(false);
-    expect(isCheckInDue(2, checkIns, '2026-09-24')).toBe(true);
+    expect(nextCheckInDate(2, checkIns, KEPT)).toBe('2026-09-24');
+    expect(isCheckInDue(2, checkIns, KEPT, '2026-09-23')).toBe(false);
+    expect(isCheckInDue(2, checkIns, KEPT, '2026-09-24')).toBe(true);
   });
 
   it('a new cycle start (after a restore) restarts the clock past an old check-in', () => {
     const checkIns = [ci('2026-05-01', 'start'), ci('2026-06-01'), ci('2026-09-20', 'start')];
-    expect(nextCheckInDate(4, checkIns)).toBe('2026-10-18');
-    expect(isCheckInDue(4, checkIns, '2026-09-26')).toBe(false);
+    expect(nextCheckInDate(4, checkIns, KEPT)).toBe('2026-10-18');
+    expect(isCheckInDue(4, checkIns, KEPT, '2026-09-26')).toBe(false);
     expect(checkInAnchor(checkIns)!.id).toBe('2026-09-20');
   });
 
@@ -436,10 +438,26 @@ describe('check-in rhythm', () => {
     expect(latestCheckIn(started)).toBeUndefined();
   });
 
+  it('is never due, and has no next date, when the deck has nothing kept in it', () => {
+    const due = '2026-08-29';
+    // Restore defaults / everything skipped / the first keep undone.
+    const empty = resolve([state('laundry', { status: 'skipped' })]).cards;
+    expect(nextCheckInDate(4, started, empty)).toBeNull();
+    expect(isCheckInDue(4, started, empty, due)).toBe(false);
+    expect(nextCheckInDate(4, started, [])).toBeNull();
+    // A family-made card nobody holds does not count either (`countsTowardCycle`).
+    const unheldCustom = resolve([
+      state('custom-swim', { custom: { name: 'Swim', emoji: '🏊', category: 'kids' } }),
+    ]).cards;
+    expect(unheldCustom.filter((c) => c.isCustom).map((c) => c.status)).toEqual(['waiting']);
+    expect(isCheckInDue(4, started, unheldCustom, due)).toBe(false);
+    expect(isCheckInDue(4, started, KEPT, due)).toBe(true);
+  });
+
   it('skips malformed records instead of throwing', () => {
     const bad = [null, { id: 'x' }, { id: 'y', completedAt: 7 }, 'nope', ...started];
-    expect(() => nextCheckInDate(4, bad)).not.toThrow();
-    expect(nextCheckInDate(4, bad)).toBe('2026-08-29');
+    expect(() => nextCheckInDate(4, bad, KEPT)).not.toThrow();
+    expect(nextCheckInDate(4, bad, KEPT)).toBe('2026-08-29');
     expect(latestCheckIn([{ id: 'x' }])).toBeUndefined();
     expect(recentMoves([], bad as ResponsibilityCheckIn[], [], '2026-08-02')).toEqual([]);
   });
@@ -654,6 +672,13 @@ describe('buildCardBriefingRows', () => {
       ).some((r) => r.kind === 'checkin');
     expect(snoozed(noon('2026-09-22'))).toBe(false); // 4 days ago
     expect(snoozed(noon('2026-09-19'))).toBe(true); // 7 days ago → back
+    // Nothing kept in the deck: no reminder, however overdue the clock is.
+    const skippedAll = resolve(baseStates.map((st) => ({ ...st, status: 'skipped' }))).cards;
+    expect(
+      buildCardBriefingRows(on({ rhythmWeeks: 4, cards: skippedAll })).some(
+        (r) => r.kind === 'checkin'
+      )
+    ).toBe(false);
     expect(
       buildCardBriefingRows(on({ rhythmWeeks: 4, today: '2026-08-28' })).some(
         (r) => r.kind === 'checkin'
