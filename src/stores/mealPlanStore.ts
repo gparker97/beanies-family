@@ -9,6 +9,7 @@ import { generateUUID } from '@/utils/id';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { trackFeature } from '@/services/analytics/plausible';
 import { SLOT_INDEX } from '@/constants/mealSlots';
 import type {
@@ -106,6 +107,29 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
     );
   }
 
+  /**
+   * Who Owns What (#109): a new recipe / other meal with no cook defaults to the single
+   * holder of the slot's card (`CARD_DEFAULTS.mealSlot`). Creation only: `copyWeek`
+   * keeps copied cooks and edits never re-default. Eat out / leftovers / skip have no
+   * cook, so they never get one. One-way dependency: this store may read
+   * `responsibilityStore`; that store never imports this one.
+   */
+  function applyCardDefaultCook(input: CreateMealPlanInput): CreateMealPlanInput {
+    if (input.cookMemberId || (input.kind !== 'recipe' && input.kind !== 'other')) return input;
+    const holder = useResponsibilityStore().defaultHolderFor({
+      kind: 'mealSlot',
+      slot: input.slot,
+    });
+    if (!holder) return input;
+    logEvent({
+      level: 'info',
+      surface: 'meal-planner',
+      message: 'card_default_applied',
+      context: { action: 'card_default_applied', slot: input.slot },
+    });
+    return { ...input, cookMemberId: holder.memberId };
+  }
+
   async function createMeal(
     input: CreateMealPlanInput,
     opts?: { quickAdd?: boolean }
@@ -123,13 +147,14 @@ export const useMealPlanStore = defineStore('mealPlans', () => {
       });
       return null;
     }
+    const withCook = applyCardDefaultCook(input);
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
         const entry = await mealRepo.createMealPlan({
-          ...input,
-          position: nextPosition(input.date, input.slot),
+          ...withCook,
+          position: nextPosition(withCook.date, withCook.slot),
         });
         meals.value = [...meals.value, entry];
         logEvent({
