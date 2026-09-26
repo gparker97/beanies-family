@@ -592,7 +592,7 @@ export function withCycleStart(
 export function buildUndo(
   token: UndoToken,
   live: ReadonlyMap<string, { updatedAt: string }>,
-  deck: readonly ResolvedCard[] = []
+  deck: readonly ResolvedCard[]
 ): (BuildResult & { stale: false }) | { stale: true } {
   for (const [id, after] of Object.entries(token.afterUpdatedAt)) {
     if (live.get(id)?.updatedAt !== after) return { stale: true };

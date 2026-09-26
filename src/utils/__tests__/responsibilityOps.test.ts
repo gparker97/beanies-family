@@ -414,14 +414,14 @@ describe('buildUndo', () => {
       ['laundry', { updatedAt: NOW }],
       ['dishes', { updatedAt: NOW }],
     ]);
-    const u1 = buildUndo(deal.undo!, live);
+    const u1 = buildUndo(deal.undo!, live, cards);
     expect(u1).toMatchObject({ stale: false });
     if (u1.stale) throw new Error('unexpected');
     expect(u1.ops).toEqual([
       { op: 'setState', state: prior },
       { op: 'deleteMove', id: deal.undo!.createdMoveIds[0] },
     ]);
-    const u2 = buildUndo(firstDeal.undo!, live);
+    const u2 = buildUndo(firstDeal.undo!, live, cards);
     if (u2.stale) throw new Error('unexpected');
     expect(u2.ops[0]).toEqual({ op: 'deleteState', id: 'dishes' });
     expect(u2.telemetry[0]!.context.detail).toBe('deal');
@@ -434,9 +434,9 @@ describe('buildUndo', () => {
       ['laundry', { updatedAt: NOW }],
       ['dishes', { updatedAt: '2026-09-26T10:00:05.000Z' }],
     ]);
-    expect(buildUndo(skip.undo!, live)).toEqual({ stale: true });
+    expect(buildUndo(skip.undo!, live, cards)).toEqual({ stale: true });
     // A card deleted on another device is stale too.
-    expect(buildUndo(skip.undo!, new Map([['laundry', { updatedAt: NOW }]]))).toEqual({
+    expect(buildUndo(skip.undo!, new Map([['laundry', { updatedAt: NOW }]]), cards)).toEqual({
       stale: true,
     });
   });
