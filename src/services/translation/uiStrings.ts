@@ -1244,6 +1244,11 @@ const STRING_DEFS = {
   'common.remove': { en: 'Remove', beanie: 'remove' },
   'nav.mealPlanner': { en: 'Meal Planner', beanie: 'meal planner' },
   'mobileNav.hint.mealPlanner': { en: "Plan the week's meals", beanie: "what's cooking this week" },
+  'nav.whoOwnsWhat': { en: 'Who Owns What', beanie: 'who owns what' },
+  'mobileNav.hint.whoOwnsWhat': {
+    en: 'Who looks after which job',
+    beanie: 'who looks after which job',
+  },
   'mealPlanner.title': { en: 'Meal Planner', beanie: 'meal planner' },
   'mealPlanner.welcome': {
     en: "what's cooking this week? 🌱",
@@ -12586,6 +12591,369 @@ const STRING_DEFS = {
     en: 'Your cards were not reset. Please try again.',
     beanie: 'your cards were not reset. please try again.',
   },
+
+  // Who Owns What (#109): the page, overview, deck and card drawers.
+  'whoOwnsWhat.welcomeSubtitle': {
+    en: "Who's holding what this week? 🙋",
+    beanie: "who's holding what this week? 🙋",
+  },
+  'whoOwnsWhat.addCard': { en: 'Add a Card', beanie: 'add a card' },
+  'whoOwnsWhat.view.overview': { en: 'Overview', beanie: 'overview' },
+  'whoOwnsWhat.view.deal': { en: 'Deal', beanie: 'deal' },
+  'whoOwnsWhat.view.deck': { en: 'Deck', beanie: 'deck' },
+  'whoOwnsWhat.menu.share': { en: 'Share the Deck', beanie: 'share the deck' },
+  'whoOwnsWhat.menu.export': { en: 'Export as PDF', beanie: 'export as pdf' },
+  'whoOwnsWhat.menu.rhythm': { en: 'Check-in Rhythm', beanie: 'check-in rhythm' },
+  'whoOwnsWhat.menu.skipped': { en: 'See Skipped Cards', beanie: 'see skipped cards' },
+  'whoOwnsWhat.menu.restore': { en: 'Restore Default Cards', beanie: 'restore default cards' },
+  'whoOwnsWhat.rhythm.title': {
+    en: 'How often should the family check in?',
+    beanie: 'how often should the family check in?',
+  },
+  'whoOwnsWhat.rhythm.message': {
+    en: "A check-in is ten minutes together to look at the deck and swap anything that isn't working. beanies reminds the grown-ups in the daily briefing when one is due.",
+    beanie:
+      "a check-in is ten minutes together to look at the deck and swap anything that isn't working. beanies reminds the grown-ups in the daily briefing when one is due.",
+  },
+  'whoOwnsWhat.rhythm.every2': { en: 'Every 2 Weeks', beanie: 'every 2 weeks' },
+  'whoOwnsWhat.rhythm.every4': { en: 'Every 4 Weeks', beanie: 'every 4 weeks' },
+  'whoOwnsWhat.rhythm.every8': { en: 'Every 8 Weeks', beanie: 'every 8 weeks' },
+  'whoOwnsWhat.rhythm.off': { en: 'Off', beanie: 'off' },
+  'whoOwnsWhat.rhythm.saved': { en: 'Check-in rhythm saved', beanie: 'check-in rhythm saved' },
+  'whoOwnsWhat.deepLink.missing': {
+    en: "That card isn't in your deck anymore",
+    beanie: "that card isn't in your deck anymore",
+  },
+  'whoOwnsWhat.deepLink.missingHelp': {
+    en: 'It may have been deleted, or the deck was restored on another device.',
+    beanie: 'it may have been deleted, or the deck was restored on another device.',
+  },
+
+  'whoOwnsWhat.overview.dealt': { en: 'Cards Dealt', beanie: 'cards dealt' },
+  'whoOwnsWhat.overview.ringLabel': {
+    en: '{held} of {deck} cards dealt',
+    beanie: '{held} of {deck} cards dealt',
+  },
+  'whoOwnsWhat.overview.allHeld': {
+    en: 'Every card in your deck has a holder.',
+    beanie: 'every card in your deck has a holder.',
+  },
+  'whoOwnsWhat.overview.waiting.one': {
+    en: 'Nearly there. 1 card is waiting for someone to pick it up.',
+    beanie: 'nearly there. 1 card is waiting for someone to pick it up.',
+  },
+  'whoOwnsWhat.overview.waiting.other': {
+    en: 'Nearly there. {count} cards are waiting for someone to pick them up.',
+    beanie: 'nearly there. {count} cards are waiting for someone to pick them up.',
+  },
+  'whoOwnsWhat.overview.empty': {
+    en: 'Your deck is empty. Bring back a skipped card or add one of your own.',
+    beanie: 'your deck is empty. bring back a skipped card or add one of your own.',
+  },
+  'whoOwnsWhat.overview.legend.held': { en: 'dealt and held', beanie: 'dealt and held' },
+  'whoOwnsWhat.overview.legend.waiting': {
+    en: 'waiting for a holder',
+    beanie: 'waiting for a holder',
+  },
+  'whoOwnsWhat.overview.legend.skipped': {
+    en: 'skipped, not for this family',
+    beanie: 'skipped, not for this family',
+  },
+  'whoOwnsWhat.overview.legend.total': {
+    en: '{deck} in your deck, out of {total} in the full set',
+    beanie: '{deck} in your deck, out of {total} in the full set',
+  },
+  'whoOwnsWhat.overview.dealLast.one': { en: 'Deal the Last Card', beanie: 'deal the last card' },
+  'whoOwnsWhat.overview.dealLast.other': {
+    en: 'Deal the Last {count}',
+    beanie: 'deal the last {count}',
+  },
+  'whoOwnsWhat.overview.seeSkipped': { en: 'See the Skipped Pile', beanie: 'see the skipped pile' },
+  'whoOwnsWhat.overview.byCategory': { en: 'By Category', beanie: 'by category' },
+  'whoOwnsWhat.overview.byCategoryHint': {
+    en: "Who's in, and what's still open",
+    beanie: "who's in, and what's still open",
+  },
+  'whoOwnsWhat.overview.allDealt': { en: 'All {count} dealt', beanie: 'all {count} dealt' },
+  'whoOwnsWhat.overview.catWaiting': { en: '{count} waiting', beanie: '{count} waiting' },
+  'whoOwnsWhat.overview.waitingTitle': {
+    en: 'Waiting for a Holder',
+    beanie: 'waiting for a holder',
+  },
+  'whoOwnsWhat.overview.openDeal': { en: 'Open the Deal View', beanie: 'open the deal view' },
+  'whoOwnsWhat.overview.deal': { en: 'Deal', beanie: 'deal' },
+  'whoOwnsWhat.overview.waitingMore': { en: '{count} more', beanie: '{count} more' },
+  'whoOwnsWhat.overview.recentTitle': { en: 'Recent Moves', beanie: 'recent moves' },
+  'whoOwnsWhat.overview.recentHint': { en: 'The last month', beanie: 'the last month' },
+  'whoOwnsWhat.overview.recentEmpty': {
+    en: 'Nothing has moved in the last month.',
+    beanie: 'nothing has moved in the last month.',
+  },
+  'whoOwnsWhat.recent.redeal': {
+    en: '{card} went from {from} to {to}',
+    beanie: '{card} went from {from} to {to}',
+  },
+  'whoOwnsWhat.recent.custom': {
+    en: 'A card of your own was added: {card}',
+    beanie: 'a card of your own was added: {card}',
+  },
+  'whoOwnsWhat.recent.split': { en: '{card} was split', beanie: '{card} was split' },
+  'whoOwnsWhat.recent.skip': { en: '{card} was skipped', beanie: '{card} was skipped' },
+  'whoOwnsWhat.recent.checkin': { en: 'Family check-in', beanie: 'family check-in' },
+  'whoOwnsWhat.recent.checkinRedealt': {
+    en: 'Family check-in, {count} re-dealt',
+    beanie: 'family check-in, {count} re-dealt',
+  },
+  'whoOwnsWhat.facts.meOk': {
+    en: 'Every grown-up holds a just-for-me card',
+    beanie: 'every grown-up holds a just-for-me card',
+  },
+  'whoOwnsWhat.facts.meOkHint': {
+    en: 'Time that is only yours counts as a job too',
+    beanie: 'time that is only yours counts as a job too',
+  },
+  'whoOwnsWhat.facts.meNudge': {
+    en: 'Not every grown-up has a just-for-me card yet',
+    beanie: 'not every grown-up has a just-for-me card yet',
+  },
+  'whoOwnsWhat.facts.meNudgeHint': {
+    en: 'Deal each grown-up a card from Just for Me. Time that is only yours counts too.',
+    beanie: 'deal each grown-up a card from just for me. time that is only yours counts too.',
+  },
+  'whoOwnsWhat.facts.split.one': { en: '1 card is split', beanie: '1 card is split' },
+  'whoOwnsWhat.facts.split.other': {
+    en: '{count} cards are split',
+    beanie: '{count} cards are split',
+  },
+  'whoOwnsWhat.facts.splitHint': {
+    en: 'By child or by label, each part with its own holder',
+    beanie: 'by child or by label, each part with its own holder',
+  },
+  'whoOwnsWhat.facts.kids': {
+    en: 'The kids are in the game',
+    beanie: 'little beans are in the game',
+  },
+  'whoOwnsWhat.facts.kidsHint': {
+    en: 'They hold cards of their own',
+    beanie: 'they hold cards of their own',
+  },
+
+  'whoOwnsWhat.checkin.title': { en: 'Family Check-in', beanie: 'family check-in' },
+  'whoOwnsWhat.checkin.every': { en: 'Every {weeks} weeks', beanie: 'every {weeks} weeks' },
+  'whoOwnsWhat.checkin.off': { en: 'Check-ins are off.', beanie: 'check-ins are off.' },
+  'whoOwnsWhat.checkin.setRhythm': { en: 'Set a Rhythm', beanie: 'set a rhythm' },
+  'whoOwnsWhat.checkin.last': {
+    en: 'The last one was {date}.',
+    beanie: 'the last one was {date}.',
+  },
+  'whoOwnsWhat.checkin.none': { en: 'No check-in yet.', beanie: 'no check-in yet.' },
+  'whoOwnsWhat.checkin.next': {
+    en: 'The next one is due {date}.',
+    beanie: 'the next one is due {date}.',
+  },
+  'whoOwnsWhat.checkin.notYet': {
+    en: 'Deal the deck first, then beanies suggests a check-in.',
+    beanie: 'deal the deck first, then beanies suggests a check-in.',
+  },
+  'whoOwnsWhat.checkin.due': {
+    en: "It's time. Ten minutes together to look at the deck and swap anything that isn't working.",
+    beanie:
+      "it's time. ten minutes together to look at the deck and swap anything that isn't working.",
+  },
+  'whoOwnsWhat.checkin.agenda': { en: 'On the Agenda', beanie: 'on the agenda' },
+  'whoOwnsWhat.checkin.agendaNobody.one': {
+    en: '1 card with nobody',
+    beanie: '1 card with nobody',
+  },
+  'whoOwnsWhat.checkin.agendaNobody.other': {
+    en: '{count} cards with nobody',
+    beanie: '{count} cards with nobody',
+  },
+  'whoOwnsWhat.checkin.agendaMoved': { en: '{card}, moved {date}', beanie: '{card}, moved {date}' },
+  'whoOwnsWhat.checkin.agendaUnchanged': {
+    en: '{card}, unchanged since {date}',
+    beanie: '{card}, unchanged since {date}',
+  },
+  'whoOwnsWhat.checkin.start': { en: 'Start a Check-in', beanie: 'start a check-in' },
+  'whoOwnsWhat.checkin.later': { en: 'Remind Me Later', beanie: 'remind me later' },
+  'whoOwnsWhat.checkin.snoozed': {
+    en: "We'll remind you again in a week",
+    beanie: "we'll remind you again in a week",
+  },
+
+  'whoOwnsWhat.first.title': { en: "Let's deal the deck ✨", beanie: "let's deal the deck ✨" },
+  'whoOwnsWhat.first.body': {
+    en: '{count} cards cover most of what keeps a home running: dinner, school forms, the trash, the big holidays. Pick the ones that are yours, then hand them out. Nobody gets stuck with everything.',
+    beanie:
+      '{count} cards cover most of what keeps a home running: dinner, school forms, the trash, the big holidays. pick the ones that are yours, then hand them out. nobody gets stuck with everything.',
+  },
+  'whoOwnsWhat.first.step1': { en: 'Keep or skip each card', beanie: 'keep or skip each card' },
+  'whoOwnsWhat.first.step1Hint': {
+    en: "Skip the ones that aren't your family. Add your own.",
+    beanie: "skip the ones that aren't your family. add your own.",
+  },
+  'whoOwnsWhat.first.step2': { en: 'Say who owns it', beanie: 'say who owns it' },
+  'whoOwnsWhat.first.step2Hint': {
+    en: "Keep a card and tap a name. Split the kids' cards by child.",
+    beanie: "keep a card and tap a bean. split the kids' cards by child.",
+  },
+  'whoOwnsWhat.first.step3': { en: 'Let beanies do the rest', beanie: 'let beanies do the rest' },
+  'whoOwnsWhat.first.step3Hint': {
+    en: 'Cooks, list owners and gift hints fill themselves in.',
+    beanie: 'cooks, list owners and gift hints fill themselves in.',
+  },
+  'whoOwnsWhat.first.start': { en: 'Start Dealing', beanie: 'start dealing' },
+  'whoOwnsWhat.first.browse': { en: 'Browse the Deck First', beanie: 'browse the deck first' },
+  'whoOwnsWhat.first.anyTime': {
+    en: 'You can re-deal any card, any time',
+    beanie: 'you can re-deal any card, any time',
+  },
+  'whoOwnsWhat.first.help': { en: 'How the Deck Works', beanie: 'how the deck works' },
+  'whoOwnsWhat.first.childNote': {
+    en: 'A grown-up deals the deck. You can browse the cards in the meantime.',
+    beanie: 'a grown-up deals the deck. you can browse the cards in the meantime.',
+  },
+  'whoOwnsWhat.first.imageAlt': {
+    en: 'The beanies family hugging',
+    beanie: 'the beanies family hugging',
+  },
+
+  'whoOwnsWhat.deck.nobody': { en: 'Nobody Yet', beanie: 'nobody yet' },
+  'whoOwnsWhat.deck.skippedPill': { en: 'Skipped · {count}', beanie: 'skipped · {count}' },
+  'whoOwnsWhat.deck.byBean': { en: 'By Person', beanie: 'by bean' },
+  'whoOwnsWhat.deck.skippedBanner.one': { en: '1 card skipped.', beanie: '1 card skipped.' },
+  'whoOwnsWhat.deck.skippedBanner.other': {
+    en: '{count} cards skipped.',
+    beanie: '{count} cards skipped.',
+  },
+  'whoOwnsWhat.deck.skippedBannerBody': {
+    en: 'They stay out of your deck and your numbers. Bring any back whenever it starts to apply.',
+    beanie:
+      'they stay out of your deck and your numbers. bring any back whenever it starts to apply.',
+  },
+  'whoOwnsWhat.deck.bringBack': { en: 'Bring Back', beanie: 'bring back' },
+  'whoOwnsWhat.deck.emptyFilter': {
+    en: 'No cards here right now.',
+    beanie: 'no cards here right now.',
+  },
+  'whoOwnsWhat.deck.noSkipped': {
+    en: 'Nothing skipped. Every card is in your deck.',
+    beanie: 'nothing skipped. every card is in your deck.',
+  },
+  'whoOwnsWhat.card.unsorted': { en: 'Not Sorted Yet', beanie: 'not sorted yet' },
+  'whoOwnsWhat.card.forChild': { en: 'for {name}', beanie: 'for {name}' },
+  'whoOwnsWhat.card.since': { en: 'Since {date}', beanie: 'since {date}' },
+  'whoOwnsWhat.card.sinceBefore': {
+    en: 'Since {date}, before that {name}',
+    beanie: 'since {date}, before that {name}',
+  },
+  'whoOwnsWhat.card.splitChild': { en: 'Split by child', beanie: 'split by child' },
+  'whoOwnsWhat.card.splitLabel': { en: 'Split by label', beanie: 'split by label' },
+  'whoOwnsWhat.card.skipped': { en: 'Skipped for Now', beanie: 'skipped for now' },
+  'whoOwnsWhat.card.open': { en: 'Open {card}', beanie: 'open {card}' },
+  'whoOwnsWhat.byBean.count.one': { en: '1 card', beanie: '1 card' },
+  'whoOwnsWhat.byBean.count.other': { en: '{count} cards', beanie: '{count} cards' },
+  'whoOwnsWhat.byBean.none': { en: 'No cards yet', beanie: 'no cards yet' },
+
+  'whoOwnsWhat.details.title': { en: 'Card Details', beanie: 'card details' },
+  'whoOwnsWhat.details.heldBy': { en: 'Held By', beanie: 'held by' },
+  'whoOwnsWhat.details.beforeThat': { en: 'Before That', beanie: 'before that' },
+  'whoOwnsWhat.details.parts': { en: 'Who Holds Each Part', beanie: 'who holds each part' },
+  'whoOwnsWhat.details.status': { en: 'Status', beanie: 'status' },
+  'whoOwnsWhat.details.done': {
+    en: 'Done Looks Like, at a Minimum',
+    beanie: 'done looks like, at a minimum',
+  },
+  'whoOwnsWhat.details.usesFor': {
+    en: 'beanies Uses This Card For',
+    beanie: 'beanies uses this card for',
+  },
+  'whoOwnsWhat.details.useMeal': {
+    en: "New {slot} meals in the meal planner start with this card's holder as the cook. You can change it on any meal.",
+    beanie:
+      "new {slot} meals in the meal planner start with this card's holder as the cook. you can change it on any meal.",
+  },
+  'whoOwnsWhat.details.useList': {
+    en: "New lists from the {list} template start with this card's holder as the owner.",
+    beanie: "new lists from the {list} template start with this card's holder as the owner.",
+  },
+  'whoOwnsWhat.details.useHint': {
+    en: "Helpful hints about this go to this card's holder on the to-do list.",
+    beanie: "helpful hints about this go to this card's holder on the to-do list.",
+  },
+  'whoOwnsWhat.details.builtInDelete': {
+    en: "This is a built-in card, so it can't be deleted. You can always skip it to keep it out of your pile.",
+    beanie:
+      "this is a built-in card, so it can't be deleted. you can always skip it to keep it out of your pile.",
+  },
+
+  'whoOwnsWhat.edit.title': { en: 'Edit Card', beanie: 'edit card' },
+  'whoOwnsWhat.edit.newTitle': { en: 'New Card', beanie: 'new card' },
+  'whoOwnsWhat.edit.name': { en: "What's the Job?", beanie: "what's the job?" },
+  'whoOwnsWhat.edit.namePlaceholder': { en: 'Swim gear', beanie: 'swim gear' },
+  'whoOwnsWhat.edit.nameNoun': { en: 'Card Name', beanie: 'card name' },
+  'whoOwnsWhat.edit.partNames': { en: 'Part Names', beanie: 'part names' },
+  'whoOwnsWhat.edit.emoji': { en: 'Pick an Emoji', beanie: 'pick an emoji' },
+  'whoOwnsWhat.edit.category': { en: 'Category', beanie: 'category' },
+  'whoOwnsWhat.edit.holder': { en: 'Who Holds This Card?', beanie: 'who holds this card?' },
+  'whoOwnsWhat.edit.split': { en: 'Split It?', beanie: 'split it?' },
+  'whoOwnsWhat.edit.split.single': { en: 'One Holder', beanie: 'one holder' },
+  'whoOwnsWhat.edit.split.child': { en: 'By Child', beanie: 'by child' },
+  'whoOwnsWhat.edit.split.label': { en: 'By Label', beanie: 'by label' },
+  'whoOwnsWhat.edit.parts': { en: 'Who Holds Each Part?', beanie: 'who holds each part?' },
+  'whoOwnsWhat.edit.childNote': {
+    en: 'A new child gets their own row, with nobody yet.',
+    beanie: 'a new little bean gets their own row, with nobody yet.',
+  },
+  'whoOwnsWhat.edit.noChildren': {
+    en: 'Add a child to your family to split this card by child.',
+    beanie: 'add a little bean to your family to split this card by child.',
+  },
+  'whoOwnsWhat.edit.addPart': { en: 'Add a Part', beanie: 'add a part' },
+  'whoOwnsWhat.edit.partName': { en: 'Part Name', beanie: 'part name' },
+  'whoOwnsWhat.edit.partPlaceholder': {
+    en: 'Upstairs, the apartment...',
+    beanie: 'upstairs, the apartment...',
+  },
+  'whoOwnsWhat.edit.removePart': { en: 'Remove This Part', beanie: 'remove this part' },
+  'whoOwnsWhat.edit.done': {
+    en: 'What Done Looks Like (at a Minimum)',
+    beanie: 'what done looks like (at a minimum)',
+  },
+  'whoOwnsWhat.edit.donePlaceholder': {
+    en: 'Dry towel and goggles in the bag by Friday',
+    beanie: 'dry towel and goggles in the bag by friday',
+  },
+  'whoOwnsWhat.edit.doneDefaultHint': {
+    en: 'Leave it blank to use the default.',
+    beanie: 'leave it blank to use the default.',
+  },
+  'whoOwnsWhat.edit.skip': { en: 'Skip This Card for Now', beanie: 'skip this card for now' },
+  'whoOwnsWhat.edit.skipHint': {
+    en: 'Skipped cards stay out of your deck until you bring them back.',
+    beanie: 'skipped cards stay out of your deck until you bring them back.',
+  },
+  'whoOwnsWhat.edit.create': { en: 'Add to Our Deck', beanie: 'add to our deck' },
+  'whoOwnsWhat.edit.redealNote': {
+    en: '{name} holds this card now and will see the change in their daily briefing.',
+    beanie: '{name} holds this card now and will see the change in their daily briefing.',
+  },
+  'whoOwnsWhat.emoji.cleaning': { en: 'Cleaning', beanie: 'cleaning' },
+  'whoOwnsWhat.emoji.cooking': { en: 'Cooking', beanie: 'cooking' },
+  'whoOwnsWhat.emoji.laundry': { en: 'Laundry', beanie: 'laundry' },
+  'whoOwnsWhat.emoji.shopping': { en: 'Shopping', beanie: 'shopping' },
+  'whoOwnsWhat.emoji.driving': { en: 'Driving', beanie: 'driving' },
+  'whoOwnsWhat.emoji.kids': { en: 'Kids', beanie: 'kids' },
+  'whoOwnsWhat.emoji.pets': { en: 'Pets', beanie: 'pets' },
+  'whoOwnsWhat.emoji.garden': { en: 'Garden', beanie: 'garden' },
+  'whoOwnsWhat.emoji.fixing': { en: 'Fixing', beanie: 'fixing' },
+  'whoOwnsWhat.emoji.paperwork': { en: 'Paperwork', beanie: 'paperwork' },
+  'whoOwnsWhat.emoji.party': { en: 'Party', beanie: 'party' },
+  'whoOwnsWhat.emoji.sports': { en: 'Sports', beanie: 'sports' },
+  'whoOwnsWhat.emoji.health': { en: 'Health', beanie: 'health' },
+  'whoOwnsWhat.emoji.travel': { en: 'Travel', beanie: 'travel' },
+  'whoOwnsWhat.emoji.people': { en: 'People', beanie: 'people' },
+  'whoOwnsWhat.emoji.me': { en: 'Just for Me', beanie: 'just for me' },
 
   // Who Owns What: card deck (#109). Names are Title Case in `en`; done lines have no
   // trailing period. American English. Ids in `responsibilityCards.ts` never change.
