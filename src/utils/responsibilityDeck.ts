@@ -512,19 +512,30 @@ export function checkInAnchor(checkIns: readonly unknown[]): ResponsibilityCheck
 
 /**
  * The next check-in's local ymd: rhythm weeks after the anchor's local day. Null when the
- * rhythm is off or there is no anchor. It changes only when a record is written (a
+ * rhythm is off, there is no anchor, or the deck has nothing in it (`isUndealtDeck`: after
+ * Restore defaults, everything skipped, or the first keep undone), since a check-in about
+ * no cards is never due. The date itself changes only when a record is written (a
  * check-in, or a new cycle start after the deck was emptied or restored), so the
  * `card-checkin:<due>` snooze key built on it is stable across every deal, skip and
  * card delete in between.
  */
-export function nextCheckInDate(weeks: number, checkIns: readonly unknown[]): string | null {
-  if (!weeks) return null;
+export function nextCheckInDate(
+  weeks: number,
+  checkIns: readonly unknown[],
+  cards: readonly ResolvedCard[]
+): string | null {
+  if (!weeks || isUndealtDeck(cards)) return null;
   const anchor = checkInAnchor(checkIns);
   return anchor ? addDaysYmd(checkInYmd(anchor), weeks * 7) : null;
 }
 
-export function isCheckInDue(weeks: number, checkIns: readonly unknown[], today: string): boolean {
-  const next = nextCheckInDate(weeks, checkIns);
+export function isCheckInDue(
+  weeks: number,
+  checkIns: readonly unknown[],
+  cards: readonly ResolvedCard[],
+  today: string
+): boolean {
+  const next = nextCheckInDate(weeks, checkIns, cards);
   return !!next && today >= next;
 }
 
@@ -679,7 +690,7 @@ export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow
         count: waiting.length,
       });
     }
-    const due = nextCheckInDate(rhythmWeeks, checkIns);
+    const due = nextCheckInDate(rhythmWeeks, checkIns, cards);
     if (due && today >= due) {
       const dismissKey = CARD_CHECKIN_PREFIX + due;
       const snoozedAt = readState[dismissKey];

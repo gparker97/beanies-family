@@ -379,6 +379,7 @@ describe('check-in and celebrations', () => {
   });
 
   it('a second check-in the same day keeps both records; the latest one counts', async () => {
+    await store.keep('laundry'); // something in the deck, so the clock runs
     const first = await store.completeCheckIn({
       stillWorks: 1,
       talkAbout: 0,
@@ -392,7 +393,7 @@ describe('check-in and celebrations', () => {
       redealt: 0,
       dealtNow: 0,
     });
-    expect(db.checkIns.size).toBe(2);
+    expect(db.checkIns.size).toBe(3); // the keep's cycle start + both check-ins
     expect(db.checkIns.get(first!.id)!.stillWorks).toBe(1);
     expect(store.lastCheckIn!.id).toBe(second!.id);
     expect(store.nextCheckIn).toBe('2026-10-24'); // 4 weeks from the day both were finished
@@ -416,11 +417,17 @@ describe('check-in and celebrations', () => {
     expect(store.nextCheckIn).toBe('2026-10-25');
     at('2026-09-30');
     await store.deal('dishes', 'main', 'greg');
+    await store.keep('laundry'); // keeps the deck non-empty through the skip + delete
     at('2026-10-01');
     await store.skip(['dishes']);
     await store.deleteCustom(c!.id); // held the earliest move
     expect(store.nextCheckIn).toBe('2026-10-25');
     expect(starts()).toHaveLength(1);
+    // Empty the deck: no next check-in at all, and nothing is due.
+    await store.skip(['laundry']);
+    expect(store.nextCheckIn).toBeNull();
+    at('2026-11-30');
+    expect(store.checkInDue).toBe(false);
     vi.setSystemTime(clock);
   });
 

@@ -140,8 +140,13 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   const lastCheckIn = computed(() => latestCheckIn(checkIns.value));
   /** What the clock and the agenda's "moved since" run from: the latest record of either kind. */
   const checkInSince = computed(() => checkInAnchor(checkIns.value));
-  const nextCheckIn = computed(() => nextCheckInDate(rhythmWeeks.value, checkIns.value));
-  const checkInDue = computed(() => isCheckInDue(rhythmWeeks.value, checkIns.value, today.value));
+  // Never due, and no next date, while the deck has nothing kept in it.
+  const nextCheckIn = computed(() =>
+    nextCheckInDate(rhythmWeeks.value, checkIns.value, resolved.value)
+  );
+  const checkInDue = computed(() =>
+    isCheckInDue(rhythmWeeks.value, checkIns.value, resolved.value, today.value)
+  );
 
   /** Only grown-ups deal; children see the page read-only. */
   const canDeal = computed(() => {
