@@ -29,6 +29,7 @@ for (const store of [
   'todoStore',
   'listStore',
   'activityStore',
+  'responsibilityStore',
   'holidayStore',
 ]) {
   const name = `use${store[0]!.toUpperCase()}${store.slice(1)}`;

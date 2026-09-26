@@ -180,6 +180,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
   // Family-scoped (synced); default OFF (prompts enabled).
   const feedbackOptOut = computed<boolean>(() => settings.value.feedbackOptOut ?? false);
+  // #109 Who Owns What: family check-in rhythm in weeks (0 = off). Family-scoped
+  // (synced); default every 4 weeks.
+  const responsibilityCheckInWeeks = computed<0 | 2 | 4 | 8>(
+    () => settings.value.responsibilityCheckInWeeks ?? 4
+  );
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -629,6 +634,13 @@ export const useSettingsStore = defineStore('settings', () => {
       })
     );
 
+  // #109: the check-in rhythm. Report-on-failure chain (toasts, then RE-THROWS), so the
+  // caller (`responsibilityStore.setRhythm`) never toasts a second time.
+  const setResponsibilityCheckInWeeks = (weeks: 0 | 2 | 4 | 8) =>
+    persistAiSetting('whoOwnsWhat.rhythm.label', 'responsibilityCheckInWeeks', () =>
+      settingsRepo.saveSettings({ responsibilityCheckInWeeks: weeks })
+    );
+
   async function setExchangeRateAutoUpdate(enabled: boolean): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -1025,6 +1037,7 @@ export const useSettingsStore = defineStore('settings', () => {
     helpfulHintNotifyByType,
     helpfulHintLeadDays,
     feedbackOptOut,
+    responsibilityCheckInWeeks,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
@@ -1042,6 +1055,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAutoSyncEnabled,
     setCalendarClashNudgeEnabled,
     setHelpfulHintsEnabled,
+    setResponsibilityCheckInWeeks,
     setHelpfulHintNotifyType,
     setHelpfulHintLead,
     setAIProvider,

@@ -235,6 +235,10 @@ describe('uiStrings', () => {
       'calendarImport.confirm.',
       'calendarImport.choose.',
       'calendarImport.failed.',
+      // Who Owns What (#109): deleting a family-made card and restoring the default deck
+      // both destroy history for good. "bean" must never stand in for a card or the deck.
+      'whoOwnsWhat.delete',
+      'whoOwnsWhat.restore',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

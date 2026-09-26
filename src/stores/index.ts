@@ -13,4 +13,5 @@ export { useAllergiesStore } from './allergiesStore';
 export { useMedicationsStore } from './medicationsStore';
 export { useRecipesStore } from './recipesStore';
 export { useMealPlanStore } from './mealPlanStore';
+export { useResponsibilityStore } from './responsibilityStore';
 export { useEmergencyContactsStore } from './emergencyContactsStore';
