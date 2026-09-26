@@ -3,8 +3,14 @@
  * Who Owns What (#109): the in-page celebration card (mockup sections 9 and 10), shared by
  * the deal pile ("Every card has a holder!") and the check-in drawer ("Deck checked"). The
  * brand gradient with white ink, the celebrating beanies, a few fact pills, one action and
- * an optional small note. The gradient is a brand surface in both modes, so it keeps its
- * colours on dark; every string arrives translated.
+ * an optional small note; every string arrives translated.
+ *
+ * Dark mode (CIG slide 9, "or deliberately keeps its light ink"): the Heritage Orange →
+ * Terracotta gradient is a fixed brand surface in BOTH themes (the CIG's Celebration
+ * States; the Nook briefing hero, `FamilyStatusToast`, does the same), so nothing on it
+ * switches. The pills and the action are solid white chips that also never switch, so
+ * their ink is fixed too and deliberately has no `dark:` / `-lift` partner: a lift would
+ * put a light accent on white. Measured on white: Deep Slate 11.0:1, `primary-700` 5.8:1.
  */
 withDefaults(
   defineProps<{
@@ -41,7 +47,7 @@ defineEmits<{ action: [] }>();
     </div>
     <button
       type="button"
-      class="font-outfit rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-[#C2410C]"
+      class="font-outfit text-primary-700 rounded-2xl bg-white px-4 py-2.5 text-sm font-bold"
       data-testid="deck-celebration-action"
       @click="$emit('action')"
     >
