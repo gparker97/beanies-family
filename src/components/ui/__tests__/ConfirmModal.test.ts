@@ -14,7 +14,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import ConfirmModal from '../ConfirmModal.vue';
-import { confirm, useConfirm } from '@/composables/useConfirm';
+import { confirm, confirmChoice, useConfirm } from '@/composables/useConfirm';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -144,5 +144,69 @@ describe('ConfirmModal', () => {
     await nextTick();
     await w.findAll('button')[0]!.trigger('click');
     await expect(answer).resolves.toBe(false);
+  });
+
+  describe('choices', () => {
+    const choices = [
+      { id: 'keep', label: 'Keep my own cards' },
+      { id: 'clear', label: 'Clear my own cards' },
+    ];
+
+    it('renders a radio group with the default selected, and confirm() still resolves a boolean', async () => {
+      const w = mountModal();
+      const answer = confirm({ ...base, choices, defaultChoice: 'keep' });
+      await nextTick();
+
+      const radios = w.findAll<HTMLInputElement>(
+        '[data-testid="confirm-choices"] input[type="radio"]'
+      );
+      expect(radios).toHaveLength(2);
+      expect(radios[0]!.element.checked).toBe(true);
+      expect(w.text()).toContain('Clear my own cards');
+
+      await confirmControl(w).trigger('click');
+      await expect(answer).resolves.toBe(true);
+    });
+
+    it('confirmChoice resolves the picked choice on confirm', async () => {
+      const w = mountModal();
+      const answer = confirmChoice({ ...base, choices, defaultChoice: 'keep' });
+      await nextTick();
+
+      await w.findAll('[data-testid="confirm-choices"] input[type="radio"]')[1]!.setValue(true);
+      await confirmControl(w).trigger('click');
+      await expect(answer).resolves.toBe('clear');
+    });
+
+    it('confirmChoice resolves null on cancel', async () => {
+      mountModal();
+      const answer = confirmChoice({ ...base, choices, defaultChoice: 'keep' });
+      await nextTick();
+      useConfirm().handleCancel();
+      await expect(answer).resolves.toBeNull();
+    });
+
+    it('confirmChoice without choices resolves the default on confirm', async () => {
+      const w = mountModal();
+      const answer = confirmChoice({ ...base, defaultChoice: 'keep' });
+      await nextTick();
+      expect(w.find('[data-testid="confirm-choices"]').exists()).toBe(false);
+      await confirmControl(w).trigger('click');
+      await expect(answer).resolves.toBe('keep');
+    });
+
+    it('a plain confirm after a choices confirm renders no radio group', async () => {
+      const w = mountModal();
+      const first = confirmChoice({ ...base, choices, defaultChoice: 'keep' });
+      await nextTick();
+      expect(w.find('[data-testid="confirm-choices"]').exists()).toBe(true);
+      await confirmControl(w).trigger('click');
+      await first;
+
+      void confirm({ title: base.title, message: base.message });
+      await nextTick();
+      expect(w.find('[data-testid="confirm-choices"]').exists()).toBe(false);
+      expect(useConfirm().state.value.selectedChoice).toBeUndefined();
+    });
   });
 });
