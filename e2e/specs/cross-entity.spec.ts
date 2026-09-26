@@ -563,3 +563,49 @@ test.describe('Loan & Activity Linking', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Who Owns What (#109): the first deal persists card states and moves
+// ---------------------------------------------------------------------------
+
+test.describe('Who Owns What', () => {
+  test('First deal: keep and deal two cards, skip one', async ({ page }) => {
+    await gotoRoot(page);
+    const dbHelper = new IndexedDBHelper(page);
+    await dbHelper.clearAllData();
+    await gotoRoot(page);
+    await bypassLoginIfNeeded(page);
+
+    await gotoRoute(page, '/who-owns-what');
+    await page.getByTestId('first-deal-start').click();
+    await page.getByTestId('deal-pile').waitFor({ state: 'visible' });
+
+    // The pile deals in category order: cooking dinner, breakfast, dishes.
+    for (const cardId of ['cooking-dinner', 'breakfast']) {
+      await page.getByTestId(`deal-pile-card-${cardId}`).waitFor({ state: 'visible' });
+      await page.getByTestId('deal-pile-keep').click();
+      await page.locator('[data-testid^="deal-pick-"]').first().click();
+    }
+    await page.getByTestId('deal-pile-card-dishes').waitFor({ state: 'visible' });
+    await page.getByTestId('deal-pile-skip').click();
+    await page.getByTestId('deal-pile-card-laundry').waitFor({ state: 'visible' });
+
+    // Gate on the third write landing in the projection before reading it.
+    await expect
+      .poll(async () => (await dbHelper.exportData()).responsibilityCards?.length ?? 0)
+      .toBe(3);
+    const data = await dbHelper.exportData();
+    const memberId = data.familyMembers[0]!.id;
+    const cards = data.responsibilityCards ?? [];
+    const held = cards.filter(
+      (c) =>
+        c.status === 'kept' && c.parts.length === 1 && c.parts.every((p) => p.holderId === memberId)
+    );
+    expect(held.map((c) => c.id).sort()).toEqual(['breakfast', 'cooking-dinner']);
+    expect(cards.filter((c) => c.status === 'skipped').map((c) => c.id)).toEqual(['dishes']);
+    expect(cards).toHaveLength(3);
+    const moves = data.responsibilityMoves ?? [];
+    expect(moves).toHaveLength(2);
+    expect(moves.every((m) => m.toId === memberId)).toBe(true);
+  });
+});
