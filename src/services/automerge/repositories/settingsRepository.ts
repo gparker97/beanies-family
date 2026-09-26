@@ -38,6 +38,7 @@ export function getDefaultSettings(): Settings {
     customInstitutions: [],
     onboardingCompleted: true,
     feedbackOptOut: false,
+    responsibilityCheckInWeeks: 4,
     createdAt: now,
     updatedAt: now,
   };

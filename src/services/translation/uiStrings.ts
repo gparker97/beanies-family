@@ -12485,6 +12485,444 @@ const STRING_DEFS = {
     en: 'Your browser blocked the clipboard. Select the text and copy it by hand instead.',
     beanie: 'your browser blocked the clipboard. select the text and copy it by hand instead.',
   },
+
+  // Who Owns What: card deck (#109). Names are Title Case in `en`; done lines have no
+  // trailing period. American English. Ids in `responsibilityCards.ts` never change.
+  'cards.cookingDinner.name': { en: 'Cooking Dinner', beanie: 'cooking dinner' },
+  'cards.cookingDinner.done': {
+    en: 'Everyone fed by seven, most nights',
+    beanie: 'everyone fed by seven, most nights',
+  },
+  'cards.breakfast.name': { en: 'Breakfast', beanie: 'breakfast' },
+  'cards.breakfast.done': {
+    en: 'Everyone out the door with something in their tummy',
+    beanie: 'everyone out the door with something in their tummy',
+  },
+  'cards.dishes.name': { en: 'Dishes', beanie: 'dishes' },
+  'cards.dishes.done': { en: 'Sink empty before bed', beanie: 'sink empty before bed' },
+  'cards.laundry.name': { en: 'Laundry', beanie: 'laundry' },
+  'cards.laundry.done': {
+    en: 'Clean, dry and back in drawers',
+    beanie: 'clean, dry and back in drawers',
+  },
+  'cards.floors.name': { en: 'Floors', beanie: 'floors' },
+  'cards.floors.done': {
+    en: 'Vacuumed before the crumbs win',
+    beanie: 'vacuumed before the crumbs win',
+  },
+  'cards.sparklingBathrooms.name': { en: 'Sparkling Bathrooms', beanie: 'sparkling bathrooms' },
+  'cards.sparklingBathrooms.done': {
+    en: 'Clean enough that guests can use them without a warning',
+    beanie: 'clean enough that guests can use them without a warning',
+  },
+  'cards.trashNight.name': { en: 'Trash Night', beanie: 'trash night' },
+  'cards.trashNight.done': {
+    en: 'Out on trash day, back in by the next morning',
+    beanie: 'out on trash day, back in by the next morning',
+  },
+  'cards.homeSupplies.name': { en: 'Home Supplies', beanie: 'home supplies' },
+  'cards.homeSupplies.done': {
+    en: 'Never out of toilet paper, soap or dish soap',
+    beanie: 'never out of toilet paper, soap or dish soap',
+  },
+  'cards.fixingThings.name': { en: 'Fixing Things', beanie: 'fixing things' },
+  'cards.fixingThings.done': {
+    en: 'The wobbly shelf and the drippy faucet sorted',
+    beanie: 'the wobbly shelf and the drippy faucet sorted',
+  },
+  'cards.seasonalSwap.name': { en: 'The Seasonal Swap', beanie: 'the seasonal swap' },
+  'cards.seasonalSwap.done': {
+    en: 'Winter coats out, summer clothes in, garage and attic tidy',
+    beanie: 'winter coats out, summer clothes in, garage and attic tidy',
+  },
+  'cards.decluttering.name': { en: 'Decluttering', beanie: 'decluttering' },
+  'cards.decluttering.done': {
+    en: 'Outgrown things donated before they pile up',
+    beanie: 'outgrown things donated before they pile up',
+  },
+  'cards.mailAndPaperwork.name': { en: 'Mail and Paperwork', beanie: 'mail and paperwork' },
+  'cards.mailAndPaperwork.done': {
+    en: 'Opened, dealt with, filed or recycled each week',
+    beanie: 'opened, dealt with, filed or recycled each week',
+  },
+  'cards.homeRentMortgageInsurance.name': {
+    en: 'Home Rent / Mortgage / Insurance',
+    beanie: 'home rent / mortgage / insurance',
+  },
+  'cards.homeRentMortgageInsurance.done': {
+    en: 'Paid on time, renewed before it lapses',
+    beanie: 'paid on time, renewed before it lapses',
+  },
+  'cards.familyBudgetCheck.name': {
+    en: 'The Family Budget Check',
+    beanie: 'the family budget check',
+  },
+  'cards.familyBudgetCheck.done': {
+    en: 'A look at where the money went, once a month',
+    beanie: 'a look at where the money went, once a month',
+  },
+  'cards.payingTheBills.name': { en: 'Paying the Bills', beanie: 'paying the bills' },
+  'cards.payingTheBills.done': {
+    en: "Every bill paid before it's due",
+    beanie: "every bill paid before it's due",
+  },
+  'cards.familyCalendar.name': { en: 'The Family Calendar', beanie: 'the family calendar' },
+  'cards.familyCalendar.done': {
+    en: 'Every activity and appointment in beanies, nobody double-booked',
+    beanie: 'every activity and appointment in beanies, nobody double-booked',
+  },
+  'cards.wifiGadgetsPasswords.name': {
+    en: 'Wifi, Gadgets and Passwords',
+    beanie: 'wifi, gadgets and passwords',
+  },
+  'cards.wifiGadgetsPasswords.done': {
+    en: 'Wifi working, devices updated, passwords somewhere safe',
+    beanie: 'wifi working, devices updated, passwords somewhere safe',
+  },
+  'cards.petCare.name': { en: 'Pet Care', beanie: 'pet care' },
+  'cards.petCare.done': {
+    en: 'Fed, walked, vet visits on time',
+    beanie: 'fed, walked, vet visits on time',
+  },
+  'cards.plants.name': { en: 'Plants', beanie: 'plants' },
+  'cards.plants.done': { en: 'Green, not crispy', beanie: 'green, not crispy' },
+  'cards.snowAndIce.name': { en: 'Snow and Ice', beanie: 'snow and ice' },
+  'cards.snowAndIce.done': {
+    en: 'Sidewalk shoveled and salted, car scraped',
+    beanie: 'sidewalk shoveled and salted, car scraped',
+  },
+  'cards.groceryShopping.name': { en: 'Grocery Shopping', beanie: 'grocery shopping' },
+  'cards.groceryShopping.done': {
+    en: 'Fridge and pantry full for the week',
+    beanie: 'fridge and pantry full for the week',
+  },
+  'cards.carCare.name': { en: 'Car Care', beanie: 'car care' },
+  'cards.carCare.done': {
+    en: 'Gas, oil changes and inspection on time',
+    beanie: 'gas, oil changes and inspection on time',
+  },
+  'cards.packagesAndReturns.name': { en: 'Packages and Returns', beanie: 'packages and returns' },
+  'cards.packagesAndReturns.done': {
+    en: 'Sent back before the return window closes',
+    beanie: 'sent back before the return window closes',
+  },
+  'cards.pointsAndCoupons.name': { en: 'Points and Coupons', beanie: 'points and coupons' },
+  'cards.pointsAndCoupons.done': {
+    en: 'Points used before they expire',
+    beanie: 'points used before they expire',
+  },
+  'cards.lunchboxes.name': { en: 'Lunchboxes', beanie: 'lunchboxes' },
+  'cards.lunchboxes.done': {
+    en: 'Packed the night before, eaten (mostly)',
+    beanie: 'packed the night before, eaten (mostly)',
+  },
+  'cards.babysittersAndNannies.name': {
+    en: 'Babysitters and Nannies',
+    beanie: 'babysitters and nannies',
+  },
+  'cards.babysittersAndNannies.done': {
+    en: 'Someone lined up for date night and sick days',
+    beanie: 'someone lined up for date night and sick days',
+  },
+  'cards.schoolForms.name': { en: 'School Forms', beanie: 'school forms' },
+  'cards.schoolForms.done': {
+    en: 'Signed and back in the backpack the same day',
+    beanie: 'signed and back in the backpack the same day',
+  },
+  'cards.schoolVacations.name': { en: 'School Vacations', beanie: 'school vacations' },
+  'cards.schoolVacations.done': {
+    en: 'Camps and care planned before the break starts',
+    beanie: 'camps and care planned before the break starts',
+  },
+  'cards.schoolDropOff.name': { en: 'School Drop-off', beanie: 'school drop-off' },
+  'cards.schoolDropOff.done': {
+    en: 'There by the bell, home with the backpack',
+    beanie: 'there by the bell, home with the backpack',
+  },
+  'cards.kidsBagsForTheDay.name': {
+    en: "Kids' Bags for the Day",
+    beanie: "kids' bags for the day",
+  },
+  'cards.kidsBagsForTheDay.done': {
+    en: 'Water bottle, snack and sweater packed',
+    beanie: 'water bottle, snack and sweater packed',
+  },
+  'cards.sportsAndClubs.name': { en: 'Sports and Clubs', beanie: 'sports and clubs' },
+  'cards.sportsAndClubs.done': {
+    en: 'Signed up, kit ready, rides sorted',
+    beanie: 'signed up, kit ready, rides sorted',
+  },
+  'cards.tutorsAndLessons.name': { en: 'Tutors and Lessons', beanie: 'tutors and lessons' },
+  'cards.tutorsAndLessons.done': {
+    en: 'Booked, paid and practiced in between',
+    beanie: 'booked, paid and practiced in between',
+  },
+  'cards.morningRoutine.name': { en: 'Morning Routine', beanie: 'morning routine' },
+  'cards.morningRoutine.done': {
+    en: 'Dressed, fed and out on time without a meltdown',
+    beanie: 'dressed, fed and out on time without a meltdown',
+  },
+  'cards.bedtimeRoutine.name': { en: 'Bedtime Routine', beanie: 'bedtime routine' },
+  'cards.bedtimeRoutine.done': {
+    en: 'Teeth, story, lights out by eight',
+    beanie: 'teeth, story, lights out by eight',
+  },
+  'cards.bathTimeAndHaircuts.name': {
+    en: 'Bath Time and Haircuts',
+    beanie: 'bath time and haircuts',
+  },
+  'cards.bathTimeAndHaircuts.done': {
+    en: 'Clean kids, trims before they need a ponytail',
+    beanie: 'clean kids, trims before they need a ponytail',
+  },
+  'cards.clothesThatFit.name': { en: 'Clothes That Fit', beanie: 'clothes that fit' },
+  'cards.clothesThatFit.done': {
+    en: 'No toes poking through shoes',
+    beanie: 'no toes poking through shoes',
+  },
+  'cards.pottyTrainingAndDiapers.name': {
+    en: 'Potty Training and Diapers',
+    beanie: 'potty training and diapers',
+  },
+  'cards.pottyTrainingAndDiapers.done': {
+    en: 'Diapers stocked, potty wins cheered',
+    beanie: 'diapers stocked, potty wins cheered',
+  },
+  'cards.homeworkAndSchoolSupplies.name': {
+    en: 'Homework and School Supplies',
+    beanie: 'homework and school supplies',
+  },
+  'cards.homeworkAndSchoolSupplies.done': {
+    en: 'Homework done, pencils sharp, projects not at midnight',
+    beanie: 'homework done, pencils sharp, projects not at midnight',
+  },
+  'cards.talkingToTeachers.name': { en: 'Talking to Teachers', beanie: 'talking to teachers' },
+  'cards.talkingToTeachers.done': {
+    en: 'Emails answered, conferences attended',
+    beanie: 'emails answered, conferences attended',
+  },
+  'cards.helpingAtSchool.name': { en: 'Helping at School', beanie: 'helping at school' },
+  'cards.helpingAtSchool.done': {
+    en: 'Volunteer shifts and bake sales covered',
+    beanie: 'volunteer shifts and bake sales covered',
+  },
+  'cards.newSchoolNewYear.name': { en: 'New School, New Year', beanie: 'new school, new year' },
+  'cards.newSchoolNewYear.done': {
+    en: 'Supplies bought, forms in, first day ready',
+    beanie: 'supplies bought, forms in, first day ready',
+  },
+  'cards.friendsAndScreens.name': { en: 'Friends and Screens', beanie: 'friends and screens' },
+  'cards.friendsAndScreens.done': {
+    en: 'Playdates planned, screen time rules kept',
+    beanie: 'playdates planned, screen time rules kept',
+  },
+  'cards.nightWakeUps.name': { en: 'Night Wake-ups', beanie: 'night wake-ups' },
+  'cards.nightWakeUps.done': {
+    en: 'Someone on duty for bad dreams and sick nights',
+    beanie: 'someone on duty for bad dreams and sick nights',
+  },
+  'cards.learningAtHome.name': { en: 'Learning at Home', beanie: 'learning at home' },
+  'cards.learningAtHome.done': {
+    en: 'Reading together, curiosity fed',
+    beanie: 'reading together, curiosity fed',
+  },
+  'cards.beingThere.name': { en: 'Being There', beanie: 'being there' },
+  'cards.beingThere.done': {
+    en: 'Someone in the audience for plays, games and assemblies',
+    beanie: 'someone in the audience for plays, games and assemblies',
+  },
+  'cards.doctorAndDentist.name': { en: 'Doctor and Dentist', beanie: 'doctor and dentist' },
+  'cards.doctorAndDentist.done': {
+    en: 'Checkups booked before anyone is overdue',
+    beanie: 'checkups booked before anyone is overdue',
+  },
+  'cards.medicineCabinet.name': { en: 'Medicine Cabinet', beanie: 'medicine cabinet' },
+  'cards.medicineCabinet.done': {
+    en: 'Band-aids in, fever medicine stocked, nothing expired',
+    beanie: 'band-aids in, fever medicine stocked, nothing expired',
+  },
+  'cards.ourEmergencyPlan.name': { en: 'Our Emergency Plan', beanie: 'our emergency plan' },
+  'cards.ourEmergencyPlan.done': {
+    en: 'Everyone knows who to call and where to meet',
+    beanie: 'everyone knows who to call and where to meet',
+  },
+  'cards.healthInsuranceAndClaims.name': {
+    en: 'Health Insurance and Claims',
+    beanie: 'health insurance and claims',
+  },
+  'cards.healthInsuranceAndClaims.done': {
+    en: 'Claims filed, coverage renewed',
+    beanie: 'claims filed, coverage renewed',
+  },
+  'cards.willsAndLifeInsurance.name': {
+    en: 'Wills and Life Insurance',
+    beanie: 'wills and life insurance',
+  },
+  'cards.willsAndLifeInsurance.done': {
+    en: 'Up to date, and someone knows where they are',
+    beanie: 'up to date, and someone knows where they are',
+  },
+  'cards.specialNeedsSupport.name': {
+    en: "Kid's Special Needs and Mental Health Support",
+    beanie: "kid's special needs and mental health support",
+  },
+  'cards.specialNeedsSupport.done': {
+    en: 'Appointments kept, school in the loop, nobody carrying it alone',
+    beanie: 'appointments kept, school in the loop, nobody carrying it alone',
+  },
+  'cards.theBigHolidays.name': { en: 'The Big Holidays', beanie: 'the big holidays' },
+  'cards.theBigHolidays.done': {
+    en: 'Decorations, food and who is coming, all planned',
+    beanie: 'decorations, food and who is coming, all planned',
+  },
+  'cards.birthdayParties.name': { en: 'Birthday Parties', beanie: 'birthday parties' },
+  'cards.birthdayParties.done': {
+    en: 'Invites out, cake in, nobody cries',
+    beanie: 'invites out, cake in, nobody cries',
+  },
+  'cards.giftsForOthers.name': { en: 'Gifts for Others', beanie: 'gifts for others' },
+  'cards.giftsForOthers.done': {
+    en: 'Bought before the party, not on the way',
+    beanie: 'bought before the party, not on the way',
+  },
+  'cards.cardsAndThankYous.name': { en: 'Cards and Thank-yous', beanie: 'cards and thank-yous' },
+  'cards.cardsAndThankYous.done': { en: 'Sent within a week', beanie: 'sent within a week' },
+  'cards.toothFairyDuty.name': { en: 'Tooth Fairy Duty', beanie: 'tooth fairy duty' },
+  'cards.toothFairyDuty.done': {
+    en: 'Coins under the pillow before morning',
+    beanie: 'coins under the pillow before morning',
+  },
+  'cards.havingPeopleOver.name': { en: 'Having People Over', beanie: 'having people over' },
+  'cards.havingPeopleOver.done': {
+    en: 'Invited, fed and nobody forgot the ice',
+    beanie: 'invited, fed and nobody forgot the ice',
+  },
+  'cards.photosAndMemories.name': { en: 'Photos and Memories', beanie: 'photos and memories' },
+  'cards.photosAndMemories.done': {
+    en: 'Best photos saved in the scrapbook, not lost on a phone',
+    beanie: 'best photos saved in the scrapbook, not lost on a phone',
+  },
+  'cards.weekendPlans.name': { en: 'Weekend Plans', beanie: 'weekend plans' },
+  'cards.weekendPlans.done': {
+    en: 'Something fun planned most weekends',
+    beanie: 'something fun planned most weekends',
+  },
+  'cards.givingBack.name': { en: 'Giving Back', beanie: 'giving back' },
+  'cards.givingBack.done': {
+    en: 'A good deed or donation as a family, now and then',
+    beanie: 'a good deed or donation as a family, now and then',
+  },
+  'cards.faithAndTraditions.name': { en: 'Faith and Traditions', beanie: 'faith and traditions' },
+  'cards.faithAndTraditions.done': {
+    en: 'The traditions that matter to us, kept going',
+    beanie: 'the traditions that matter to us, kept going',
+  },
+  'cards.dateNights.name': { en: 'Date Nights', beanie: 'date nights' },
+  'cards.dateNights.done': {
+    en: 'One evening a month that is just the two of us',
+    beanie: 'one evening a month that is just the two of us',
+  },
+  'cards.grandparents.name': { en: 'Grandparents', beanie: 'grandparents' },
+  'cards.grandparents.done': {
+    en: 'Visits planned, video calls on Sundays',
+    beanie: 'visits planned, video calls on sundays',
+  },
+  'cards.keepingUpWithFamily.name': {
+    en: 'Keeping Up with Family',
+    beanie: 'keeping up with family',
+  },
+  'cards.keepingUpWithFamily.done': {
+    en: "Cousins' birthdays remembered, news passed on",
+    beanie: "cousins' birthdays remembered, news passed on",
+  },
+  'cards.agingParentCare.name': {
+    en: 'Aging Parent or In-law Care',
+    beanie: 'aging parent or in-law care',
+  },
+  'cards.agingParentCare.done': {
+    en: 'Appointments covered, nobody carrying it alone',
+    beanie: 'appointments covered, nobody carrying it alone',
+  },
+  'cards.tripPacking.name': { en: 'Trip Packing', beanie: 'trip packing' },
+  'cards.tripPacking.done': {
+    en: 'One bag each, nothing forgotten',
+    beanie: 'one bag each, nothing forgotten',
+  },
+  'cards.planningTrips.name': { en: 'Planning Trips', beanie: 'planning trips' },
+  'cards.planningTrips.done': {
+    en: 'Booked, planned and in beanies before we go',
+    beanie: 'booked, planned and in beanies before we go',
+  },
+  'cards.passportsAndDocuments.name': {
+    en: 'Passports and Documents',
+    beanie: 'passports and documents',
+  },
+  'cards.passportsAndDocuments.done': {
+    en: 'Not expired, packed, and in the same place',
+    beanie: 'not expired, packed, and in the same place',
+  },
+  'cards.outingsAndCulture.name': { en: 'Outings and Culture', beanie: 'outings and culture' },
+  'cards.outingsAndCulture.done': {
+    en: 'Museums, shows and days out, now and then',
+    beanie: 'museums, shows and days out, now and then',
+  },
+  'cards.theYard.name': { en: 'The Yard', beanie: 'the yard' },
+  'cards.theYard.done': {
+    en: 'Mowed, watered, not a jungle',
+    beanie: 'mowed, watered, not a jungle',
+  },
+  'cards.furnitureAndDecorations.name': {
+    en: 'Furniture and Decorations',
+    beanie: 'furniture and decorations',
+  },
+  'cards.furnitureAndDecorations.done': {
+    en: 'The house feels like home, and the broken chair gets replaced',
+    beanie: 'the house feels like home, and the broken chair gets replaced',
+  },
+  'cards.theRenovation.name': { en: 'The Renovation', beanie: 'the renovation' },
+  'cards.theRenovation.done': {
+    en: 'Quotes in, a decision made',
+    beanie: 'quotes in, a decision made',
+  },
+  'cards.moving.name': { en: 'Moving', beanie: 'moving' },
+  'cards.moving.done': {
+    en: 'Boxes packed, address changed, nothing left behind',
+    beanie: 'boxes packed, address changed, nothing left behind',
+  },
+  'cards.bikes.name': { en: 'Bikes', beanie: 'bikes' },
+  'cards.bikes.done': { en: 'Tires pumped, helmets found', beanie: 'tires pumped, helmets found' },
+  'cards.thePool.name': { en: 'The Pool', beanie: 'the pool' },
+  'cards.thePool.done': { en: 'Clear water, cover on', beanie: 'clear water, cover on' },
+  'cards.campingGear.name': { en: 'Camping Gear', beanie: 'camping gear' },
+  'cards.campingGear.done': {
+    en: 'Tent dry, nothing moldy in the garage',
+    beanie: 'tent dry, nothing moldy in the garage',
+  },
+  'cards.vegetablePatch.name': { en: 'The Vegetable Patch', beanie: 'the vegetable patch' },
+  'cards.vegetablePatch.done': {
+    en: 'Rows weeded, beans picked',
+    beanie: 'rows weeded, beans picked',
+  },
+  'cards.theFireplace.name': { en: 'The Fireplace', beanie: 'the fireplace' },
+  'cards.theFireplace.done': {
+    en: 'Chimney swept once a year, logs in',
+    beanie: 'chimney swept once a year, logs in',
+  },
+  'cards.timeToMyself.name': { en: 'Time to Myself', beanie: 'time to myself' },
+  'cards.timeToMyself.done': {
+    en: 'A few hours a week that are only mine',
+    beanie: 'a few hours a week that are only mine',
+  },
+  'cards.movingMyBody.name': { en: 'Moving My Body', beanie: 'moving my body' },
+  'cards.movingMyBody.done': {
+    en: 'Something sweaty, three times a week',
+    beanie: 'something sweaty, three times a week',
+  },
+  'cards.seeingMyFriends.name': { en: 'Seeing My Friends', beanie: 'seeing my friends' },
+  'cards.seeingMyFriends.done': {
+    en: 'A catch-up with friends at least once a month',
+    beanie: 'a catch-up with friends at least once a month',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
