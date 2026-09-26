@@ -528,13 +528,35 @@ describe('read-state reducers', () => {
       'announcement:discord-community-2026-05': 'r',
       'tip:tip-link-txn': 'r',
     };
-    const pruned = pruneReadState(m, ['todo-due:t1:2026-05-27']);
+    const pruned = pruneReadState(m, ['todo-due:t1:2026-05-27'], '2026-05-27T12:00:00.000Z');
     expect(pruned).toEqual({
       'todo-due:t1:2026-05-27': 'r',
       'whats-new:2026.01': 'r',
       'announcement:discord-community-2026-05': 'r',
       'tip:tip-link-txn': 'r',
     });
+  });
+
+  it('pruneReadState keeps card-move:* / card-checkin:* reads younger than 30 days and drops older ones', () => {
+    const now = '2026-09-26T12:00:00.000Z';
+    const daysAgo = (d: number) => new Date(Date.parse(now) - d * 86_400_000).toISOString();
+    const m = {
+      'card-move:c1:main:2026-08-28': daysAgo(29),
+      'card-move:c2:main:2026-08-26': daysAgo(31),
+      'card-checkin:2026-09-20': daysAgo(29),
+      'card-checkin:2026-08-01': daysAgo(31),
+      'card-move:bad': 'not-a-date',
+    };
+    expect(pruneReadState(m, [], now)).toEqual({
+      'card-move:c1:main:2026-08-28': daysAgo(29),
+      'card-checkin:2026-09-20': daysAgo(29),
+    });
+  });
+
+  it('pruneReadState still keeps a card-move read that is in keepIds, whatever its age', () => {
+    const now = '2026-09-26T12:00:00.000Z';
+    const m = { 'card-move:c1': '2020-01-01T00:00:00.000Z' };
+    expect(pruneReadState(m, ['card-move:c1'], now)).toEqual(m);
   });
 });
 

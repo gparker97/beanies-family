@@ -74,15 +74,23 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const selectedId = ref<string | null>(null);
   let autoOpenedThisSession = false;
 
-  // ── snapshot: pure assembly (reactive to data, docVersion, now) ─────────────
-  const snapshot = computed<DeriveInput | null>(() => {
+  // ── readState: the current member's id→readAt slice of notificationReads ────
+  // The one place the store reads the projection. Also read by consumers that keep
+  // their own keys in the slice (Who Owns What's card-move / card-checkin reads).
+  const readState = computed<Record<string, string>>(() => {
     void docVersion.value; // re-derive after read-state mutations (raw changeDoc)
     const currentMember = familyStore.currentMember;
-    if (!currentMember) return null;
+    if (!currentMember || !isDocLoaded()) return {};
+    return (projectionGetById('notificationReads', currentMember.id) ?? {}) as Record<
+      string,
+      string
+    >;
+  });
 
-    const readState = isDocLoaded()
-      ? ((projectionGetById('notificationReads', currentMember.id) ?? {}) as Record<string, string>)
-      : {};
+  // ── snapshot: pure assembly (reactive to data, readState, now) ──────────────
+  const snapshot = computed<DeriveInput | null>(() => {
+    const currentMember = familyStore.currentMember;
+    if (!currentMember) return null;
 
     // One pass over the distinct months spanning the window (≤2), over the
     // UNFILTERED activeActivities, so duty-only occurrences survive and we never
@@ -128,7 +136,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
         lastReconciledAt: c.lastReconciledAt,
         updatedAt: c.updatedAt,
       })),
-      readState,
+      readState: readState.value,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,
     };
@@ -249,7 +257,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   }
   function pruneReads(): void {
     const keep = notifications.value.map((n) => n.id);
-    void applyReducer('pruneReads', (slice) => pruneReadState(slice, keep));
+    void applyReducer('pruneReads', (slice) => pruneReadState(slice, keep, nowIso()));
   }
 
   // ── Drawer actions (the only mutators of isOpen/view/selectedId) ────────────
@@ -302,6 +310,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     selectedId,
     selected,
     notifications,
+    readState,
     unreadCount,
     hasUnread,
     latestUnseenAutoOpen,

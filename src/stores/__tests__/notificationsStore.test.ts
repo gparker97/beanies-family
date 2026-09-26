@@ -135,6 +135,27 @@ describe('notificationsStore — read-state mutations', () => {
     expect(reads).toEqual({});
   });
 
+  it('readState exposes the current member slice, including non-bell keys', () => {
+    reads['v'] = { 'card-move:c1:main:2026-09-20': '2026-09-20T10:00:00.000Z' };
+    const s = useNotificationsStore();
+    expect(s.readState).toEqual({ 'card-move:c1:main:2026-09-20': '2026-09-20T10:00:00.000Z' });
+  });
+
+  it('readState is empty with no loaded doc', () => {
+    reads['v'] = { a: 'r' };
+    docLoaded = false;
+    expect(useNotificationsStore().readState).toEqual({});
+  });
+
+  it('pruneReads keeps a recent card-move read and drops an old one', async () => {
+    const recent = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    reads['v'] = { 'card-move:new': recent, 'card-move:old': '2020-01-01T00:00:00.000Z' };
+    useNotificationsStore().pruneReads();
+    await flush();
+    expect(reads['v']['card-move:new']).toBe(recent);
+    expect(reads['v']['card-move:old']).toBeUndefined();
+  });
+
   it('guards: no loaded doc → reports + no-op', () => {
     const s = useNotificationsStore();
     docLoaded = false;

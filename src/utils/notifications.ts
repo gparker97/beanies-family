@@ -51,6 +51,21 @@ const PRUNE_EXEMPT_PREFIXES = [
   COMMUNITY_NUDGE_PREFIX,
 ] as const;
 
+/**
+ * Read-state keys that are NOT bell notifications but share `notificationReads`:
+ * Who Owns What card-move dismissals (`card-move:<moveId>`) and check-in snoozes
+ * (`card-checkin:<dueDate>`). The bell never derives them, so the plain prune
+ * would delete them at once; they are also unbounded (one per move), so they
+ * can't join `PRUNE_EXEMPT_PREFIXES` (whose invariant is "bounded by static
+ * content"). Instead they're kept while their `readAt` is younger than
+ * `AGED_EXEMPT_MAX_DAYS`: a moved note shows for 14 days and a snooze lasts 7,
+ * so nothing pruned at 30 can resurface.
+ */
+export const CARD_MOVE_PREFIX = 'card-move:';
+export const CARD_CHECKIN_PREFIX = 'card-checkin:';
+const AGED_EXEMPT_PREFIXES = [CARD_MOVE_PREFIX, CARD_CHECKIN_PREFIX] as const;
+export const AGED_EXEMPT_MAX_DAYS = 30;
+
 export interface NotificationOccurrence {
   activity: FamilyActivity;
   date: string;
@@ -563,16 +578,27 @@ export function markAllReadIn(
  * any id matching a prefix in `PRUNE_EXEMPT_PREFIXES` is always kept. All
  * exempt kinds are window-exempt and bounded by content count (whats-new by
  * release catalogue, announcement by registry, tip by ALL_TIPS); pruning
- * would resurface old items as unread.
+ * would resurface old items as unread. Ids matching `AGED_EXEMPT_PREFIXES` are
+ * kept only while their `readAt` is within `AGED_EXEMPT_MAX_DAYS` of `nowIso`
+ * (an unparseable `readAt` counts as old).
  */
 export function pruneReadState(
   map: Record<string, string>,
-  keepIds: readonly string[]
+  keepIds: readonly string[],
+  nowIso: string
 ): Record<string, string> {
   const keep = new Set(keepIds);
+  const agedCutoff = new Date(nowIso).getTime() - AGED_EXEMPT_MAX_DAYS * MS_PER_DAY;
   const next: Record<string, string> = {};
   for (const [id, readAt] of Object.entries(map)) {
-    if (keep.has(id) || PRUNE_EXEMPT_PREFIXES.some((p) => id.startsWith(p))) next[id] = readAt;
+    if (
+      keep.has(id) ||
+      PRUNE_EXEMPT_PREFIXES.some((p) => id.startsWith(p)) ||
+      (AGED_EXEMPT_PREFIXES.some((p) => id.startsWith(p)) &&
+        new Date(readAt).getTime() > agedCutoff)
+    ) {
+      next[id] = readAt;
+    }
   }
   return next;
 }
