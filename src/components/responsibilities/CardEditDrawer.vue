@@ -129,8 +129,15 @@ const v = useFormValidation(
   'responsibility-card',
   () => ({
     ...(editsIdentity.value ? { name: () => name.value.trim().length > 0 } : {}),
-    ...(split.value.splitMode === 'label'
-      ? { parts: () => split.value.parts.every((p) => !!p.label?.trim()) }
+    // A split needs at least one part (a child split with no children has none), and every
+    // label part needs a name. Save stays disabled rather than reaching the builder.
+    ...(split.value.splitMode !== 'single'
+      ? {
+          parts: () =>
+            split.value.parts.length > 0 &&
+            (split.value.splitMode !== 'label' ||
+              split.value.parts.every((p) => !!p.label?.trim())),
+        }
       : {}),
   }),
   { open: () => props.open }
