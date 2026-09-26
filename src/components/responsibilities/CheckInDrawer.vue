@@ -153,7 +153,17 @@ const pickingPart = computed(() => {
     ? (c.parts.find((p) => !p.holderId) ?? c.parts[0])
     : c.parts[0];
 });
-const members = computed(() => familyStore.sortedHumans);
+/**
+ * Who the picker offers. A re-deal moves the card, so its current holder is not a choice
+ * (picking them would write nothing yet toast "dealt" and count a re-deal); "Still works"
+ * is the answer for keeping it where it is.
+ */
+const members = computed(() => {
+  const holder = picking.value?.reason === 'redeal' ? pickingPart.value?.holderId : undefined;
+  return holder
+    ? familyStore.sortedHumans.filter((m) => m.id !== holder)
+    : familyStore.sortedHumans;
+});
 
 async function onPick(memberId: string): Promise<void> {
   const c = pickingCard.value;
