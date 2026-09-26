@@ -17,7 +17,7 @@
  * it is a caption, never a scoreboard. Writes go through `useDealActions`; the page hosts
  * the drawers (`open`, `edit`, `new-card`).
  */
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -35,13 +35,6 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import DeckActionButton from './DeckActionButton.vue';
 import { useDealActions } from './useDealActions';
 
-const props = withDefaults(
-  defineProps<{
-    /** Open the tap picker on this card (the Overview's per-card Deal button). */
-    focusCardId?: string;
-  }>(),
-  { focusCardId: undefined }
-);
 const emit = defineEmits<{
   open: [cardId: string];
   edit: [cardId: string];
@@ -116,17 +109,6 @@ const picking = computed(() => (pickingId.value ? store.cardById(pickingId.value
 function togglePicker(cardId: string): void {
   pickingId.value = pickingId.value === cardId ? null : cardId;
 }
-
-watch(
-  () => props.focusCardId,
-  (id) => {
-    if (!id) return;
-    query.value = '';
-    filter.value = store.cardById(id)?.status === 'held' ? 'all' : 'toDeal';
-    pickingId.value = id;
-  },
-  { immediate: true }
-);
 
 /** The part a deal targets: the one dragged, else the first open one, else an unsplit card's. */
 function targetPart(card: ResolvedCard, partKey?: string): ResolvedPart | undefined {

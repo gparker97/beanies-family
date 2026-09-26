@@ -63,6 +63,11 @@ const props = defineProps<{
    * it was: it called a `cancelPicker` that only flipped a flag nothing reads in mandatory mode.
    */
   dismissStyle?: 'back' | 'close';
+  /**
+   * The host binds the digits 1-9 to the first nine tiles (the deal pile does). This only
+   * announces them (`aria-keyshortcuts`); the host owns the listener.
+   */
+  numberShortcuts?: boolean;
 }>();
 
 const emit = defineEmits<{ pick: [memberId: string]; cancel: [] }>();
@@ -107,6 +112,7 @@ defineExpose({ scrollIntoView });
         class="tile"
         :style="{ '--stagger-delay': `${60 + idx * 50}ms` }"
         :data-testid="`${props.tileTestidPrefix ?? 'inline-member-tile-'}${member.id}`"
+        :aria-keyshortcuts="props.numberShortcuts && idx < 9 ? String(idx + 1) : undefined"
         @click="emit('pick', member.id)"
       >
         <BeanieAvatar
