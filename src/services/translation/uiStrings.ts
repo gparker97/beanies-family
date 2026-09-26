@@ -12631,8 +12631,8 @@ const STRING_DEFS = {
 
   'whoOwnsWhat.overview.dealt': { en: 'Cards Dealt', beanie: 'cards dealt' },
   'whoOwnsWhat.overview.ringLabel': {
-    en: '{held} of {deck} cards dealt',
-    beanie: '{held} of {deck} cards dealt',
+    en: '{held} of {total} cards have a holder',
+    beanie: '{held} of {total} cards have a holder',
   },
   'whoOwnsWhat.overview.allHeld': {
     en: 'Every card in your deck has a holder.',
@@ -12646,6 +12646,10 @@ const STRING_DEFS = {
     en: 'Nearly there. {count} cards are waiting for someone to pick them up.',
     beanie: 'nearly there. {count} cards are waiting for someone to pick them up.',
   },
+  'whoOwnsWhat.overview.toSort': {
+    en: '{held} of {total} cards have a holder. {count} still to sort.',
+    beanie: '{held} of {total} cards have a holder. {count} still to sort.',
+  },
   'whoOwnsWhat.overview.empty': {
     en: 'Your deck is empty. Bring back a skipped card or add one of your own.',
     beanie: 'your deck is empty. bring back a skipped card or add one of your own.',
@@ -12655,13 +12659,14 @@ const STRING_DEFS = {
     en: 'waiting for a holder',
     beanie: 'waiting for a holder',
   },
+  'whoOwnsWhat.overview.legend.unsorted': { en: 'still to sort', beanie: 'still to sort' },
   'whoOwnsWhat.overview.legend.skipped': {
     en: 'skipped, not for this family',
     beanie: 'skipped, not for this family',
   },
   'whoOwnsWhat.overview.legend.total': {
-    en: '{deck} in your deck, out of {total} in the full set',
-    beanie: '{deck} in your deck, out of {total} in the full set',
+    en: '{inPlay} in play, out of {total} in the full set',
+    beanie: '{inPlay} in play, out of {total} in the full set',
   },
   'whoOwnsWhat.overview.dealLast.one': { en: 'Deal the Last Card', beanie: 'deal the last card' },
   'whoOwnsWhat.overview.dealLast.other': {
@@ -12676,6 +12681,7 @@ const STRING_DEFS = {
   },
   'whoOwnsWhat.overview.allDealt': { en: 'All {count} dealt', beanie: 'all {count} dealt' },
   'whoOwnsWhat.overview.catWaiting': { en: '{count} waiting', beanie: '{count} waiting' },
+  'whoOwnsWhat.overview.catToSort': { en: '{count} to sort', beanie: '{count} to sort' },
   'whoOwnsWhat.overview.waitingTitle': {
     en: 'Waiting for a Holder',
     beanie: 'waiting for a holder',

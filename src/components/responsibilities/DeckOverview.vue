@@ -2,7 +2,8 @@
 /**
  * Who Owns What (#109): the Overview, the default view (Requirement 7, mockup sections 1
  * and 2). It answers "is every job covered?", never "who holds more?": the ring counts
- * cards dealt against the deck, categories show coverage and faces, and NO per-person
+ * cards with a holder against every card in play (the whole set minus skipped, so unsorted
+ * cards count as not done yet), categories show coverage and faces, and NO per-person
  * total appears anywhere on this surface.
  *
  * Sections: summary (ring, legend, Deal the Last N, See the Skipped Pile), By Category,
@@ -65,8 +66,15 @@ const WAITING_SHOWN = 5;
 const stats = computed(() => store.stats);
 
 const headline = computed(() => {
-  const { deck, waiting } = stats.value;
-  if (!deck) return t('whoOwnsWhat.overview.empty');
+  const { inPlay, held, waiting, unsorted } = stats.value;
+  if (!inPlay) return t('whoOwnsWhat.overview.empty');
+  if (unsorted) {
+    return fillTemplate(t('whoOwnsWhat.overview.toSort'), {
+      held,
+      total: inPlay,
+      count: unsorted,
+    });
+  }
   if (!waiting) return t('whoOwnsWhat.overview.allHeld');
   return fillTemplate(
     t(waiting === 1 ? 'whoOwnsWhat.overview.waiting.one' : 'whoOwnsWhat.overview.waiting.other'),
@@ -77,6 +85,15 @@ const headline = computed(() => {
 const legend = computed(() => [
   { key: 'held', count: stats.value.held, label: t('whoOwnsWhat.overview.legend.held') },
   { key: 'waiting', count: stats.value.waiting, label: t('whoOwnsWhat.overview.legend.waiting') },
+  ...(stats.value.unsorted
+    ? [
+        {
+          key: 'unsorted',
+          count: stats.value.unsorted,
+          label: t('whoOwnsWhat.overview.legend.unsorted'),
+        },
+      ]
+    : []),
   { key: 'skipped', count: stats.value.skipped, label: t('whoOwnsWhat.overview.legend.skipped') },
 ]);
 
@@ -157,7 +174,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
       <!-- Summary -->
       <DeckPanel>
         <div class="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-          <DeckRing :held="stats.held" :deck="stats.deck" />
+          <DeckRing :held="stats.held" :waiting="stats.waiting" :in-play="stats.inPlay" />
           <div class="flex min-w-0 flex-1 flex-col gap-3.5">
             <p
               class="font-outfit dark:text-ink text-base font-semibold text-[var(--color-text)]"
@@ -166,7 +183,12 @@ const kidsHolding = computed<FamilyMember[]>(() =>
               {{ headline }}
             </p>
             <ul class="space-y-1.5 text-sm">
-              <li v-for="row in legend" :key="row.key" class="flex items-center gap-2">
+              <li
+                v-for="row in legend"
+                :key="row.key"
+                class="flex items-center gap-2"
+                :data-testid="`overview-legend-${row.key}`"
+              >
                 <span class="legend-key h-3 w-3 shrink-0 rounded-full" :class="row.key" />
                 <strong class="font-outfit dark:text-ink text-[var(--color-text)]">{{
                   row.count
@@ -178,7 +200,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
               <li class="dark:text-ink-faint pl-5 text-xs text-[var(--color-text-muted)]">
                 {{
                   fillTemplate(t('whoOwnsWhat.overview.legend.total'), {
-                    deck: stats.deck,
+                    inPlay: stats.inPlay,
                     total: stats.total,
                   })
                 }}
@@ -396,6 +418,16 @@ html.dark .legend-key.waiting {
     transparent 2px 5px
   );
   box-shadow: inset 0 0 0 1.5px var(--color-accent-lift);
+}
+
+.legend-key.unsorted {
+  background: rgb(241 93 34 / 12%);
+  box-shadow: inset 0 0 0 1.5px rgb(241 93 34 / 35%);
+}
+
+html.dark .legend-key.unsorted {
+  background: color-mix(in srgb, var(--color-accent-lift) 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent-lift) 45%, transparent);
 }
 
 .legend-key.skipped {
