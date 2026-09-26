@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * Who Owns What (#109): "By Category" on the Overview. One row per category with cards in
- * the deck: a held / waiting bar, "All N dealt" or "N waiting", and the faces of whoever
- * holds cards there. Coverage, never comparison: faces only, no per-person counts.
+ * play (anything not skipped): a held / waiting / still-to-sort bar, "N to sort", "N waiting"
+ * or "All N dealt", and the faces of whoever holds cards there. Coverage, never comparison: faces only, no per-person counts.
  *
  * Desktop: one line per category. Phone: name and faces, then the bar and count beneath.
  */
@@ -49,7 +49,7 @@ function faces(row: CategoryCoverage): FamilyMember[] {
         class="bar dark:bg-surface-overlay order-3 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-[var(--tint-slate-5)] sm:order-2"
         role="img"
         :aria-label="
-          fillTemplate(t('whoOwnsWhat.overview.ringLabel'), { held: row.held, deck: row.deck })
+          fillTemplate(t('whoOwnsWhat.overview.ringLabel'), { held: row.held, total: row.deck })
         "
       >
         <span
@@ -58,19 +58,25 @@ function faces(row: CategoryCoverage): FamilyMember[] {
           :style="{ flex: row.held }"
         />
         <span v-if="row.waiting" class="waiting rounded-full" :style="{ flex: row.waiting }" />
+        <span v-if="row.unsorted" class="unsorted rounded-full" :style="{ flex: row.unsorted }" />
       </span>
       <span
         class="order-4 text-xs whitespace-nowrap tabular-nums sm:order-3"
         :class="
-          row.waiting
-            ? 'text-primary-500 dark:text-accent-lift font-semibold'
-            : 'dark:text-ink-faint text-[var(--color-text-muted)]'
+          row.unsorted
+            ? 'dark:text-ink-soft font-semibold text-[var(--color-text-muted)]'
+            : row.waiting
+              ? 'text-primary-500 dark:text-accent-lift font-semibold'
+              : 'dark:text-ink-faint text-[var(--color-text-muted)]'
         "
+        :data-testid="`category-coverage-count-${row.category}`"
       >
         {{
-          row.waiting
-            ? fillTemplate(t('whoOwnsWhat.overview.catWaiting'), { count: row.waiting })
-            : fillTemplate(t('whoOwnsWhat.overview.allDealt'), { count: row.deck })
+          row.unsorted
+            ? fillTemplate(t('whoOwnsWhat.overview.catToSort'), { count: row.unsorted })
+            : row.waiting
+              ? fillTemplate(t('whoOwnsWhat.overview.catWaiting'), { count: row.waiting })
+              : fillTemplate(t('whoOwnsWhat.overview.allDealt'), { count: row.deck })
         }}
       </span>
       <span class="order-2 justify-self-end sm:order-4">
@@ -91,5 +97,13 @@ html.dark .waiting {
     var(--color-accent-lift) 0 2px,
     transparent 2px 6px
   );
+}
+
+.unsorted {
+  background: rgb(241 93 34 / 14%);
+}
+
+html.dark .unsorted {
+  background: color-mix(in srgb, var(--color-accent-lift) 18%, transparent);
 }
 </style>

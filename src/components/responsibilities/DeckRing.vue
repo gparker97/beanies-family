@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /**
- * Who Owns What (#109): the Overview's ring, cards dealt (held) out of the family's deck,
- * with the waiting share drawn faintly after it. Brand gradient on a slate track that has
- * its own dark partner. Animates up from 0 on mount; static under reduced motion.
+ * Who Owns What (#109): the Overview's ring, cards with a holder out of every card in play
+ * (the whole set minus skipped), so it only fills as the deck is actually sorted. The rest
+ * is drawn faintly after it: waiting, then (fainter still) the cards still to sort. Brand
+ * gradient on a slate track that has its own dark partner. Animates up from 0 on mount;
+ * static under reduced motion.
  *
  * Single consumer, so it lives with the feature. Move it to `ui/` when a second appears.
  */
@@ -11,7 +13,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { fillTemplate } from '@/utils/fillTemplate';
 
-const props = defineProps<{ held: number; deck: number }>();
+const props = defineProps<{ held: number; waiting: number; inPlay: number }>();
 
 const { t } = useTranslation();
 const gradientId = `deck-ring-${useId()}`;
@@ -28,14 +30,15 @@ onMounted(() => {
   });
 });
 
-const heldLen = computed(() =>
-  props.deck ? (props.held / props.deck) * CIRCUMFERENCE * drawn.value : 0
-);
-const waitingLen = computed(() =>
-  props.deck ? ((props.deck - props.held) / props.deck) * CIRCUMFERENCE * drawn.value : 0
-);
+/** Arc length for `count` cards out of everything in play. */
+function arc(count: number): number {
+  return props.inPlay ? (count / props.inPlay) * CIRCUMFERENCE * drawn.value : 0;
+}
+const heldLen = computed(() => arc(props.held));
+const waitingLen = computed(() => arc(props.waiting));
+const unsortedLen = computed(() => arc(Math.max(0, props.inPlay - props.held - props.waiting)));
 const label = computed(() =>
-  fillTemplate(t('whoOwnsWhat.overview.ringLabel'), { held: props.held, deck: props.deck })
+  fillTemplate(t('whoOwnsWhat.overview.ringLabel'), { held: props.held, total: props.inPlay })
 );
 </script>
 
@@ -70,12 +73,22 @@ const label = computed(() =>
         :stroke-dasharray="`${waitingLen} ${CIRCUMFERENCE}`"
         :stroke-dashoffset="-heldLen"
       />
+      <circle
+        class="arc unsorted"
+        cx="50"
+        cy="50"
+        :r="RADIUS"
+        fill="none"
+        stroke-width="11"
+        :stroke-dasharray="`${unsortedLen} ${CIRCUMFERENCE}`"
+        :stroke-dashoffset="-(heldLen + waitingLen)"
+      />
     </svg>
     <div class="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
       <span class="font-outfit dark:text-ink text-3xl font-extrabold text-[var(--color-text)]">
         {{ held
         }}<span class="dark:text-ink-faint text-base font-semibold text-[var(--color-text-muted)]"
-          >/{{ deck }}</span
+          >/{{ inPlay }}</span
         >
       </span>
       <span class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
@@ -106,6 +119,16 @@ html.dark .track {
 }
 
 html.dark .waiting {
+  stroke: var(--color-accent-lift);
+}
+
+.unsorted {
+  opacity: 0.12;
+  stroke: #f15d22;
+}
+
+html.dark .unsorted {
+  opacity: 0.16;
   stroke: var(--color-accent-lift);
 }
 

@@ -252,6 +252,8 @@ export interface DeckStats {
   total: number;
   /** The family's deck: waiting + held. */
   deck: number;
+  /** Every card not skipped: held + waiting + unsorted. The Overview's progress measures against this. */
+  inPlay: number;
   held: number;
   waiting: number;
   skipped: number;
@@ -264,6 +266,7 @@ export function deckStats(cards: readonly ResolvedCard[]): DeckStats {
   const s: DeckStats = {
     total: cards.length,
     deck: 0,
+    inPlay: 0,
     held: 0,
     waiting: 0,
     skipped: 0,
@@ -277,6 +280,7 @@ export function deckStats(cards: readonly ResolvedCard[]): DeckStats {
     }
   }
   s.deck = s.held + s.waiting;
+  s.inPlay = s.total - s.skipped;
   return s;
 }
 
@@ -312,21 +316,26 @@ export function groupByCategory(cards: readonly ResolvedCard[]): CategoryGroup[]
 
 export interface CategoryCoverage {
   category: ListCategory;
+  /** Every card in the category that is not skipped: held + waiting + unsorted. */
   deck: number;
   held: number;
   waiting: number;
+  unsorted: number;
   /** Everyone holding at least one part in the category. Faces only, never counts. */
   holderIds: string[];
 }
 
-/** Per category in `LIST_CATEGORIES` order (unknown categories last); only categories with a deck. */
+/**
+ * Per category in `LIST_CATEGORIES` order (unknown categories last); only categories with at
+ * least one card that is not skipped, so a category still waiting to be sorted shows too.
+ */
 export function categoryCoverage(cards: readonly ResolvedCard[]): CategoryCoverage[] {
   const byCat = new Map<ListCategory, CategoryCoverage>();
   for (const c of cards) {
-    if (c.status !== 'held' && c.status !== 'waiting') continue;
+    if (c.status === 'skipped') continue;
     let row = byCat.get(c.category);
     if (!row) {
-      row = { category: c.category, deck: 0, held: 0, waiting: 0, holderIds: [] };
+      row = { category: c.category, deck: 0, held: 0, waiting: 0, unsorted: 0, holderIds: [] };
       byCat.set(c.category, row);
     }
     row.deck += 1;
