@@ -6,11 +6,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { UndoToken } from '@/utils/responsibilityOps';
 
-const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn(), invoke: vi.fn() }));
+// A live toast list like the real one: shown toasts sit in it until dismissed or used.
+const toast = vi.hoisted(() => {
+  const toasts = { value: [] as { id: number; actionFn?: () => unknown }[] };
+  const remove = (id: number) => (toasts.value = toasts.value.filter((t) => t.id !== id));
+  return {
+    toasts,
+    show: vi.fn(),
+    dismiss: vi.fn(remove),
+    invoke: vi.fn(async (id: number) => void remove(id)),
+  };
+});
 vi.mock('@/composables/useToast', () => ({
   showToast: toast.show,
   dismissToast: toast.dismiss,
   invokeToastAction: toast.invoke,
+  hasToastAction: (id: number) => toast.toasts.value.some((t) => t.id === id && !!t.actionFn),
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -44,8 +55,14 @@ const TOKEN: UndoToken = {
 beforeEach(() => {
   vi.clearAllMocks();
   resetDealActionsForTest();
+  toast.toasts.value = [];
   let id = 0;
-  toast.show.mockImplementation(() => ++id);
+  toast.show.mockImplementation(
+    (_type: string, _title: string, _message?: string, opts?: { actionFn?: () => unknown }) => {
+      toast.toasts.value.push({ id: ++id, actionFn: opts?.actionFn });
+      return id;
+    }
+  );
 });
 
 describe('useDealActions', () => {
@@ -152,13 +169,25 @@ describe('useDealActions', () => {
       debug.mockRestore();
     });
 
-    it('an expired toast is left to invokeToastAction, which no-ops', async () => {
+    it('an expired or dismissed toast leaves U unhandled, with nothing invoked', async () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
       store.skip.mockResolvedValue({ result: ['a'], undo: TOKEN });
       await useDealActions().skip(['a']);
-      toast.invoke.mockResolvedValueOnce(undefined);
+      expect(useDealActions().hasLiveUndo()).toBe(true);
+      // The toast times out (the real list drops it on its own timer).
+      toast.toasts.value = [];
+      expect(useDealActions().hasLiveUndo()).toBe(false);
       await useDealActions().undoLast();
-      expect(toast.invoke).toHaveBeenCalledWith(1);
-      expect(store.undo).not.toHaveBeenCalled();
+      expect(toast.invoke).not.toHaveBeenCalled();
+      debug.mockRestore();
+    });
+
+    it('an Undo tapped on the toast itself leaves nothing for U', async () => {
+      store.keep.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+      store.undo.mockResolvedValue(true);
+      await useDealActions().keep('laundry');
+      await toast.invoke(1);
+      expect(useDealActions().hasLiveUndo()).toBe(false);
     });
   });
 });

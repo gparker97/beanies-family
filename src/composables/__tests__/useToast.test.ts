@@ -6,7 +6,7 @@ vi.mock('@/utils/errorReporter', () => ({
   reportError: vi.fn(),
 }));
 
-import { showToast, dismissToast, invokeToastAction, useToast } from '../useToast';
+import { showToast, dismissToast, hasToastAction, invokeToastAction, useToast } from '../useToast';
 import { reportError } from '@/utils/errorReporter';
 
 describe('useToast — action-button extension', () => {
@@ -46,6 +46,18 @@ describe('useToast — action-button extension', () => {
     const toast = toasts.value.at(-1);
     expect(toast?.actionLabel).toBe('Undo');
     expect(toast?.actionFn).toBe(fn);
+  });
+
+  it('hasToastAction is true only while the toast is up and carries an action', async () => {
+    const withAction = showToast('success', 'Kept', undefined, { actionFn: () => {} });
+    const plain = showToast('info', 'Plain');
+    expect(hasToastAction(withAction)).toBe(true);
+    expect(hasToastAction(plain)).toBe(false);
+    await invokeToastAction(withAction);
+    expect(hasToastAction(withAction)).toBe(false);
+    const again = showToast('success', 'Kept again', undefined, { actionFn: () => {} });
+    dismissToast(again);
+    expect(hasToastAction(again)).toBe(false);
   });
 
   it('invokeToastAction dismisses the toast AND calls the handler', async () => {

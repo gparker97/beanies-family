@@ -64,7 +64,7 @@ export function pileView(status: CardStatus, picking: boolean): PileView {
 
 export interface PilePosition {
   category: ListCategory | null;
-  /** 1-based index within the category; null while visiting a card outside the queue. */
+  /** 1-based index within the category; null while `visiting` (views read `visiting`). */
   n: number | null;
   total: number | null;
 }
@@ -165,11 +165,14 @@ export function usePileCursor(opts: {
     currentId.value = orderedIds.value[i + dir]!;
   }
 
-  /** Show this card. One outside the queue is visited (see the file header), never added. */
+  /**
+   * Show this card. One outside the queue is visited (see the file header), never added.
+   * Every jump re-records where a visit goes back to: the card on screen, or nothing when
+   * the jump leaves the done state (so an older card is never returned to). A jump from one
+   * visited card to another keeps the queue card the first visit left.
+   */
   function jumpTo(id: string): void {
-    if (!queue.value.includes(id) && currentId.value && !visiting.value) {
-      returnId.value = currentId.value;
-    }
+    if (!visiting.value) returnId.value = currentId.value;
     currentId.value = id;
   }
 
