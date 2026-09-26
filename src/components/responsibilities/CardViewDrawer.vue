@@ -88,17 +88,25 @@ const uses = computed(() => {
   return lines;
 });
 
-/** True while THIS drawer is deleting its card, so the disappearance below is expected. */
+/**
+ * True only while THIS drawer's confirmed delete is being written, so that disappearance
+ * is expected. Not during the confirm itself: a card deleted elsewhere while the confirm
+ * is up still gets the notice and the close below.
+ */
 let deleting = false;
 
 async function onDelete(): Promise<void> {
   if (!card.value) return;
-  deleting = true;
+  let deleted = false;
   try {
-    if (await confirmAndDeleteCard(card.value)) emit('close');
+    deleted = await confirmAndDeleteCard(card.value, { onConfirmed: () => (deleting = true) });
   } finally {
     deleting = false;
   }
+  // Never leave an empty drawer: close on our delete, and also when the card is gone
+  // however the delete ended (the store refused it because another device deleted it
+  // first, and has said so).
+  if (deleted || (props.open && !card.value)) emit('close');
 }
 
 watch(card, (next, prev) => {
