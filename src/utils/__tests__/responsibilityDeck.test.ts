@@ -296,6 +296,7 @@ describe('deckStats / categoryCoverage', () => {
     expect(deckStats(cards)).toEqual({
       total: 5,
       deck: 3,
+      inPlay: 4,
       held: 2,
       waiting: 1,
       skipped: 1,
@@ -306,9 +307,40 @@ describe('deckStats / categoryCoverage', () => {
 
   it('reports coverage per category in category order, faces without counts', () => {
     expect(categoryCoverage(cards)).toEqual([
-      { category: 'home', deck: 2, held: 2, waiting: 0, holderIds: ['greg', 'sofia'] },
-      { category: 'kids', deck: 1, held: 0, waiting: 1, holderIds: ['greg'] },
+      {
+        category: 'home',
+        deck: 2,
+        held: 2,
+        waiting: 0,
+        unsorted: 0,
+        holderIds: ['greg', 'sofia'],
+      },
+      { category: 'kids', deck: 1, held: 0, waiting: 1, unsorted: 0, holderIds: ['greg'] },
+      // Only an unsorted card here, so the row shows up with nothing dealt yet; the skipped
+      // `out` category (car-care) never does.
+      { category: 'projects', deck: 1, held: 0, waiting: 0, unsorted: 1, holderIds: [] },
     ]);
+  });
+
+  it('inPlay is the whole set minus skipped, and coverage counts unsorted cards per category', () => {
+    const stats = deckStats(cards);
+    expect(stats.inPlay).toBe(stats.held + stats.waiting + stats.unsorted);
+    expect(stats.inPlay).toBe(stats.total - stats.skipped);
+    const rows = categoryCoverage(cards);
+    // Every non-skipped card lands in exactly one row; skipped never does.
+    expect(rows.reduce((n, r) => n + r.deck, 0)).toBe(stats.inPlay);
+    expect(rows.reduce((n, r) => n + r.unsorted, 0)).toBe(stats.unsorted);
+    for (const r of rows) expect(r.deck).toBe(r.held + r.waiting + r.unsorted);
+  });
+
+  it('a category with only unsorted cards still gets a coverage row', () => {
+    const r = resolve([]);
+    const rows = categoryCoverage(r.cards);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row).toMatchObject({ held: 0, waiting: 0, holderIds: [] });
+      expect(row.unsorted).toBe(row.deck);
+    }
   });
 
   it('singleHolderOf is undefined for split, waiting, skipped and unknown cards', () => {
