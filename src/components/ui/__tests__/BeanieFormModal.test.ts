@@ -117,4 +117,39 @@ describe('BeanieFormModal', () => {
       expect(cls).toContain('bg-gradient-to-r');
     });
   });
+
+  describe('deleteDisabledReason', () => {
+    const deleteTile = () =>
+      document.body.querySelector<HTMLButtonElement>('[data-testid="form-modal-delete"]');
+    const reason = () => document.body.querySelector('[data-testid="form-modal-delete-reason"]');
+
+    it('renders no delete tile by default', () => {
+      mount(BeanieFormModal, { props: baseProps, attachTo: document.body });
+      expect(deleteTile()).toBeNull();
+    });
+
+    it('showDelete renders an enabled tile with no reason badge', async () => {
+      const w = mount(BeanieFormModal, {
+        props: { ...baseProps, showDelete: true },
+        attachTo: document.body,
+      });
+      expect(deleteTile()!.disabled).toBe(false);
+      expect(reason()).toBeNull();
+      deleteTile()!.click();
+      expect(w.emitted('delete')).toHaveLength(1);
+    });
+
+    it('renders the tile disabled with an InfoHintBadge carrying the reason', () => {
+      const w = mount(BeanieFormModal, {
+        props: { ...baseProps, deleteDisabledReason: 'Built-in cards stay in the deck.' },
+        attachTo: document.body,
+      });
+      expect(deleteTile()!.disabled).toBe(true);
+      expect(reason()).not.toBeNull();
+      const badge = w.findComponent({ name: 'InfoHintBadge' });
+      expect(badge.props('text')).toBe('Built-in cards stay in the deck.');
+      deleteTile()!.click();
+      expect(w.emitted('delete')).toBeUndefined();
+    });
+  });
 });
