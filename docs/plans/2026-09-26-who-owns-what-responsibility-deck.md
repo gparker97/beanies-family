@@ -392,6 +392,24 @@ Surface **`responsibilities`** (store and page), **`deck-export`** (fridge sheet
 - **Pass 3 (Sustainability)**: split the store into pure op builders (utils) + thin orchestrating store + a repository that computes nothing (`applyDeckOps`); undo scoped to deal/keep/skip/bringBack with one generic snapshot token; `deal` implies keep and the edit drawer saves as one atomic `saveCard`; whole-record `set` writes and `resolveDeck` shape validation; moves are advisory (superseded moves ignored); card-move/check-in reads age-pruned at 30 days instead of exempt forever; BeanHero migration deferred; `confirmChoice` keeps confirm's boolean; briefing rows from a pure builder with a generic `dismissKey` / `route`; one `useDealActions` for undo toasts; generic `ListCategoryPills`; one-way store dependency rule; old-client wall exposure of `people` lists noted; extraction commits sequenced and individually revertible.
 - **Pass 4 (Fresh-eyes sweep)**: fixed first-deal moves flooding the briefing (`isRedeal`, actor-exclusion, cap 3); meal cook default only for recipe/other kinds; list `createdBy` preserved (holder via `overrides.ownerId`); defined restore-with-keep (custom → waiting; first-deal state keyed on built-ins); export runner gains per-page PDF rendering + iOS canvas pixel-ratio clamp and keeps the meal sheet's surface/copy; `wrapAsync` surface/context only when passed, translated verify errors; one visible undo toast at a time; store-side holder validation with every write guarded; unknown list categories fail closed on the wall; removed stale `integration` / `cookFromCardId` / `hintCardId` / template `cardId` / bean-picker / `*Batch` references; added missing test and legend-rename files.
 
+## Outcome
+
+> Recorded 2026-09-26 after /beanies-build-auto.
+
+Built in 43 local commits on `main` (from `820f0d6c`), not pushed or deployed. `npm run validate` green (9210 tests). Implemented in four slices (shared extractions, data layer + deck + store, UI, integrations + help + E2E) by implementation agents, then two `/code-review high` rounds.
+
+Deviations from the plan, all deliberate:
+
+- **Check-in anchor is stored, not derived.** Two review rounds showed the derived anchor (`firstDealtAt` from card `createdAt`, then from moves) could not satisfy restore, decide-later-only decks and custom-card deletion at once. It was replaced by a write-once `kind: 'start'` record in `responsibilityCheckIns`, written in the same batch as the write that first puts something in an empty deck; due date = latest start or check-in + rhythm. Undo of that first write deletes the start record.
+- **Check-in ids are unique** (`YYYY-MM-DD-<suffix>`), not the date, so same-day check-ins no longer overwrite each other; the day is read from `completedAt`.
+- The store stayed one file (~540 lines) rather than splitting out check-in, to avoid exposing its private write helpers.
+- First deal opens the pile at every width (desktop links to the board).
+- `pngBlobsToPdf` compresses page images (a 3-page deck PDF went from 30 MB to 1.2 MB), which also shrinks the meal plan PDF.
+- The deck-dealt celebration and the pile's in-page completion card both show, as the plan and mockup ask; flagged to greg.
+- Fixed in passing: the selected filter pill on Beanie Lists had no background (an undefined colour variable).
+
+Follow-up requested by greg the same day: a desktop dealing redesign (dealing table, Card by card / Board switch, neutral Keep/Skip, this-round panel, back/forward filmstrip), mockup first.
+
 ## Appendix A: Built-in deck (draft, ~81 cards)
 
 Names below are the `beanie` (lowercase) values; `en` is Title Case. Done lines are drafted during implementation in the same voice as the mockup ("everyone fed by seven, most nights"), American English, one short line each.

@@ -8,6 +8,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-26
+
+_Not yet released._
+
+### Added
+
+- **Who Owns What.** A new Treehouse page with a deck of about 80 household responsibility
+  cards, from cooking dinner to date nights. Keep or skip each card, hand it to someone in one
+  tap, split it by child or by place, and re-deal it whenever things change. The overview shows
+  how much of the deck is covered, never who does more.
+- A **family check-in** every 2, 4 or 8 weeks (or off) brings up the cards worth talking about.
+- The dealt deck prints as a **fridge sheet** (PDF) or shares as an image.
+- Card holders fill in the cook on new dinners and breakfasts, the owner of new grocery and
+  packing lists, and who gets gift and trip hints, with a note saying why.
+- The daily briefing shows your cards, cards that moved to or from you, cards nobody holds yet
+  and when a check-in is due.
+- **People We Love** is a new list category.
+
+### Fixed
+
+- The selected filter pill on Beanie Lists shows its highlight again.
+
 ## 2026-09-25
 
 _Released in 0.23 (web, Android production; iOS in App Store review)._
