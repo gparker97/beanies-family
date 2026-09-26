@@ -64,4 +64,52 @@ describe('useAttentionPulse.pulse', () => {
     vi.advanceTimersByTime(1000);
     expect(target.classList.contains('card-bounce')).toBe(false);
   });
+
+  it('ignores an animationend bubbled up from a descendant', () => {
+    const target = document.createElement('div');
+    const child = document.createElement('span');
+    target.appendChild(child);
+    useAttentionPulse().pulse(target, 'card-bounce');
+    child.dispatchEvent(new Event('animationend', { bubbles: true }));
+    expect(target.classList.contains('card-bounce')).toBe(true);
+    target.dispatchEvent(new Event('animationend'));
+    expect(target.classList.contains('card-bounce')).toBe(false);
+  });
+
+  it('under reduced motion (no animationend), a stale listener cannot end a newer pulse', () => {
+    const target = document.createElement('div');
+    const child = document.createElement('span');
+    target.appendChild(child);
+    const { pulse } = useAttentionPulse();
+    // First pulse: animation suppressed, so only the fallback ends it.
+    pulse(target, 'key-press');
+    vi.advanceTimersByTime(3000);
+    expect(target.classList.contains('key-press')).toBe(false);
+    // A newer pulse; a later animationend bubbling up (a child's) must not end it early.
+    pulse(target, 'key-press');
+    child.dispatchEvent(new Event('animationend', { bubbles: true }));
+    vi.advanceTimersByTime(2900);
+    expect(target.classList.contains('key-press')).toBe(true);
+    // Its own fallback still ends it.
+    vi.advanceTimersByTime(100);
+    expect(target.classList.contains('key-press')).toBe(false);
+  });
+
+  it('a re-trigger detaches the earlier listener, so one animationend finishes one pulse', () => {
+    const target = document.createElement('div');
+    const remove = vi.spyOn(target.classList, 'remove');
+    const { pulse } = useAttentionPulse();
+    pulse(target, 'card-bounce');
+    pulse(target, 'card-bounce');
+    remove.mockClear();
+    target.dispatchEvent(new Event('animationend'));
+    // One finish, not two (the first pulse's listener is gone).
+    expect(remove).toHaveBeenCalledTimes(1);
+    // Pulses on different classes are independent.
+    pulse(target, 'card-bounce');
+    pulse(target, 'drop-flash');
+    vi.advanceTimersByTime(3000);
+    expect(target.classList.contains('card-bounce')).toBe(false);
+    expect(target.classList.contains('drop-flash')).toBe(false);
+  });
 });
