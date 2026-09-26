@@ -5,7 +5,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
-import { LIST_CATEGORIES } from '@/constants/listCategories';
+import { LIST_CATEGORIES, isKnownListCategory } from '@/constants/listCategories';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { groupByRecency, groupCompletedByRecency } from '@/utils/completedListBands';
 import { useToday } from '@/composables/useToday';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
@@ -80,8 +81,40 @@ const shelves = computed<Shelf[]>(() => {
     if (lists.length)
       out.push({ key: cat.id, title: categoryLabel(cat.id), emoji: cat.emoji, lists });
   }
+  // Lists whose category this build doesn't know (added by a newer client) get ONE
+  // fallback shelf, so a future category can never hide lists on an older client again.
+  // Hidden while a category filter is on (an unknown category can't be selected).
+  if (!selectedCategory.value) {
+    const unknown: FamilyList[] = [];
+    for (const [cat, lists] of listStore.listsByCategory) {
+      if (isKnownListCategory(cat)) continue;
+      reportUnknownCategory(cat);
+      unknown.push(...lists.filter((l) => !dueIds.has(l.id)));
+    }
+    if (unknown.length) {
+      out.push({ key: '__other', title: t('lists.category.other'), emoji: '📁', lists: unknown });
+    }
+  }
   return out;
 });
+
+/**
+ * Log each unknown category once per page instance. The value comes from the document,
+ * so it is sent only when it has the shape of a real category id; anything else is
+ * reported as `'invalid'` so user-typed text can never reach the firehose.
+ */
+const reportedUnknownCategories = new Set<string>();
+function reportUnknownCategory(cat: unknown): void {
+  const key = String(cat);
+  if (reportedUnknownCategories.has(key)) return;
+  reportedUnknownCategories.add(key);
+  logEvent({
+    level: 'warn',
+    surface: 'lists',
+    message: 'unknown_category',
+    context: { detail: /^[a-z-]{1,32}$/.test(key) ? key : 'invalid' },
+  });
+}
 
 const completed = computed(() =>
   listStore.completedLists.filter(

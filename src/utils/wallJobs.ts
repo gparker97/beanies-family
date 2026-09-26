@@ -27,6 +27,7 @@
  * in both places is one job, not two, and the dated to-do wins.
  */
 import type { FamilyList, FamilyListItem, ListCategory, TodoItem } from '@/types/models';
+import { isKnownListCategory } from '@/constants/listCategories';
 import type {
   WallJob,
   WallJobsInput,
@@ -52,10 +53,14 @@ import { extractDatePart } from '@/utils/date';
  * this is the same promise for the other sensitive categories, and it belongs
  * in the rule rather than in a component.
  */
-const PRIVATE_LIST_CATEGORIES: readonly ListCategory[] = ['health', 'me'];
+const PRIVATE_LIST_CATEGORIES: readonly ListCategory[] = ['health', 'people', 'me'];
 
+/**
+ * A category this build doesn't know (synced from a newer client) fails CLOSED: the
+ * wall is a shared screen, and an unknown category may well be a private one.
+ */
 export function isWallSafeList(list: FamilyList): boolean {
-  return !PRIVATE_LIST_CATEGORIES.includes(list.category);
+  return isKnownListCategory(list.category) && !PRIVATE_LIST_CATEGORIES.includes(list.category);
 }
 
 /**
