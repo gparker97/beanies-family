@@ -326,6 +326,7 @@ describe('edit, custom cards and restore', () => {
       expect.objectContaining({
         surface: 'responsibilities',
         message: expect.stringContaining('buildSaveCard'),
+        severity: 'critical', // a family's save failed: pages Slack
         context: { action: 'responsibilityStore:saveCard' },
         error: expect.objectContaining({ message: expect.stringContaining('buildSaveCard') }),
       })

@@ -419,9 +419,11 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   function failBuild(action: string, e: unknown): null {
     const err = e instanceof Error ? e : new Error(String(e));
     error.value = err.message;
+    // Critical: a family's save or deal failed (CLAUDE.md), so it pages, not just logs.
     reportError({
       surface: SURFACE,
       message: err.message,
+      severity: 'critical',
       error: err,
       context: { action: `responsibilityStore:${action}` },
     });
