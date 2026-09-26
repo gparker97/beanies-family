@@ -1,4 +1,5 @@
 import { computed } from 'vue';
+import type { RouteLocationRaw } from 'vue-router';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
@@ -8,9 +9,19 @@ import { useActivityStore } from '@/stores/activityStore';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useMemberInfo } from '@/composables/useMemberInfo';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import { useNotificationsStore } from '@/stores/notificationsStore';
+import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
+import { buildCardBriefingRows, type CardBriefingRow } from '@/utils/responsibilityDeck';
 import { useTranslation } from '@/composables/useTranslation';
-import { formatTime12, formatDateShort, addDays, toISODateString } from '@/utils/date';
+import {
+  formatTime12,
+  formatDateShort,
+  formatNookDate,
+  addDays,
+  toISODateString,
+} from '@/utils/date';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -29,7 +40,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal';
+  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -38,6 +49,10 @@ export interface CriticalItem {
   completed?: boolean; // whether this item is done
   dutyType?: 'dropoff' | 'pickup' | 'dropoff-pickup'; // for duty items only
   caption?: string; // optional subtitle below the message (used by 'holiday')
+  /** Generic: ticking the row writes this read key (notificationsStore.markRead). */
+  dismissKey?: string;
+  /** Generic: tapping the row routes here (never falls through to open-activity). */
+  route?: RouteLocationRaw;
 }
 
 /** How many briefing items show before the "Show all N" disclosure appears. */
@@ -108,6 +123,14 @@ const MEAL_UNASSIGNED_KEY = 'mealPlanner.briefing.unassigned' satisfies UIString
 // Helpful Hints (#40) — one fixed framing, no due-state table (see the loop).
 const HINT_KEY = 'nook.criticalHint' satisfies UIStringKey;
 
+// Who Owns What (#109) — card rows come from the pure `buildCardBriefingRows`; this
+// only maps them. Copy never counts anything about anyone but the viewer.
+const WHO_OWNS_WHAT_PATH = '/who-owns-what';
+const MOVED_KEYS = {
+  from: 'whoOwnsWhat.briefing.movedAway',
+  to: 'whoOwnsWhat.briefing.movedToYou',
+} satisfies Record<'from' | 'to', UIStringKey>;
+
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
   const todoStore = useTodoStore();
@@ -118,6 +141,9 @@ export function useCriticalItems() {
   const medicationsStore = useMedicationsStore();
   const holidayStore = useHolidayStore();
   const settingsStore = useSettingsStore();
+  const responsibilityStore = useResponsibilityStore();
+  const notificationsStore = useNotificationsStore();
+  const { cardName } = useResponsibilityCardLabel();
   const { getMemberName, getMemberById } = useMemberInfo();
   const { t } = useTranslation();
   const { today: todayStr } = useToday();
@@ -408,6 +434,20 @@ export function useCriticalItems() {
       }
     }
 
+    // ── Who Owns What (#109) card rows ───────────────────────────────
+    // Untimed, so they keep insertion order: above the hint block, below the rest.
+    const cardRows = buildCardBriefingRows({
+      cards: responsibilityStore.resolved,
+      moves: responsibilityStore.moves,
+      checkIns: responsibilityStore.checkIns,
+      rhythmWeeks: responsibilityStore.rhythmWeeks,
+      readState: notificationsStore.readState,
+      viewerId: memberId,
+      viewerIsAdult: isAdultMember(currentMember),
+      today: todayStr.value,
+    });
+    for (const row of cardRows) items.push(cardItem(row));
+
     // ── Helpful Hints (#40) for the current member ─────────────────────
     // Hints ride their own loop, never the to-do loop: a hint's dueDate is its
     // nudge date, so through the overdue/today/noDue tables every hint would read
@@ -471,6 +511,83 @@ export function useCriticalItems() {
 
     return items;
   });
+
+  function namesOf(cardIds: readonly string[]): string {
+    return cardIds
+      .map((id) => responsibilityStore.cardById(id))
+      .filter((c) => !!c)
+      .map((c) => cardName(c))
+      .join(', ');
+  }
+
+  /** One card row → one briefing item. No deck logic here, only copy and routing. */
+  function cardItem(row: CardBriefingRow): CriticalItem {
+    const base = { type: 'card' as const, time: '' };
+    switch (row.kind) {
+      case 'mine': {
+        const count = row.cardIds.length;
+        const countLabel = buildMessage(
+          count === 1
+            ? 'whoOwnsWhat.briefing.mineCount.one'
+            : 'whoOwnsWhat.briefing.mineCount.other',
+          { count: String(count) }
+        );
+        return {
+          ...base,
+          id: 'card-mine',
+          message: t('whoOwnsWhat.briefing.mine'),
+          caption: `${namesOf(row.cardIds.slice(0, 3))} · ${countLabel}`,
+          icon: '🙋',
+          completable: false,
+          route: WHO_OWNS_WHAT_PATH,
+        };
+      }
+      case 'moved': {
+        const card = responsibilityStore.cardById(row.cardId);
+        const otherId = row.role === 'to' ? row.move.fromId : row.move.toId;
+        return {
+          ...base,
+          id: row.dismissKey,
+          message: buildMessage(MOVED_KEYS[row.role], {
+            card: card ? cardName(card) : '',
+            name: getMemberName(otherId, t('family.unknownMemberInline')),
+            date: formatNookDate(row.move.at.slice(0, 10)),
+          }),
+          icon: '🙋',
+          completable: true,
+          completed: false,
+          dismissKey: row.dismissKey,
+          route: { path: WHO_OWNS_WHAT_PATH, query: { card: row.cardId } },
+        };
+      }
+      case 'nobody':
+        return {
+          ...base,
+          id: 'card-nobody',
+          message: buildMessage(
+            row.count === 1
+              ? 'whoOwnsWhat.briefing.nobody.one'
+              : 'whoOwnsWhat.briefing.nobody.other',
+            { count: String(row.count), names: namesOf(row.cardIds) }
+          ),
+          icon: '🫥',
+          completable: false,
+          route: { path: WHO_OWNS_WHAT_PATH, query: { view: 'deal' } },
+        };
+      case 'checkin':
+        return {
+          ...base,
+          id: row.dismissKey,
+          message: t('whoOwnsWhat.briefing.checkIn'),
+          caption: t('whoOwnsWhat.briefing.checkInCaption'),
+          icon: '🗓️',
+          completable: true,
+          completed: false,
+          dismissKey: row.dismissKey,
+          route: WHO_OWNS_WHAT_PATH,
+        };
+    }
+  }
 
   /**
    * Resolve a briefing key and fill its `{placeholders}`. Delegates to the shared
