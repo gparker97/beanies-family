@@ -187,6 +187,17 @@ describe('listStore', () => {
     expect(await store.createFromTemplate('does-not-exist', 'm-1')).toBeNull();
   });
 
+  it('createFromTemplate with a card holder as owner keeps the creator as createdBy (#109)', async () => {
+    const store = useListStore();
+    vi.mocked(listRepo.createList).mockImplementation(
+      async (input) =>
+        ({ ...(input as object), id: 'seed', createdAt: 'x', updatedAt: 'x' }) as FamilyList
+    );
+    const g = await store.createFromTemplate('grocery', 'm-1', { ownerId: 'm-2' });
+    expect(g!.ownerId).toBe('m-2');
+    expect(g!.createdBy).toBe('m-1');
+  });
+
   it('deleteList removes the list', async () => {
     const store = useListStore();
     store.lists = [list({ id: 'x' })];

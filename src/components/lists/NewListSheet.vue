@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCardDefaultHint } from '@/composables/useCardDefaultHint';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { useListStore } from '@/stores/listStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { getListCategory } from '@/constants/listCategories';
 import { LIST_TEMPLATES, getListTemplatesForCategory } from '@/constants/listTemplates';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import InferredHint from '@/components/ui/InferredHint.vue';
 import ListCategoryPills from './ListCategoryPills.vue';
-import type { ListCategory } from '@/types/models';
+import type { CreateFamilyListInput, ListCategory } from '@/types/models';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: []; created: [id: string] }>();
@@ -32,8 +35,31 @@ function close(): void {
   emit('close');
 }
 
+// Who Owns What (#109): a template mapped to a card (`CARD_DEFAULTS.listTemplate`) owns
+// the new list with that card's single holder. The hint shows on the tile BEFORE the pick
+// (the sheet closes on pick) and is derived, never stored.
+const { holderFor, holdsHint } = useCardDefaultHint();
+const tileHints = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    templates.value.map((tmpl) => [tmpl.key, holdsHint({ kind: 'listTemplate', key: tmpl.key })])
+  )
+);
+
 async function pickTemplate(key: string): Promise<void> {
-  const overrides = selectedCategory.value ? { category: selectedCategory.value } : {};
+  const overrides: Partial<CreateFamilyListInput> = selectedCategory.value
+    ? { category: selectedCategory.value }
+    : {};
+  // `meId` stays the creator (`createdBy`); only the owner comes from the card.
+  const holder = holderFor({ kind: 'listTemplate', key });
+  if (holder) {
+    overrides.ownerId = holder.memberId;
+    logEvent({
+      level: 'info',
+      surface: 'lists',
+      message: 'card_default_applied',
+      context: { action: 'card_default_applied', detail: key },
+    });
+  }
   const created = await listStore.createFromTemplate(key, meId.value, overrides);
   if (created) emit('created', created.id);
   close();
@@ -86,6 +112,7 @@ const isOpen = computed(() => props.open);
               t(tmpl.nameKey)
             }}</span>
             <span class="text-xs text-[var(--color-text-muted)]">{{ t(tmpl.descriptionKey) }}</span>
+            <InferredHint :text="tileHints[tmpl.key]" />
           </button>
         </div>
       </div>
