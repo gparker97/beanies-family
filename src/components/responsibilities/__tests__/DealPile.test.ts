@@ -162,6 +162,31 @@ describe('DealPile', () => {
     expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
   });
 
+  it('an Undo tapped while the card is still flying leaves no emoji behind', async () => {
+    let land!: () => void;
+    fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
+    store.undo.mockImplementation(async () => {
+      store.set('laundry', { status: 'unsorted', parts: [{ key: 'main' }] });
+      return true;
+    });
+    const w = mountPile();
+    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
+    await w.find('[data-testid="deal-pick-sofia"]').trigger('click');
+    await flushPromises();
+
+    // The write resolved, so the toast is up; the flight has not landed yet.
+    const opts = toast.show.mock.calls.find((c) => c[3]?.actionFn)![3];
+    await opts.actionFn();
+    await flushPromises();
+    land();
+    await flushPromises();
+
+    expect(store.undo).toHaveBeenCalledWith(TOKEN);
+    // The same card is back on top, still at "Who owns it?", with nothing under sofia.
+    expect(w.find('[data-testid="deal-pile-card-laundry"]').exists()).toBe(true);
+    expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
+  });
+
   it('"Decide later" is the only path that calls keep', async () => {
     const w = mountPile();
     await w.find('[data-testid="deal-pile-keep"]').trigger('click');
