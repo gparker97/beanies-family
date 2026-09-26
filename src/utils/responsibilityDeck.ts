@@ -403,12 +403,18 @@ export function defaultHolderFor(
 
 // ── Family check-in ─────────────────────────────────────────────────────────────
 
-/** When the deck was first dealt: the earliest `createdAt` among kept cards (derived). */
-export function firstDealtAt(cards: readonly ResolvedCard[]): string | undefined {
+/**
+ * When the deck was first dealt: the earliest move that gave a card to someone (derived,
+ * never stored). Moves, not card `createdAt`, because only moves have the right lifetime:
+ * skipping or re-dealing a card never deletes its moves, so the anchor (and the
+ * `card-checkin:<due>` snooze key built on it) stays put; "Restore defaults" deletes every
+ * move, so the clock restarts at the next deal whether or not custom cards were kept.
+ */
+export function firstDealtAt(moves: readonly ResponsibilityMove[]): string | undefined {
   let first: string | undefined;
-  for (const c of cards) {
-    if (c.state?.status !== 'kept') continue;
-    if (!first || c.state.createdAt < first) first = c.state.createdAt;
+  for (const m of moves) {
+    if (!m?.toId || typeof m.at !== 'string') continue;
+    if (!first || m.at < first) first = m.at;
   }
   return first;
 }
@@ -593,7 +599,7 @@ export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow
         count: waiting.length,
       });
     }
-    const due = nextCheckInDate(rhythmWeeks, checkIns, firstDealtAt(cards));
+    const due = nextCheckInDate(rhythmWeeks, checkIns, firstDealtAt(moves));
     if (due && today >= due) {
       const dismissKey = CARD_CHECKIN_PREFIX + due;
       const snoozedAt = readState[dismissKey];

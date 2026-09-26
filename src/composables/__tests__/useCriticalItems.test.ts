@@ -1138,6 +1138,15 @@ describe('useCriticalItems', () => {
         updatedAt: createdAt,
       };
     }
+    /** The first deal (no `fromId`): anchors the check-in clock, never a moved note. */
+    const FIRST_DEAL = {
+      id: 'laundry:main:2026-01-01T10:00:00.000Z',
+      cardId: 'laundry',
+      partKey: 'main',
+      toId: 'parent-2',
+      byId: 'parent-2',
+      at: '2026-01-01T10:00:00.000Z',
+    };
     function seedDeck(states: unknown[], moves: unknown[] = []) {
       const deck = useResponsibilityStore();
       deck.states = states;
@@ -1154,6 +1163,7 @@ describe('useCriticalItems', () => {
           kept('floors'),
         ],
         [
+          FIRST_DEAL,
           {
             id: 'laundry:main:2026-03-09T10:00:00.000Z',
             cardId: 'laundry',
@@ -1227,7 +1237,10 @@ describe('useCriticalItems', () => {
 
     it('shows cards with nobody and the check-in to adults only', () => {
       familyStore.setCurrentMember('child-1');
-      seedDeck([kept('laundry', 'child-1', '2026-01-01T10:00:00.000Z'), kept('floors')]);
+      seedDeck(
+        [kept('laundry', 'child-1', '2026-01-01T10:00:00.000Z'), kept('floors')],
+        [FIRST_DEAL]
+      );
       expect(cardRows().map((r) => r.id)).toEqual(['card-mine']);
     });
 
@@ -1237,6 +1250,7 @@ describe('useCriticalItems', () => {
       seedDeck(
         [kept('laundry', 'parent-1', '2026-01-01T10:00:00.000Z')],
         [
+          FIRST_DEAL,
           {
             id: moveId,
             cardId: 'laundry',

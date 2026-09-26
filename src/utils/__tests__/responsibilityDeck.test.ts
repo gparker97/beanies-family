@@ -418,14 +418,23 @@ describe('check-in rhythm', () => {
     expect(isCheckInDue(2, checkIns, dealt, '2026-09-24')).toBe(true);
   });
 
-  it('firstDealtAt is the earliest createdAt among kept cards', () => {
-    const { cards } = resolve([
-      state('laundry', { createdAt: noon('2026-08-05') }),
-      state('dishes', { createdAt: noon('2026-08-02') }),
-      state('bikes', { status: 'skipped', createdAt: noon('2026-07-01') }),
-    ]);
-    expect(firstDealtAt(cards)).toBe(noon('2026-08-02'));
-    expect(firstDealtAt(resolve([]).cards)).toBeUndefined();
+  it('firstDealtAt is the earliest move that gave a card to someone', () => {
+    const moves = [
+      move({ cardId: 'laundry', toId: 'greg', at: noon('2026-08-05') }),
+      move({ cardId: 'dishes', toId: 'sofia', at: noon('2026-08-02') }),
+      move({ cardId: 'bikes', fromId: 'greg', at: noon('2026-07-01') }), // a clear: no holder
+    ];
+    expect(firstDealtAt(moves)).toBe(noon('2026-08-02'));
+    expect(firstDealtAt([])).toBeUndefined();
+  });
+
+  it('the anchor ignores card createdAt, so skipping the earliest card never moves it', () => {
+    // A card kept long ago (e.g. a custom card kept through "Restore defaults") with no
+    // deal since: nothing has been dealt, so no check-in is due.
+    expect(firstDealtAt([])).toBeUndefined();
+    // Skipping a dealt card keeps its moves, so the due date and its snooze key stand.
+    const moves = [move({ cardId: 'laundry', toId: 'greg', at: noon('2026-08-01') })];
+    expect(nextCheckInDate(4, [], firstDealtAt(moves))).toBe('2026-08-29');
   });
 });
 
@@ -603,7 +612,10 @@ describe('buildCardBriefingRows', () => {
 
   it('shows the check-in row from the due date, snoozable for 7 days', () => {
     // Dealt 2026-08-01, rhythm 4 weeks → due 2026-08-29.
-    const due = buildCardBriefingRows(input({ rhythmWeeks: 4 })).find((r) => r.kind === 'checkin');
+    const dealt = [move({ cardId: 'laundry', toId: 'greg', at: noon('2026-08-01') })];
+    const due = buildCardBriefingRows(input({ rhythmWeeks: 4 }, dealt)).find(
+      (r) => r.kind === 'checkin'
+    );
     expect(due).toEqual({
       kind: 'checkin',
       dueDate: '2026-08-29',
@@ -611,12 +623,12 @@ describe('buildCardBriefingRows', () => {
     });
     const snoozed = (readAt: string) =>
       buildCardBriefingRows(
-        input({ rhythmWeeks: 4, readState: { 'card-checkin:2026-08-29': readAt } })
+        input({ rhythmWeeks: 4, readState: { 'card-checkin:2026-08-29': readAt } }, dealt)
       ).some((r) => r.kind === 'checkin');
     expect(snoozed(noon('2026-09-22'))).toBe(false); // 4 days ago
     expect(snoozed(noon('2026-09-19'))).toBe(true); // 7 days ago → back
     expect(
-      buildCardBriefingRows(input({ rhythmWeeks: 4, today: '2026-08-28' })).some(
+      buildCardBriefingRows(input({ rhythmWeeks: 4, today: '2026-08-28' }, dealt)).some(
         (r) => r.kind === 'checkin'
       )
     ).toBe(false);

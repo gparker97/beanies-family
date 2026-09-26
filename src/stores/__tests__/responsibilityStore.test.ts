@@ -346,7 +346,10 @@ describe('edit, custom cards and restore', () => {
       holderId: 'leo',
     });
     await store.deal('laundry', 'main', 'sofia');
+    expect(store.nextCheckIn).toBe('2026-10-24');
     await store.restoreDefaults({ keepCustom: true });
+    // The deal starts over: nothing is dealt, so no check-in clock, kept custom card or not.
+    expect(store.nextCheckIn).toBeNull();
     expect(store.cardById(c!.id)!.status).toBe('waiting');
     expect(store.cardById('laundry')!.status).toBe('unsorted');
     expect(db.moves.size).toBe(0);
@@ -372,6 +375,17 @@ describe('check-in and celebrations', () => {
     setResponsibilityCheckInWeeks.mockRejectedValueOnce(new Error('x'));
     expect(await store.setRhythm(2)).toBeNull();
     expect(showToast).not.toHaveBeenCalled(); // settingsStore owns that toast
+  });
+
+  it('the check-in due date survives skipping the first card dealt', async () => {
+    await store.deal('laundry', 'main', 'sofia'); // 2026-09-26
+    vi.setSystemTime(Date.parse('2026-09-30T10:00:00.000Z'));
+    await store.deal('dishes', 'main', 'greg');
+    expect(store.nextCheckIn).toBe('2026-10-24');
+    vi.setSystemTime(Date.parse('2026-10-01T10:00:00.000Z'));
+    await store.skip(['laundry']);
+    expect(store.nextCheckIn).toBe('2026-10-24'); // same due date, same snooze key
+    vi.setSystemTime(clock);
   });
 
   it('fires deck-dealt once, on the write that sorts the last card', async () => {
