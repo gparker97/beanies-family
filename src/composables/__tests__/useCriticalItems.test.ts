@@ -5,6 +5,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import type {
   FamilyActivity,
   FamilyMember,
@@ -57,6 +58,19 @@ vi.mock('@/config/flags', async (importOriginal) => {
       flag === 'helpfulHints' ? flagState.helpfulHints : actual.isFlagEnabled(flag as never),
   };
 });
+
+// Who Owns What (#109): the briefing reads card-move / check-in dismissals from the
+// viewer's read-state slice. Driven per test.
+const { readStateBox } = vi.hoisted(() => ({
+  readStateBox: { value: {} as Record<string, string> },
+}));
+vi.mock('@/stores/notificationsStore', () => ({
+  useNotificationsStore: () => ({
+    get readState() {
+      return readStateBox.value;
+    },
+  }),
+}));
 
 vi.mock('@/composables/useToday', async () => {
   const { ref, computed } = await import('vue');
@@ -167,6 +181,7 @@ describe('useCriticalItems', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     flagState.helpfulHints = true;
+    readStateBox.value = {};
 
     familyStore = useFamilyStore();
     activityStore = useActivityStore();
@@ -1108,6 +1123,109 @@ describe('useCriticalItems', () => {
       todoStore.todos.push(partyHint());
 
       expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+    });
+  });
+  describe('Who Owns What card rows (#109)', () => {
+    const RECENT = '2026-03-05T10:00:00.000Z';
+    function kept(id: string, holderId?: string, createdAt = RECENT) {
+      return {
+        id,
+        status: 'kept',
+        splitMode: 'single',
+        parts: [{ key: 'main', ...(holderId ? { holderId } : {}) }],
+        createdAt,
+        updatedAt: createdAt,
+      };
+    }
+    function seedDeck(states: unknown[], moves: unknown[] = []) {
+      const deck = useResponsibilityStore();
+      deck.states = states;
+      deck.moves = moves as never;
+    }
+    const cardRows = () => useCriticalItems().criticalItems.value.filter((i) => i.type === 'card');
+
+    it("shows the viewer's cards, a moved note, cards with nobody and a due check-in", () => {
+      familyStore.setCurrentMember('parent-1');
+      seedDeck(
+        [
+          kept('laundry', 'parent-1', '2026-01-01T10:00:00.000Z'), // dealt > 4 weeks ago
+          kept('dishes', 'parent-1'),
+          kept('floors'),
+        ],
+        [
+          {
+            id: 'laundry:main:2026-03-09T10:00:00.000Z',
+            cardId: 'laundry',
+            partKey: 'main',
+            fromId: 'parent-2',
+            toId: 'parent-1',
+            byId: 'parent-2',
+            at: '2026-03-09T10:00:00.000Z',
+          },
+        ]
+      );
+      const rows = cardRows();
+      expect(rows.map((r) => r.icon)).toEqual(['🙋', '🙋', '🫥', '🗓️']);
+      const [mine, moved, nobody, checkIn] = rows;
+      expect(mine!.route).toBe('/who-owns-what');
+      expect(moved!.completable).toBe(true);
+      expect(moved!.dismissKey).toBe('card-move:laundry:main:2026-03-09T10:00:00.000Z');
+      expect(moved!.route).toEqual({ path: '/who-owns-what', query: { card: 'laundry' } });
+      expect(nobody!.route).toEqual({ path: '/who-owns-what', query: { view: 'deal' } });
+      expect(nobody!.completable).toBe(false);
+      expect(checkIn!.dismissKey).toMatch(/^card-checkin:/);
+    });
+
+    it('orders card rows above the helpful-hint block', () => {
+      familyStore.setCurrentMember('parent-1');
+      seedDeck([kept('dishes', 'parent-1')]);
+      todoStore.todos.push(
+        makeTodo({
+          id: 'hint-1',
+          title: 'Pack for the trip',
+          hintType: 'trip-packing',
+          hintKey: 'trip-packing:v1:2026-03-12',
+          hintEventDate: '2026-03-12',
+          dueDate: '2026-03-10',
+          assigneeIds: ['parent-1'],
+          createdBy: 'parent-1',
+        })
+      );
+      const ids = useCriticalItems().criticalItems.value.map((i) => i.id);
+      expect(ids.indexOf('card-mine')).toBeGreaterThanOrEqual(0);
+      expect(ids.indexOf('card-mine')).toBeLessThan(ids.indexOf('hint-1'));
+    });
+
+    it('shows cards with nobody and the check-in to adults only', () => {
+      familyStore.setCurrentMember('child-1');
+      seedDeck([kept('laundry', 'child-1', '2026-01-01T10:00:00.000Z'), kept('floors')]);
+      expect(cardRows().map((r) => r.id)).toEqual(['card-mine']);
+    });
+
+    it('hides a dismissed moved note and a snoozed check-in', () => {
+      familyStore.setCurrentMember('parent-2');
+      const moveId = 'laundry:main:2026-03-09T10:00:00.000Z';
+      seedDeck(
+        [kept('laundry', 'parent-1', '2026-01-01T10:00:00.000Z')],
+        [
+          {
+            id: moveId,
+            cardId: 'laundry',
+            partKey: 'main',
+            fromId: 'parent-2',
+            toId: 'parent-1',
+            byId: 'parent-1',
+            at: '2026-03-09T10:00:00.000Z',
+          },
+        ]
+      );
+      const before = cardRows();
+      expect(before.map((r) => r.icon)).toEqual(['🙋', '🗓️']);
+      readStateBox.value = {
+        [`card-move:${moveId}`]: '2026-03-09T12:00:00.000Z',
+        [before[1]!.dismissKey!]: '2026-03-09T12:00:00.000Z',
+      };
+      expect(cardRows()).toHaveLength(0);
     });
   });
 });

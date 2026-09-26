@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import type { RouteLocationRaw } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -34,10 +35,16 @@ const emit = defineEmits<{
   'open-meal': [id: string];
   'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
   'complete-todo': [id: string];
+  /** A row with a generic `dismissKey`: the tick is the dismiss. */
+  dismiss: [key: string];
+  /** A row with a generic `route`: the page routes. */
+  'open-route': [route: RouteLocationRaw];
 }>();
 
 function handleComplete(item: CriticalItem) {
-  if (item.dutyType) {
+  if (item.dismissKey) {
+    emit('dismiss', item.dismissKey);
+  } else if (item.dutyType) {
     emit('complete-duty', item.id, item.dutyType, item.occurrenceDate ?? '');
   } else if (item.type === 'todo') {
     emit('complete-todo', item.id);
@@ -108,12 +115,13 @@ const title = computed(() => {
 });
 
 function handleItemClick(item: CriticalItem) {
-  if (item.type === 'todo') emit('open-todo', item.id);
+  if (item.route) emit('open-route', item.route);
+  else if (item.type === 'todo') emit('open-todo', item.id);
   else if (item.type === 'medication') emit('open-medication', item.id);
   else if (item.type === 'list') emit('open-list', item.id);
   else if (item.type === 'meal') emit('open-meal', item.id);
-  else if (item.type === 'holiday')
-    return; // informational only — no target view
+  else if (item.type === 'holiday' || item.type === 'card')
+    return; // informational only (a card row without a route) — no target view
   else emit('open-activity', item.id, item.occurrenceDate ?? '');
 }
 </script>
