@@ -82,7 +82,6 @@ watch(
 function live(card: ResolvedCard): ResolvedCard {
   return store.cardById(card.id) ?? card;
 }
-const tint = (card: ResolvedCard): string => categoryTint(card.category);
 
 const isEmpty = computed(
   () => !agenda.value.nobody.length && !agenda.value.moved.length && !agenda.value.unchanged.length
@@ -303,9 +302,12 @@ const completedNote = computed(() =>
           :data-testid="`checkin-unchanged-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': tint(card) }" aria-hidden="true">{{
-              cardEmoji(card)
-            }}</span>
+            <span
+              class="thumb"
+              :style="{ '--cat': categoryTint(card.category) }"
+              aria-hidden="true"
+              >{{ cardEmoji(card) }}</span
+            >
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small class="ci-meta">{{ dealtLine(card.id) || heldLine(card) }}</small>
@@ -347,9 +349,12 @@ const completedNote = computed(() =>
           :data-testid="`checkin-moved-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': tint(card) }" aria-hidden="true">{{
-              cardEmoji(card)
-            }}</span>
+            <span
+              class="thumb"
+              :style="{ '--cat': categoryTint(card.category) }"
+              aria-hidden="true"
+              >{{ cardEmoji(card) }}</span
+            >
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small class="ci-meta">{{ movedLine(move) }}</small>
@@ -375,9 +380,12 @@ const completedNote = computed(() =>
           :data-testid="`checkin-nobody-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': tint(card) }" aria-hidden="true">{{
-              cardEmoji(card)
-            }}</span>
+            <span
+              class="thumb"
+              :style="{ '--cat': categoryTint(card.category) }"
+              aria-hidden="true"
+              >{{ cardEmoji(card) }}</span
+            >
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small v-if="dealtTo[card.id]" class="ci-meta">{{ dealtLine(card.id) }}</small>

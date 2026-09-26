@@ -47,8 +47,6 @@ const skipped = useExpandableList(() => lists.value.skipped, { initial });
 const skippedHeadingEl = useTemplateRef<HTMLElement>('skippedHeadingEl');
 defineExpose({ skippedHeadingEl });
 
-const tint = (card: ResolvedCard): string => categoryTint(card.category);
-
 /** Who has it: the holder's face and name, "Split by …", or "Nobody yet". */
 function owner(card: ResolvedCard): { memberId?: string; label: string } {
   if (card.splitMode === 'child') return { label: t('whoOwnsWhat.card.splitChild') };
@@ -100,7 +98,7 @@ function jump(cardId: string): void {
             :class="{ 'is-current': card.id === currentId }"
             :aria-current="card.id === currentId ? 'true' : undefined"
             :disabled="disabled"
-            :style="{ '--cat': tint(card) }"
+            :style="{ '--cat': categoryTint(card.category) }"
             :data-testid="`deal-list-kept-${card.id}`"
             @click="jump(card.id)"
           >
@@ -147,7 +145,7 @@ function jump(cardId: string): void {
             :class="{ 'is-current': card.id === currentId }"
             :aria-current="card.id === currentId ? 'true' : undefined"
             :disabled="disabled"
-            :style="{ '--cat': tint(card) }"
+            :style="{ '--cat': categoryTint(card.category) }"
             :data-testid="`deal-list-skipped-${card.id}`"
             @click="jump(card.id)"
           >
