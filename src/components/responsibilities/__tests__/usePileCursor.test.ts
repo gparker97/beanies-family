@@ -97,13 +97,44 @@ describe('usePileCursor', () => {
   });
 
   it('load with a startId opens that card, adding it to the queue when out of scope', () => {
-    const { cursor } = setup([card('a', 'waiting'), card('b', 'waiting'), card('h', 'held')]);
-    cursor.load(['a', 'b'], 'b');
-    expect(cursor.currentId.value).toBe('b');
-    cursor.jumpTo('h');
-    expect(cursor.currentId.value).toBe('h');
+    const { cursor } = setup([card('a', 'waiting'), card('b', 'waiting'), card('w', 'waiting')]);
+    cursor.load(['a', 'b'], 'w');
+    expect(cursor.currentId.value).toBe('w');
+    expect(cursor.visiting.value).toBe(false);
     expect(cursor.total.value).toBe(3);
     expect(cursor.position.value?.total).toBe(3);
+  });
+
+  it('a card jumped to from outside the queue is visited: no totals change, arrows go back', () => {
+    const { cursor, set } = setup([
+      card('a', 'unsorted'),
+      card('b', 'unsorted'),
+      card('h', 'held', 'kids'),
+    ]);
+    cursor.load(['a', 'b']);
+    cursor.step(1);
+    cursor.jumpTo('h');
+    expect(cursor.currentId.value).toBe('h');
+    expect(cursor.visiting.value).toBe(true);
+    expect(cursor.total.value).toBe(2);
+    expect(cursor.remaining.value).toBe(2);
+    expect(cursor.position.value).toEqual({ category: 'kids', n: null, total: null });
+    expect(cursor.nextToDecide.value).toBe('b');
+    // Either arrow returns to the queue card the jump left; the visit never joins the queue.
+    expect(cursor.canStep(-1)).toBe(true);
+    cursor.step(-1);
+    expect(cursor.currentId.value).toBe('b');
+    expect(cursor.total.value).toBe(2);
+    // A visit that ends in a first decision advances back into the queue.
+    cursor.jumpTo('h');
+    set('h', 'waiting');
+    cursor.settle('h', 'advance');
+    expect(cursor.currentId.value).toBe('h');
+    set('h', 'held');
+    set('b', 'held');
+    cursor.settle('h', 'advance');
+    expect(cursor.currentId.value).toBe('a');
+    expect(cursor.total.value).toBe(2);
   });
 
   it('settle advance moves to the next undecided card, wrapping, then to the done state', () => {
@@ -185,7 +216,7 @@ describe('usePileCursor', () => {
 });
 
 describe('usePileCursor with the deck order', () => {
-  it('a card jumped to takes its natural place, not the end of the pile', () => {
+  it('a start card outside the scope takes its natural place, not the end of the pile', () => {
     const deck = reactive(
       new Map([
         ['a', card('a', 'held')],
@@ -196,8 +227,7 @@ describe('usePileCursor with the deck order', () => {
     const cursor = scope.run(() =>
       usePileCursor({ cardById: (id) => deck.get(id), order: () => ['a', 'b'] })
     )!;
-    cursor.load(['b']);
-    cursor.jumpTo('a');
+    cursor.load(['b'], 'a');
     expect(cursor.position.value).toEqual({ category: 'home', n: 1, total: 2 });
     cursor.step(1);
     expect(cursor.currentId.value).toBe('b');

@@ -6,7 +6,10 @@
  *  - Skip flies to the Skipped list's heading.
  *  - An Undo during the flight keeps the card; an Undo after it jumps back to the card.
  *  - Revisiting a decided card shows its banner, and each change stays on the card.
- *  - The keyboard shortcuts call the same guarded functions as the buttons.
+ *  - While an action is in flight the pile renders from its snapshot (nothing re-renders
+ *    under the flying card), and releases it once the action settles.
+ *  - The keyboard shortcuts call the same guarded functions as the buttons, and leave a key
+ *    alone when it would do nothing.
  * The store is a live stand-in: its actions flip card statuses the way the real store's
  * projection would, so the pile moves off the store, not off its own bookkeeping.
  */
@@ -21,7 +24,8 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 vi.mock('@/utils/prefersReducedMotion', () => ({ prefersReducedMotion: () => true }));
-vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+const telemetry = vi.hoisted(() => ({ logEvent: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => telemetry);
 const fly = vi.hoisted(() => ({ flyTo: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/composables/useFlyTo', () => ({ flyTo: fly.flyTo }));
 const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn(), invoke: vi.fn() }));
@@ -131,9 +135,13 @@ function mountPile(props: Record<string, unknown> = {}) {
 }
 const has = (w: VueWrapper, id: string) => w.find(`[data-testid="${id}"]`).exists();
 const click = (w: VueWrapper, id: string) => w.find(`[data-testid="${id}"]`).trigger('click');
-function press(key: string): void {
-  window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }));
+function press(key: string): KeyboardEvent {
+  const e = new KeyboardEvent('keydown', { key, cancelable: true });
+  window.dispatchEvent(e);
+  return e;
 }
+const logged = (message: string) =>
+  telemetry.logEvent.mock.calls.filter((c) => c[0].message === message).map((c) => c[0].context);
 function lastUndo(): () => Promise<void> {
   return toast.show.mock.calls.filter((c) => c[3]?.actionFn).at(-1)![3].actionFn;
 }
@@ -213,6 +221,47 @@ describe('DealPile: first decisions', () => {
     expect(has(w, 'deal-pick-sofia')).toBe(false);
     expect(has(w, 'deal-pile-question')).toBe(true);
     expect(w.find('[data-testid="deal-pile-card-laundry"]').classes()).not.toContain('is-leaving');
+  });
+
+  it('while a pick is in flight the picker and the target face stay, then the pile moves on', async () => {
+    let land!: () => void;
+    fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
+    const w = mountPile();
+    await click(w, 'deal-pile-keep');
+    await click(w, 'deal-pick-sofia');
+    await flushPromises();
+
+    // The deal has landed in the store (laundry is held by Sofia), the card is still flying.
+    expect(store.cardById('laundry')!.status).toBe('held');
+    expect(has(w, 'picker')).toBe(true);
+    expect(has(w, 'deal-pick-sofia')).toBe(true);
+    expect(w.find('[data-testid="picker"]').attributes('data-back')).toBe(
+      'whoOwnsWhat.pile.decideLater'
+    );
+    expect(has(w, 'deal-pile-banner')).toBe(false);
+    expect(has(w, 'deal-pile-back-to')).toBe(false);
+
+    land();
+    await flushPromises();
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    expect(has(w, 'deal-pile-question')).toBe(true);
+  });
+
+  it('while a skip is in flight Keep and Skip stay and no Skipped banner flashes', async () => {
+    let land!: () => void;
+    fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
+    const w = mountPile();
+    await click(w, 'deal-pile-skip');
+    await flushPromises();
+
+    expect(store.cardById('laundry')!.status).toBe('skipped');
+    expect(has(w, 'deal-pile-skip')).toBe(true);
+    expect(has(w, 'deal-pile-keep')).toBe(true);
+    expect(has(w, 'deal-pile-banner')).toBe(false);
+
+    land();
+    await flushPromises();
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
   });
 
   it('"Decide later" is the only path that calls keep, and moves on', async () => {
@@ -303,21 +352,56 @@ describe('DealPile: stepping and revisiting', () => {
     store.resolved = [makeCard('laundry', 'held', 'sofia'), makeCard('dishes')];
   });
 
-  it('the back arrow reaches a decided card, and "Back to" returns to the next one', async () => {
+  it('a card visited from the lists does not grow the pile, and "Back to" returns', async () => {
     const w = mountPile({ scope: 'unsorted' });
     expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    const position = () => w.find('[data-testid="deal-pile-position"]').text();
+    expect(position()).toBe('whoOwnsWhat.pile.position');
     await click(w, 'deal-list-kept-laundry');
     expect(has(w, 'deal-pile-card-laundry')).toBe(true);
     expect(w.find('[data-testid="deal-list-kept-laundry"]').attributes('aria-current')).toBe(
       'true'
     );
     expect(has(w, 'deal-pile-banner')).toBe(true);
+    // Outside the pile's queue: the category alone, and the totals don't move.
+    expect(position()).not.toContain('whoOwnsWhat.pile.position');
+    expect(w.find('[role="progressbar"]').attributes('aria-valuemax')).toBe('1');
     await click(w, 'deal-pile-back-to');
     expect(has(w, 'deal-pile-card-dishes')).toBe(true);
-    // Arrows step through decided cards too (dishes' queue now includes laundry).
-    await click(w, 'deal-pile-prev');
-    await click(w, 'deal-pile-next');
-    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    expect(w.find('[data-testid="deal-pile-prev"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('Bring back from the Skipped list runs the pile revisit: on the card, logged, undo', async () => {
+    store.resolved = [makeCard('laundry', 'skipped'), makeCard('dishes')];
+    const w = mountPile();
+    await click(w, 'deal-list-bring-back-laundry');
+    await flushPromises();
+    expect(store.bringBack).toHaveBeenCalledWith('laundry');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-banner-give')).toBe(true);
+    expect(logged('pile_revisit_change')).toEqual([{ detail: 'bring_back' }]);
+    expect(toast.show.mock.calls.at(-1)![3]?.actionFn).toBeTypeOf('function');
+  });
+
+  it('a split card with a part held shows that part above "Waiting for a holder"', () => {
+    const split: ResolvedCard = {
+      ...makeCard('laundry', 'waiting'),
+      splitMode: 'label',
+      parts: [
+        { key: 'a', label: 'Mornings', holderId: 'sofia' },
+        { key: 'b', label: 'Evenings' },
+      ],
+    };
+    store.resolved = [split];
+    const w = mountPile({ scope: 'waiting' });
+    const banner = w.find('[data-testid="deal-pile-banner"]');
+    expect(banner.text()).toContain('Mornings');
+    expect(banner.text()).toContain('whoOwnsWhat.pile.withSince');
+    expect(banner.text()).toContain('whoOwnsWhat.pile.waitingBanner');
+    expect(banner.text()).not.toContain('Evenings');
+    expect(banner.text().indexOf('Mornings')).toBeLessThan(
+      banner.text().indexOf('whoOwnsWhat.pile.waitingBanner')
+    );
   });
 
   it('arrows and list jumps are disabled while an action is in flight', async () => {
@@ -404,10 +488,10 @@ describe('DealPile: keyboard shortcuts', () => {
     store.resolved = [makeCard('laundry', 'held', 'sofia'), makeCard('dishes')];
     const w = mountPile();
     await click(w, 'deal-list-kept-laundry');
-    press('s');
+    expect(press('s').defaultPrevented).toBe(false);
     await flushPromises();
     expect(store.skip).not.toHaveBeenCalled();
-    press('ArrowRight');
+    expect(press('ArrowRight').defaultPrevented).toBe(true);
     await flushPromises();
     expect(has(w, 'deal-pile-card-dishes')).toBe(true);
     press('S');
@@ -423,5 +507,24 @@ describe('DealPile: keyboard shortcuts', () => {
     await flushPromises();
     expect(toast.invoke).toHaveBeenCalledWith(1);
     expect(w.exists()).toBe(true);
+  });
+
+  it('keys that would do nothing keep their default: an arrow at the end, U with no toast', () => {
+    mountPile();
+    expect(press('ArrowLeft').defaultPrevented).toBe(false);
+    expect(press('u').defaultPrevented).toBe(false);
+    expect(press('3').defaultPrevented).toBe(false);
+    expect(press('ArrowRight').defaultPrevented).toBe(true);
+  });
+
+  it('ignores keys while focus is on a control outside the pile', async () => {
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    const w = mountPile();
+    outside.focus();
+    expect(press('k').defaultPrevented).toBe(false);
+    await flushPromises();
+    expect(has(w, 'picker')).toBe(false);
+    outside.remove();
   });
 });

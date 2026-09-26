@@ -21,6 +21,18 @@ import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 /** How long a smooth scroll takes to settle before the pulse starts, so it is seen. */
 const REVEAL_PULSE_DELAY_MS = 400;
 
+/**
+ * Longer than any one-shot pulse (the longest, `attention-pulse-twice`, runs 1.6s). The class
+ * comes off at this point even when `animationend` never fires: under reduced motion
+ * (`animation: none`), when a more specific rule on the element owns its `animation`, or when
+ * the element left the page mid-animation. A stuck class would otherwise swallow the next
+ * pulse or leave a static style behind.
+ */
+const PULSE_FALLBACK_MS = 3000;
+
+/** The fallback timer per element and class, so a re-trigger restarts it rather than racing it. */
+const fallbackTimers = new WeakMap<HTMLElement, Map<string, ReturnType<typeof setTimeout>>>();
+
 export function useAttentionPulse() {
   function pulse(el: HTMLElement | null | undefined, className = 'attention-pulse') {
     if (!el) return;
@@ -29,9 +41,17 @@ export function useAttentionPulse() {
     // Force reflow so re-adding the class restarts the animation
     void el.offsetWidth;
     el.classList.add(className);
-    el.addEventListener('animationend', () => el.classList.remove(className), {
-      once: true,
-    });
+
+    let timers = fallbackTimers.get(el);
+    if (!timers) fallbackTimers.set(el, (timers = new Map()));
+    clearTimeout(timers.get(className));
+    const done = () => {
+      clearTimeout(timers.get(className));
+      timers.delete(className);
+      el.classList.remove(className);
+    };
+    timers.set(className, setTimeout(done, PULSE_FALLBACK_MS));
+    el.addEventListener('animationend', done, { once: true });
   }
 
   /**

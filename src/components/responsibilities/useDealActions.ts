@@ -133,13 +133,21 @@ export function useDealActions() {
   }
 
   /**
+   * Whether the last deck toast offered an Undo, so `U` has something to tap (it may have
+   * just expired, in which case `undoLast` quietly does nothing).
+   */
+  function hasLiveUndo(): boolean {
+    return liveUndoToastId !== null && liveToastHasUndo;
+  }
+
+  /**
    * The `U` shortcut: tap the live toast's Undo. `invokeToastAction` runs it, reports a
    * thrown handler with an error toast, and no-ops when the toast has already expired.
    * With no live Undo (none shown yet, or a plain toast) there is nothing to do.
    */
   async function undoLast(): Promise<void> {
     const id = liveUndoToastId;
-    if (id === null || !liveToastHasUndo) {
+    if (id === null || !hasLiveUndo()) {
       // eslint-disable-next-line no-console -- an expected no-op (U with nothing to undo), debug only
       console.debug('[useDealActions] undoLast: no live undo toast');
       return;
@@ -149,5 +157,5 @@ export function useDealActions() {
     await invokeToastAction(id);
   }
 
-  return { deal, keep, skip, bringBack, undo, undoLast };
+  return { deal, keep, skip, bringBack, undo, undoLast, hasLiveUndo };
 }

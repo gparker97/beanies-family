@@ -8,7 +8,8 @@
  *    its part caption). An unsplit card offers Give it to someone else (when there is
  *    someone), Skip instead and Split it; a split card offers Split it (the edit drawer is
  *    the per-part change) and Skip instead.
- *  - waiting: "Waiting for a holder"; the faces follow below it, in `DealPile`.
+ *  - waiting: "Waiting for a holder"; the faces follow below it, in `DealPile`. A split
+ *    card with some parts already held lists those parts first, as on a held card.
  *  - skipped: "Skipped" with Bring back.
  */
 import { computed } from 'vue';
@@ -57,7 +58,7 @@ const lines = computed(() =>
     <div
       class="banner dark:border-line dark:text-ink flex flex-col gap-1.5 rounded-2xl border px-3 py-2.5 text-sm text-[var(--color-text)]"
     >
-      <template v-if="view === 'held'">
+      <template v-if="view === 'held' || view === 'waiting'">
         <p v-for="line in lines" :key="line.key" class="flex items-center gap-2.5">
           <MemberChip :member-id="line.memberId" size="dot" />
           <span class="min-w-0">
@@ -65,10 +66,10 @@ const lines = computed(() =>
             {{ line.text }}
           </span>
         </p>
+        <p v-if="view === 'waiting'" class="font-outfit font-semibold">
+          {{ t('whoOwnsWhat.pile.waitingBanner') }}
+        </p>
       </template>
-      <p v-else-if="view === 'waiting'" class="font-outfit font-semibold">
-        {{ t('whoOwnsWhat.pile.waitingBanner') }}
-      </p>
       <p v-else class="font-outfit font-semibold">
         <span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skipped') }}
       </p>

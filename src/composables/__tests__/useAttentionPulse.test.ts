@@ -39,3 +39,29 @@ describe('useAttentionPulse.reveal', () => {
     expect(() => useAttentionPulse().reveal(null)).not.toThrow();
   });
 });
+
+describe('useAttentionPulse.pulse', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('removes the class on animationend', () => {
+    const target = document.createElement('div');
+    useAttentionPulse().pulse(target, 'key-press');
+    expect(target.classList.contains('key-press')).toBe(true);
+    target.dispatchEvent(new Event('animationend'));
+    expect(target.classList.contains('key-press')).toBe(false);
+  });
+
+  it('never leaves the class stuck when animationend never fires', () => {
+    const target = document.createElement('div');
+    const { pulse } = useAttentionPulse();
+    pulse(target, 'card-bounce');
+    vi.advanceTimersByTime(2000);
+    // A re-trigger restarts the fallback instead of being cut short by the first one.
+    pulse(target, 'card-bounce');
+    vi.advanceTimersByTime(2000);
+    expect(target.classList.contains('card-bounce')).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(target.classList.contains('card-bounce')).toBe(false);
+  });
+});
