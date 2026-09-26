@@ -9,6 +9,8 @@
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatNookDate } from '@/utils/date';
+import { ymdOf } from '@/utils/responsibilityDeck';
 import type { ResponsibilityCardDef } from '@/constants/responsibilityCards';
 import type { CardSplitMode } from '@/types/models';
 
@@ -51,5 +53,22 @@ export function useResponsibilityCardLabel() {
     return card.splitMode === 'label' ? (part.label ?? '') : '';
   }
 
-  return { cardName, cardDone, cardEmoji, partCaption };
+  /**
+   * Who holds a part and since when, for "With Sofia since Sep 12". `date` is null when
+   * neither the part nor the card records a time (the caller then shows the name alone);
+   * the result is null only when the part has no holder.
+   */
+  function heldSince(
+    card: { state: { createdAt: string } | null },
+    part: { holderId?: string; since?: string }
+  ): { name: string; date: string | null } | null {
+    if (!part.holderId) return null;
+    const since = part.since ?? card.state?.createdAt;
+    return {
+      name: getMemberName(part.holderId, ''),
+      date: since ? formatNookDate(ymdOf(since)) : null,
+    };
+  }
+
+  return { cardName, cardDone, cardEmoji, partCaption, heldSince };
 }

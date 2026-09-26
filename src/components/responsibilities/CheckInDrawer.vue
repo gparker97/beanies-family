@@ -27,6 +27,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import {
   buildCheckInAgenda,
+  otherHumans,
   ymdOf,
   type CheckInAgenda,
   type ResolvedCard,
@@ -51,7 +52,7 @@ const { today } = useToday();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
-const { cardName, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardEmoji, partCaption, heldSince } = useResponsibilityCardLabel();
 const actions = useDealActions();
 
 const FALLBACK_TINT = '#94A3B8';
@@ -103,8 +104,7 @@ const movedOptions = computed(() => [
  * is the answer for keeping it where it is).
  */
 function redealTargets(card: ResolvedCard) {
-  const holder = live(card).parts[0]?.holderId;
-  return familyStore.sortedHumans.filter((m) => m.id !== holder);
+  return otherHumans(familyStore.sortedHumans, live(card));
 }
 /** Re-deal is offered only when there is someone to re-deal to: never an empty picker. */
 function unchangedOptions(card: ResolvedCard) {
@@ -131,14 +131,9 @@ function setOutcome(cardId: string, value: string): void {
 function heldLine(card: ResolvedCard): string {
   const c = live(card);
   const part = c.parts.find((p) => p.holderId);
-  if (!part?.holderId) return '';
-  const since = part.since ?? c.state?.createdAt;
-  return since
-    ? fillTemplate(t('whoOwnsWhat.checkinDrawer.heldSince'), {
-        name: getMemberName(part.holderId, ''),
-        date: formatNookDate(ymdOf(since)),
-      })
-    : getMemberName(part.holderId, '');
+  const held = part ? heldSince(c, part) : null;
+  if (!held) return '';
+  return held.date ? fillTemplate(t('whoOwnsWhat.checkinDrawer.heldSince'), held) : held.name;
 }
 
 function movedLine(move: { fromId?: string; toId?: string; at: string }): string {

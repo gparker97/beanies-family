@@ -22,8 +22,10 @@ import {
   isCheckInDue,
   isRedeal,
   isUndealtDeck,
+  keptAndSkipped,
   latestCheckIn,
   nextCheckInDate,
+  otherHumans,
   recentMoves,
   resolveDeck,
   singleHolderOf,
@@ -716,5 +718,54 @@ describe('deck drift guards', () => {
     const heroes = RESPONSIBILITY_CARDS.filter((c) => c.illustration);
     expect(heroes).toHaveLength(10);
     for (const c of heroes) expect(c.illustration).toBe(`/brand/cards/${c.id}.webp`);
+  });
+});
+
+// ── Deal pile helpers ───────────────────────────────────────────────────────────
+
+describe('otherHumans', () => {
+  it("drops the first part's holder, and keeps everyone when nobody holds it", () => {
+    const { cards } = resolve([
+      state('laundry', { parts: [{ key: 'main', holderId: 'sofia' }] }),
+      state('dishes'),
+    ]);
+    expect(otherHumans(FAMILY, card(cards, 'laundry')).map((m) => m.id)).toEqual([
+      'greg',
+      'leo',
+      'mia',
+      'rex',
+    ]);
+    expect(otherHumans(FAMILY, card(cards, 'dishes'))).toHaveLength(FAMILY.length);
+  });
+});
+
+describe('keptAndSkipped', () => {
+  it('splits kept (held + waiting) from skipped, newest change first, unsorted in neither', () => {
+    const { cards } = resolve([
+      state('laundry', {
+        parts: [{ key: 'main', holderId: 'sofia' }],
+        updatedAt: noon('2026-09-01'),
+      }),
+      state('dishes', { updatedAt: noon('2026-09-03') }),
+      state('car-care', { status: 'skipped', updatedAt: noon('2026-09-02') }),
+      state('bikes', { status: 'skipped', updatedAt: noon('2026-09-04') }),
+    ]);
+    const { kept, skipped } = keptAndSkipped(cards);
+    expect(kept.map((c) => c.id)).toEqual(['dishes', 'laundry']);
+    expect(skipped.map((c) => c.id)).toEqual(['bikes', 'car-care']);
+    expect([...kept, ...skipped].some((c) => c.id === 'lunchboxes')).toBe(false);
+  });
+
+  it('breaks updatedAt ties by category order, then id, so the order is stable', () => {
+    const { cards } = resolve([
+      state('lunchboxes', { parts: [{ key: 'main', holderId: 'greg' }] }),
+      state('laundry', { parts: [{ key: 'main', holderId: 'greg' }] }),
+      state('dishes', { parts: [{ key: 'main', holderId: 'greg' }] }),
+    ]);
+    const home = LIST_CATEGORIES.findIndex((c) => c.id === 'home');
+    const kids = LIST_CATEGORIES.findIndex((c) => c.id === 'kids');
+    const byCat =
+      home < kids ? ['dishes', 'laundry', 'lunchboxes'] : ['lunchboxes', 'dishes', 'laundry'];
+    expect(keptAndSkipped(cards).kept.map((c) => c.id)).toEqual(byCat);
   });
 });
