@@ -285,7 +285,8 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     logAll(build.telemetry, action);
     if (opts.celebrateDealt !== false) {
       const pendingAfter = stats.value.waiting + stats.value.unsorted;
-      if (pendingBefore > 0 && pendingAfter === 0) {
+      // "Every card has a holder" needs a card to hold: a deck skipped whole is not dealt.
+      if (pendingBefore > 0 && pendingAfter === 0 && stats.value.deck > 0) {
         celebrate('deck-dealt');
         log('info', 'deck_dealt', { action, count: stats.value.deck });
       }
