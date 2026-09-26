@@ -296,6 +296,18 @@ describe('what a shared screen must never show', () => {
     const mine = list({ id: 'lm', category: 'me', ownerId: 'greg' });
     expect(build([], [mine]).listsByMember.greg).toEqual([]);
   });
+
+  it('keeps a "people we love" list off the wall', () => {
+    const people = list({ id: 'lp', category: 'people', ownerId: 'greg' });
+    expect(build([], [people]).listsByMember.greg).toEqual([]);
+  });
+
+  it('fails closed on a category this build does not know (a newer client)', () => {
+    const future = list({ id: 'lf', category: 'pets' as never, ownerId: 'greg' });
+    const result = build([], [future]);
+    expect(result.listsByMember.greg).toEqual([]);
+    expect(result.orphanLists).toEqual([]);
+  });
 });
 
 /**

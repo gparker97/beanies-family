@@ -736,7 +736,7 @@ export type TodoSort = 'newest' | 'oldest' | 'dueDate';
 // Beanie Lists (#33) — categorized family checklists (named bundles of items,
 // distinct from individual To-Dos). Gated behind the `familyLists` dev flag.
 export type ListCategory =
-  'home' | 'out' | 'kids' | 'health' | 'celebrations' | 'trips' | 'projects' | 'me';
+  'home' | 'out' | 'kids' | 'health' | 'celebrations' | 'people' | 'trips' | 'projects' | 'me';
 export type ListLifecycle = 'oneoff' | 'recurring';
 export type ListFrequency = 'daily' | 'weekly' | 'monthly';
 

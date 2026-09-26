@@ -1590,7 +1590,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       { type: 'heading', content: 'List categories', level: 2, id: 'categories' },
       {
         type: 'paragraph',
-        content: 'Every list lives in one of eight categories, so the page stays tidy:',
+        content: 'Every list lives in one of nine categories, so the page stays tidy:',
       },
       {
         type: 'list',
@@ -1601,6 +1601,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '\u{1F9D2} <strong>Kids & School</strong> — before-school, homework, kids’ chores',
           '\u{1FA7A} <strong>Health & Safety</strong> — appointments, medicines, safety checks',
           '\u{1F389} <strong>Celebrations & Traditions</strong> — parties, holidays, gatherings',
+          '\u{1F49E} <strong>People We Love</strong> - date nights, grandparents, family near and far',
           '\u{1F9F3} <strong>Trips & Packing</strong> — what to pack and prep for travel',
           '✅ <strong>Projects & Honey-dos</strong> — bigger job bundles and partner lists',
           '✨ <strong>Just for Me</strong> — your own personal lists',

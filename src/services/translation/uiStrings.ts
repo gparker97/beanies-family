@@ -6962,7 +6962,7 @@ const STRING_DEFS = {
   'lists.shelf.completed': { en: 'Completed', beanie: 'completed' },
   'lists.filter.all': { en: 'All', beanie: 'all' },
   'lists.progress': { en: '{done}/{total}', beanie: '{done}/{total}' },
-  // Categories (8)
+  // Categories (9)
   'lists.category.home': { en: 'Home & Household', beanie: 'home & household' },
   'lists.category.out': { en: 'Out & Errands', beanie: 'out & errands' },
   'lists.category.kids': { en: 'Kids & School', beanie: 'kids & school' },
@@ -6971,6 +6971,9 @@ const STRING_DEFS = {
     en: 'Celebrations & Traditions',
     beanie: 'celebrations & traditions',
   },
+  'lists.category.people': { en: 'People We Love', beanie: 'people we love' },
+  // Fallback shelf title for a list whose category this build doesn't know (a newer client's).
+  'lists.category.other': { en: 'Other', beanie: 'other' },
   'lists.category.trips': { en: 'Trips & Packing', beanie: 'trips & packing' },
   'lists.category.projects': { en: 'Projects & Honey-dos', beanie: 'projects & honey-dos' },
   'lists.category.me': { en: 'Just for Me', beanie: 'just for me' },
@@ -6980,6 +6983,7 @@ const STRING_DEFS = {
   'lists.categoryShort.kids': { en: 'Kids', beanie: 'kids' },
   'lists.categoryShort.health': { en: 'Health', beanie: 'health' },
   'lists.categoryShort.celebrations': { en: 'Celebrate', beanie: 'celebrate' },
+  'lists.categoryShort.people': { en: 'People', beanie: 'people' },
   'lists.categoryShort.trips': { en: 'Trips', beanie: 'trips' },
   'lists.categoryShort.projects': { en: 'Projects', beanie: 'projects' },
   'lists.categoryShort.me': { en: 'Just for Me', beanie: 'just for me' },
