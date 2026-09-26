@@ -24,6 +24,11 @@ import { computed, onMounted, ref, watch } from 'vue';
  *
  * Both paths are a no-op for a modal mounted closed — the `seed()` guard below — which is
  * every consumer in the codebase today.
+ *
+ * `entityKey` (optional): a modal that stays open while its parent retargets it (a drawer
+ * whose entity id changes under it) passes the id here, so a new target reseeds too, not
+ * only a change of `open`. Key on the id, never the entity object: a store that rebuilds
+ * its objects on every write would otherwise wipe the draft mid-edit.
  */
 export function useFormModal<T>(
   getEntity: () => T | undefined | null,
@@ -31,6 +36,7 @@ export function useFormModal<T>(
   options: {
     onEdit: (entity: T) => void;
     onNew: () => void;
+    entityKey?: () => unknown;
   }
 ) {
   const isEditing = computed(() => !!getEntity());
@@ -47,7 +53,10 @@ export function useFormModal<T>(
   }
 
   // The ordinary path: the parent flips `open` while the modal is already mounted.
-  watch(getOpen, seed);
+  // Retargeting while open (`entityKey`) reseeds too.
+  const entityKey = options.entityKey;
+  if (entityKey) watch([getOpen, entityKey], seed);
+  else watch(getOpen, seed);
   // The already-open path: the parent opened it before this component ever rendered.
   onMounted(seed);
 

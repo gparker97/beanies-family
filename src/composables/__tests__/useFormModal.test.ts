@@ -98,6 +98,44 @@ describe('seeding', () => {
   });
 });
 
+describe('entityKey', () => {
+  const Keyed = defineComponent({
+    props: {
+      open: Boolean,
+      entity: { type: Object as () => { id: string } | null, default: null },
+    },
+    setup(props) {
+      useFormModal(
+        () => props.entity,
+        () => props.open,
+        { onEdit, onNew, entityKey: () => props.entity?.id }
+      );
+      return {};
+    },
+    template: '<div />',
+  });
+
+  it('reseeds when retargeted while open, but not for a rebuilt object with the same id', async () => {
+    onEdit.mockClear();
+    onNew.mockClear();
+    const w = mount(Keyed, { props: { open: true, entity: { id: 'a' } } });
+    expect(onEdit).toHaveBeenLastCalledWith({ id: 'a' });
+    await w.setProps({ entity: { id: 'a' } }); // same card, fresh object (a store rebuild)
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    await w.setProps({ entity: { id: 'b' } });
+    expect(onEdit).toHaveBeenLastCalledWith({ id: 'b' });
+    await w.setProps({ entity: null });
+    expect(onNew).toHaveBeenCalledOnce();
+  });
+
+  it('does not seed a retarget while closed', async () => {
+    onEdit.mockClear();
+    const w = mount(Keyed, { props: { open: false, entity: { id: 'a' } } });
+    await w.setProps({ entity: { id: 'b' } });
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+});
+
 describe('isEditing', () => {
   it('tracks whether an entity is present', async () => {
     const w = mountHost({ open: false });
