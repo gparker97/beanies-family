@@ -171,6 +171,28 @@ function forget(id: number): void {
   log.value = log.value.filter((e) => e.seq !== id);
 }
 
+/**
+ * The session-log entry for ONE action, tied to its toast's Undo. The toast appears as soon
+ * as the write resolves, but a dealt or skipped card is only recorded after its flight, so
+ * an Undo can land first: it marks the action undone and `record` then writes nothing.
+ */
+function logEntryFor() {
+  let id = 0;
+  let undone = false;
+  return {
+    onUndone(): void {
+      undone = true;
+      if (id) forget(id);
+    },
+    /** Records the entry; false (nothing recorded) when the action was already undone. */
+    record(entry: Omit<LogEntry, 'seq'>): boolean {
+      if (undone) return false;
+      id = record(entry);
+      return true;
+    },
+  };
+}
+
 const members = computed(() => familyStore.sortedHumans);
 function gotFor(memberId: string): string {
   return log.value
@@ -247,16 +269,16 @@ function pick(memberId: string): Promise<void> {
     if (!c || !p) return;
     const target = faceEl(memberId);
     leaving.value = true;
-    let entry = 0;
+    const entry = logEntryFor();
     const [, res] = await Promise.all([
       flyTo(cardEl.value, target),
-      actions.deal(c.id, p.key, memberId, { onUndone: () => forget(entry) }),
+      actions.deal(c.id, p.key, memberId, { onUndone: entry.onUndone }),
     ]);
     if (!res) {
       leaving.value = false;
       return;
     }
-    entry = record({ kind: 'dealt', cardIds: [c.id], memberId, emojis: [cardEmoji(c)] });
+    if (!entry.record({ kind: 'dealt', cardIds: [c.id], memberId, emojis: [cardEmoji(c)] })) return;
     pulse(target, 'card-bounce');
     await landingBeat();
   });
@@ -271,9 +293,9 @@ function decideLater(): Promise<void> {
       passed.value = new Set(passed.value).add(c.id);
       return;
     }
-    let entry = 0;
-    const res = await actions.keep(c.id, { onUndone: () => forget(entry) });
-    if (res) entry = record({ kind: 'kept', cardIds: [c.id], emojis: [] });
+    const entry = logEntryFor();
+    const res = await actions.keep(c.id, { onUndone: entry.onUndone });
+    if (res) entry.record({ kind: 'kept', cardIds: [c.id], emojis: [] });
   });
 }
 
@@ -282,10 +304,10 @@ function skipIds(ids: readonly string[]): Promise<void> {
     const c = card.value;
     if (!c || !ids.length) return;
     leaving.value = true;
-    let entry = 0;
+    const entry = logEntryFor();
     const [, res] = await Promise.all([
       flyTo(cardEl.value, trayEl.value),
-      actions.skip(ids, { onUndone: () => forget(entry) }),
+      actions.skip(ids, { onUndone: entry.onUndone }),
     ]);
     if (!res) {
       leaving.value = false;
@@ -295,7 +317,7 @@ function skipIds(ids: readonly string[]): Promise<void> {
       const s = store.cardById(id);
       return s ? cardEmoji(s) : '';
     });
-    entry = record({ kind: 'skipped', cardIds: [...ids], emojis });
+    if (!entry.record({ kind: 'skipped', cardIds: [...ids], emojis })) return;
     pulse(trayEl.value, 'drop-flash');
     await landingBeat();
   });
