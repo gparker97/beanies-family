@@ -12,6 +12,10 @@
  * the `pile_revisit_change` event, the double-tap guard).
  *
  * The Skipped heading is the skip flight's landing spot, so it is exposed to `DealPile`.
+ *
+ * The two piles read as separate: one hairline divider (vertical beside the columns at md+,
+ * horizontal between the stacked lists on a phone) and a faint tinted panel behind Skipped
+ * at md+.
  */
 import { computed, useTemplateRef } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -78,7 +82,7 @@ function jump(cardId: string): void {
 
 <template>
   <div
-    class="dark:border-line grid w-full gap-4 border-t border-[var(--color-border)] pt-4 md:grid-cols-2 md:gap-7"
+    class="dark:border-line grid w-full gap-4 border-t border-[var(--color-border)] pt-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-6"
     data-testid="deal-lists"
   >
     <!-- Kept -->
@@ -124,8 +128,16 @@ function jump(cardId: string): void {
       />
     </section>
 
+    <span
+      class="dark:bg-line h-px w-full bg-[var(--color-border)] md:h-auto md:w-px"
+      aria-hidden="true"
+      data-testid="deal-lists-divider"
+    />
+
     <!-- Skipped -->
-    <section>
+    <section
+      class="md:dark:bg-surface-overlay min-w-0 md:-mt-2 md:rounded-2xl md:bg-[var(--tint-slate-5)] md:px-3 md:pt-2 md:pb-3"
+    >
       <h3
         ref="skippedHeadingEl"
         class="font-outfit dark:text-ink mb-2 text-base font-bold text-[var(--color-text)]"
