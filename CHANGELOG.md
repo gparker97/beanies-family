@@ -18,6 +18,7 @@ _Not yet released._
   cards, from cooking dinner to date nights. Keep or skip each card, hand it to someone in one
   tap, split it by child or by place, and re-deal it whenever things change. The overview shows
   how much of the deck is covered, never who does more.
+- Dealing now shows kept and skipped cards below the pile and lets you step back and forward.
 - A **family check-in** every 2, 4 or 8 weeks (or off) brings up the cards worth talking about.
 - The dealt deck prints as a **fridge sheet** (PDF) or shares as an image.
 - Card holders fill in the cook on new dinners and breakfasts, the owner of new grocery and

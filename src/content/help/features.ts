@@ -2244,6 +2244,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
+          'Under the pile, <strong>Kept</strong> lists the cards you kept and who has each one, and <strong>Skipped</strong> lists the ones you skipped, newest first. Use the arrows on either side of the card to step back and forward through the cards, including ones you already decided. Tap a card in either list to bring it back onto the pile: from there you can <strong>Give it to someone else</strong>, <strong>Skip instead</strong>, <strong>Split it</strong>, or <strong>Bring Back</strong> a skipped card. <strong>Back to</strong> takes you to the next card still to decide.',
+      },
+      {
+        type: 'paragraph',
+        content:
           'When every kept card has a holder, beanies celebrates: <em>Every card has a holder!</em> You don’t have to finish in one sitting. Come back any time and the deal picks up where you left off.',
       },
       {
@@ -2291,8 +2296,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>From the card:</strong> open it in the <strong>Deck</strong> view, tap <strong>Edit</strong>, choose someone else under <strong>Who Holds This Card?</strong> and save.',
-          '<strong>On a computer or tablet:</strong> open the <strong>Deal</strong> view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard.',
-          '<strong>On a phone:</strong> the <strong>Deal</strong> view shows the waiting cards one at a time, just like the first deal.',
+          '<strong>In the Deal view:</strong> the cards come one at a time, just like the first deal. Tap a card in the <strong>Kept</strong> list below the pile and choose <strong>Give it to someone else</strong>.',
+          '<strong>On a computer or tablet:</strong> prefer to see everything at once? Tap <strong>Board view</strong> at the top right of the Deal view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard. <strong>Card by card</strong> takes you back to the pile, and beanies remembers which one you like.',
         ],
       },
       {
