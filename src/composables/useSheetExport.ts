@@ -282,7 +282,9 @@ export async function pngBlobsToPdf(pngBlobs: Blob[], opts: PdfExportOptions = {
       const scale = Math.min((pageW - margin * 2) / imgW, (pageH - margin * 2) / imgH);
       const w = imgW * scale;
       const h = imgH * scale;
-      pdf.addImage(dataUrl, 'PNG', (pageW - w) / 2, (pageH - h) / 2, w, h);
+      // 'FAST' deflates the embedded image: without it jsPDF stores the decoded pixels raw,
+      // about 10 MB per A4 page at 2x, which is a heavy file to share or email.
+      pdf.addImage(dataUrl, 'PNG', (pageW - w) / 2, (pageH - h) / 2, w, h, undefined, 'FAST');
     }
     return pdf.output('blob');
   } catch (err) {
