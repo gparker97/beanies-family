@@ -137,6 +137,21 @@ Surface `responsibilities`, existing allowlisted keys only (`action`, `detail`, 
 - **Pass 3 (Sustainability)**: moved the cursor into a mount-free `usePileCursor` with pure `isUndecided` / `nextUndecided` / `pileView`; replaced the stage ref with `pileView(status, picking)` and one flag-reset point; split the revisit banner into `DealPileBanner`; made `settle(actedId, 'advance' | 'stay')` explicit, fixing five cursor bugs (revisit actions jumping away, a first-deal Decide later sticking, a vanished card with no anchor, arrows moving during a flight, undefined held-picker Cancel); `pickable` shared by tiles and 1-9 keys.
 - **Pass 4 (Fresh-eyes sweep)**: unified `onUndone` / `settle`; fixed the per-button guard that broke Skip on the faces view; `openDeal` no longer overwrites the saved deal mode; the page owns one board toggle and DealBoard's dead focus prop goes; kept CheckInDrawer's name-only held line; fixed key-press sticking under reduced motion and hover sticking on touch; K/S only on undecided cards, no flights for revisits; defined load timing, done state, stable list order, popover guards and `undoLast` on plain toasts; renamed `lists.kept`.
 
+## Outcome
+
+> Recorded 2026-09-26 after /beanies-build-auto.
+
+Built in local commits on `main` (from `2fdad1d0`), not pushed or deployed; `npm run validate` green (9277 tests), the Who Owns What E2E test passes. Two `/code-review high` rounds (10 findings each), all verified and fixed.
+
+Deviations, all deliberate:
+
+- A `DealPileStage.vue` component holds the arrows and card, keeping `DealPile.vue` smaller than before the change.
+- `usePileCursor` orders by the store's card order, and a card opened from the lists is a transient "visit" that doesn't join the queue (so the progress bar and "card n of total" never inflate).
+- While an action is in flight the pile renders from a frozen snapshot, so nothing re-renders under the flying card.
+- Keyboard shortcuts act wherever focus is (a focus-scope rule from review round 1 disabled them on the normal way in and was removed); they only yield to text entry, open dialogs, drawers and menus, and arrow keys yield to arrow-driven widgets.
+- `useAttentionPulse` (app-wide) now finishes each pulse exactly once, with a fallback timer, fixing a stale-listener bug that also affected existing callers.
+- "Give it to someone else" is hidden when nobody else can hold the card. A failed action keeps the faces open to retry.
+
 ## Prompt Log
 
 <details>
