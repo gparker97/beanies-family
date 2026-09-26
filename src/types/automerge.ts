@@ -28,6 +28,9 @@ import type {
   OverlapAck,
   ListCycle,
   RemovedMember,
+  ResponsibilityCardState,
+  ResponsibilityMove,
+  ResponsibilityCheckIn,
   Settings,
   PodLineage,
 } from './models';
@@ -96,6 +99,14 @@ export interface FamilyDocument {
    * Write-once, never deleted. See `RemovedMember` in models.ts.
    */
   removedMembers: Record<string, RemovedMember>;
+  /**
+   * Who Owns What (#109). Card state keyed by card id (built-in id or `custom-<uuid>`),
+   * always written whole. Moves and check-ins are WRITE-ONCE history records. The only
+   * write surface for all three is `responsibilityRepository.ts`.
+   */
+  responsibilityCards: Record<string, ResponsibilityCardState>;
+  responsibilityMoves: Record<string, ResponsibilityMove>;
+  responsibilityCheckIns: Record<string, ResponsibilityCheckIn>;
   settings: Settings | null;
   /**
    * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
@@ -170,5 +181,8 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   overlapAcknowledgments: 0,
   listCycles: 0,
   removedMembers: 0,
+  responsibilityCards: 0,
+  responsibilityMoves: 0,
+  responsibilityCheckIns: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
