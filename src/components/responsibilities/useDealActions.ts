@@ -15,7 +15,7 @@
  * A component that shows its own trace of an action (the deal pile's emoji row under a
  * face) passes `onUndone`, called only when the toast's Undo actually landed.
  */
-import { dismissToast, showToast } from '@/composables/useToast';
+import { dismissToast, invokeToastAction, showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -31,12 +31,14 @@ export interface DealActionOptions {
   onUndone?: () => void;
 }
 
-/** The one live deck undo toast, shared by every consumer. */
+/** The one live deck toast, shared by every consumer, and whether it carries an Undo. */
 let liveUndoToastId: number | null = null;
+let liveToastHasUndo = false;
 
 /** Test seam: forget the live toast between tests. */
 export function resetDealActionsForTest(): void {
   liveUndoToastId = null;
+  liveToastHasUndo = false;
 }
 
 export function useDealActions() {
@@ -54,6 +56,7 @@ export function useDealActions() {
 
   function offer(title: string, token: UndoToken | null, opts?: DealActionOptions): void {
     if (liveUndoToastId !== null) dismissToast(liveUndoToastId);
+    liveToastHasUndo = token !== null;
     liveUndoToastId = token
       ? showToast('success', title, undefined, {
           actionLabel: t('action.undo'),
@@ -115,15 +118,36 @@ export function useDealActions() {
     return res;
   }
 
-  async function bringBack(cardId: string): Promise<UndoableResult<ResolvedCard> | null> {
+  async function bringBack(
+    cardId: string,
+    opts?: DealActionOptions
+  ): Promise<UndoableResult<ResolvedCard> | null> {
     const res = await store.bringBack(cardId);
     if (!res) return null;
     offer(
       fillTemplate(t('whoOwnsWhat.toast.broughtBack'), { card: cardName(res.result) }),
-      res.undo
+      res.undo,
+      opts
     );
     return res;
   }
 
-  return { deal, keep, skip, bringBack, undo };
+  /**
+   * The `U` shortcut: tap the live toast's Undo. `invokeToastAction` runs it, reports a
+   * thrown handler with an error toast, and no-ops when the toast has already expired.
+   * With no live Undo (none shown yet, or a plain toast) there is nothing to do.
+   */
+  async function undoLast(): Promise<void> {
+    const id = liveUndoToastId;
+    if (id === null || !liveToastHasUndo) {
+      // eslint-disable-next-line no-console -- an expected no-op (U with nothing to undo), debug only
+      console.debug('[useDealActions] undoLast: no live undo toast');
+      return;
+    }
+    liveUndoToastId = null;
+    liveToastHasUndo = false;
+    await invokeToastAction(id);
+  }
+
+  return { deal, keep, skip, bringBack, undo, undoLast };
 }
