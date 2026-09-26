@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-25",
-    "translationCount": 4967
+    "lastUpdated": "2026-09-26",
+    "translationCount": 5056
   },
   "translations": {
     "app.name": {
@@ -4646,11 +4646,6 @@
       "hash": "gxeikb",
       "lastUpdated": "2026-03-03"
     },
-    "budget.csvUpload.title": {
-      "translation": "Csv 上传",
-      "hash": "7k478b",
-      "lastUpdated": "2026-03-03"
-    },
     "budget.comingSoon": {
       "translation": "不日上映",
       "hash": "3jubzu",
@@ -4924,11 +4919,6 @@
     "budget.batchAdd.subtitle": {
       "translation": "一次添加多笔交易",
       "hash": "55bfas",
-      "lastUpdated": "2026-03-03"
-    },
-    "budget.csvUpload.subtitle": {
-      "translation": "从您的银行对账单导入",
-      "hash": "9is0bh",
       "lastUpdated": "2026-03-03"
     },
     "budget.upcoming.today": {
@@ -14702,9 +14692,9 @@
       "lastUpdated": "2026-06-03"
     },
     "settings.ai.askBeforePhotosHint": {
-      "translation": "在向AI发送照片、文档或所选文本之前，显示隐私检查。",
-      "hash": "5lpmkg",
-      "lastUpdated": "2026-09-03"
+      "translation": "在向AI发送照片、文档或所选文本之前，显示隐私检查。银行对账单总是第一次询问。",
+      "hash": "bzw6sp",
+      "lastUpdated": "2026-09-26"
     },
     "ai.sourcePhotoPreview": {
       "translation": "保存后附加",
@@ -20367,9 +20357,9 @@
       "lastUpdated": "2026-08-27"
     },
     "shareTarget.unrecognised.message": {
-      "translation": "beanies无法确定这是一项活动、一次旅行还是一个食谱。您仍然可以自行添加。",
-      "hash": "so6vo9",
-      "lastUpdated": "2026-08-27"
+      "translation": "beanies无法确定这是一项活动、一次旅行、一个食谱还是一张银行对账单。您仍然可以自行添加。",
+      "hash": "q18fln",
+      "lastUpdated": "2026-09-26"
     },
     "shareTarget.readerOff.title": {
       "translation": "读卡器不可用",
@@ -21732,9 +21722,9 @@
       "lastUpdated": "2026-09-03"
     },
     "shareTarget.text.tooLong.message": {
-      "translation": "这比beanies一次可以阅读的文本还要多。选择包含详细信息的零件，然后重试。",
-      "hash": "xd1pcz",
-      "lastUpdated": "2026-09-03"
+      "translation": "这比Beanies一次可以阅读的文本还要多。选择包含详细信息的零件，然后重试。如果是银行对账单，请先选择“交易” ：对账单部分读取。",
+      "hash": "fryr1u",
+      "lastUpdated": "2026-09-26"
     },
     "shareTarget.text.truncated.title": {
       "translation": "阅读第一部分",
@@ -24614,7 +24604,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-25"
+      "lastUpdated": "2026-09-26"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -24830,6 +24820,471 @@
       "translation": "行程日期",
       "hash": "bfdfii",
       "lastUpdated": "2026-09-25"
+    },
+    "transactions.onStatementAs": {
+      "translation": "在您的对账单上作为",
+      "hash": "p2ftdd",
+      "lastUpdated": "2026-09-26"
+    },
+    "budget.importStatement.title": {
+      "translation": "导入对账单",
+      "hash": "sinxjf",
+      "lastUpdated": "2026-09-26"
+    },
+    "transactions.magicHint": {
+      "translation": "导入银行对账单： PDF、屏幕截图、CSV或粘贴的文本",
+      "hash": "q2u6un",
+      "lastUpdated": "2026-09-26"
+    },
+    "transactions.magicAria": {
+      "translation": "魔豆：导入银行对账单",
+      "hash": "ocox01",
+      "lastUpdated": "2026-09-26"
+    },
+    "budget.importStatement.subtitle": {
+      "translation": "PDF、屏幕截图、CSV或粘贴的文本",
+      "hash": "neh09",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.dest.transactions": {
+      "translation": "交易",
+      "hash": "z19kl1",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.noun.event": {
+      "translation": "行动记录",
+      "hash": "xa0km6",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.noun.travel": {
+      "translation": "一次旅行",
+      "hash": "ok0t4s",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.noun.recipe": {
+      "translation": "添加新食谱",
+      "hash": "hdjxlf",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.noun.transactions": {
+      "translation": "银行对账单",
+      "hash": "9696ay",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.pick.as.transactions": {
+      "translation": "我们会将此视为银行对账单。",
+      "hash": "wp5l91",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.correct.statementNotFree": {
+      "translation": "将其作为银行对账单阅读，每页花费一个bean。",
+      "hash": "ve4uh5",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.reading.statement": {
+      "translation": "正在阅读您的对账单……",
+      "hash": "2lw9w0",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.reading.progress": {
+      "translation": "第{done}页，共{total}页",
+      "hash": "j0duka",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.title": {
+      "translation": "这看起来像是银行对账单",
+      "hash": "upsfph",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.intro": {
+      "translation": "beanies将使用安全、私密的人工智能阅读每个页面，并列出它找到的交易供您检查。",
+      "hash": "9x3l0o",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.whatValue": {
+      "translation": "此对账单的页面，加上您家人之前提交过的商店和收款人的名称，以及每个类别的类别，因此建议与您的相匹配。切勿使用金额、日期、账户或人员。",
+      "hash": "1a98i8",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.readsLabel": {
+      "translation": "IT成本",
+      "hash": "p6tbub",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.reads.one": {
+      "translation": "1读， 1豆。",
+      "hash": "l2g8az",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.reads.other": {
+      "translation": "{count}个读数，每页一个bean。",
+      "hash": "y29a0w",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.afterValue": {
+      "translation": "在您确认列表之前，不会保存任何内容。声明本身不由AI服务或beanies保存。",
+      "hash": "mtase0",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.consent.statement.confirm": {
+      "translation": "阅读我的声明",
+      "hash": "95frj9",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.title": {
+      "translation": "您的声明，请阅读",
+      "hash": "b3ypnw",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.lines.one": {
+      "translation": "{count}行",
+      "hash": "sxebsb",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.lines.other": {
+      "translation": "%{count} 行",
+      "hash": "qn4k7s",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.period": {
+      "translation": "{from}至{to}",
+      "hash": "ot1zq4",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.account.label": {
+      "translation": "步进",
+      "hash": "1cygw",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.account.note": {
+      "translation": "更改帐户会重新检查每一行。",
+      "hash": "jjn17f",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.account.none": {
+      "translation": "选择此对账单所适用的账号。",
+      "hash": "dbqrub",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.totals.add": {
+      "translation": "{count}个要添加",
+      "hash": "uap3hv",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.totals.familiar": {
+      "translation": "{count}个看起来很熟悉",
+      "hash": "2pofw1",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.totals.skipped": {
+      "translation": "已跳过{count}个",
+      "hash": "czc0p",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.totals.possible.one": {
+      "translation": "1个可能的重复项",
+      "hash": "x052sr",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.totals.possible.other": {
+      "translation": "{count}个可能的重复项",
+      "hash": "jll3k0",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.tickAll": {
+      "translation": "全部勾选",
+      "hash": "x2oyvy",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.untickAll": {
+      "translation": "取消所有选中",
+      "hash": "j6mlvb",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.familiar": {
+      "translation": "熟悉",
+      "hash": "anasl1",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.mergeAll": {
+      "translation": "合并所有",
+      "hash": "b094ef",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.keepAll": {
+      "translation": "全部保留",
+      "hash": "3s03q",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.bulk.skipAll": {
+      "translation": "全部跳过( L)",
+      "hash": "yi8adc",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.day.tick": {
+      "translation": "在{day}添加每一行",
+      "hash": "nnna3h",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.tick": {
+      "translation": "Add {name}",
+      "hash": "",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.edit": {
+      "translation": "Edit {name}",
+      "hash": "",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.already": {
+      "translation": "已添加{date}",
+      "hash": "7pjksc",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.transferFrom": {
+      "translation": "从{account}转账",
+      "hash": "1c4pna",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.transferTo": {
+      "translation": "转账至{account}",
+      "hash": "3c5n2d",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.offer": {
+      "translation": "支付来源",
+      "hash": "1txqxt",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.row.offerNone": {
+      "translation": "不是转账",
+      "hash": "jd7yjt",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.statement": {
+      "translation": "对账单",
+      "hash": "n97doj",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.existing": {
+      "translation": "已在Beanies中",
+      "hash": "n431f0",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.possible": {
+      "translation": "可能已经戴在帽子上了",
+      "hash": "1gffe9",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.possibleSkipWhy": {
+      "translation": "较早的导入已添加此内容。已跳过，除非您同时保留两者。",
+      "hash": "gufban",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.possibleWhy": {
+      "translation": "看起来很像你的照片。除非您合并或跳过，否则两者都将保留。",
+      "hash": "km8njg",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.merge": {
+      "translation": "合并",
+      "hash": "1872fs",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.keepBoth": {
+      "translation": "保留两者",
+      "hash": "394sos",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.skip": {
+      "translation": "跳过",
+      "hash": "1j9un",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.estimated": {
+      "translation": "预计",
+      "hash": "aba2tg",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.mergeWhy": {
+      "translation": "保留您的姓名和链接，并记录对账单金额和日期。",
+      "hash": "1ylbs1",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.pair.transferWhy": {
+      "translation": "将其记录为两个账户之间的一次转账。",
+      "hash": "31nbvt",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.editor.in": {
+      "translation": "收钱",
+      "hash": "4ffdx7",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.editor.out": {
+      "translation": "取钱",
+      "hash": "4rz92m",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.editor.transfer": {
+      "translation": "移交",
+      "hash": "m93b4b",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.editor.transferFrom": {
+      "translation": "从底部",
+      "hash": "vgsdop",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.editor.transferTo": {
+      "translation": "到账户",
+      "hash": "wh15dk",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.dropped.one": {
+      "translation": "1个页面看起来像术语或营销，未被阅读。",
+      "hash": "q2rsq2",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.dropped.other": {
+      "translation": "{count}页看起来像条款或营销，未被阅读。",
+      "hash": "yzhupz",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.readAnyway": {
+      "translation": "仍然阅读第{page}页",
+      "hash": "1r0m53",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.beyondCap": {
+      "translation": "仅阅读了前{count}页。单独导入其余部分。",
+      "hash": "1hpfjv",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.failed.one": {
+      "translation": "无法读取1页。此列表中缺少其行。",
+      "hash": "7murda",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.failed.other": {
+      "translation": "{count}页无法读取。此列表中缺少他们的行。",
+      "hash": "n1drv5",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.capped": {
+      "translation": "一页上的行数超过了豆豆一次读取的行数。请根据您的陈述检查每页的结尾。",
+      "hash": "qydqu0",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.overlap.one": {
+      "translation": "1行已在Bean中，未勾选。",
+      "hash": "xe1w4h",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.notice.overlap.other": {
+      "translation": "{count}行已在Bean中，未勾选。",
+      "hash": "flda2k",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.confirm.add": {
+      "translation": "添加{add}",
+      "hash": "93v5w8",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.confirm.merge": {
+      "translation": "合并{merge}",
+      "hash": "y6lbs",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.confirm.both": {
+      "translation": "添加{add} ，合并{merge}",
+      "hash": "v1ebxo",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.confirm.nothing": {
+      "translation": "无添加。",
+      "hash": "mp7mzz",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.done.title": {
+      "translation": "报表已导入",
+      "hash": "kkcclx",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.done.body": {
+      "translation": "{added}已添加， {merged}与您已有的匹配。",
+      "hash": "nm3bpk",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.partial.title": {
+      "translation": "主要进口",
+      "hash": "mqieok",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.partial.body": {
+      "translation": "{added}已添加， {merged}已匹配，但{failed}无法更新。这些交易未更改；请再次导入对账单以重试。",
+      "hash": "te3ce3",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.failed.title": {
+      "translation": "无法导入",
+      "hash": "vqbksk",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.failed.body": {
+      "translation": "未保存任何内容。请重试。",
+      "hash": "v6skg2",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.unverified.title": {
+      "translation": "导入尚未确认",
+      "hash": "qer9r3",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.unverified.body": {
+      "translation": "新交易已保存，但无法确认，熟悉的行未更新。再次导入此对账单之前，请检查交易；已添加的行将显示为已添加。",
+      "hash": "3055n",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.planFailed.title": {
+      "translation": "无法查看该对账单",
+      "hash": "o8wc9k",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.planFailed.body": {
+      "translation": "beanies阅读了它，但无法构建列表。请重试，并告诉我们是否会继续发生这种情况。",
+      "hash": "vda2m5",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.readAnywayFailed": {
+      "translation": "无法读取该页面。",
+      "hash": "2im9t",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.rateMissing.title": {
+      "translation": "汇率",
+      "hash": "tma1mm",
+      "lastUpdated": "2026-09-26"
+    },
+    "statementImport.rateMissing.body": {
+      "translation": "将此行移至该账户需要两种货币之间的汇率。在“设置”中添加一个，然后重试。",
+      "hash": "vczthl",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.capture.pick.none.message": {
+      "translation": "您选择了“{kind}” ，但beanies在这里找不到{noun}。无需选择即可再次交出，或选择其他图块。",
+      "hash": "jvo6r9",
+      "lastUpdated": "2026-09-26"
+    },
+    "ai.correct.picked": {
+      "translation": "正在以{noun}的身份再次读取…",
+      "hash": "oepunj",
+      "lastUpdated": "2026-09-26"
+    },
+    "category.interest": {
+      "translation": "利息",
+      "hash": "ai396y",
+      "lastUpdated": "2026-09-26"
     }
   }
 }
