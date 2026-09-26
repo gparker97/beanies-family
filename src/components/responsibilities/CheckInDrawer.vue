@@ -68,7 +68,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    agenda.value = buildCheckInAgenda(store.resolved, store.moves, store.lastCheckIn, today.value);
+    agenda.value = buildCheckInAgenda(store.resolved, store.moves, store.checkInSince, today.value);
     outcomes.value = {};
     dealtTo.value = {};
     picking.value = null;

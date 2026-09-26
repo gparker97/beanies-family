@@ -47,6 +47,7 @@ const store = reactive({
   resolved: [card('laundry', 'greg'), card('dishes')],
   moves: [],
   lastCheckIn: undefined,
+  checkInSince: undefined,
   nextCheckIn: null,
   cardById(id: string) {
     return this.resolved.find((c) => c.id === id);

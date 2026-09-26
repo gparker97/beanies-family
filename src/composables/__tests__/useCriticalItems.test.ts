@@ -1138,7 +1138,7 @@ describe('useCriticalItems', () => {
         updatedAt: createdAt,
       };
     }
-    /** The first deal (no `fromId`): anchors the check-in clock, never a moved note. */
+    /** The first deal (no `fromId`): never a moved note. */
     const FIRST_DEAL = {
       id: 'laundry:main:2026-01-01T10:00:00.000Z',
       cardId: 'laundry',
@@ -1147,10 +1147,22 @@ describe('useCriticalItems', () => {
       byId: 'parent-2',
       at: '2026-01-01T10:00:00.000Z',
     };
+    /** The check-in cycle's start record, written with that first deal: anchors the clock. */
+    const CYCLE_START = {
+      id: '2026-01-01-start',
+      kind: 'start' as const,
+      completedAt: '2026-01-01T10:00:00.000Z',
+      byId: 'parent-2',
+      stillWorks: 0,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+    };
     function seedDeck(states: unknown[], moves: unknown[] = []) {
       const deck = useResponsibilityStore();
       deck.states = states;
       deck.moves = moves as never;
+      deck.checkIns = moves.length ? [CYCLE_START] : [];
     }
     const cardRows = () => useCriticalItems().criticalItems.value.filter((i) => i.type === 'card');
 

@@ -40,9 +40,9 @@ import { toISODateString } from '@/utils/date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
   categoryCoverage,
+  checkInAnchor,
   deckStats,
   defaultHolderFor as pureDefaultHolderFor,
-  firstDealtAt,
   isCheckInDue,
   latestCheckIn,
   nextCheckInDate,
@@ -60,6 +60,7 @@ import {
   buildSaveCard,
   buildSkip,
   buildUndo,
+  withCycleStart,
   type BuildResult,
   type CardDraft,
   type CheckInOutcomes,
@@ -106,9 +107,16 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   const coverage = computed(() => categoryCoverage(resolved.value));
   const waiting = computed(() => resolved.value.filter((c) => c.status === 'waiting'));
   const customCount = computed(() => resolved.value.filter((c) => c.isCustom).length);
-  /** First-deal state: no built-in card has been kept or skipped yet. */
+  /**
+   * First-deal state (the page's empty state): no built-in card has been kept or skipped
+   * yet. Not the check-in clock's rule: that is `isUndealtDeck` (see `withCycleStart`).
+   */
   const isFirstDeal = computed(() =>
     resolved.value.every((c) => c.isCustom || c.status === 'unsorted')
+  );
+  /** Every kept card has a holder, and there is at least one (a deck skipped whole is not). */
+  const isFullyDealt = computed(
+    () => stats.value.deck > 0 && stats.value.waiting === 0 && stats.value.unsorted === 0
   );
 
   function cardById(id: string): ResolvedCard | undefined {
@@ -125,14 +133,12 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   }
 
   const rhythmWeeks = computed(() => settingsStore.responsibilityCheckInWeeks);
+  /** The last FINISHED check-in (the Overview's "last check-in"); never a cycle start. */
   const lastCheckIn = computed(() => latestCheckIn(checkIns.value));
-  const dealtAt = computed(() => firstDealtAt(moves.value));
-  const nextCheckIn = computed(() =>
-    nextCheckInDate(rhythmWeeks.value, checkIns.value, dealtAt.value)
-  );
-  const checkInDue = computed(() =>
-    isCheckInDue(rhythmWeeks.value, checkIns.value, dealtAt.value, today.value)
-  );
+  /** What the clock and the agenda's "moved since" run from: the latest record of either kind. */
+  const checkInSince = computed(() => checkInAnchor(checkIns.value));
+  const nextCheckIn = computed(() => nextCheckInDate(rhythmWeeks.value, checkIns.value));
+  const checkInDue = computed(() => isCheckInDue(rhythmWeeks.value, checkIns.value, today.value));
 
   /** Only grown-ups deal; children see the page read-only. */
   const canDeal = computed(() => {
@@ -258,15 +264,28 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
 
   /**
    * Write a builder's ops, verify every op landed, refresh, and fire the deck-dealt
-   * celebration on the transition. Resolves `true` on success (including a no-op) and
-   * `null` after `wrapAsync` has shown and reported a failure.
+   * celebration on the transition. Every write except an undo first goes through
+   * `withCycleStart`, so the write that puts the first card in an empty deck also starts
+   * the check-in cycle, whichever action it is. Resolves the build actually written (its
+   * `undo` includes any cycle start) on success, including a no-op, and `null` after
+   * `wrapAsync` has shown and reported a failure.
    */
   async function write(
     action: string,
-    build: BuildResult,
-    opts: { celebrateDealt?: boolean } = {}
-  ): Promise<true | null> {
-    if (!build.ops.length) return true;
+    built: BuildResult,
+    opts: { celebrateDealt?: boolean; cycleStart?: boolean } = {}
+  ): Promise<BuildResult | null> {
+    if (!built.ops.length) return built;
+    const build =
+      opts.cycleStart === false
+        ? built
+        : withCycleStart(
+            built,
+            resolved.value,
+            familyStore.currentMemberId ?? '',
+            nowIso(),
+            today.value
+          );
     const pendingBefore = stats.value.waiting + stats.value.unsorted;
     const ok = await wrapAsync(
       isLoading,
@@ -283,16 +302,12 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     );
     if (!ok) return null;
     logAll(build.telemetry, action);
-    if (opts.celebrateDealt !== false) {
-      const pendingAfter = stats.value.waiting + stats.value.unsorted;
-      // "Every card has a holder" needs a card to hold: a deck skipped whole is not dealt.
-      if (pendingBefore > 0 && pendingAfter === 0 && stats.value.deck > 0) {
-        celebrate('deck-dealt');
-        log('info', 'deck_dealt', { action, count: stats.value.deck });
-      }
+    if (opts.celebrateDealt !== false && pendingBefore > 0 && isFullyDealt.value) {
+      celebrate('deck-dealt');
+      log('info', 'deck_dealt', { action, count: stats.value.deck });
     }
     logLoaded();
-    return true;
+    return build;
   }
 
   const nowIso = () => toISODateString(new Date());
@@ -302,9 +317,9 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     build: BuildResult,
     result: () => T
   ): Promise<UndoableResult<T> | null> {
-    const ok = await write(action, build);
-    if (!ok) return null;
-    return { result: result(), undo: build.ops.length ? (build.undo ?? null) : null };
+    const written = await write(action, build);
+    if (!written) return null;
+    return { result: result(), undo: written.ops.length ? (written.undo ?? null) : null };
   }
 
   // ========== ACTIONS ==========
@@ -382,7 +397,7 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
       } catch (e) {
         return failBuild('deleteCustom', e);
       }
-      return write('deleteCustom', build);
+      return (await write('deleteCustom', build)) ? true : null;
     });
   }
 
@@ -457,7 +472,11 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   function completeCheckIn(outcomes: CheckInOutcomes): Promise<ResponsibilityCheckIn | null> {
     return guarded('completeCheckIn', {}, async (actor) => {
       const build = buildCheckIn(outcomes, actor, nowIso(), today.value);
-      if (!(await write('completeCheckIn', build, { celebrateDealt: false }))) return null;
+      const written = await write('completeCheckIn', build, {
+        celebrateDealt: false,
+        cycleStart: false,
+      });
+      if (!written) return null;
       celebrate('check-in-done');
       return build.checkIn;
     });
@@ -484,13 +503,14 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     return guarded('undo', {}, async () => {
       const live = new Map<string, ResponsibilityCardState>();
       for (const c of resolved.value) if (c.state) live.set(c.id, c.state);
-      const build = buildUndo(token, live);
+      const build = buildUndo(token, live, resolved.value);
       if (build.stale) {
         showToast('info', t('whoOwnsWhat.undo.stale'), t('whoOwnsWhat.undo.staleHelp'));
         log('warn', 'undo_stale', { action: 'undo', detail: token.action });
         return null;
       }
-      return write('undo', build, { celebrateDealt: false });
+      const written = await write('undo', build, { celebrateDealt: false, cycleStart: false });
+      return written ? (true as const) : null;
     });
   }
 
@@ -520,8 +540,10 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     waiting,
     customCount,
     isFirstDeal,
+    isFullyDealt,
     rhythmWeeks,
     lastCheckIn,
+    checkInSince,
     nextCheckIn,
     checkInDue,
     canDeal,

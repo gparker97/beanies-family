@@ -84,7 +84,7 @@ const waitingShown = computed(() => store.waiting.slice(0, WAITING_SHOWN));
 
 // ── Check-in ─────────────────────────────────────────────────────────────────
 const agenda = computed(() =>
-  buildCheckInAgenda(store.resolved, store.moves, store.lastCheckIn, today.value)
+  buildCheckInAgenda(store.resolved, store.moves, store.checkInSince, today.value)
 );
 
 function snoozeCheckIn(): void {

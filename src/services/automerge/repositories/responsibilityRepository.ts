@@ -15,7 +15,8 @@
  *   - Moves and check-ins are WRITE-ONCE. There is no update path; do not add one.
  *   - The ONLY paths that delete moves are `deleteCustom` (that card's moves),
  *     `restoreDefaults` (every move) and `undo` of a move the same session just created.
- *     Check-ins are never deleted.
+ *     The ONLY path that deletes a check-in record is `undo` of the cycle-start record the
+ *     same session's first keep or deal just created; a finished check-in is never deleted.
  *
  * NOTE the caller cannot read success from the return value: a batch mutation resolves to
  * `undefined`. The store verifies with `isDeckOpApplied` (a projection read) instead.
@@ -73,6 +74,8 @@ function toMutation(op: DeckOp): MutationOp {
         id: op.checkIn.id,
         entity: toPlain(stripUndefined(op.checkIn)),
       };
+    case 'deleteCheckIn':
+      return { op: 'delete', collection: 'responsibilityCheckIns', id: op.id };
   }
 }
 
@@ -101,5 +104,7 @@ export function isDeckOpApplied(op: DeckOp): boolean {
       return (
         getById('responsibilityCheckIns', op.checkIn.id)?.completedAt === op.checkIn.completedAt
       );
+    case 'deleteCheckIn':
+      return !getById('responsibilityCheckIns', op.id);
   }
 }
