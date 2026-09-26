@@ -6,9 +6,9 @@ import { MOBILE_NAV_CATEGORIES } from '@/constants/navigation';
 const mockRoute = { path: '/nook' };
 
 // Planning has two flag-gated beans: Beanie Lists (`familyLists`) and the Meal
-// Planner (`mealPlanner`). These tests assert the 4-bean Planning stack
-// (Activities, Travel, To-do, Meal Planner), so keep `mealPlanner` ON and only
-// `familyLists` OFF (its 5th bean is out of scope here).
+// Planner (`mealPlanner`). These tests assert the 5-bean Planning stack
+// (Activities, Travel, To-do, Meal Planner, Who Owns What), so keep `mealPlanner`
+// ON and only `familyLists` OFF (its bean is out of scope here).
 vi.mock('@/config/flags', async (orig) => ({
   ...(await orig<typeof import('@/config/flags')>()),
   isFlagEnabled: (flag: string) => flag !== 'familyLists',
@@ -124,9 +124,9 @@ describe('MobileNavBeanStack', () => {
     expect(wrapper.findAll('[role=menuitem]')).toHaveLength(0);
   });
 
-  it('renders 4 beans for Planning (Activities, Travel, To-do, Meal Planner)', () => {
+  it('renders 5 beans for Planning (Activities, Travel, To-do, Meal Planner, Who Owns What)', () => {
     const wrapper = mountStack({ category: planning });
-    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(4);
+    expect(wrapper.findAll('[role=menuitem]')).toHaveLength(5);
   });
 
   it('renders 6 beans for Money', () => {
@@ -143,11 +143,11 @@ describe('MobileNavBeanStack', () => {
     const wrapper = mountStack({ category: planning });
     const beans = wrapper.findAll('[role=menuitem]');
     // Items render in REVERSED order — first DOM item is the last category item.
-    // For Planning, items are [/activities, /travel, /todo, /meal-planner];
-    // reversed first = /meal-planner.
+    // For Planning, items are [/activities, /travel, /todo, /meal-planner, /who-owns-what];
+    // reversed first = /who-owns-what.
     await beans[0]!.trigger('click');
     expect(wrapper.emitted('navigate')).toBeTruthy();
-    expect(wrapper.emitted('navigate')![0]).toEqual(['/meal-planner']);
+    expect(wrapper.emitted('navigate')![0]).toEqual(['/who-owns-what']);
   });
 
   it('emits close on scrim tap', async () => {
@@ -232,9 +232,9 @@ describe('MobileNavBeanStack', () => {
     const wrapper = mountStack({ category: planning, attach: true });
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    // Bottom bean (DOM order index 0 since reversed) is /meal-planner for Planning
+    // Bottom bean (DOM order index 0 since reversed) is /who-owns-what for Planning
     const focused = document.activeElement;
-    expect(focused?.textContent).toContain('nav.mealPlanner');
+    expect(focused?.textContent).toContain('nav.whoOwnsWhat');
     wrapper.unmount();
   });
 
@@ -251,8 +251,8 @@ describe('MobileNavBeanStack', () => {
   it('exposes hint text inside the same button so screen readers read both', () => {
     const wrapper = mountStack({ category: planning });
     const beans = wrapper.findAll('[role=menuitem]');
-    // Reversed order: /meal-planner first
-    expect(beans[0]!.text()).toContain('nav.mealPlanner');
-    expect(beans[0]!.text()).toContain('mobileNav.hint.mealPlanner');
+    // Reversed order: /who-owns-what first
+    expect(beans[0]!.text()).toContain('nav.whoOwnsWhat');
+    expect(beans[0]!.text()).toContain('mobileNav.hint.whoOwnsWhat');
   });
 });
