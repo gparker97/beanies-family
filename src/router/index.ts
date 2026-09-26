@@ -268,6 +268,12 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.mealPlanner', requiresAuth: true, requiresFlag: 'mealPlanner' },
   },
   {
+    path: '/who-owns-what',
+    name: 'WhoOwnsWhat',
+    component: () => import('@/pages/WhoOwnsWhatPage.vue'),
+    meta: { titleKey: 'nav.whoOwnsWhat', requiresAuth: true },
+  },
+  {
     path: '/lists',
     name: 'Lists',
     component: () => import('@/pages/BeanieListsPage.vue'),

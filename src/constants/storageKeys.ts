@@ -15,4 +15,7 @@
 export const STORAGE_KEYS = {
   TEXT_SIZE: 'beanies:textSize',
   THEME: 'beanies:theme',
+  /** Who Owns What (#109): the last-used view (overview / deal / deck). Device-local;
+   *  not read by the `index.html` bootstrap. */
+  WHO_OWNS_WHAT_VIEW: 'beanies:whoOwnsWhatView',
 } as const;
