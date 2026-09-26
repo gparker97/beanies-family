@@ -34,7 +34,7 @@ const { t } = useTranslation();
 const { getMemberName } = useMemberInfo();
 const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
 
-/** Fallback when a category is unknown to this build (a newer client's card). */
+/** The category colour (`categoryTint` falls back for a category newer than this build). */
 const tint = computed(() => categoryTint(props.card.category));
 
 const name = computed(() => cardName(props.card));

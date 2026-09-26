@@ -57,8 +57,6 @@ const actions = useDealActions();
 
 const rootEl = ref<HTMLElement | null>(null);
 
-const tint = (card: ResolvedCard): string => categoryTint(card.category);
-
 // ── Rail ─────────────────────────────────────────────────────────────────────
 const filter = ref<'toDeal' | 'all'>('toDeal');
 const query = ref('');
@@ -320,7 +318,7 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
               tabindex="0"
               class="rail-card dark:bg-surface-overlay dark:border-line flex cursor-grab items-center gap-2.5 rounded-[14px] border border-[rgb(44_62_80/8%)] bg-white p-2 shadow-[var(--card-shadow)] transition-transform hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-[#AED6F1] focus-visible:outline-none"
               :class="{ 'is-open': card.status !== 'held', 'is-picking': pickingId === card.id }"
-              :style="{ '--cat': tint(card) }"
+              :style="{ '--cat': categoryTint(card.category) }"
               :aria-label="fillTemplate(t('whoOwnsWhat.board.dealCard'), { card: cardName(card) })"
               :aria-expanded="pickingId === card.id"
               :data-testid="`deal-rail-${card.id}`"
@@ -430,7 +428,7 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
             type="button"
             draggable="true"
             class="chip"
-            :style="{ '--cat': tint(chip.card) }"
+            :style="{ '--cat': categoryTint(chip.card.category) }"
             :data-testid="`deal-chip-${m.id}-${chip.key}`"
             @click="emit('open', chip.card.id)"
             @dragstart="startDrag({ cardId: chip.card.id, partKey: chip.part?.key }, $event)"
@@ -490,7 +488,7 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
             type="button"
             draggable="true"
             class="chip is-skipped"
-            :style="{ '--cat': tint(chip.card) }"
+            :style="{ '--cat': categoryTint(chip.card.category) }"
             :data-testid="`deal-chip-skipped-${chip.key}`"
             @click="emit('open', chip.card.id)"
             @dragstart="startDrag({ cardId: chip.card.id }, $event)"

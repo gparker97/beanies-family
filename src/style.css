@@ -174,8 +174,8 @@
   --color-text-muted: #c3ced6; /* ink-soft    9.11 on raised */
   --muted-text: var(--color-text-muted); /* ink-soft 9.11 on raised */
   --color-border: #4a5b69; /* line */
-  --color-border-strong: #7a8a97; /* line-strong */
-  --press-bg: rgb(255 139 94 / 14%); /* accent-lift, 14% */
+  --color-border-strong: var(--color-line-strong);
+  --press-bg: color-mix(in srgb, var(--color-accent-lift) 14%, transparent);
   --press-edge: var(--color-accent-lift);
   --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
   --card-hover-shadow: 0 8px 32px rgb(0 0 0 / 30%);
