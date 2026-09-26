@@ -41,7 +41,7 @@ const labelFor = (id: ListCategory): string =>
 
 const activeClass = computed(() =>
   props.tone === 'filter'
-    ? 'border-transparent bg-[var(--color-foundation)] text-white'
+    ? 'border-transparent bg-secondary-500 text-white dark:bg-ink dark:text-surface-ground'
     : 'border-[var(--color-primary-500)] bg-[var(--tint-orange-12)] text-[var(--color-primary-500)]'
 );
 const INACTIVE_CLASS =
