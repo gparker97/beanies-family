@@ -1,18 +1,19 @@
 <script setup lang="ts">
 /**
- * MealExportLegend — the footer-left legend for the meal export: the distinct
- * cooks (initial chip + name) plus a muted "serve time · guests" key. Slotted
- * into `ExportSheet`'s `#legend`. Dumb/px-pinned like the other export views;
+ * ExportPeopleLegend — the footer-left legend for an export sheet: a label, the
+ * distinct people on the sheet (initial chip + name) plus a muted key. Slotted
+ * into `ExportSheet`'s `#legend` by every sheet (the meal plan's cooks, the
+ * responsibility deck's holders). Dumb/px-pinned like the other export views;
  * all text arrives resolved.
  */
-import type { ExportCook } from '@/utils/mealExportModel';
+import type { ExportPerson } from '@/utils/mealExportModel';
 
 defineProps<{
   /** e.g. "Cooks". */
-  cooksLabel: string;
-  cooks: ExportCook[];
+  label: string;
+  people: ExportPerson[];
   /**
-   * e.g. "⏰ serve time · 👥 guests" — or only one half, or empty.
+   * A sheet-specific key, e.g. "⏰ serve time · 👥 guests" — or only one half, or empty.
    *
    * The caller builds it from what the sheet contains, so a key is never printed for a
    * symbol that is not on the page.
@@ -23,9 +24,9 @@ defineProps<{
 
 <template>
   <div class="legend">
-    <span v-if="cooks.length" class="cooks">
-      <b class="cooks-label">{{ cooksLabel }}</b>
-      <span v-for="c in cooks" :key="c.initial + c.name" class="chip">
+    <span v-if="people.length" class="people">
+      <b class="people-label">{{ label }}</b>
+      <span v-for="c in people" :key="c.initial + c.name" class="chip">
         <span class="dot" :style="{ background: c.color || '#2C3E50' }">{{ c.initial }}</span>
         <span>{{ c.name }}</span>
       </span>
@@ -44,14 +45,14 @@ defineProps<{
   gap: 8px 12px;
 }
 
-.cooks {
+.people {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.cooks-label {
+.people-label {
   color: #2c3e50;
   font-family: Outfit, sans-serif;
   font-size: 12px;
@@ -70,7 +71,7 @@ defineProps<{
 
   /*
    * A PILL, not a fixed circle. `initialsById` widens an initial to two glyphs whenever two
-   * cooks share a first letter — which is the whole reason the printed chip can lose its
+   * people share a first letter — which is the whole reason the printed chip can lose its
    * name and stay readable in greyscale — and "Mi" does not fit a 16px box, so the letters
    * spilled past the coloured ground and read as clipped.
    *
