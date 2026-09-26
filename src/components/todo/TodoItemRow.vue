@@ -6,6 +6,7 @@ import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
 import { isHint, hintEmoji as hintEmojiFor } from '@/utils/helpfulHints';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
@@ -43,6 +44,18 @@ const isDueToday = computed(() => isTodoDueToday(props.todo));
 const isHintRow = computed(() => isHint(props.todo));
 const isFreshHint = computed(() => isHintRow.value && !props.todo.hintAcknowledged);
 const hintEmoji = computed(() => hintEmojiFor(props.todo.hintType));
+// Who Owns What (#109): derived, never stored. The hint's sole assignee is the single
+// holder of its mapped card, so explain where the assignment came from.
+const responsibilityStore = useResponsibilityStore();
+const { getMemberById } = useMemberInfo();
+const hintFromCard = computed(() => {
+  const hintType = props.todo.hintType;
+  if (!hintType) return false;
+  const holder = responsibilityStore.defaultHolderFor({ kind: 'hint', hintType });
+  if (!holder) return false;
+  const owners = effectiveAssignees(props.todo, (id) => Boolean(getMemberById(id)));
+  return owners.length === 1 && owners[0] === holder.memberId;
+});
 const hintEventLabel = computed(() =>
   props.todo.hintEventDate ? formatNookDate(props.todo.hintEventDate) : null
 );
@@ -109,8 +122,6 @@ const timeAgo = computed(() => {
   return t('todo.addedDaysAgo').replace('{days}', String(diffDays));
 });
 
-const { getMemberById } = useMemberInfo();
-
 /**
  * Owners as members, resolved and deduped. A to-do card is not a bean lane, so it
  * shows everyone on it — and the face replaces the full-name pill because on a card
@@ -171,7 +182,8 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
           class="font-outfit dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-[0.625rem] font-semibold text-[var(--color-primary-500)] md:px-2.5 md:text-xs"
         >
           {{ hintEmoji }} {{ t('todo.hint.badge')
-          }}<template v-if="hintEventLabel">, {{ hintEventLabel }}</template>
+          }}<template v-if="hintEventLabel">, {{ hintEventLabel }}</template
+          ><template v-if="hintFromCard"> · {{ t('whoOwnsWhat.default.hintAssigned') }}</template>
         </span>
         <InfoHintBadge
           v-if="isFreshHint"
