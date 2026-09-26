@@ -88,6 +88,35 @@ function onConfirmKeydown(e: KeyboardEvent): void {
       <p v-else-if="state.detail" class="dark:text-ink-soft text-xs text-gray-500">
         {{ state.detail }}
       </p>
+
+      <!-- Optional radio group (confirmChoice): the confirm also asks HOW. -->
+      <div
+        v-if="state.choices"
+        role="radiogroup"
+        :aria-label="t(state.title)"
+        class="flex w-full flex-col gap-2 text-left"
+        data-testid="confirm-choices"
+      >
+        <label
+          v-for="choice in state.choices"
+          :key="choice.id"
+          class="font-outfit dark:text-ink flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold text-[var(--color-text)] transition-colors"
+          :class="
+            state.selectedChoice === choice.id
+              ? 'border-primary-500 dark:border-accent-lift bg-[var(--tint-orange-8)]'
+              : 'dark:border-line-strong dark:bg-surface-raised dark:hover:bg-surface-hover border-gray-200 bg-white hover:bg-gray-50'
+          "
+        >
+          <input
+            v-model="state.selectedChoice"
+            type="radio"
+            name="confirm-choice"
+            :value="choice.id"
+            class="accent-primary-500 dark:accent-accent-lift h-4 w-4 shrink-0"
+          />
+          <span>{{ choice.label }}</span>
+        </label>
+      </div>
     </div>
 
     <!-- Footer — uses native buttons to avoid click event delegation issues -->
