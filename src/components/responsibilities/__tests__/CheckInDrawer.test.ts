@@ -60,7 +60,7 @@ const store = reactive({
 });
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
-import { showToast } from '@/composables/useToast';
+import { dismissToast, showToast } from '@/composables/useToast';
 import { resetDealActionsForTest } from '../useDealActions';
 import CheckInDrawer from '../CheckInDrawer.vue';
 
@@ -81,7 +81,10 @@ function mountDrawer() {
     props: { open: true },
     global: {
       stubs: {
-        BeanieFormModal: { template: '<div><slot /></div>' },
+        BeanieFormModal: {
+          emits: ['save'],
+          template: '<div><button data-testid="save" @click="$emit(\'save\')" /><slot /></div>',
+        },
         InlineMemberPicker: PickerStub,
         TogglePillGroup: PillsStub,
         MemberChip: true,
@@ -153,5 +156,27 @@ describe('CheckInDrawer', () => {
     expect(w.find('[data-testid="checkin-deal-dishes"]').exists()).toBe(true);
     await w.find('[data-testid="checkin-deal-dishes"]').trigger('click');
     expect(w.findComponent(PickerStub).exists()).toBe(true);
+  });
+
+  it("Finish retires a deal's live Undo, so the record and the deck can't disagree", async () => {
+    vi.mocked(showToast).mockReturnValueOnce(41); // the deal's Undo toast
+    store.deal.mockResolvedValue({ result: store.resolved[1], undo: TOKEN });
+    const w = mountDrawer();
+    await w.find('[data-testid="checkin-deal-dishes"]').trigger('click');
+    w.findComponent(PickerStub).vm.$emit('pick', 'sofia');
+    await flushPromises();
+    // A refused finish keeps the Undo: nothing was recorded.
+    store.completeCheckIn.mockResolvedValueOnce(null);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(dismissToast).not.toHaveBeenCalled();
+    store.completeCheckIn.mockResolvedValueOnce({ id: 'ci', completedAt: OLD, dealtNow: 1 });
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.completeCheckIn).toHaveBeenLastCalledWith(
+      expect.objectContaining({ dealtNow: 1 })
+    );
+    expect(dismissToast).toHaveBeenCalledWith(41);
+    expect(store.undo).not.toHaveBeenCalled();
   });
 });

@@ -157,5 +157,16 @@ export function useDealActions() {
     await invokeToastAction(id);
   }
 
-  return { deal, keep, skip, bringBack, undo, undoLast, hasLiveUndo };
+  /**
+   * Retire the live deck Undo without running it. For a step that records the deck as it
+   * stands (a finished check-in): an Undo after that would revert a card the record still
+   * counts, so the two could disagree.
+   */
+  function dismissLiveUndo(): void {
+    if (liveUndoToastId === null) return;
+    dismissToast(liveUndoToastId);
+    liveUndoToastId = null;
+  }
+
+  return { deal, keep, skip, bringBack, undo, undoLast, hasLiveUndo, dismissLiveUndo };
 }

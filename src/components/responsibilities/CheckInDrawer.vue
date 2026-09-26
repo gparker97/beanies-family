@@ -102,16 +102,22 @@ const movedOptions = computed(() => [
 function redealTargets(card: ResolvedCard) {
   return otherHumans(familyStore.sortedHumans, live(card));
 }
-/** Re-deal is offered only when there is someone to re-deal to: never an empty picker. */
-function unchangedOptions(card: ResolvedCard) {
-  const out = [
+/**
+ * The pills for each "haven't moved" card (card id → options). Re-deal is offered only
+ * when there is someone to re-deal to: never an empty picker.
+ */
+const unchangedOptions = computed(() => {
+  const base = [
     option('stillWorks', 'whoOwnsWhat.checkinDrawer.stillWorks', '👍'),
     option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
   ];
-  if (redealTargets(card).length)
-    out.push(option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁'));
-  return out;
-}
+  const withRedeal = [...base, option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁')];
+  const byId: Record<string, typeof base> = {};
+  for (const card of agenda.value.unchanged) {
+    byId[card.id] = redealTargets(card).length ? withRedeal : base;
+  }
+  return byId;
+});
 
 function setOutcome(cardId: string, value: string): void {
   const next = { ...outcomes.value };
@@ -217,7 +223,11 @@ async function onSave(): Promise<void> {
   try {
     const record = await store.completeCheckIn(counts.value);
     // The store has already shown and reported any failure; stay open so nothing is lost.
-    if (record) completed.value = record;
+    if (!record) return;
+    completed.value = record;
+    // The record counts the deck as it stands now: a deal's Undo after this would revert a
+    // card the record still counts, so retire it.
+    actions.dismissLiveUndo();
   } finally {
     submitting.value = false;
   }
@@ -320,7 +330,7 @@ const completedNote = computed(() =>
           </div>
           <TogglePillGroup
             :model-value="outcomes[card.id] ?? ''"
-            :options="unchangedOptions(card)"
+            :options="unchangedOptions[card.id]"
             clearable
             @update:model-value="setOutcome(card.id, $event)"
           />

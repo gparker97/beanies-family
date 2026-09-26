@@ -190,4 +190,15 @@ describe('useDealActions', () => {
       expect(useDealActions().hasLiveUndo()).toBe(false);
     });
   });
+
+  it('dismissLiveUndo retires the live Undo without running it; a second call is a no-op', async () => {
+    store.keep.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+    await useDealActions().keep('laundry');
+    useDealActions().dismissLiveUndo();
+    expect(toast.dismiss).toHaveBeenCalledWith(1);
+    expect(store.undo).not.toHaveBeenCalled();
+    expect(useDealActions().hasLiveUndo()).toBe(false);
+    useDealActions().dismissLiveUndo();
+    expect(toast.dismiss).toHaveBeenCalledTimes(1);
+  });
 });
