@@ -61,26 +61,56 @@ describe('useKeyboardShortcuts', () => {
     s.stop();
   });
 
-  it('with a scope, acts only with focus inside it or on the page itself', () => {
-    const root = document.createElement('div');
-    const inside = document.createElement('button');
-    root.appendChild(inside);
-    const outside = document.createElement('button');
-    document.body.append(root, outside);
-    const fn = vi.fn(() => true);
-    const s = effectScope();
-    s.run(() => useKeyboardShortcuts({ j: fn }, { enabled: true, tag: 'test', scope: root }));
+  it('acts whatever button has focus, e.g. the page-level toggle that opened the surface', async () => {
+    const toggle = document.createElement('button');
+    document.body.appendChild(toggle);
+    toggle.focus();
+    const e = press('k');
+    press('ArrowLeft');
+    await flush();
+    expect(k).toHaveBeenCalledTimes(2);
+    expect(e.defaultPrevented).toBe(true);
+  });
 
-    outside.focus();
-    const e = press('j');
-    expect(fn).not.toHaveBeenCalled();
-    expect(e.defaultPrevented).toBe(false);
-    inside.focus();
-    press('j');
-    inside.blur();
-    press('j');
-    expect(fn).toHaveBeenCalledTimes(2);
-    s.stop();
+  it('leaves arrows to a focused widget that uses them, but still takes letters there', async () => {
+    for (const make of [
+      () => {
+        const el = document.createElement('div');
+        el.setAttribute('role', 'slider');
+        el.tabIndex = 0;
+        return el;
+      },
+      () => {
+        const list = document.createElement('div');
+        list.setAttribute('role', 'tablist');
+        const tab = document.createElement('button');
+        tab.setAttribute('role', 'tab');
+        list.appendChild(tab);
+        document.body.appendChild(list);
+        return tab;
+      },
+      () => {
+        const el = document.createElement('input');
+        el.type = 'range';
+        return el;
+      },
+    ]) {
+      const el = make();
+      if (!el.isConnected) document.body.appendChild(el);
+      el.focus();
+      const arrow = press('ArrowLeft');
+      expect(arrow.defaultPrevented).toBe(false);
+      el.remove();
+    }
+    expect(k).not.toHaveBeenCalled();
+    const menu = document.createElement('div');
+    menu.setAttribute('role', 'menu');
+    menu.tabIndex = 0;
+    document.body.appendChild(menu);
+    menu.focus();
+    press('k');
+    await flush();
+    expect(k).toHaveBeenCalledTimes(1);
   });
 
   it('ignores repeats, modifiers, and a disabled surface', async () => {

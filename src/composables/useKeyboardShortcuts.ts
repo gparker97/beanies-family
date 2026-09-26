@@ -14,12 +14,16 @@
  *  - `enabled` is false;
  *  - it is a held-down repeat, already handled (`defaultPrevented`), or has Ctrl / Meta /
  *    Alt (a browser or OS shortcut, never ours);
- *  - someone is typing (`isTextEntryFocused`);
- *  - focus sits on something outside `scope` other than the page itself (a sidebar link, a
- *    header toggle, a menu button): the key belongs to what has focus. Focus inside the
- *    scope, or on `<body>` (nothing focused), is ours. Without a `scope`, any focus is;
+ *  - someone is typing (`isTextEntryFocused`, which includes a `<select>`);
+ *  - it is an arrow key and focus is inside a widget that uses arrows itself (a slider, a
+ *    listbox, a menu, a tab list, a radio group...): the arrow keeps its native meaning
+ *    there. Letters and digits still act, since those widgets don't use them;
  *  - a modal or drawer is open (`hasOpenOverlays`) or any Escape layer is (popovers and
  *    menus register there), so a shortcut never acts on the page behind them.
+ *
+ * Focus elsewhere on the page does NOT block a shortcut: the normal way in leaves focus on
+ * the button that opened the surface (a view toggle, a tab), and gating on focus there
+ * turned every shortcut off exactly when someone reached for one.
  *
  * Failure modes: attaching or detaching the listener can throw in a sandboxed frame that
  * lost `window`; that is caught with a warn and the shortcuts simply don't work. A handler
@@ -35,11 +39,36 @@ import { isTextEntryFocused } from '@/utils/isTextEntryFocused';
 export type ShortcutHandler = () => boolean | Promise<unknown>;
 export type ShortcutMap = Record<string, ShortcutHandler>;
 
-/** Focus on the page itself, or inside `scope`: the shortcut's to take. */
-function focusIsOurs(scope: HTMLElement | null | undefined): boolean {
+/** Widgets whose own keyboard model uses the arrow keys. */
+const ARROW_WIDGET = [
+  'select',
+  'input[type="range"]',
+  ...[
+    'slider',
+    'spinbutton',
+    'listbox',
+    'option',
+    'menu',
+    'menubar',
+    'menuitem',
+    'menuitemcheckbox',
+    'menuitemradio',
+    'tablist',
+    'tab',
+    'radiogroup',
+    'radio',
+    'tree',
+    'treeitem',
+    'grid',
+    'treegrid',
+    'combobox',
+  ].map((role) => `[role="${role}"]`),
+].join(',');
+
+/** Focus is inside a widget that takes the arrow keys for itself. */
+function arrowsBelongToFocus(): boolean {
   const el = document.activeElement;
-  if (!el || el === document.body || el === document.documentElement) return true;
-  return !scope || scope.contains(el);
+  return !!el && el !== document.body && !!el.closest(ARROW_WIDGET);
 }
 
 export function useKeyboardShortcuts(
@@ -47,8 +76,6 @@ export function useKeyboardShortcuts(
   options: {
     enabled: MaybeRefOrGetter<boolean>;
     tag: string;
-    /** The surface's root element: keys count only with focus inside it, or on the page. */
-    scope?: MaybeRefOrGetter<HTMLElement | null | undefined>;
     onError?: (key: string, err: unknown) => void;
   }
 ): void {
@@ -68,7 +95,7 @@ export function useKeyboardShortcuts(
     const fn = map[key];
     if (!fn) return;
     if (isTextEntryFocused() || hasOpenOverlays() || hasOpenEscapeLayer()) return;
-    if (!focusIsOurs(toValue(options.scope))) return;
+    if (key.startsWith('arrow') && arrowsBelongToFocus()) return;
 
     let result: boolean | Promise<unknown>;
     try {
