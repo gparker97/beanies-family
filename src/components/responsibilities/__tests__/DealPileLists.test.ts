@@ -1,7 +1,7 @@
 /**
  * DealPileLists: Kept (with owner) and Skipped (with Bring back), newest first from the
- * store; the first 6 with Show all; a row click asks the pile to jump; Bring back goes
- * through useDealActions and is its own button.
+ * store; the first 6 with Show all; a row click asks the pile to jump; Bring back is its own
+ * button and asks the pile to bring the card back (the pile owns every write).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -51,7 +51,6 @@ function card(id: string, status: CardStatus, updatedAt: string, holderId?: stri
 
 const store = reactive({
   resolved: [] as ResolvedCard[],
-  bringBack: vi.fn(),
   cardById(id: string) {
     return this.resolved.find((c) => c.id === id);
   },
@@ -59,7 +58,6 @@ const store = reactive({
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
 import DealPileLists from '../DealPileLists.vue';
-import { resetDealActionsForTest } from '../useDealActions';
 
 function mountLists(props: Record<string, unknown> = {}) {
   return mount(DealPileLists, { props, global: { stubs: { MemberChip: true } } });
@@ -67,13 +65,11 @@ function mountLists(props: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  resetDealActionsForTest();
   store.resolved = [
     card('laundry', 'held', '2026-09-01T00:00:00Z', 'sofia'),
     card('dishes', 'waiting', '2026-09-03T00:00:00Z'),
     card('lunchboxes', 'skipped', '2026-09-02T00:00:00Z'),
   ];
-  store.bringBack.mockResolvedValue(null);
 });
 
 describe('DealPileLists', () => {
@@ -95,7 +91,7 @@ describe('DealPileLists', () => {
     expect(html).not.toContain('deal-pick-');
   });
 
-  it('a row click emits jump; Bring back calls the action and does not jump', async () => {
+  it('a row click emits jump; Bring back emits bring-back and does not jump', async () => {
     const w = mountLists({ currentId: 'laundry' });
     expect(w.find('[data-testid="deal-list-kept-laundry"]').attributes('aria-current')).toBe(
       'true'
@@ -103,7 +99,7 @@ describe('DealPileLists', () => {
     await w.find('[data-testid="deal-list-kept-dishes"]').trigger('click');
     expect(w.emitted('jump')).toEqual([['dishes']]);
     await w.find('[data-testid="deal-list-bring-back-lunchboxes"]').trigger('click');
-    expect(store.bringBack).toHaveBeenCalledWith('lunchboxes');
+    expect(w.emitted('bring-back')).toEqual([['lunchboxes']]);
     expect(w.emitted('jump')).toHaveLength(1);
   });
 
@@ -112,7 +108,7 @@ describe('DealPileLists', () => {
     await w.find('[data-testid="deal-list-kept-dishes"]').trigger('click');
     await w.find('[data-testid="deal-list-bring-back-lunchboxes"]').trigger('click');
     expect(w.emitted('jump')).toBeUndefined();
-    expect(store.bringBack).not.toHaveBeenCalled();
+    expect(w.emitted('bring-back')).toBeUndefined();
   });
 
   it('shows the first 6, then Show all expands in place and is logged', async () => {

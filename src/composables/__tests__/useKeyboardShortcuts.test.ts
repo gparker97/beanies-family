@@ -12,7 +12,7 @@ function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 let scope: ReturnType<typeof effectScope>;
-const k = vi.fn();
+const k = vi.fn(() => true);
 const enabled = ref(true);
 
 beforeEach(() => {
@@ -40,6 +40,47 @@ describe('useKeyboardShortcuts', () => {
   it('leaves unmapped keys alone', () => {
     const e = press('x');
     expect(e.defaultPrevented).toBe(false);
+  });
+
+  it('keeps the default when the handler says it did nothing', () => {
+    const noop = vi.fn(() => false);
+    const s = effectScope();
+    s.run(() => useKeyboardShortcuts({ arrowright: noop }, { enabled: true, tag: 'test' }));
+    const e = press('ArrowRight');
+    expect(noop).toHaveBeenCalledTimes(1);
+    expect(e.defaultPrevented).toBe(false);
+    s.stop();
+  });
+
+  it('prevents the default for a handler that started async work', () => {
+    const s = effectScope();
+    s.run(() =>
+      useKeyboardShortcuts({ p: () => Promise.resolve() }, { enabled: true, tag: 'test' })
+    );
+    expect(press('p').defaultPrevented).toBe(true);
+    s.stop();
+  });
+
+  it('with a scope, acts only with focus inside it or on the page itself', () => {
+    const root = document.createElement('div');
+    const inside = document.createElement('button');
+    root.appendChild(inside);
+    const outside = document.createElement('button');
+    document.body.append(root, outside);
+    const fn = vi.fn(() => true);
+    const s = effectScope();
+    s.run(() => useKeyboardShortcuts({ j: fn }, { enabled: true, tag: 'test', scope: root }));
+
+    outside.focus();
+    const e = press('j');
+    expect(fn).not.toHaveBeenCalled();
+    expect(e.defaultPrevented).toBe(false);
+    inside.focus();
+    press('j');
+    inside.blur();
+    press('j');
+    expect(fn).toHaveBeenCalledTimes(2);
+    s.stop();
   });
 
   it('ignores repeats, modifiers, and a disabled surface', async () => {

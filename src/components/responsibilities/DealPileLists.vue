@@ -7,7 +7,9 @@
  *
  * Each list shows its first 6 (3 on a phone) and expands in place (ADR-025). Clicking a row
  * asks the pile to jump to that card (`jump`); Bring back is its own button beside the row
- * (never nested inside it) and goes straight through `useDealActions`, as on the Deck.
+ * (never nested inside it) and asks the pile to bring it back (`bring-back`), so it runs
+ * through the same revisit as the pile's own Bring back (the undo that returns to the card,
+ * the `pile_revisit_change` event, the double-tap guard).
  *
  * The Skipped heading is the skip flight's landing spot, so it is exposed to `DealPile`.
  */
@@ -18,28 +20,24 @@ import { useExpandableList } from '@/composables/useExpandableList';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { keptAndSkipped, type ResolvedCard } from '@/utils/responsibilityDeck';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
-import { useDealActions } from './useDealActions';
 
 const props = withDefaults(defineProps<{ currentId?: string | null; disabled?: boolean }>(), {
   currentId: null,
   disabled: false,
 });
-const emit = defineEmits<{ jump: [cardId: string] }>();
-
-const FALLBACK_TINT = '#94A3B8';
+const emit = defineEmits<{ jump: [cardId: string]; 'bring-back': [cardId: string] }>();
 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const { isMobile } = useBreakpoint();
 const { getMemberById } = useMemberInfo();
 const { cardName, cardEmoji } = useResponsibilityCardLabel();
-const { bringBack } = useDealActions();
 
 const lists = computed(() => keptAndSkipped(store.resolved));
 const initial = isMobile.value ? 3 : 6;
@@ -49,9 +47,7 @@ const skipped = useExpandableList(() => lists.value.skipped, { initial });
 const skippedHeadingEl = useTemplateRef<HTMLElement>('skippedHeadingEl');
 defineExpose({ skippedHeadingEl });
 
-function tint(card: ResolvedCard): string {
-  return getListCategory(card.category)?.color ?? FALLBACK_TINT;
-}
+const tint = (card: ResolvedCard): string => categoryTint(card.category);
 
 /** Who has it: the holder's face and name, "Split by …", or "Nobody yet". */
 function owner(card: ResolvedCard): { memberId?: string; label: string } {
@@ -74,7 +70,7 @@ function showAll(which: 'kept' | 'skipped'): void {
 }
 
 function onBringBack(cardId: string): void {
-  if (!props.disabled) void bringBack(cardId);
+  if (!props.disabled) emit('bring-back', cardId);
 }
 
 function jump(cardId: string): void {
