@@ -831,6 +831,77 @@ export interface ListCycle {
   updatedAt: ISODateString;
 }
 
+// Who Owns What (#109) — the family responsibility deck. The built-in cards are static
+// (`src/constants/responsibilityCards.ts`); only the family's decisions about them are
+// stored. Read and write these ONLY through `responsibilityStore` / the pure builders in
+// `src/utils/responsibilityOps.ts`; every write surface is `responsibilityRepository.ts`.
+
+/** How a card's work is divided: one holder, one part per current child, or free-text parts. */
+export type CardSplitMode = 'single' | 'child' | 'label';
+
+/**
+ * One holdable part of a card. `key` is `'main'` for a single card, the child's member id
+ * for a child split, or a generated id for a label split (never the label text, so a
+ * rename keeps the part's history).
+ */
+export interface CardPart {
+  key: string;
+  /** Label splits only: the family's own text, e.g. "upstairs". */
+  label?: string;
+  /** Absent = nobody holds this part yet (the card is waiting). */
+  holderId?: UUID;
+}
+
+/**
+ * A family's decision about one card. The id is the static card id for a built-in card
+ * (DETERMINISTIC, so two devices keeping the same card converge on one record) or
+ * `custom-<uuid>` for a card the family made. Always written whole (a record `set`,
+ * never a field patch), so a concurrent write can only ever leave a complete record.
+ */
+export interface ResponsibilityCardState {
+  id: string;
+  status: 'kept' | 'skipped';
+  splitMode: CardSplitMode;
+  /** `single` → `[{ key: 'main' }]`; `child` → keyed by child id; `label` → label parts. */
+  parts: CardPart[];
+  /** The family's own "done looks like" line; absent = the card's default. */
+  doneOverride?: string;
+  /** Custom cards only. Built-in cards keep their static name, emoji and category. */
+  custom?: { name: string; emoji: string; category: ListCategory };
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * One change of holder on one card part. WRITE-ONCE advisory history: card state is the
+ * truth, and a move whose `toId` no longer holds the part (lost to a concurrent write) is
+ * ignored. Id = `moveId(cardId, partKey, at)` from `responsibilityOps.ts`, nowhere else.
+ */
+export interface ResponsibilityMove {
+  id: string;
+  cardId: string;
+  partKey: string;
+  partLabel?: string;
+  /** Absent = the part had nobody (a first deal). */
+  fromId?: UUID;
+  /** Absent = the part was cleared back to nobody. */
+  toId?: UUID;
+  byId?: UUID;
+  at: ISODateString;
+}
+
+/** A finished family check-in. WRITE-ONCE; id = the local ymd it was finished (one per day). */
+export interface ResponsibilityCheckIn {
+  id: string;
+  completedAt: ISODateString;
+  byId?: UUID;
+  stillWorks: number;
+  talkAbout: number;
+  redealt: number;
+  dealtNow: number;
+}
+
 /**
  * A named family checklist. The fields below are split by lifecycle —
  * read them ONLY through the predicates in `@/utils/listLifecycle.ts`, never
@@ -2037,6 +2108,8 @@ export interface Settings {
    *  never-downgrade rule must be revisited. Absent on families confirmed before it. */
   recoveryKitConfirmedVia?: 'saved' | 'acknowledged';
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
+  /** #109 Who Owns What: family check-in rhythm in weeks; 0 = off (default 4 via getDefaultSettings). Family-scoped. The last check-in is derived from the check-in records, never stored here. */
+  responsibilityCheckInWeeks?: 0 | 2 | 4 | 8;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
