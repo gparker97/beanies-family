@@ -16,6 +16,12 @@
  * against the live store. `scope` only chooses that snapshot (`load`, once the deck has
  * loaded). The view comes from `pileView(status, picking)`; `picking` and `leaving` are the
  * only local UI flags, reset by one watcher (not while busy) and by `run()`'s `settle`.
+ *
+ * While an action is in flight the pile renders from a **snapshot** of the card taken when
+ * the action started (`frozen`), not the live store: the write lands before the flight
+ * does, and reading the live status would unmount the target face mid-flight (losing its
+ * bounce), retitle the picker, or flash the held / skipped banner under the flying card.
+ * The snapshot is released in `run()`'s `finally`, after the landing beat and `settle`.
  * After a first decision the pile advances to the next card still to decide; a revisit
  * change stays on the card to show its new banner. Every write goes through
  * `useDealActions` (one undo toast), and an Undo jumps the pile back to its card.
@@ -26,9 +32,13 @@
  *
  * Desktop shortcuts (`useKeyboardShortcuts`), unadvertised beyond `aria-keyshortcuts`:
  * K keep, S skip, 1-9 the Nth face, arrows step, U undo. Each calls the same function its
- * button does, which carries its own guard.
+ * button does and returns false when that would do nothing, so the browser keeps the key
+ * (an arrow at the end of the pile still scrolls). They act only with focus in the pile or
+ * on the page itself. S flashes its button (`key-press`), which stays on screen through the
+ * flight; K and the digits need no flash, because the faces opening and the flight are the
+ * feedback, and the button or face they would flash is about to go.
  */
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
@@ -94,7 +104,6 @@ const actions = useDealActions();
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
 const stageRef = useTemplateRef<{ cardEl: HTMLElement | null }>('stageRef');
 const cardEl = computed(() => stageRef.value?.cardEl ?? null);
-const keepBtn = useTemplateRef<{ $el: HTMLElement }>('keepBtn');
 const skipBtn = useTemplateRef<{ $el: HTMLElement }>('skipBtn');
 const listsRef = useTemplateRef<{ skippedHeadingEl: HTMLElement | null }>('listsRef');
 
@@ -114,7 +123,7 @@ const cursor = usePileCursor({
   cardById: (id) => store.cardById(id),
   order: () => store.resolved.map((c) => c.id),
 });
-const { currentId, current: card, position } = cursor;
+const { currentId, position } = cursor;
 
 watch(
   () => store.isLoaded,
@@ -128,6 +137,13 @@ watch(
 
 /** Double-tap guard: one action at a time, and the cursor can't move under a flight. */
 const busy = ref(false);
+/**
+ * The card as it was when the running action started, and whether it was still to decide.
+ * Set for the whole of `run()`; while set, the pile renders from it (see the file header).
+ */
+const frozen = shallowRef<{ card: ResolvedCard; undecided: boolean } | null>(null);
+/** The card the pile renders: the in-flight snapshot, else the live card on screen. */
+const card = computed(() => frozen.value?.card ?? cursor.current.value);
 /** The faces are showing: after Keep, or for "Give it to someone else". */
 const picking = ref(false);
 /** Hidden after its flight so it can't flash back before the next card replaces it. */
@@ -136,11 +152,11 @@ function resetFlags(): void {
   picking.value = false;
   leaving.value = false;
 }
-watch([currentId, () => card.value?.status], () => {
+watch([currentId, () => cursor.current.value?.status], () => {
   if (!busy.value) resetFlags();
 });
 // A card deleted elsewhere while on screen: move on (a mid-flight one settles in `run`).
-watch(card, (c) => {
+watch(cursor.current, (c) => {
   if (c || !currentId.value || busy.value) return;
   log('pile_card_missing', 'current');
   cursor.settle(currentId.value, 'advance');
@@ -151,7 +167,9 @@ const bannerView = computed(() => {
   if (view.value === 'held' || view.value === 'skipped') return view.value;
   return card.value?.status === 'waiting' ? 'waiting' : null;
 });
-const undecided = computed(() => !!card.value && cursor.isUndecided(card.value.id));
+const undecided = computed(() =>
+  frozen.value ? frozen.value.undecided : !!card.value && cursor.isUndecided(card.value.id)
+);
 
 const members = computed(() => familyStore.sortedHumans);
 /** Who the faces offer, and what 1-9 index: everyone, or all but the holder when giving. */
@@ -166,17 +184,14 @@ const part = computed(() => card.value?.parts.find((p) => !p.holderId) ?? card.v
 const partLine = computed(() =>
   card.value && part.value ? partCaption(card.value, part.value) : ''
 );
-const positionLine = computed(() =>
-  position.value
-    ? fillTemplate(t('whoOwnsWhat.pile.position'), {
-        category: position.value.category
-          ? categoryLabel(position.value.category)
-          : t('lists.category.other'),
-        n: position.value.n,
-        total: position.value.total,
-      })
-    : ''
-);
+const positionLine = computed(() => {
+  const pos = position.value;
+  if (!pos) return '';
+  const category = pos.category ? categoryLabel(pos.category) : t('lists.category.other');
+  // A card visited from the lists sits outside the pile: its category, and no count.
+  if (pos.n === null) return category;
+  return fillTemplate(t('whoOwnsWhat.pile.position'), { category, n: pos.n, total: pos.total });
+});
 const backToLabel = computed(() => {
   const next = cursor.nextToDecide.value ? store.cardById(cursor.nextToDecide.value) : undefined;
   return next ? fillTemplate(t('whoOwnsWhat.pile.backTo'), { card: cardName(next) }) : '';
@@ -209,12 +224,14 @@ async function run(fn: (c: ResolvedCard) => Promise<boolean>, after: SettleMode)
   const c = card.value;
   if (busy.value || !c) return;
   busy.value = true;
+  frozen.value = { card: c, undecided: cursor.isUndecided(c.id) };
   let ok = true;
   try {
     ok = await fn(c);
   } finally {
     busy.value = false;
     cursor.settle(c.id, after);
+    frozen.value = null;
     if (ok || currentId.value !== c.id) resetFlags();
     else leaving.value = false;
   }
@@ -232,6 +249,14 @@ function faceEl(memberId: string): HTMLElement | null {
     rootEl.value?.querySelector<HTMLElement>(`[data-testid="${PICK_TESTID_PREFIX}${memberId}"]`) ??
     null
   );
+}
+/**
+ * What bounces when a card lands: the face's avatar, not its tile. The picker's scoped tile
+ * rule owns the tile's `animation` (its entrance pop) and outranks the global one-shot class,
+ * so a bounce on the tile would never play.
+ */
+function bounceEl(tile: HTMLElement | null): HTMLElement | null {
+  return tile?.querySelector<HTMLElement>('[data-testid="beanie-avatar"]') ?? tile;
 }
 
 function pick(memberId: string): Promise<void> {
@@ -252,7 +277,7 @@ function pick(memberId: string): Promise<void> {
         actions.deal(c.id, p.key, memberId, undoTo(c)),
       ]);
       if (!res) return false;
-      pulse(target, 'card-bounce');
+      pulse(bounceEl(target), 'card-bounce');
       await landingBeat();
       return true;
     },
@@ -319,6 +344,12 @@ function bringBack(): Promise<void> {
     return !!res;
   }, 'stay');
 }
+/** Bring back from the Skipped list: show that card, then the same revisit as its banner. */
+function bringBackFromList(cardId: string): Promise<void> {
+  if (busy.value) return Promise.resolve();
+  if (currentId.value !== cardId) jumpTo(cardId);
+  return bringBack();
+}
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 function stepBy(dir: -1 | 1): void {
@@ -340,35 +371,36 @@ function backToNext(): void {
 const KEY_CLASS: Record<string, string> = { k: 'keep', s: 'skip', u: 'undo' };
 const keyClass = (key: string) => KEY_CLASS[key] ?? (key.startsWith('arrow') ? 'step' : 'pick');
 
-function pickNth(n: number): Promise<void> | void {
+// Each returns false when its button would do nothing, so the browser keeps the key.
+function pickNth(n: number): false | Promise<void> {
   const m = pickable.value[n - 1];
-  if (view.value !== 'pick' || busy.value || !m) return;
+  if (view.value !== 'pick' || busy.value || !m) return false;
   logOnce('pile_shortcut', 'pick');
-  pulse(faceEl(m.id), 'key-press');
   return pick(m.id);
+}
+function stepKey(dir: -1 | 1): boolean {
+  if (busy.value || !cursor.canStep(dir)) return false;
+  logOnce('pile_shortcut', 'step');
+  stepBy(dir);
+  return true;
 }
 const keyMap: ShortcutMap = {
   k: () => {
-    if (view.value !== 'sort' || busy.value) return;
+    if (view.value !== 'sort' || busy.value) return false;
     logOnce('pile_shortcut', 'keep');
-    pulse(keepBtn.value?.$el, 'key-press');
     keep();
+    return true;
   },
   s: () => {
-    if (!canSkip.value || busy.value) return;
+    if (!canSkip.value || busy.value) return false;
     logOnce('pile_shortcut', 'skip');
     pulse(skipBtn.value?.$el, 'key-press');
     return skip();
   },
-  arrowleft: () => {
-    if (!busy.value && cursor.canStep(-1)) logOnce('pile_shortcut', 'step');
-    stepBy(-1);
-  },
-  arrowright: () => {
-    if (!busy.value && cursor.canStep(1)) logOnce('pile_shortcut', 'step');
-    stepBy(1);
-  },
+  arrowleft: () => stepKey(-1),
+  arrowright: () => stepKey(1),
   u: () => {
+    if (!actions.hasLiveUndo()) return false;
     logOnce('pile_shortcut', 'undo');
     return actions.undoLast();
   },
@@ -377,6 +409,7 @@ for (let n = 1; n <= 9; n++) keyMap[String(n)] = () => pickNth(n);
 useKeyboardShortcuts(keyMap, {
   enabled: () => cursor.ready.value,
   tag: 'DealPile',
+  scope: rootEl,
   onError: (key) => log('pile_shortcut_error', keyClass(key), 'warn'),
 });
 
@@ -529,7 +562,6 @@ const waitingLine = computed(() => {
           </p>
           <div class="grid w-full max-w-sm grid-cols-2 gap-2.5">
             <DeckActionButton
-              ref="keepBtn"
               variant="choice"
               :disabled="busy"
               aria-keyshortcuts="K"
@@ -658,6 +690,7 @@ const waitingLine = computed(() => {
       :current-id="currentId"
       :disabled="busy"
       @jump="jumpTo"
+      @bring-back="bringBackFromList"
     />
   </div>
 </template>

@@ -5,7 +5,10 @@
  *
  * The model:
  *  - `queue` is a snapshot of the card ids in scope, taken once when the deck has loaded
- *    (`load`). A card jumped to from the lists joins it.
+ *    (`load`, plus the card it opens at). Progress, `total` and `position` count only it.
+ *  - A card jumped to from the lists that is not in the queue is **visited**, never added:
+ *    the position line shows just its category, the totals don't move, and either arrow (or
+ *    an advancing action) returns to the queue card the jump left (`returnId`).
  *  - `ordered` resolves the queue against the LIVE deck (`cardById`) in category order, so
  *    a card deleted on another device drops out and the order never drifts.
  *  - `currentId` is a card id, not an index, so a store refresh can never swap the card on
@@ -61,9 +64,9 @@ export function pileView(status: CardStatus, picking: boolean): PileView {
 
 export interface PilePosition {
   category: ListCategory | null;
-  /** 1-based index within the category. */
-  n: number;
-  total: number;
+  /** 1-based index within the category; null while visiting a card outside the queue. */
+  n: number | null;
+  total: number | null;
 }
 
 export function usePileCursor(opts: {
@@ -79,6 +82,8 @@ export function usePileCursor(opts: {
   const queue = ref<string[]>([]);
   const passed = ref(new Set<string>());
   const currentId = ref<string | null>(null);
+  /** The queue card a jump to an out-of-queue card left, where the pile goes back to. */
+  const returnId = ref<string | null>(null);
   const ready = ref(false);
 
   const rank = computed(() => new Map((order?.() ?? []).map((id, i) => [id, i])));
@@ -92,6 +97,13 @@ export function usePileCursor(opts: {
   const current = computed(() => (currentId.value ? cardById(currentId.value) : undefined));
 
   const undecided = (id: string) => isUndecided(cardById(id), passed.value);
+  const inQueue = (id: string) => orderedIds.value.includes(id);
+  /** On a card outside the queue (reached from the lists). */
+  const visiting = computed(() => !!currentId.value && !queue.value.includes(currentId.value));
+  /** Where a visit goes back to: the card it left, while that is still in the pile. */
+  const backToQueue = computed(() =>
+    visiting.value && returnId.value && inQueue(returnId.value) ? returnId.value : null
+  );
 
   const position = computed<PilePosition | null>(() => {
     const id = currentId.value;
@@ -100,43 +112,64 @@ export function usePileCursor(opts: {
       const i = g.cards.findIndex((c) => c.id === id);
       if (i !== -1) return { category: g.category, n: i + 1, total: g.cards.length };
     }
-    return null;
+    const c = cardById(id);
+    return c ? { category: c.category ?? null, n: null, total: null } : null;
   });
+
+  /**
+   * The next card still to decide after `fromId`. From a visited card that is the card the
+   * visit left (when it still needs an answer), else the next one after it.
+   */
+  function nextAfter(fromId: string): string | null {
+    const back = inQueue(fromId) ? null : backToQueue.value;
+    if (!back) return nextUndecided(orderedIds.value, fromId, undecided);
+    return undecided(back) ? back : nextUndecided(orderedIds.value, back, undecided);
+  }
 
   const remaining = computed(() => ordered.value.filter((c) => undecided(c.id)).length);
   const total = computed(() => ordered.value.length);
   /** Where "Back to <card>" goes from a decided card; null when there is nowhere to go. */
-  const nextToDecide = computed(() =>
-    currentId.value ? nextUndecided(orderedIds.value, currentId.value, undecided) : null
-  );
+  const nextToDecide = computed(() => (currentId.value ? nextAfter(currentId.value) : null));
 
-  /** Take the queue snapshot. Starts at `startId` when given, else the first undecided card. */
+  /**
+   * Take the queue snapshot. Starts at `startId` when given (it joins the queue: it is the
+   * card the pile was opened to deal), else the first undecided card.
+   */
   function load(ids: readonly string[], startId?: string): void {
-    queue.value = [...new Set(ids)];
+    queue.value = [...new Set(startId ? [...ids, startId] : ids)];
     ready.value = true;
-    if (startId) jumpTo(startId);
-    else currentId.value = nextUndecided(orderedIds.value, null, undecided);
+    currentId.value = startId ?? nextUndecided(orderedIds.value, null, undecided);
   }
 
   function canStep(dir: -1 | 1): boolean {
     const id = currentId.value;
     if (!id) return false;
+    if (visiting.value) return backToQueue.value !== null;
     const i = orderedIds.value.indexOf(id);
     if (i === -1) return false;
     const j = i + dir;
     return j >= 0 && j < orderedIds.value.length;
   }
 
-  /** One card back or forward, including decided cards. Clamped at the ends (no wrap). */
+  /**
+   * One card back or forward, including decided cards. Clamped at the ends (no wrap). From a
+   * visited card either direction returns to the queue card the visit left.
+   */
   function step(dir: -1 | 1): void {
     if (!canStep(dir)) return;
+    if (visiting.value) {
+      currentId.value = backToQueue.value;
+      return;
+    }
     const i = orderedIds.value.indexOf(currentId.value!);
     currentId.value = orderedIds.value[i + dir]!;
   }
 
-  /** Show this card; one outside the queue joins it, so `position` is never missing. */
+  /** Show this card. One outside the queue is visited (see the file header), never added. */
   function jumpTo(id: string): void {
-    if (!queue.value.includes(id)) queue.value = [...queue.value, id];
+    if (!queue.value.includes(id) && currentId.value && !visiting.value) {
+      returnId.value = currentId.value;
+    }
     currentId.value = id;
   }
 
@@ -156,7 +189,7 @@ export function usePileCursor(opts: {
     if (currentId.value !== actedId) return;
     if (after === 'stay' && cardById(actedId)) return;
     if (undecided(actedId)) return;
-    currentId.value = nextUndecided(orderedIds.value, actedId, undecided);
+    currentId.value = nextAfter(actedId);
   }
 
   return {
@@ -165,6 +198,7 @@ export function usePileCursor(opts: {
     current,
     ordered,
     position,
+    visiting,
     remaining,
     total,
     nextToDecide,

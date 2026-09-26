@@ -124,9 +124,12 @@ describe('useDealActions', () => {
   describe('undoLast', () => {
     it("taps the live toast's Undo, once", async () => {
       store.keep.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+      expect(useDealActions().hasLiveUndo()).toBe(false);
       await useDealActions().keep('laundry');
+      expect(useDealActions().hasLiveUndo()).toBe(true);
       await useDealActions().undoLast();
       expect(toast.invoke).toHaveBeenCalledWith(1);
+      expect(useDealActions().hasLiveUndo()).toBe(false);
       await useDealActions().undoLast();
       expect(toast.invoke).toHaveBeenCalledTimes(1);
     });
@@ -143,6 +146,7 @@ describe('useDealActions', () => {
       const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
       store.deal.mockResolvedValue({ result: { id: 'laundry' }, undo: null });
       await useDealActions().deal('laundry', 'main', null);
+      expect(useDealActions().hasLiveUndo()).toBe(false);
       await useDealActions().undoLast();
       expect(toast.invoke).not.toHaveBeenCalled();
       debug.mockRestore();
