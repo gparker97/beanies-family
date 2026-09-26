@@ -39,31 +39,32 @@ import { isTextEntryFocused } from '@/utils/isTextEntryFocused';
 export type ShortcutHandler = () => boolean | Promise<unknown>;
 export type ShortcutMap = Record<string, ShortcutHandler>;
 
-/** Widgets whose own keyboard model uses the arrow keys. */
+/**
+ * Widgets whose own keyboard model uses the arrow keys. No `select` / `input[type="range"]`:
+ * `isTextEntryFocused` already blocks every INPUT and SELECT before this is consulted.
+ */
 const ARROW_WIDGET = [
-  'select',
-  'input[type="range"]',
-  ...[
-    'slider',
-    'spinbutton',
-    'listbox',
-    'option',
-    'menu',
-    'menubar',
-    'menuitem',
-    'menuitemcheckbox',
-    'menuitemradio',
-    'tablist',
-    'tab',
-    'radiogroup',
-    'radio',
-    'tree',
-    'treeitem',
-    'grid',
-    'treegrid',
-    'combobox',
-  ].map((role) => `[role="${role}"]`),
-].join(',');
+  'slider',
+  'spinbutton',
+  'listbox',
+  'option',
+  'menu',
+  'menubar',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'tablist',
+  'tab',
+  'radiogroup',
+  'radio',
+  'tree',
+  'treeitem',
+  'grid',
+  'treegrid',
+  'combobox',
+]
+  .map((role) => `[role="${role}"]`)
+  .join(',');
 
 /** Focus is inside a widget that takes the arrow keys for itself. */
 function arrowsBelongToFocus(): boolean {
