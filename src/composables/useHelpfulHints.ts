@@ -18,6 +18,8 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import { CARD_DEFAULTS } from '@/constants/responsibilityCards';
 import { isFlagEnabled } from '@/config/flags';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
@@ -27,7 +29,7 @@ import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { toAssigneePayload } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { addDaysYmd, formatDateWithDay, parseLocalDate } from '@/utils/date';
-import type { TodoItem } from '@/types/models';
+import type { HelpfulHintType, TodoItem } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { withAppInitiatedWrites } from '@/services/analytics/plausible';
 
@@ -66,6 +68,25 @@ export function useHelpfulHints(): void {
   const vacationStore = useVacationStore();
   const settingsStore = useSettingsStore();
   const todoStore = useTodoStore();
+  const responsibilityStore = useResponsibilityStore();
+
+  // Who Owns What (#109): hint type → the single holder of its mapped card. Read at
+  // reconcile time; `null` until the deck is loaded, so nothing is narrowed early.
+  const HINT_TYPES = Object.keys(CARD_DEFAULTS.hint) as HelpfulHintType[];
+  function cardHolders(): Partial<Record<HelpfulHintType, string>> {
+    const out: Partial<Record<HelpfulHintType, string>> = {};
+    for (const hintType of HINT_TYPES) {
+      const holder = responsibilityStore.defaultHolderFor({ kind: 'hint', hintType });
+      if (holder) out[hintType] = holder.memberId;
+    }
+    return out;
+  }
+  /** The ONE narrow watch source for the deck: changes only when a hint-mapped card's
+   *  single holder changes, never on any other deal (no deep watch of card states). */
+  function cardHolderKey(): string {
+    const holders = cardHolders();
+    return HINT_TYPES.map((h) => `${h}=${holders[h] ?? ''}`).join('|');
+  }
 
   // Adapt the app's key-only t() + fillTemplate into the engine's pure translator.
   const translate = (key: string, params?: Record<string, string>) =>
@@ -134,7 +155,7 @@ export function useHelpfulHints(): void {
       end
     );
 
-    const { hints, skipped, reasons } = computeDesiredHints({
+    const { hints, skipped, reasons, cardHolder } = computeDesiredHints({
       today: todayStr,
       members: familyStore.humans,
       occurrences,
@@ -142,6 +163,7 @@ export function useHelpfulHints(): void {
       leadDays,
       translate,
       formatDate: (ymd) => formatDateWithDay(ymd),
+      cardHolders: cardHolders(),
     });
 
     const { toCreate, toRemove } = reconcileHints(hints, existing, todayStr);
@@ -197,7 +219,7 @@ export function useHelpfulHints(): void {
     )
       .sort()
       .map(([r, c]) => `${r}:${c}`)
-      .join(',')}`;
+      .join(',')}|card:${cardHolder.used}:${cardHolder.ineligible}`;
 
     if (emitGate(signature)) {
       logEvent({
@@ -224,6 +246,25 @@ export function useHelpfulHints(): void {
           surface: SURFACE,
           message: 'trigger skipped',
           context: { hint_reason: reason, hint_count: count },
+        });
+      }
+
+      // Who Owns What (#109): once per reconcile, how many desired hints went to their
+      // card holder and how many kept the default audience (holder not in it).
+      if (cardHolder.used) {
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'card_holder_used',
+          context: { count: cardHolder.used },
+        });
+      }
+      if (cardHolder.ineligible) {
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'card_holder_ineligible',
+          context: { count: cardHolder.ineligible },
         });
       }
     }
@@ -262,8 +303,8 @@ export function useHelpfulHints(): void {
     debounce = setTimeout(() => void runReconcile(), DEBOUNCE_MS);
   }
 
-  // Reactive to the day clock, the roster, the activity/vacation sources, and the
-  // family master switch — NOT to `todos` (see file header). Debounced; runs once
+  // Reactive to the day clock, the roster, the activity/vacation sources, the
+  // hint-mapped card holders (a narrow string key), and the family master switch — NOT to `todos` (see file header). Debounced; runs once
   // on mount. Deep so an in-place edit (e.g. a member's dateOfBirth) is caught.
   watch(
     [
@@ -273,6 +314,7 @@ export function useHelpfulHints(): void {
       () => vacationStore.upcomingVacations,
       () => settingsStore.helpfulHintsEnabled,
       () => settingsStore.helpfulHintLeadDays,
+      cardHolderKey,
     ],
     queueReconcile,
     { immediate: true, deep: true }

@@ -320,3 +320,77 @@ describe('dedupeHintsByKey + isHint', () => {
     expect(isHint({ title: 'manual' } as TodoItem)).toBe(false);
   });
 });
+
+describe('computeDesiredHints — Who Owns What card holders (#109)', () => {
+  const dad = member({ id: 'dad', name: 'Dad', ageGroup: 'adult' });
+  const mum = member({ id: 'mum', name: 'Mum', ageGroup: 'adult' });
+  const kid = member({
+    id: 'kid',
+    name: 'Kid',
+    ageGroup: 'child',
+    dateOfBirth: { month: 8, day: 7 },
+  }); // birthday 14 days out
+
+  it('assigns the hint to the card holder when they are in the audience', () => {
+    const result = computeDesiredHints(
+      baseInput({ members: [dad, mum, kid], cardHolders: { 'birthday-present': 'mum' } })
+    );
+    expect(result.hints[0]!.assigneeIds).toEqual(['mum']);
+    expect(result.cardHolder).toEqual({ used: 1, ineligible: 0 });
+  });
+
+  it('never assigns the birthday person their own present, even when they hold the card', () => {
+    const bdayMum = member({
+      id: 'mum',
+      name: 'Mum',
+      ageGroup: 'adult',
+      dateOfBirth: { month: 8, day: 1 },
+    });
+    const result = computeDesiredHints(
+      baseInput({ members: [dad, bdayMum], cardHolders: { 'birthday-present': 'mum' } })
+    );
+    expect(result.hints[0]!.assigneeIds).toEqual(['dad']); // default audience kept
+    expect(result.cardHolder).toEqual({ used: 0, ineligible: 1 });
+  });
+
+  it('keeps the default audience for unmapped types and trips with an outside holder', () => {
+    const trip = {
+      id: 'trip',
+      name: 'Beach',
+      startDate: '2026-07-26',
+      assigneeIds: ['dad', 'kid'],
+    };
+    const result = computeDesiredHints(
+      baseInput({
+        members: [dad, mum, kid],
+        vacations: [trip],
+        cardHolders: { 'trip-packing': 'dad', 'trip-documents': 'mum' },
+      })
+    );
+    const byType = Object.fromEntries(result.hints.map((h) => [h.hintType, h.assigneeIds]));
+    expect(byType['trip-packing']).toEqual(['dad']);
+    expect(byType['trip-documents']).toEqual(['dad', 'kid']); // mum isn't travelling
+    expect(result.cardHolder).toEqual({ used: 1, ineligible: 1 });
+  });
+
+  it('never reassigns an existing hint: keyed reconcile does not recreate it', () => {
+    const { hints } = computeDesiredHints(
+      baseInput({ members: [dad, mum, kid], cardHolders: { 'birthday-present': 'mum' } })
+    );
+    const existing = {
+      id: 'h1',
+      title: 't',
+      completed: false,
+      createdBy: 'dad',
+      createdAt: '2026-07-20',
+      updatedAt: '2026-07-20',
+      hintType: 'birthday-present',
+      hintKey: hints[0]!.hintKey,
+      hintEventDate: hints[0]!.eventDate,
+      assigneeIds: ['dad', 'mum'],
+    } as TodoItem;
+    const { toCreate, toRemove } = reconcileHints(hints, [existing], TODAY);
+    expect(toCreate).toHaveLength(0);
+    expect(toRemove).toHaveLength(0);
+  });
+});
