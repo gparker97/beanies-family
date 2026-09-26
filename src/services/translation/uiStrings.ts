@@ -1409,6 +1409,7 @@ const STRING_DEFS = {
   'action.edit': { en: 'Edit', beanie: 'edit' },
   'action.copy': { en: 'Copy', beanie: 'copy' },
   'action.delete': { en: 'Delete', beanie: 'delete' },
+  'action.moreOptions': { en: 'More Options', beanie: 'more options' },
   'action.save': { en: 'Save', beanie: 'save' },
   'action.saveAndClose': { en: 'Save & Close', beanie: 'save & close' },
   'action.saveChanges': { en: 'Save Changes', beanie: 'save changes' },
