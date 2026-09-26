@@ -2236,7 +2236,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Tap <strong>Start Dealing</strong>. (Want a look first? Tap <strong>Browse the Deck First</strong>.)',
           'The top card asks <strong>Keep this card, or skip it?</strong> Tap <strong>Keep</strong> if the job exists in your home, or <strong>Skip</strong> if it doesn’t.',
           'When you keep a card, beanies asks <strong>Who owns it?</strong> Tap a family member’s face. The card flies to them, so you can see who got what.',
-          'Not sure yet? Tap <strong>Decide later</strong>. The card stays in your deck, waiting for a holder.',
+          'Not sure yet? Tap <strong>Decide Later</strong>. The card stays in your deck, waiting for a holder.',
           'For cards that come in groups (like everything about the car or the yard), beanies offers a shortcut such as <strong>No car?</strong> with <strong>Skip</strong> for the whole group.',
           'Made a mistake? Every keep, deal and skip shows a toast with <strong>Undo</strong> for a few seconds.',
         ],
@@ -2244,7 +2244,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Under the pile, <strong>Kept</strong> lists the cards you kept and who has each one, and <strong>Skipped</strong> lists the ones you skipped, newest first. Use the arrows on either side of the card to step back and forward through the cards, including ones you already decided. Tap a card in either list to bring it back onto the pile: from there you can <strong>Give it to someone else</strong>, <strong>Skip instead</strong>, <strong>Split it</strong>, or <strong>Bring Back</strong> a skipped card. <strong>Back to</strong> takes you to the next card still to decide.',
+          'Under the pile, <strong>Kept</strong> lists the cards you kept and who has each one, and <strong>Skipped</strong> lists the ones you skipped, newest first. Use the arrows on either side of the card to step back and forward through the cards, including ones you already decided. Tap a card in either list to bring it back onto the pile: from there you can <strong>Give It to Someone Else</strong>, <strong>Skip Instead</strong>, <strong>Split It</strong>, or <strong>Bring Back</strong> a skipped card. <strong>Back to</strong> takes you to the next card still to decide.',
       },
       {
         type: 'paragraph',
@@ -2296,8 +2296,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>From the card:</strong> open it in the <strong>Deck</strong> view, tap <strong>Edit</strong>, choose someone else under <strong>Who Holds This Card?</strong> and save.',
-          '<strong>In the Deal view:</strong> the cards come one at a time, just like the first deal. Tap a card in the <strong>Kept</strong> list below the pile and choose <strong>Give it to someone else</strong>.',
-          '<strong>On a computer or tablet:</strong> prefer to see everything at once? Tap <strong>Board view</strong> at the top right of the Deal view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard. <strong>Card by card</strong> takes you back to the pile, and beanies remembers which one you like.',
+          '<strong>In the Deal view:</strong> the cards come one at a time, just like the first deal. Tap a card in the <strong>Kept</strong> list below the pile and choose <strong>Give It to Someone Else</strong>.',
+          '<strong>On a computer or tablet:</strong> prefer to see everything at once? Tap <strong>Board View</strong> at the top right of the Deal view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard. <strong>Card by Card</strong> takes you back to the pile, and beanies remembers which one you like.',
         ],
       },
       {
