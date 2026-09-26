@@ -2433,6 +2433,11 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Update 2026-09-26 (session start, greg):** the #107 real-statement tests on prod are DONE and
+> passed. 0.23 is LIVE on both stores (iOS App Store + Android Play production). Closed: the
+> "owed by greg" statement checklist and the store-review watch. Now unblocked: `/beanies-pre-plan
+#110`, and raising the update floor to 0.23 (only on greg's instruction, per the runbook).
+
 > **Validated 2026-09-25 (session 2 close).** The session-1 record's "#108 + drawer validation NOT deployed" and its seven-item release note are DONE: shipped in 0.23 (`3e0399c0`). 5 Dependabot PRs still open; no other branches.
 >
 > **Session 2026-09-25 (2) record — 0.23 / #107:**
