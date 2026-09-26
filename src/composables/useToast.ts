@@ -88,13 +88,16 @@ const toasts = ref<Toast[]>([]);
  * button in the toast (e.g., "Undo"). The action handler runs AFTER
  * the toast dismisses; exceptions it throws are caught and re-surfaced
  * as an error toast + console.error — never silent.
+ *
+ * Returns the toast's id (for `dismissToast`). A deduped call returns the id of
+ * the live toast it matched.
  */
 export function showToast(
   type: ToastType,
   title: string,
   message?: string,
   options?: ToastActionOptions
-): void {
+): number {
   // Dedupe: if an identical toast is already live, ignore the duplicate so a
   // repeated trigger (e.g. tapping a failing button) doesn't stack the same
   // message. Runs BEFORE the reportError block below so a duplicated error
@@ -110,7 +113,7 @@ export function showToast(
     if (duplicate) {
       // Freshen the displayed timestamp; the original auto-dismiss timer stands.
       duplicate.timestamp = Date.now();
-      return;
+      return duplicate.id;
     }
   }
 
@@ -174,6 +177,8 @@ export function showToast(
       dismissToast(toast.id);
     }, delay);
   }
+
+  return toast.id;
 }
 
 export function dismissToast(id: number): void {
