@@ -187,6 +187,34 @@ describe('DealPile', () => {
     expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
   });
 
+  it('an all-skipped deck ends on the plain done card, not "every card has a holder"', async () => {
+    store.stats = {
+      total: 2,
+      deck: 0,
+      held: 0,
+      waiting: 0,
+      skipped: 2,
+      unsorted: 0,
+      splitCount: 0,
+    };
+    const w = mountPile();
+    await w.find('[data-testid="deal-pile-skip"]').trigger('click');
+    await flushPromises();
+    await w.find('[data-testid="deal-pile-skip"]').trigger('click');
+    await flushPromises();
+    expect(w.find('[data-testid="deal-pile-celebrate"]').exists()).toBe(false);
+    expect(w.find('[data-testid="deal-pile-done"]').exists()).toBe(true);
+    store.stats = {
+      total: 2,
+      deck: 0,
+      held: 0,
+      waiting: 0,
+      skipped: 0,
+      unsorted: 2,
+      splitCount: 0,
+    };
+  });
+
   it('"Decide later" is the only path that calls keep', async () => {
     const w = mountPile();
     await w.find('[data-testid="deal-pile-keep"]').trigger('click');

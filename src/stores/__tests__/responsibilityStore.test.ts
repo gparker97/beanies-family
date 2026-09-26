@@ -388,6 +388,13 @@ describe('check-in and celebrations', () => {
     vi.setSystemTime(clock);
   });
 
+  it('never fires deck-dealt when the whole deck was skipped (nothing to hold)', async () => {
+    await store.skip(RESPONSIBILITY_CARDS.map((c) => c.id));
+    expect(store.stats.unsorted).toBe(0);
+    expect(celebrate).not.toHaveBeenCalled();
+    expect(logged('deck_dealt')).toHaveLength(0);
+  });
+
   it('fires deck-dealt once, on the write that sorts the last card', async () => {
     const all = RESPONSIBILITY_CARDS.map((c) => c.id);
     await store.skip(all.slice(1));
