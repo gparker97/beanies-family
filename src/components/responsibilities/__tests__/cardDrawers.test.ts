@@ -13,11 +13,14 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 import { getResponsibilityCard } from '@/constants/responsibilityCards';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
+import type { FamilyMember } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn(() => 1), dismissToast: vi.fn() }));
+vi.mock('@/composables/useConfirm', () => ({ confirm: vi.fn(async () => true) }));
+vi.mock('@/composables/useSounds', () => ({ playWhoosh: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {} }),
@@ -86,7 +89,9 @@ const store = reactive({
 });
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
+import { showToast } from '@/composables/useToast';
 import CardEditDrawer from '../CardEditDrawer.vue';
+import CardSplitEditor from '../CardSplitEditor.vue';
 import CardViewDrawer from '../CardViewDrawer.vue';
 import WhoOwnsWhatPage from '@/pages/WhoOwnsWhatPage.vue';
 
@@ -172,6 +177,18 @@ describe('CardEditDrawer', () => {
     expect(w.find('[data-testid="card-edit-redeal-note"]').exists()).toBe(true);
   });
 
+  it('a split with no parts (By child, no children) never reaches the store', async () => {
+    const w = await openEdit('laundry');
+    w.findComponent(SplitEditorStub).vm.$emit('update:modelValue', {
+      splitMode: 'child',
+      parts: [],
+    });
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard).not.toHaveBeenCalled();
+    expect(w.emitted('close')).toBeUndefined();
+  });
+
   it('stays open when the store refused (the store already said why)', async () => {
     store.saveCard.mockResolvedValue(null);
     const w = await openEdit('laundry');
@@ -214,6 +231,40 @@ describe('CardEditDrawer', () => {
   });
 });
 
+describe('CardSplitEditor', () => {
+  const PillsStub = defineComponent({
+    name: 'TogglePillGroup',
+    props: ['modelValue', 'options'],
+    template: '<div />',
+  });
+  const modes = (members: readonly object[]) =>
+    mount(CardSplitEditor, {
+      props: {
+        modelValue: { splitMode: 'single', parts: [{ key: 'main' }] },
+        members: members as FamilyMember[],
+        holders: [],
+      },
+      global: {
+        stubs: {
+          TogglePillGroup: PillsStub,
+          FormFieldGroup: { template: '<div><slot /></div>' },
+          FamilyChipPicker: true,
+          BeanieAvatar: true,
+        },
+      },
+    })
+      .findComponent(PillsStub)
+      .props('options')
+      .map((o: { value: string }) => o.value);
+
+  it('offers By child only when the family has a child to split for', () => {
+    expect(modes(family.members)).toEqual(['single', 'label']);
+    expect(
+      modes([...family.members, { id: 'leo', name: 'Leo', role: 'member', ageGroup: 'child' }])
+    ).toEqual(['single', 'child', 'label']);
+  });
+});
+
 describe('CardViewDrawer', () => {
   const mountView = (canEdit: boolean, cardId = 'laundry') =>
     mount(CardViewDrawer, { props: { open: true, cardId, canEdit }, global: { stubs } });
@@ -223,6 +274,36 @@ describe('CardViewDrawer', () => {
     expect(w.find('[data-testid="card-view-edit"]').exists()).toBe(true);
     expect(w.find('[data-testid="delete"]').exists()).toBe(false);
     expect(w.find('[data-testid="delete-reason"]').exists()).toBe(true);
+  });
+
+  it('deleting from its own tile shows the delete toast only, never the card-gone notice', async () => {
+    const saved = store.cards['custom-swim']!;
+    store.deleteCustom.mockImplementation(async (id: string) => {
+      delete store.cards[id];
+      return true;
+    });
+    const w = mountView(true, 'custom-swim');
+    await w.find('[data-testid="delete"]').trigger('click');
+    await flushPromises();
+    expect(store.deleteCustom).toHaveBeenCalledWith('custom-swim');
+    expect(w.emitted('close')).toHaveLength(1);
+    const titles = vi.mocked(showToast).mock.calls.map((c) => c[1]);
+    expect(titles).toEqual(['whoOwnsWhat.delete.done']);
+    w.unmount();
+    store.cards['custom-swim'] = saved;
+  });
+
+  it('a card deleted elsewhere while open still says so and closes', async () => {
+    const saved = store.cards['custom-swim']!;
+    const w = mountView(true, 'custom-swim');
+    delete store.cards['custom-swim'];
+    await flushPromises();
+    expect(vi.mocked(showToast).mock.calls.map((c) => c[1])).toEqual([
+      'whoOwnsWhat.error.cardGone',
+    ]);
+    expect(w.emitted('close')).toHaveLength(1);
+    w.unmount();
+    store.cards['custom-swim'] = saved;
   });
 
   it('a child sees the card read-only: no Edit, no delete of any kind', () => {

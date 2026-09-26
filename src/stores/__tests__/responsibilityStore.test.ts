@@ -304,6 +304,27 @@ describe('edit, custom cards and restore', () => {
     expect(logged('split_set')).toHaveLength(1);
   });
 
+  it('an invalid draft writes nothing and toasts a translated title, never the builder string', async () => {
+    const r = await store.saveCard('lunchboxes', {
+      splitMode: 'child',
+      parts: [], // a child split in a family with no children
+      skipped: false,
+    });
+    expect(r).toBeNull();
+    expect(applyDeckOps).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith(
+      'error',
+      'whoOwnsWhat.error.saveFailed',
+      undefined,
+      expect.objectContaining({
+        surface: 'responsibilities',
+        context: { action: 'responsibilityStore:saveCard' },
+        error: expect.objectContaining({ message: expect.stringContaining('buildSaveCard') }),
+      })
+    );
+  });
+
   it('deleteCustom removes the card and its moves', async () => {
     const c = await store.createCustom({
       name: 'Hens',
