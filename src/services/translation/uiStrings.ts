@@ -7476,6 +7476,14 @@ const STRING_DEFS = {
     en: '5-star meal! The whole pod approves.',
     beanie: '5-star meal! the whole pod approves',
   },
+  'celebration.deckDealt': {
+    en: 'Every card has a holder!',
+    beanie: 'every card has a holder! the beanies are cheering!',
+  },
+  'celebration.checkInDone': {
+    en: 'Deck checked! See you at the next check-in.',
+    beanie: 'deck checked! see you at the next check-in.',
+  },
 
   // Setup Progress Modal
   'setupProgress.title': {
@@ -12484,6 +12492,99 @@ const STRING_DEFS = {
   'share.copyFailedHelp': {
     en: 'Your browser blocked the clipboard. Select the text and copy it by hand instead.',
     beanie: 'your browser blocked the clipboard. select the text and copy it by hand instead.',
+  },
+
+  // Who Owns What (#109): store and shared copy. Delete and restore are important
+  // surfaces (see uiStrings.test.ts): their beanie values keep the real nouns.
+  'whoOwnsWhat.error.readOnly': {
+    en: 'Only grown-ups can change the deck',
+    beanie: 'only grown-ups can change the deck',
+  },
+  'whoOwnsWhat.error.readOnlyHelp': {
+    en: 'Ask a parent to deal, skip or edit cards.',
+    beanie: 'ask a parent to deal, skip or edit cards.',
+  },
+  'whoOwnsWhat.error.cardGone': {
+    en: "That card isn't in your deck anymore",
+    beanie: "that card isn't in your deck anymore",
+  },
+  'whoOwnsWhat.error.cardGoneHelp': {
+    en: 'Someone may have changed the deck on another device. Take another look and try again.',
+    beanie: 'someone may have changed the deck on another device. take another look and try again.',
+  },
+  'whoOwnsWhat.error.saveFailed': {
+    en: "Couldn't save that change to the deck",
+    beanie: "couldn't save that change to the deck",
+  },
+  'whoOwnsWhat.undo.stale': {
+    en: "Couldn't undo that",
+    beanie: "couldn't undo that",
+  },
+  'whoOwnsWhat.undo.staleHelp': {
+    en: 'The card was changed on another device, so nothing was undone.',
+    beanie: 'the card was changed on another device, so nothing was undone.',
+  },
+  'whoOwnsWhat.toast.dealt': {
+    en: '{card} is now held by {name}',
+    beanie: '{card} is now held by {name}',
+  },
+  'whoOwnsWhat.toast.cleared': {
+    en: '{card} has nobody for now',
+    beanie: '{card} has nobody for now',
+  },
+  'whoOwnsWhat.toast.kept': {
+    en: '{card} is waiting for a holder',
+    beanie: '{card} is waiting for a holder',
+  },
+  'whoOwnsWhat.toast.skipped.one': { en: 'Skipped {card}', beanie: 'skipped {card}' },
+  'whoOwnsWhat.toast.skipped.other': {
+    en: 'Skipped {count} cards',
+    beanie: 'skipped {count} cards',
+  },
+  'whoOwnsWhat.toast.broughtBack': {
+    en: '{card} is back in your deck',
+    beanie: '{card} is back in your deck',
+  },
+  'whoOwnsWhat.toast.saved': { en: 'Card saved', beanie: 'card saved' },
+  'whoOwnsWhat.toast.created': { en: 'Card added to your deck', beanie: 'card added to your deck' },
+  'whoOwnsWhat.toast.undone': { en: 'Undone', beanie: 'undone' },
+  'whoOwnsWhat.rhythm.label': { en: 'Check-in rhythm', beanie: 'check-in rhythm' },
+  'whoOwnsWhat.delete.title': { en: 'Delete this card?', beanie: 'delete this card?' },
+  'whoOwnsWhat.delete.message': {
+    en: 'This is a card your family made, so deleting it removes it for good, along with its history.',
+    beanie:
+      'this is a card your family made, so deleting it removes it for good, along with its history.',
+  },
+  'whoOwnsWhat.delete.done': { en: 'Card deleted', beanie: 'card deleted' },
+  'whoOwnsWhat.restore.title': {
+    en: 'Restore the default cards and start over?',
+    beanie: 'restore the default cards and start over?',
+  },
+  'whoOwnsWhat.restore.message': {
+    en: "Every built-in card comes back, including the ones you skipped. Every holder, split and card history is cleared and the deal starts again. This can't be undone.",
+    beanie:
+      "every built-in card comes back, including the ones you skipped. every holder, split and card history is cleared and the deal starts again. this can't be undone.",
+  },
+  'whoOwnsWhat.restore.keepCustom': {
+    en: 'Keep our own cards ({count})',
+    beanie: 'keep our own cards ({count})',
+  },
+  'whoOwnsWhat.restore.clearCustom': {
+    en: 'Clear our own cards too',
+    beanie: 'clear our own cards too',
+  },
+  'whoOwnsWhat.restore.confirm': { en: 'Restore and start over', beanie: 'restore and start over' },
+  'whoOwnsWhat.restore.done': {
+    en: "Default cards restored. Let's deal the deck!",
+    beanie: "default cards restored. let's deal the deck!",
+  },
+  'whoOwnsWhat.restore.failed': {
+    en: "Couldn't restore the default cards",
+    beanie: "couldn't restore the default cards",
+  },
+  'whoOwnsWhat.restore.failedHelp': {
+    en: 'Your cards were not reset. Please try again.',
+    beanie: 'your cards were not reset. please try again.',
   },
 
   // Who Owns What: card deck (#109). Names are Title Case in `en`; done lines have no

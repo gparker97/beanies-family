@@ -20,7 +20,9 @@ export type CelebrationTrigger =
   | 'first-save'
   | 'debt-free'
   | 'recipe-5star'
-  | 'list-complete';
+  | 'list-complete'
+  | 'deck-dealt'
+  | 'check-in-done';
 
 interface Celebration {
   id: number;
@@ -122,6 +124,17 @@ const configs: Record<
   'goal-milestone': {
     type: 'toast',
     messageKey: 'celebration.goalMilestone',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
+  }, // Who Owns What (#109): every kept card has a holder. Fired on the TRANSITION inside the
+  // store action that made it true, never from a watcher, so a reload never replays it.
+  'deck-dealt': {
+    type: 'shower',
+    messageKey: 'celebration.deckDealt',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
+  },
+  'check-in-done': {
+    type: 'toast',
+    messageKey: 'celebration.checkInDone',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
 };

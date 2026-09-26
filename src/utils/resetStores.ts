@@ -10,6 +10,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
@@ -35,6 +36,7 @@ export function resetAllAppStores(): void {
   useTodoStore().resetState();
   useListStore().resetState();
   useActivityStore().resetState();
+  useResponsibilityStore().resetState();
   useHolidayStore().resetState();
   // Tear down the calendar sync engine (pollers + watchers + module state) so it
   // doesn't keep running after sign-out / family-switch (F7). Flag-gated so the
