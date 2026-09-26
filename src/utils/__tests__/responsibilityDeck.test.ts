@@ -17,6 +17,7 @@ import {
   deckStats,
   defaultHolderFor,
   firstDealtAt,
+  groupByCategory,
   groupShortcut,
   isCheckInDue,
   isRedeal,
@@ -29,6 +30,7 @@ import {
 } from '@/utils/responsibilityDeck';
 import type {
   FamilyMember,
+  ListCategory,
   ResponsibilityCardState,
   ResponsibilityCheckIn,
   ResponsibilityMove,
@@ -478,6 +480,24 @@ describe('groupShortcut', () => {
     expect(groupShortcut(r1.cards, card(r1.cards, 'laundry'))).toBeNull();
     const r2 = resolve([state('bikes', { status: 'skipped' })]);
     expect(groupShortcut(r2.cards, card(r2.cards, 'car-care'))).toBeNull();
+  });
+});
+
+describe('groupByCategory', () => {
+  it('groups in LIST_CATEGORIES order, keeps card order, and puts unknown categories last', () => {
+    const { cards } = resolve([]);
+    const stray = { ...card(cards, 'laundry'), id: 'x', category: 'future' as ListCategory };
+    const groups = groupByCategory([card(cards, 'bikes'), stray, ...cards]);
+    const order = LIST_CATEGORIES.map((c) => c.id as string);
+    const cats = groups.map((g) => g.category);
+    expect(cats.at(-1)).toBeNull();
+    const known = cats.filter((c): c is ListCategory => c !== null);
+    expect(known).toEqual([...known].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
+    expect(groups.find((g) => g.category === 'home')!.cards.map((c) => c.id)).toEqual([
+      'laundry',
+      'dishes',
+    ]);
+    expect(groups.at(-1)!.cards.map((c) => c.id)).toEqual(['x']);
   });
 });
 

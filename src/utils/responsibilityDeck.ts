@@ -280,6 +280,36 @@ export function deckStats(cards: readonly ResolvedCard[]): DeckStats {
   return s;
 }
 
+/** A run of cards in one category; `category` is null for categories this build doesn't know. */
+export interface CategoryGroup {
+  category: ListCategory | null;
+  cards: ResolvedCard[];
+}
+
+/**
+ * Cards grouped by category in `LIST_CATEGORIES` order, unknown categories last (one
+ * group), card order kept within each group. The ONE ordering every deck surface uses:
+ * the Deck shelves, the deal rail, the deal pile's first-deal order and the fridge sheet.
+ */
+export function groupByCategory(cards: readonly ResolvedCard[]): CategoryGroup[] {
+  const known = new Set<string>(LIST_CATEGORIES.map((c) => c.id));
+  const byCat = new Map<ListCategory | null, ResolvedCard[]>();
+  for (const c of cards) {
+    const key = known.has(c.category) ? c.category : null;
+    const arr = byCat.get(key) ?? [];
+    arr.push(c);
+    byCat.set(key, arr);
+  }
+  const out: CategoryGroup[] = [];
+  for (const cat of LIST_CATEGORIES) {
+    const group = byCat.get(cat.id);
+    if (group?.length) out.push({ category: cat.id, cards: group });
+  }
+  const other = byCat.get(null);
+  if (other?.length) out.push({ category: null, cards: other });
+  return out;
+}
+
 export interface CategoryCoverage {
   category: ListCategory;
   deck: number;
