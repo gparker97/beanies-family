@@ -277,13 +277,14 @@ For reference, the current help center contains these articles:
 - Family holidays on the planner
 - Set up the beanie wall on a tablet *(device setup: screen lock, Guided Access / screen pinning, orientation, mounting and charging; linked from the Beanie Wall card in Settings)*
 
-**Features (17):**
+**Features (18):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
 - Budgets & Category Limits
 - Family To-Do Lists *(includes the "Someday · Maybe" section)*
 - Beanie Lists *(categorized family checklists — one-off & recurring; `popular`)*
+- Who Owns What *(the responsibility deck: first deal, splitting, re-dealing, the check-in, the fridge sheet, and card-holder defaults)*
 - Travel Plans & Vacations
 - The Family Nook — Your Home Base
 - Family Planner & Activities

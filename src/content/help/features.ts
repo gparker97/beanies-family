@@ -2188,45 +2188,243 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
-  // Who Owns What (#109). A minimal first version so `HELP_PATHS.whoOwnsWhat` resolves;
-  // the full how-to (splitting, re-dealing, the check-in, the fridge sheet) follows.
+  // Who Owns What (#109): the full how-to. Mirrors `WhoOwnsWhatPage` and its drawers;
+  // the labels in <strong> are the `en` values in `uiStrings.ts` (`whoOwnsWhat.*`).
   {
     slug: 'who-owns-what',
     category: 'features',
     title: 'Who Owns What: Share the Jobs That Keep Your Home Running',
     excerpt:
-      'A deck of household jobs your family keeps or skips, then hands out, so who owns what is never a debate.',
+      'A deck of household jobs your family keeps or skips, then hands out, so who owns what is never a debate. Split cards by child, re-deal when life changes, check in together and print the deck for the fridge.',
     icon: '\u{1F64B}',
-    readTime: 2,
+    readTime: 7,
     updatedDate: '2026-09-26',
     sections: [
       { type: 'heading', content: 'What is Who Owns What?', level: 2, id: 'what' },
       {
         type: 'paragraph',
         content:
-          "<strong>Who Owns What</strong> is a deck of cards, one for each job that keeps a home running: cooking dinner, school forms, the trash, the big holidays. Your family keeps the cards that apply, skips the ones that don't, and gives each kept card a holder. You'll find it under <strong>Who Owns What</strong> in the Treehouse section of the sidebar.",
+          "Running a home is hundreds of small jobs, and most of them live in one person's head. <strong>Who Owns What</strong> puts them on the table as a deck of cards, one for each job: cooking dinner, school forms, trash night, the big holidays, time to yourself. Your family keeps the cards that apply, skips the ones that don't, and gives every kept card a holder. From then on, everyone can see who owns what, and nobody has to carry the whole list alone.",
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You’ll find it under <strong>Who Owns What</strong> in the Treehouse section of the sidebar, right after the Meal Planner (on a phone, it’s in the Planning tab). The page has three views: <strong>Overview</strong> (where you land), <strong>Deal</strong> and <strong>Deck</strong>.',
+      },
+      {
+        type: 'callout',
+        title: 'Only grown-ups deal',
+        icon: '\u{1F9D1}',
+        content:
+          'Grown-ups deal, re-deal, skip, split and edit cards. Kids can hold cards and see the whole deck, but they can’t change it.',
       },
       {
         type: 'heading',
-        content: 'Dealing the deck for the first time',
+        content: 'Deal the deck for the first time',
         level: 2,
         id: 'first-deal',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The first time you open the page, the Overview shows <strong>Let’s deal the deck</strong>. The deal takes one pass through the cards, category by category.',
       },
       {
         type: 'steps',
         content: '',
         items: [
-          'Open Who Owns What and tap <strong>Start dealing</strong>.',
-          'For each card, choose <strong>Keep</strong> or <strong>Skip</strong>.',
-          'When you keep a card, tap the person who owns it, or decide later and leave it waiting.',
+          'Tap <strong>Start Dealing</strong>. (Want a look first? Tap <strong>Browse the Deck First</strong>.)',
+          'The top card asks <strong>Keep this card, or skip it?</strong> Tap <strong>Keep</strong> if the job exists in your home, or <strong>Skip</strong> if it doesn’t.',
+          'When you keep a card, beanies asks <strong>Who owns it?</strong> Tap a family member’s face. The card flies to them, so you can see who got what.',
+          'Not sure yet? Tap <strong>Decide later</strong>. The card stays in your deck, waiting for a holder.',
+          'For cards that come in groups (like everything about the car or the yard), beanies offers a shortcut such as <strong>No car?</strong> with <strong>Skip</strong> for the whole group.',
+          'Made a mistake? Every keep, deal and skip shows a toast with <strong>Undo</strong> for a few seconds.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When every kept card has a holder, beanies celebrates: <em>Every card has a holder!</em> You don’t have to finish in one sitting. Come back any time and the deal picks up where you left off.',
+      },
+      {
+        type: 'heading',
+        content: 'Split a card by child or by place',
+        level: 2,
+        id: 'split',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Some jobs are really several. Bedtime for two kids, or cleaning two floors of a house, can each have their own holder.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the <strong>Deck</strong> view and tap the card to open <strong>Card Details</strong>.',
+          'Tap <strong>Edit</strong>.',
+          'Under <strong>Split It?</strong>, choose <strong>By Child</strong> for one part per child, or <strong>By Label</strong> to name the parts yourself (for example, "upstairs" and "downstairs").',
+          'Under <strong>Who Holds Each Part?</strong>, pick a holder for each part. With <strong>By Label</strong>, use <strong>Add a Part</strong> to add more.',
+          'Save the card.',
         ],
       },
       {
         type: 'infoBox',
-        title: 'Good to know',
+        title: 'When the family changes',
+        icon: '\u{1F476}',
+        content:
+          'On a card split by child, a new child gets their own part with nobody yet, and a child who leaves the family drops off the card. If anyone who held a card is removed from the family, that card simply goes back to waiting for a holder.',
+      },
+      {
+        type: 'heading',
+        content: 'Re-deal a card when life changes',
+        level: 2,
+        id: 're-deal',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Jobs move around: a new work schedule, a new baby, a kid old enough to take on laundry. Re-dealing is quick, and beanies keeps a short history, so a card shows who has held it since when and who held it before.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>From the card:</strong> open it in the <strong>Deck</strong> view, tap <strong>Edit</strong>, choose someone else under <strong>Who Holds This Card?</strong> and save.',
+          '<strong>On a computer or tablet:</strong> open the <strong>Deal</strong> view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard.',
+          '<strong>On a phone:</strong> the <strong>Deal</strong> view shows the waiting cards one at a time, just like the first deal.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When a card changes hands, both the person who held it and the person who now holds it get a short note in their daily briefing.',
+      },
+      {
+        type: 'heading',
+        content: 'Skip, bring back, add and delete cards',
+        level: 2,
+        id: 'skip-add',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Skip</strong> keeps a card out of your deck and out of every number. Find skipped cards with the <strong>Skipped</strong> pill in the Deck view (or <strong>See Skipped Cards</strong> in the ⋯ menu) and tap <strong>Bring Back</strong> whenever a job starts to apply, say when you get a dog or move to a house with a yard.',
+          '<strong>Add your own:</strong> tap <strong>Add a Card</strong>, fill in <strong>What’s the Job?</strong>, an emoji, a category and optionally a holder, then tap <strong>Add to Our Deck</strong>.',
+          '<strong>What done looks like:</strong> every card has a short line describing the minimum that counts as done. Edit it on any card under <strong>What Done Looks Like (at a Minimum)</strong>, or leave it blank to use the default.',
+          '<strong>Delete:</strong> only cards your family made can be deleted, from the delete button in <strong>Card Details</strong>. Built-in cards can’t be deleted, but you can always skip them.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Read the Overview',
+        level: 2,
+        id: 'overview',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The <strong>Overview</strong> shows how much of your deck has a holder, how many cards are still waiting and how many you skipped. Below that you’ll see coverage <strong>By Category</strong> with the faces of the people holding cards there, a list of cards <strong>Waiting for a Holder</strong> (each with a <strong>Deal</strong> button), <strong>Recent Moves</strong> from the last month, and your family check-in.',
+      },
+      {
+        type: 'callout',
+        title: 'Coverage, never comparison',
+        icon: '\u{1F91D}',
+        content:
+          'The Overview never shows how many cards each person holds. The goal is that every job has an owner, not that everyone holds the same number. A big job and a small job are both one card, so counting them would tell you very little.',
+      },
+      {
+        type: 'heading',
+        content: 'The family check-in',
+        level: 2,
+        id: 'check-in',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every few weeks, beanies suggests ten minutes together to look at the deck and swap anything that isn’t working. There are no scores, only a nudge to talk.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'When a check-in is due, it shows on the Overview and in your daily briefing. Tap <strong>Start a Check-in</strong>.',
+          'The agenda lists cards with nobody (tap <strong>Deal Now</strong>), cards that moved since last time, and a few that haven’t changed hands in a long while. Mark each one <strong>Still Works</strong> or <strong>Let’s Talk</strong>, or re-deal it right there.',
+          'Tap <strong>Finish Check-in</strong>. beanies lists what you wanted to talk about and shows when the next check-in is due.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Check-ins happen every 4 weeks unless you change it. Open the ⋯ menu and choose <strong>Check-in Rhythm</strong> to pick <strong>Every 2 Weeks</strong>, <strong>Every 4 Weeks</strong>, <strong>Every 8 Weeks</strong> or <strong>Off</strong>. Not a good week? <strong>Remind Me Later</strong> hides the reminder for a week.',
+      },
+      {
+        type: 'heading',
+        content: 'Print the deck for the fridge',
+        level: 2,
+        id: 'fridge-sheet',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The fridge sheet puts your dealt deck on paper: every kept card by category, with each holder’s initial beside it. Cards still waiting for a holder get a dashed line so you can write a name in, and skipped cards are left off. Open the ⋯ menu and choose <strong>Export as PDF</strong> to print it (a big deck spills onto a second page, never splitting a category), or <strong>Share the Deck</strong> to send it as an image.',
+      },
+      {
+        type: 'heading',
+        content: 'How beanies uses your cards',
+        level: 2,
+        id: 'defaults',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once a card has a single holder, beanies uses it to fill things in for you when you create something new. You can always change the result, and changing it never changes the card.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Meals:</strong> a new dinner in the Meal Planner starts with the holder of <em>Cooking Dinner</em> as the cook, and a new breakfast starts with the holder of <em>Breakfast</em>. The meal shows a small note such as <em>"Sofia holds Cooking Dinner in Who Owns What."</em> Eating out, leftovers and skipped meals never get a cook.',
+          '<strong>Lists:</strong> a new list from the grocery template is owned by the holder of <em>Grocery Shopping</em>, and a vacation packing list by the holder of <em>Trip Packing</em>. The template shows who it will go to before you pick it.',
+          '<strong>Helpful hints:</strong> gift reminders go to the holder of <em>Gifts for Others</em>, anniversary plans to the holder of <em>Date Nights</em>, and trip reminders to the holders of <em>Trip Packing</em> and <em>Passports and Documents</em>. The hint says <em>Assigned from Who Owns What</em>. A birthday-present hint still never goes to the person whose birthday it is.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        title: 'Only for new things',
         icon: '\u{1F4A1}',
         content:
-          'Only grown-ups can deal, edit or skip cards; kids can see the whole deck. Built-in cards can be skipped but not deleted, and cards your family adds can be deleted from the card itself.',
+          'Defaults apply only when something is created. Re-dealing a card never moves meals, lists or hints you already have, and a split card isn’t used as a default. Open any card and look under <strong>beanies Uses This Card For</strong> to see where it is used.',
+      },
+      {
+        type: 'heading',
+        content: 'Start over with the default cards',
+        level: 2,
+        id: 'restore',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Open the ⋯ menu and choose <strong>Restore Default Cards</strong> to bring every built-in card back (including skipped ones) and deal the deck again from the start. Choose <strong>Keep our own cards</strong> to keep the cards your family made (they come back waiting for a holder) or <strong>Clear our own cards too</strong>, then tap <strong>Restore and start over</strong>. Your check-in history is kept.',
+      },
+      {
+        type: 'callout',
+        title: 'This can’t be undone',
+        icon: '⚠️',
+        content:
+          'Restoring clears every holder, split and card history in your deck. If you only want to change a few cards, re-deal or skip them instead.',
+      },
+      {
+        type: 'heading',
+        content: 'What’s next?',
+        level: 2,
+        id: 'whats-next',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'See how your cards show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
       },
     ],
   },
