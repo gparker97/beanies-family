@@ -58,6 +58,7 @@
 import { computed, onScopeDispose, readonly, ref, watch, type Ref } from 'vue';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isTextEntryFocused } from '@/utils/isTextEntryFocused';
 import {
   WALL_MIN_BOX_SIDE_PX,
   deviceCanBeAWall,
@@ -72,23 +73,6 @@ import {
  * stuck on the old layout.
  */
 export const ROOM_SETTLE_MS = 600;
-
-/**
- * Is the person typing right now?
- *
- * The engine-independent signal that a viewport shrink is a keyboard: on every
- * platform, a soft keyboard is only ever open because an editable element has
- * focus. Reading `activeElement` needs no listener, no `visualViewport`, and no
- * per-engine knowledge of whether the layout viewport resizes.
- */
-function isTextEntryFocused(): boolean {
-  if (typeof document === 'undefined') return false;
-  const el = document.activeElement as HTMLElement | null;
-  if (!el) return false;
-  if (el.isContentEditable) return true;
-  const tag = el.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-}
 
 export function useWallRoomGate(surface = 'beanie-wall'): Readonly<Ref<boolean>> {
   /**

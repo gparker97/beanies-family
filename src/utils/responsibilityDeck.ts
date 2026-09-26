@@ -391,6 +391,40 @@ export function singleHolderOf(cards: readonly ResolvedCard[], cardId: string): 
   return card.parts[0]!.holderId;
 }
 
+/**
+ * Who a card could be handed to next: every member but its first part's current holder.
+ * Offering the holder would write nothing yet toast "dealt" and count a re-deal. Used by
+ * the check-in's Re-deal and the deal pile's "Give it to someone else".
+ */
+export function otherHumans<M extends { id: string }>(
+  members: readonly M[],
+  card: Pick<ResolvedCard, 'parts'>
+): M[] {
+  const holder = card.parts[0]?.holderId;
+  return members.filter((m) => m.id !== holder);
+}
+
+/**
+ * The deal pile's two lists: Kept (held and waiting) and Skipped, each newest change first
+ * by `state.updatedAt` (every deck write stamps it). Ties break by category order, then id,
+ * so the lists never reshuffle between renders. Unsorted cards are in neither list.
+ */
+export function keptAndSkipped(cards: readonly ResolvedCard[]): {
+  kept: ResolvedCard[];
+  skipped: ResolvedCard[];
+} {
+  const catIndex = new Map<string, number>(LIST_CATEGORIES.map((c, i) => [c.id, i]));
+  const rank = (c: ResolvedCard) => catIndex.get(c.category) ?? LIST_CATEGORIES.length;
+  const newestFirst = (a: ResolvedCard, b: ResolvedCard) =>
+    (b.state?.updatedAt ?? '').localeCompare(a.state?.updatedAt ?? '') ||
+    rank(a) - rank(b) ||
+    a.id.localeCompare(b.id);
+  return {
+    kept: cards.filter((c) => c.status === 'held' || c.status === 'waiting').sort(newestFirst),
+    skipped: cards.filter((c) => c.status === 'skipped').sort(newestFirst),
+  };
+}
+
 /** The `CARD_DEFAULTS` lookup + `singleHolderOf`: who beanies should default to, and why. */
 export function defaultHolderFor(
   cards: readonly ResolvedCard[],
