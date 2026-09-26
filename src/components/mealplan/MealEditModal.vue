@@ -11,11 +11,13 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import InferredHint from '@/components/ui/InferredHint.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useCardDefaultHint } from '@/composables/useCardDefaultHint';
 import { confirm } from '@/composables/useConfirm';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type { MealPlanEntry, MealKind, UpdateMealPlanInput } from '@/types/models';
@@ -41,6 +43,13 @@ const recipe = computed(() =>
   props.meal?.recipeId ? recipesStore.recipes.find((r) => r.id === props.meal!.recipeId) : undefined
 );
 const isRecipe = computed(() => kind.value === 'recipe');
+
+// Who Owns What (#109): derived, nothing stored. Shows while the chosen cook is the
+// single holder of the slot's card ("Sofia holds Cooking Dinner in Who Owns What.").
+const { holderFor, holdsHint } = useCardDefaultHint();
+const cookHint = computed(() =>
+  props.meal ? holdsHint({ kind: 'mealSlot', slot: props.meal.slot }, cookId.value) : ''
+);
 
 // Plan-type toggle: only the non-recipe types are switchable here. A recipe meal
 // stays a recipe (change it by removing + re-adding) — but it can be turned into a
@@ -93,7 +102,18 @@ async function save(): Promise<void> {
     note: note.value.trim() || undefined,
     serveTime: serveTime.value || undefined,
   };
-  await mealPlanStore.updateMeal(props.meal.id, patch);
+  const holderId = holderFor({ kind: 'mealSlot', slot: props.meal.slot })?.memberId;
+  const overridden =
+    !!holderId && props.meal.cookMemberId === holderId && cookId.value !== holderId;
+  const saved = await mealPlanStore.updateMeal(props.meal.id, patch);
+  if (saved && overridden) {
+    logEvent({
+      level: 'info',
+      surface: 'meal-planner',
+      message: 'card_default_overridden',
+      context: { action: 'card_default_overridden', slot: props.meal.slot },
+    });
+  }
   emit('close');
 }
 
@@ -213,6 +233,7 @@ async function onCookLogClosed(): Promise<void> {
           </span>
         </div>
         <FamilyChipPicker v-model="cookId" mode="single" />
+        <InferredHint :text="cookHint" />
       </div>
 
       <!-- Who's eating + guests -->
