@@ -1,0 +1,92 @@
+/**
+ * useDealActions: the one undo toast for the deck. Only a truthy store result toasts
+ * (the store already reported every failure), the toast carries Undo wired to the
+ * token, and only one deck undo toast is ever live.
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { UndoToken } from '@/utils/responsibilityOps';
+
+const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn() }));
+vi.mock('@/composables/useToast', () => ({
+  showToast: toast.show,
+  dismissToast: toast.dismiss,
+}));
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
+}));
+vi.mock('@/composables/useMemberInfo', () => ({
+  useMemberInfo: () => ({ getMemberName: (id: string) => `name:${id}` }),
+}));
+vi.mock('@/composables/useResponsibilityCardLabel', () => ({
+  useResponsibilityCardLabel: () => ({ cardName: (c: { id: string }) => `card:${c.id}` }),
+}));
+const store = vi.hoisted(() => ({
+  deal: vi.fn(),
+  keep: vi.fn(),
+  skip: vi.fn(),
+  bringBack: vi.fn(),
+  undo: vi.fn(),
+  cardById: vi.fn((id: string) => ({ id })),
+}));
+vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
+
+import { useDealActions, resetDealActionsForTest, UNDO_TOAST_MS } from '../useDealActions';
+
+const TOKEN: UndoToken = { action: 'deal', before: {}, afterUpdatedAt: {}, createdMoveIds: [] };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  resetDealActionsForTest();
+  let id = 0;
+  toast.show.mockImplementation(() => ++id);
+});
+
+describe('useDealActions', () => {
+  it('shows one toast with Undo after a successful deal, wired to the token', async () => {
+    store.deal.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+    store.undo.mockResolvedValue(true);
+    const { deal } = useDealActions();
+
+    await deal('laundry', 'main', 'sofia');
+
+    expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'sofia');
+    expect(toast.show).toHaveBeenCalledTimes(1);
+    const [type, , , opts] = toast.show.mock.calls[0]!;
+    expect(type).toBe('success');
+    expect(opts).toMatchObject({ actionLabel: 'action.undo', durationMs: UNDO_TOAST_MS });
+
+    await opts.actionFn();
+    expect(store.undo).toHaveBeenCalledWith(TOKEN);
+    expect(toast.show).toHaveBeenLastCalledWith('success', 'whoOwnsWhat.toast.undone');
+  });
+
+  it('never toasts when the store refused or failed (it already told the person)', async () => {
+    store.skip.mockResolvedValue(null);
+    const { skip } = useDealActions();
+    expect(await skip(['car-care'])).toBeNull();
+    expect(toast.show).not.toHaveBeenCalled();
+  });
+
+  it('keeps only one deck undo toast visible at a time', async () => {
+    store.keep.mockResolvedValue({ result: { id: 'a' }, undo: TOKEN });
+    store.bringBack.mockResolvedValue({ result: { id: 'b' }, undo: TOKEN });
+    const actions = useDealActions();
+
+    await actions.keep('a');
+    expect(toast.dismiss).not.toHaveBeenCalled();
+    await actions.bringBack('b');
+    expect(toast.dismiss).toHaveBeenCalledWith(1);
+  });
+
+  it('shows a plain toast (no Undo) when nothing changed', async () => {
+    store.deal.mockResolvedValue({ result: { id: 'laundry' }, undo: null });
+    await useDealActions().deal('laundry', 'main', null);
+    expect(toast.show).toHaveBeenCalledWith('success', 'whoOwnsWhat.toast.cleared');
+  });
+
+  it('a stale undo resolves falsy and adds no second toast', async () => {
+    store.undo.mockResolvedValue(null);
+    expect(await useDealActions().undo(TOKEN)).toBeNull();
+    expect(toast.show).not.toHaveBeenCalled();
+  });
+});
