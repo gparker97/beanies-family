@@ -336,7 +336,10 @@ function keep(): void {
 
 // ── Completion ───────────────────────────────────────────────────────────────
 const finished = computed(() => queueReady.value && !topId.value && !busy.value);
-const allHeld = computed(() => store.stats.waiting === 0 && store.stats.unsorted === 0);
+/** Every kept card has a holder, and there is at least one (an all-skipped deck is not). */
+const allHeld = computed(
+  () => store.stats.deck > 0 && store.stats.waiting === 0 && store.stats.unsorted === 0
+);
 const kidsHolding = computed(
   () =>
     familyStore.sortedHumans.filter((m) => !isAdultMember(m) && store.myCards(m.id).length > 0)
