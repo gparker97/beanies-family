@@ -20,6 +20,7 @@
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import MedicationLogRow from '@/components/pod/MedicationLogRow.vue';
@@ -365,13 +366,7 @@ const scheduleMeta = computed(() => {
          native save slot is "Close", footer-start holds the secondary
          action (here, Edit). -->
     <template #footer-start>
-      <button
-        type="button"
-        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
-        @click="handleEdit"
-      >
-        ✏️ {{ t('action.edit') }}
-      </button>
+      <ModalSecondaryButton @click="handleEdit"> ✏️ {{ t('action.edit') }} </ModalSecondaryButton>
     </template>
   </BeanieFormModal>
 

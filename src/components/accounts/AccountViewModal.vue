@@ -18,6 +18,7 @@
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import AccountDetailsView from '@/components/accounts/AccountDetailsView.vue';
 import { hasAccountDetails } from '@/utils/accountDetails';
@@ -277,13 +278,9 @@ watch(
          Mirrors the Cancel/Save pairing convention used by other view-edit
          drawers (MedicationViewModal, ActivityViewEditModal). -->
     <template #footer-start>
-      <button
-        type="button"
-        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
-        @click="emit('close')"
-      >
+      <ModalSecondaryButton @click="emit('close')">
         {{ t('action.close') }}
-      </button>
+      </ModalSecondaryButton>
     </template>
   </BeanieFormModal>
 </template>

@@ -19,6 +19,7 @@ import { formatDate } from '@/utils/date';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
@@ -638,14 +639,9 @@ async function handleDelete() {
     </div>
 
     <template #footer-start>
-      <button
-        v-if="isEditable"
-        type="button"
-        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50"
-        @click="handleOpenEdit"
-      >
+      <ModalSecondaryButton v-if="isEditable" @click="handleOpenEdit">
         ✏️ {{ t('action.edit') }}
-      </button>
+      </ModalSecondaryButton>
     </template>
   </BeanieFormModal>
 </template>
