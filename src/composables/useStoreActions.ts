@@ -15,6 +15,14 @@ interface WrapAsyncOptions {
    * the wasm stack alone is unactionable (see triage 2026-05-02).
    */
   action?: string;
+  /**
+   * Kebab-case surface for the failure report, e.g. `'responsibilities'`.
+   * When set, the regular (non-panic) error toast reports under this surface
+   * with `context: { action }` (if `action` is set) instead of the generic
+   * `'app'`. Omitted: the toast options are exactly as before, so existing
+   * callers' reports do not change.
+   */
+  surface?: string;
 }
 
 /**
@@ -56,7 +64,7 @@ export async function wrapAsync<T>(
   fn: () => Promise<T>,
   options?: WrapAsyncOptions
 ): Promise<T | undefined> {
-  const { errorToast = true, successToast, action } = options ?? {};
+  const { errorToast = true, successToast, action, surface } = options ?? {};
 
   isLoading.value = true;
   error.value = null;
@@ -92,7 +100,10 @@ export async function wrapAsync<T>(
         // Pass `error: e` so the stack lands in the Slack alert. Without
         // this, every catch here showed up at surface `app` with no stack
         // frames — see commit history for the diagnostic backstory.
-        showToast('error', rawMessage, undefined, { error: e });
+        showToast('error', rawMessage, undefined, {
+          error: e,
+          ...(surface ? { surface, ...(action ? { context: { action } } : {}) } : {}),
+        });
       }
     }
     return undefined;

@@ -307,3 +307,63 @@ describe('wrapAsync — engine panic friendly-toast wrap', () => {
     });
   });
 });
+
+describe('wrapAsync — optional report surface', () => {
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isLoading.value = false;
+    error.value = null;
+  });
+
+  it('reports a regular error under the given surface with the action as context', async () => {
+    const original = new Error('Save failed');
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        throw original;
+      },
+      { action: 'responsibilityStore:deal', surface: 'responsibilities' }
+    );
+
+    expect(showToast).toHaveBeenCalledWith('error', 'Save failed', undefined, {
+      error: original,
+      surface: 'responsibilities',
+      context: { action: 'responsibilityStore:deal' },
+    });
+  });
+
+  it('keeps the toast options unchanged when only an action is passed', async () => {
+    const original = new Error('Save failed');
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        throw original;
+      },
+      { action: 'todoStore:createTodo' }
+    );
+
+    expect(showToast).toHaveBeenCalledWith('error', 'Save failed', undefined, { error: original });
+  });
+
+  it('adds the surface without context when no action is passed', async () => {
+    const original = new Error('Save failed');
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        throw original;
+      },
+      { surface: 'responsibilities' }
+    );
+
+    expect(showToast).toHaveBeenCalledWith('error', 'Save failed', undefined, {
+      error: original,
+      surface: 'responsibilities',
+    });
+  });
+});
