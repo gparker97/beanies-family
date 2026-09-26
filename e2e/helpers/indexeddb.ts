@@ -16,6 +16,9 @@ import type {
   Medication,
   Allergy,
   Milestone,
+  ResponsibilityCardState,
+  ResponsibilityCheckIn,
+  ResponsibilityMove,
   Settings,
 } from '@/types/models';
 
@@ -43,6 +46,9 @@ export interface ExportedData {
   medications?: Medication[];
   allergies?: Allergy[];
   milestones?: Milestone[];
+  responsibilityCards?: ResponsibilityCardState[];
+  responsibilityMoves?: ResponsibilityMove[];
+  responsibilityCheckIns?: ResponsibilityCheckIn[];
   settings: Settings | undefined;
 }
 
