@@ -40,7 +40,36 @@ vi.mock('@/services/automerge/repositories/mealPlanRepository', () => ({
   replaceWeek: (...a: unknown[]) => replaceWeek(...(a as [])),
 }));
 
+// Who Owns What (#109): the store's `defaultHolderFor` is the pure lookup over a
+// resolved deck; the fixture below controls which cards are held and how.
+const deckCards = { value: [] as ResolvedCard[] };
+vi.mock('@/stores/responsibilityStore', () => ({
+  useResponsibilityStore: () => ({
+    defaultHolderFor: (target: CardDefaultTarget) => pureDefaultHolderFor(deckCards.value, target),
+  }),
+}));
+
 import { useMealPlanStore } from '@/stores/mealPlanStore';
+import { logEvent } from '@/services/telemetry/logEvent';
+import {
+  defaultHolderFor as pureDefaultHolderFor,
+  type ResolvedCard,
+} from '@/utils/responsibilityDeck';
+import type { CardDefaultTarget } from '@/constants/responsibilityCards';
+
+function heldCard(id: string, holders: (string | undefined)[]): ResolvedCard {
+  const split = holders.length > 1;
+  return {
+    id,
+    isCustom: false,
+    category: 'home',
+    emoji: '🍲',
+    status: holders.every(Boolean) ? 'held' : 'waiting',
+    splitMode: split ? 'label' : 'single',
+    parts: holders.map((holderId, i) => ({ key: split ? `p${i}` : 'main', holderId })),
+    state: null,
+  };
+}
 
 type Store = ReturnType<typeof useMealPlanStore>;
 
@@ -83,7 +112,61 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   repoState.all = [];
+  deckCards.value = [];
   store = useMealPlanStore();
+});
+
+describe('mealPlanStore — Who Owns What cook default (#109)', () => {
+  const createdCook = () =>
+    (createMealPlan.mock.calls.at(-1)![0] as { cookMemberId?: string }).cookMemberId;
+
+  it('defaults an unset cook to the single holder of the slot card', async () => {
+    deckCards.value = [heldCard('cooking-dinner', ['sofia']), heldCard('breakfast', ['greg'])];
+    await store.createMeal({ date: '2026-08-20', slot: 'dinner', kind: 'recipe', cooked: false });
+    expect(createdCook()).toBe('sofia');
+    await store.createMeal({ date: '2026-08-20', slot: 'breakfast', kind: 'other', cooked: false });
+    expect(createdCook()).toBe('greg');
+    expect(vi.mocked(logEvent)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'meal-planner',
+        message: 'card_default_applied',
+        context: expect.objectContaining({ slot: 'breakfast' }),
+      })
+    );
+  });
+
+  it('never overrides a chosen cook', async () => {
+    deckCards.value = [heldCard('cooking-dinner', ['sofia'])];
+    await store.createMeal({
+      date: '2026-08-20',
+      slot: 'dinner',
+      kind: 'recipe',
+      cooked: false,
+      cookMemberId: 'greg',
+    });
+    expect(createdCook()).toBe('greg');
+  });
+
+  it('leaves the cook unset when the card is split, waiting or unmapped', async () => {
+    deckCards.value = [heldCard('cooking-dinner', ['sofia', 'greg'])];
+    await store.createMeal({ date: '2026-08-20', slot: 'dinner', kind: 'recipe', cooked: false });
+    expect(createdCook()).toBeUndefined();
+    deckCards.value = [heldCard('cooking-dinner', [undefined])];
+    await store.createMeal({ date: '2026-08-21', slot: 'dinner', kind: 'recipe', cooked: false });
+    expect(createdCook()).toBeUndefined();
+    deckCards.value = [heldCard('cooking-dinner', ['sofia'])];
+    await store.createMeal({ date: '2026-08-21', slot: 'lunch', kind: 'recipe', cooked: false });
+    expect(createdCook()).toBeUndefined();
+  });
+
+  it.each(['eat_out', 'leftovers', 'skip'] as const)(
+    'never gives a %s meal a cook',
+    async (kind) => {
+      deckCards.value = [heldCard('cooking-dinner', ['sofia'])];
+      await store.createMeal({ date: '2026-08-20', slot: 'dinner', kind, cooked: false });
+      expect(createdCook()).toBeUndefined();
+    }
+  );
 });
 
 describe('mealPlanStore', () => {

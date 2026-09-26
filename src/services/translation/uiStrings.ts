@@ -13167,6 +13167,51 @@ const STRING_DEFS = {
     beanie: 'something went wrong preparing your fridge sheet. please try again.',
   },
 
+  // Who Owns What: creation-time defaults (#109). Derived at render time, never stored.
+  'whoOwnsWhat.default.holds': {
+    en: '{name} holds {card} in Who Owns What.',
+    beanie: '{name} holds {card} in who owns what.',
+  },
+  'whoOwnsWhat.default.hintAssigned': {
+    en: 'Assigned from Who Owns What',
+    beanie: 'assigned from who owns what',
+  },
+
+  // Who Owns What: Nook briefing rows (#109). Never a count about anyone but the viewer.
+  'whoOwnsWhat.briefing.mine': {
+    en: 'Your cards in Who Owns What',
+    beanie: 'your cards in who owns what',
+  },
+  'whoOwnsWhat.briefing.mineCount.one': { en: 'your 1 card', beanie: 'your 1 card' },
+  'whoOwnsWhat.briefing.mineCount.other': {
+    en: 'your {count} cards',
+    beanie: 'your {count} cards',
+  },
+  'whoOwnsWhat.briefing.movedAway': {
+    en: '{card} moved to {name} on {date}.',
+    beanie: '{card} moved to {name} on {date}. one less on your pile.',
+  },
+  'whoOwnsWhat.briefing.movedToYou': {
+    en: 'You now hold {card}, from {name}.',
+    beanie: 'you now hold {card}, from {name}.',
+  },
+  'whoOwnsWhat.briefing.nobody.one': {
+    en: '{names} has nobody yet.',
+    beanie: '{names} has nobody yet.',
+  },
+  'whoOwnsWhat.briefing.nobody.other': {
+    en: '{count} cards have nobody yet: {names}.',
+    beanie: '{count} cards have nobody yet: {names}.',
+  },
+  'whoOwnsWhat.briefing.checkIn': {
+    en: 'Your family check-in is due',
+    beanie: 'your family check-in is due',
+  },
+  'whoOwnsWhat.briefing.checkInCaption': {
+    en: 'Ten minutes together over Who Owns What',
+    beanie: 'ten minutes together over who owns what',
+  },
+
   // Who Owns What: card deck (#109). Names are Title Case in `en`; done lines have no
   // trailing period. American English. Ids in `responsibilityCards.ts` never change.
   'cards.cookingDinner.name': { en: 'Cooking Dinner', beanie: 'cooking dinner' },
