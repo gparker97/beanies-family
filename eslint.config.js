@@ -165,6 +165,9 @@ export default [
             '⧉', // meal-planner copy-week action glyph
             '🍲', // meal planner
             '👥', // "who's eating" guests glyph
+            '🙅', // Who Owns What skipped-pile banner (#109)
+            '✂️', // Who Owns What "cards are split" fact (#109)
+            '↩', // Who Owns What "Bring Back" on a skipped card (#109)
             '⏰',
             '⏳',
             '⚠',
