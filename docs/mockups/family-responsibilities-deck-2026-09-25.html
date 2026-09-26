@@ -620,6 +620,95 @@
 
   .frame.light { --c-people: #e17055; } .frame.dark { --c-people: #f5a38c; }
   .ps-bd { grid-template-columns: repeat(3, 1fr); }
+
+  /* ══ round 6: the dealing table ════════════════════════════════════════ */
+  .r6-group { margin-top: 64px; padding: 24px; border-radius: 28px; border: 2px dashed var(--pg-accent); }
+  .r6-group > h2.r6-title { font-size: 1.875rem; font-weight: 800; }
+  .dealbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .dealbar .grp { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  kbd { font-family: Inter, sans-serif; font-size: .75rem; font-weight: 600; line-height: 1.4; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; color: var(--ink-soft); background: var(--overlay); }
+  .keys { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: .75rem; color: var(--ink-faint); }
+  .keys span { display: inline-flex; gap: 4px; align-items: center; }
+
+  .film { display: flex; align-items: center; gap: 10px; }
+  .film .arrow { width: 36px; height: 36px; border-radius: 12px; border: 1.5px solid var(--line-strong); background: var(--raised); display: grid; place-items: center; color: var(--ink); font-weight: 700; flex: none; }
+  .film .where { font-family: Outfit, sans-serif; font-weight: 600; font-size: .875rem; color: var(--ink); white-space: nowrap; }
+  .film .where small { font-family: Inter, sans-serif; font-weight: 400; color: var(--ink-faint); margin-left: 6px; }
+  .strip { display: flex; gap: 4px; flex: 1; min-width: 0; overflow: hidden; padding: 6px 2px; }
+  .fc { width: 26px; height: 34px; border-radius: 7px; border: 1px solid var(--line); background: var(--raised); flex: none; position: relative; display: grid; place-items: center; font-size: .75rem; }
+  .fc::after { content: ""; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; }
+  .fc.held::after { background: #f15d22; }
+  .fc.wait::after { border: 1.5px solid var(--accent); background: transparent; }
+  .fc.skip { opacity: .55; } .fc.skip::after { background: var(--aside); }
+  .fc.now { border: 2px solid var(--accent); transform: translateY(-4px); box-shadow: var(--shadow); }
+
+  .table { display: grid; grid-template-columns: 236px minmax(0, 1fr) 232px; gap: 18px; align-items: start; }
+  .table .cardcol { display: flex; flex-direction: column; gap: 14px; align-items: stretch; }
+  .rcard.big { width: 100%; max-width: 280px; align-self: center; transform: rotate(-1.5deg); box-shadow: var(--shadow-hover); }
+  .rcard.big .glyph { font-size: 4rem; }
+  .rcard.big .name { font-size: 1.25rem; }
+  .rcard.big .done { font-size: .875rem; }
+  .uses { font-size: .75rem; color: var(--ink-soft); background: var(--silk-tint); border: 1px solid var(--silk-line); border-radius: 12px; padding: 8px 10px; }
+  .q { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.125rem; color: var(--ink); margin: 0; text-align: center; }
+  .dbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dbtn { display: flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid var(--line-strong); background: var(--raised); color: var(--ink); border-radius: 16px; padding: 12px 10px; font-family: Outfit, sans-serif; font-weight: 700; font-size: .875rem; }
+  .dbtn.hot { border-color: var(--accent); background: var(--tint-o8); color: var(--ink); }
+  .dbtn.done { border-color: var(--accent); background: var(--tint-o15); }
+  .minor { display: flex; gap: 14px; justify-content: center; font-family: Outfit, sans-serif; font-size: .875rem; font-weight: 600; color: var(--ink-soft); }
+  .minor u { text-decoration: none; border-bottom: 1.5px dotted var(--line-strong); }
+
+  .seatcol { display: flex; flex-direction: column; gap: 12px; }
+  .prompt { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--tint-o8); border-radius: 14px; padding: 10px 14px; font-family: Outfit, sans-serif; font-weight: 600; font-size: .875rem; color: var(--ink); }
+  .prompt .ghostbtn { padding: 6px 12px; border-radius: 10px; }
+  .seats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .seat { border: 1.5px solid var(--line); border-radius: 20px; padding: 12px; background: var(--raised); display: flex; flex-direction: column; gap: 12px; min-height: 230px; }
+  .seat.live { border-color: var(--accent); box-shadow: 0 0 0 4px var(--tint-o8); }
+  .seat.hover { border-color: var(--accent); background: var(--tint-o8); box-shadow: 0 0 0 4px var(--tint-o15); }
+  .seat.kid { min-height: 0; }
+  .seat .sh { display: flex; align-items: center; gap: 10px; }
+  .seat .sh b { font-family: Outfit, sans-serif; font-size: 1rem; font-weight: 700; color: var(--ink); display: block; line-height: 1.2; }
+  .seat .sh > div { flex: 1; min-width: 0; } .seat .sh small { font-size: .75rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .seat .sh kbd { margin-left: auto; }
+  .hands { display: flex; flex-wrap: wrap; gap: 14px 18px; }
+  .hand { display: flex; flex-direction: column; gap: 4px; }
+  .fan { position: relative; height: 70px; }
+  .mc { --cat: var(--c-home); position: absolute; top: 4px; width: 46px; height: 62px; border-radius: 9px; background: var(--raised); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(44,62,80,.12); display: grid; align-items: start; justify-items: start; padding: 4px 5px; font-size: 1rem; background-image: linear-gradient(color-mix(in srgb, var(--cat) 14%, transparent), color-mix(in srgb, var(--cat) 14%, transparent)); }
+  .frame.dark .mc { box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .mc.new { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hand small { font-size: .75rem; color: var(--ink-faint); font-family: Outfit, sans-serif; font-weight: 600; }
+  .seat .empty { font-size: .75rem; color: var(--ink-faint); border: 1.5px dashed var(--line-strong); border-radius: 12px; padding: 10px; text-align: center; }
+
+  .round { border-left: 1px solid var(--line); padding-left: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .round h4 { margin: 0; font-family: Outfit, sans-serif; font-size: 1rem; font-weight: 700; color: var(--ink); }
+  .round .seg { align-self: stretch; flex-wrap: wrap; } .round .seg span { padding: 6px 10px; }
+  .rlist { display: flex; flex-direction: column; gap: 8px; }
+  .rlist .who { font-family: Outfit, sans-serif; font-size: .75rem; font-weight: 700; color: var(--ink-faint); margin-top: 4px; }
+  .rrow { display: flex; align-items: center; gap: 10px; font-size: .875rem; color: var(--ink); }
+  .rrow .th { --cat: var(--c-home); width: 30px; height: 30px; border-radius: 9px; background: color-mix(in srgb, var(--cat) 14%, transparent); display: grid; place-items: center; font-size: 1rem; flex: none; }
+  .rrow .act { margin-left: auto; font-family: Outfit, sans-serif; font-size: .75rem; font-weight: 700; color: var(--accent); }
+  .rrow.skipped { color: var(--ink-soft); }
+  .skipgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .skipgrid .rcard { font-size: .875rem; }
+
+  .decided { display: flex; gap: 10px; align-items: center; border-radius: 14px; padding: 10px 12px; background: var(--silk-tint); border: 1px solid var(--silk-line); font-size: .875rem; color: var(--ink); }
+  .decided b { font-family: Outfit, sans-serif; }
+  .chg { display: flex; flex-direction: column; gap: 8px; }
+
+  .skiprow-open { border-radius: 14px; background: var(--overlay); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .skiprow-open .hd { display: flex; align-items: center; gap: 10px; font-family: Outfit, sans-serif; font-weight: 700; font-size: .875rem; color: var(--ink); }
+  .skiprow-open .hd .caret { margin-left: auto; color: var(--ink-faint); }
+  .skiprow-open .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+
+  .phone .film .arrow { width: 32px; height: 32px; }
+  .phone .strip .fc { width: 20px; height: 28px; }
+  .roundbtn { align-self: stretch; display: flex; justify-content: space-between; align-items: center; border: 1.5px solid var(--line-strong); border-radius: 14px; padding: 10px 12px; font-family: Outfit, sans-serif; font-size: .875rem; font-weight: 600; color: var(--ink); background: var(--raised); }
+  .roundbtn small { color: var(--ink-faint); font-family: Inter, sans-serif; font-weight: 400; }
+
+  @media (max-width: 900px) {
+    .table { grid-template-columns: 1fr; }
+    .round { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+    .r6-group { padding: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -629,8 +718,8 @@
       <div class="brand">beanies<span>.family</span><small>every bean counts</small></div>
       <h1>who owns what, one glance away.</h1>
       <p class="lede">a deck of household responsibility cards your family holds, splits and trades. deal them out once, and beanies quietly puts the right person on the right things.</p>
-      <p class="round">mockup round 5 · sat 26 sep 2026 · Notion #109</p>
-      <nav class="jump" aria-label="screens in this mockup"><a class="new" href="#overview">overview</a><a class="new" href="#overview-phone">phone + deal mode</a><a class="new" href="#deal">deal rail</a><a href="#deck">deck</a><a class="new" href="#edit">view + edit</a><a class="new" href="#split">split + your own</a><a href="#phones">by bean</a><a class="new" href="#aside">skipped</a><a href="#firstdeal">first deal</a><a class="new" href="#checkin">check-in</a><a href="#nook">nook</a><a class="new" href="#print">fridge sheet</a><a class="new" href="#restore">restore</a><a class="new" href="#ideas">scope</a></nav>
+      <p class="round">mockup round 6 · sat 26 sep 2026 · Notion #109</p>
+      <nav class="jump" aria-label="screens in this mockup"><a class="new" href="#dealing-table">round 6: dealing table</a><a class="new" href="#overview">overview</a><a class="new" href="#overview-phone">phone + deal mode</a><a class="new" href="#deal">deal rail</a><a href="#deck">deck</a><a class="new" href="#edit">view + edit</a><a class="new" href="#split">split + your own</a><a href="#phones">by bean</a><a class="new" href="#aside">skipped</a><a href="#firstdeal">first deal</a><a class="new" href="#checkin">check-in</a><a href="#nook">nook</a><a class="new" href="#print">fridge sheet</a><a class="new" href="#restore">restore</a><a class="new" href="#ideas">scope</a></nav>
     </div>
     <div class="hero-fan" aria-label="three example responsibility cards">
       <div class="rcard" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">🍳</span><span class="wm">🍳</span></div><div class="body"><div class="name">cooking dinner</div><div class="done">everyone fed by seven, most nights</div><div class="holder"><span class="who"><span class="av m-sofia"><img data-im="mother" alt=""></span>Sofia</span></div></div></div>
@@ -639,6 +728,167 @@
       <span class="hero-hand">dealt, not nagged ✨</span>
     </div>
   </header>
+
+  <!-- ══ round 6: dealing, redesigned ═══════════════════════════════════ -->
+  <div class="r6-group" id="dealing-table">
+    <h2 class="r6-title">round 6 · dealing, redesigned</h2>
+    <p class="caption" style="margin-top:8px">greg's feedback on the built app, 26 sep: dealing is the most important part, so on a desktop it should use the whole screen and make it easy for a couple to deal together; the pile and the board should both stay reachable; keep and skip shouldn't look pre-selected; you should see what was kept and skipped; and you should be able to step back and forward through the cards. these screens replace sections 2, 3 and 9's dealing parts. the rest of the mockup below is unchanged.</p>
+
+    <section id="d1" style="margin-top:28px">
+      <h2>d1 · the dealing table <span class="tag">desktop · light</span></h2>
+      <p class="sub">one card, the whole family, and what's happened so far</p>
+      <p class="caption">the card sits on the left, big enough to read the done-line from the sofa. everyone who can hold a card has a seat in the middle, grown-ups side by side and the kids in smaller seats below, each seat showing that person's hand as small fanned cards grouped by category, so a couple can see what each of them is taking on as they go. keep and skip are equal outlined buttons; after keep, the seats light up and you click one or press its number. clicking a seat straight away keeps and deals in one move. the filmstrip above shows where you are in the category, with a dot per card (filled: held, ring: waiting, grey: skipped) and the arrows step back and forward. the keyboard legend sits by the view switch. here greg's seat is under the pointer.</p>
+      <div class="frame light desktop" data-shell="who owns what" style="height:auto">
+        <div class="main">
+          <div class="content" style="gap:16px">
+            <div class="toprow"><div class="welcome">who's holding what this week? 🙋</div><button class="addbtn" type="button">＋ add a card</button></div>
+            <div class="dealbar"><div class="grp"><div class="views"><span>overview</span><span class="on">deal</span><span>deck</span></div><div class="seg"><span class="on">card by card</span><span>board</span></div></div><div class="keys"><span><kbd>K</kbd> keep</span><span><kbd>S</kbd> skip</span><span><kbd>1</kbd>–<kbd>4</kbd> give to</span><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>U</kbd> undo</span></div></div>
+            <div class="film"><span class="arrow">‹</span><span class="where">🧒 kids &amp; school<small>3 of 21</small></span><div class="strip"><span class="fc held">🥪</span><span class="fc skip">🧑‍🍼</span><span class="fc  now">📋</span><span class="fc ">🏖️</span><span class="fc ">🎒</span><span class="fc ">🧢</span><span class="fc ">⚽</span><span class="fc ">🎹</span><span class="fc ">🌅</span><span class="fc ">🌙</span><span class="fc ">🛀</span><span class="fc ">👕</span><span class="fc ">🧷</span><span class="fc ">✏️</span><span class="fc ">🍎</span><span class="fc ">🙋</span><span class="fc ">🏫</span><span class="fc ">📱</span><span class="fc ">🧸</span><span class="fc ">📚</span><span class="fc ">👏</span></div><span class="arrow">›</span></div>
+            <div class="table">
+              <div class="cardcol">
+                <div class="rcard big" style="--cat: var(--c-kids)"><div class="slab"><span class="glyph">📋</span><span class="wm">📋</span></div><div class="body"><div class="name">school forms</div><div class="done">signed and back in the backpack the same day</div><div class="holder"><span class="chip cat" style="--cat: var(--c-kids)"><i></i>kids &amp; school</span></div></div></div>
+                <p class="q">kept! who owns it?</p>
+                <div class="dbtns"><button class="dbtn done" type="button">✓ keep <kbd>K</kbd></button><button class="dbtn" type="button">skip <kbd>S</kbd></button></div>
+                <div class="minor"><u>split it</u><u>decide later</u></div>
+              </div>
+              <div class="seatcol">
+                <div class="prompt"><span>who owns school forms? click a seat or press 1 to 4.</span><button class="ghostbtn" type="button">decide later</button></div>
+                <div class="seats"><div class="seat live hover"><div class="sh"><span class="av md m-greg"><img data-im="father" alt=""></span><div><b>greg</b><small>6 cards</small></div><kbd>1</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:94px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(-10deg)">🧹</span><span class="mc" style="--cat: var(--c-home); left:20px; transform: rotate(-4deg)">🗑️</span><span class="mc" style="--cat: var(--c-home); left:40px; transform: rotate(4deg)">🔧</span><span class="mc" style="--cat: var(--c-home); left:60px; transform: rotate(10deg)">📬</span></div><small>🏠 home</small></div><div class="hand"><div class="fan" style="width:62px"><span class="mc" style="--cat: var(--c-out); left:0px; transform: rotate(-4deg)">🛒</span><span class="mc" style="--cat: var(--c-out); left:20px; transform: rotate(4deg)">🚗</span></div><small>🛒 out</small></div></div></div><div class="seat live"><div class="sh"><span class="av md m-sofia"><img data-im="mother" alt=""></span><div><b>Sofia</b><small>7 cards</small></div><kbd>2</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:110px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(-14deg)">🍳</span><span class="mc" style="--cat: var(--c-home); left:20px; transform: rotate(-7deg)">🧺</span><span class="mc" style="--cat: var(--c-home); left:40px; transform: rotate(0deg)">🛁</span><span class="mc" style="--cat: var(--c-home); left:60px; transform: rotate(7deg)">📅</span><span class="mc" style="--cat: var(--c-home); left:80px; transform: rotate(14deg)">💳</span></div><small>🏠 home</small></div><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-out); left:0px; transform: rotate(0deg)">📦</span></div><small>🛒 out</small></div><div class="hand"><div class="fan" style="width:46px"><span class="mc new" style="--cat: var(--c-kids); left:0px; transform: rotate(0deg)">🥪</span></div><small>🧒 kids</small></div></div></div><div class="seat live kid"><div class="sh"><span class="av md m-mia"><img data-im="girl" alt=""></span><div><b>Mia</b><small>1 card · age 9</small></div><kbd>3</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(0deg)">🪴</span></div><small>🏠 home</small></div></div></div><div class="seat live kid"><div class="sh"><span class="av md m-leo"><img data-im="boy" alt=""></span><div><b>Leo</b><small>1 card · age 6</small></div><kbd>4</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(0deg)">🐾</span></div><small>🏠 home</small></div></div></div></div>
+              </div>
+              <div class="round">
+                <h4>this round</h4>
+                <div class="seg"><span class="on">kept · 15</span><span>skipped · 7</span><span>waiting · 2</span></div>
+                <div class="rlist"><span class="who">Sofia · 7</span><div class="rrow "><span class="th" style="--cat: var(--c-kids)">🥪</span><span>lunchboxes</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">💳</span><span>paying the bills</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">📅</span><span>the family calendar</span><span class="act">change</span></div><span class="who">greg · 6</span><div class="rrow "><span class="th" style="--cat: var(--c-home)">📬</span><span>mail and paperwork</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-out)">🚗</span><span>car care</span><span class="act">change</span></div><span class="who">Mia and Leo · 2</span><div class="rrow "><span class="th" style="--cat: var(--c-home)">🪴</span><span>plants</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">🐾</span><span>pet care</span><span class="act">change</span></div></div>
+                <div class="uses">tap change on any card to give it to someone else, split it or skip it.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="d2">
+      <h2>d2 · stepping back to fix a card <span class="tag">desktop · dark</span></h2>
+      <p class="sub">go back, see what you chose, change it</p>
+      <p class="caption">pressing ← (or clicking a card in the filmstrip) goes back to laundry, which is already with Sofia. the card says so, her seat shows the card highlighted in her hand, and the buttons change to what you can do with a decided card: give it to someone else (click another seat or press their number), skip it instead, or split it. the this-round panel is on the skipped tab: every skipped card by name, each with bring back.</p>
+      <div class="frame dark desktop" data-shell="who owns what" style="height:auto">
+        <div class="main">
+          <div class="content" style="gap:16px">
+            <div class="toprow"><div class="welcome">who's holding what this week? 🙋</div><button class="addbtn" type="button">＋ add a card</button></div>
+            <div class="dealbar"><div class="grp"><div class="views"><span>overview</span><span class="on">deal</span><span>deck</span></div><div class="seg"><span class="on">card by card</span><span>board</span></div></div><div class="keys"><span><kbd>K</kbd> keep</span><span><kbd>S</kbd> skip</span><span><kbd>1</kbd>–<kbd>4</kbd> give to</span><span><kbd>←</kbd><kbd>→</kbd> move</span><span><kbd>U</kbd> undo</span></div></div>
+            <div class="film"><span class="arrow">‹</span><span class="where">🏠 home &amp; household<small>4 of 20</small></span><div class="strip"><span class="fc held">🍳</span><span class="fc held">🥣</span><span class="fc skip">🍽️</span><span class="fc held now">🧺</span><span class="fc held">🧹</span><span class="fc held">🛁</span><span class="fc held">🗑️</span><span class="fc wait">🧻</span><span class="fc held">🔧</span><span class="fc skip">📦</span><span class="fc skip">🎁</span><span class="fc held">📬</span><span class="fc wait">🏠</span><span class="fc skip">📊</span><span class="fc held">💳</span><span class="fc held">📅</span><span class="fc skip">📶</span><span class="fc held">🐾</span><span class="fc held">🪴</span><span class="fc skip">❄️</span></div><span class="arrow">›</span></div>
+            <div class="table">
+              <div class="cardcol">
+                <div class="rcard big" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">🧺</span><span class="wm">🧺</span></div><div class="body"><div class="name">laundry</div><div class="done">clean, dry and back in drawers</div><div class="holder"><span class="who"><span class="av  m-sofia"><img data-im="mother" alt=""></span>Sofia</span></div></div></div>
+                <div class="decided"><span class="av  m-sofia"><img data-im="mother" alt=""></span><span>with <b>Sofia</b> since today</span></div>
+                <div class="chg"><button class="dbtn" type="button">give it to someone else <kbd>1</kbd>–<kbd>4</kbd></button><div class="dbtns"><button class="dbtn" type="button">skip instead <kbd>S</kbd></button><button class="dbtn" type="button">split it</button></div></div>
+              </div>
+              <div class="seatcol">
+                <div class="prompt"><span>to move laundry, click another seat or press their number.</span><button class="ghostbtn" type="button">next card ›</button></div>
+                <div class="seats"><div class="seat "><div class="sh"><span class="av md m-greg"><img data-im="father" alt=""></span><div><b>greg</b><small>6 cards</small></div><kbd>1</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:94px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(-10deg)">🧹</span><span class="mc" style="--cat: var(--c-home); left:20px; transform: rotate(-4deg)">🗑️</span><span class="mc" style="--cat: var(--c-home); left:40px; transform: rotate(4deg)">🔧</span><span class="mc" style="--cat: var(--c-home); left:60px; transform: rotate(10deg)">📬</span></div><small>🏠 home</small></div><div class="hand"><div class="fan" style="width:62px"><span class="mc" style="--cat: var(--c-out); left:0px; transform: rotate(-4deg)">🛒</span><span class="mc" style="--cat: var(--c-out); left:20px; transform: rotate(4deg)">🚗</span></div><small>🛒 out</small></div></div></div><div class="seat live"><div class="sh"><span class="av md m-sofia"><img data-im="mother" alt=""></span><div><b>Sofia</b><small>7 cards · holds laundry</small></div><kbd>2</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:110px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(-14deg)">🍳</span><span class="mc new" style="--cat: var(--c-home); left:20px; transform: rotate(-7deg)">🧺</span><span class="mc" style="--cat: var(--c-home); left:40px; transform: rotate(0deg)">🛁</span><span class="mc" style="--cat: var(--c-home); left:60px; transform: rotate(7deg)">📅</span><span class="mc" style="--cat: var(--c-home); left:80px; transform: rotate(14deg)">💳</span></div><small>🏠 home</small></div><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-out); left:0px; transform: rotate(0deg)">📦</span></div><small>🛒 out</small></div><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-kids); left:0px; transform: rotate(0deg)">🥪</span></div><small>🧒 kids</small></div></div></div><div class="seat kid"><div class="sh"><span class="av md m-mia"><img data-im="girl" alt=""></span><div><b>Mia</b><small>1 card · age 9</small></div><kbd>3</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(0deg)">🪴</span></div><small>🏠 home</small></div></div></div><div class="seat kid"><div class="sh"><span class="av md m-leo"><img data-im="boy" alt=""></span><div><b>Leo</b><small>1 card · age 6</small></div><kbd>4</kbd></div><div class="hands"><div class="hand"><div class="fan" style="width:46px"><span class="mc" style="--cat: var(--c-home); left:0px; transform: rotate(0deg)">🐾</span></div><small>🏠 home</small></div></div></div></div>
+              </div>
+              <div class="round">
+                <h4>this round</h4>
+                <div class="seg"><span>kept · 15</span><span class="on">skipped · 7</span><span>waiting · 2</span></div>
+                <div class="rlist"><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">🍽️</span><span>dishes</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">📦</span><span>the seasonal swap</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">🎁</span><span>decluttering</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">📊</span><span>the family budget check</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">📶</span><span>wifi, gadgets and passwords</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-home)">❄️</span><span>snow and ice</span><span class="act">↩ bring back</span></div><div class="rrow skipped"><span class="th" style="--cat: var(--c-kids)">🧑‍🍼</span><span>babysitters and nannies</span><span class="act">↩ bring back</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="d3">
+      <h2>d3 · the board, one switch away <span class="tag">desktop · light</span></h2>
+      <p class="sub">card by card and the board are two ways to do the same thing</p>
+      <p class="caption">the deal view has a card by card | board switch that remembers your last choice. the overview's "deal the last 3" and each waiting card's deal button open card by card at that card. on the board, the skipped row opens to full height so you can actually read what was skipped and bring any card back, and collapses again with the caret. phones only get card by card: the board needs a mouse and room.</p>
+      <div class="frame light desktop" data-shell="who owns what" style="height:auto">
+        <div class="main">
+          <div class="content" style="gap:16px">
+            <div class="toprow"><div class="welcome">who's holding what this week? 🙋</div><button class="addbtn" type="button">＋ add a card</button></div>
+            <div class="dealbar"><div class="grp"><div class="views"><span>overview</span><span class="on">deal</span><span>deck</span></div><div class="seg"><span>card by card</span><span class="on">board</span></div></div></div>
+            <div class="board" style="height:auto">
+              <div class="rail">
+                <b>🙋 the deck</b><div class="hint" style="font-family:Outfit,sans-serif;font-size:.875rem">57 cards still to deal</div>
+                <div class="search">search all 74 cards…</div>
+                <div class="seg" style="align-self:flex-start"><span class="on">to deal</span><span>all</span></div>
+                <div class="rlbl">kids &amp; school</div>
+                <div class="rcardrow"><span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="th" style="--cat: var(--c-kids)">📋</span><span class="tx"><b>school forms</b><small>signed and back the same day</small></span></div>
+                <div class="rcardrow"><span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="th" style="--cat: var(--c-kids)">🏖️</span><span class="tx"><b>school vacations</b><small>camps planned before the break</small></span></div>
+                <div class="rcardrow"><span class="grip"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="th" style="--cat: var(--c-kids)">🎒</span><span class="tx"><b>school drop-off</b><small>there by the bell</small></span></div>
+              </div>
+              <div class="rows">
+                <div class="brow m-sofia"><div class="lab"><span class="av md m-sofia"><img data-im="mother" alt=""></span><b>Sofia</b><small>7</small></div><div class="cells"><span class="mcard" style="--cat: var(--c-home)"><span class="th">🍳</span>cooking dinner</span><span class="mcard" style="--cat: var(--c-home)"><span class="th">🧺</span>laundry</span><span class="mcard" style="--cat: var(--c-kids)"><span class="th">🥪</span>lunchboxes</span><span class="mcard" style="box-shadow:none;border-style:dashed"><small>+4 more</small></span></div></div>
+                <div class="brow m-greg"><div class="lab"><span class="av md m-greg"><img data-im="father" alt=""></span><b>greg</b><small>6</small></div><div class="cells"><span class="mcard" style="--cat: var(--c-out)"><span class="th">🛒</span>grocery shopping</span><span class="mcard" style="--cat: var(--c-out)"><span class="th">🚗</span>car care</span><span class="mcard" style="box-shadow:none;border-style:dashed"><small>+4 more</small></span><span class="drop">＋</span></div></div>
+                <div class="skiprow-open">
+                  <div class="hd">⏭️ skipped · 7 <span style="font-family:Inter,sans-serif;font-weight:400;color:var(--ink-faint)">drop a card here to skip it</span><span class="caret">▴ collapse</span></div>
+                  <div class="grid">
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">🍽️</span></div><div class="body"><div class="name">dishes</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">📦</span></div><div class="body"><div class="name">the seasonal swap</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">🎁</span></div><div class="body"><div class="name">decluttering</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">📊</span></div><div class="body"><div class="name">the family budget check</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">📶</span></div><div class="body"><div class="name">wifi, gadgets and passwords</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                    <div class="rcard aside" style="--cat: var(--c-home)"><div class="slab"><span class="glyph">❄️</span></div><div class="body"><div class="name">snow and ice</div><div class="holder"><span class="backbtn">↩ bring back</span></div></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="d4">
+      <h2>d4 · the same on a phone <span class="tag">phone · light + dark</span></h2>
+      <p class="sub">card by card, with a way back and a look at the round</p>
+      <p class="caption">left: keep and skip are equal outlined buttons, with the filmstrip and arrows above the card; a this-round bar at the bottom shows the tally and opens the sheet. middle (dark): the this-round sheet, kept grouped by person, with change on every card; skipped and waiting are the other tabs. right: swiping back to laundry shows it's with Sofia and offers give it to someone else, skip instead, or split it.</p>
+      <div class="phones">
+        <div class="frame light phone" data-mshell="who owns what">
+          <div class="mbody" style="gap:10px">
+            <div class="views"><span>overview</span><span class="on">deal</span><span>deck</span></div>
+            <div class="film"><span class="arrow">‹</span><span class="where">🧒 kids<small>3 of 21</small></span><div class="strip"><span class="fc held">🥪</span><span class="fc skip">🧑‍🍼</span><span class="fc  now">📋</span><span class="fc ">🏖️</span><span class="fc ">🎒</span><span class="fc ">🧢</span><span class="fc ">⚽</span><span class="fc ">🎹</span><span class="fc ">🌅</span></div><span class="arrow">›</span></div>
+            <div class="rcard big" style="--cat: var(--c-kids); max-width:220px"><div class="slab"><span class="glyph">📋</span><span class="wm">📋</span></div><div class="body"><div class="name">school forms</div><div class="done">signed and back in the backpack the same day</div></div></div>
+            <p class="q">keep this card, or skip it?</p>
+            <div class="dbtns"><button class="dbtn" type="button">✓ keep</button><button class="dbtn" type="button">⏭️ skip</button></div>
+            <div class="roundbtn">this round <small>kept 15 · skipped 7 · waiting 2 ›</small></div>
+          </div>
+        </div>
+        <div class="frame dark phone" data-mshell="who owns what">
+          <div class="sheet">
+            <div class="sh-hd"><span class="ic">🃏</span><b>this round</b><span class="x">✕</span></div>
+            <div class="sh-bd">
+              <div class="seg"><span class="on">kept · 15</span><span>skipped · 7</span><span>waiting · 2</span></div>
+              <div class="rlist"><span class="who">Sofia · 7</span><div class="rrow "><span class="th" style="--cat: var(--c-kids)">🥪</span><span>lunchboxes</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">💳</span><span>paying the bills</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">📅</span><span>the family calendar</span><span class="act">change</span></div><span class="who">greg · 6</span><div class="rrow "><span class="th" style="--cat: var(--c-home)">📬</span><span>mail and paperwork</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-out)">🚗</span><span>car care</span><span class="act">change</span></div><span class="who">Mia and Leo · 2</span><div class="rrow "><span class="th" style="--cat: var(--c-home)">🪴</span><span>plants</span><span class="act">change</span></div><div class="rrow "><span class="th" style="--cat: var(--c-home)">🐾</span><span>pet care</span><span class="act">change</span></div></div>
+            </div>
+            <div class="sh-ft"><button class="save" type="button">back to dealing</button></div>
+          </div>
+        </div>
+        <div class="frame light phone" data-mshell="who owns what">
+          <div class="mbody" style="gap:10px">
+            <div class="views"><span>overview</span><span class="on">deal</span><span>deck</span></div>
+            <div class="film"><span class="arrow">‹</span><span class="where">🏠 home<small>4 of 20</small></span><div class="strip"><span class="fc held">🍳</span><span class="fc held">🥣</span><span class="fc skip">🍽️</span><span class="fc held now">🧺</span><span class="fc held">🧹</span><span class="fc held">🛁</span><span class="fc held">🗑️</span><span class="fc wait">🧻</span><span class="fc held">🔧</span></div><span class="arrow">›</span></div>
+            <div class="rcard big" style="--cat: var(--c-home); max-width:220px"><div class="slab"><span class="glyph">🧺</span><span class="wm">🧺</span></div><div class="body"><div class="name">laundry</div><div class="done">clean, dry and back in drawers</div></div></div>
+            <div class="decided"><span class="av  m-sofia"><img data-im="mother" alt=""></span><span>with <b>Sofia</b> since today</span></div>
+            <div class="chg"><button class="dbtn" type="button">give it to someone else</button><div class="dbtns"><button class="dbtn" type="button">skip instead</button><button class="dbtn" type="button">split it</button></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="d5">
+      <h2>d5 · what this round changes</h2>
+      <ol class="decisions">
+        <li><b>the dealing table on desktop:</b> card left, seats centre, this round right, all at full width. couples deal side by side at one screen.</li>
+        <li><b>click a seat to keep and deal in one move;</b> keep then pick still works, and so do the number keys.</li>
+        <li><b>keep and skip are equal</b> until you hover, focus or press K / S.</li>
+        <li><b>card by card | board</b> switch in the deal view; overview deal buttons open card by card; phones get card by card only.</li>
+        <li><b>this round:</b> kept by person, skipped at full size with bring back, and waiting, on desktop as a panel and on phones as a sheet. the board's skipped row opens to full height.</li>
+        <li><b>back and forward:</b> arrows, the filmstrip and ← / → keys. a decided card shows its holder and offers give it to someone else, skip instead or split it.</li>
+        <li><b>hand counts</b> appear small on the seats, like on the board: the deal view is where per-person counts are allowed, and they stay quiet.</li>
+      </ol>
+    </section>
+  </div>
+
 
   <!-- ── 1. overview (the default view) ────────────────────────────────── -->
   <section id="overview">
