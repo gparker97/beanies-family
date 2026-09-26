@@ -102,12 +102,13 @@ const { cardName, cardEmoji, partCaption } = useResponsibilityCardLabel();
 const { pulse } = useAttentionPulse();
 const actions = useDealActions();
 
-const rootEl = useTemplateRef<HTMLElement>('rootEl');
 const stageRef = useTemplateRef<{ cardEl: HTMLElement | null }>('stageRef');
 const cardEl = computed(() => stageRef.value?.cardEl ?? null);
 const skipBtn = useTemplateRef<{ $el: HTMLElement }>('skipBtn');
 const listsRef = useTemplateRef<{ skippedHeadingEl: HTMLElement | null }>('listsRef');
-const pickerRef = useTemplateRef<{ faceEl: (memberId: string) => HTMLElement | null }>('pickerRef');
+const pickerRef = useTemplateRef<{
+  memberTarget: (memberId: string) => { tile: HTMLElement; face: HTMLElement | null } | null;
+}>('pickerRef');
 
 // ── Telemetry ────────────────────────────────────────────────────────────────
 const loggedOnce = new Set<string>();
@@ -253,13 +254,6 @@ function landingBeat(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, LANDING_BEAT_MS));
 }
 
-function faceEl(memberId: string): HTMLElement | null {
-  return (
-    rootEl.value?.querySelector<HTMLElement>(`[data-testid="${PICK_TESTID_PREFIX}${memberId}"]`) ??
-    null
-  );
-}
-
 function pick(memberId: string): Promise<void> {
   const giving = card.value?.status === 'held';
   return run(
@@ -271,15 +265,16 @@ function pick(memberId: string): Promise<void> {
         if (res) log('pile_revisit_change', 'give');
         return !!res;
       }
-      const target = faceEl(memberId);
+      // One lookup for both beats: the card flies to the tile, then the avatar bounces.
+      const target = pickerRef.value?.memberTarget(memberId) ?? null;
       leaving.value = true;
       const [, res] = await Promise.all([
-        flyTo(cardEl.value, target),
+        flyTo(cardEl.value, target?.tile ?? null),
         actions.deal(c.id, p.key, memberId, undoTo(c)),
       ]);
       if (!res) return false;
-      // The face's avatar bounces (the picker's own target; its tile's animation is taken).
-      pulse(pickerRef.value?.faceEl(memberId), 'card-bounce');
+      // The avatar bounces (its tile's animation is taken by the entrance pop).
+      pulse(target?.face, 'card-bounce');
       await landingBeat();
       return true;
     },
@@ -463,11 +458,7 @@ const waitingLine = computed(() => {
 </script>
 
 <template>
-  <div
-    ref="rootEl"
-    class="mx-auto flex w-full max-w-3xl flex-col items-center gap-6"
-    data-testid="deal-pile"
-  >
+  <div class="mx-auto flex w-full max-w-3xl flex-col items-center gap-6" data-testid="deal-pile">
     <div class="flex w-full max-w-md flex-col items-center gap-4">
       <!-- Completion: every card has a holder, or the pile is done with some still waiting. -->
       <DeckCelebration

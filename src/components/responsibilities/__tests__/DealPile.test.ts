@@ -114,13 +114,19 @@ const store = reactive({
 });
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
-// A light InlineMemberPicker: the real one's tiles, testids, back chip and `faceEl`.
+// A light InlineMemberPicker: the real one's tiles, testids, back chip and `memberTarget`.
 const PickerStub = defineComponent({
   props: ['members', 'title', 'backLabel', 'tileTestidPrefix'],
   emits: ['pick', 'cancel'],
   setup(props, { emit, expose }) {
+    const tiles = new Map<string, HTMLElement>();
     const faces = new Map<string, HTMLElement>();
-    expose({ faceEl: (id: string) => faces.get(id) ?? null });
+    const track = (map: Map<string, HTMLElement>, id: string) => (el: unknown) =>
+      el ? map.set(id, el as HTMLElement) : map.delete(id);
+    expose({
+      memberTarget: (id: string) =>
+        tiles.has(id) ? { tile: tiles.get(id)!, face: faces.get(id) ?? null } : null,
+    });
     return () =>
       h('section', { 'data-testid': 'picker', 'data-back': props.backLabel }, [
         h('button', { 'data-testid': 'picker-back', onClick: () => emit('cancel') }),
@@ -129,14 +135,10 @@ const PickerStub = defineComponent({
             'button',
             {
               'data-testid': `${props.tileTestidPrefix}${m.id}`,
+              ref: track(tiles, m.id),
               onClick: () => emit('pick', m.id),
             },
-            [
-              h('span', {
-                'data-testid': `face-${m.id}`,
-                ref: (el) => (el ? faces.set(m.id, el as HTMLElement) : faces.delete(m.id)),
-              }),
-            ]
+            [h('span', { 'data-testid': `face-${m.id}`, ref: track(faces, m.id) })]
           )
         ),
       ]);
