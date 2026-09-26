@@ -41,7 +41,7 @@ describe('usePhotoEntityBinding', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia());
-    toastSpy = vi.spyOn(toastModule, 'showToast').mockImplementation(() => {});
+    toastSpy = vi.spyOn(toastModule, 'showToast').mockImplementation(() => 0);
     reportSpy = vi.spyOn(reporterModule, 'reportError').mockImplementation(() => {});
   });
 

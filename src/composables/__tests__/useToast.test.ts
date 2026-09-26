@@ -22,6 +22,20 @@ describe('useToast — action-button extension', () => {
     vi.useRealTimers();
   });
 
+  it('returns the new toast id, so a caller can dismiss its own toast', () => {
+    const id = showToast('success', 'Dealt', undefined, { actionLabel: 'Undo', actionFn: vi.fn() });
+    expect(toasts.value.map((t) => t.id)).toContain(id);
+    dismissToast(id);
+    expect(toasts.value.find((t) => t.id === id)).toBeUndefined();
+  });
+
+  it('a deduped call returns the id of the live toast it matched', () => {
+    const first = showToast('info', 'Same', 'msg');
+    const second = showToast('info', 'Same', 'msg');
+    expect(second).toBe(first);
+    expect(toasts.value.filter((t) => t.title === 'Same')).toHaveLength(1);
+  });
+
   it('stores actionLabel + actionFn on the toast when provided', () => {
     const fn = vi.fn();
     showToast('success', 'Saved', 'All good', {
