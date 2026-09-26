@@ -33,10 +33,11 @@
  * Desktop shortcuts (`useKeyboardShortcuts`), unadvertised beyond `aria-keyshortcuts`:
  * K keep, S skip, 1-9 the Nth face, arrows step, U undo. Each calls the same function its
  * button does and returns false when that would do nothing, so the browser keeps the key
- * (an arrow at the end of the pile still scrolls). They act only with focus in the pile or
- * on the page itself. S flashes its button (`key-press`), which stays on screen through the
- * flight; K and the digits need no flash, because the faces opening and the flight are the
- * feedback, and the button or face they would flash is about to go.
+ * (an arrow at the end of the pile still scrolls). They act wherever focus is (the normal
+ * way in leaves it on the Deal toggle), except while typing, inside a widget that owns the
+ * arrows, or under a modal or popover. S flashes its button (`key-press`), which stays on
+ * screen through the flight; K and the digits need no flash, because the faces opening and
+ * the flight are the feedback, and the button or face they would flash is about to go.
  */
 import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -106,6 +107,7 @@ const stageRef = useTemplateRef<{ cardEl: HTMLElement | null }>('stageRef');
 const cardEl = computed(() => stageRef.value?.cardEl ?? null);
 const skipBtn = useTemplateRef<{ $el: HTMLElement }>('skipBtn');
 const listsRef = useTemplateRef<{ skippedHeadingEl: HTMLElement | null }>('listsRef');
+const pickerRef = useTemplateRef<{ faceEl: (memberId: string) => HTMLElement | null }>('pickerRef');
 
 // ── Telemetry ────────────────────────────────────────────────────────────────
 const loggedOnce = new Set<string>();
@@ -137,11 +139,17 @@ watch(
 
 /** Double-tap guard: one action at a time, and the cursor can't move under a flight. */
 const busy = ref(false);
+type GroupShortcut = ReturnType<typeof groupShortcut>;
 /**
- * The card as it was when the running action started, and whether it was still to decide.
- * Set for the whole of `run()`; while set, the pile renders from it (see the file header).
+ * The card as it was when the running action started, whether it was still to decide, and
+ * its group-shortcut row. Set for the whole of `run()`; while set, the pile renders from it
+ * (see the file header), so a group skip's own write can't unmount the row mid-flight.
  */
-const frozen = shallowRef<{ card: ResolvedCard; undecided: boolean } | null>(null);
+const frozen = shallowRef<{
+  card: ResolvedCard;
+  undecided: boolean;
+  shortcut: GroupShortcut;
+} | null>(null);
 /** The card the pile renders: the in-flight snapshot, else the live card on screen. */
 const card = computed(() => frozen.value?.card ?? cursor.current.value);
 /** The faces are showing: after Keep, or for "Give it to someone else". */
@@ -189,7 +197,7 @@ const positionLine = computed(() => {
   if (!pos) return '';
   const category = pos.category ? categoryLabel(pos.category) : t('lists.category.other');
   // A card visited from the lists sits outside the pile: its category, and no count.
-  if (pos.n === null) return category;
+  if (cursor.visiting.value) return category;
   return fillTemplate(t('whoOwnsWhat.pile.position'), { category, n: pos.n, total: pos.total });
 });
 const backToLabel = computed(() => {
@@ -208,11 +216,12 @@ const toGo = computed(() =>
   )
 );
 
-const shortcut = computed(() =>
+/** "No car? Skip all 3": live, except in flight, when the snapshot's row stands. */
+const liveShortcut = (): GroupShortcut =>
   view.value === 'sort' && card.value?.status === 'unsorted'
     ? groupShortcut(store.resolved, card.value)
-    : null
-);
+    : null;
+const shortcut = computed(() => (frozen.value ? frozen.value.shortcut : liveShortcut()));
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 /**
@@ -224,7 +233,7 @@ async function run(fn: (c: ResolvedCard) => Promise<boolean>, after: SettleMode)
   const c = card.value;
   if (busy.value || !c) return;
   busy.value = true;
-  frozen.value = { card: c, undecided: cursor.isUndecided(c.id) };
+  frozen.value = { card: c, undecided: cursor.isUndecided(c.id), shortcut: liveShortcut() };
   let ok = true;
   try {
     ok = await fn(c);
@@ -250,14 +259,6 @@ function faceEl(memberId: string): HTMLElement | null {
     null
   );
 }
-/**
- * What bounces when a card lands: the face's avatar, not its tile. The picker's scoped tile
- * rule owns the tile's `animation` (its entrance pop) and outranks the global one-shot class,
- * so a bounce on the tile would never play.
- */
-function bounceEl(tile: HTMLElement | null): HTMLElement | null {
-  return tile?.querySelector<HTMLElement>('[data-testid="beanie-avatar"]') ?? tile;
-}
 
 function pick(memberId: string): Promise<void> {
   const giving = card.value?.status === 'held';
@@ -277,7 +278,8 @@ function pick(memberId: string): Promise<void> {
         actions.deal(c.id, p.key, memberId, undoTo(c)),
       ]);
       if (!res) return false;
-      pulse(bounceEl(target), 'card-bounce');
+      // The face's avatar bounces (the picker's own target; its tile's animation is taken).
+      pulse(pickerRef.value?.faceEl(memberId), 'card-bounce');
       await landingBeat();
       return true;
     },
@@ -337,18 +339,21 @@ function skipInstead(): Promise<void> {
     return !!res;
   }, 'stay');
 }
-function bringBack(): Promise<void> {
+function bringBack(detail: 'bring_back' | 'bring_back_list' = 'bring_back'): Promise<void> {
   return run(async (c) => {
     const res = await actions.bringBack(c.id, undoTo(c));
-    if (res) log('pile_revisit_change', 'bring_back');
+    if (res) log('pile_revisit_change', detail);
     return !!res;
   }, 'stay');
 }
-/** Bring back from the Skipped list: show that card, then the same revisit as its banner. */
+/**
+ * Bring back from the Skipped list: show that card, then the same revisit as its banner.
+ * The move is part of the bring-back, not a list jump, so it logs only the revisit.
+ */
 function bringBackFromList(cardId: string): Promise<void> {
   if (busy.value) return Promise.resolve();
-  if (currentId.value !== cardId) jumpTo(cardId);
-  return bringBack();
+  if (currentId.value !== cardId) cursor.jumpTo(cardId);
+  return bringBack('bring_back_list');
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -409,7 +414,6 @@ for (let n = 1; n <= 9; n++) keyMap[String(n)] = () => pickNth(n);
 useKeyboardShortcuts(keyMap, {
   enabled: () => cursor.ready.value,
   tag: 'DealPile',
-  scope: rootEl,
   onError: (key) => log('pile_shortcut_error', keyClass(key), 'warn'),
 });
 
@@ -626,12 +630,13 @@ const waitingLine = computed(() => {
             @give="give"
             @skip-instead="skipInstead"
             @split="emit('split', card.id)"
-            @bring-back="bringBack"
+            @bring-back="bringBack()"
           />
 
           <!-- Who owns it? One tap deals (and, on a first deal, keeps) the card. -->
           <template v-if="view === 'pick'">
             <InlineMemberPicker
+              ref="pickerRef"
               class="w-full"
               :members="pickable"
               :title="
