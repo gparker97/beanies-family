@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="E extends string = never">
 /**
  * The shared category-chip row for Beanie Lists — one wrapping row of bordered
  * pills over `LIST_CATEGORIES`. Replaces three copy-pasted blocks (NewListSheet,
@@ -8,6 +8,10 @@
  *  - `short`    : short vs full category label
  *  - `clearable`: clicking the selected pill clears to null
  *  - `showAll`  : render a leading "All" pill (selected when modelValue is null)
+ *  - `extras`   : caller-owned pills after the categories, same classes (e.g. the
+ *                 Deck view's "Nobody yet" / "Skipped · N"). Their ids widen the
+ *                 model type to `ListCategory | E`; without `extras`, E is `never`
+ *                 and the model stays exactly `ListCategory | null`.
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -17,15 +21,17 @@ import type { ListCategory } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
-    modelValue: ListCategory | null;
+    modelValue: ListCategory | E | null;
     tone?: 'edit' | 'filter';
     short?: boolean;
     clearable?: boolean;
     showAll?: boolean;
+    /** Extra pills rendered after the categories. `label` is already translated. */
+    extras?: { id: E; label: string; emoji?: string }[];
   }>(),
-  { tone: 'edit', short: false, clearable: false, showAll: false }
+  { tone: 'edit', short: false, clearable: false, showAll: false, extras: () => [] }
 );
-const emit = defineEmits<{ 'update:modelValue': [value: ListCategory | null] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: ListCategory | E | null] }>();
 
 const { t } = useTranslation();
 const { categoryLabel, categoryShortLabel } = useListCategoryLabel();
@@ -41,7 +47,7 @@ const activeClass = computed(() =>
 const INACTIVE_CLASS =
   'border-[var(--color-border)] bg-white text-[var(--color-text-muted)] dark:bg-surface-raised';
 
-function pick(id: ListCategory): void {
+function pick(id: ListCategory | E): void {
   emit('update:modelValue', props.clearable && props.modelValue === id ? null : id);
 }
 </script>
@@ -66,6 +72,16 @@ function pick(id: ListCategory): void {
       @click="pick(cat.id)"
     >
       <span aria-hidden="true">{{ cat.emoji }}</span> {{ labelFor(cat.id) }}
+    </button>
+    <button
+      v-for="extra in extras"
+      :key="extra.id"
+      type="button"
+      class="rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"
+      :class="modelValue === extra.id ? activeClass : INACTIVE_CLASS"
+      @click="pick(extra.id)"
+    >
+      <span v-if="extra.emoji" aria-hidden="true">{{ extra.emoji }}</span> {{ extra.label }}
     </button>
   </div>
 </template>
