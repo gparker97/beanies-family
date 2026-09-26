@@ -131,12 +131,13 @@ const card = computed(() => (shownId.value ? store.cardById(shownId.value) : und
 
 /** Keep/skip first on a first deal; straight to the faces for a waiting card. */
 const stage = ref<'sort' | 'pick'>('sort');
+const firstStage = () => (props.scope === 'waiting' ? 'pick' : 'sort');
 /** Hidden after its flight so it can't flash back before the next card replaces it. */
 const leaving = ref(false);
 watch(
   shownId,
   () => {
-    stage.value = props.scope === 'waiting' ? 'pick' : 'sort';
+    stage.value = firstStage();
     leaving.value = false;
   },
   { immediate: true }
@@ -270,9 +271,16 @@ function pick(memberId: string): Promise<void> {
     const target = faceEl(memberId);
     leaving.value = true;
     const entry = logEntryFor();
+    const onUndone = () => {
+      entry.onUndone();
+      // An Undo that lands during the flight brings the same card back on top, so
+      // `shownId` never changes and its watcher never resets the question: do it here.
+      // (After the flight the card comes back as a new `shownId`, and the watcher does.)
+      if (shownId.value === c.id) stage.value = firstStage();
+    };
     const [, res] = await Promise.all([
       flyTo(cardEl.value, target),
-      actions.deal(c.id, p.key, memberId, { onUndone: entry.onUndone }),
+      actions.deal(c.id, p.key, memberId, { onUndone }),
     ]);
     if (!res) {
       leaving.value = false;
