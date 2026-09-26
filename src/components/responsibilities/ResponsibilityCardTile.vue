@@ -17,7 +17,7 @@ import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardL
 import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
-import { ymdOf, type ResolvedCard, type ResolvedPart } from '@/utils/responsibilityDeck';
+import { ymdOf, type ResolvedCard } from '@/utils/responsibilityDeck';
 import MemberChip from '@/components/ui/MemberChip.vue';
 
 const props = withDefaults(
@@ -32,7 +32,7 @@ const emit = defineEmits<{ open: [cardId: string]; 'bring-back': [cardId: string
 
 const { t } = useTranslation();
 const { getMemberName } = useMemberInfo();
-const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
+const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
 
 /** Fallback when a category is unknown to this build (a newer client's card). */
 const FALLBACK_TINT = '#94A3B8';
@@ -46,14 +46,6 @@ const isKept = computed(() => props.card.status === 'held' || props.card.status 
 /** Kept, but nobody holds any part: drawn as a ghosted, dashed card. */
 const isOpen = computed(() => isKept.value && props.card.parts.every((p) => !p.holderId));
 const isSkipped = computed(() => props.card.status === 'skipped');
-
-/** "for Mia" on a child split, the family's label on a label split. */
-function partCaption(part: ResolvedPart): string {
-  if (props.card.splitMode === 'child') {
-    return fillTemplate(t('whoOwnsWhat.card.forChild'), { name: getMemberName(part.key, '') });
-  }
-  return props.card.splitMode === 'label' ? (part.label ?? '') : '';
-}
 
 /** "Since 3 Mar" (+ "before that greg") for an unsplit, held card. */
 const history = computed(() => {
@@ -164,9 +156,9 @@ const failedIllustrations = new Set<string>();
             <!-- A split part leads with what it is ("for Mia", "upstairs"), so the row
                  still reads when a narrow tile truncates it. -->
             <span
-              v-if="partCaption(part)"
+              v-if="partCaption(card, part)"
               class="dark:text-ink-faint min-w-0 truncate text-[var(--color-text-muted)]"
-              >{{ partCaption(part) }} ·</span
+              >{{ partCaption(card, part) }} ·</span
             >
             <template v-if="part.holderId">
               <MemberChip :member-id="part.holderId" size="dot" class="shrink-0" />
