@@ -84,17 +84,19 @@ onMounted(() => {
 });
 
 /**
- * A member's avatar, for a host's one-shot landing effect (the deal pile's `card-bounce`).
- * The avatar, not the tile: the tile's scoped rule owns its `animation` (the entrance pop),
- * so a one-shot class on the tile would never play, and letting one win there would replay
- * the pop when the class came off.
+ * A member's tile and avatar, the ONE lookup a host's landing effects use (the deal pile
+ * flies a card to the tile, then bounces the avatar). The bounce goes on the avatar, not
+ * the tile: the tile's scoped rule owns its `animation` (the entrance pop), so a one-shot
+ * class on the tile would never play, and letting one win there would replay the pop when
+ * the class came off. Null when the member has no tile here.
  */
-function faceEl(memberId: string): HTMLElement | null {
-  const faces = rootRef.value?.querySelectorAll<HTMLElement>('[data-face]') ?? [];
-  return [...faces].find((el) => el.dataset.face === memberId) ?? null;
+function memberTarget(memberId: string): { tile: HTMLElement; face: HTMLElement | null } | null {
+  const tiles = rootRef.value?.querySelectorAll<HTMLElement>('[data-member-tile]') ?? [];
+  const tile = [...tiles].find((el) => el.dataset.memberTile === memberId);
+  return tile ? { tile, face: tile.querySelector<HTMLElement>('[data-face]') } : null;
 }
 
-defineExpose({ scrollIntoView, faceEl });
+defineExpose({ scrollIntoView, memberTarget });
 </script>
 
 <template>
@@ -121,6 +123,7 @@ defineExpose({ scrollIntoView, faceEl });
         :key="member.id"
         type="button"
         class="tile"
+        :data-member-tile="member.id"
         :style="{ '--stagger-delay': `${60 + idx * 50}ms` }"
         :data-testid="`${props.tileTestidPrefix ?? 'inline-member-tile-'}${member.id}`"
         :aria-keyshortcuts="props.numberShortcuts && idx < 9 ? String(idx + 1) : undefined"
