@@ -7,7 +7,8 @@
  *  - **Still nobody**: Deal Now opens "Who owns it?" and deals through `useDealActions`.
  *  - **Moved since last time**: Settling In / Let's Talk.
  *  - **Haven't moved in a while** (up to 3, 90+ days): Still Works / Let's Talk / Re-deal
- *    (Re-deal opens the same picker).
+ *    (Re-deal opens the same picker, and is offered only when someone else could take it).
+ *    An Undo from a deal's toast reopens that card here.
  * Finish records one write-once check-in with the outcome counts
  * (`store.completeCheckIn`, which fires the celebration), then the drawer shows "Deck
  * checked" with the "Let's Talk" cards listed and the next due date. No to-do is created
@@ -96,11 +97,25 @@ const movedOptions = computed(() => [
   option('settling', 'whoOwnsWhat.checkinDrawer.settling', '👍'),
   option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
 ]);
-const unchangedOptions = computed(() => [
-  option('stillWorks', 'whoOwnsWhat.checkinDrawer.stillWorks', '👍'),
-  option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
-  option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁'),
-]);
+/**
+ * Who a re-deal of this card could go to: every human but the part's current holder
+ * (picking them would write nothing yet toast "dealt" and count a re-deal; "Still works"
+ * is the answer for keeping it where it is).
+ */
+function redealTargets(card: ResolvedCard) {
+  const holder = live(card).parts[0]?.holderId;
+  return familyStore.sortedHumans.filter((m) => m.id !== holder);
+}
+/** Re-deal is offered only when there is someone to re-deal to: never an empty picker. */
+function unchangedOptions(card: ResolvedCard) {
+  const out = [
+    option('stillWorks', 'whoOwnsWhat.checkinDrawer.stillWorks', '👍'),
+    option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
+  ];
+  if (redealTargets(card).length)
+    out.push(option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁'));
+  return out;
+}
 
 function setOutcome(cardId: string, value: string): void {
   const next = { ...outcomes.value };
@@ -153,24 +168,30 @@ const pickingPart = computed(() => {
     ? (c.parts.find((p) => !p.holderId) ?? c.parts[0])
     : c.parts[0];
 });
-/**
- * Who the picker offers. A re-deal moves the card, so its current holder is not a choice
- * (picking them would write nothing yet toast "dealt" and count a re-deal); "Still works"
- * is the answer for keeping it where it is.
- */
-const members = computed(() => {
-  const holder = picking.value?.reason === 'redeal' ? pickingPart.value?.holderId : undefined;
-  return holder
-    ? familyStore.sortedHumans.filter((m) => m.id !== holder)
-    : familyStore.sortedHumans;
-});
+/** Who the picker offers: everyone for Deal Now, `redealTargets` for a re-deal. */
+const members = computed(() =>
+  picking.value?.reason === 'redeal' && pickingCard.value
+    ? redealTargets(pickingCard.value)
+    : familyStore.sortedHumans
+);
 
 async function onPick(memberId: string): Promise<void> {
   const c = pickingCard.value;
   const part = pickingPart.value;
   const reason = picking.value?.reason;
   if (!c || !part || !reason) return;
-  const res = await actions.deal(c.id, part.key, memberId);
+  // An Undo from the toast takes the deal back here too: the card is open again (Deal Now
+  // shows again; a re-deal's pill clears so tapping Re-deal reopens the picker), and the
+  // counts no longer include it.
+  const res = await actions.deal(c.id, part.key, memberId, {
+    onUndone: () => {
+      if (dealtTo.value[c.id] !== memberId) return;
+      const next = { ...dealtTo.value };
+      delete next[c.id];
+      dealtTo.value = next;
+      if (reason === 'redeal') setOutcome(c.id, '');
+    },
+  });
   if (!res) return;
   dealtTo.value = { ...dealtTo.value, [c.id]: memberId };
   picking.value = null;
@@ -305,7 +326,7 @@ const completedNote = computed(() =>
           </div>
           <TogglePillGroup
             :model-value="outcomes[card.id] ?? ''"
-            :options="unchangedOptions"
+            :options="unchangedOptions(card)"
             clearable
             @update:model-value="setOutcome(card.id, $event)"
           />
