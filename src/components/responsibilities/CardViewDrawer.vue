@@ -13,7 +13,7 @@
  * says so and closes, rather than rendering an empty shell. A delete from this drawer's
  * own tile is not a surprise: it has its own success toast, so the notice is skipped.
  */
-import { computed, watch } from 'vue';
+import { computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -21,7 +21,6 @@ import MemberChip from '@/components/ui/MemberChip.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { showToast } from '@/composables/useToast';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { cardUsesFor } from '@/constants/responsibilityCards';
 import { categoryTint, getListCategory } from '@/constants/listCategories';
@@ -30,7 +29,7 @@ import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import { ymdOf, type ResolvedPart } from '@/utils/responsibilityDeck';
-import { useCardDeletion } from './useCardDeletion';
+import { useCardDrawerEnd } from './useCardDeletion';
 
 const props = withDefaults(
   defineProps<{
@@ -47,7 +46,6 @@ const { t } = useTranslation();
 const store = useResponsibilityStore();
 const { categoryLabel } = useListCategoryLabel();
 const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
-const { confirmAndDeleteCard } = useCardDeletion();
 
 const card = computed(() => (props.cardId ? store.cardById(props.cardId) : undefined));
 const category = computed(() => (card.value ? getListCategory(card.value.category) : undefined));
@@ -88,33 +86,11 @@ const uses = computed(() => {
   return lines;
 });
 
-/**
- * True only while THIS drawer's confirmed delete is being written, so that disappearance
- * is expected. Not during the confirm itself: a card deleted elsewhere while the confirm
- * is up still gets the notice and the close below.
- */
-let deleting = false;
-
-async function onDelete(): Promise<void> {
-  if (!card.value) return;
-  let deleted = false;
-  try {
-    deleted = await confirmAndDeleteCard(card.value, { onConfirmed: () => (deleting = true) });
-  } finally {
-    deleting = false;
-  }
-  // Never leave an empty drawer: close on our delete, and also when the card is gone
-  // however the delete ended (the store refused it because another device deleted it
-  // first, and has said so).
-  if (deleted || (props.open && !card.value)) emit('close');
-}
-
-watch(card, (next, prev) => {
-  if (props.open && prev && !next && !deleting) {
-    console.warn('[CardViewDrawer] card disappeared while the drawer was open:', prev.id);
-    showToast('info', t('whoOwnsWhat.error.cardGone'), t('whoOwnsWhat.error.cardGoneHelp'));
-    emit('close');
-  }
+const { onDelete } = useCardDrawerEnd({
+  card,
+  isOpen: () => props.open,
+  close: () => emit('close'),
+  source: 'CardViewDrawer',
 });
 </script>
 
