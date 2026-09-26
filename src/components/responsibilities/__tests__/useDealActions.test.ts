@@ -6,10 +6,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { UndoToken } from '@/utils/responsibilityOps';
 
-const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn() }));
+const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn(), invoke: vi.fn() }));
 vi.mock('@/composables/useToast', () => ({
   showToast: toast.show,
   dismissToast: toast.dismiss,
+  invokeToastAction: toast.invoke,
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -109,5 +110,51 @@ describe('useDealActions', () => {
     store.undo.mockResolvedValueOnce(true);
     await opts.actionFn();
     expect(onUndone).toHaveBeenCalledTimes(1);
+  });
+
+  it('bringBack passes onUndone through to its Undo', async () => {
+    store.bringBack.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+    const onUndone = vi.fn();
+    await useDealActions().bringBack('laundry', { onUndone });
+    store.undo.mockResolvedValueOnce(true);
+    await toast.show.mock.calls[0]![3].actionFn();
+    expect(onUndone).toHaveBeenCalledTimes(1);
+  });
+
+  describe('undoLast', () => {
+    it("taps the live toast's Undo, once", async () => {
+      store.keep.mockResolvedValue({ result: { id: 'laundry' }, undo: TOKEN });
+      await useDealActions().keep('laundry');
+      await useDealActions().undoLast();
+      expect(toast.invoke).toHaveBeenCalledWith(1);
+      await useDealActions().undoLast();
+      expect(toast.invoke).toHaveBeenCalledTimes(1);
+    });
+
+    it('does nothing when no toast has been shown', async () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      await useDealActions().undoLast();
+      expect(toast.invoke).not.toHaveBeenCalled();
+      expect(debug).toHaveBeenCalled();
+      debug.mockRestore();
+    });
+
+    it('does nothing when the live toast is a plain one (nothing to undo)', async () => {
+      const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+      store.deal.mockResolvedValue({ result: { id: 'laundry' }, undo: null });
+      await useDealActions().deal('laundry', 'main', null);
+      await useDealActions().undoLast();
+      expect(toast.invoke).not.toHaveBeenCalled();
+      debug.mockRestore();
+    });
+
+    it('an expired toast is left to invokeToastAction, which no-ops', async () => {
+      store.skip.mockResolvedValue({ result: ['a'], undo: TOKEN });
+      await useDealActions().skip(['a']);
+      toast.invoke.mockResolvedValueOnce(undefined);
+      await useDealActions().undoLast();
+      expect(toast.invoke).toHaveBeenCalledWith(1);
+      expect(store.undo).not.toHaveBeenCalled();
+    });
   });
 });
