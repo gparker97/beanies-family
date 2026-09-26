@@ -80,6 +80,15 @@ export function newCustomCardId(): string {
   return `${CUSTOM_CARD_PREFIX}${generateUUID()}`;
 }
 
+/**
+ * A new check-in's id: the local day it was finished plus a random suffix, so two check-ins
+ * on the same day (two grown-ups on two phones) are two records, never one overwriting the
+ * other. Nothing parses it: the day is read from `completedAt` (`checkInYmd`).
+ */
+export function newCheckInId(todayYmd: string): string {
+  return `${todayYmd}-${generateUUID().slice(0, 8)}`;
+}
+
 function clone<T>(v: T): T {
   return JSON.parse(JSON.stringify(v)) as T;
 }
@@ -492,15 +501,16 @@ export interface CheckInOutcomes {
   dealtNow: number;
 }
 
-/** A write-once check-in, keyed by the local ymd it was finished (one per day). */
+/** A write-once check-in with its own id (`newCheckInId`): a second one never overwrites. */
 export function buildCheckIn(
   outcomes: CheckInOutcomes,
   actorId: string,
   nowIso: string,
-  todayYmd: string
+  todayYmd: string,
+  id: string = newCheckInId(todayYmd)
 ): BuildResult & { checkIn: ResponsibilityCheckIn } {
   const checkIn: ResponsibilityCheckIn = {
-    id: todayYmd,
+    id,
     completedAt: nowIso,
     byId: actorId,
     stillWorks: outcomes.stillWorks,

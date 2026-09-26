@@ -363,10 +363,30 @@ describe('edit, custom cards and restore', () => {
 describe('check-in and celebrations', () => {
   it('records a check-in and celebrates', async () => {
     const r = await store.completeCheckIn({ stillWorks: 1, talkAbout: 0, redealt: 0, dealtNow: 2 });
-    expect(r).toMatchObject({ id: '2026-09-26', byId: 'greg' });
-    expect(db.checkIns.has('2026-09-26')).toBe(true);
+    expect(r).toMatchObject({ byId: 'greg' });
+    expect(db.checkIns.has(r!.id)).toBe(true);
     expect(celebrate).toHaveBeenCalledWith('check-in-done');
-    expect(store.lastCheckIn!.id).toBe('2026-09-26');
+    expect(store.lastCheckIn!.id).toBe(r!.id);
+  });
+
+  it('a second check-in the same day keeps both records; the latest one counts', async () => {
+    const first = await store.completeCheckIn({
+      stillWorks: 1,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+    });
+    tick();
+    const second = await store.completeCheckIn({
+      stillWorks: 0,
+      talkAbout: 2,
+      redealt: 0,
+      dealtNow: 0,
+    });
+    expect(db.checkIns.size).toBe(2);
+    expect(db.checkIns.get(first!.id)!.stillWorks).toBe(1);
+    expect(store.lastCheckIn!.id).toBe(second!.id);
+    expect(store.nextCheckIn).toBe('2026-10-24'); // 4 weeks from the day both were finished
   });
 
   it('setRhythm goes through settingsStore and never toasts twice on failure', async () => {
