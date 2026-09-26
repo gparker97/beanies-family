@@ -3,6 +3,7 @@ import ModalIconTitle from '@/components/ui/ModalIconTitle.vue';
 import { computed } from 'vue';
 import BaseModal from './BaseModal.vue';
 import BaseSidePanel from './BaseSidePanel.vue';
+import InfoHintBadge from './InfoHintBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
@@ -31,6 +32,12 @@ interface Props {
   /** Label shown beside the spinner while submitting. Defaults to `common.saving`. */
   submittingLabel?: string;
   showDelete?: boolean;
+  /**
+   * Why this record can't be deleted (already translated). When set, the delete tile
+   * renders DISABLED with an InfoHintBadge carrying the reason, instead of hiding it —
+   * so a person looking for Delete learns why it isn't available. Implies the tile.
+   */
+  deleteDisabledReason?: string;
   /**
    * Extra classes for the body element — for a caller that needs to mark the
    * whole body rather than its content, such as `is-celebration`, whose
@@ -71,6 +78,7 @@ const props = withDefaults(defineProps<Props>(), {
   isSubmitting: false,
   submittingLabel: undefined,
   showDelete: false,
+  deleteDisabledReason: undefined,
   customHeader: false,
   variant: 'modal',
   layer: 'base',
@@ -186,18 +194,26 @@ const containerProps = computed(() => {
 
     <template #footer>
       <div class="flex items-center gap-3">
-        <!-- Delete button (optional) — always leftmost -->
+        <!-- Delete button (optional) — always leftmost. With a disabled reason it
+             stays visible but inert, with the reason one tap away. -->
         <button
-          v-if="showDelete"
+          v-if="showDelete || deleteDisabledReason"
           type="button"
           :aria-label="t('action.delete')"
-          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl transition-all duration-150 hover:scale-105"
+          class="flex h-[48px] w-[48px] flex-shrink-0 items-center justify-center rounded-[14px] text-xl transition-all duration-150 enabled:hover:scale-105 disabled:cursor-not-allowed disabled:opacity-40"
           style="background: rgb(239 68 68 / 8%)"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || !!deleteDisabledReason"
+          data-testid="form-modal-delete"
           @click="emit('delete')"
         >
           🗑️
         </button>
+        <InfoHintBadge
+          v-if="deleteDisabledReason"
+          :text="deleteDisabledReason"
+          class="-ml-1 flex-shrink-0"
+          data-testid="form-modal-delete-reason"
+        />
 
         <!-- Extra footer actions (slot) -->
         <slot name="footer-start" />
