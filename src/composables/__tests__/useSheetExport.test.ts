@@ -6,6 +6,7 @@ vi.mock('html-to-image', () => ({ toBlob: (...args: unknown[]) => toBlob(...args
 
 const jsPdfCtor = vi.fn();
 const addImage = vi.fn();
+const addPage = vi.fn();
 const output = vi.fn(() => new Blob(['pdf'], { type: 'application/pdf' }));
 vi.mock('jspdf', () => ({
   jsPDF: vi.fn().mockImplementation(function (this: unknown, opts: unknown) {
@@ -13,12 +14,18 @@ vi.mock('jspdf', () => ({
     return {
       internal: { pageSize: { getWidth: () => 841.89, getHeight: () => 595.28 } },
       addImage,
+      addPage,
       output,
     };
   }),
 }));
 
-import { exportElementToPng, pngBlobToPdf, ExportError } from '@/composables/useSheetExport';
+import {
+  exportElementToPng,
+  pngBlobToPdf,
+  pngBlobsToPdf,
+  ExportError,
+} from '@/composables/useSheetExport';
 
 // Deterministic image decode — jsdom/happy-dom don't decode data URLs.
 class FakeImage {
@@ -133,5 +140,31 @@ describe('pngBlobToPdf', () => {
       name: 'ExportError',
       stage: 'pdf',
     });
+  });
+});
+
+describe('pngBlobsToPdf', () => {
+  it('puts each PNG on its own landscape-A4 page, in order', async () => {
+    const pngs = [new Blob(['a']), new Blob(['b']), new Blob(['c'])];
+    const result = await pngBlobsToPdf(pngs);
+
+    expect(jsPdfCtor).toHaveBeenCalledTimes(1);
+    expect(addImage).toHaveBeenCalledTimes(3);
+    // The first page comes with the document; each later one is added.
+    expect(addPage).toHaveBeenCalledTimes(2);
+    expect(addPage).toHaveBeenCalledWith('a4', 'landscape');
+    expect(output).toHaveBeenCalledTimes(1);
+    expect(result.type).toBe('application/pdf');
+  });
+
+  it('a single PNG adds no extra page', async () => {
+    await pngBlobsToPdf([new Blob(['a'])]);
+    expect(addPage).not.toHaveBeenCalled();
+    expect(addImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws ExportError(stage="pdf") for an empty page list', async () => {
+    await expect(pngBlobsToPdf([])).rejects.toMatchObject({ name: 'ExportError', stage: 'pdf' });
+    expect(jsPdfCtor).not.toHaveBeenCalled();
   });
 });

@@ -59,8 +59,8 @@ export interface ExportSlotRow {
   cells: ExportMealCell[][];
 }
 
-/** A distinct cook appearing in the week — drives the footer legend. */
-export interface ExportCook {
+/** A distinct person on an export sheet (a cook in the week) — drives the footer legend. */
+export interface ExportPerson {
   initial: string;
   name: string;
   color?: string;
@@ -71,7 +71,7 @@ export interface MealExportRows {
   dayColumns: { dateISO: string; weekday: string; dayNum: string }[];
   rows: ExportSlotRow[];
   /** Distinct cooks across the week, in first-appearance order (footer legend). */
-  cooks: ExportCook[];
+  cooks: ExportPerson[];
   /**
    * Does the sheet actually contain a serve time / a guest count?
    *
@@ -125,7 +125,7 @@ export function buildMealExportRows(
   const byCell = new Map<string, MealPlanEntry[]>();
   // Distinct cooks in first-appearance order, deduped by member id.
   const cookIds = new Set<string>();
-  const cooks: ExportCook[] = [];
+  const cooks: ExportPerson[] = [];
   for (const meal of meals) {
     const key = `${meal.date}|${meal.slot}`;
     const bucket = byCell.get(key);
