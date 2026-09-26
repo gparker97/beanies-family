@@ -2188,4 +2188,46 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  // Who Owns What (#109). A minimal first version so `HELP_PATHS.whoOwnsWhat` resolves;
+  // the full how-to (splitting, re-dealing, the check-in, the fridge sheet) follows.
+  {
+    slug: 'who-owns-what',
+    category: 'features',
+    title: 'Who Owns What: Share the Jobs That Keep Your Home Running',
+    excerpt:
+      'A deck of household jobs your family keeps or skips, then hands out, so who owns what is never a debate.',
+    icon: '\u{1F64B}',
+    readTime: 2,
+    updatedDate: '2026-09-26',
+    sections: [
+      { type: 'heading', content: 'What is Who Owns What?', level: 2, id: 'what' },
+      {
+        type: 'paragraph',
+        content:
+          "<strong>Who Owns What</strong> is a deck of cards, one for each job that keeps a home running: cooking dinner, school forms, the trash, the big holidays. Your family keeps the cards that apply, skips the ones that don't, and gives each kept card a holder. You'll find it under <strong>Who Owns What</strong> in the Treehouse section of the sidebar.",
+      },
+      {
+        type: 'heading',
+        content: 'Dealing the deck for the first time',
+        level: 2,
+        id: 'first-deal',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open Who Owns What and tap <strong>Start dealing</strong>.',
+          'For each card, choose <strong>Keep</strong> or <strong>Skip</strong>.',
+          'When you keep a card, tap the person who owns it, or decide later and leave it waiting.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        title: 'Good to know',
+        icon: '\u{1F4A1}',
+        content:
+          'Only grown-ups can deal, edit or skip cards; kids can see the whole deck. Built-in cards can be skipped but not deleted, and cards your family adds can be deleted from the card itself.',
+      },
+    ],
+  },
 ];
