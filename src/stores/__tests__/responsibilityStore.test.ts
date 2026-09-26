@@ -75,19 +75,21 @@ const applyDeckOps = vi.fn(async (ops: readonly DeckOp[]) => {
     else if (op.op === 'deleteState') db.cards.delete(op.id);
     else if (op.op === 'setMove') db.moves.set(op.move.id, structuredClone(op.move));
     else if (op.op === 'deleteMove') db.moves.delete(op.id);
+    else if (op.op === 'deleteCheckIn') db.checkIns.delete(op.id);
     else db.checkIns.set(op.checkIn.id, structuredClone(op.checkIn));
   }
 });
 vi.mock('@/services/automerge/repositories/responsibilityRepository', () => ({
   getAllCardStates: async () => [...db.cards.values()].map((s) => structuredClone(s)),
   getAllMoves: async () => [...db.moves.values()],
-  getAllCheckIns: async () => [...db.checkIns.values()],
+  getAllCheckIns: async () => [...db.checkIns.values()] as ResponsibilityCheckIn[],
   applyDeckOps: (ops: readonly DeckOp[]) => applyDeckOps(ops),
   isDeckOpApplied: (op: DeckOp) => {
     if (op.op === 'setState') return db.cards.get(op.state.id)?.updatedAt === op.state.updatedAt;
     if (op.op === 'deleteState') return !db.cards.has(op.id);
     if (op.op === 'setMove') return db.moves.has(op.move.id);
     if (op.op === 'deleteMove') return !db.moves.has(op.id);
+    if (op.op === 'deleteCheckIn') return !db.checkIns.has(op.id);
     return db.checkIns.has(op.checkIn.id);
   },
 }));
@@ -157,7 +159,8 @@ describe('deal / keep / skip / bring back', () => {
   it('deals an unsorted card in ONE batch (state + move) and returns an undo token', async () => {
     const r = await store.deal('laundry', 'main', 'sofia');
     expect(applyDeckOps).toHaveBeenCalledTimes(1);
-    expect(opsOf(0).map((o) => o.op)).toEqual(['setState', 'setMove']);
+    // The first card into the empty deck also starts the check-in cycle, in the same batch.
+    expect(opsOf(0).map((o) => o.op)).toEqual(['setState', 'setMove', 'setCheckIn']);
     expect(r!.result.status).toBe('held');
     expect(r!.undo!.action).toBe('deal');
     expect(store.defaultHolderFor({ kind: 'listTemplate', key: 'grocery' })).toBeNull();
@@ -348,8 +351,6 @@ describe('edit, custom cards and restore', () => {
     await store.deal('laundry', 'main', 'sofia');
     expect(store.nextCheckIn).toBe('2026-10-24');
     await store.restoreDefaults({ keepCustom: true });
-    // The deal starts over: nothing is dealt, so no check-in clock, kept custom card or not.
-    expect(store.nextCheckIn).toBeNull();
     expect(store.cardById(c!.id)!.status).toBe('waiting');
     expect(store.cardById('laundry')!.status).toBe('unsorted');
     expect(db.moves.size).toBe(0);
@@ -397,15 +398,72 @@ describe('check-in and celebrations', () => {
     expect(showToast).not.toHaveBeenCalled(); // settingsStore owns that toast
   });
 
-  it('the check-in due date survives skipping the first card dealt', async () => {
-    await store.deal('laundry', 'main', 'sofia'); // 2026-09-26
-    vi.setSystemTime(Date.parse('2026-09-30T10:00:00.000Z'));
+  const at = (ymd: string) => vi.setSystemTime(Date.parse(`${ymd}T10:00:00.000Z`));
+  const starts = () => [...db.checkIns.values()].filter((c) => c.kind === 'start');
+
+  it('the due date (and its snooze key) stands through deals, skips and a custom delete', async () => {
+    const c = await store.createCustom({ name: 'Hens', emoji: '🐔', category: 'home' });
+    at('2026-09-27');
+    await store.deal(c!.id, 'main', 'sofia'); // the first card with a holder: the cycle starts
+    expect(store.nextCheckIn).toBe('2026-10-25');
+    at('2026-09-30');
     await store.deal('dishes', 'main', 'greg');
-    expect(store.nextCheckIn).toBe('2026-10-24');
-    vi.setSystemTime(Date.parse('2026-10-01T10:00:00.000Z'));
-    await store.skip(['laundry']);
-    expect(store.nextCheckIn).toBe('2026-10-24'); // same due date, same snooze key
+    at('2026-10-01');
+    await store.skip(['dishes']);
+    await store.deleteCustom(c!.id); // held the earliest move
+    expect(store.nextCheckIn).toBe('2026-10-25');
+    expect(starts()).toHaveLength(1);
     vi.setSystemTime(clock);
+  });
+
+  it('a deck sorted only with "Decide later" still gets a due date', async () => {
+    await store.keep('laundry');
+    expect(starts()).toHaveLength(1);
+    expect(store.nextCheckIn).toBe('2026-10-24');
+    expect(store.lastCheckIn).toBeUndefined(); // a cycle start is not a check-in
+  });
+
+  it('Restore then re-deal restarts the clock, even with an old check-in on record', async () => {
+    await store.createCustom({ name: 'Hens', emoji: '🐔', category: 'home', holderId: 'leo' });
+    await store.completeCheckIn({ stillWorks: 1, talkAbout: 0, redealt: 0, dealtNow: 0 });
+    const old = store.lastCheckIn!;
+    at('2026-12-01');
+    await store.restoreDefaults({ keepCustom: true });
+    expect(db.checkIns.has(old.id)).toBe(true); // history is kept
+    await store.deal('laundry', 'main', 'sofia');
+    expect(store.nextCheckIn).toBe('2026-12-29'); // not due at once from September
+    expect(store.checkInDue).toBe(false);
+    expect(store.lastCheckIn!.id).toBe(old.id);
+    vi.setSystemTime(clock);
+  });
+
+  it('undo of the first keep or deal removes the start record it wrote', async () => {
+    const k = await store.keep('laundry');
+    expect(k!.undo!.createdCheckInIds).toHaveLength(1);
+    await store.undo(k!.undo!);
+    expect(starts()).toHaveLength(0);
+    expect(store.nextCheckIn).toBeNull();
+    tick();
+    const d = await store.deal('laundry', 'main', 'sofia');
+    await store.undo(d!.undo!);
+    expect(db.checkIns.size).toBe(0);
+    // A second keep into a deck that already has a card writes no start and removes none.
+    tick();
+    await store.keep('laundry');
+    tick();
+    const second = await store.keep('dishes');
+    expect(second!.undo!.createdCheckInIds).toEqual([]);
+    await store.undo(second!.undo!);
+    expect(starts()).toHaveLength(1);
+  });
+
+  it('a malformed check-in record (no completedAt) is skipped, never thrown on', async () => {
+    db.checkIns.set('bad', { id: 'bad' } as unknown as ResponsibilityCheckIn);
+    await store.load();
+    expect(store.nextCheckIn).toBeNull();
+    expect(store.lastCheckIn).toBeUndefined();
+    await store.keep('laundry');
+    expect(store.nextCheckIn).toBe('2026-10-24');
   });
 
   it('never fires deck-dealt when the whole deck was skipped (nothing to hold)', async () => {

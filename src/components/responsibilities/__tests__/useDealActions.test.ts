@@ -32,7 +32,13 @@ vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => s
 
 import { useDealActions, resetDealActionsForTest, UNDO_TOAST_MS } from '../useDealActions';
 
-const TOKEN: UndoToken = { action: 'deal', before: {}, afterUpdatedAt: {}, createdMoveIds: [] };
+const TOKEN: UndoToken = {
+  action: 'deal',
+  before: {},
+  afterUpdatedAt: {},
+  createdMoveIds: [],
+  createdCheckInIds: [],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();

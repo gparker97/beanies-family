@@ -336,10 +336,6 @@ function keep(): void {
 
 // ── Completion ───────────────────────────────────────────────────────────────
 const finished = computed(() => queueReady.value && !topId.value && !busy.value);
-/** Every kept card has a holder, and there is at least one (an all-skipped deck is not). */
-const allHeld = computed(
-  () => store.stats.deck > 0 && store.stats.waiting === 0 && store.stats.unsorted === 0
-);
 const kidsHolding = computed(
   () =>
     familyStore.sortedHumans.filter((m) => !isAdultMember(m) && store.myCards(m.id).length > 0)
@@ -391,7 +387,7 @@ const waitingLine = computed(() => {
   >
     <!-- Completion: every card has a holder, or the pile is done with some still waiting. -->
     <DeckCelebration
-      v-if="finished && allHeld && total > 0"
+      v-if="finished && store.isFullyDealt && total > 0"
       :title="t('whoOwnsWhat.pile.celebrateTitle')"
       :body="fillTemplate(t('whoOwnsWhat.pile.celebrateBody'), { count: store.stats.deck })"
       :pills="celebratePills"

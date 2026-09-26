@@ -891,9 +891,21 @@ export interface ResponsibilityMove {
   at: ISODateString;
 }
 
-/** A finished family check-in. WRITE-ONCE; id = the local ymd it was finished (one per day). */
+/**
+ * A record in the check-in log, WRITE-ONCE with its own id (`newCheckInId`). Two kinds:
+ *  - `'checkin'` (or no `kind`, for records written before the field existed): a finished
+ *    family check-in with its outcome counts.
+ *  - `'start'`: the start of a check-in cycle, written in the same batch as the write that
+ *    first puts something in an empty deck (`withCycleStart`). Counts are zero.
+ * The next check-in is due rhythm weeks after the latest record of EITHER kind.
+ */
+export type ResponsibilityCheckInKind = 'start' | 'checkin';
+
 export interface ResponsibilityCheckIn {
   id: string;
+  /** Absent = `'checkin'`. */
+  kind?: ResponsibilityCheckInKind;
+  /** When the check-in was finished, or the cycle started. */
   completedAt: ISODateString;
   byId?: UUID;
   stillWorks: number;

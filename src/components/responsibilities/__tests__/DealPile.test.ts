@@ -52,13 +52,22 @@ function unsorted(id: string, category: ResolvedCard['category'] = 'home'): Reso
   };
 }
 
-const TOKEN: UndoToken = { action: 'deal', before: {}, afterUpdatedAt: {}, createdMoveIds: [] };
+const TOKEN: UndoToken = {
+  action: 'deal',
+  before: {},
+  afterUpdatedAt: {},
+  createdMoveIds: [],
+  createdCheckInIds: [],
+};
 
 const store = reactive({
   isLoaded: true,
   resolved: [] as ResolvedCard[],
   stats: { total: 2, deck: 0, held: 0, waiting: 0, skipped: 0, unsorted: 2, splitCount: 0 },
   nextCheckIn: null as string | null,
+  get isFullyDealt() {
+    return this.stats.deck > 0 && this.stats.waiting === 0 && this.stats.unsorted === 0;
+  },
   cardById(id: string) {
     return this.resolved.find((c) => c.id === id);
   },

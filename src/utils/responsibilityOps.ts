@@ -13,12 +13,17 @@
  *   - Move ids: `moveId(cardId, partKey, at)`.
  *   - Card state is always written WHOLE (`setState`), never patched.
  *   - A builder that would change nothing returns `ops: []`; the store then skips the write.
+ *   - The check-in cycle starts with a stored `'start'` record, appended by `withCycleStart`
+ *     to the write that first puts something in an empty deck. The due date is derived
+ *     from records only (`nextCheckInDate`), never from cards or moves.
  */
 import { generateUUID } from '@/utils/id';
 import {
   CUSTOM_CARD_PREFIX,
   MAIN_PART_KEY,
   childMembers,
+  countsTowardCycle,
+  isUndealtDeck,
   isValidCardState,
   type ResolvedCard,
   type ResolvedPart,
@@ -38,7 +43,8 @@ export type DeckOp =
   | { op: 'deleteState'; id: string }
   | { op: 'setMove'; move: ResponsibilityMove }
   | { op: 'deleteMove'; id: string }
-  | { op: 'setCheckIn'; checkIn: ResponsibilityCheckIn };
+  | { op: 'setCheckIn'; checkIn: ResponsibilityCheckIn }
+  | { op: 'deleteCheckIn'; id: string };
 
 export type UndoableAction = 'deal' | 'keep' | 'skip' | 'bringBack';
 
@@ -46,13 +52,16 @@ export type UndoableAction = 'deal' | 'keep' | 'skip' | 'bringBack';
  * In-memory (per session) undo for the toast actions. `undo` restores exactly `before`
  * (`null` = the card had no record: delete it) and deletes `createdMoveIds`, in one batch,
  * but only when every card's live `updatedAt` still equals `afterUpdatedAt` (otherwise
- * another device changed it and the whole undo is refused).
+ * another device changed it and the whole undo is refused). `createdCheckInIds` is the
+ * cycle-start record the action wrote (`withCycleStart`), if any; the undo deletes it
+ * only when the deck is empty again afterwards.
  */
 export interface UndoToken {
   action: UndoableAction;
   before: Record<string, ResponsibilityCardState | null>;
   afterUpdatedAt: Record<string, string>;
   createdMoveIds: string[];
+  createdCheckInIds: string[];
 }
 
 /** One success event for the store to log (allowlisted context keys only). */
@@ -156,7 +165,7 @@ function tokenFor(
     before[c.id] = c.state ? clone(c.state) : null;
     afterUpdatedAt[c.id] = nowIso;
   }
-  return { action, before, afterUpdatedAt, createdMoveIds };
+  return { action, before, afterUpdatedAt, createdMoveIds, createdCheckInIds: [] };
 }
 
 const NOOP: BuildResult = { ops: [], telemetry: [] };
@@ -453,7 +462,9 @@ export function buildDeleteCustom(
  *   - every non-custom record is deleted (every built-in card is unsorted again);
  *   - custom cards are deleted, or with `keepCustom` kept as waiting: holders and split
  *     cleared, `custom` and `doneOverride` preserved;
- *   - every move is deleted; check-ins are kept.
+ *   - every move is deleted; check-in records are kept. The deck is then empty (see
+ *     `countsTowardCycle`), so the next write that puts a card in it writes a new cycle
+ *     start (`withCycleStart`) and the check-in clock restarts from there.
  */
 export function buildRestoreDefaults(
   states: readonly unknown[],
@@ -511,6 +522,7 @@ export function buildCheckIn(
 ): BuildResult & { checkIn: ResponsibilityCheckIn } {
   const checkIn: ResponsibilityCheckIn = {
     id,
+    kind: 'checkin',
     completedAt: nowIso,
     byId: actorId,
     stillWorks: outcomes.stillWorks,
@@ -527,12 +539,60 @@ export function buildCheckIn(
 }
 
 /**
+ * Start the check-in cycle if this write is the one that first puts something in an empty
+ * deck: `deck` is the resolved deck the builder read (`isUndealtDeck`), and a written card
+ * record counts per `countsTowardCycle`. Appends ONE `'start'` record (zero counts) to the
+ * same op batch and to the undo token, so undoing that first keep or deal removes it
+ * again. Any other write is returned unchanged.
+ */
+export function withCycleStart(
+  build: BuildResult,
+  deck: readonly ResolvedCard[],
+  actorId: string,
+  nowIso: string,
+  todayYmd: string,
+  id: string = newCheckInId(todayYmd)
+): BuildResult {
+  const starts = build.ops.some(
+    (o) =>
+      o.op === 'setState' &&
+      countsTowardCycle(
+        o.state.status === 'kept',
+        o.state.id.startsWith(CUSTOM_CARD_PREFIX),
+        o.state.parts
+      )
+  );
+  if (!starts || !isUndealtDeck(deck)) return build;
+  const checkIn: ResponsibilityCheckIn = {
+    id,
+    kind: 'start',
+    completedAt: nowIso,
+    byId: actorId,
+    stillWorks: 0,
+    talkAbout: 0,
+    redealt: 0,
+    dealtNow: 0,
+  };
+  return {
+    ops: [...build.ops, { op: 'setCheckIn', checkIn }],
+    undo: build.undo
+      ? { ...build.undo, createdCheckInIds: [...build.undo.createdCheckInIds, id] }
+      : undefined,
+    telemetry: [...build.telemetry, { message: 'checkin_cycle_started', context: {} }],
+  };
+}
+
+/**
  * Undo a toast action. Refused as a whole (`stale: true`, no ops) when ANY card in the
  * token changed since (its live `updatedAt` differs), so a group skip never half-undoes.
+ * The token's cycle start is deleted only when the deck is empty again once `before` is
+ * restored (judged on `deck`, the live resolved deck): if another card went into the deck
+ * meanwhile (another device), the cycle it belongs to has started and its start stays.
  */
 export function buildUndo(
   token: UndoToken,
-  live: ReadonlyMap<string, { updatedAt: string }>
+  live: ReadonlyMap<string, { updatedAt: string }>,
+  deck: readonly ResolvedCard[] = []
 ): (BuildResult & { stale: false }) | { stale: true } {
   for (const [id, after] of Object.entries(token.afterUpdatedAt)) {
     if (live.get(id)?.updatedAt !== after) return { stale: true };
@@ -542,6 +602,16 @@ export function buildUndo(
     ops.push(before ? { op: 'setState', state: clone(before) } : { op: 'deleteState', id });
   }
   for (const id of token.createdMoveIds) ops.push({ op: 'deleteMove', id });
+  if (token.createdCheckInIds.length) {
+    const others = deck.filter((c) => !(c.id in token.before));
+    const restored = Object.values(token.before).some(
+      (b) =>
+        !!b && countsTowardCycle(b.status === 'kept', b.id.startsWith(CUSTOM_CARD_PREFIX), b.parts)
+    );
+    if (isUndealtDeck(others) && !restored) {
+      for (const id of token.createdCheckInIds) ops.push({ op: 'deleteCheckIn', id });
+    }
+  }
   return {
     stale: false,
     ops,

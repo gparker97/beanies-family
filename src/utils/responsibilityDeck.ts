@@ -348,7 +348,7 @@ export type RecentItem =
 
 /**
  * The Overview's "recent moves": re-deals, custom cards added, splits, skips and
- * check-ins in the last 30 days, newest first. Skips and splits have no history record,
+ * finished check-ins (never cycle starts) in the last 30 days, newest first. Skips and splits have no history record,
  * so they are read from the card's `updatedAt` (the latest write to a skipped or split
  * card); that is approximate by design and good enough for a glance.
  */
@@ -377,6 +377,7 @@ export function recentMoves(
       items.push({ kind: 'split', at: s.updatedAt, cardId: s.id });
   }
   for (const c of checkIns) {
+    if (!isReadableCheckIn(c) || isCycleStart(c)) continue;
     if (inWindow(c.completedAt)) items.push({ kind: 'checkin', at: c.completedAt, checkIn: c });
   }
   return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
@@ -404,54 +405,92 @@ export function defaultHolderFor(
 // ── Family check-in ─────────────────────────────────────────────────────────────
 
 /**
- * When the deck was first dealt: the earliest move that gave a card to someone (derived,
- * never stored). Moves, not card `createdAt`, because only moves have the right lifetime:
- * skipping or re-dealing a card never deletes its moves, so the anchor (and the
- * `card-checkin:<due>` snooze key built on it) stays put; "Restore defaults" deletes every
- * move, so the clock restarts at the next deal whether or not custom cards were kept.
+ * Does a card put something in the deck for a check-in to be about? A kept built-in card
+ * (held, or "decide later"), or a family-made card someone holds. A family-made card that
+ * nobody holds does not count: "Restore defaults" keeps those as waiting, and the deal
+ * (and so the check-in clock) must still start over after it. Skipped and unsorted cards
+ * never count. The ONE rule, shared by the resolved deck (`isUndealtDeck`) and the card
+ * records a builder is about to write (`withCycleStart`).
  */
-export function firstDealtAt(moves: readonly ResponsibilityMove[]): string | undefined {
-  let first: string | undefined;
-  for (const m of moves) {
-    if (!m?.toId || typeof m.at !== 'string') continue;
-    if (!first || m.at < first) first = m.at;
-  }
-  return first;
+export function countsTowardCycle(
+  kept: boolean,
+  isCustom: boolean,
+  parts: readonly { holderId?: string }[]
+): boolean {
+  return kept && (!isCustom || parts.some((p) => !!p.holderId));
 }
 
-/** The local day a check-in was finished. The ONE reader: ids are opaque. */
+/** Nothing is in the deck yet (see `countsTowardCycle`): the next write that adds a card starts a check-in cycle. */
+export function isUndealtDeck(cards: readonly ResolvedCard[]): boolean {
+  return !cards.some((c) =>
+    countsTowardCycle(c.status === 'held' || c.status === 'waiting', c.isCustom, c.parts)
+  );
+}
+
+/** A check-in record is readable only with a string `completedAt`; anything else is skipped. */
+function isReadableCheckIn(c: unknown): c is ResponsibilityCheckIn {
+  return (
+    !!c &&
+    typeof c === 'object' &&
+    typeof (c as { completedAt?: unknown }).completedAt === 'string' &&
+    !!(c as { completedAt: string }).completedAt
+  );
+}
+
+/** A cycle-start record, not a finished check-in. Records without `kind` are check-ins. */
+export function isCycleStart(c: ResponsibilityCheckIn): boolean {
+  return c.kind === 'start';
+}
+
+/** The local day a check-in was finished (or a cycle started). The ONE reader: ids are opaque. */
 export function checkInYmd(checkIn: ResponsibilityCheckIn): string {
   return ymdOf(checkIn.completedAt);
 }
 
-/** The most recently finished check-in (by `completedAt`; several may share a day). */
-export function latestCheckIn(
-  checkIns: readonly ResponsibilityCheckIn[]
+function latestOf(
+  checkIns: readonly unknown[],
+  include: (c: ResponsibilityCheckIn) => boolean
 ): ResponsibilityCheckIn | undefined {
   let last: ResponsibilityCheckIn | undefined;
-  for (const c of checkIns) if (!last || c.completedAt > last.completedAt) last = c;
+  for (const c of checkIns) {
+    if (!isReadableCheckIn(c) || !include(c)) continue;
+    if (!last || c.completedAt > last.completedAt) last = c;
+  }
   return last;
 }
 
-/** The next check-in's ymd, or null when the rhythm is off or nothing is dealt yet. */
-export function nextCheckInDate(
-  weeks: number,
-  checkIns: readonly ResponsibilityCheckIn[],
-  dealtAt: string | undefined
-): string | null {
-  if (!weeks) return null;
-  const last = latestCheckIn(checkIns);
-  if (last) return addDaysYmd(checkInYmd(last), weeks * 7);
-  return dealtAt ? addDaysYmd(ymdOf(dealtAt), weeks * 7) : null;
+/**
+ * The most recently FINISHED check-in (by `completedAt`; several may share a day). Cycle
+ * starts are not check-ins, so the Overview's "last check-in" never shows one.
+ */
+export function latestCheckIn(checkIns: readonly unknown[]): ResponsibilityCheckIn | undefined {
+  return latestOf(checkIns, (c) => !isCycleStart(c));
 }
 
-export function isCheckInDue(
-  weeks: number,
-  checkIns: readonly ResponsibilityCheckIn[],
-  dealtAt: string | undefined,
-  today: string
-): boolean {
-  const next = nextCheckInDate(weeks, checkIns, dealtAt);
+/**
+ * What the check-in clock runs from: the latest record of either kind, a finished
+ * check-in or a cycle start. Undefined until the deck has had something put in it. Also
+ * the line "moved since last time" is drawn from.
+ */
+export function checkInAnchor(checkIns: readonly unknown[]): ResponsibilityCheckIn | undefined {
+  return latestOf(checkIns, () => true);
+}
+
+/**
+ * The next check-in's local ymd: rhythm weeks after the anchor's local day. Null when the
+ * rhythm is off or there is no anchor. It changes only when a record is written (a
+ * check-in, or a new cycle start after the deck was emptied or restored), so the
+ * `card-checkin:<due>` snooze key built on it is stable across every deal, skip and
+ * card delete in between.
+ */
+export function nextCheckInDate(weeks: number, checkIns: readonly unknown[]): string | null {
+  if (!weeks) return null;
+  const anchor = checkInAnchor(checkIns);
+  return anchor ? addDaysYmd(checkInYmd(anchor), weeks * 7) : null;
+}
+
+export function isCheckInDue(weeks: number, checkIns: readonly unknown[], today: string): boolean {
+  const next = nextCheckInDate(weeks, checkIns);
   return !!next && today >= next;
 }
 
@@ -461,7 +500,7 @@ export const UNCHANGED_MIN_DAYS = 90;
 export interface CheckInAgenda {
   /** Cards with nobody: "deal now". */
   nobody: ResolvedCard[];
-  /** Cards re-dealt since the last check-in (latest move per card): "settling in" / "let's talk". */
+  /** Cards re-dealt since the anchor (latest move per card): "settling in" / "let's talk". */
   moved: { card: ResolvedCard; move: ResponsibilityMove }[];
   /** Up to 3 held cards unchanged for the longest (at least 90 days). */
   unchanged: ResolvedCard[];
@@ -472,10 +511,11 @@ function isCurrentMove(card: ResolvedCard | undefined, m: ResponsibilityMove): b
   return !!card && card.parts.some((p) => p.key === m.partKey && p.holderId === m.toId);
 }
 
+/** `anchor` is `checkInAnchor(checkIns)`: re-deals after it are "moved since last time". */
 export function buildCheckInAgenda(
   cards: readonly ResolvedCard[],
   moves: readonly ResponsibilityMove[],
-  lastCheckIn: ResponsibilityCheckIn | undefined,
+  anchor: ResponsibilityCheckIn | undefined,
   today: string
 ): CheckInAgenda {
   const byId = new Map(cards.map((c) => [c.id, c]));
@@ -484,7 +524,7 @@ export function buildCheckInAgenda(
   const movedByCard = new Map<string, ResponsibilityMove>();
   for (const m of moves) {
     if (!isRedeal(m)) continue;
-    if (lastCheckIn && m.at <= lastCheckIn.completedAt) continue;
+    if (anchor && m.at <= anchor.completedAt) continue;
     const card = byId.get(m.cardId);
     if (card?.status !== 'held' && card?.status !== 'waiting') continue;
     if (!isCurrentMove(card, m)) continue;
@@ -605,7 +645,7 @@ export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow
         count: waiting.length,
       });
     }
-    const due = nextCheckInDate(rhythmWeeks, checkIns, firstDealtAt(moves));
+    const due = nextCheckInDate(rhythmWeeks, checkIns);
     if (due && today >= due) {
       const dismissKey = CARD_CHECKIN_PREFIX + due;
       const snoozedAt = readState[dismissKey];
