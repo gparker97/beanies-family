@@ -24,7 +24,7 @@ import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardL
 import { showToast } from '@/composables/useToast';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { cardUsesFor } from '@/constants/responsibilityCards';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint, getListCategory } from '@/constants/listCategories';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -147,7 +147,7 @@ watch(card, (next, prev) => {
           >
             <span
               class="h-2 w-2 rounded-full"
-              :style="{ backgroundColor: category?.color ?? '#94A3B8' }"
+              :style="{ backgroundColor: categoryTint(card.category) }"
               aria-hidden="true"
             />
             {{ category ? categoryLabel(category.id) : t('lists.category.other') }}

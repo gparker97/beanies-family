@@ -13,7 +13,7 @@ import { useMemberInfo, getMemberRoleLabel } from '@/composables/useMemberInfo';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -51,7 +51,7 @@ const rows = computed(() =>
           key: `${card.id}:${part.key}`,
           cardId: card.id,
           label: `${cardEmoji(card)} ${cardName(card)}${suffix ? `, ${suffix}` : ''}`,
-          tint: getListCategory(card.category)?.color ?? '#94A3B8',
+          tint: categoryTint(card.category),
         });
       }
     }

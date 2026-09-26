@@ -14,7 +14,7 @@ import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import { ymdOf, type ResolvedCard } from '@/utils/responsibilityDeck';
@@ -35,8 +35,7 @@ const { getMemberName } = useMemberInfo();
 const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
 
 /** Fallback when a category is unknown to this build (a newer client's card). */
-const FALLBACK_TINT = '#94A3B8';
-const tint = computed(() => getListCategory(props.card.category)?.color ?? FALLBACK_TINT);
+const tint = computed(() => categoryTint(props.card.category));
 
 const name = computed(() => cardName(props.card));
 const done = computed(() => cardDone(props.card));

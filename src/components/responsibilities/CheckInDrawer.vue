@@ -22,7 +22,7 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import {
@@ -55,7 +55,6 @@ const { getMemberName } = useMemberInfo();
 const { cardName, cardEmoji, partCaption, heldSince } = useResponsibilityCardLabel();
 const actions = useDealActions();
 
-const FALLBACK_TINT = '#94A3B8';
 const EMPTY_AGENDA: CheckInAgenda = { nobody: [], moved: [], unchanged: [] };
 
 const agenda = ref<CheckInAgenda>(EMPTY_AGENDA);
@@ -83,9 +82,7 @@ watch(
 function live(card: ResolvedCard): ResolvedCard {
   return store.cardById(card.id) ?? card;
 }
-function tint(card: ResolvedCard): string {
-  return getListCategory(card.category)?.color ?? FALLBACK_TINT;
-}
+const tint = (card: ResolvedCard): string => categoryTint(card.category);
 
 const isEmpty = computed(
   () => !agenda.value.nobody.length && !agenda.value.moved.length && !agenda.value.unchanged.length

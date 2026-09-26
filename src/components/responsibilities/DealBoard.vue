@@ -26,7 +26,7 @@ import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { createDragPayload } from '@/composables/useDragPayload';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { groupByCategory, type ResolvedCard, type ResolvedPart } from '@/utils/responsibilityDeck';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -44,7 +44,6 @@ const emit = defineEmits<{
 /** Chips shown per row before "+N more". */
 const CHIP_CAP = 10;
 const SKIPPED_ROW = '__skipped';
-const FALLBACK_TINT = '#94A3B8';
 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
@@ -58,9 +57,7 @@ const actions = useDealActions();
 
 const rootEl = ref<HTMLElement | null>(null);
 
-function tint(card: ResolvedCard): string {
-  return getListCategory(card.category)?.color ?? FALLBACK_TINT;
-}
+const tint = (card: ResolvedCard): string => categoryTint(card.category);
 
 // ── Rail ─────────────────────────────────────────────────────────────────────
 const filter = ref<'toDeal' | 'all'>('toDeal');

@@ -7,7 +7,7 @@
  * `variant="choice"` is the deal pile's Keep / Skip / revisit buttons (round 7): larger, and
  * every choice looks equally unselected until it is hovered (pointer devices only, so a tap
  * can't leave it lit), focused from the keyboard, or its shortcut is pressed (the one-shot
- * `key-press` animation in `style.css`, which paints the tint through `--press-*` so it can
+ * `key-press` animation in `style.css`, which paints the `--press-*` tokens from `style.css` so it can
  * never stick, and is killed under reduced motion).
  */
 withDefaults(defineProps<{ disabled?: boolean; variant?: 'default' | 'choice' }>(), {
@@ -66,11 +66,8 @@ html.dark .deck-action:hover:not(:disabled) {
 
 /* ── choice ─────────────────────────────────────────────────────────────── */
 .deck-action.is-choice {
-  --press-bg: rgb(241 93 34 / 8%);
-  --press-edge: #f15d22;
-
   align-items: center;
-  border: 1.5px solid rgb(44 62 80 / 22%);
+  border: 1.5px solid var(--color-border-strong);
   border-radius: 1rem;
   display: inline-flex;
   font-weight: 700;
@@ -88,11 +85,7 @@ html.dark .deck-action:hover:not(:disabled) {
 }
 
 html.dark .deck-action.is-choice {
-  --press-bg: rgb(255 139 94 / 14%);
-  --press-edge: var(--color-accent-lift);
-
   background: var(--color-surface-raised);
-  border-color: var(--color-line-strong);
 }
 
 html.dark .deck-action.is-choice:focus-visible {

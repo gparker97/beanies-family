@@ -11,7 +11,7 @@ import { computed, useTemplateRef } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 
@@ -24,13 +24,11 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ step: [dir: -1 | 1] }>();
 
-const FALLBACK_TINT = '#94A3B8';
-
 const { t } = useTranslation();
 const { categoryLabel } = useListCategoryLabel();
 const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
 
-const tint = computed(() => getListCategory(props.card.category)?.color || FALLBACK_TINT);
+const tint = computed(() => categoryTint(props.card.category));
 
 const cardEl = useTemplateRef<HTMLElement>('cardEl');
 defineExpose({ cardEl });
@@ -124,7 +122,7 @@ defineExpose({ cardEl });
 
 .arrow {
   background: #fff;
-  border: 1.5px solid rgb(44 62 80 / 22%);
+  border: 1.5px solid var(--color-border-strong);
   border-radius: 0.875rem;
   color: var(--color-text);
   display: grid;
@@ -154,7 +152,6 @@ defineExpose({ cardEl });
 
 html.dark .arrow {
   background: var(--color-surface-raised);
-  border-color: var(--color-line-strong);
   color: var(--color-ink);
 }
 

@@ -32,7 +32,7 @@ import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslationStore } from '@/stores/translationStore';
-import { getListCategory } from '@/constants/listCategories';
+import { CATEGORY_FALLBACK_TINT, getListCategory } from '@/constants/listCategories';
 import {
   buildExportBlocks,
   paginateExport,
@@ -274,7 +274,7 @@ const exportResolvers: DeckExportResolvers = {
     const def = id ? getListCategory(id) : undefined;
     return id && def
       ? { title: categoryLabel(id), emoji: def.emoji, color: def.color }
-      : { title: t('lists.category.other'), emoji: '📁', color: '#94A3B8' };
+      : { title: t('lists.category.other'), emoji: '📁', color: CATEGORY_FALLBACK_TINT };
   },
   name: cardName,
   done: cardDone,
