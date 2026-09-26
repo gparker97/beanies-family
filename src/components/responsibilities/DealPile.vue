@@ -1,26 +1,32 @@
 <script setup lang="ts">
 /**
- * Who Owns What (#109): the deal pile (Requirements 9 and 10, mockup sections 2 and 9).
- * One card at a time on top of a pile. It serves two jobs:
+ * Who Owns What (#109): the deal pile, card by card (round 7, mockup sections s1-s4). The
+ * Deal view's default at every width: one card at a time, centered, with back / forward
+ * arrows and the Kept and Skipped lists underneath.
  *
- *  - **First deal** (`scope: 'unsorted'`): every unsorted card in category order. "Keep this
- *    card, or skip it?" with Keep (primary, left) and Skip. Keep reveals "Who owns it?";
- *    a pick is ONE `deal` call (an unsorted card is kept and dealt in one write, one undo),
- *    and only "Decide later" calls `keep`.
- *  - **Phone deal view** (`scope: 'waiting'`): the kept cards with an open part, straight to
- *    "Who owns it?". "Decide later" just moves on (the card is already waiting).
+ *  - An **unsorted** card asks "Keep this card, or skip it?" (Keep and Skip look equally
+ *    unselected). Keep reveals "Kept! Who owns it?"; a pick is ONE `deal` call (kept and
+ *    dealt in one write, one undo), and only "Decide later" calls `keep`.
+ *  - A **waiting** card goes straight to the faces. "Decide later" passes it for this visit.
+ *  - A **held** or **skipped** card (reached by the arrows or the lists) shows what it is
+ *    and offers a change (`DealPileBanner`): give it to someone else, skip instead, split
+ *    it, bring back.
  *
- * The queue is a snapshot of card ids taken once the deck has loaded; which card is on top
- * is derived from the LIVE store (the first queued card still in scope), so an undo from
- * the toast, or a change on another device, puts a card back on the pile without any
- * bookkeeping here. The one piece of session state is the log that draws who got what:
- * the emoji row under each face and the skipped tray. An undo removes its entry through
- * `useDealActions`' `onUndone`.
+ * `usePileCursor` owns which card is on screen: an id over a queue snapshot resolved
+ * against the live store. `scope` only chooses that snapshot (`load`, once the deck has
+ * loaded). The view comes from `pileView(status, picking)`; `picking` and `leaving` are the
+ * only local UI flags, reset by one watcher (not while busy) and by `run()`'s `settle`.
+ * After a first decision the pile advances to the next card still to decide; a revisit
+ * change stays on the card to show its new banner. Every write goes through
+ * `useDealActions` (one undo toast), and an Undo jumps the pile back to its card.
  *
- * The deal animation: the card flies into the chosen face (`useFlyTo`), the face bounces
- * (`card-bounce`), the emoji joins that face's row. The card on screen is pinned while an
- * action is in flight, so a store refresh mid-flight can't swap it under the animation.
- * Reduced motion: no flight, no bounce; the undo toast still confirms every action.
+ * The deal animation: the card flies into the chosen face (`useFlyTo`) and the face
+ * bounces; a skip flies to the Skipped list's heading. Revisit changes don't fly. Reduced
+ * motion: no flight, no bounce; the undo toast still confirms every action.
+ *
+ * Desktop shortcuts (`useKeyboardShortcuts`), unadvertised beyond `aria-keyshortcuts`:
+ * K keep, S skip, 1-9 the Nth face, arrows step, U undo. Each calls the same function its
+ * button does, which carries its own guard.
  */
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -28,41 +34,45 @@ import { isAdultMember } from '@/composables/useMemberInfo';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { useKeyboardShortcuts, type ShortcutMap } from '@/composables/useKeyboardShortcuts';
 import { flyTo } from '@/composables/useFlyTo';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { getListCategory } from '@/constants/listCategories';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
-import { groupByCategory, groupShortcut, type ResolvedCard } from '@/utils/responsibilityDeck';
+import { groupShortcut, otherHumans, type ResolvedCard } from '@/utils/responsibilityDeck';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import DeckActionButton from './DeckActionButton.vue';
 import DeckCelebration from './DeckCelebration.vue';
+import DealPileBanner from './DealPileBanner.vue';
+import DealPileLists from './DealPileLists.vue';
+import DealPileStage from './DealPileStage.vue';
 import { useDealActions } from './useDealActions';
+import { pileView, usePileCursor, type SettleMode } from './usePileCursor';
 
 const props = withDefaults(
   defineProps<{
+    /** Which cards the pile opens with: the first deal's unsorted cards, or the waiting ones. */
     scope: 'unsorted' | 'waiting';
-    /** Start the pile at this card (the Overview's per-card Deal button). */
+    /** Open the pile at this card (the Overview's per-card Deal button). */
     startCardId?: string;
-    /** md+ only: offer the board instead of the pile. */
-    showBoardLink?: boolean;
   }>(),
-  { startCardId: undefined, showBoardLink: false }
+  { startCardId: undefined }
 );
 const emit = defineEmits<{
   split: [cardId: string];
   overview: [];
   'deal-waiting': [];
-  'use-board': [];
 }>();
 
 /** Every face tile in the picker carries this prefix + member id: the fly-to target. */
 const PICK_TESTID_PREFIX = 'deal-pick-';
-/** After a card lands, a beat to see the face bounce and the emoji join its row. */
+/** After a card lands, a beat to see the face bounce. */
 const LANDING_BEAT_MS = 380;
+const SURFACE = 'responsibilities';
 
 const GROUP_QUESTION: Record<NonNullable<ResolvedCard['group']>, UIStringKey> = {
   car: 'whoOwnsWhat.pile.group.car',
@@ -72,75 +82,83 @@ const GROUP_QUESTION: Record<NonNullable<ResolvedCard['group']>, UIStringKey> = 
   pet: 'whoOwnsWhat.pile.group.pet',
   school: 'whoOwnsWhat.pile.group.school',
 };
-const FALLBACK_TINT = '#94A3B8';
 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardEmoji, partCaption } = useResponsibilityCardLabel();
 const { pulse } = useAttentionPulse();
 const actions = useDealActions();
 
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
-const cardEl = useTemplateRef<HTMLElement>('cardEl');
-const trayEl = useTemplateRef<HTMLElement>('trayEl');
+const stageRef = useTemplateRef<{ cardEl: HTMLElement | null }>('stageRef');
+const cardEl = computed(() => stageRef.value?.cardEl ?? null);
+const keepBtn = useTemplateRef<{ $el: HTMLElement }>('keepBtn');
+const skipBtn = useTemplateRef<{ $el: HTMLElement }>('skipBtn');
+const listsRef = useTemplateRef<{ skippedHeadingEl: HTMLElement | null }>('listsRef');
 
-function inScope(card: ResolvedCard | undefined): card is ResolvedCard {
-  if (!card) return false;
-  return props.scope === 'unsorted' ? card.status === 'unsorted' : card.status === 'waiting';
+// ── Telemetry ────────────────────────────────────────────────────────────────
+const loggedOnce = new Set<string>();
+function log(message: string, detail: string, level: 'info' | 'warn' = 'info'): void {
+  logEvent({ level, surface: SURFACE, message, context: { detail } });
+}
+function logOnce(message: string, detail: string): void {
+  if (loggedOnce.has(`${message}:${detail}`)) return;
+  loggedOnce.add(`${message}:${detail}`);
+  log(message, detail);
 }
 
-// ── The queue (a snapshot) and the live top card ────────────────────────────
-const queue = ref<string[]>([]);
-const queueReady = ref(false);
-/** Waiting-scope "Decide later": moved past this session without a write. */
-const passed = ref(new Set<string>());
+// ── The cursor ───────────────────────────────────────────────────────────────
+const cursor = usePileCursor({
+  cardById: (id) => store.cardById(id),
+  order: () => store.resolved.map((c) => c.id),
+});
+const { currentId, current: card, position } = cursor;
 
 watch(
   () => store.isLoaded,
   (loaded) => {
-    if (!loaded || queueReady.value) return;
-    const ids = groupByCategory(store.resolved.filter(inScope)).flatMap((g) =>
-      g.cards.map((c) => c.id)
-    );
-    const start = props.startCardId ? ids.indexOf(props.startCardId) : -1;
-    if (start > 0) ids.unshift(...ids.splice(start, 1));
-    queue.value = ids;
-    queueReady.value = true;
+    if (!loaded || cursor.ready.value) return;
+    const ids = store.resolved.filter((c) => c.status === props.scope).map((c) => c.id);
+    cursor.load(ids, props.startCardId);
   },
   { immediate: true }
 );
 
-const pending = computed(() =>
-  queue.value.filter((id) => !passed.value.has(id) && inScope(store.cardById(id)))
-);
-const topId = computed(() => pending.value[0] ?? null);
-
-/** The card on screen: follows the top card, but is pinned while an action is in flight. */
+/** Double-tap guard: one action at a time, and the cursor can't move under a flight. */
 const busy = ref(false);
-const shownId = ref<string | null>(null);
-watch(
-  topId,
-  (id) => {
-    if (!busy.value) shownId.value = id;
-  },
-  { immediate: true }
-);
-const card = computed(() => (shownId.value ? store.cardById(shownId.value) : undefined));
-
-/** Keep/skip first on a first deal; straight to the faces for a waiting card. */
-const stage = ref<'sort' | 'pick'>('sort');
-const firstStage = () => (props.scope === 'waiting' ? 'pick' : 'sort');
+/** The faces are showing: after Keep, or for "Give it to someone else". */
+const picking = ref(false);
 /** Hidden after its flight so it can't flash back before the next card replaces it. */
 const leaving = ref(false);
-watch(
-  shownId,
-  () => {
-    stage.value = firstStage();
-    leaving.value = false;
-  },
-  { immediate: true }
+function resetFlags(): void {
+  picking.value = false;
+  leaving.value = false;
+}
+watch([currentId, () => card.value?.status], () => {
+  if (!busy.value) resetFlags();
+});
+// A card deleted elsewhere while on screen: move on (a mid-flight one settles in `run`).
+watch(card, (c) => {
+  if (c || !currentId.value || busy.value) return;
+  log('pile_card_missing', 'current');
+  cursor.settle(currentId.value, 'advance');
+});
+
+const view = computed(() => (card.value ? pileView(card.value.status, picking.value) : null));
+const bannerView = computed(() => {
+  if (view.value === 'held' || view.value === 'skipped') return view.value;
+  return card.value?.status === 'waiting' ? 'waiting' : null;
+});
+const undecided = computed(() => !!card.value && cursor.isUndecided(card.value.id));
+
+const members = computed(() => familyStore.sortedHumans);
+/** Who the faces offer, and what 1-9 index: everyone, or all but the holder when giving. */
+const pickable = computed(() =>
+  view.value === 'pick' && card.value?.status === 'held'
+    ? otherHumans(members.value, card.value)
+    : members.value
 );
 
 /** The part a pick deals: the first open one (the only one on an unsplit card). */
@@ -148,75 +166,25 @@ const part = computed(() => card.value?.parts.find((p) => !p.holderId) ?? card.v
 const partLine = computed(() =>
   card.value && part.value ? partCaption(card.value, part.value) : ''
 );
-const tint = computed(
-  () => (card.value && getListCategory(card.value.category)?.color) || FALLBACK_TINT
+const positionLine = computed(() =>
+  position.value
+    ? fillTemplate(t('whoOwnsWhat.pile.position'), {
+        category: position.value.category
+          ? categoryLabel(position.value.category)
+          : t('lists.category.other'),
+        n: position.value.n,
+        total: position.value.total,
+      })
+    : ''
 );
-
-// ── Session log: who got what ────────────────────────────────────────────────
-interface LogEntry {
-  seq: number;
-  kind: 'dealt' | 'kept' | 'skipped';
-  cardIds: string[];
-  memberId?: string;
-  emojis: string[];
-}
-const log = ref<LogEntry[]>([]);
-let seq = 0;
-
-function record(entry: Omit<LogEntry, 'seq'>): number {
-  const id = ++seq;
-  log.value.push({ ...entry, seq: id });
-  return id;
-}
-function forget(id: number): void {
-  log.value = log.value.filter((e) => e.seq !== id);
-}
-
-/**
- * The session-log entry for ONE action, tied to its toast's Undo. The toast appears as soon
- * as the write resolves, but a dealt or skipped card is only recorded after its flight, so
- * an Undo can land first: it marks the action undone and `record` then writes nothing.
- */
-function logEntryFor() {
-  let id = 0;
-  let undone = false;
-  return {
-    onUndone(): void {
-      undone = true;
-      if (id) forget(id);
-    },
-    /** Records the entry; false (nothing recorded) when the action was already undone. */
-    record(entry: Omit<LogEntry, 'seq'>): boolean {
-      if (undone) return false;
-      id = record(entry);
-      return true;
-    },
-  };
-}
-
-const members = computed(() => familyStore.sortedHumans);
-function gotFor(memberId: string): string {
-  return log.value
-    .filter((e) => e.kind === 'dealt' && e.memberId === memberId)
-    .flatMap((e) => e.emojis)
-    .join('');
-}
-const trayEmojis = computed(() =>
-  log.value
-    .filter((e) => e.kind === 'skipped')
-    .flatMap((e) => e.emojis)
-    .join('')
-);
-const keptCount = computed(
-  () => new Set(log.value.filter((e) => e.kind !== 'skipped').flatMap((e) => e.cardIds)).size
-);
-const skippedCount = computed(() =>
-  log.value.filter((e) => e.kind === 'skipped').reduce((n, e) => n + e.cardIds.length, 0)
-);
+const backToLabel = computed(() => {
+  const next = cursor.nextToDecide.value ? store.cardById(cursor.nextToDecide.value) : undefined;
+  return next ? fillTemplate(t('whoOwnsWhat.pile.backTo'), { card: cardName(next) }) : '';
+});
 
 // ── Progress ─────────────────────────────────────────────────────────────────
-const remaining = computed(() => pending.value.length);
-const total = computed(() => queue.value.length);
+const remaining = cursor.remaining;
+const total = cursor.total;
 const doneCount = computed(() => total.value - remaining.value);
 const toGo = computed(() =>
   fillTemplate(
@@ -224,32 +192,35 @@ const toGo = computed(() =>
     { count: remaining.value }
   )
 );
-const tally = computed(() =>
-  fillTemplate(t('whoOwnsWhat.pile.tally'), {
-    kept: keptCount.value,
-    skipped: skippedCount.value,
-  })
-);
 
 const shortcut = computed(() =>
-  props.scope === 'unsorted' && card.value && stage.value === 'sort'
+  view.value === 'sort' && card.value?.status === 'unsorted'
     ? groupShortcut(store.resolved, card.value)
     : null
 );
 
 // ── Actions ──────────────────────────────────────────────────────────────────
-async function run(fn: () => Promise<void>): Promise<void> {
-  if (busy.value) return;
+/**
+ * Runs one action on the card on screen. `fn` resolves false when the write was refused or
+ * failed (the store has toasted), which keeps the faces open to try again. Afterwards the
+ * cursor settles: on to the next card (`advance`) or stays to show the result (`stay`).
+ */
+async function run(fn: (c: ResolvedCard) => Promise<boolean>, after: SettleMode): Promise<void> {
+  const c = card.value;
+  if (busy.value || !c) return;
   busy.value = true;
+  let ok = true;
   try {
-    await fn();
+    ok = await fn(c);
   } finally {
     busy.value = false;
-    // A split card with another open part stays on top: show it again.
-    if (topId.value === shownId.value) leaving.value = false;
-    shownId.value = topId.value;
+    cursor.settle(c.id, after);
+    if (ok || currentId.value !== c.id) resetFlags();
+    else leaving.value = false;
   }
 }
+/** An Undo puts the pile back on the card it reversed. */
+const undoTo = (c: ResolvedCard) => ({ onUndone: () => cursor.jumpTo(c.id) });
 
 function landingBeat(): Promise<void> {
   if (prefersReducedMotion()) return Promise.resolve();
@@ -264,86 +235,153 @@ function faceEl(memberId: string): HTMLElement | null {
 }
 
 function pick(memberId: string): Promise<void> {
-  return run(async () => {
-    const c = card.value;
-    const p = part.value;
-    if (!c || !p) return;
-    const target = faceEl(memberId);
-    leaving.value = true;
-    const entry = logEntryFor();
-    const onUndone = () => {
-      entry.onUndone();
-      // An Undo that lands during the flight brings the same card back on top, so
-      // `shownId` never changes and its watcher never resets the question: do it here.
-      // (After the flight the card comes back as a new `shownId`, and the watcher does.)
-      if (shownId.value === c.id) stage.value = firstStage();
-    };
-    const [, res] = await Promise.all([
-      flyTo(cardEl.value, target),
-      actions.deal(c.id, p.key, memberId, { onUndone }),
-    ]);
-    if (!res) {
-      leaving.value = false;
-      return;
-    }
-    if (!entry.record({ kind: 'dealt', cardIds: [c.id], memberId, emojis: [cardEmoji(c)] })) return;
-    pulse(target, 'card-bounce');
-    await landingBeat();
-  });
+  const giving = card.value?.status === 'held';
+  return run(
+    async (c) => {
+      const p = part.value;
+      if (!p) return false;
+      if (giving) {
+        const res = await actions.deal(c.id, p.key, memberId, undoTo(c));
+        if (res) log('pile_revisit_change', 'give');
+        return !!res;
+      }
+      const target = faceEl(memberId);
+      leaving.value = true;
+      const [, res] = await Promise.all([
+        flyTo(cardEl.value, target),
+        actions.deal(c.id, p.key, memberId, undoTo(c)),
+      ]);
+      if (!res) return false;
+      pulse(target, 'card-bounce');
+      await landingBeat();
+      return true;
+    },
+    giving ? 'stay' : 'advance'
+  );
 }
 
-/** "Decide later": keep it waiting (first deal), or just move on (already waiting). */
-function decideLater(): Promise<void> {
-  return run(async () => {
-    const c = card.value;
-    if (!c) return;
-    if (props.scope === 'waiting') {
-      passed.value = new Set(passed.value).add(c.id);
-      return;
-    }
-    const entry = logEntryFor();
-    const res = await actions.keep(c.id, { onUndone: entry.onUndone });
-    if (res) entry.record({ kind: 'kept', cardIds: [c.id], emojis: [] });
-  });
+/** The picker's dismiss: Cancel when giving; else "Decide later" (keep it waiting, move on). */
+function onPickerCancel(): Promise<void> {
+  if (card.value?.status === 'held') {
+    picking.value = false;
+    return Promise.resolve();
+  }
+  return run(async (c) => {
+    if (c.status === 'unsorted' && !(await actions.keep(c.id, undoTo(c)))) return false;
+    cursor.pass(c.id);
+    return true;
+  }, 'advance');
 }
 
 function skipIds(ids: readonly string[]): Promise<void> {
-  return run(async () => {
-    const c = card.value;
-    if (!c || !ids.length) return;
+  return run(async (c) => {
+    if (!ids.length) return false;
+    const target = listsRef.value?.skippedHeadingEl ?? null;
     leaving.value = true;
-    const entry = logEntryFor();
-    const [, res] = await Promise.all([
-      flyTo(cardEl.value, trayEl.value),
-      actions.skip(ids, { onUndone: entry.onUndone }),
-    ]);
-    if (!res) {
-      leaving.value = false;
-      return;
-    }
-    const emojis = ids.map((id) => {
-      const s = store.cardById(id);
-      return s ? cardEmoji(s) : '';
-    });
-    if (!entry.record({ kind: 'skipped', cardIds: [...ids], emojis })) return;
-    pulse(trayEl.value, 'drop-flash');
+    const [, res] = await Promise.all([flyTo(cardEl.value, target), actions.skip(ids, undoTo(c))]);
+    if (!res) return false;
+    pulse(target, 'drop-flash');
     await landingBeat();
-  });
+    return true;
+  }, 'advance');
 }
 
+const canSkip = computed(
+  () =>
+    (view.value === 'sort' || view.value === 'pick') &&
+    (card.value?.status === 'unsorted' || card.value?.status === 'waiting')
+);
 function skip(): Promise<void> {
-  return card.value ? skipIds([card.value.id]) : Promise.resolve();
+  return canSkip.value && card.value ? skipIds([card.value.id]) : Promise.resolve();
 }
 function skipGroup(): Promise<void> {
   return shortcut.value ? skipIds(shortcut.value.unsortedIds) : Promise.resolve();
 }
-
 function keep(): void {
-  stage.value = 'pick';
+  if (view.value === 'sort' && !busy.value) picking.value = true;
 }
 
+// Revisit changes: no flight, the banner changes in place and the toast confirms.
+function give(): void {
+  if (view.value === 'held' && !busy.value) picking.value = true;
+}
+function skipInstead(): Promise<void> {
+  return run(async (c) => {
+    const res = await actions.skip([c.id], undoTo(c));
+    if (res) log('pile_revisit_change', 'skip');
+    return !!res;
+  }, 'stay');
+}
+function bringBack(): Promise<void> {
+  return run(async (c) => {
+    const res = await actions.bringBack(c.id, undoTo(c));
+    if (res) log('pile_revisit_change', 'bring_back');
+    return !!res;
+  }, 'stay');
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+function stepBy(dir: -1 | 1): void {
+  if (busy.value || !cursor.canStep(dir)) return;
+  cursor.step(dir);
+  logOnce('pile_step', dir < 0 ? 'prev' : 'next');
+}
+function jumpTo(cardId: string): void {
+  if (busy.value) return;
+  cursor.jumpTo(cardId);
+  log('pile_jump', 'list');
+}
+function backToNext(): void {
+  const next = cursor.nextToDecide.value;
+  if (next && !busy.value) cursor.jumpTo(next);
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────────────────────────
+const KEY_CLASS: Record<string, string> = { k: 'keep', s: 'skip', u: 'undo' };
+const keyClass = (key: string) => KEY_CLASS[key] ?? (key.startsWith('arrow') ? 'step' : 'pick');
+
+function pickNth(n: number): Promise<void> | void {
+  const m = pickable.value[n - 1];
+  if (view.value !== 'pick' || busy.value || !m) return;
+  logOnce('pile_shortcut', 'pick');
+  pulse(faceEl(m.id), 'key-press');
+  return pick(m.id);
+}
+const keyMap: ShortcutMap = {
+  k: () => {
+    if (view.value !== 'sort' || busy.value) return;
+    logOnce('pile_shortcut', 'keep');
+    pulse(keepBtn.value?.$el, 'key-press');
+    keep();
+  },
+  s: () => {
+    if (!canSkip.value || busy.value) return;
+    logOnce('pile_shortcut', 'skip');
+    pulse(skipBtn.value?.$el, 'key-press');
+    return skip();
+  },
+  arrowleft: () => {
+    if (!busy.value && cursor.canStep(-1)) logOnce('pile_shortcut', 'step');
+    stepBy(-1);
+  },
+  arrowright: () => {
+    if (!busy.value && cursor.canStep(1)) logOnce('pile_shortcut', 'step');
+    stepBy(1);
+  },
+  u: () => {
+    logOnce('pile_shortcut', 'undo');
+    return actions.undoLast();
+  },
+};
+for (let n = 1; n <= 9; n++) keyMap[String(n)] = () => pickNth(n);
+useKeyboardShortcuts(keyMap, {
+  enabled: () => cursor.ready.value,
+  tag: 'DealPile',
+  onError: (key) => log('pile_shortcut_error', keyClass(key), 'warn'),
+});
+
 // ── Completion ───────────────────────────────────────────────────────────────
-const finished = computed(() => queueReady.value && !topId.value && !busy.value);
+const finished = computed(() => cursor.ready.value && !currentId.value && !busy.value);
 const kidsHolding = computed(
   () =>
     familyStore.sortedHumans.filter((m) => !isAdultMember(m) && store.myCards(m.id).length > 0)
@@ -390,326 +428,241 @@ const waitingLine = computed(() => {
 <template>
   <div
     ref="rootEl"
-    class="mx-auto flex w-full max-w-md flex-col items-center gap-4"
+    class="mx-auto flex w-full max-w-3xl flex-col items-center gap-6"
     data-testid="deal-pile"
   >
-    <!-- Completion: every card has a holder, or the pile is done with some still waiting. -->
-    <DeckCelebration
-      v-if="finished && store.isFullyDealt && total > 0"
-      :title="t('whoOwnsWhat.pile.celebrateTitle')"
-      :body="fillTemplate(t('whoOwnsWhat.pile.celebrateBody'), { count: store.stats.deck })"
-      :pills="celebratePills"
-      :action-label="t('whoOwnsWhat.pile.seeOverview')"
-      :note="nextCheckInLine"
-      :image-alt="t('whoOwnsWhat.pile.imageAlt')"
-      data-testid="deal-pile-celebrate"
-      @action="emit('overview')"
-    />
+    <div class="flex w-full max-w-md flex-col items-center gap-4">
+      <!-- Completion: every card has a holder, or the pile is done with some still waiting. -->
+      <DeckCelebration
+        v-if="finished && store.isFullyDealt && total > 0"
+        :title="t('whoOwnsWhat.pile.celebrateTitle')"
+        :body="fillTemplate(t('whoOwnsWhat.pile.celebrateBody'), { count: store.stats.deck })"
+        :pills="celebratePills"
+        :action-label="t('whoOwnsWhat.pile.seeOverview')"
+        :note="nextCheckInLine"
+        :image-alt="t('whoOwnsWhat.pile.imageAlt')"
+        data-testid="deal-pile-celebrate"
+        @action="emit('overview')"
+      />
 
-    <div
-      v-else-if="finished"
-      class="dark:bg-surface-raised dark:border-line flex w-full flex-col items-center gap-3 rounded-3xl border border-[var(--color-border)] bg-white px-5 py-6 text-center"
-      data-testid="deal-pile-done"
-    >
-      <span class="text-4xl" aria-hidden="true">🃏</span>
-      <h3 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
-        {{ total > 0 ? t('whoOwnsWhat.pile.doneTitle') : t('whoOwnsWhat.pile.empty') }}
-      </h3>
-      <p
-        v-if="store.stats.waiting > 0"
-        class="dark:text-ink-soft text-sm text-[var(--color-text-muted)]"
+      <div
+        v-else-if="finished"
+        class="dark:bg-surface-raised dark:border-line flex w-full flex-col items-center gap-3 rounded-3xl border border-[var(--color-border)] bg-white px-5 py-6 text-center"
+        data-testid="deal-pile-done"
       >
-        {{ waitingLine }}
-      </p>
-      <div class="flex flex-wrap justify-center gap-2">
-        <button
+        <span class="text-4xl" aria-hidden="true">🃏</span>
+        <h3 class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]">
+          {{ total > 0 ? t('whoOwnsWhat.pile.doneTitle') : t('whoOwnsWhat.pile.empty') }}
+        </h3>
+        <p
           v-if="store.stats.waiting > 0"
-          type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-bold text-white"
-          data-testid="deal-pile-deal-waiting"
-          @click="emit('deal-waiting')"
+          class="dark:text-ink-soft text-sm text-[var(--color-text-muted)]"
         >
-          {{ t('whoOwnsWhat.pile.dealWaiting') }}
-        </button>
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 dark:bg-surface-overlay dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
-          @click="emit('overview')"
-        >
-          {{ t('whoOwnsWhat.pile.seeOverview') }}
-        </button>
-      </div>
-    </div>
-
-    <template v-else-if="card">
-      <!-- Progress -->
-      <div class="w-full space-y-1.5" data-testid="deal-pile-progress">
-        <div
-          class="font-outfit dark:text-ink-faint flex justify-between text-xs font-semibold text-[var(--color-text-muted)]"
-        >
-          <span>{{ toGo }}</span>
-          <span>{{ tally }}</span>
+          {{ waitingLine }}
+        </p>
+        <div class="flex flex-wrap justify-center gap-2">
+          <button
+            v-if="store.stats.waiting > 0"
+            type="button"
+            class="font-outfit from-primary-500 to-terracotta-400 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-bold text-white"
+            data-testid="deal-pile-deal-waiting"
+            @click="emit('deal-waiting')"
+          >
+            {{ t('whoOwnsWhat.pile.dealWaiting') }}
+          </button>
+          <button
+            type="button"
+            class="font-outfit text-secondary-500 dark:bg-surface-overlay dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
+            @click="emit('overview')"
+          >
+            {{ t('whoOwnsWhat.pile.seeOverview') }}
+          </button>
         </div>
-        <div
-          class="progress-track h-2 w-full overflow-hidden rounded-full"
-          role="progressbar"
-          :aria-valuemin="0"
-          :aria-valuemax="total"
-          :aria-valuenow="doneCount"
-          :aria-label="toGo"
-        >
+      </div>
+
+      <template v-else-if="card">
+        <!-- Progress -->
+        <div class="w-full space-y-1.5" data-testid="deal-pile-progress">
+          <p
+            class="font-outfit dark:text-ink-faint text-xs font-semibold text-[var(--color-text-muted)]"
+          >
+            {{ toGo }}
+          </p>
           <div
-            class="from-primary-500 to-terracotta-400 h-full rounded-full bg-gradient-to-r transition-[width]"
-            :style="{ width: `${total ? (doneCount / total) * 100 : 0}%` }"
-          />
-        </div>
-      </div>
-
-      <!-- The pile: two card backs, the live card on top. -->
-      <div class="pile relative mt-1 shrink-0">
-        <div class="card-back back-2" aria-hidden="true">
-          <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />
-        </div>
-        <div class="card-back back-1" aria-hidden="true">
-          <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />
-        </div>
-        <article
-          ref="cardEl"
-          :key="card.id"
-          class="pile-card dark:bg-surface-raised dark:border-line-strong absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white"
-          :class="{ 'is-leaving': leaving }"
-          :style="{ '--cat': tint }"
-          :data-testid="`deal-pile-card-${card.id}`"
-        >
-          <div class="slab relative grid place-items-center overflow-hidden">
-            <span class="text-6xl leading-none" aria-hidden="true">{{ cardEmoji(card) }}</span>
-            <span
-              class="pointer-events-none absolute -right-1.5 -bottom-3.5 text-6xl leading-none opacity-[0.07]"
-              aria-hidden="true"
-              >{{ cardEmoji(card) }}</span
-            >
+            class="progress-track h-2 w-full overflow-hidden rounded-full"
+            role="progressbar"
+            :aria-valuemin="0"
+            :aria-valuemax="total"
+            :aria-valuenow="doneCount"
+            :aria-label="toGo"
+          >
+            <div
+              class="from-primary-500 to-terracotta-400 h-full rounded-full bg-gradient-to-r transition-[width]"
+              :style="{ width: `${total ? (doneCount / total) * 100 : 0}%` }"
+            />
           </div>
-          <div class="flex flex-1 flex-col gap-1 p-3">
-            <p
-              class="font-outfit dark:text-ink text-lg leading-tight font-semibold text-[var(--color-text)]"
+        </div>
+
+        <p
+          class="font-outfit dark:text-ink-soft text-sm font-semibold text-[var(--color-text-muted)]"
+          data-testid="deal-pile-position"
+        >
+          {{ positionLine }}
+        </p>
+
+        <DealPileStage
+          ref="stageRef"
+          :card="card"
+          :leaving="leaving"
+          :can-prev="!busy && cursor.canStep(-1)"
+          :can-next="!busy && cursor.canStep(1)"
+          @step="stepBy"
+        />
+
+        <!-- Keep or skip. Equal, unselected buttons; Keep first. -->
+        <template v-if="view === 'sort'">
+          <p
+            class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]"
+            data-testid="deal-pile-question"
+          >
+            {{ t('whoOwnsWhat.pile.question') }}
+          </p>
+          <div class="grid w-full max-w-sm grid-cols-2 gap-2.5">
+            <DeckActionButton
+              ref="keepBtn"
+              variant="choice"
+              :disabled="busy"
+              aria-keyshortcuts="K"
+              data-testid="deal-pile-keep"
+              @click="keep"
             >
-              {{ cardName(card) }}
-            </p>
-            <p
-              v-if="cardDone(card)"
-              class="dark:text-ink-faint text-sm leading-snug text-[var(--color-text-muted)]"
+              <span aria-hidden="true">✓</span> {{ t('whoOwnsWhat.pile.keep') }}
+            </DeckActionButton>
+            <DeckActionButton
+              ref="skipBtn"
+              variant="choice"
+              :disabled="busy"
+              aria-keyshortcuts="S"
+              data-testid="deal-pile-skip"
+              @click="skip"
             >
-              {{ cardDone(card) }}
-            </p>
-            <span
-              class="cat-chip font-outfit dark:text-ink-soft mt-auto inline-flex items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-xs font-semibold text-[var(--color-text)]"
-            >
-              <i class="h-2 w-2 rounded-full" :style="{ background: tint }" />{{
-                categoryLabel(card.category)
+              <span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skip') }}
+            </DeckActionButton>
+          </div>
+
+          <!-- Group shortcut: "No car? Skip all 3 of these cards at once". -->
+          <div
+            v-if="shortcut"
+            class="shortcut dark:border-line flex w-full items-center gap-2.5 rounded-2xl border border-[var(--tint-silk-30)] px-3 py-2.5 text-xs"
+            data-testid="deal-pile-shortcut"
+          >
+            <span class="text-base" aria-hidden="true">{{ cardEmoji(card) }}</span>
+            <span class="dark:text-ink-soft min-w-0 flex-1 text-[var(--color-text-muted)]">
+              <b class="font-outfit dark:text-ink text-[var(--color-text)]">{{
+                t(GROUP_QUESTION[shortcut.group])
+              }}</b>
+              {{
+                fillTemplate(t('whoOwnsWhat.pile.groupBody'), {
+                  count: shortcut.unsortedIds.length,
+                })
               }}
             </span>
-          </div>
-        </article>
-      </div>
-
-      <!-- Stage 1 (first deal): keep or skip. Keep is primary and first. -->
-      <template v-if="stage === 'sort'">
-        <p
-          class="font-outfit text-primary-500 dark:text-accent-lift text-lg font-bold"
-          data-testid="deal-pile-question"
-        >
-          {{ t('whoOwnsWhat.pile.question') }}
-        </p>
-        <div class="grid w-full grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            class="font-outfit from-primary-500 to-terracotta-400 rounded-2xl bg-gradient-to-r px-3 py-3 text-sm font-bold text-white shadow-[0_4px_12px_rgb(241_93_34/20%)] disabled:opacity-60"
-            :disabled="busy"
-            data-testid="deal-pile-keep"
-            @click="keep"
-          >
-            ✓ {{ t('whoOwnsWhat.pile.keep') }}
-          </button>
-          <button
-            type="button"
-            class="font-outfit dark:bg-surface-overlay dark:border-line dark:text-ink rounded-2xl border border-[var(--color-border)] bg-[#F3F5F7] px-3 py-3 text-sm font-bold text-[var(--color-text)] disabled:opacity-60"
-            :disabled="busy"
-            data-testid="deal-pile-skip"
-            @click="skip"
-          >
-            <span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skip') }}
-          </button>
-        </div>
-
-        <!-- Group shortcut: "No car? Skip all 3 of these cards at once". -->
-        <div
-          v-if="shortcut"
-          class="shortcut dark:border-line flex w-full items-center gap-2.5 rounded-2xl border border-[var(--tint-silk-30)] px-3 py-2.5 text-xs"
-          data-testid="deal-pile-shortcut"
-        >
-          <span class="text-base" aria-hidden="true">{{ cardEmoji(card) }}</span>
-          <span class="dark:text-ink-soft min-w-0 flex-1 text-[var(--color-text-muted)]">
-            <b class="font-outfit dark:text-ink text-[var(--color-text)]">{{
-              t(GROUP_QUESTION[shortcut.group])
-            }}</b>
-            {{
-              fillTemplate(t('whoOwnsWhat.pile.groupBody'), { count: shortcut.unsortedIds.length })
-            }}
-          </span>
-          <button
-            type="button"
-            class="font-outfit text-primary-500 dark:text-accent-lift shrink-0 font-bold whitespace-nowrap"
-            :disabled="busy"
-            data-testid="deal-pile-group-skip"
-            @click="skipGroup"
-          >
-            {{
-              fillTemplate(t('whoOwnsWhat.pile.groupAction'), {
-                count: shortcut.unsortedIds.length,
-              })
-            }}
-          </button>
-        </div>
-      </template>
-
-      <!-- Stage 2: who owns it? One tap deals (and, on a first deal, keeps) the card. -->
-      <template v-else>
-        <InlineMemberPicker
-          class="w-full"
-          :members="members"
-          :title="scope === 'unsorted' ? t('whoOwnsWhat.pile.kept') : t('whoOwnsWhat.pile.whoOwns')"
-          :subtitle="partLine || undefined"
-          :back-label="t('whoOwnsWhat.pile.decideLater')"
-          :empty-message="t('whoOwnsWhat.pile.noMembers')"
-          :tile-testid-prefix="PICK_TESTID_PREFIX"
-          dismiss-style="close"
-          @pick="pick"
-          @cancel="decideLater"
-        >
-          <template #badge="{ member }">
-            <span
-              class="got min-h-[1.125rem] text-xs leading-none"
-              :data-testid="`deal-pile-got-${member.id}`"
-              >{{ gotFor(member.id) }}</span
+            <button
+              type="button"
+              class="font-outfit text-primary-500 dark:text-accent-lift shrink-0 font-bold whitespace-nowrap"
+              :disabled="busy"
+              data-testid="deal-pile-group-skip"
+              @click="skipGroup"
             >
-          </template>
-        </InlineMemberPicker>
-        <div class="flex flex-wrap justify-center gap-2">
-          <DeckActionButton
+              {{
+                fillTemplate(t('whoOwnsWhat.pile.groupAction'), {
+                  count: shortcut.unsortedIds.length,
+                })
+              }}
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <!-- A decided card: who has it (or waiting / skipped), and what can change. -->
+          <DealPileBanner
+            v-if="bannerView"
+            :card="card"
+            :view="bannerView"
+            :can-give="otherHumans(members, card).length > 0"
             :disabled="busy"
-            data-testid="deal-pile-split"
-            @click="emit('split', card.id)"
-          >
-            <span aria-hidden="true">✂️</span> {{ t('whoOwnsWhat.pile.split') }}
-          </DeckActionButton>
-          <DeckActionButton :disabled="busy" data-testid="deal-pile-skip-pick" @click="skip">
-            <span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skip') }}
-          </DeckActionButton>
-        </div>
-      </template>
+            @give="give"
+            @skip-instead="skipInstead"
+            @split="emit('split', card.id)"
+            @bring-back="bringBack"
+          />
 
-      <!-- The skipped tray: its emoji row grows as cards drop in. -->
-      <div
-        ref="trayEl"
-        class="tray dark:border-line-strong flex w-full items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-[rgb(44_62_80/18%)] px-3 py-2"
-        data-testid="deal-pile-tray"
-      >
-        <span
-          class="font-outfit dark:text-ink-faint shrink-0 text-xs font-semibold text-[var(--color-text-muted)]"
-          ><span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skipped') }}</span
+          <!-- Who owns it? One tap deals (and, on a first deal, keeps) the card. -->
+          <template v-if="view === 'pick'">
+            <InlineMemberPicker
+              class="w-full"
+              :members="pickable"
+              :title="
+                card.status === 'unsorted'
+                  ? t('whoOwnsWhat.pile.kept')
+                  : t('whoOwnsWhat.pile.whoOwns')
+              "
+              :subtitle="partLine || undefined"
+              :back-label="
+                card.status === 'held' ? t('action.cancel') : t('whoOwnsWhat.pile.decideLater')
+              "
+              :empty-message="t('whoOwnsWhat.pile.noMembers')"
+              :tile-testid-prefix="PICK_TESTID_PREFIX"
+              dismiss-style="close"
+              number-shortcuts
+              @pick="pick"
+              @cancel="onPickerCancel"
+            />
+            <div v-if="card.status !== 'held'" class="flex flex-wrap justify-center gap-2">
+              <DeckActionButton
+                :disabled="busy"
+                data-testid="deal-pile-split"
+                @click="emit('split', card.id)"
+              >
+                <span aria-hidden="true">✂️</span> {{ t('whoOwnsWhat.pile.split') }}
+              </DeckActionButton>
+              <DeckActionButton
+                ref="skipBtn"
+                :disabled="busy"
+                aria-keyshortcuts="S"
+                data-testid="deal-pile-skip-pick"
+                @click="skip"
+              >
+                <span aria-hidden="true">⏭️</span> {{ t('whoOwnsWhat.pile.skip') }}
+              </DeckActionButton>
+            </div>
+          </template>
+        </template>
+
+        <button
+          v-if="!undecided && backToLabel"
+          type="button"
+          class="font-outfit text-primary-500 dark:text-accent-lift text-sm font-semibold underline-offset-2 hover:underline"
+          :disabled="busy"
+          data-testid="deal-pile-back-to"
+          @click="backToNext"
         >
-        <span class="min-w-0 truncate text-sm" data-testid="deal-pile-tray-emojis">{{
-          trayEmojis
-        }}</span>
-      </div>
+          {{ backToLabel }} <span aria-hidden="true">›</span>
+        </button>
+      </template>
+    </div>
 
-      <button
-        v-if="showBoardLink"
-        type="button"
-        class="font-outfit text-primary-500 dark:text-accent-lift text-xs font-semibold underline-offset-2 hover:underline"
-        @click="emit('use-board')"
-      >
-        {{ t('whoOwnsWhat.pile.useBoard') }}
-      </button>
-    </template>
+    <DealPileLists
+      v-if="cursor.ready.value"
+      ref="listsRef"
+      :current-id="currentId"
+      :disabled="busy"
+      @jump="jumpTo"
+    />
   </div>
 </template>
 
 <style scoped>
-.pile {
-  height: 17rem;
-  width: 12.25rem;
-}
-
-.card-back {
-  background: linear-gradient(155deg, #f15d22, #e67e22);
-  border: 4px solid #fff;
-  border-radius: 1rem;
-  box-shadow: var(--card-shadow);
-  display: grid;
-  inset: 0;
-  place-items: center;
-  position: absolute;
-}
-
-html.dark .card-back {
-  border-color: var(--color-surface-raised);
-}
-
-.card-back img {
-  opacity: 0.9;
-  width: 4.375rem;
-}
-
-.back-1 {
-  transform: rotate(5deg) translate(0.625rem, 0.25rem);
-}
-
-.back-2 {
-  transform: rotate(-4deg) translate(-0.5625rem, 0.375rem);
-}
-
-.pile-card {
-  animation: pile-enter 280ms ease-out;
-  box-shadow: var(--card-hover-shadow);
-  transform: rotate(-2deg);
-}
-
-/* After its flight the card stays hidden until the next one replaces it. The flight's own
-   keyframes set opacity, so this has no effect while it is in the air. */
-.pile-card.is-leaving {
-  opacity: 0;
-}
-
-@keyframes pile-enter {
-  from {
-    opacity: 0.5;
-    transform: rotate(5deg) translate(0.625rem, 0.5rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: rotate(-2deg);
-  }
-}
-
-.slab {
-  background: color-mix(in srgb, var(--cat) 12%, transparent);
-  flex: 0 0 42%;
-}
-
-html.dark .slab {
-  background: color-mix(in srgb, var(--cat) 18%, transparent);
-}
-
-.cat-chip {
-  background: color-mix(in srgb, var(--cat) 12%, transparent);
-}
-
-html.dark .cat-chip {
-  background: color-mix(in srgb, var(--cat) 22%, transparent);
-}
-
 .progress-track {
   background: var(--tint-slate-5);
 }
@@ -724,18 +677,5 @@ html.dark .progress-track {
 
 html.dark .shortcut {
   background: var(--color-surface-raised);
-}
-
-.tray {
-  background: transparent;
-}
-
-.got {
-  display: block;
-  letter-spacing: 0.05em;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 </style>
