@@ -112,6 +112,7 @@ import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -161,6 +162,7 @@ const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
 const recipesStore = useRecipesStore();
 const mealPlanStore = useMealPlanStore();
+const responsibilityStore = useResponsibilityStore();
 const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -1052,6 +1054,9 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         medicationsStore.loadMedications(),
         recipesStore.loadRecipes(),
         mealPlanStore.loadMealPlans(),
+        // Same batch as activities/meals: the deck must be loaded before useHelpfulHints'
+        // first debounced reconcile, or a hint created in that gap keeps its default audience.
+        responsibilityStore.load(),
         emergencyContactsStore.loadEmergencyContacts(),
       ]);
 
