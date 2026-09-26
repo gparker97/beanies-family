@@ -119,6 +119,10 @@ export interface HelpfulHintsInput {
   leadDays: Record<HelpfulHintType, number>;
   translate: HintTranslate;
   formatDate: HintFormatDate;
+  /** Who Owns What (#109): hint type → the single holder of its mapped card
+   *  (`CARD_DEFAULTS.hint`). A holder who is in the computed audience becomes the sole
+   *  assignee; one who isn't (e.g. the birthday person) is ignored. */
+  cardHolders?: Partial<Record<HelpfulHintType, string>>;
 }
 
 /** A hint that should currently exist. The actual notification `dueDate` is
@@ -164,8 +168,15 @@ export function buildHintKey(
   return `${hintType}:${scopeId}:${eventDateISO}`;
 }
 
-/** Callback used by the source functions to tally why a candidate was skipped. */
-type SkipRecorder = (reason: HintSkipReason) => void;
+/** What happened to a mapped card holder on a generated hint (#109). */
+export type CardHolderOutcome = 'used' | 'ineligible';
+
+/** Callbacks the source functions use to tally why a candidate was skipped, and what
+ *  happened to its card holder. */
+interface Recorder {
+  skip: (reason: HintSkipReason) => void;
+  holder: (outcome: CardHolderOutcome) => void;
+}
 
 /** Build a DesiredHint for an in-window event, or null if outside its window /
  *  no audience (recording the reason). `scopeId` = the stable per-source id. */
@@ -176,22 +187,34 @@ function buildDesired(
   eventDate: string,
   name: string,
   assigneeIds: string[],
-  skip: SkipRecorder
+  rec: Recorder
 ): DesiredHint | null {
   if (!assigneeIds.length) {
-    skip('no-audience');
+    rec.skip('no-audience');
     return null;
   }
   if (eventDate < input.today) {
-    skip('retroactive');
+    rec.skip('retroactive');
     return null;
   }
   const lead = input.leadDays[hintType];
   // eventDate >= today is guaranteed above, so daysBetween (absolute) is the
   // forward distance. Reuse the shared date helper rather than re-implement it.
   if (daysBetween(input.today, eventDate) > lead) {
-    skip('out-of-window');
+    rec.skip('out-of-window');
     return null;
+  }
+  // The card holder narrows the audience only from WITHIN it, so a surprise-sensitive
+  // exclusion (the birthday person) can never be undone by a card.
+  const holder = input.cardHolders?.[hintType];
+  let audience = assigneeIds;
+  if (holder) {
+    if (assigneeIds.includes(holder)) {
+      audience = [holder];
+      rec.holder('used');
+    } else {
+      rec.holder('ineligible');
+    }
   }
   const title = input.translate(HINT_TYPE_META[hintType].titleKey, {
     name,
@@ -201,7 +224,7 @@ function buildDesired(
     hintType,
     hintKey: buildHintKey(hintType, scopeId, eventDate),
     title,
-    assigneeIds,
+    assigneeIds: audience,
     eventDate,
   };
 }
@@ -223,18 +246,21 @@ export interface ComputeResult {
   /** Per-reason tally of candidates that did NOT become a hint (normal
    *  degradations + malformed-record) — for "why no hint for X?" triage. */
   reasons: Partial<Record<HintSkipReason, number>>;
+  /** Who Owns What (#109): desired hints assigned to their card holder, and hints whose
+   *  card holder was outside the audience (so the default audience was kept). */
+  cardHolder: { used: number; ineligible: number };
 }
 
 /** Trigger 1 — member birthday −14d → present/party (adults excl. the birthday
  *  person & pets). */
-function birthdayHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
+function birthdayHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   const adults = input.members.filter((m) => isAdultMember(m) && !m.isPet);
   for (const member of input.members) {
     try {
       if (member.isPet) continue;
       if (!member.dateOfBirth) {
-        skip('no-dob');
+        rec.skip('no-dob');
         continue;
       }
       const { month, day } = member.dateOfBirth;
@@ -247,18 +273,18 @@ function birthdayHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHin
         eventDate,
         member.name,
         audience,
-        skip
+        rec
       );
       if (hint) out.push(hint);
     } catch {
-      skip('malformed-record');
+      rec.skip('malformed-record');
     }
   }
   return out;
 }
 
 /** Triggers 2–4 — Party-group activity occurrences → gift/plan hints (attendees). */
-function activityHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
+function activityHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   for (const occ of Object.values(input.occurrences).flat()) {
     try {
@@ -273,27 +299,27 @@ function activityHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHin
         extractDatePart(date),
         activity.title,
         audience,
-        skip
+        rec
       );
       if (hint) out.push(hint);
     } catch {
-      skip('malformed-record');
+      rec.skip('malformed-record');
     }
   }
   return out;
 }
 
 /** Triggers 5–6 — trip −2d packing / −7d documents (travellers). */
-function tripHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] {
+function tripHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   for (const trip of input.vacations) {
     try {
       if (!trip.startDate) {
-        skip('no-start-date');
+        rec.skip('no-start-date');
         continue;
       }
       if (!trip.assigneeIds.length) {
-        skip('no-attendees');
+        rec.skip('no-attendees');
         continue;
       }
       const eventDate = extractDatePart(trip.startDate);
@@ -305,12 +331,12 @@ function tripHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] 
           eventDate,
           trip.name,
           trip.assigneeIds,
-          skip
+          rec
         );
         if (hint) out.push(hint);
       }
     } catch {
-      skip('malformed-record');
+      rec.skip('malformed-record');
     }
   }
   return out;
@@ -319,15 +345,21 @@ function tripHints(input: HelpfulHintsInput, skip: SkipRecorder): DesiredHint[] 
 /** The full desired set + skip diagnostics (error count + per-reason tally). */
 export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
   const reasons: Partial<Record<HintSkipReason, number>> = {};
-  const skip: SkipRecorder = (reason) => {
-    reasons[reason] = (reasons[reason] ?? 0) + 1;
+  const cardHolder = { used: 0, ineligible: 0 };
+  const rec: Recorder = {
+    skip: (reason) => {
+      reasons[reason] = (reasons[reason] ?? 0) + 1;
+    },
+    holder: (outcome) => {
+      cardHolder[outcome] += 1;
+    },
   };
   const hints = [
-    ...birthdayHints(input, skip),
-    ...activityHints(input, skip),
-    ...tripHints(input, skip),
+    ...birthdayHints(input, rec),
+    ...activityHints(input, rec),
+    ...tripHints(input, rec),
   ];
-  return { hints, skipped: reasons['malformed-record'] ?? 0, reasons };
+  return { hints, skipped: reasons['malformed-record'] ?? 0, reasons, cardHolder };
 }
 
 /** Diff desired hints against the family's existing hint to-dos.
