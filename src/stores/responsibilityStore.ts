@@ -126,7 +126,7 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
 
   const rhythmWeeks = computed(() => settingsStore.responsibilityCheckInWeeks);
   const lastCheckIn = computed(() => latestCheckIn(checkIns.value));
-  const dealtAt = computed(() => firstDealtAt(resolved.value));
+  const dealtAt = computed(() => firstDealtAt(moves.value));
   const nextCheckIn = computed(() =>
     nextCheckInDate(rhythmWeeks.value, checkIns.value, dealtAt.value)
   );
