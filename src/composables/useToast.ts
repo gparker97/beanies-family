@@ -186,6 +186,14 @@ export function dismissToast(id: number): void {
 }
 
 /**
+ * Is this toast still on screen with its action? False once it has expired, been
+ * dismissed, or had its action used (each removes it from the list).
+ */
+export function hasToastAction(id: number): boolean {
+  return toasts.value.some((t) => t.id === id && !!t.actionFn);
+}
+
+/**
  * Fire the toast's bound action (if any), then dismiss it. Runs the
  * handler AFTER dismissal so the toast doesn't linger while the action
  * resolves. Catches thrown exceptions and surfaces them as an error

@@ -137,6 +137,43 @@ describe('usePileCursor', () => {
     expect(cursor.total.value).toBe(2);
   });
 
+  it('a jump from the done state forgets the card an earlier visit left', () => {
+    const { cursor, set } = setup([
+      card('a', 'unsorted'),
+      card('b', 'unsorted'),
+      card('h', 'held', 'kids'),
+    ]);
+    cursor.load(['a', 'b']);
+    cursor.jumpTo('h'); // visit from a: returns to a
+    expect(cursor.canStep(1)).toBe(true);
+    cursor.step(1);
+    expect(cursor.currentId.value).toBe('a');
+    set('a', 'held');
+    set('b', 'held');
+    cursor.settle('a', 'advance');
+    expect(cursor.currentId.value).toBeNull();
+    // From the done state there is nowhere to go back to, not the stale "a".
+    cursor.jumpTo('h');
+    expect(cursor.visiting.value).toBe(true);
+    expect(cursor.canStep(-1)).toBe(false);
+    expect(cursor.canStep(1)).toBe(false);
+    cursor.step(1);
+    expect(cursor.currentId.value).toBe('h');
+  });
+
+  it('a jump from one visited card to another still returns to the queue card', () => {
+    const { cursor } = setup([
+      card('a', 'unsorted'),
+      card('h1', 'held', 'kids'),
+      card('h2', 'held', 'kids'),
+    ]);
+    cursor.load(['a']);
+    cursor.jumpTo('h1');
+    cursor.jumpTo('h2');
+    cursor.step(-1);
+    expect(cursor.currentId.value).toBe('a');
+  });
+
   it('settle advance moves to the next undecided card, wrapping, then to the done state', () => {
     const { cursor, set } = setup([card('a', 'unsorted'), card('b', 'unsorted')]);
     cursor.load(['a', 'b']);

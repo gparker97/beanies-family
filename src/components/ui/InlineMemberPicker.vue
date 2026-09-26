@@ -83,7 +83,18 @@ onMounted(() => {
   void scrollIntoView();
 });
 
-defineExpose({ scrollIntoView });
+/**
+ * A member's avatar, for a host's one-shot landing effect (the deal pile's `card-bounce`).
+ * The avatar, not the tile: the tile's scoped rule owns its `animation` (the entrance pop),
+ * so a one-shot class on the tile would never play, and letting one win there would replay
+ * the pop when the class came off.
+ */
+function faceEl(memberId: string): HTMLElement | null {
+  const faces = rootRef.value?.querySelectorAll<HTMLElement>('[data-face]') ?? [];
+  return [...faces].find((el) => el.dataset.face === memberId) ?? null;
+}
+
+defineExpose({ scrollIntoView, faceEl });
 </script>
 
 <template>
@@ -116,6 +127,7 @@ defineExpose({ scrollIntoView });
         @click="emit('pick', member.id)"
       >
         <BeanieAvatar
+          :data-face="member.id"
           :variant="getMemberAvatarVariant(member)"
           :color="member.color"
           size="sm"

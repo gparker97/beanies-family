@@ -28,11 +28,22 @@ const telemetry = vi.hoisted(() => ({ logEvent: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => telemetry);
 const fly = vi.hoisted(() => ({ flyTo: vi.fn(() => Promise.resolve()) }));
 vi.mock('@/composables/useFlyTo', () => ({ flyTo: fly.flyTo }));
-const toast = vi.hoisted(() => ({ show: vi.fn(), dismiss: vi.fn(), invoke: vi.fn() }));
+// A live toast list like the real one: shown toasts sit in it until dismissed or used.
+const toast = vi.hoisted(() => {
+  const toasts = { value: [] as { id: number; actionFn?: () => unknown }[] };
+  const remove = (id: number) => (toasts.value = toasts.value.filter((t) => t.id !== id));
+  return {
+    toasts,
+    show: vi.fn(),
+    dismiss: vi.fn(remove),
+    invoke: vi.fn(async (id: number) => void remove(id)),
+  };
+});
 vi.mock('@/composables/useToast', () => ({
   showToast: toast.show,
   dismissToast: toast.dismiss,
   invokeToastAction: toast.invoke,
+  hasToastAction: (id: number) => toast.toasts.value.some((t) => t.id === id && !!t.actionFn),
 }));
 
 const family = reactive({
@@ -103,19 +114,30 @@ const store = reactive({
 });
 vi.mock('@/stores/responsibilityStore', () => ({ useResponsibilityStore: () => store }));
 
-// A light InlineMemberPicker: the real one's tiles, testids and back chip.
+// A light InlineMemberPicker: the real one's tiles, testids, back chip and `faceEl`.
 const PickerStub = defineComponent({
   props: ['members', 'title', 'backLabel', 'tileTestidPrefix'],
   emits: ['pick', 'cancel'],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
+    const faces = new Map<string, HTMLElement>();
+    expose({ faceEl: (id: string) => faces.get(id) ?? null });
     return () =>
       h('section', { 'data-testid': 'picker', 'data-back': props.backLabel }, [
         h('button', { 'data-testid': 'picker-back', onClick: () => emit('cancel') }),
         ...props.members.map((m: { id: string }) =>
-          h('button', {
-            'data-testid': `${props.tileTestidPrefix}${m.id}`,
-            onClick: () => emit('pick', m.id),
-          })
+          h(
+            'button',
+            {
+              'data-testid': `${props.tileTestidPrefix}${m.id}`,
+              onClick: () => emit('pick', m.id),
+            },
+            [
+              h('span', {
+                'data-testid': `face-${m.id}`,
+                ref: (el) => (el ? faces.set(m.id, el as HTMLElement) : faces.delete(m.id)),
+              }),
+            ]
+          )
         ),
       ]);
   },
@@ -149,7 +171,14 @@ function lastUndo(): () => Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   resetDealActionsForTest();
-  toast.show.mockImplementation(() => 1);
+  toast.toasts.value = [];
+  let toastId = 0;
+  toast.show.mockImplementation(
+    (_type: string, _title: string, _message?: string, opts?: { actionFn?: () => unknown }) => {
+      toast.toasts.value.push({ id: ++toastId, actionFn: opts?.actionFn });
+      return toastId;
+    }
+  );
   store.resolved = [makeCard('laundry'), makeCard('dishes')];
   store.deal.mockImplementation(async (id: string, _part: string, memberId: string) => {
     store.set(id, { status: 'held', parts: [{ key: 'main', holderId: memberId }] });
@@ -262,6 +291,40 @@ describe('DealPile: first decisions', () => {
     land();
     await flushPromises();
     expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+  });
+
+  it('a group skip in flight keeps its shortcut row, then releases it', async () => {
+    store.resolved = [
+      { ...makeCard('laundry'), group: 'car' },
+      { ...makeCard('dishes'), group: 'car' },
+    ];
+    let land!: () => void;
+    fly.flyTo.mockImplementationOnce(() => new Promise<void>((r) => (land = r)));
+    const w = mountPile();
+    expect(has(w, 'deal-pile-shortcut')).toBe(true);
+    await click(w, 'deal-pile-group-skip');
+    await flushPromises();
+    // Both cards are skipped in the store; the row the flight started from stays.
+    expect(store.skip).toHaveBeenCalledWith(['laundry', 'dishes']);
+    expect(has(w, 'deal-pile-shortcut')).toBe(true);
+    land();
+    await flushPromises();
+    expect(has(w, 'deal-pile-shortcut')).toBe(false);
+  });
+
+  it("a pick bounces the chosen face's avatar, the picker's own target", async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-keep');
+    const face = w.find('[data-testid="face-sofia"]').element as HTMLElement;
+    const seen: string[] = [];
+    const add = face.classList.add.bind(face.classList);
+    vi.spyOn(face.classList, 'add').mockImplementation((...c: string[]) => {
+      seen.push(...c);
+      add(...c);
+    });
+    await click(w, 'deal-pick-sofia');
+    await flushPromises();
+    expect(seen).toContain('card-bounce');
   });
 
   it('"Decide later" is the only path that calls keep, and moves on', async () => {
@@ -379,7 +442,9 @@ describe('DealPile: stepping and revisiting', () => {
     expect(store.bringBack).toHaveBeenCalledWith('laundry');
     expect(has(w, 'deal-pile-card-laundry')).toBe(true);
     expect(has(w, 'deal-banner-give')).toBe(true);
-    expect(logged('pile_revisit_change')).toEqual([{ detail: 'bring_back' }]);
+    // One event for the whole move, told apart from the banner's own Bring back.
+    expect(logged('pile_revisit_change')).toEqual([{ detail: 'bring_back_list' }]);
+    expect(logged('pile_jump')).toEqual([]);
     expect(toast.show.mock.calls.at(-1)![3]?.actionFn).toBeTypeOf('function');
   });
 
@@ -517,14 +582,18 @@ describe('DealPile: keyboard shortcuts', () => {
     expect(press('ArrowRight').defaultPrevented).toBe(true);
   });
 
-  it('ignores keys while focus is on a control outside the pile', async () => {
-    const outside = document.createElement('button');
-    document.body.appendChild(outside);
+  it('acts after a click on a page-level button outside the pile (focus left there)', async () => {
+    const toggle = document.createElement('button');
+    document.body.appendChild(toggle);
     const w = mountPile();
-    outside.focus();
-    expect(press('k').defaultPrevented).toBe(false);
+    toggle.focus();
+    toggle.click();
+    expect(press('k').defaultPrevented).toBe(true);
     await flushPromises();
-    expect(has(w, 'picker')).toBe(false);
-    outside.remove();
+    expect(has(w, 'picker')).toBe(true);
+    press('1');
+    await flushPromises();
+    expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'greg');
+    toggle.remove();
   });
 });

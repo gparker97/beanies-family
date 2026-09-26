@@ -15,7 +15,7 @@
  * A component that shows its own trace of an action (the deal pile's emoji row under a
  * face) passes `onUndone`, called only when the toast's Undo actually landed.
  */
-import { dismissToast, invokeToastAction, showToast } from '@/composables/useToast';
+import { dismissToast, hasToastAction, invokeToastAction, showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -31,14 +31,12 @@ export interface DealActionOptions {
   onUndone?: () => void;
 }
 
-/** The one live deck toast, shared by every consumer, and whether it carries an Undo. */
+/** The one deck toast last shown, shared by every consumer. */
 let liveUndoToastId: number | null = null;
-let liveToastHasUndo = false;
 
 /** Test seam: forget the live toast between tests. */
 export function resetDealActionsForTest(): void {
   liveUndoToastId = null;
-  liveToastHasUndo = false;
 }
 
 export function useDealActions() {
@@ -56,7 +54,6 @@ export function useDealActions() {
 
   function offer(title: string, token: UndoToken | null, opts?: DealActionOptions): void {
     if (liveUndoToastId !== null) dismissToast(liveUndoToastId);
-    liveToastHasUndo = token !== null;
     liveUndoToastId = token
       ? showToast('success', title, undefined, {
           actionLabel: t('action.undo'),
@@ -133,11 +130,15 @@ export function useDealActions() {
   }
 
   /**
-   * Whether the last deck toast offered an Undo, so `U` has something to tap (it may have
-   * just expired, in which case `undoLast` quietly does nothing).
+   * Whether the last deck toast is still on screen with its Undo, so `U` has something to
+   * tap. Read from the live toast list: a toast that expired, was dismissed or was used is
+   * gone from it, and then the remembered id is cleared too.
    */
   function hasLiveUndo(): boolean {
-    return liveUndoToastId !== null && liveToastHasUndo;
+    if (liveUndoToastId === null) return false;
+    const live = hasToastAction(liveUndoToastId);
+    if (!live) liveUndoToastId = null;
+    return live;
   }
 
   /**
@@ -153,7 +154,6 @@ export function useDealActions() {
       return;
     }
     liveUndoToastId = null;
-    liveToastHasUndo = false;
     await invokeToastAction(id);
   }
 
