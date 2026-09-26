@@ -14,6 +14,7 @@ import {
   buildUndo,
   draftPartsForMode,
   moveId,
+  withCycleStart,
   type DeckOp,
 } from '@/utils/responsibilityOps';
 import type { FamilyMember, ResponsibilityCardState, ResponsibilityMove } from '@/types/models';
@@ -90,6 +91,7 @@ describe('buildDeal', () => {
       before: { laundry: null },
       afterUpdatedAt: { laundry: NOW },
       createdMoveIds: [m!.move.id],
+      createdCheckInIds: [],
     });
     expect(r.telemetry[0]).toMatchObject({ message: 'card_dealt', context: { detail: 'first' } });
   });
@@ -394,7 +396,7 @@ describe('buildCheckIn', () => {
     const outcomes = { stillWorks: 2, talkAbout: 1, redealt: 1, dealtNow: 3 };
     const r = buildCheckIn(outcomes, 'greg', NOW, '2026-09-26');
     expect(r.ops).toEqual([{ op: 'setCheckIn', checkIn: r.checkIn }]);
-    expect(r.checkIn).toMatchObject({ completedAt: NOW, byId: 'greg' });
+    expect(r.checkIn).toMatchObject({ kind: 'checkin', completedAt: NOW, byId: 'greg' });
     expect(r.checkIn.id).toMatch(/^2026-09-26-[0-9a-f]{8}$/);
     expect(r.telemetry[0]!.context.count).toBe(7);
     // A second check-in the same day is a second record, never an overwrite.
@@ -437,5 +439,93 @@ describe('buildUndo', () => {
     expect(buildUndo(skip.undo!, new Map([['laundry', { updatedAt: NOW }]]))).toEqual({
       stale: true,
     });
+  });
+});
+
+describe('withCycleStart', () => {
+  const START_ID = 'start-1';
+  const starts = (ops: DeckOp[]) =>
+    ops.filter((o): o is Extract<DeckOp, { op: 'setCheckIn' }> => o.op === 'setCheckIn');
+  const custom = (holderId?: string) =>
+    state('custom-hens', {
+      custom: { name: 'Hens', emoji: '🐔', category: 'home' },
+      parts: [{ key: 'main', ...(holderId ? { holderId } : {}) }],
+    });
+
+  it('the first keep or deal into an empty deck appends ONE start record, in the undo too', () => {
+    const deck = resolved([]);
+    for (const build of [
+      buildKeep(card(deck, 'laundry'), 'greg', NOW),
+      buildDeal(card(deck, 'laundry'), 'main', 'sofia', 'greg', NOW),
+    ]) {
+      const r = withCycleStart(build, deck, 'greg', NOW, '2026-09-26', START_ID);
+      expect(starts(r.ops)).toEqual([
+        {
+          op: 'setCheckIn',
+          checkIn: {
+            id: START_ID,
+            kind: 'start',
+            completedAt: NOW,
+            byId: 'greg',
+            stillWorks: 0,
+            talkAbout: 0,
+            redealt: 0,
+            dealtNow: 0,
+          },
+        },
+      ]);
+      expect(r.ops.slice(0, build.ops.length)).toEqual(build.ops);
+      expect(r.undo!.createdCheckInIds).toEqual([START_ID]);
+      expect(build.undo!.createdCheckInIds).toEqual([]); // the input is not mutated
+    }
+  });
+
+  it('writes nothing more once the deck has something in it, or for a write that adds nothing', () => {
+    const dealt = resolved([state('laundry')]);
+    const keep = buildKeep(card(dealt, 'dishes'), 'greg', NOW);
+    expect(withCycleStart(keep, dealt, 'greg', NOW, '2026-09-26')).toBe(keep);
+    const empty = resolved([]);
+    const skip = buildSkip([card(empty, 'laundry')], 'greg', NOW);
+    expect(withCycleStart(skip, empty, 'greg', NOW, '2026-09-26')).toBe(skip);
+  });
+
+  it('after Restore (custom cards kept as waiting) the next keep starts a new cycle', () => {
+    const afterRestore = resolved([custom()]);
+    const keep = buildKeep(card(afterRestore, 'laundry'), 'greg', NOW);
+    expect(starts(withCycleStart(keep, afterRestore, 'greg', NOW, '2026-09-26').ops)).toHaveLength(
+      1
+    );
+  });
+
+  it('a custom card starts the cycle only when it is created with a holder', () => {
+    const deck = resolved([]);
+    const input = { name: 'Hens', emoji: '🐔', category: 'home' as const };
+    const bare = buildCreateCustom(input, 'greg', NOW);
+    expect(starts(withCycleStart(bare, deck, 'greg', NOW, '2026-09-26').ops)).toHaveLength(0);
+    const held = buildCreateCustom({ ...input, holderId: 'leo' }, 'greg', NOW);
+    expect(starts(withCycleStart(held, deck, 'greg', NOW, '2026-09-26').ops)).toHaveLength(1);
+  });
+
+  it('undo of the first keep deletes the start; not when another card went in meanwhile', () => {
+    const deck = resolved([]);
+    const r = withCycleStart(
+      buildKeep(card(deck, 'laundry'), 'greg', NOW),
+      deck,
+      'greg',
+      NOW,
+      '2026-09-26',
+      START_ID
+    );
+    const live = new Map([['laundry', { updatedAt: NOW }]]);
+    const alone = buildUndo(r.undo!, live, resolved([state('laundry', { updatedAt: NOW })]));
+    if (alone.stale) throw new Error('unexpected');
+    expect(alone.ops).toContainEqual({ op: 'deleteCheckIn', id: START_ID });
+    const withOther = buildUndo(
+      r.undo!,
+      live,
+      resolved([state('laundry', { updatedAt: NOW }), state('dishes')])
+    );
+    if (withOther.stale) throw new Error('unexpected');
+    expect(withOther.ops.some((o) => o.op === 'deleteCheckIn')).toBe(false);
   });
 });
