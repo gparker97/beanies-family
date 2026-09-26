@@ -3,6 +3,12 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export type ConfirmVariant = 'danger' | 'info';
 
+/** One radio option in a confirm. `label` is already translated, like `detail`. */
+export interface ConfirmChoice {
+  id: string;
+  label: string;
+}
+
 interface ConfirmOptions {
   title: UIStringKey;
   message: UIStringKey;
@@ -44,6 +50,14 @@ interface ConfirmOptions {
    * what looks nice; `covering_eyes` in particular is reserved for privacy and encryption.
    */
   mascotSrc?: string;
+  /**
+   * A radio group between the message and the buttons, for a confirm that also
+   * asks HOW (e.g. restore defaults: keep or clear your own cards). Read the pick
+   * with `confirmChoice()`; `confirm()` still resolves a plain boolean.
+   */
+  choices?: ConfirmChoice[];
+  /** The choice selected when the dialog opens. */
+  defaultChoice?: string;
 }
 
 interface ConfirmState {
@@ -58,6 +72,9 @@ interface ConfirmState {
   confirmLabel?: UIStringKey;
   cancelLabel?: UIStringKey;
   mascotSrc?: string;
+  choices?: ConfirmChoice[];
+  /** The radio the user has selected; bound by ConfirmModal. */
+  selectedChoice?: string;
   resolve: ((value: boolean) => void) | null;
 }
 
@@ -75,6 +92,8 @@ const state = ref<ConfirmState>({
   confirmLabel: undefined,
   cancelLabel: undefined,
   mascotSrc: undefined,
+  choices: undefined,
+  selectedChoice: undefined,
 });
 
 /**
@@ -95,9 +114,22 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
       confirmLabel: options.confirmLabel,
       cancelLabel: options.cancelLabel,
       mascotSrc: options.mascotSrc,
+      // Every confirm() rewrites these, so a radio group from one confirm can
+      // never leak into the next plain one.
+      choices: options.choices?.length ? options.choices : undefined,
+      selectedChoice: options.choices?.length ? options.defaultChoice : undefined,
       resolve,
     };
   });
+}
+
+/**
+ * `confirm()` with `choices`: resolves the selected choice id when the user
+ * confirms (falling back to `defaultChoice`), or `null` when they cancel.
+ */
+export async function confirmChoice(options: ConfirmOptions): Promise<string | null> {
+  const ok = await confirm(options);
+  return ok ? (state.value.selectedChoice ?? options.defaultChoice ?? null) : null;
 }
 
 /**
