@@ -168,6 +168,9 @@ export default [
             '🙅', // Who Owns What skipped-pile banner (#109)
             '✂️', // Who Owns What "cards are split" fact (#109)
             '↩', // Who Owns What "Bring Back" on a skipped card (#109)
+            '⏭️', // Who Owns What skip action + skipped tray (#109)
+            '🃏', // Who Owns What deal pile, all sorted (#109)
+            '🙋', // Who Owns What nav emoji, deal board title (#109)
             '⏰',
             '⏳',
             '⚠',
