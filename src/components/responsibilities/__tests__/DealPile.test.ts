@@ -191,8 +191,11 @@ describe('DealPile', () => {
     await flushPromises();
 
     expect(store.undo).toHaveBeenCalledWith(TOKEN);
-    // The same card is back on top, still at "Who owns it?", with nothing under sofia.
+    // The same card is back on top, asking "Keep this card, or skip it?" again (it is
+    // unsorted again), with nothing under sofia once Keep is tapped.
     expect(w.find('[data-testid="deal-pile-card-laundry"]').exists()).toBe(true);
+    expect(w.find('[data-testid="deal-pick-sofia"]').exists()).toBe(false);
+    await w.find('[data-testid="deal-pile-keep"]').trigger('click');
     expect(w.find('[data-testid="deal-pile-got-sofia"]').text()).toBe('');
   });
 
