@@ -14,6 +14,8 @@
  *     already been shown and logged, so callers branch on falsy and NEVER toast again.
  *   - Refusals (child, card gone, invalid holder, stale undo) are info toasts plus a
  *     `logEvent` warn: nothing broke, so nothing is reported.
+ *   - A builder throw (an editor bug) is `failBuild`: one direct report plus one silent,
+ *     translated toast.
  *   - `restoreDefaults` reports its own failure once, at critical.
  *
  * DEPENDENCY DIRECTION (one-way, no cycles): this store imports only `familyStore`,
@@ -32,6 +34,7 @@ import { isAdultMember } from '@/composables/useMemberInfo';
 import { isDocLoaded } from '@/services/automerge/docService';
 import * as repo from '@/services/automerge/repositories/responsibilityRepository';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -402,18 +405,22 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   }
 
   /**
-   * Surface a builder throw: ONE translated toast and ONE report. A builder's message is a
-   * developer string ("buildSaveCard: ..."), so it goes to the report (as the error, with
-   * its stack) and never into the toast a family reads.
+   * Surface a builder throw: ONE report and ONE translated toast. A builder's message is a
+   * developer string ("buildSaveCard: ..."), so it is the report's message (with the error
+   * and its stack) and never the toast a family reads. The report is made directly and
+   * the toast is `silent`, so toast dedupe (an identical toast already on screen) can
+   * never swallow the report.
    */
   function failBuild(action: string, e: unknown): null {
     const err = e instanceof Error ? e : new Error(String(e));
     error.value = err.message;
-    showToast('error', t('whoOwnsWhat.error.saveFailed'), undefined, {
-      error: err,
+    reportError({
       surface: SURFACE,
+      message: err.message,
+      error: err,
       context: { action: `responsibilityStore:${action}` },
     });
+    showToast('error', t('whoOwnsWhat.error.saveFailed'), undefined, { silent: true });
     return null;
   }
 

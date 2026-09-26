@@ -25,6 +25,10 @@ vi.mock('@/composables/useToast', () => ({ showToast: (...a: unknown[]) => showT
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (k: string) => k }),
 }));
+const reportError = vi.fn();
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: (...a: unknown[]) => reportError(...a),
+}));
 const celebrate = vi.fn();
 vi.mock('@/composables/useCelebration', () => ({
   celebrate: (...a: unknown[]) => celebrate(...a),
@@ -315,17 +319,21 @@ describe('edit, custom cards and restore', () => {
     });
     expect(r).toBeNull();
     expect(applyDeckOps).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledTimes(1);
-    expect(showToast).toHaveBeenCalledWith(
-      'error',
-      'whoOwnsWhat.error.saveFailed',
-      undefined,
+    // ONE direct report carrying the developer string, and ONE silent translated toast, so
+    // toast dedupe can never swallow the report.
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'responsibilities',
+        message: expect.stringContaining('buildSaveCard'),
         context: { action: 'responsibilityStore:saveCard' },
         error: expect.objectContaining({ message: expect.stringContaining('buildSaveCard') }),
       })
     );
+    expect(showToast).toHaveBeenCalledTimes(1);
+    expect(showToast).toHaveBeenCalledWith('error', 'whoOwnsWhat.error.saveFailed', undefined, {
+      silent: true,
+    });
   });
 
   it('deleteCustom removes the card and its moves', async () => {
