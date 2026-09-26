@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useCriticalItems } from '@/composables/useCriticalItems';
+import { formatNookDate } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
@@ -1174,6 +1175,34 @@ describe('useCriticalItems', () => {
       expect(nobody!.route).toEqual({ path: '/who-owns-what', query: { view: 'deal' } });
       expect(nobody!.completable).toBe(false);
       expect(checkIn!.dismissKey).toMatch(/^card-checkin:/);
+    });
+
+    it("dates a moved note by the viewer's LOCAL day, not the UTC day of the timestamp", () => {
+      familyStore.setCurrentMember('parent-1');
+      // 20:00 UTC is already the next day east of UTC (the UTC slice would be a day early).
+      const at = '2026-03-08T20:00:00.000Z';
+      seedDeck(
+        [kept('laundry', 'parent-2')],
+        [
+          {
+            id: `laundry:main:${at}`,
+            cardId: 'laundry',
+            partKey: 'main',
+            fromId: 'parent-1', // "Laundry moved to Dad on {date}."
+            toId: 'parent-2',
+            byId: 'parent-2',
+            at,
+          },
+        ]
+      );
+      const d = new Date(at);
+      const localYmd = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0'),
+      ].join('-');
+      const moved = cardRows().find((r) => r.id === `card-move:laundry:main:${at}`);
+      expect(moved!.message).toContain(formatNookDate(localYmd));
     });
 
     it('orders card rows above the helpful-hint block', () => {

@@ -13,7 +13,7 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { buildCardBriefingRows, type CardBriefingRow } from '@/utils/responsibilityDeck';
+import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/responsibilityDeck';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   formatTime12,
@@ -551,7 +551,7 @@ export function useCriticalItems() {
           message: buildMessage(MOVED_KEYS[row.role], {
             card: card ? cardName(card) : '',
             name: getMemberName(otherId, t('family.unknownMemberInline')),
-            date: formatNookDate(row.move.at.slice(0, 10)),
+            date: formatNookDate(ymdOf(row.move.at)),
           }),
           icon: '🙋',
           completable: true,
