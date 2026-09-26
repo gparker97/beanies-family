@@ -30,28 +30,59 @@ const REVEAL_PULSE_DELAY_MS = 400;
  */
 const PULSE_FALLBACK_MS = 3000;
 
-/** The fallback timer per element and class, so a re-trigger restarts it rather than racing it. */
-const fallbackTimers = new WeakMap<HTMLElement, Map<string, ReturnType<typeof setTimeout>>>();
+/**
+ * One running pulse: its fallback timer and the controller that owns its `animationend`
+ * listener. Exactly one of {animationend, fallback} finishes it, and finishing tears down both.
+ */
+interface ActivePulse {
+  timer: ReturnType<typeof setTimeout>;
+  listener: AbortController;
+}
+
+/**
+ * The running pulse per element and class. A re-trigger finishes the old one's listener and
+ * timer before starting its own, so nothing left over from an earlier pulse (a listener whose
+ * fallback already fired, a timer) can end a newer one early.
+ */
+const activePulses = new WeakMap<HTMLElement, Map<string, ActivePulse>>();
 
 export function useAttentionPulse() {
   function pulse(el: HTMLElement | null | undefined, className = 'attention-pulse') {
     if (!el) return;
+    let running = activePulses.get(el);
+    if (!running) activePulses.set(el, (running = new Map()));
+    const previous = running.get(className);
+    if (previous) {
+      clearTimeout(previous.timer);
+      previous.listener.abort();
+    }
+
     // Remove first in case it's already animating (allows re-trigger)
     el.classList.remove(className);
     // Force reflow so re-adding the class restarts the animation
     void el.offsetWidth;
     el.classList.add(className);
 
-    let timers = fallbackTimers.get(el);
-    if (!timers) fallbackTimers.set(el, (timers = new Map()));
-    clearTimeout(timers.get(className));
-    const done = () => {
-      clearTimeout(timers.get(className));
-      timers.delete(className);
-      el.classList.remove(className);
-    };
-    timers.set(className, setTimeout(done, PULSE_FALLBACK_MS));
-    el.addEventListener('animationend', done, { once: true });
+    const listener = new AbortController();
+    const self: ActivePulse = { listener, timer: setTimeout(() => done(), PULSE_FALLBACK_MS) };
+    running.set(className, self);
+    const map = running;
+    function done(): void {
+      // Only this pulse's own finish counts; a newer pulse has already replaced it.
+      if (map.get(className) !== self) return;
+      clearTimeout(self.timer);
+      listener.abort();
+      map.delete(className);
+      el!.classList.remove(className);
+    }
+    el.addEventListener(
+      'animationend',
+      (event) => {
+        // A descendant's animation bubbles here too; only the element's own ends the pulse.
+        if (event.target === el) done();
+      },
+      { signal: listener.signal }
+    );
   }
 
   /**
