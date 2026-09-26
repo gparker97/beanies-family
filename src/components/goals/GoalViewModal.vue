@@ -14,6 +14,7 @@
 import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import EntityActivityLog, { type ActivityEntry } from '@/components/common/EntityActivityLog.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -308,13 +309,9 @@ watch(
 
     <!-- Close paired with the primary Contribute save button. -->
     <template #footer-start>
-      <button
-        type="button"
-        class="font-outfit dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50"
-        @click="emit('close')"
-      >
+      <ModalSecondaryButton @click="emit('close')">
         {{ t('action.close') }}
-      </button>
+      </ModalSecondaryButton>
     </template>
   </BeanieFormModal>
 </template>
