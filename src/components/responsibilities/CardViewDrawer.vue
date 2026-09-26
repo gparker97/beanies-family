@@ -18,7 +18,6 @@ import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { showToast } from '@/composables/useToast';
@@ -45,9 +44,8 @@ const emit = defineEmits<{ close: []; edit: [cardId: string] }>();
 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
-const { getMemberName } = useMemberInfo();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
+const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
 const { confirmAndDeleteCard } = useCardDeletion();
 
 const card = computed(() => (props.cardId ? store.cardById(props.cardId) : undefined));
@@ -59,12 +57,6 @@ const statusLabel = computed(() => {
   if (card.value?.status === 'unsorted') return t('whoOwnsWhat.card.unsorted');
   return '';
 });
-
-function partLabel(part: ResolvedPart): string {
-  if (card.value?.splitMode === 'child')
-    return fillTemplate(t('whoOwnsWhat.card.forChild'), { name: getMemberName(part.key, '') });
-  return part.label ?? '';
-}
 
 function since(part: ResolvedPart): string {
   return part.since
@@ -184,7 +176,7 @@ watch(card, (next, prev) => {
             <span
               class="font-outfit dark:text-ink-soft text-sm font-semibold text-[var(--color-text)]"
             >
-              {{ partLabel(part) }}
+              {{ partCaption(card, part) }}
             </span>
             <span class="ml-auto flex items-center gap-2">
               <template v-if="part.holderId">

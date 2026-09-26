@@ -17,9 +17,9 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
-import { LIST_CATEGORIES, isKnownListCategory } from '@/constants/listCategories';
+import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
-import type { ResolvedCard } from '@/utils/responsibilityDeck';
+import { groupByCategory, type ResolvedCard } from '@/utils/responsibilityDeck';
 import type { ListCategory } from '@/types/models';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ResponsibilityCardTile from './ResponsibilityCardTile.vue';
@@ -77,25 +77,14 @@ const visible = computed(() => {
   return f && f !== 'byBean' ? live.filter((c) => c.category === f) : live;
 });
 
-const shelves = computed<Shelf[]>(() => {
-  const byCat = new Map<string, ResolvedCard[]>();
-  for (const c of visible.value) {
-    const key = isKnownListCategory(c.category) ? c.category : '__other';
-    const arr = byCat.get(key) ?? [];
-    arr.push(c);
-    byCat.set(key, arr);
-  }
-  const out: Shelf[] = [];
-  for (const cat of LIST_CATEGORIES) {
-    const cards = byCat.get(cat.id);
-    if (cards?.length)
-      out.push({ key: cat.id, title: categoryLabel(cat.id), emoji: cat.emoji, cards });
-  }
-  const other = byCat.get('__other');
-  if (other?.length)
-    out.push({ key: '__other', title: t('lists.category.other'), emoji: '📁', cards: other });
-  return out;
-});
+const shelves = computed<Shelf[]>(() =>
+  groupByCategory(visible.value).map(({ category, cards }) => {
+    const def = category ? getListCategory(category) : undefined;
+    return category && def
+      ? { key: category, title: categoryLabel(category), emoji: def.emoji, cards }
+      : { key: '__other', title: t('lists.category.other'), emoji: '📁', cards };
+  })
+);
 
 const emptyMessage = computed(() =>
   props.filter === 'skipped' ? t('whoOwnsWhat.deck.noSkipped') : t('whoOwnsWhat.deck.emptyFilter')

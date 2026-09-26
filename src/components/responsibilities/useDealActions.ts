@@ -12,6 +12,8 @@
  * person has already moved past. The id is module state for exactly that reason.
  *
  * Animation stays in the components (`useFlyTo`); this composable is writes and toasts.
+ * A component that shows its own trace of an action (the deal pile's emoji row under a
+ * face) passes `onUndone`, called only when the toast's Undo actually landed.
  */
 import { dismissToast, showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
@@ -23,6 +25,11 @@ import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import type { UndoToken } from '@/utils/responsibilityOps';
 
 export const UNDO_TOAST_MS = 6000;
+
+export interface DealActionOptions {
+  /** Called after the toast's Undo landed (never on a refused or failed undo). */
+  onUndone?: () => void;
+}
 
 /** The one live deck undo toast, shared by every consumer. */
 let liveUndoToastId: number | null = null;
@@ -45,13 +52,13 @@ export function useDealActions() {
     return ok;
   }
 
-  function offer(title: string, token: UndoToken | null): void {
+  function offer(title: string, token: UndoToken | null, opts?: DealActionOptions): void {
     if (liveUndoToastId !== null) dismissToast(liveUndoToastId);
     liveUndoToastId = token
       ? showToast('success', title, undefined, {
           actionLabel: t('action.undo'),
           actionFn: async () => {
-            await undo(token);
+            if (await undo(token)) opts?.onUndone?.();
           },
           durationMs: UNDO_TOAST_MS,
         })
@@ -61,7 +68,8 @@ export function useDealActions() {
   async function deal(
     cardId: string,
     partKey: string,
-    memberId: string | null
+    memberId: string | null,
+    opts?: DealActionOptions
   ): Promise<UndoableResult<ResolvedCard> | null> {
     const res = await store.deal(cardId, partKey, memberId);
     if (!res) return null;
@@ -70,19 +78,30 @@ export function useDealActions() {
       memberId
         ? fillTemplate(t('whoOwnsWhat.toast.dealt'), { card, name: getMemberName(memberId, '') })
         : fillTemplate(t('whoOwnsWhat.toast.cleared'), { card }),
-      res.undo
+      res.undo,
+      opts
     );
     return res;
   }
 
-  async function keep(cardId: string): Promise<UndoableResult<ResolvedCard> | null> {
+  async function keep(
+    cardId: string,
+    opts?: DealActionOptions
+  ): Promise<UndoableResult<ResolvedCard> | null> {
     const res = await store.keep(cardId);
     if (!res) return null;
-    offer(fillTemplate(t('whoOwnsWhat.toast.kept'), { card: cardName(res.result) }), res.undo);
+    offer(
+      fillTemplate(t('whoOwnsWhat.toast.kept'), { card: cardName(res.result) }),
+      res.undo,
+      opts
+    );
     return res;
   }
 
-  async function skip(cardIds: readonly string[]): Promise<UndoableResult<string[]> | null> {
+  async function skip(
+    cardIds: readonly string[],
+    opts?: DealActionOptions
+  ): Promise<UndoableResult<string[]> | null> {
     const res = await store.skip(cardIds);
     if (!res) return null;
     const only = cardIds.length === 1 ? store.cardById(cardIds[0]!) : undefined;
@@ -90,7 +109,8 @@ export function useDealActions() {
       only
         ? fillTemplate(t('whoOwnsWhat.toast.skipped.one'), { card: cardName(only) })
         : fillTemplate(t('whoOwnsWhat.toast.skipped.other'), { count: cardIds.length }),
-      res.undo
+      res.undo,
+      opts
     );
     return res;
   }

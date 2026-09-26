@@ -7,7 +7,10 @@
 // Never throws and never logs: an unknown card (from a newer client) is detected and
 // logged once in `resolveDeck` / the store, not at every render.
 import { useTranslation } from '@/composables/useTranslation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { ResponsibilityCardDef } from '@/constants/responsibilityCards';
+import type { CardSplitMode } from '@/types/models';
 
 /** The fields label resolution needs; a `ResolvedCard` satisfies it. */
 export interface CardLabelSource {
@@ -19,6 +22,7 @@ export interface CardLabelSource {
 
 export function useResponsibilityCardLabel() {
   const { t } = useTranslation();
+  const { getMemberName } = useMemberInfo();
 
   function cardName(card: CardLabelSource): string {
     if (card.custom) return card.custom.name;
@@ -36,5 +40,16 @@ export function useResponsibilityCardLabel() {
     return card.custom?.emoji ?? card.def?.emoji ?? '🃏';
   }
 
-  return { cardName, cardDone, cardEmoji };
+  /** What a split part is: "for Mia" on a child split, the family's label on a label split. */
+  function partCaption(
+    card: { splitMode: CardSplitMode },
+    part: { key: string; label?: string }
+  ): string {
+    if (card.splitMode === 'child') {
+      return fillTemplate(t('whoOwnsWhat.card.forChild'), { name: getMemberName(part.key, '') });
+    }
+    return card.splitMode === 'label' ? (part.label ?? '') : '';
+  }
+
+  return { cardName, cardDone, cardEmoji, partCaption };
 }

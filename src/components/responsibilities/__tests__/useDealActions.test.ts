@@ -89,4 +89,19 @@ describe('useDealActions', () => {
     expect(await useDealActions().undo(TOKEN)).toBeNull();
     expect(toast.show).not.toHaveBeenCalled();
   });
+
+  it('calls onUndone only when the toast Undo actually landed', async () => {
+    store.skip.mockResolvedValue({ result: ['a'], undo: TOKEN });
+    const onUndone = vi.fn();
+    await useDealActions().skip(['a'], { onUndone });
+    const opts = toast.show.mock.calls[0]![3];
+
+    store.undo.mockResolvedValueOnce(null);
+    await opts.actionFn();
+    expect(onUndone).not.toHaveBeenCalled();
+
+    store.undo.mockResolvedValueOnce(true);
+    await opts.actionFn();
+    expect(onUndone).toHaveBeenCalledTimes(1);
+  });
 });
