@@ -1,32 +1,14 @@
-import { ref } from 'vue';
 import type { MealKind } from '@/types/models';
+import { createDragPayload } from '@/composables/useDragPayload';
 
 /**
- * What is currently being dragged onto the meal board. A module-level singleton
- * so the recipe rail (drag source) and the board cells (drop targets) share it
- * without prop drilling. Drag-and-drop is a pointer-only enhancement — the tap
- * picker is the canonical, keyboard-accessible path and works without any of this.
+ * What is currently being dragged onto the meal board, shared by the recipe rail
+ * (drag source) and the board cells (drop targets). The tap picker is the canonical,
+ * keyboard-accessible path and works without any of this.
  */
 export type MealDragPayload =
   | { source: 'recipe'; recipeId: string }
   | { source: 'type'; kind: MealKind }
   | { source: 'meal'; mealId: string };
 
-const dragged = ref<MealDragPayload | null>(null);
-
-export function useMealDrag() {
-  function startDrag(payload: MealDragPayload, event?: DragEvent): void {
-    dragged.value = payload;
-    // Firefox CANCELS a drag whose `dragstart` sets no dataTransfer data — so a
-    // module-ref-only payload silently kills the whole drag flow there. Setting
-    // any data (the value is unused; we read the ref) makes the drag start.
-    if (event?.dataTransfer) {
-      event.dataTransfer.setData('text/plain', 'beanies-meal');
-      event.dataTransfer.effectAllowed = 'move';
-    }
-  }
-  function endDrag(): void {
-    dragged.value = null;
-  }
-  return { dragged, startDrag, endDrag };
-}
+export const useMealDrag = createDragPayload<MealDragPayload>('beanies-meal');
