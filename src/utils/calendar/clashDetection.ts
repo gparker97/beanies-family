@@ -6,6 +6,7 @@
 // offset-bearing instant, all-day from a local-midnight span), while activity times
 // are local wall-time via `Date.getTime()` — so overlap stays timezone-correct.
 
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import type { FamilyActivity } from '@/types/models';
 import { parseLocalDate, addDaysYmd } from '@/utils/date';
 import type { EventTime } from '@/services/calendar/CalendarClient';
@@ -35,12 +36,8 @@ export interface ClashInfo {
   fingerprint: string;
 }
 
-/** One occurrence of an activity on a concrete date (as expanded for the view). */
-export interface ActivityOccurrence {
-  activity: FamilyActivity;
-  /** `YYYY-MM-DD` of this occurrence. */
-  date: string;
-}
+/** One occurrence of an activity on a concrete date: the shared shape. */
+export type { ActivityOccurrence };
 
 /** Busy intervals (absolute ms) + the display label, per connected calendar. */
 export interface ConnectionBusy {

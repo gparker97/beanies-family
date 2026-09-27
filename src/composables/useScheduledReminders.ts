@@ -12,6 +12,7 @@
  * with a FRESH `now` each reschedule so no `fireAt` drifts past between recompute
  * and schedule. See `docs/plans/2026-07-23-notifications-end-to-end-native.md`.
  */
+import { isContinuationDay } from '@/utils/calendar/occurrence';
 import { computed, type ComputedRef } from 'vue';
 import type {
   FamilyMember,
@@ -262,6 +263,9 @@ export function buildActivityReminders(
       try {
         const a = occ?.activity;
         if (!a?.id) continue;
+        // One reminder per event: a multi-day trip or weekend repeat is
+        // reminded about on the day it starts, not every morning it covers.
+        if (isContinuationDay(occ)) continue;
         const ctx = activityReminderContext(a, input.currentMember, input.resolveMember);
         if (!ctx.relevant) continue;
         const res = remindersForActivityOccurrence(a, date, ctx, prefs, nowMs, input.t);

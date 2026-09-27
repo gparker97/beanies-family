@@ -207,3 +207,41 @@ describe('monthCells — week separators (the mobile stream labels)', () => {
     expect([...weekRanges.values()].some((w) => w.isCurrent)).toBe(true);
   });
 });
+
+describe('multi-day repeats in the month grid', () => {
+  it("⭐ joins each repeat's days into one bar (repeatStart survives into the cells)", () => {
+    // A weekly Wed-Fri activity: Aug 5-7 and Aug 12-14 (weeks start on Sunday).
+    const a = activity({
+      id: 'wf',
+      date: '2026-08-05',
+      endDate: '2026-08-07',
+      isAllDay: true,
+      recurrence: 'weekly',
+      daysOfWeek: [3],
+    });
+    const occ = (date: string, repeatStart: string) => ({ activity: a, date, repeatStart });
+    const { days: cells } = monthCells({
+      ...BASE,
+      occurrences: [
+        occ('2026-08-05', '2026-08-05'),
+        occ('2026-08-06', '2026-08-05'),
+        occ('2026-08-07', '2026-08-05'),
+        occ('2026-08-12', '2026-08-12'),
+        occ('2026-08-13', '2026-08-12'),
+        occ('2026-08-14', '2026-08-12'),
+      ],
+    });
+    const edges = (date: string) => {
+      const item = cells
+        .find((c) => c.date === date)!
+        .allDayItems.find((i) => i.activity.id === 'wf')!;
+      return [item.isStart, item.isEnd];
+    };
+    expect([edges('2026-08-05'), edges('2026-08-06'), edges('2026-08-07')]).toEqual([
+      [true, false],
+      [false, false],
+      [false, true],
+    ]);
+    expect(edges('2026-08-12')).toEqual([true, false]);
+  });
+});

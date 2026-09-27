@@ -15,6 +15,11 @@ _Not yet released._
 ### Added
 
 - The Who Owns What overview has a **Deal the Remaining** button, and tapping a category opens it in the deck.
+- **Multi-day repeating activities.** An all-day activity that repeats can now last several days (a weekly Friday-to-Sunday weekend): each repeat is drawn across all of its days in the week, month, day and wall views, and a new **Lasts** field sets how many days each repeat takes.
+
+### Changed
+
+- In Who Owns What, the split option **By Label** is now called **Custom**.
 
 ### Fixed
 
@@ -23,6 +28,7 @@ _Not yet released._
 - Short or back-to-back activities, and activities with the same start and end time, no longer cover each other on the week and day views.
 - Activities that run past midnight are drawn up to midnight instead of as a thin sliver, and no longer stretch the whole day back to midnight.
 - Repeating all-day activities now show on every repeat in the week, month and wall views.
+- Moving, splitting or editing one occurrence of a multi-day repeat keeps its length, and ticked duties stay on their day.
 - The beanie wall no longer shows an activity with the same start and end time as lasting all day.
 
 ## 2026-09-26

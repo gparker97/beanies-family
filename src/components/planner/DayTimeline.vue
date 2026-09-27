@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 /**
  * Single-day vertical timeline for mobile (daily + weekly views).
  *
@@ -38,7 +39,8 @@ import type {
   HolidayOccurrence,
 } from '@/types/models';
 
-type Occurrence = { activity: FamilyActivity; date: string };
+/** The shared occurrence shape (`calendar/occurrence.ts`). */
+type Occurrence = ActivityOccurrence;
 
 interface Props {
   /** ISO date `YYYY-MM-DD` this timeline represents. */

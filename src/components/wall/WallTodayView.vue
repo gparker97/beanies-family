@@ -130,7 +130,7 @@ const { byDay: bandReferences } = useWallReferenceDays(
 const allDaySpans = computed(() => {
   const days = [focusYmd.value];
   const result = computeAllDaySpans(
-    events.value.map((o) => ({ activity: o.activity, date: o.date })),
+    events.value,
     days.map((dateStr) => ({ dateStr }))
   );
   return wallDayAllDay(result, days, (activity, ymd) => ({ activity, date: ymd }));

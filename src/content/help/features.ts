@@ -2268,8 +2268,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           'Open the <strong>Deck</strong> view and tap the card to open <strong>Card Details</strong>.',
           'Tap <strong>Edit</strong>.',
-          'Under <strong>Split It?</strong>, choose <strong>By Child</strong> for one part per child, or <strong>By Label</strong> to name the parts yourself (for example, "upstairs" and "downstairs").',
-          'Under <strong>Who Holds Each Part?</strong>, pick a holder for each part. With <strong>By Label</strong>, use <strong>Add a Part</strong> to add more.',
+          'Under <strong>Split It?</strong>, choose <strong>By Child</strong> for one part per child, or <strong>Custom</strong> to name the parts yourself (for example, "upstairs" and "downstairs").',
+          'Under <strong>Who Holds Each Part?</strong>, pick a holder for each part. With <strong>Custom</strong>, use <strong>Add a Part</strong> to add more.',
           'Save the card.',
         ],
       },

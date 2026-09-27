@@ -157,7 +157,7 @@ const { byDay: bandReferences } = useWallReferenceDays(
 const allDaySpans = computed(() => {
   const occurrences = visible.value.flatMap((ymd) => eventsFor(ymd));
   const result = computeAllDaySpans(
-    occurrences.map((o) => ({ activity: o.activity, date: o.date })),
+    occurrences,
     visible.value.map((dateStr) => ({ dateStr }))
   );
   return wallDayAllDay(result, visible.value, (activity, ymd) => ({ activity, date: ymd }));
