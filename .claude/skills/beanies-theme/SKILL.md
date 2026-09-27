@@ -678,12 +678,15 @@ The Deep Slate sidebar is the app's anchor. It houses the brand logo (actual log
 
 **Accordion sections:**
 
-| Section | Icon | Color | Items |
-|---------|------|-------|-------|
-| The Piggy Bank 🐷 | 🐷 | Heritage Orange tint | Overview, Accounts, Budgets, Transactions |
-| The Treehouse 🌳 | 🌳 | Green (#6EE7B7) tint | Family Nook, Family Planner, Family To-Do, Family Hub |
+| Section | Icon | Label colour | Items |
+|---------|------|--------------|-------|
+| The Treehouse | 🌳 | `accent-lift` (Heritage Orange on slate) | Family Dashboard, Activities, Travel, To-Dos, Lists, Meal Planner, Who Owns What |
+| The Piggy Bank | 🐷 | `success-lift` (green on slate) | Overview, Accounts, Budgets, Transactions, Goals, Assets (hidden without finance access) |
+| The Bean Pod | hugging beanies image (`POD_ANCHOR_SRC`, emoji fallback 🌱) | `silk-lift` (Sky Silk on slate) | Meet the Beans, Family Scrapbook, Family Milestones, Family Cookbook, Care & Safety, Emergency Contacts |
 
-**Settings** — pinned at sidebar bottom, outside both accordions.
+Order matches the phone tabs (Planning, Money, Pod). The sidebar is Deep Slate in both modes, so every section label uses its `-lift` token. Sections, colours and anchors live in `NAV_SECTIONS` (`src/constants/navigation.ts`), rendered once by `AppNavMenu` for both the sidebar and the phone drawer. There are no nested groups.
+
+**Settings** — pinned at sidebar bottom, outside the accordions.
 
 **Active nav item:** Orange gradient background + 4px Heritage Orange left bar indicator. Nav items use `rounded-2xl`.
 
@@ -787,7 +790,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 | Term | Meaning |
 |------|---------|
 | The Nook | Main dashboard |
-| The Bean Pod | Family hub |
+| The Bean Pod | Family people section (sidebar accordion; the phone's Pod tab) |
 | Parent Bean | Adult family member |
 | Little Bean | Child family member |
 | Add Bean | Invite/add family member |

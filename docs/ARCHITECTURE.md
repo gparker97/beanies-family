@@ -200,7 +200,7 @@ Photo bytes live in the user's Google Drive inside the **shared** `beanies.famil
 
 **Pet Beans** are `FamilyMember` records with `isPet: true` — same shape as humans, no email / permissions / invite UI surfaced, auto-pick the `pet-dog` avatar variant via `getMemberAvatarVariant({ ..., isPet })`. Counted in the roster but excluded from invitable-member counts and the Drive folder-share migration.
 
-**Sidebar** uses a shared `AppSidebarSubNav` component with two-level nesting (section → parent-item → child-items). Expand/collapse state is module-scoped in `useSidebarAccordion` and persisted to `localStorage`, so desktop `AppSidebar` and mobile `MobileHamburgerMenu` stay in sync.
+**Sidebar**: desktop `AppSidebar` and the phone `MobileHamburgerMenu` both render one `AppNavMenu` over three flat accordion sections from `NAV_SECTIONS` (The Treehouse, The Piggy Bank, The Bean Pod). The active row is the most specific nav item for the route (`activeNavItem`). Open/closed state is module-scoped in `useSidebarAccordion` and persisted to `localStorage`, so both surfaces stay in sync; `AppNavMenu` reveals the current route's section on every route change and mount.
 
 **Accent font.** Caveat (handwritten) joins Outfit + Inter as a third brand-sanctioned typeface — saying quotes, polaroid captions, recipe notes only. Never UI chrome. See [ADR-022 §3](adr/022-pod-architecture.md#3-caveat-font-as-a-third-brand-sanctioned-accent).
 

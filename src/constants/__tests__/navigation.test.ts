@@ -1,6 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { describe, it, expect, vi } from 'vitest';
+
+// Flags default on; a test can switch one off to prove hidden items never match.
+const disabledFlags = new Set<string>();
+vi.mock('@/config/flags', () => ({ isFlagEnabled: (flag: string) => !disabledFlags.has(flag) }));
 import {
   NAV_ITEMS,
+  NAV_SECTIONS,
+  POD_ANCHOR_SRC,
+  activeNavItem,
+  navItemsInSection,
   MOBILE_NAV_CATEGORIES,
   MONEY_ROUTE_PATHS,
   KNOWN_BADGE_KEYS,
@@ -114,17 +124,15 @@ describe('navigation: MOBILE_NAV_CATEGORIES', () => {
     ]);
   });
 
-  it('paths in NAV_ITEMS with mobileCategory are unique', () => {
-    const paths: string[] = [];
-    for (const item of NAV_ITEMS) {
-      if (item.mobileCategory) paths.push(item.path);
-      if (item.children) {
-        for (const child of item.children) {
-          if (child.mobileCategory) paths.push(child.path);
-        }
-      }
-    }
+  it('every NAV_ITEMS path is unique (activeNavItem and the badge lookup assume one item per path)', () => {
+    const paths = NAV_ITEMS.map((item) => item.path);
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('the Pod tab carries the hugging-beanies anchor, with the emoji as its fallback', () => {
+    const pod = MOBILE_NAV_CATEGORIES.find((c) => c.id === 'pod')!;
+    expect(pod.iconSrc).toBe(POD_ANCHOR_SRC);
+    expect(pod.emoji).toBeTruthy();
   });
 });
 
@@ -151,20 +159,91 @@ describe('navigation: badge registry', () => {
     expect(getBadgeKeyForPath('/unknown-path')).toBeUndefined();
   });
 
-  it('MOBILE_TAGGED_NAV_ITEMS includes parents and children with mobileCategory', () => {
+  it('MOBILE_TAGGED_NAV_ITEMS includes every item tagged with a mobileCategory', () => {
     const paths = MOBILE_TAGGED_NAV_ITEMS.map((i) => i.path);
-    // Parents tagged with mobileCategory
     expect(paths).toContain('/todo');
     expect(paths).toContain('/travel');
     expect(paths).toContain('/budgets');
     expect(paths).toContain('/goals');
-    // Pod children tagged with mobileCategory
     expect(paths).toContain('/pod/scrapbook');
     expect(paths).toContain('/pod/cookbook');
+    expect(paths).not.toContain('/settings');
   });
 
   it('expands a multi-category route into one entry per category (Activities → calendar + planning)', () => {
     const activities = MOBILE_TAGGED_NAV_ITEMS.filter((i) => i.path === '/activities');
     expect(activities.map((e) => e.mobileCategory).sort()).toEqual(['calendar', 'planning']);
+  });
+});
+
+describe('navigation: sidebar sections', () => {
+  it('has three accordion sections in the phone tab order, each labelled with a -lift token', () => {
+    expect(NAV_SECTIONS.map((s) => s.id)).toEqual(['treehouse', 'piggyBank', 'beanPod']);
+    for (const section of NAV_SECTIONS) expect(section.colorClass).toMatch(/^text-[a-z]+-lift$/);
+    expect(NAV_SECTIONS.find((s) => s.id === 'piggyBank')!.requiresFinances).toBe(true);
+  });
+
+  it('The Bean Pod holds the six Pod pages, flat, in order', () => {
+    expect(navItemsInSection('beanPod').map((i) => i.path)).toEqual([
+      '/pod',
+      '/pod/scrapbook',
+      '/pod/milestones',
+      '/pod/cookbook',
+      '/pod/safety',
+      '/pod/contacts',
+    ]);
+  });
+
+  it('The Treehouse no longer contains any Pod page', () => {
+    expect(navItemsInSection('treehouse').some((i) => i.path.startsWith('/pod'))).toBe(false);
+  });
+
+  it('The Bean Pod is anchored by the hugging beanies, with an emoji fallback', () => {
+    const pod = NAV_SECTIONS.find((s) => s.id === 'beanPod')!;
+    expect(pod.labelKey).toBe('nav.section.beanPod');
+    expect(pod.iconSrc).toBe(POD_ANCHOR_SRC);
+    expect(pod.emoji).toBeTruthy();
+  });
+
+  it('the anchor image exists in the brand source (public/brand is build output)', () => {
+    expect(existsSync(join('packages/brand/assets/shared', basename(POD_ANCHOR_SRC)))).toBe(true);
+  });
+});
+
+describe('navigation: activeNavItem', () => {
+  const MEMBER = '0f8b6c1e-2d3a-4b5c-8d9e-1a2b3c4d5e6f';
+
+  it('picks the most specific item for a route', () => {
+    expect(activeNavItem('/pod/cookbook')?.path).toBe('/pod/cookbook');
+    expect(activeNavItem(`/pod/cookbook/${MEMBER}`)?.path).toBe('/pod/cookbook');
+    expect(activeNavItem('/pod')?.path).toBe('/pod');
+  });
+
+  it('maps a member page to Meet the Beans in The Bean Pod', () => {
+    const item = activeNavItem(`/pod/${MEMBER}/overview`);
+    expect(item?.path).toBe('/pod');
+    expect(item?.section).toBe('beanPod');
+  });
+
+  it('returns the owning item for other sections', () => {
+    expect(activeNavItem('/settings')?.section).toBe('pinned');
+    expect(activeNavItem('/budgets')?.section).toBe('piggyBank');
+  });
+
+  it('skips a flag-hidden item (it is never rendered, so it must never win)', () => {
+    expect(activeNavItem('/lists')?.path).toBe('/lists');
+    disabledFlags.add('familyLists');
+    try {
+      expect(activeNavItem('/lists')).toBeUndefined();
+    } finally {
+      disabledFlags.delete('familyLists');
+    }
+  });
+
+  it('never matches external items or look-alike paths', () => {
+    expect(activeNavItem('/help')).toBeUndefined();
+    expect(activeNavItem('/discord')).toBeUndefined();
+    expect(activeNavItem('/podcast')).toBeUndefined();
+    expect(activeNavItem('/')).toBeUndefined();
   });
 });

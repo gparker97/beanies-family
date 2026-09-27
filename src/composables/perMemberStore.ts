@@ -25,36 +25,18 @@
 import { ref, watch, type Ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { reportError } from '@/utils/errorReporter';
+import { readStoredJson, writeStoredJson, type StoredJsonRead } from '@/utils/storedJson';
 
 export function perMemberKey(prefix: string, memberId: string): string {
   return `${prefix}-${memberId}`;
 }
 
-export type RawRead = { kind: 'missing' } | { kind: 'corrupt' } | { kind: 'ok'; value: unknown };
-
 /**
- * Read + JSON-parse a per-member blob. Never throws.
- *   - missing key OR read error → `{ kind: 'missing' }` (read errors warn)
- *   - present but unparseable    → `{ kind: 'corrupt' }` (warns)
- *   - present + valid JSON        → `{ kind: 'ok', value }`
- * The caller owns schema validation of `value` and decides whether a corrupt
- * blob should be overwritten.
+ * Read + JSON-parse a per-member blob (contract: `readStoredJson`). The caller
+ * owns schema validation of `value` and whether a corrupt blob is overwritten.
  */
-export function readPerMemberRaw(prefix: string, memberId: string, label: string): RawRead {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(perMemberKey(prefix, memberId));
-  } catch (err) {
-    console.warn(`[${label}] localStorage read failed — using empty state`, err);
-    return { kind: 'missing' };
-  }
-  if (!raw) return { kind: 'missing' };
-  try {
-    return { kind: 'ok', value: JSON.parse(raw) };
-  } catch (err) {
-    console.warn(`[${label}] localStorage parse failed — resetting`, err);
-    return { kind: 'corrupt' };
-  }
+export function readPerMemberRaw(prefix: string, memberId: string, label: string): StoredJsonRead {
+  return readStoredJson(perMemberKey(prefix, memberId), label);
 }
 
 /**
@@ -77,19 +59,15 @@ export function writePerMemberState(
   saveSurface: string,
   saveMessage: string
 ): boolean {
-  try {
-    localStorage.setItem(perMemberKey(prefix, memberId), JSON.stringify(value));
-    return true;
-  } catch (err) {
-    console.warn(`[${label}] localStorage write failed`, err);
-    reportError({
-      surface: saveSurface,
-      message: saveMessage,
-      error: err,
-      severity: 'warning',
-    });
-    return false;
-  }
+  const write = writeStoredJson(perMemberKey(prefix, memberId), value, label);
+  if (write.ok) return true;
+  reportError({
+    surface: saveSurface,
+    message: saveMessage,
+    error: write.error,
+    severity: 'warning',
+  });
+  return false;
 }
 
 /**

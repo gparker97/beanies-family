@@ -19,6 +19,8 @@ _Not yet released._
 
 ### Changed
 
+- **The Bean Pod** now has its own place in the sidebar, next to The Treehouse and The Piggy Bank, so Meet the Beans, the Scrapbook, Milestones, the Cookbook, Care & Safety and Emergency Contacts are one click away. The phone's Pod tab now shows the hugging beanies.
+- The sidebar section labels are easier to read, and the phone menu's Help and Discord links now open correctly.
 - In Who Owns What, the split option **By Label** is now called **Custom**.
 - The privacy policy now mentions that some calendar diagnostics include an activity's random id (never its title, people or date).
 

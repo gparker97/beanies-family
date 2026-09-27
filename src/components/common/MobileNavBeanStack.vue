@@ -35,8 +35,7 @@ import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 import { useNavBadges } from '@/composables/useNavBadges';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { usePermissions, FINANCE_ROUTES } from '@/composables/usePermissions';
-import { isRouteActive } from '@/utils/route';
-import { isItemFlagEnabled } from '@/constants/navigation';
+import { activeNavItem, isItemFlagEnabled } from '@/constants/navigation';
 import type { MobileNavCategory, MobileNavStackItem } from '@/constants/navigation';
 
 const props = defineProps<{
@@ -102,8 +101,11 @@ const visibleItems = computed<MobileNavStackItem[]>(() => {
 // = bottom bean correct without index gymnastics.
 const reversedItems = computed(() => [...visibleItems.value].reverse());
 
+/** The most specific nav item for the route, so `/pod/cookbook` marks only Cookbook (not Meet the Beans too). */
+const currentPath = computed(() => activeNavItem(route.path)?.path);
+
 function isCurrent(item: MobileNavStackItem): boolean {
-  return isRouteActive(route.path, item.path);
+  return item.path === currentPath.value;
 }
 
 function onBeanTap(item: MobileNavStackItem) {
