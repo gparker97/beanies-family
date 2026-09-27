@@ -20,6 +20,7 @@ _Not yet released._
 ### Changed
 
 - In Who Owns What, the split option **By Label** is now called **Custom**.
+- The privacy policy now mentions that some calendar diagnostics include an activity's random id (never its title, people or date).
 
 ### Fixed
 
@@ -29,6 +30,8 @@ _Not yet released._
 - Activities that run past midnight are drawn up to midnight instead of as a thin sliver, and no longer stretch the whole day back to midnight.
 - Repeating all-day activities now show on every repeat in the week, month and wall views.
 - Moving, splitting or editing one occurrence of a multi-day repeat keeps its length, and ticked duties stay on their day.
+- Activities that run past midnight (like a 10pm-1am sleepover) now also show on the next morning, and still count as one event for reminders, clashes and duties.
+- A repeating series that only carries the newer schedule format keeps syncing to Google Calendar and asks which occurrences to change when deleted.
 - The beanie wall no longer shows an activity with the same start and end time as lasting all day.
 
 ## 2026-09-26

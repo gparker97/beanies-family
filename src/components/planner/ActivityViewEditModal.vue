@@ -51,7 +51,7 @@ import LinkedLists from '@/components/lists/LinkedLists.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import { openExternal } from '@/utils/openExternal';
 import { safeExternalHref } from '@/utils/url';
-import { shiftSpan, spanOffsetDays } from '@/utils/calendar/activityDays';
+import { isRepeatingActivity, shiftSpan, spanOffsetDays } from '@/utils/calendar/activityDays';
 // SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
 const activityLinkHref = computed(() => safeExternalHref(props.activity?.link));
 import { MARKETING_URL } from '@/utils/marketing';
@@ -550,7 +550,8 @@ const viewFormattedEndDate = computed(() => {
 
 const viewIsAllDay = computed(() => activity.value?.isAllDay ?? false);
 
-const isRecurring = computed(() => activity.value?.recurrence !== 'none');
+// The legacy enum OR the canonical `rule` (#70): one definition of "repeats".
+const isRecurring = computed(() => !!activity.value && isRepeatingActivity(activity.value));
 
 // A one-off override child (a rescheduled/edited single occurrence of a recurring
 // series). Only ACTIVE overrides are ever shown here (a cancelled one renders
@@ -687,7 +688,7 @@ async function handleDelete() {
 
   // Recurring MASTER occurrence with a date — scope-aware delete (unchanged path).
   // `emit('close')` fires only on a confirmed action so cancelling keeps the drawer open.
-  if (act.recurrence !== 'none' && props.occurrenceDate) {
+  if (isRecurring.value && props.occurrenceDate) {
     const scope = await chooseScope();
     if (!scope) return;
 

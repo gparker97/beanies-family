@@ -119,7 +119,8 @@ const monthData = computed(() => {
     month,
     weekStartDay,
     todayStr: todayStr.value,
-    occurrences: activityStore.activitiesInRange(startYmd, endYmd),
+    // EVENTS: one chip per event (an overnight tail is not a chip of its own).
+    occurrences: activityStore.eventsInRange(startYmd, endYmd),
     segments: vacationStore.travelSegmentOccurrencesInRange(startYmd, endYmd),
     vacations: vacationStore.vacations,
     // Derived from each member's date of birth over the SAME span as everything

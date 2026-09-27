@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyActivity } from '@/types/models';
 import {
+  drawnOffsetDays,
+  isOvernightTimed,
   isRepeatingActivity,
   minRepeatGapDays,
   resolveActivityDays,
@@ -149,5 +151,32 @@ describe('multi-day span helpers', () => {
     expect(minRepeatGapDays({ unit: 'week', interval: 3, end: never })).toBe(21);
     expect(minRepeatGapDays({ unit: 'week', interval: 1, weekdays: [0, 6], end: never })).toBe(1);
     expect(minRepeatGapDays({ unit: 'month', interval: 1, end: never })).toBe(28);
+  });
+});
+
+describe('overnight timed activities', () => {
+  const timed = (startTime: string, endTime: string, over: Partial<FamilyActivity> = {}) =>
+    makeActivity({ startTime, endTime, ...over });
+
+  it("⭐ covers both shapes: the implicit roll and sync's explicit next-day endDate", () => {
+    expect(isOvernightTimed(timed('22:00', '01:00'))).toBe(true);
+    expect(isOvernightTimed(timed('22:00', '01:00', { endDate: '2026-06-11' }))).toBe(true);
+    expect(drawnOffsetDays(timed('22:00', '01:00'))).toBe(1);
+  });
+
+  it('draws no tail for an event ending exactly at midnight, or a same-day one', () => {
+    expect(isOvernightTimed(timed('22:00', '00:00'))).toBe(false);
+    expect(isOvernightTimed(timed('09:00', '10:00'))).toBe(false);
+  });
+
+  it('leaves 24h-plus timed events (an explicit endDate two days on) out of scope', () => {
+    expect(isOvernightTimed(timed('22:00', '01:00', { endDate: '2026-06-12' }))).toBe(false);
+    expect(isOvernightTimed(timed('18:00', '20:00', { endDate: '2026-06-11' }))).toBe(false);
+  });
+
+  it('never treats an all-day activity as overnight', () => {
+    expect(
+      isOvernightTimed(makeActivity({ isAllDay: true, startTime: '22:00', endTime: '01:00' }))
+    ).toBe(false);
   });
 });

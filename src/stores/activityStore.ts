@@ -18,6 +18,7 @@ import {
   daysBetweenYmd,
 } from '@/utils/date';
 import {
+  drawnOffsetDays,
   isRepeatingActivity,
   minRepeatGapDays,
   shiftSpan,
@@ -334,15 +335,18 @@ export const useActivityStore = defineStore('activities', () => {
   function expandRecurring(
     activity: FamilyActivity,
     year: number,
-    month: number
+    month: number,
+    { drawTails = true }: { drawTails?: boolean } = {}
   ): ActivityOccurrence[] {
-    // A repeating all-day activity that lasts several days (a weekly Fri-Sun
-    // weekend) is drawn on EVERY day of every repeat, mirroring how a one-off
-    // multi-day trip expands. Everything else is one occurrence per start.
-    const offset = isRepeatingActivity(activity)
-      ? Math.min(spanOffsetDays(activity), MAX_SPAN_OFFSET_DAYS)
-      : 0;
-    if (offset === 0) return expandMonthStarts(activity, year, month);
+    // A repeating activity drawn across several days (an all-day Fri-Sun
+    // weekend, or an overnight 22:00-01:00 whose tail lands on the next
+    // morning) is drawn on EVERY day of every repeat, mirroring how a one-off
+    // expands. Everything else is one occurrence per start.
+    // `drawTails: false` (EVENT accessors) skips the overnight look-back and
+    // tails outright rather than computing and discarding them.
+    const drawn = drawTails ? drawnOffsetDays(activity) : spanOffsetDays(activity);
+    const offset = isRepeatingActivity(activity) ? Math.min(drawn, MAX_SPAN_OFFSET_DAYS) : 0;
+    if (offset === 0) return expandMonthStarts(activity, year, month, drawTails);
 
     const from = toDateInputValue(new Date(year, month, 1));
     const to = toDateInputValue(new Date(year, month + 1, 0));
@@ -359,11 +363,15 @@ export const useActivityStore = defineStore('activities', () => {
     // activity is never drawn twice on a date (legacy data can overlap; the
     // form caps new lengths at `minRepeatGapDays`).
     starts.sort();
+    // Only ALL-DAY repeats can overlap a day. A daily overnight series has
+    // yesterday's tail (00:00-01:00) and tonight's start (22:00) on the same
+    // date: both are real, so timed occurrences are never de-duplicated.
+    const dedupeByDay = spanOffsetDays(activity) > 0;
     const seen = new Set<string>();
     const results: ActivityOccurrence[] = [];
     for (const start of starts) {
       for (const occ of coveredDays(activity, start, offset, from, to)) {
-        if (seen.has(occ.date)) continue;
+        if (dedupeByDay && seen.has(occ.date)) continue;
         seen.add(occ.date);
         results.push(occ);
       }
@@ -378,7 +386,8 @@ export const useActivityStore = defineStore('activities', () => {
   function expandMonthStarts(
     activity: FamilyActivity,
     year: number,
-    month: number
+    month: number,
+    drawTails = true
   ): ActivityOccurrence[] {
     const startDate = activity.date ? parseLocalDate(activity.date) : null;
     if (!startDate || Number.isNaN(startDate.getTime())) {
@@ -416,10 +425,10 @@ export const useActivityStore = defineStore('activities', () => {
     // `recurrenceEndDate` is a SERIES rule — it must never gate a one-off. An
     // override child that inherited one (possible in `.beanpod` files written
     // before the 2026-08-15 fix) would otherwise be pruned by the early return
-    // below and vanish from the calendar entirely. Ignoring it on
-    // `recurrence:'none'` un-hides that legacy data with no migration.
+    // below and vanish from the calendar entirely. Ignoring it on a
+    // non-repeating record un-hides that legacy data with no migration.
     const endDate =
-      activity.recurrence !== 'none' && activity.recurrenceEndDate
+      isRepeatingActivity(activity) && activity.recurrenceEndDate
         ? parseLocalDate(activity.recurrenceEndDate)
         : null;
     const monthStart = new Date(year, month, 1);
@@ -434,7 +443,7 @@ export const useActivityStore = defineStore('activities', () => {
     let results: ActivityOccurrence[];
     switch (activity.recurrence) {
       case 'none':
-        results = expandOneOff(activity, startDate, monthStart, monthEnd);
+        results = expandOneOff(activity, startDate, monthStart, monthEnd, drawTails);
         break;
       case 'daily':
         results = expandDaily(activity, startDate, monthStart, effectiveEnd);
@@ -493,9 +502,12 @@ export const useActivityStore = defineStore('activities', () => {
     activity: FamilyActivity,
     startDate: Date,
     monthStart: Date,
-    monthEnd: Date
+    monthEnd: Date,
+    drawTails = true
   ): ActivityOccurrence[] {
-    const offset = spanOffsetDays(activity);
+    // EVENT callers pass `drawTails: false`: an all-day trip still spans its
+    // days, but an overnight tail is never built.
+    const offset = drawTails ? drawnOffsetDays(activity) : spanOffsetDays(activity);
     if (offset > 0) {
       return coveredDays(
         activity,
@@ -610,7 +622,21 @@ export const useActivityStore = defineStore('activities', () => {
   const formatDate = toDateInputValue;
 
   /**
-   * Get all occurrences (direct + recurring expanded) for a given month.
+   * EVENT expansion: `expandRecurring` minus the next-morning tails of overnight
+   * TIMED events, which are drawn on the time grids but are not events of their
+   * own (one clash, one duty prompt, one reminder per event; the wall already
+   * draws the event past midnight). Used by every EVENT accessor below.
+   */
+  function expandEvents(activity: FamilyActivity, year: number, month: number) {
+    // ONE mechanism: no overnight tails are built at all (repeats and one-offs
+    // alike); all-day spans and their month look-back are unaffected.
+    return expandRecurring(activity, year, month, { drawTails: false });
+  }
+
+  /**
+   * DRAWN: every occurrence for a month, including the continuation days of
+   * multi-day and overnight events (the time grids, the day agenda and the clash
+   * window read this). Member-filtered.
    */
   function monthActivities(year: number, month: number) {
     const all: ActivityOccurrence[] = [];
@@ -621,8 +647,21 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
-   * All occurrences (direct + recurring expanded) whose date falls within
-   * `[startYmd, endYmd]` inclusive. Same member-filtered source as
+   * EVENT form of {@link monthActivities}: no overnight tails (the week strip's
+   * dots and the day agenda's upcoming list count events, not drawn days).
+   * Member-filtered. An all-day trip's later days are kept (each is a real day).
+   */
+  function monthEvents(year: number, month: number) {
+    const all: ActivityOccurrence[] = [];
+    for (const a of filteredActivities.value) {
+      all.push(...expandEvents(a, year, month));
+    }
+    return all;
+  }
+
+  /**
+   * DRAWN (continuation days included). All occurrences (direct + recurring
+   * expanded) whose date falls within `[startYmd, endYmd]` inclusive. Same member-filtered source as
    * {@link monthActivities} — this is the arbitrary-range form of it, used by
    * the month grid so the prev/next-month padding cells show their items too.
    *
@@ -633,6 +672,22 @@ export const useActivityStore = defineStore('activities', () => {
    * activity (see the INVARIANT note on `expandRecurringYearly`).
    */
   function activitiesInRange(startYmd: string, endYmd: string) {
+    return occurrencesInRangeBy(expandRecurring, startYmd, endYmd);
+  }
+
+  /**
+   * EVENT form of {@link activitiesInRange}: no overnight tails (the month grid
+   * shows one chip per event, as the Google and Apple month views do).
+   */
+  function eventsInRange(startYmd: string, endYmd: string) {
+    return occurrencesInRangeBy(expandEvents, startYmd, endYmd);
+  }
+
+  function occurrencesInRangeBy(
+    expand: (a: FamilyActivity, year: number, month: number) => ActivityOccurrence[],
+    startYmd: string,
+    endYmd: string
+  ) {
     const all: ActivityOccurrence[] = [];
     if (!startYmd || !endYmd || startYmd > endYmd) return all;
     const start = parseLocalDate(startYmd);
@@ -645,7 +700,7 @@ export const useActivityStore = defineStore('activities', () => {
       const y = cursor.getFullYear();
       const m = cursor.getMonth();
       for (const a of filteredActivities.value) {
-        for (const occ of expandRecurring(a, y, m)) {
+        for (const occ of expand(a, y, m)) {
           if (occ.date >= startYmd && occ.date <= endYmd) all.push(occ);
         }
       }
@@ -659,12 +714,13 @@ export const useActivityStore = defineStore('activities', () => {
    * (same source as `activitiesForDate`) — so drop-off/pick-up duty-only
    * occurrences are never dropped by the global member filter. Used by the
    * notification deriver's month-bucketed window pass; do NOT use the
-   * member-filtered `monthActivities` there.
+   * member-filtered `monthActivities` there. EVENT: no overnight tails (the bell,
+   * OS reminders and hints would otherwise fire again the next morning).
    */
   function activeActivitiesForMonth(year: number, month: number) {
     const all: ActivityOccurrence[] = [];
     for (const a of activeActivities.value) {
-      all.push(...expandRecurring(a, year, month));
+      all.push(...expandEvents(a, year, month));
     }
     return all;
   }
@@ -676,6 +732,7 @@ export const useActivityStore = defineStore('activities', () => {
    * Reads `today` from the reactive `useToday` composable so this list
    * auto-refreshes at midnight and on tab wake — without a reactive source
    * the previous `new Date()` call only re-ran when other deps changed.
+   * EVENT: no overnight tails.
    */
   const { today: todayRef } = useToday();
   const upcomingActivities = computed(() => {
@@ -689,7 +746,7 @@ export const useActivityStore = defineStore('activities', () => {
         // Normalised through `Date`: a raw `getMonth() + i` past 11 silently
         // dropped yearly activities (see `activitiesInRange`).
         const month = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        const expanded = expandRecurring(a, month.getFullYear(), month.getMonth());
+        const expanded = expandEvents(a, month.getFullYear(), month.getMonth());
         for (const occ of expanded) {
           if (occ.date >= todayStr) {
             results.push(occ);
@@ -728,6 +785,7 @@ export const useActivityStore = defineStore('activities', () => {
    * appears by its soonest upcoming occurrence, found by walking months forward
    * through `expandRecurring` (yearly can be up to ~12 months out → 13-month bound).
    */
+  // EVENT: an overnight tail is never an activity's "next occurrence".
   const linkableActivities = computed<ActivityOccurrence[]>(() => {
     const todayStr = todayRef.value;
     const base = parseLocalDate(todayStr);
@@ -746,12 +804,12 @@ export const useActivityStore = defineStore('activities', () => {
           return null;
         }
         const startYmd = activity.date.slice(0, 10);
-        // Multi-day relevance intentionally mirrors `expandOneOff` (gates on
-        // isAllDay && endDate — keep in sync). An ongoing multi-day activity
-        // (start past, end future) surfaces on today, honouring the ≥-today
-        // contract rather than sorting under a past start date.
-        const lastRelevant =
-          activity.isAllDay && activity.endDate ? activity.endDate.slice(0, 10) : startYmd;
+        // Multi-day relevance: an all-day trip is relevant through its last day
+        // (`spanOffsetDays`, the rule `expandOneOff` draws with; an overnight tail
+        // is not an event, so it does not extend it). An ongoing trip (start
+        // past, end future) surfaces on today, honouring the >= today contract
+        // rather than sorting under a past start date.
+        const lastRelevant = addDaysYmd(startYmd, spanOffsetDays(activity));
         if (lastRelevant < todayStr) return null; // past-only
         return startYmd < todayStr ? todayStr : startYmd;
       }
@@ -766,7 +824,8 @@ export const useActivityStore = defineStore('activities', () => {
       // already passed (found next year at i=12).
       for (let i = 0; i <= 12; i++) {
         const step = new Date(base.getFullYear(), base.getMonth() + i, 1);
-        const occs = expandRecurring(activity, step.getFullYear(), step.getMonth());
+        // EVENTS: an overnight series' next-morning tail is not its next occurrence.
+        const occs = expandEvents(activity, step.getFullYear(), step.getMonth());
         // expandRecurring is NOT globally sorted (multi-day-of-week interleaves),
         // so take the MIN matching date; drop `< today` in the current month.
         let min: string | null = null;
@@ -1494,13 +1553,14 @@ export const useActivityStore = defineStore('activities', () => {
   /**
    * Get all activity occurrences for a specific date (unfiltered by member).
    * Uses activeActivities so pickup/dropoff assignments are never excluded
-   * by the global member filter.
+   * by the global member filter. EVENT: no overnight tails (the wall draws the
+   * event past midnight on its start day; duty prompts fire once).
    */
   function activitiesForDate(dateStr: string): ActivityOccurrence[] {
     const d = parseLocalDate(dateStr);
     const all: ActivityOccurrence[] = [];
     for (const a of activeActivities.value) {
-      all.push(...expandRecurring(a, d.getFullYear(), d.getMonth()));
+      all.push(...expandEvents(a, d.getFullYear(), d.getMonth()));
     }
     return all.filter((occ) => occ.date === dateStr);
   }
@@ -1511,7 +1571,12 @@ export const useActivityStore = defineStore('activities', () => {
    * trip's own start date for a trip. Built on the expansion itself, so a click on
    * Sunday of a Fri-Sun weekend always opens the event that is DRAWN there, and a
    * reschedule never mistakes a trip's third day for its start. A single-day
-   * record returns `ymd` unchanged.
+   * record (and any TIMED record) returns `ymd` unchanged: the next-morning tail
+   * of an overnight event resolves to its start day through `eventDateOf`
+   * (`calendar/occurrence.ts`) instead, at the card that was clicked, because a
+   * daily overnight series has two cards on one date and only the card knows
+   * which it is. An all-day continuation keeps the clicked day for duty ticks,
+   * so each day of a trip has its own tick.
    */
   function repeatStartFor(activity: FamilyActivity, ymd: string): string {
     if (spanOffsetDays(activity) === 0) return ymd;
@@ -1552,8 +1617,7 @@ export const useActivityStore = defineStore('activities', () => {
       for (const [ids, code, gate] of problems) {
         if (!ids.length || !gate(ids.join(','))) continue;
         // A fixed message and structured fields, so a metric filter can group it.
-        // `activity_id` is not an allowlisted context key: the ids go to the
-        // local console only, for someone debugging on the device.
+        // Counts only (it covers many records); the ids go to the local console.
         console.warn(`[activityStore] multi-day repeat ${code}:`, ids.slice(0, 5));
         logEvent({
           surface: 'activity-schedule',
@@ -1568,6 +1632,8 @@ export const useActivityStore = defineStore('activities', () => {
 
   return {
     repeatStartFor,
+    monthEvents,
+    eventsInRange,
     backfillReminderMinutes,
     // State
     activities,

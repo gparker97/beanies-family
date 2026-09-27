@@ -8,6 +8,8 @@ import {
   useWeekNavigation,
   useTimeGrid,
   groupOverlapping,
+  timedCards,
+  type TimedCard,
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
@@ -219,13 +221,17 @@ function getUntimedSegmentsForDay(dateStr: string): TravelSegmentOccurrence[] {
 // Keeps `useTimeGrid` agnostic to segment shape; the composable just sees a
 // list of `{ startTime, endTime }` entries and auto-extends its hour range
 // to fit (so a 22:00 flight expands the grid past the 7am-7pm default).
+/** Each day's timed cards, built once for both the time range and the grid. */
+const cardsByDay = computed(() => {
+  const map = new Map<string, TimedCard[]>();
+  for (const [date, occs] of weekActivities.value) map.set(date, timedCards(occs));
+  return map;
+});
+
 const allTimedActivities = computed(() => {
+  // The DRAWN windows: a 00:00 continuation must pull the day's range up too.
   const items: { startTime?: string; endTime?: string }[] = [];
-  for (const arr of weekActivities.value.values()) {
-    for (const occ of arr) {
-      if (!isAllDayActivity(occ.activity)) items.push(occ.activity);
-    }
-  }
+  for (const cards of cardsByDay.value.values()) items.push(...cards);
   for (const occ of weekSegments.value) {
     if (occ.time) items.push({ startTime: occ.time, endTime: addHourToTime(occ.time) });
   }
@@ -315,12 +321,6 @@ const DAY_ABBREV_KEYS = [
 ] as const;
 function dayAbbrev(date: Date): string {
   return t(DAY_ABBREV_KEYS[date.getDay()]!);
-}
-
-function getTimedForDay(dateStr: string): Occurrence[] {
-  return (weekActivities.value.get(dateStr) ?? [])
-    .filter((o) => !isAllDayActivity(o.activity))
-    .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
 }
 
 // Multi-day all-day activities + single-day buckets — delegated to the
@@ -525,7 +525,8 @@ const stripDensities = computed(() => {
   const occByDate = new Map<string, FamilyActivity[]>();
   for (const key of months) {
     const [y, m] = key.split('-').map(Number);
-    const occs = activityStore.monthActivities(y!, m!);
+    // EVENTS: an overnight event's next-morning tail is not a dot of its own.
+    const occs = activityStore.monthEvents(y!, m!);
     for (const occ of occs) {
       if (occ.activity.vacationId) continue;
       if (!stripDateSet.has(occ.date)) continue;
@@ -879,23 +880,21 @@ function onStripDayClick(dateStr: string) {
 
             <!-- Activity blocks -->
             <template
-              v-for="(group, gi) in groupOverlapping(
-                getTimedForDay(day.dateStr).map((o) => o.activity)
-              )"
+              v-for="(group, gi) in groupOverlapping(cardsByDay.get(day.dateStr) ?? [])"
               :key="gi"
             >
               <div
-                v-for="(activity, ai) in group"
-                :key="activity.id"
+                v-for="({ activity, startTime, endTime, eventDate, key }, ai) in group"
+                :key="key"
                 class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
                 :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
                 :style="{
-                  ...getPosition(activity.startTime!, activity.endTime),
+                  ...getPosition(startTime!, endTime),
                   left: `${(ai / group.length) * 100}%`,
                   width: `calc(${100 / group.length}% - 2px)`,
                   ...identityFor(activity).style,
                 }"
-                @click.stop="emit('view-activity', activity.id, day.dateStr)"
+                @click.stop="emit('view-activity', activity.id, eventDate)"
               >
                 <!--
                   DESKTOP week grid. `DayTimeline` covers the MOBILE path only, so a
@@ -913,7 +912,7 @@ function onStripDayClick(dateStr: string) {
                   <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
                   <span class="truncate">{{ activity.title }}</span>
                   <PhotoIndicator :photo-ids="activity.photoIds" />
-                  <ClashIndicator :clash="clashFor(activity.id, day.dateStr)" class="ml-1" />
+                  <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span

@@ -107,12 +107,9 @@ export function computeAllDaySpans(
 
     // Skip timed activities entirely — they go in the dot row, not the
     // all-day lane.
-    if (!a.isAllDay) {
-      // Defensive: a timed activity with endDate set is a schema-drift
-      // signal, not a normal record.
-      if (a.endDate) reportOddRecord(a, 'timed_with_end_date');
-      continue;
-    }
+    // (A timed record CAN carry `endDate`: calendar sync writes a next-day one on
+    // every overnight import. It is not drift, and the time grids draw it.)
+    if (!a.isAllDay) continue;
 
     // An end BEFORE the start: the store draws it as a single day (an older
     // client moved it without its span), so it is bucketed as one here too
@@ -176,19 +173,17 @@ export function computeAllDaySpans(
 /**
  * Odd all-day records, reported once per activity per session: this runs on
  * every render of every all-day row, so an unconditional log would flood. A
- * fixed message with a structured code; the id goes to the local console only
- * (`activity_id` is not an allowlisted context key).
+ * fixed message with a structured code and the record's `activity_id`.
  */
 const reportedOddRecords = new Set<string>();
 function reportOddRecord(a: FamilyActivity, code: string): void {
   const key = `${code}:${a.id}`;
   if (reportedOddRecords.has(key)) return;
   reportedOddRecords.add(key);
-  console.warn(`[allDaySpans] ${code}:`, a.id);
   logEvent({
     level: 'warn',
     surface: 'all-day-spans',
     message: 'all_day_odd_record',
-    context: { action: 'layout', error_code: code },
+    context: { action: 'layout', error_code: code, activity_id: a.id },
   });
 }

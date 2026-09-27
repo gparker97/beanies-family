@@ -10,6 +10,8 @@ import {
   useDayNavigation,
   useTimeGrid,
   groupOverlapping,
+  timedCards,
+  type TimedCard,
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
@@ -32,7 +34,7 @@ import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
-import type { FamilyActivity, FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
+import type { FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
 
 /**
  * Controlled period — the page owns the canonical date. The day view derives
@@ -136,12 +138,14 @@ function memberActivities(memberId: string): Occurrence[] {
   return dayActivities.value.filter((o) => belongsInMemberColumn(o.activity, memberId));
 }
 
-function memberTimedActivities(memberId: string): FamilyActivity[] {
-  return memberActivities(memberId)
-    .filter((o) => !isAllDayActivity(o.activity))
-    .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''))
-    .map((o) => o.activity);
-}
+/** Each lane's timed cards, built once per change (a continuation draws from 00:00). */
+const cardsByMember = computed(() => {
+  const map = new Map<string, TimedCard[]>();
+  for (const member of visibleMembers.value) {
+    map.set(member.id, timedCards(memberActivities(member.id)));
+  }
+  return map;
+});
 
 function memberUntimedActivities(memberId: string): Occurrence[] {
   // The ONE all-day predicate — an `isAllDay: true` activity that still carries
@@ -167,9 +171,10 @@ const segmentBuckets = computed(() => splitTimedUntimed(daySegments.value));
 // Keeps useTimeGrid agnostic to segments; the composable just sees a list
 // of {startTime, endTime} entries and auto-extends the hour range.
 const allTimedActivities = computed(() => {
-  const items: { startTime?: string; endTime?: string }[] = dayActivities.value
-    .filter((o) => !isAllDayActivity(o.activity))
-    .map((o) => o.activity as { startTime?: string; endTime?: string });
+  // The DRAWN windows: a 00:00 continuation must pull the day's range up too.
+  const items: { startTime?: string; endTime?: string }[] = [
+    ...cardsByMember.value.values(),
+  ].flat();
   for (const seg of segmentBuckets.value.timed) {
     if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
   }
@@ -580,12 +585,12 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
 
             <!-- Activity blocks -->
             <template
-              v-for="(group, gi) in groupOverlapping(memberTimedActivities(member.id))"
+              v-for="(group, gi) in groupOverlapping(cardsByMember.get(member.id) ?? [])"
               :key="gi"
             >
               <div
-                v-for="(activity, ai) in group"
-                :key="activity.id"
+                v-for="({ activity, startTime, endTime, eventDate, key }, ai) in group"
+                :key="key"
                 class="dark:bg-surface-raised absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] bg-white px-1.5 py-1 text-xs shadow-sm transition-shadow hover:shadow-md"
                 :class="[
                   identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : '',
@@ -594,12 +599,12 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                     : '',
                 ]"
                 :style="{
-                  ...getPosition(activity.startTime!, activity.endTime),
+                  ...getPosition(startTime!, endTime),
                   left: `${(ai / group.length) * 100}%`,
                   width: `calc(${100 / group.length}% - 2px)`,
                   ...identityFor(activity, { laneMemberId: member.id }).edgeStyle,
                 }"
-                @click.stop="emit('view-activity', activity.id, currentDay.dateStr)"
+                @click.stop="emit('view-activity', activity.id, eventDate)"
               >
                 <!--
                   DESKTOP bean lanes. `DayTimeline` covers the MOBILE path only, so a
@@ -616,7 +621,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                 >
                   <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
                   <span class="truncate">{{ activity.title }}</span>
-                  <ClashIndicator :clash="clashFor(activity.id, currentDay.dateStr)" class="ml-1" />
+                  <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">
                   <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">

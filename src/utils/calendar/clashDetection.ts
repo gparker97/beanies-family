@@ -6,7 +6,7 @@
 // offset-bearing instant, all-day from a local-midnight span), while activity times
 // are local wall-time via `Date.getTime()` — so overlap stays timezone-correct.
 
-import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
+import { eventDateOf, type ActivityOccurrence } from '@/utils/calendar/occurrence';
 import type { FamilyActivity } from '@/types/models';
 import { parseLocalDate, addDaysYmd } from '@/utils/date';
 import type { EventTime } from '@/services/calendar/CalendarClient';
@@ -132,8 +132,17 @@ export function computeClashes(
   const clashes = new Map<string, ClashInfo>();
   // Intervals arrive already in absolute ms (the events.list path converts once) —
   // no pre-parse needed here.
+  const counted = new Set<string>();
   for (const occ of occurrences) {
-    const range = activityTimeRange(occ.activity, occ.date);
+    // An overnight event's next-morning tail IS its start-day event: read it
+    // from that day (its range runs past midnight), counted once. Skipping the
+    // tail lost the clash whenever the start day was off-screen; reading it as
+    // its own day made a phantom 22:00 event the next evening.
+    const date = eventDateOf(occ);
+    const key = clashKey(occ.activity.id, date);
+    if (counted.has(key)) continue;
+    counted.add(key);
+    const range = activityTimeRange(occ.activity, date);
     if (!range) continue;
     for (const conn of busyByConnection) {
       const hit = conn.intervals.some(
@@ -143,11 +152,11 @@ export function computeClashes(
           intervalsOverlap(range.startMs, range.endMs, iv.startMs, iv.endMs)
       );
       if (hit) {
-        clashes.set(clashKey(occ.activity.id, occ.date), {
+        clashes.set(key, {
           connectionId: conn.connectionId,
           calendarLabel: conn.calendarLabel,
           activityId: occ.activity.id,
-          occurrenceDate: occ.date,
+          occurrenceDate: date,
           fingerprint: `${range.startMs}-${range.endMs}`,
         });
         break; // first overlapping calendar wins
