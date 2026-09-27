@@ -39,10 +39,16 @@ import {
   addHourToTime,
   formatNookDate,
   extractDatePart,
-  parseLocalDate,
-  toDateInputValue,
-  addDays,
+  addDaysYmd,
+  daysBetweenYmd,
 } from '@/utils/date';
+import {
+  isRepeatingActivity,
+  minRepeatGapDays,
+  shiftSpan,
+  endDateOffsetDays,
+} from '@/utils/calendar/activityDays';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { safeExternalHref } from '@/utils/url';
 // SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
@@ -148,6 +154,24 @@ const endTime = ref('');
  */
 const mode = ref<'one-off' | 'recurring'>('one-off');
 const rule = ref<RecurrenceRule | null>(null);
+/**
+ * How many days each repeat of a repeating ALL-DAY activity lasts (1 = a single
+ * day). Stored as `endDate` relative to `date`, the same shape the Google import
+ * writes; see docs/plans/2026-09-27-multi-day-repeating-activities.md.
+ */
+const lastsDays = ref(1);
+/**
+ * The span as the form OPENED it (mode, all-day, rule and Lasts). Legacy or
+ * imported data may already exceed the cap, and an unrelated edit (a new title)
+ * must still save; but changing ANY of these (making a 10-day trip weekly, a
+ * weekly repeat daily) is checked against the current cap.
+ */
+const spanShape = computed(() =>
+  JSON.stringify([mode.value, isAllDay.value, rule.value, lastsDays.value])
+);
+const seededSpanShape = ref('');
+/** A repeat may last until the next one starts, never into it. */
+const maxLastsDays = computed(() => (rule.value ? minRepeatGapDays(rule.value) : 7));
 const isRecurring = computed(() => mode.value === 'recurring');
 const category = ref<ActivityCategory>('' as ActivityCategory);
 const assigneeIds = ref<string[]>([]);
@@ -357,7 +381,11 @@ const { isEditing, isSubmitting } = useFormModal(
       // the trip — there is no scope modal on a one-off to catch it.
       date.value =
         activity.recurrence !== 'none' ? (props.occurrenceDate ?? activity.date) : activity.date;
-      endDate.value = activity.endDate ?? '';
+      // A series' `endDate` is relative to the SERIES start; the form's date is the
+      // opened occurrence. Re-based, so switching an occurrence to one-off keeps
+      // that repeat's days instead of an end date weeks before its start.
+      endDate.value =
+        (isRepeatingActivity(activity) ? shiftSpan(activity, date.value) : activity.endDate) ?? '';
       isAllDay.value = activity.isAllDay ?? false;
       startTime.value = activity.startTime ?? '';
       endTime.value = activity.endTime ?? '';
@@ -371,6 +399,9 @@ const { isEditing, isSubmitting } = useFormModal(
       // no `rule` at all (the diff below sees no change), so a legacy series
       // stays on the legacy expansion path until deliberately edited.
       rule.value = resolveActivityRule(activity)?.rule ?? null;
+      // Any end after the start, timed or all-day: a timed Fri 18:00 - Sun 18:00
+      // repeat ticked all-day then shows (and keeps) its real 3 days.
+      lastsDays.value = endDateOffsetDays(activity) + 1;
       category.value = activity.category;
       assigneeIds.value = normalizeAssignees(activity);
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
@@ -410,6 +441,7 @@ const { isEditing, isSubmitting } = useFormModal(
       // Matches the initial value above: a fresh form is a one-off until asked otherwise.
       mode.value = 'one-off';
       rule.value = null;
+      lastsDays.value = 1;
       seriesAnchorReady.value = false;
       seriesAnchor.value = date.value;
       category.value = '' as ActivityCategory;
@@ -500,12 +532,16 @@ watch(
         // Taken AFTER the flags release so watcher-settled values are part of
         // the baseline rather than surfacing as phantom user changes.
         // Skipped for the AI update-existing flow — see the ref's docblock.
-        editBaseline.value = props.sourcePhoto ? null : buildPayload();
+        editBaseline.value = props.sourcePhoto ? null : withRepairableEndDate(buildPayload());
+        // The AI update flow opens on EXTRACTED values, never saved: nothing to
+        // grandfather, so the Lasts cap always applies there.
+        seededSpanShape.value = props.sourcePhoto ? '' : spanShape.value;
       });
     } else if (open) {
       // New-activity path: `onNew` has seeded `date` + `seriesAnchor`.
       nextTick(() => {
         seriesAnchorReady.value = true;
+        seededSpanShape.value = spanShape.value;
       });
       editBaseline.value = null;
     } else {
@@ -564,11 +600,9 @@ const seriesAnchorReady = ref(false);
 watch(date, (newDate, oldDate) => {
   if (!seriesAnchorReady.value) return;
   if (!newDate || !oldDate || !seriesAnchor.value) return;
-  const deltaDays = Math.round(
-    (parseLocalDate(newDate).getTime() - parseLocalDate(oldDate).getTime()) / 86_400_000
-  );
+  const deltaDays = daysBetweenYmd(oldDate, newDate);
   if (!Number.isFinite(deltaDays) || deltaDays === 0) return;
-  seriesAnchor.value = toDateInputValue(addDays(parseLocalDate(seriesAnchor.value), deltaDays));
+  seriesAnchor.value = addDaysYmd(seriesAnchor.value, deltaDays);
 });
 
 /**
@@ -660,6 +694,15 @@ const v = useFormValidation(
     title: () => title.value.trim().length > 0,
     date: () => !!date.value,
     assignees: () => assigneeIds.value.length > 0,
+    ...(isRecurring.value && isAllDay.value
+      ? {
+          lasts: () =>
+            spanShape.value === seededSpanShape.value ||
+            (Number.isInteger(lastsDays.value) &&
+              lastsDays.value >= 1 &&
+              lastsDays.value <= maxLastsDays.value),
+        }
+      : {}),
     ...(isRecurring.value && hasCost.value
       ? {
           feeSchedule: () => feeSchedule.value !== 'none',
@@ -682,6 +725,42 @@ const saveLabel = computed(() =>
 );
 
 /**
+ * A repeat whose stored `endDate` is on or before its `date` reads as one day, so
+ * the form's payload carries no `endDate`, and neither would a baseline built the
+ * same way: the bad value would survive every save. Seeding the baseline with it
+ * makes any save write the cleared value.
+ */
+function withRepairableEndDate(baseline: CreateFamilyActivityInput): CreateFamilyActivityInput {
+  const a = props.activity;
+  if (a && isRepeatingActivity(a) && a.endDate && a.endDate <= a.date) {
+    return { ...baseline, endDate: a.endDate };
+  }
+  return baseline;
+}
+
+/**
+ * A one-off spans days through its visible end date (only forward: an end before
+ * the start would expand to nothing). A repeating all-day activity spans days
+ * through "Lasts", written as `endDate` relative to the form's date. On an edit
+ * the value reaches the store only when it DIFFERS from the baseline (built by
+ * this same function), so an untouched span is never rewritten.
+ */
+function payloadEndDate(): string | undefined {
+  if (!isAllDay.value) {
+    // No end-date field on a timed form, but a timed record can carry one (a
+    // Fri 18:00 - Sun 18:00 import, read by Google). Keep it, relative to the
+    // form's date, when the record was already timed; clear it when the user
+    // just switched an all-day record to timed.
+    const a = props.activity;
+    return a && a.isAllDay !== true ? shiftSpan(a, date.value) : undefined;
+  }
+  if (isRecurring.value) {
+    return lastsDays.value > 1 ? addDaysYmd(date.value, lastsDays.value - 1) : undefined;
+  }
+  return endDate.value && endDate.value > date.value ? endDate.value : undefined;
+}
+
+/**
  * Build the activity payload from current form state. Used by both
  * the eager-create path (photos require an entity id before save) and
  * the final emit('save') handler. Includes `photoIds` from the binding
@@ -696,16 +775,7 @@ function buildPayload(): CreateFamilyActivityInput {
     icon: icon.value || undefined,
     description: description.value.trim() || undefined,
     date: date.value,
-    // Only a one-off can span days, and only forward: the field is hidden while
-    // repeating, so a value left over from a multi-day one-off is not written. On
-    // an edit this only reaches the store when it DIFFERS from the baseline (built
-    // by this same function): switching a multi-day one-off to repeating clears it;
-    // a value already stored on a repeating record is left as it is (it may be a
-    // Google import's real per-repeat length; see the 2026-09-27 plan's Outcome).
-    endDate:
-      isAllDay.value && !isRecurring.value && endDate.value && endDate.value > date.value
-        ? endDate.value
-        : undefined,
+    endDate: payloadEndDate(),
     isAllDay: isAllDay.value || undefined,
     startTime: isAllDay.value ? undefined : startTime.value || undefined,
     endTime: isAllDay.value ? undefined : endTime.value || undefined,
@@ -884,6 +954,13 @@ function handleSave() {
     // diff at its correct current value — a harmless same-value write. Do not
     // add machinery to chase it.
     const data = editBaseline.value ? diffPayload(editBaseline.value, payload) : payload;
+    // A ONE-OFF form shows its end date, so when the start moves the end on
+    // screen is the intent even if unchanged: without it the store's span rule
+    // would shift the end along (a Sat-Mon child moved to Fri would become
+    // Fri-Sun). A repeat's "Lasts" is a length, so there the rule is right.
+    if (!isRecurring.value && 'date' in data && !('endDate' in data)) {
+      data.endDate = payload.endDate;
+    }
     // `createdBy` is destructured off the DIFF, not the payload — otherwise it
     // rides along into an update whenever the current member changed mid-session.
     const { createdBy: _omit, ...updateData } = data;
@@ -1068,6 +1145,33 @@ function handleSave() {
              a half-empty two-column grid. -->
         <FormFieldGroup :label="t('planner.field.date')" v-bind="v.bind('date')">
           <BeanieDatePicker v-model="date" required />
+        </FormFieldGroup>
+        <!-- A repeating all-day activity can last several days (a weekly
+             Fri-Sun weekend). Optional: it defaults to one day. -->
+        <FormFieldGroup
+          v-if="isAllDay"
+          :label="t('planner.field.lasts')"
+          v-bind="v.bind('lasts')"
+          :required="false"
+          :error-message="
+            fillTemplate(t('planner.validation.lastsRange'), { max: String(maxLastsDays) })
+          "
+          optional
+        >
+          <div class="flex items-center gap-2">
+            <BaseInput
+              v-model.number="lastsDays"
+              type="number"
+              min="1"
+              :max="maxLastsDays"
+              class="w-20"
+            />
+            <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+              lastsDays === 1
+                ? t('planner.field.lastsUnit.one')
+                : t('planner.field.lastsUnit.other')
+            }}</span>
+          </div>
         </FormFieldGroup>
         <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('modal.startTime')">

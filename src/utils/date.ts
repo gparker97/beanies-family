@@ -221,6 +221,20 @@ export function addDaysYmd(ymd: string, days: number): string {
 }
 
 /**
+ * Signed whole days from `fromYmd` to `toYmd` (`'2026-05-01' → '2026-05-04'` is 3).
+ * Computed on UTC midnights, so a DST change inside the range can never round a
+ * day away. The one day-difference for calendar dates; `YYYY-MM-DD` prefixes of
+ * longer strings are accepted.
+ */
+export function daysBetweenYmd(fromYmd: string, toYmd: string): number {
+  const utc = (ymd: string) => {
+    const [y, m, d] = ymd.slice(0, 10).split('-').map(Number);
+    return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1);
+  };
+  return Math.round((utc(toYmd) - utc(fromYmd)) / 86_400_000);
+}
+
+/**
  * Days from `dayOfWeek` back to the first day of its week, per the user's
  * `weekStartDay` (0=Sun..6=Sat).
  *

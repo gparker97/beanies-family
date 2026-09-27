@@ -14,6 +14,7 @@
  * time — see docs/plans/2026-07-24-helpful-hints.md), while the real event date
  * lives in `hintEventDate` for expiry + display.
  */
+import { isContinuationDay } from '@/utils/calendar/occurrence';
 import type { FamilyMember, HelpfulHintType, TodoItem } from '@/types/models';
 import type { NotificationOccurrence } from '@/utils/notifications';
 import { ACTIVITY_GROUP_MAP } from '@/constants/activityCategories';
@@ -288,6 +289,8 @@ function activityHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
   const out: DesiredHint[] = [];
   for (const occ of Object.values(input.occurrences).flat()) {
     try {
+      // One hint per event, not one per day a multi-day party covers.
+      if (isContinuationDay(occ)) continue;
       const { activity, date } = occ;
       const hintType = activityTypeFor(activity.category);
       if (!hintType) continue; // not a hint-worthy category — not a "skip"

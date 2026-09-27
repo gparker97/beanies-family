@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyActivity } from '@/types/models';
-import { isRepeatingActivity, resolveActivityDays } from '../activityDays';
+import {
+  isRepeatingActivity,
+  minRepeatGapDays,
+  resolveActivityDays,
+  shiftSpan,
+  spanOffsetDays,
+  withRebasedEndDate,
+} from '../activityDays';
+import { daysBetweenYmd } from '@/utils/date';
 
 function makeActivity(overrides: Partial<FamilyActivity> = {}): FamilyActivity {
   return {
@@ -89,5 +97,57 @@ describe('a repeating activity with a real multi-day endDate', () => {
       endDate: '2026-06-14',
     });
     expect(resolveActivityDays(a)).toMatchObject({ endYmd: '2026-06-14', endDayOffset: 2 });
+  });
+});
+
+describe('multi-day span helpers', () => {
+  const span = (date: string, endDate?: string) => ({ isAllDay: true as const, date, endDate });
+
+  it('daysBetweenYmd is signed and unaffected by a DST change in the range', () => {
+    expect(daysBetweenYmd('2026-05-01', '2026-05-04')).toBe(3);
+    expect(daysBetweenYmd('2026-05-04', '2026-05-01')).toBe(-3);
+    // US DST starts 2026-03-08, EU 2026-03-29.
+    expect(daysBetweenYmd('2026-03-06', '2026-03-09')).toBe(3);
+    expect(daysBetweenYmd('2026-03-27', '2026-03-30')).toBe(3);
+  });
+
+  it('spanOffsetDays counts days after the start, 0 for a single day or a bad end', () => {
+    expect(spanOffsetDays(span('2026-05-01', '2026-05-03'))).toBe(2);
+    expect(spanOffsetDays(span('2026-05-01'))).toBe(0);
+    expect(spanOffsetDays(span('2026-05-01', '2026-04-29'))).toBe(0);
+    // Only an explicitly all-day record spans days (matches the store's rule).
+    expect(spanOffsetDays({ date: '2026-05-01', endDate: '2026-05-03' })).toBe(0);
+  });
+
+  it('shiftSpan keeps the length when the start moves, across DST too', () => {
+    expect(shiftSpan(span('2026-05-01', '2026-05-03'), '2026-05-08')).toBe('2026-05-10');
+    expect(shiftSpan(span('2026-03-06', '2026-03-08'), '2026-03-27')).toBe('2026-03-29');
+    expect(shiftSpan(span('2026-05-01'), '2026-05-08')).toBeUndefined();
+  });
+
+  it('withRebasedEndDate carries the span unless the patch sets endDate itself', () => {
+    const existing = span('2026-05-01', '2026-05-03');
+    expect(withRebasedEndDate(existing, { date: '2026-05-08' })).toEqual({
+      date: '2026-05-08',
+      endDate: '2026-05-10',
+    });
+    // A present `undefined` is a deliberate clear (Lasts back to 1 day).
+    expect(withRebasedEndDate(existing, { date: '2026-05-08', endDate: undefined })).toEqual({
+      date: '2026-05-08',
+      endDate: undefined,
+    });
+    const noMove = { title: 'x' } as { date?: string; endDate?: string; title: string };
+    expect(withRebasedEndDate(existing, noMove)).toBe(noMove);
+  });
+
+  it('minRepeatGapDays is the tightest gap between starts', () => {
+    const never = { kind: 'never' as const };
+    expect(minRepeatGapDays({ unit: 'day', interval: 1, end: never })).toBe(1);
+    expect(minRepeatGapDays({ unit: 'week', interval: 1, weekdays: [5], end: never })).toBe(7);
+    expect(minRepeatGapDays({ unit: 'week', interval: 1, weekdays: [1, 3], end: never })).toBe(2);
+    expect(minRepeatGapDays({ unit: 'week', interval: 2, weekdays: [1, 3], end: never })).toBe(2);
+    expect(minRepeatGapDays({ unit: 'week', interval: 3, end: never })).toBe(21);
+    expect(minRepeatGapDays({ unit: 'week', interval: 1, weekdays: [0, 6], end: never })).toBe(1);
+    expect(minRepeatGapDays({ unit: 'month', interval: 1, end: never })).toBe(28);
   });
 });

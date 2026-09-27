@@ -11,6 +11,7 @@
 // renders 3-5 months, and per-month store queries would triple-to-quintuple the
 // scans on every recompute.
 
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { extractDatePart, formatNookDate, toDateInputValue, monthGridRange } from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
@@ -21,15 +22,13 @@ import type {
   CellTimedOccurrence,
   CellVacation,
 } from '@/components/planner/MonthDayCard.vue';
-import type { FamilyActivity, FamilyVacation } from '@/types/models';
+import type { FamilyVacation } from '@/types/models';
 import type { DayExtra } from '@/utils/calendarDay';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 
-/** One activity occurrence as `activityStore.activitiesInRange` yields it. */
-export interface ActivityOccurrenceInput {
-  activity: FamilyActivity;
-  date: string;
-}
+/** One activity occurrence as `activityStore.activitiesInRange` yields it: the
+ *  shared shape (`calendar/occurrence.ts`), `repeatStart` included. */
+export type ActivityOccurrenceInput = ActivityOccurrence;
 
 /** Week-separator metadata for the mobile stream's per-week label rows. */
 export interface WeekRangeMeta {
@@ -70,7 +69,7 @@ export interface MonthCellsInput {
  */
 export interface PreparedCellData {
   timed: Map<string, CellTimedOccurrence[]>;
-  allDay: Array<{ activity: FamilyActivity; date: string }>;
+  allDay: ActivityOccurrence[];
   segments: Map<string, TravelSegmentOccurrence[]>;
   vacations: Map<string, CellVacation[]>;
   vacationDates: Set<string>;
@@ -92,7 +91,7 @@ export interface PrepareCellDataInput {
 
 export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
   const timed = new Map<string, CellTimedOccurrence[]>();
-  const allDay: Array<{ activity: FamilyActivity; date: string }> = [];
+  const allDay: ActivityOccurrence[] = [];
   for (const occ of input.occurrences) {
     // Vacation-linked activities render as the trailing vacation bar.
     if (occ.activity.vacationId) continue;
@@ -101,7 +100,8 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
     // on `!startTime` — so the same event was an all-day chip here and a timed
     // block there. One predicate, every surface.
     if (isAllDayActivity(occ.activity)) {
-      allDay.push({ activity: occ.activity, date: occ.date });
+      // Whole occurrence: `repeatStart` groups a multi-day repeat's days.
+      allDay.push(occ);
       continue;
     }
     if (!timed.has(occ.date)) timed.set(occ.date, []);

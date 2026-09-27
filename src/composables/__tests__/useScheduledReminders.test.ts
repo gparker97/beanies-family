@@ -101,6 +101,21 @@ const PREFS: ReminderPrefs = {
 };
 
 describe('buildReminderSchedule — activities', () => {
+  it('⭐ reminds about a multi-day event once, on the day it starts', () => {
+    const a = activity({ id: 'trip' as UUID, startTime: '15:00', reminderMinutes: 30 });
+    const { reminders } = buildReminderSchedule(
+      input({
+        occurrencesByDate: {
+          '2026-05-22': [{ ...occ('2026-05-22', a), repeatStart: '2026-05-22' }],
+          '2026-05-23': [{ ...occ('2026-05-23', a), repeatStart: '2026-05-22' }],
+        },
+      }),
+      NOW,
+      PREFS
+    );
+    expect(reminders.map((r) => r.fireAt.toISOString().slice(0, 10))).toEqual(['2026-05-22']);
+  });
+
   it('fires at (startTime − reminderMinutes), not at the event', () => {
     const a = activity({ id: 'a' as UUID, startTime: '15:00', reminderMinutes: 30 });
     const { reminders } = buildReminderSchedule(

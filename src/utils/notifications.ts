@@ -11,7 +11,8 @@
  * Presentation (icon/accent) is intentionally absent — see
  * `types/notifications.ts` + `components/notifications/notificationKinds.ts`.
  */
-import type { TodoItem, FamilyActivity, FamilyList, FamilyMember } from '@/types/models';
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
+import type { TodoItem, FamilyList, FamilyMember } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
@@ -66,10 +67,8 @@ export const CARD_CHECKIN_PREFIX = 'card-checkin:';
 const AGED_EXEMPT_PREFIXES = [CARD_MOVE_PREFIX, CARD_CHECKIN_PREFIX] as const;
 export const AGED_EXEMPT_MAX_DAYS = 30;
 
-export interface NotificationOccurrence {
-  activity: FamilyActivity;
-  date: string;
-}
+/** The shared occurrence shape (`calendar/occurrence.ts`). */
+export type NotificationOccurrence = ActivityOccurrence;
 
 export interface DeriveInput {
   todos: TodoItem[];

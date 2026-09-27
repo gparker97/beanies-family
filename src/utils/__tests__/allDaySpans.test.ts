@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { computeAllDaySpans } from '../allDaySpans';
+
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (e: unknown) => logEvent(e) }));
 import type { FamilyActivity } from '@/types/models';
 
 /**
@@ -69,7 +72,7 @@ describe('computeAllDaySpans', () => {
     );
 
     expect(result.spans).toHaveLength(1);
-    expect(result.spans[0]).toEqual({ activity: a, startCol: 2, span: 3 });
+    expect(result.spans[0]).toEqual({ activity: a, startYmd: '2026-05-13', startCol: 2, span: 3 });
     expect(result.spanningIds.has('a-multi')).toBe(true);
     // Multi-day shouldn't bleed into singleByDate.
     expect(result.singleByDate.size).toBe(0);
@@ -101,7 +104,9 @@ describe('computeAllDaySpans', () => {
     expect(result.spans[0]).toMatchObject({ startCol: 4, span: 3 }); // Fri-Sun
   });
 
-  it('logs and skips an activity with endDate < startDate', () => {
+  it('reports an activity with endDate < startDate and draws it as one day', () => {
+    // The store draws it as a single day (an older client moved it without its
+    // span); skipping it here made it vanish from the all-day row.
     const a = activity({
       id: 'a-bad',
       date: '2026-05-15',
@@ -111,9 +116,13 @@ describe('computeAllDaySpans', () => {
     const result = computeAllDaySpans([{ activity: a, date: '2026-05-15' }], week());
 
     expect(result.spans).toEqual([]);
-    expect(result.singleByDate.size).toBe(0);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('a-bad'));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid record'));
+    expect(result.singleByDate.get('2026-05-15')).toEqual([a]);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'all_day_odd_record',
+        context: expect.objectContaining({ error_code: 'end_before_start' }),
+      })
+    );
   });
 
   it('excludes timed activities (isAllDay falsy) from both buckets', () => {
@@ -142,8 +151,12 @@ describe('computeAllDaySpans', () => {
 
     expect(result.spans).toEqual([]);
     expect(result.singleByDate.size).toBe(0);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('a-drifted'));
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Schema drift'));
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'all_day_odd_record',
+        context: expect.objectContaining({ error_code: 'timed_with_end_date' }),
+      })
+    );
   });
 
   it('returns empty buckets for empty input', () => {
@@ -217,44 +230,42 @@ describe('computeAllDaySpans', () => {
     expect(result.spanningIds.size).toBe(2);
   });
 
-  it('⭐ shows every repeat of a repeating all-day activity carrying a stale endDate', () => {
-    // A multi-day one-off switched to weekly kept its hidden endDate. Each
-    // occurrence then deduped into the anchor's span and every later repeat
-    // vanished. Repeating activities are bucketed by occurrence date instead.
-    const a = activity({
-      id: 'swim',
-      date: '2026-05-04',
-      endDate: '2026-05-06',
-      isAllDay: true,
-      recurrence: 'weekly',
-      daysOfWeek: [1],
-    });
-    const result = computeAllDaySpans(
-      [
-        { activity: a, date: '2026-05-11' },
-        { activity: a, date: '2026-05-18' },
-      ],
-      [...week(), { dateStr: '2026-05-18' }]
-    );
-    expect(result.spans).toHaveLength(0);
-    expect(result.singleByDate.get('2026-05-11')?.map((x) => x.id)).toEqual(['swim']);
-    expect(result.singleByDate.get('2026-05-18')?.map((x) => x.id)).toEqual(['swim']);
-  });
-
-  it('⭐ shows every repeat of an imported weekly two-day event on its own day', () => {
-    // Same shape as the Google import: `rule` + a genuine `endDate`. The store
-    // expands one occurrence per repeat, so each is bucketed by its own date
-    // rather than deduped into the anchor's span.
+  it('⭐ draws each repeat of a multi-day repeating activity as its own span', () => {
+    // A weekly Fri-Sun weekend (the Google import shape: rule + endDate). The
+    // store emits every covered day tagged with its repeat start; each repeat is
+    // one span, and two repeats in one row are two spans.
     const a = activity({
       id: 'weekend',
-      date: '2026-05-02',
+      date: '2026-05-01',
       endDate: '2026-05-03',
       isAllDay: true,
-      recurrence: 'none',
-      rule: { unit: 'week', interval: 1, weekdays: [6], end: { kind: 'never' } },
-    } as never);
-    const result = computeAllDaySpans([{ activity: a, date: '2026-05-16' }], week());
-    expect(result.spans).toHaveLength(0);
-    expect(result.singleByDate.get('2026-05-16')?.map((x) => x.id)).toEqual(['weekend']);
+      recurrence: 'weekly',
+      daysOfWeek: [5],
+    });
+    const occ = (date: string, repeatStart: string) => ({ activity: a, date, repeatStart });
+    const days = [
+      '2026-05-10',
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+      '2026-05-16',
+      '2026-05-17',
+    ].map((dateStr) => ({ dateStr }));
+    const result = computeAllDaySpans(
+      [
+        occ('2026-05-10', '2026-05-08'), // tail of the previous repeat
+        occ('2026-05-15', '2026-05-15'),
+        occ('2026-05-16', '2026-05-15'),
+        occ('2026-05-17', '2026-05-15'),
+      ],
+      days
+    );
+    expect(result.spans.map((s) => [s.startYmd, s.startCol, s.span])).toEqual([
+      ['2026-05-08', 0, 1],
+      ['2026-05-15', 5, 3],
+    ]);
+    expect(result.singleByDate.size).toBe(0);
   });
 });
