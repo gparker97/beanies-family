@@ -12,12 +12,12 @@
  * The Deal view is `DealPile` (card by card) at every width, the default. At md+ one toggle
  * at the top right of the Deal view switches to `DealBoard` and back; that choice is
  * remembered per device (`dealMode`) and only the toggle changes it. Every `openDeal`
- * request (the first deal, "Deal the last N", a card's Deal button) shows the pile at that
+ * request (the first deal, "Deal the remaining N", a card's Deal button) shows the pile at that
  * card without touching the saved choice; phones never see the board. The check-in is `CheckInDrawer`, and the fridge sheet (Share / Export as PDF, from the ⋯ menu
  * and the Overview) runs on `useSheetExportRunner` (surface `deck-export`) with one
  * `ExportSheet` per page off-screen.
  */
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePersistedChoice } from '@/composables/usePersistedChoice';
@@ -40,7 +40,7 @@ import {
   type DeckExportResolvers,
   type ExportPage,
 } from '@/utils/responsibilityExportModel';
-import type { LanguageCode } from '@/types/models';
+import type { LanguageCode, ListCategory } from '@/types/models';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -123,6 +123,29 @@ watch(
 );
 
 const deckFilter = ref<DeckFilter>(null);
+const deckGrid = ref<InstanceType<typeof DeckGrid> | null>(null);
+
+/** An Overview "By Category" row: the Deck view, filtered to that category, at its shelf. */
+async function openCategory(category: ListCategory): Promise<void> {
+  deckFilter.value = category;
+  view.value = 'deck';
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'overview_open_category',
+    context: { detail: category },
+  });
+  await nextTick();
+  const shown = (await deckGrid.value?.scrollToShelf(category)) ?? false;
+  if (!shown) {
+    logEvent({
+      level: 'warn',
+      surface: SURFACE,
+      message: 'overview_open_category_no_shelf',
+      context: { detail: category },
+    });
+  }
+}
 
 // ── Drawers ──────────────────────────────────────────────────────────────────
 const viewCardId = ref<string | null>(null);
@@ -463,6 +486,8 @@ async function restoreDefaults(): Promise<void> {
         v-else
         :can-deal="canDeal"
         @deal-waiting="openDeal({ scope: 'waiting' })"
+        @deal-remaining="openDeal({ scope: $event })"
+        @open-category="openCategory"
         @deal-card="openDeal({ scope: 'waiting', cardId: $event })"
         @see-skipped="seeSkipped"
         @open-card="openCard"
@@ -492,6 +517,7 @@ async function restoreDefaults(): Promise<void> {
     <!-- Deck -->
     <DeckGrid
       v-else
+      ref="deckGrid"
       v-model:filter="deckFilter"
       :cards="store.resolved"
       :can-edit="canDeal"
