@@ -6,7 +6,8 @@
  * cards count as not done yet), categories show coverage and faces, and NO per-person
  * total appears anywhere on this surface.
  *
- * Sections: summary (ring, legend, Deal the Last N, See the Skipped Pile), By Category,
+ * Sections: summary (ring, legend, Deal the Remaining N, See the Skipped Pile), By Category
+ * (each row opens the Deck view at that category),
  * the family check-in, Waiting for a Holder, Recent Moves and a few Facts. Desktop is
  * two columns; a phone stacks them.
  *
@@ -32,7 +33,7 @@ import {
   ymdOf,
   type RecentItem,
 } from '@/utils/responsibilityDeck';
-import type { FamilyMember } from '@/types/models';
+import type { FamilyMember, ListCategory } from '@/types/models';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import DeckPanel from './DeckPanel.vue';
@@ -44,6 +45,10 @@ withDefaults(defineProps<{ canDeal?: boolean }>(), { canDeal: false });
 const emit = defineEmits<{
   /** Open the deal view over every waiting card. */
   'deal-waiting': [];
+  /** Open the deal pile over what is left: the unsorted cards first, else the waiting. */
+  'deal-remaining': [scope: 'unsorted' | 'waiting'];
+  /** Open the Deck view filtered to one category. */
+  'open-category': [category: ListCategory];
   /** Open the deal pile at one card. */
   'deal-card': [cardId: string];
   'see-skipped': [];
@@ -64,6 +69,13 @@ const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
 const WAITING_SHOWN = 5;
 
 const stats = computed(() => store.stats);
+
+/** Every card still to deal: unsorted plus waiting. */
+const remaining = computed(() => stats.value.unsorted + stats.value.waiting);
+
+function dealRemaining(): void {
+  emit('deal-remaining', stats.value.unsorted > 0 ? 'unsorted' : 'waiting');
+}
 
 const headline = computed(() => {
   const { inPlay, held, waiting, unsorted } = stats.value;
@@ -208,16 +220,16 @@ const kidsHolding = computed<FamilyMember[]>(() =>
             </ul>
             <div class="flex flex-wrap gap-2">
               <BaseButton
-                v-if="canDeal && stats.waiting"
+                v-if="canDeal && remaining"
                 size="sm"
-                data-testid="overview-deal-last"
-                @click="emit('deal-waiting')"
+                data-testid="overview-deal-remaining"
+                @click="dealRemaining"
               >
                 {{
-                  stats.waiting === 1
-                    ? t('whoOwnsWhat.overview.dealLast.one')
-                    : fillTemplate(t('whoOwnsWhat.overview.dealLast.other'), {
-                        count: stats.waiting,
+                  remaining === 1
+                    ? t('whoOwnsWhat.overview.dealRemaining.one')
+                    : fillTemplate(t('whoOwnsWhat.overview.dealRemaining.other'), {
+                        count: remaining,
                       })
                 }}
               </BaseButton>
@@ -240,7 +252,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
         :title="t('whoOwnsWhat.overview.byCategory')"
         :hint="t('whoOwnsWhat.overview.byCategoryHint')"
       >
-        <CategoryCoverage :rows="store.coverage" />
+        <CategoryCoverage :rows="store.coverage" @open="emit('open-category', $event)" />
       </DeckPanel>
     </div>
 

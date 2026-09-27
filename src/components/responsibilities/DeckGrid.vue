@@ -12,9 +12,11 @@
  *  - By Person: `DeckByBean`.
  *
  * The filter is a `v-model` owned by the page, so the ⋯ menu and the Overview's "See the
- * skipped pile" can open this view already filtered.
+ * skipped pile" and "By Category" rows can open this view already filtered;
+ * `scrollToShelf` brings a category's shelf into view once it has rendered.
  */
-import { computed } from 'vue';
+import { computed, nextTick, ref } from 'vue';
+import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { getListCategory } from '@/constants/listCategories';
@@ -60,6 +62,9 @@ const extras = computed<{ id: DeckExtraFilter; label: string; emoji: string }[]>
   { id: 'byBean', label: t('whoOwnsWhat.deck.byBean'), emoji: '👥' },
 ]);
 
+/** The shelf key for cards with no known category. */
+const OTHER_SHELF = '__other';
+
 interface Shelf {
   key: string;
   title: string;
@@ -82,7 +87,7 @@ const shelves = computed<Shelf[]>(() =>
     const def = category ? getListCategory(category) : undefined;
     return category && def
       ? { key: category, title: categoryLabel(category), emoji: def.emoji, cards }
-      : { key: '__other', title: t('lists.category.other'), emoji: '📁', cards };
+      : { key: OTHER_SHELF, title: t('lists.category.other'), emoji: '📁', cards };
   })
 );
 
@@ -93,10 +98,24 @@ const emptyMessage = computed(() =>
 function onBringBack(cardId: string): void {
   void bringBack(cardId);
 }
+
+const root = ref<HTMLElement | null>(null);
+
+/** Scroll a category's shelf into view; false when that shelf isn't shown. */
+async function scrollToShelf(category: ListCategory): Promise<boolean> {
+  await nextTick();
+  const key = getListCategory(category) ? category : OTHER_SHELF;
+  const shelf = root.value?.querySelector<HTMLElement>(`[data-shelf="${CSS.escape(key)}"]`);
+  if (!shelf) return false;
+  shelf.scrollIntoView({ block: 'start', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+  return true;
+}
+
+defineExpose({ scrollToShelf });
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div ref="root" class="space-y-5">
     <ListCategoryPills
       v-if="showPills"
       :model-value="filter"
@@ -139,7 +158,13 @@ function onBringBack(cardId: string): void {
         {{ emptyMessage }}
       </p>
 
-      <section v-for="shelf in shelves" :key="shelf.key" :data-testid="`deck-shelf-${shelf.key}`">
+      <section
+        v-for="shelf in shelves"
+        :key="shelf.key"
+        :data-shelf="shelf.key"
+        :data-testid="`deck-shelf-${shelf.key}`"
+        class="scroll-mt-4"
+      >
         <h3
           class="font-outfit dark:text-ink-faint mb-2 text-xs font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
         >
