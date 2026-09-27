@@ -216,4 +216,45 @@ describe('computeAllDaySpans', () => {
     expect(result.spans[1]).toMatchObject({ startCol: 4, span: 3 });
     expect(result.spanningIds.size).toBe(2);
   });
+
+  it('⭐ shows every repeat of a repeating all-day activity carrying a stale endDate', () => {
+    // A multi-day one-off switched to weekly kept its hidden endDate. Each
+    // occurrence then deduped into the anchor's span and every later repeat
+    // vanished. Repeating activities are bucketed by occurrence date instead.
+    const a = activity({
+      id: 'swim',
+      date: '2026-05-04',
+      endDate: '2026-05-06',
+      isAllDay: true,
+      recurrence: 'weekly',
+      daysOfWeek: [1],
+    });
+    const result = computeAllDaySpans(
+      [
+        { activity: a, date: '2026-05-11' },
+        { activity: a, date: '2026-05-18' },
+      ],
+      [...week(), { dateStr: '2026-05-18' }]
+    );
+    expect(result.spans).toHaveLength(0);
+    expect(result.singleByDate.get('2026-05-11')?.map((x) => x.id)).toEqual(['swim']);
+    expect(result.singleByDate.get('2026-05-18')?.map((x) => x.id)).toEqual(['swim']);
+  });
+
+  it('⭐ shows every repeat of an imported weekly two-day event on its own day', () => {
+    // Same shape as the Google import: `rule` + a genuine `endDate`. The store
+    // expands one occurrence per repeat, so each is bucketed by its own date
+    // rather than deduped into the anchor's span.
+    const a = activity({
+      id: 'weekend',
+      date: '2026-05-02',
+      endDate: '2026-05-03',
+      isAllDay: true,
+      recurrence: 'none',
+      rule: { unit: 'week', interval: 1, weekdays: [6], end: { kind: 'never' } },
+    } as never);
+    const result = computeAllDaySpans([{ activity: a, date: '2026-05-16' }], week());
+    expect(result.spans).toHaveLength(0);
+    expect(result.singleByDate.get('2026-05-16')?.map((x) => x.id)).toEqual(['weekend']);
+  });
 });

@@ -15,7 +15,7 @@
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
-import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
+import { useTimeGrid, groupOverlapping, plannerExtent } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
@@ -104,7 +104,10 @@ const timedRef = computed(() => {
   }
   return items;
 });
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(timedRef);
+const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+  timedRef,
+  'day-mobile'
+);
 
 // ── Untimed content (all-day row) ──
 // The ONE all-day predicate, shared with the month grid and the wall. Splitting
@@ -145,11 +148,12 @@ const positionedEvents = computed<PositionedEvent[]>(() => {
     const laneEnd: number[] = []; // minute offset when each lane becomes free
     const laneOfEvent: number[] = [];
     for (const act of cluster) {
-      const [sh, sm] = (act.startTime ?? '0:0').split(':').map(Number);
-      const start = (sh ?? 0) * 60 + (sm ?? 0);
-      const [eh, em] = (act.endTime ?? '').split(':').map(Number);
-      const end =
-        act.endTime !== undefined && !Number.isNaN(eh) ? (eh ?? 0) * 60 + (em ?? 0) : start + 60;
+      // The card's RENDERED extent (floored, overnight clamped), the same one the
+      // clusters were built from. Unreadable starts share one cluster at the top
+      // of the grid; an end of Infinity gives each its own lane, never dropped.
+      const extent = plannerExtent(act);
+      const start = extent?.start ?? 0;
+      const end = extent?.end ?? Number.POSITIVE_INFINITY;
       let placed = -1;
       for (let l = 0; l < laneEnd.length; l++) {
         if ((laneEnd[l] ?? 0) <= start) {

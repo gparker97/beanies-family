@@ -21,7 +21,6 @@ import {
   defaultMaxBlock,
   MAX_BLOCK_PX,
   MAX_BLOCK_CEILING_PX,
-  clusterOverlapping,
   findFolds,
   foldThresholdMinutes,
   layoutTimeGrid,
@@ -613,42 +612,7 @@ describe('determinism', () => {
   });
 });
 
-describe('clusterOverlapping / mergeBusy', () => {
-  it('handles disjoint, touching, nested, identical, unsorted and empty', () => {
-    expect(clusterOverlapping([])).toEqual([]);
-    expect(
-      clusterOverlapping([
-        { start: 0, end: 10 },
-        { start: 20, end: 30 },
-      ])
-    ).toHaveLength(2);
-    expect(
-      clusterOverlapping([
-        { start: 0, end: 10 },
-        { start: 10, end: 20 },
-      ])
-    ).toHaveLength(2);
-    expect(
-      clusterOverlapping([
-        { start: 0, end: 100 },
-        { start: 10, end: 20 },
-      ])
-    ).toHaveLength(1);
-    expect(
-      clusterOverlapping([
-        { start: 5, end: 9 },
-        { start: 5, end: 9 },
-      ])
-    ).toHaveLength(1);
-    // Unsorted input must not change the answer.
-    expect(
-      clusterOverlapping([
-        { start: 20, end: 30 },
-        { start: 0, end: 10 },
-      ])
-    ).toHaveLength(2);
-  });
-
+describe('mergeBusy / findFolds', () => {
   it('merges busy periods across columns', () => {
     expect(
       mergeBusy([

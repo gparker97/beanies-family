@@ -32,6 +32,14 @@ export function isAllDayActivity(activity: FamilyActivity): boolean {
   return activity.isAllDay === true || !activity.startTime;
 }
 
+/**
+ * Whether the activity repeats. The legacy `recurrence` enum OR the canonical
+ * `rule` (#70) is enough: a record can carry either.
+ */
+export function isRepeatingActivity(activity: FamilyActivity): boolean {
+  return (!!activity.recurrence && activity.recurrence !== 'none') || !!activity.rule;
+}
+
 /** Why Google can never accept this activity's event body. */
 export type PushBlockReason = 'bad_start_time' | 'bad_end_time' | 'bad_date';
 
@@ -85,9 +93,8 @@ export function pushBlockReason(activity: FamilyActivity): PushBlockReason | nul
     return 'bad_date';
   }
 
-  const repeats = (activity.recurrence && activity.recurrence !== 'none') || !!activity.rule;
   if (
-    repeats &&
+    isRepeatingActivity(activity) &&
     activity.recurrenceEndDate &&
     !isRealYmd(activity.recurrenceEndDate.slice(0, 10))
   ) {
@@ -125,6 +132,9 @@ export function resolveActivityDays(activity: FamilyActivity): ActivityDays {
   const startTime = activity.startTime as string; // guaranteed by isAllDayActivity check
   const endTime = activity.endTime ?? startTime;
   let endYmd = activity.endDate?.slice(0, 10) ?? startYmd;
+  // Overnight is STRICT `<` (equal times are zero-length). Same rule as the grids'
+  // `timedSpanMinutes` (`calendar/timeSpans.ts`); equivalent for zero-padded
+  // `HH:mm`, since this compares strings and that one parses minutes.
   if (!activity.endDate && endTime < startTime) endYmd = addDaysYmd(startYmd, 1);
   return {
     allDay: false,
