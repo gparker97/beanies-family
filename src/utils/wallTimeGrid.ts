@@ -36,7 +36,8 @@
  *  4. A fold is PROPORTIONAL to what it skips, or it cannot say how much.
  *  5. (Rendering, in WallTimeGrid.vue) the now-line goes BEHIND the blocks.
  */
-import { activitySpanMinutes, ASSUMED_DURATION_MIN, MINUTES_PER_DAY } from '@/utils/wallActivities';
+import { activitySpanMinutes, ASSUMED_DURATION_MIN } from '@/utils/wallActivities';
+import { clusterOverlapping, MINUTES_PER_DAY } from '@/utils/calendar/timeSpans';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { WallOccurrence } from '@/utils/wallActivities';
 
@@ -444,48 +445,6 @@ export interface GridLayout {
 export interface LayoutOptions {
   maxBlock?: number;
   assumedDurationMin?: number;
-}
-
-// ── Generic overlap clustering ────────────────────────────────────────────
-
-/**
- * Group items into clusters of mutually-overlapping ranges, on ALREADY PARSED
- * minute offsets. Pure, total, generic — no time-string parsing and no
- * assumed-duration policy, both of which are the caller's business.
- *
- * @see groupOverlapping in `@/composables/useCalendarNavigation` — the same
- * sweep for the planner. The two have deliberately NOT been converged: that one
- * bundles `HH:mm` parsing and a 60-minute default into the sweep, and its parser
- * returns `NaN`, which currently makes a malformed item start a NEW group and
- * still render. Pointing it here would filter it out instead — silently dropping
- * an activity from the live planner, across three call sites. If you are here to
- * change clustering, change BOTH or neither. Follow-ups F1/F2 in
- * `docs/plans/2026-09-03-wall-time-grid.md`.
- *
- * It lives in this module, rather than a generic `timeSpans.ts`, because it has
- * exactly one consumer. Move it out when it gets a second.
- */
-export function clusterOverlapping<T extends { start: number; end: number }>(
-  items: readonly T[]
-): T[][] {
-  const sorted = [...items].sort((a, b) => a.start - b.start || b.end - a.end);
-  const clusters: T[][] = [];
-  let current: T[] = [];
-  let reach = -Infinity;
-  for (const item of sorted) {
-    // `>=` not `>`: an event ending exactly as the next begins is sequential,
-    // not simultaneous. Treating a touching pair as a collision would split the
-    // column for the school run and the drop-off five minutes later.
-    if (current.length && item.start >= reach) {
-      clusters.push(current);
-      current = [];
-      reach = -Infinity;
-    }
-    current.push(item);
-    reach = Math.max(reach, item.end);
-  }
-  if (current.length) clusters.push(current);
-  return clusters;
 }
 
 // ── Parsing (hoisted out of the search — done once, not 100 times) ────────

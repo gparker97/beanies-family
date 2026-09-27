@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { FamilyActivity } from '@/types/models';
-import { resolveActivityDays } from '../activityDays';
+import { isRepeatingActivity, resolveActivityDays } from '../activityDays';
 
 function makeActivity(overrides: Partial<FamilyActivity> = {}): FamilyActivity {
   return {
@@ -61,5 +61,33 @@ describe('resolveActivityDays', () => {
     );
     expect(days.endYmd).toBe('2026-06-12');
     expect(days.endDayOffset).toBe(2);
+  });
+});
+
+describe('isRepeatingActivity', () => {
+  it('counts the legacy enum or a canonical rule', () => {
+    expect(isRepeatingActivity(makeActivity())).toBe(false);
+    expect(isRepeatingActivity(makeActivity({ recurrence: 'weekly' }))).toBe(true);
+    expect(
+      isRepeatingActivity(
+        makeActivity({ rule: { unit: 'week', interval: 1, end: { kind: 'never' } } } as never)
+      )
+    ).toBe(true);
+  });
+});
+
+describe('a repeating activity with a real multi-day endDate', () => {
+  it('⭐ keeps its day length for Google export and clash detection', () => {
+    // A Google import of a weekly Fri-Sun event carries `endDate` alongside `rule`
+    // (planImport spreads googleTimesToActivityFields). It is NOT stale data:
+    // ignoring it here would re-push the series to Google shortened.
+    const a = makeActivity({
+      isAllDay: true,
+      recurrence: 'weekly',
+      daysOfWeek: [5],
+      date: '2026-06-12',
+      endDate: '2026-06-14',
+    });
+    expect(resolveActivityDays(a)).toMatchObject({ endYmd: '2026-06-14', endDayOffset: 2 });
   });
 });

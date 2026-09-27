@@ -13,6 +13,7 @@
  */
 
 import type { FamilyActivity } from '@/types/models';
+import { isRepeatingActivity } from '@/utils/calendar/activityDays';
 
 /** Shape returned by `activityStore.monthActivities()` and `weekActivities`. */
 export interface ActivityOccurrence {
@@ -101,15 +102,25 @@ export function computeAllDaySpans(
       continue;
     }
 
+    // Only a ONE-OFF spans days here, exactly as the store expands it
+    // (`expandOneOff` honours `endDate`; the repeating expansions emit one
+    // occurrence per repeat day and ignore it). A repeating activity can carry an
+    // `endDate` (a Google import of a weekly Sat-Sun event, or a value left over
+    // from a multi-day one-off switched to repeating), and treating it as a span
+    // deduped every repeat into the ANCHOR's span, so every repeat after the first
+    // vanished from the all-day rows. Each repeat is bucketed by its own date.
+    // `endDate` itself is untouched: Google export and clash detection still read
+    // it through `resolveActivityDays`.
+    const endDate = isRepeatingActivity(a) ? undefined : a.endDate;
     // Multi-day = endDate is set AND strictly after start. If endDate equals
     // the start, treat as single-day (no real span).
-    const hasMultiDay = !!a.endDate && a.endDate > a.date;
+    const hasMultiDay = !!endDate && endDate > a.date;
 
     // Catch invalid records: endDate before startDate. Skip the activity
     // so it doesn't pollute either bucket; the rest of the row still renders.
-    if (a.endDate && a.endDate < a.date) {
+    if (endDate && endDate < a.date) {
       console.warn(
-        `[allDaySpans] Activity ${a.id} has endDate=${a.endDate} before date=${a.date}. ` +
+        `[allDaySpans] Activity ${a.id} has endDate=${endDate} before date=${a.date}. ` +
           `Invalid record — skipping.`
       );
       continue;
@@ -126,7 +137,7 @@ export function computeAllDaySpans(
       // reverse-iter fallback for safety with older targets.
       let endCol = -1;
       for (let i = days.length - 1; i >= 0; i--) {
-        if (days[i]!.dateStr <= a.endDate!) {
+        if (days[i]!.dateStr <= endDate!) {
           endCol = i;
           break;
         }

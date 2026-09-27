@@ -766,12 +766,10 @@ export function safeOccurredOn(
  * block at the top of an empty axis and looked like a layout bug rather than bad data.
  * A `null` is a value the caller is forced to handle.
  *
- * This is the intended single definition, but it deliberately does NOT yet replace the
- * ad-hoc destructures elsewhere. `addHourToTime` and `formatTime12` in this file, and
- * `parseMinutes` in `useCalendarNavigation.ts`, re-FORMAT rather than compute an offset,
- * and converging them would change live-planner behaviour for malformed input across 23
- * importing files. See follow-ups F1/F2/F4 in
- * `docs/plans/2026-09-03-wall-time-grid.md`.
+ * This is the single definition for grid positioning: both the planner and the wall read
+ * it through `timedSpanMinutes` (`calendar/timeSpans.ts`). `addHourToTime` and
+ * `formatTime12` in this file still re-FORMAT rather than compute an offset and are not
+ * converged (follow-up F4 in `docs/plans/2026-09-03-wall-time-grid.md`).
  */
 export function minutesOfDay(hhmm: string | undefined | null): number | null {
   if (!hhmm) return null;

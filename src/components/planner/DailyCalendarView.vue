@@ -174,8 +174,10 @@ const allTimedActivities = computed(() => {
   return items;
 });
 
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } =
-  useTimeGrid(allTimedActivities);
+const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+  allTimedActivities,
+  'day-lanes'
+);
 
 // Vacation bars active on this day
 const activeVacations = computed(() =>
