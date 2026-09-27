@@ -23,7 +23,7 @@ const mockActivityOccurrences: Array<{ activity: FamilyActivity; date: string }>
 
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({
-    activitiesInRange: (startYmd: string, endYmd: string) =>
+    eventsInRange: (startYmd: string, endYmd: string) =>
       mockActivityOccurrences.filter((o) => o.date >= startYmd && o.date <= endYmd),
   }),
   CATEGORY_COLORS: { sports: '#F15D22' } as Record<string, string>,

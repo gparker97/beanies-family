@@ -143,6 +143,56 @@ describe('computeClashes', () => {
     expect(clashes.size).toBe(0);
   });
 
+  it('⭐ counts an overnight event once, from its start day, never a phantom 22:00 the next day', () => {
+    const activity = makeActivity({
+      id: 'n1',
+      date: '2026-06-10',
+      startTime: '22:00',
+      endTime: '01:00',
+    });
+    const busy: ConnectionBusy[] = [
+      {
+        connectionId: 'conn-1',
+        calendarLabel: 'work',
+        // Busy on the NEXT evening: only a (wrong) 22:00 reading of the tail hits it.
+        intervals: [
+          { startMs: localMs('2026-06-11', '22:30'), endMs: localMs('2026-06-11', '23:00') },
+        ],
+      },
+    ];
+    const clashes = computeClashes(
+      [
+        { activity, date: '2026-06-10', repeatStart: '2026-06-10' },
+        { activity, date: '2026-06-11', repeatStart: '2026-06-10' },
+      ],
+      busy
+    );
+    expect(clashes.size).toBe(0);
+  });
+
+  it('⭐ flags a tail alone on screen, keyed at its START day (the clash the grid looks up)', () => {
+    const activity = makeActivity({
+      id: 'n2',
+      date: '2026-06-10',
+      startTime: '22:00',
+      endTime: '01:00',
+    });
+    const busy: ConnectionBusy[] = [
+      {
+        connectionId: 'conn-1',
+        calendarLabel: 'work',
+        intervals: [
+          { startMs: localMs('2026-06-11', '00:30'), endMs: localMs('2026-06-11', '00:45') },
+        ],
+      },
+    ];
+    const clashes = computeClashes(
+      [{ activity, date: '2026-06-11', repeatStart: '2026-06-10' }],
+      busy
+    );
+    expect([...clashes.keys()]).toEqual([clashKey('n2', '2026-06-10')]);
+  });
+
   it('never flags an all-day occurrence', () => {
     const occurrences: ActivityOccurrence[] = [
       { activity: makeActivity({ id: 'a1', isAllDay: true }), date: '2026-06-10' },

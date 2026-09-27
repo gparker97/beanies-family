@@ -10,6 +10,7 @@
 
 import type { FamilyActivity } from '@/types/models';
 import type { RecurrenceRule } from '@/types/recurrence';
+import { MINUTES_PER_DAY, timedSpanMinutes } from '@/utils/calendar/timeSpans';
 import { addDaysYmd, daysBetweenYmd, isRealYmd, isWallClockTime } from '@/utils/date';
 
 export interface ActivityDays {
@@ -142,6 +143,35 @@ export function endDateOffsetDays(activity: Pick<FamilyActivity, 'date' | 'endDa
   if (!activity.endDate) return 0;
   const offset = daysBetweenYmd(activity.date, activity.endDate);
   return offset > 0 ? offset : 0;
+}
+
+/**
+ * A timed activity that runs past midnight into the NEXT day (a sleepover, a night
+ * shift, 22:00-01:00), so its tail is drawn on the next morning too. Defined by
+ * `resolveActivityDays` (end one day later), the same rule clash detection and
+ * the Google export use, so it covers both shapes: the implicit roll (`endTime <
+ * startTime`, no `endDate`) and calendar sync's explicit next-day `endDate`.
+ *
+ * Two meanings of "overnight", on purpose: a 22:00-00:00 event also ends on the
+ * next day for `resolveActivityDays` (Google needs the next day's midnight), but
+ * it has no TAIL to draw, so it is not overnight here. Anything 24 hours or longer
+ * is a timed multi-day event, out of scope (drawn on its start day only).
+ */
+export function isOvernightTimed(activity: FamilyActivity): boolean {
+  if (isAllDayActivity(activity)) return false;
+  const span = timedSpanMinutes(activity.startTime, activity.endTime, 0);
+  if (!span?.overnight || span.end <= MINUTES_PER_DAY) return false;
+  return resolveActivityDays(activity).endDayOffset === 1;
+}
+
+/**
+ * How many days after its start an occurrence is DRAWN across: an all-day span's
+ * length, 1 for an overnight timed tail, else 0. Drives the store's expansion.
+ */
+export function drawnOffsetDays(activity: FamilyActivity): number {
+  const span = spanOffsetDays(activity);
+  if (span > 0) return span;
+  return isOvernightTimed(activity) ? 1 : 0;
 }
 
 /**

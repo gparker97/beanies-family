@@ -67,6 +67,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'from_path',
   'action',
   'error_code',
+  // An activity record's random id (2026-09-27): which activity a calendar
+  // diagnostic is about (an odd all-day record, an activity store failure). A
+  // per-record UUID in the already-declared "Other Diagnostic Data" category:
+  // never a title, a member or a date. Several `activityStore` reports passed it
+  // before it was listed, and it was silently stripped.
+  'activity_id',
   // Beanie wall sizing (#96, surface 'beanie-wall'). Four coarse integers, no
   // identifier value beyond what a user-agent string already exposes, and no
   // user-typed content can reach them. They exist because `wall_room_gate_closed`
