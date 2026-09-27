@@ -16,6 +16,11 @@ _Not yet released._
 
 - The Who Owns What overview has a **Deal the Remaining** button, and tapping a category opens it in the deck.
 
+### Fixed
+
+- The desktop week and day views no longer put events under the wrong day or member when a birthday is on the calendar.
+- The week view's current-time line now shows only on the current week.
+
 ## 2026-09-26
 
 _Not yet released._

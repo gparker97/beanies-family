@@ -389,7 +389,7 @@ export const useActivityStore = defineStore('activities', () => {
         cursor.setDate(cursor.getDate() + 1);
       }
     } else if (startDate >= monthStart && startDate <= monthEnd) {
-      results.push({ activity, date: activity.date });
+      results.push({ activity, date: formatDate(startDate) });
     }
     return results;
   }
