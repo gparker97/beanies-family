@@ -67,6 +67,8 @@ Clipboard-copy was considered and dropped — adds a third path with marginal va
 
 ### 5. Two-level sidebar nesting via `AppSidebarSubNav`
 
+> **Amended 2026-09-27.** The Pod's pages moved to a flat third sidebar section, **The Bean Pod** (anchored by the hugging beanies, matching the phone's Pod tab); nested nav items and `AppSidebarSubNav` were removed, and the sidebar and drawer now share one `AppNavMenu`. See `docs/plans/2026-09-27-bean-pod-sidebar-section.md`. The text below is kept as history.
+
 The pre-Pod sidebar was one-level: section headers + flat items. The Pod needs sub-items (Meet the Beans / Scrapbook / Cookbook / Care & Safety / Emergency Contacts) under a single "The Pod" parent.
 
 `AppSidebarSubNav.vue` is extracted and shared between `AppSidebar` (desktop) and `MobileHamburgerMenu` (mobile). Expand/collapse state is module-scoped in `useSidebarAccordion` and persisted to `localStorage`, so it stays synced across viewports. Clicking the parent item navigates to its `path` **and** expands; clicking the chevron toggles expansion only (`event.stopPropagation()`).

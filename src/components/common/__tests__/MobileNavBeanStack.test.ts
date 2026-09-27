@@ -165,12 +165,20 @@ describe('MobileNavBeanStack', () => {
     expect(current.text()).toContain('nav.accounts');
   });
 
-  it('marks parent bean active for nested routes', () => {
+  it('marks only the most specific bean current (Cookbook, not Meet the Beans too)', () => {
     mockRoute.path = '/pod/cookbook';
     const wrapper = mountStack({ category: pod });
-    const current = wrapper.find('[role=menuitem][aria-current="page"]');
-    expect(current.exists()).toBe(true);
-    expect(current.text()).toContain('nav.pod.cookbook');
+    const current = wrapper.findAll('[role=menuitem][aria-current="page"]');
+    expect(current).toHaveLength(1);
+    expect(current[0]!.text()).toContain('nav.pod.cookbook');
+  });
+
+  it('marks the owning bean current on a deeper route (a recipe → Cookbook)', () => {
+    mockRoute.path = '/pod/cookbook/0f8b6c1e-2d3a-4b5c-8d9e-1a2b3c4d5e6f';
+    const wrapper = mountStack({ category: pod });
+    const current = wrapper.findAll('[role=menuitem][aria-current="page"]');
+    expect(current).toHaveLength(1);
+    expect(current[0]!.text()).toContain('nav.pod.cookbook');
   });
 
   it('positions on left side when anchor is left-half', async () => {

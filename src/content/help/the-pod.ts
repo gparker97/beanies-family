@@ -16,7 +16,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Every family member is a “bean” with their own profile — favourites, funny sayings, milestones, health notes, and more. Here’s how to fill one in.',
     icon: '🧑‍🤝‍🧑',
     readTime: 5,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -51,7 +51,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'In the sidebar, open <strong>The Pod</strong> 🌱 (under the Treehouse), then choose <strong>Meet the Beans</strong>',
+          'In the sidebar, open <strong>The Bean Pod</strong> (on a phone, tap the <strong>Pod</strong> tab), then choose <strong>Meet the Beans</strong>',
           'You’ll see a card for every family member',
           'Tap a bean’s card to open their profile — you’ll land on their <strong>Overview</strong>',
         ],
@@ -162,7 +162,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Keep each bean’s allergies and medications in one place — and a quick-reference page anyone caring for your family can check at a glance.',
     icon: '🩺',
     readTime: 5,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -192,7 +192,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open the bean’s profile (<strong>The Pod 🌱 → Meet the Beans →</strong> tap the bean), then go to the <strong>Allergies</strong> tab — or tap <strong>＋ Add Something → ⚠️ Allergy</strong> from anywhere on their page',
+          'Open the bean’s profile (<strong>The Bean Pod → Meet the Beans →</strong> tap the bean), then go to the <strong>Allergies</strong> tab — or tap <strong>＋ Add Something → ⚠️ Allergy</strong> from anywhere on their page',
           'Fill in <strong>What they are allergic to</strong> (e.g. <em>Peanuts</em>)',
           'Pick a <strong>Type</strong> — Food, Medication, Environmental, Contact, or Insect',
           'Pick a <strong>Severity</strong> — Mild, Moderate, or Severe',
@@ -239,7 +239,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Open <strong>The Pod 🌱 → Care &amp; Safety</strong> for the whole-family view. It pulls together three things:',
+          'Open <strong>The Bean Pod → Care &amp; Safety</strong> for the whole-family view. It pulls together three things:',
       },
       {
         type: 'list',
@@ -298,7 +298,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Catch the firsts and the big moments — first word, lost tooth, new job, new puppy — and keep them in one family timeline, with dates and photos.',
     icon: '🌟',
     readTime: 5,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -321,7 +321,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>The Family Milestones page</strong> — open <strong>The Pod 🌱 → Family Milestones</strong> for one timeline of everyone’s moments, in order (oldest first), like turning the pages of a family album',
+          '<strong>The Family Milestones page</strong> — open <strong>The Bean Pod → Family Milestones</strong> for one timeline of everyone’s moments, in order (oldest first), like turning the pages of a family album',
           '<strong>A bean’s Milestones tab</strong> — open a bean’s profile (<strong>Meet the Beans →</strong> tap the bean) and go to the <strong>Milestones</strong> tab to see just that person’s moments',
         ],
       },
@@ -409,7 +409,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'A digital memory-book you can flip through — a page for each family member, plus an “Everyone” page — filled in automatically from the things you add to your beans.',
     icon: '📖',
     readTime: 4,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -430,7 +430,8 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'paragraph',
-        content: 'In the sidebar, open <strong>The Pod 🌱 → Family Scrapbook</strong>.',
+        content:
+          'In the sidebar, open <strong>The Bean Pod → Family Scrapbook</strong> (on a phone, tap the <strong>Pod</strong> tab).',
       },
       {
         type: 'heading',
@@ -511,7 +512,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Point beanies at a photo, a PDF, a recipe link or a cooking video, and it writes the recipe into your cookbook for you to check.',
     icon: '🍳',
     readTime: 5,
-    updatedDate: '2026-09-25',
+    updatedDate: '2026-09-27',
     popular: true,
     sections: [
       {
@@ -540,7 +541,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>The Pod 🌱 → Family Cookbook</strong>',
+          'Open <strong>The Bean Pod → Family Cookbook</strong>',
           'Tap <strong>Read a Recipe</strong> at the top of the page (next to <strong>Add a recipe</strong>)',
           'The first time, beanies asks your permission to send this one recipe to be read — have a look at what it says, then agree',
           'Paste your link straight into the box that opens, then tap <strong>Read It</strong>. Reading from a photo or a PDF instead? <strong>Take a photo</strong> and <strong>Choose a file</strong> are just underneath.',
@@ -698,7 +699,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Keep the recipes that get passed down — the story behind them, the photos, and a log of every time someone makes them.',
     icon: '🍜',
     readTime: 6,
-    updatedDate: '2026-09-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -720,7 +721,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'In the sidebar, open <strong>The Pod 🌱 → Family Cookbook</strong> (you’ll see it titled <em>“Secret Family Recipes”</em> — shhh 🤫). There’s also a shortcut on the <strong>Meet the Beans</strong> page.',
+          'In the sidebar, open <strong>The Bean Pod → Family Cookbook</strong> (on a phone, tap the <strong>Pod</strong> tab). You’ll see it titled <em>“Secret Family Recipes”</em> (shhh 🤫). There’s also a shortcut on the <strong>Meet the Beans</strong> page.',
       },
       {
         type: 'heading',
@@ -861,7 +862,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Your family phonebook — doctors, school, dentists, sitters — kept where anyone looking after your family can find it.',
     icon: '🆘',
     readTime: 3,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-09-27',
     sections: [
       {
         type: 'heading',
@@ -883,7 +884,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'In the sidebar, open <strong>The Pod 🌱 → Emergency Contacts</strong>. A peek at your key contacts also appears on the <strong>Care &amp; Safety</strong> page, with a link through to the full list.',
+          'In the sidebar, open <strong>The Bean Pod → Emergency Contacts</strong> (on a phone, tap the <strong>Pod</strong> tab). A peek at your key contacts also appears on the <strong>Care &amp; Safety</strong> page, with a link through to the full list.',
       },
       {
         type: 'heading',
