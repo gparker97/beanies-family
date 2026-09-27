@@ -248,6 +248,8 @@ const nowIndicatorTop = computed(() => {
 });
 
 const showNowIndicator = computed(() => {
+  // "Now" only means something on the week that contains today.
+  if (!weekDays.value.some((d) => d.isToday)) return false;
   const h = Math.floor(nowMinutes.value / 60);
   const start = hours.value[0] ?? 7;
   const end = hours.value[hours.value.length - 1] ?? 19;
