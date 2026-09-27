@@ -25,3 +25,13 @@ Fix: the celebration rules now live in `@layer components`, so a positioning uti
 wins and in-flow chips keep `relative` as the default. Guard: `celebrationCascade.test.ts` (fails on the
 old CSS). Browser-verified before/after with a seeded family: week columns 88/564 -> 156 each, day lanes
 188/537 -> 275 each; month chip still `relative`, mobile DayTimeline and wall blocks now `absolute`.
+
+## Follow-up: time-grid span fixes
+
+- **2026-09-27** "Commit pushes and implement the identified bugs with /beanies-build-auto"
+- **2026-09-27** "Approve and implement with beanies build auto do not stop unless there is a genuine blocker"
+
+Outcome: plan `docs/plans/2026-09-27-calendar-time-grid-span-fixes.md` (four review passes, then built, two
+`/code-review high` rounds). Shared `timeSpans.ts` for planner + wall; short, zero-length and overnight cards
+fixed on every grid; repeating all-day activities show on every repeat. Defect 3 re-routed after review found
+Google imports legitimately carry `endDate` on repeating events (see the plan's Outcome).

@@ -94,6 +94,16 @@ describe('activitySpanMinutes', () => {
     const span = activitySpanMinutes(activity({ startTime: '18:00', endTime: '17:00' }));
     expect(span!.end).toBeGreaterThan(span!.start);
   });
+
+  it('⭐ keeps a zero-length record short, not 24 hours', () => {
+    // The overnight rule is STRICT `end < start` (as `resolveActivityDays` has it).
+    // `<=` turned 10:00-10:00, which the form writes when an end is set before the
+    // start, into a block covering the whole day and the next morning.
+    expect(activitySpanMinutes(activity({ startTime: '10:00', endTime: '10:00' }))).toEqual({
+      start: 600,
+      end: 601,
+    });
+  });
 });
 
 describe('regressions found by review', () => {

@@ -696,7 +696,16 @@ function buildPayload(): CreateFamilyActivityInput {
     icon: icon.value || undefined,
     description: description.value.trim() || undefined,
     date: date.value,
-    endDate: isAllDay.value && endDate.value ? endDate.value : undefined,
+    // Only a one-off can span days, and only forward: the field is hidden while
+    // repeating, so a value left over from a multi-day one-off is not written. On
+    // an edit this only reaches the store when it DIFFERS from the baseline (built
+    // by this same function): switching a multi-day one-off to repeating clears it;
+    // a value already stored on a repeating record is left as it is (it may be a
+    // Google import's real per-repeat length; see the 2026-09-27 plan's Outcome).
+    endDate:
+      isAllDay.value && !isRecurring.value && endDate.value && endDate.value > date.value
+        ? endDate.value
+        : undefined,
     isAllDay: isAllDay.value || undefined,
     startTime: isAllDay.value ? undefined : startTime.value || undefined,
     endTime: isAllDay.value ? undefined : endTime.value || undefined,

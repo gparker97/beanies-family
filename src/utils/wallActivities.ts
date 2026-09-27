@@ -11,7 +11,7 @@ import {
   matchesAssigneeFilter,
   normalizeAssignees,
 } from '@/utils/assignees';
-import { minutesOfDay } from '@/utils/date';
+import { timedSpanMinutes } from '@/utils/calendar/timeSpans';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { AllDaySpansResult } from '@/utils/allDaySpans';
 import { SHARED_EVENT_COLOR, resolveMemberColor } from '@/constants/memberColors';
@@ -109,7 +109,7 @@ export function wallActivityColour(
  * How long an activity with no end time is assumed to run, on the wall.
  *
  * Deliberately a wall constant and a defaulted PARAMETER rather than a globally
- * unified one: the planner's `groupOverlapping` (`useCalendarNavigation.ts`)
+ * unified one: the planner's `plannerSpan` (`useCalendarNavigation.ts`)
  * assumes 60, and quietly changing that would alter clustering in `DayTimeline`,
  * `DailyCalendarView` and `WeeklyCalendarView` as an invisible side effect of a
  * wall feature. Two numbers that disagree on purpose beat one that silently
@@ -117,21 +117,21 @@ export function wallActivityColour(
  */
 export const ASSUMED_DURATION_MIN = 90;
 
-/** So an activity running past midnight is a real span, not a negative one. */
-/** Shared with `wallTimeGrid`, which draws the axis this wraps around. */
-export const MINUTES_PER_DAY = 1440;
-
 /**
- * The TRUE minute span of a timed occurrence — the one definition of "when is
- * this on" for the wall.
+ * The TRUE minute span of a timed occurrence, the one definition of "when is
+ * this on" for the wall. Delegates to `timedSpanMinutes` (`calendar/timeSpans.ts`),
+ * which the planner shares, so the two surfaces cannot disagree about how long the
+ * same record lasts.
  *
  * Returns `null` for an all-day activity (it has no position on a time axis) and
- * for one whose times cannot be read. The caller MUST handle `null`; the grid
+ * for one whose start cannot be read. The caller MUST handle `null`; the grid
  * routes those into the all-day band so no event is ever lost, and counts them.
  *
- * The end is clamped to be at least one minute after the start, so a record with
- * `endTime` equal to or before `startTime` produces a valid, if tiny, span rather
- * than a negative height.
+ * An end BEFORE the start (strictly) runs past midnight: a sleepover, a night
+ * shift, a red-eye, reachable via calendar sync and AI extraction, which skip the
+ * form's clamp. The wall carries that span past 1440 and grows its axis. Equal
+ * times are a zero-length event (it used to become 24 hours here), floored to one
+ * minute so the geometry below always has a positive length.
  */
 export function activitySpanMinutes(
   activity: FamilyActivity,
@@ -142,26 +142,12 @@ export function activitySpanMinutes(
   // `isAllDay.value || undefined`, so a legitimately all-day record can persist
   // with the flag unset and no start time. Reading the raw flag sent those to
   // `rejected`, which both styled them as corrupt AND fired a false
-  // `wall_grid_unreadable_time` warning — poisoning the one diagnostic this
+  // `wall_grid_unreadable_time` warning, poisoning the one diagnostic this
   // feature has for genuine data corruption.
   if (isAllDayActivity(activity)) return null;
-  const start = minutesOfDay(activity.startTime);
-  if (start === null) return null;
-  const rawEnd = minutesOfDay(activity.endTime);
-  if (rawEnd === null) return { start, end: start + assumedDurationMin };
-  /*
-   * ⚠️ An end BEFORE the start means the activity runs past midnight — a
-   * sleepover, a night shift, a red-eye. Clamping it to `start + 1` turned a
-   * three-hour event into a one-minute sliver, collapsed the evening into a
-   * "quiet" fold, marked it `past` a minute after it began, and printed a
-   * fabricated "22:00–22:01" range. `resolveActivityDays` already treats this as
-   * next-day (`activityDays.ts`), and both the clash detector and the Google
-   * export honour it — so the wall was the only surface disagreeing about how
-   * long the same record lasts. Reachable via calendar sync and AI extraction,
-   * which do not go through the form's own clamp.
-   */
-  const end = rawEnd <= start ? rawEnd + MINUTES_PER_DAY : rawEnd;
-  return { start, end: Math.max(start + 1, end) };
+  const span = timedSpanMinutes(activity.startTime, activity.endTime, assumedDurationMin);
+  if (!span) return null;
+  return { start: span.start, end: Math.max(span.start + 1, span.end) };
 }
 
 /**

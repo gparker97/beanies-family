@@ -20,6 +20,10 @@ _Not yet released._
 
 - The desktop week and day views no longer put events under the wrong day or member when a birthday is on the calendar.
 - The week view's current-time line now shows only on the current week.
+- Short or back-to-back activities, and activities with the same start and end time, no longer cover each other on the week and day views.
+- Activities that run past midnight are drawn up to midnight instead of as a thin sliver, and no longer stretch the whole day back to midnight.
+- Repeating all-day activities now show on every repeat in the week, month and wall views.
+- The beanie wall no longer shows an activity with the same start and end time as lasting all day.
 
 ## 2026-09-26
 

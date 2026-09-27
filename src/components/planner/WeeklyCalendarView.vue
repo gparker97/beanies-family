@@ -230,8 +230,10 @@ const allTimedActivities = computed(() => {
   return items;
 });
 
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } =
-  useTimeGrid(allTimedActivities);
+const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+  allTimedActivities,
+  'week'
+);
 
 // Current time indicator
 const nowMinutes = ref(0);
