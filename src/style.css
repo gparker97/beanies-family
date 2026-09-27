@@ -1252,60 +1252,71 @@ html.dark .magic-tagline-band {
  *
  * Solo and shared cards are separated only by a blend and a face; everything
  * decorative is saved for here, so a birthday actually looks like one.
+ *
+ * `@layer components`, NOT unlayered. The `position: relative` below is a DEFAULT for
+ * in-flow chips (month, all-day, drawers), which need a containing block for the
+ * sticker and the confetti. Unlayered CSS beats every Tailwind layer regardless of
+ * specificity, so this rule used to override `absolute` on the time-grid cards
+ * (desktop week and day lanes, mobile DayTimeline, wall time blocks): a birthday card
+ * dropped into normal flow, its content widened its `1fr` column, and every other
+ * column in that grid shrank, putting the week's and the lanes' events under the
+ * wrong headers. In the components layer a positioning utility on the element wins.
  */
-.is-celebration {
-  /*
-   * Tier 3 — the third and final cut, and the smallest.
-   *
-   * Cut 1 was a Heritage-Orange gradient border. It collided with three meanings the edge
-   * already carries (`border-primary-500` is today, `ring-primary-500` is selected, an
-   * orange wash is overdue) and its `border-left-color: transparent !important` erased the
-   * OWNER'S colour — making a birthday the one card that could not say whose it was.
-   *
-   * Cut 2 replaced it with a bunting edge: semicircles bitten out of the top and bottom.
-   * Sound in principle — shape is the one channel this palette has not already spent — but
-   * it did not survive contact with the real app. It only rendered where the card carried a
-   * member wash (the notches are punched in the colour BEHIND the card, so on a white card
-   * they were white on white), and where it did render greg's read was that it did not
-   * carry its weight.
-   *
-   * So tier 3 is now confetti and the corner sticker, and nothing structural at all. The
-   * card keeps the ordinary owner-coloured edge every other card has, and no surface needs
-   * to know what colour sits behind it. Fewer moving parts than either previous cut.
-   *
-   * Deliberately NOT `overflow: hidden`: the sticker sits outside the box at
-   * `right: -6px; top: -9px`, so clipping here would erase it. The confetti layer clips
-   * ITSELF (see `CelebrationConfetti.vue`).
-   *
-   * `isolation: isolate` creates a stacking context so the confetti can sit at
-   * `z-index: -1` — above the card's background, beneath every child — without any card
-   * having to wrap or re-index its content. Without it a `-1` layer escapes behind the card
-   * entirely and vanishes.
-   */
-  isolation: isolate;
-  position: relative;
-}
+@layer components {
+  .is-celebration {
+    /*
+     * Tier 3 — the third and final cut, and the smallest.
+     *
+     * Cut 1 was a Heritage-Orange gradient border. It collided with three meanings the edge
+     * already carries (`border-primary-500` is today, `ring-primary-500` is selected, an
+     * orange wash is overdue) and its `border-left-color: transparent !important` erased the
+     * OWNER'S colour — making a birthday the one card that could not say whose it was.
+     *
+     * Cut 2 replaced it with a bunting edge: semicircles bitten out of the top and bottom.
+     * Sound in principle — shape is the one channel this palette has not already spent — but
+     * it did not survive contact with the real app. It only rendered where the card carried a
+     * member wash (the notches are punched in the colour BEHIND the card, so on a white card
+     * they were white on white), and where it did render greg's read was that it did not
+     * carry its weight.
+     *
+     * So tier 3 is now confetti and the corner sticker, and nothing structural at all. The
+     * card keeps the ordinary owner-coloured edge every other card has, and no surface needs
+     * to know what colour sits behind it. Fewer moving parts than either previous cut.
+     *
+     * Deliberately NOT `overflow: hidden`: the sticker sits outside the box at
+     * `right: -6px; top: -9px`, so clipping here would erase it. The confetti layer clips
+     * ITSELF (see `CelebrationConfetti.vue`).
+     *
+     * `isolation: isolate` creates a stacking context so the confetti can sit at
+     * `z-index: -1` — above the card's background, beneath every child — without any card
+     * having to wrap or re-index its content. Without it a `-1` layer escapes behind the card
+     * entirely and vanishes.
+     */
+    isolation: isolate;
+    position: relative;
+  }
 
-/* The sticker overhangs the corner, which is what makes it read as applied rather
-   than printed. `pointer-events: none` so it never eats a tap on the card.
-   NOTE it sits OUTSIDE the card's box, so any surface showing it must not clip —
-   `MonthChip` and `AllDayChip` are `overflow-hidden` for truncation and deliberately
-   pass no `data-sticker`. */
-.is-celebration::after {
-  background: var(--celebration-surface, #fff);
-  border-radius: 999px;
-  box-shadow: 0 2px 8px rgb(44 62 80 / 18%);
-  content: attr(data-sticker);
-  font-size: 1rem;
-  line-height: 1;
-  padding: 0.16rem;
-  pointer-events: none;
-  position: absolute;
-  right: -6px;
-  top: -9px;
-  z-index: 5;
-}
+  /* The sticker overhangs the corner, which is what makes it read as applied rather
+     than printed. `pointer-events: none` so it never eats a tap on the card.
+     NOTE it sits OUTSIDE the card's box, so any surface showing it must not clip —
+     `MonthChip` and `AllDayChip` are `overflow-hidden` for truncation and deliberately
+     pass no `data-sticker`. */
+  .is-celebration::after {
+    background: var(--celebration-surface, #fff);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgb(44 62 80 / 18%);
+    content: attr(data-sticker);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.16rem;
+    pointer-events: none;
+    position: absolute;
+    right: -6px;
+    top: -9px;
+    z-index: 5;
+  }
 
-.dark .is-celebration {
-  --celebration-surface: #1e2a36; /* surface-raised */
+  .dark .is-celebration {
+    --celebration-surface: #1e2a36; /* surface-raised */
+  }
 }

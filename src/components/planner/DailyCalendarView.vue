@@ -367,7 +367,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
           <div
             v-for="member in visibleMembers"
             :key="'header-' + member.id"
-            class="relative flex flex-col items-center gap-1 py-2.5"
+            class="relative flex min-w-0 flex-col items-center gap-1 py-2.5"
           >
             <!--
               The lane header is what NAMES this column — so a solo card inside it can
@@ -383,7 +383,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
               aria-hidden="true"
             />
             <span
-              class="font-outfit text-secondary-500/55 dark:text-ink-soft text-xs font-semibold lowercase"
+              class="font-outfit text-secondary-500/55 dark:text-ink-soft max-w-full truncate px-1 text-xs font-semibold lowercase"
             >
               {{ member.name }}
             </span>
