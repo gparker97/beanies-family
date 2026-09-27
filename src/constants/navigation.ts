@@ -2,6 +2,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
 import { isKnownFlag, type DevFlag } from '@/config/flagRegistry';
 import { isFlagEnabled } from '@/config/flags';
+import { isRouteActive } from '@/utils/route';
 
 /**
  * Shared visibility test for any flag-gated config item (nav items, quick-add
@@ -13,7 +14,9 @@ export function isItemFlagEnabled(item: { requiresFlag?: DevFlag }): boolean {
   return !item.requiresFlag || isFlagEnabled(item.requiresFlag);
 }
 
-export type NavSection = 'treehouse' | 'piggyBank' | 'pinned';
+export type NavSection = 'treehouse' | 'piggyBank' | 'beanPod' | 'pinned';
+/** The collapsible sidebar sections (everything except the pinned footer). */
+export type AccordionSectionId = Exclude<NavSection, 'pinned'>;
 
 /**
  * Tag a NAV_ITEMS entry with a mobile category to make it appear in the
@@ -41,9 +44,16 @@ export type StackableCategoryId = Exclude<MobileCategoryId, LeafCategoryId>;
 const LEAF_ID_SET: ReadonlySet<MobileCategoryId> = new Set(LEAF_CATEGORY_IDS);
 
 export interface NavSectionDef {
-  id: NavSection;
+  id: AccordionSectionId;
   labelKey: UIStringKey;
+  /** Always set: the anchor itself, or the fallback when `iconSrc` fails to load. */
   emoji: string;
+  /** Optional image anchor shown in place of the emoji (see NavGlyph). */
+  iconSrc?: string;
+  /** Label colour on the Deep Slate sidebar/drawer (both modes): a `-lift` token. */
+  colorClass: string;
+  /** Hidden from members who cannot view finances. */
+  requiresFinances?: boolean;
 }
 
 export interface NavItemDef {
@@ -51,7 +61,6 @@ export interface NavItemDef {
   path: string;
   emoji: string;
   section: NavSection;
-  comingSoon?: boolean;
   badgeKey?: string;
   /** Hide this item unless the named dev feature flag is enabled. */
   requiresFlag?: DevFlag;
@@ -63,21 +72,6 @@ export interface NavItemDef {
    * center Calendar leaf AND a Planning-stack bean.
    */
   mobileCategory?: MobileCategoryId | MobileCategoryId[];
-  /**
-   * Optional nested sub-items. When present, the parent renders as an
-   * expandable group in the sidebar — clicking the parent navigates to its
-   * own `path` and reveals the children. Children are rendered via
-   * AppSidebarSubNav at an indented scale.
-   */
-  children?: NavSubItemDef[];
-}
-
-export interface NavSubItemDef {
-  labelKey: UIStringKey;
-  path: string;
-  emoji: string;
-  /** See `MobileCategoryId` for tagging contract. */
-  mobileCategory?: MobileCategoryId | MobileCategoryId[];
 }
 
 /** Normalize the single-or-array `mobileCategory` tag to an array (possibly empty). */
@@ -88,9 +82,31 @@ function mobileCategoriesOf(item: {
   return Array.isArray(item.mobileCategory) ? item.mobileCategory : [item.mobileCategory];
 }
 
+/** The Bean Pod's anchor: the hugging beanies at icon size (source in packages/brand/assets/shared). */
+export const POD_ANCHOR_SRC = '/brand/beanies_family_hugging_transparent_64x64.png';
+
+/** Sidebar/drawer accordion sections, in display order (the phone tab order). */
 export const NAV_SECTIONS: NavSectionDef[] = [
-  { id: 'treehouse', labelKey: 'nav.section.treehouse', emoji: '\u{1F333}' },
-  { id: 'piggyBank', labelKey: 'nav.section.piggyBank', emoji: '\u{1F437}' },
+  {
+    id: 'treehouse',
+    labelKey: 'nav.section.treehouse',
+    emoji: '\u{1F333}',
+    colorClass: 'text-accent-lift',
+  },
+  {
+    id: 'piggyBank',
+    labelKey: 'nav.section.piggyBank',
+    emoji: '\u{1F437}',
+    colorClass: 'text-success-lift',
+    requiresFinances: true,
+  },
+  {
+    id: 'beanPod',
+    labelKey: 'nav.section.beanPod',
+    emoji: '\u{1F331}',
+    iconSrc: POD_ANCHOR_SRC,
+    colorClass: 'text-silk-lift',
+  },
 ];
 
 export const NAV_ITEMS: NavItemDef[] = [
@@ -151,53 +167,6 @@ export const NAV_ITEMS: NavItemDef[] = [
     section: 'treehouse',
     mobileCategory: 'planning',
   },
-  {
-    labelKey: 'nav.pod',
-    path: '/pod',
-    emoji: '\u{1F331}',
-    section: 'treehouse',
-    // mobileCategory intentionally omitted on the parent — its first
-    // child (`nav.pod.meetBeans`) shares path '/pod' and carries the
-    // mobile tag, avoiding a duplicate bean for the same route.
-    children: [
-      {
-        labelKey: 'nav.pod.meetBeans',
-        path: '/pod',
-        emoji: '\u{1F9D1}‍\u{1F91D}‍\u{1F9D1}',
-        mobileCategory: 'pod',
-      },
-      {
-        labelKey: 'nav.pod.scrapbook',
-        path: '/pod/scrapbook',
-        emoji: '\u{1F4D6}',
-        mobileCategory: 'pod',
-      },
-      {
-        labelKey: 'nav.pod.milestones',
-        path: '/pod/milestones',
-        emoji: '\u{1F31F}',
-        mobileCategory: 'pod',
-      },
-      {
-        labelKey: 'nav.pod.cookbook',
-        path: '/pod/cookbook',
-        emoji: '\u{1F35C}',
-        mobileCategory: 'pod',
-      },
-      {
-        labelKey: 'nav.pod.safety',
-        path: '/pod/safety',
-        emoji: '\u{1FA7A}',
-        mobileCategory: 'pod',
-      },
-      {
-        labelKey: 'nav.pod.contacts',
-        path: '/pod/contacts',
-        emoji: '\u{1F198}',
-        mobileCategory: 'pod',
-      },
-    ],
-  },
   // The Piggy Bank
   {
     labelKey: 'nav.overview',
@@ -243,6 +212,49 @@ export const NAV_ITEMS: NavItemDef[] = [
     section: 'piggyBank',
     mobileCategory: 'money',
   },
+  // The Bean Pod
+  {
+    labelKey: 'nav.pod.meetBeans',
+    path: '/pod',
+    emoji: '\u{1F9D1}‍\u{1F91D}‍\u{1F9D1}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
+  {
+    labelKey: 'nav.pod.scrapbook',
+    path: '/pod/scrapbook',
+    emoji: '\u{1F4D6}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
+  {
+    labelKey: 'nav.pod.milestones',
+    path: '/pod/milestones',
+    emoji: '\u{1F31F}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
+  {
+    labelKey: 'nav.pod.cookbook',
+    path: '/pod/cookbook',
+    emoji: '\u{1F35C}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
+  {
+    labelKey: 'nav.pod.safety',
+    path: '/pod/safety',
+    emoji: '\u{1FA7A}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
+  {
+    labelKey: 'nav.pod.contacts',
+    path: '/pod/contacts',
+    emoji: '\u{1F198}',
+    section: 'beanPod',
+    mobileCategory: 'pod',
+  },
   // Pinned (no mobileCategory — desktop-sidebar / hamburger only)
   {
     labelKey: 'nav.help',
@@ -263,9 +275,28 @@ export const NAV_ITEMS: NavItemDef[] = [
   { labelKey: 'nav.settings', path: '/settings', emoji: '⚙️', section: 'pinned' },
 ];
 
-export const TREEHOUSE_ITEMS = NAV_ITEMS.filter((item) => item.section === 'treehouse');
-export const PIGGY_BANK_ITEMS = NAV_ITEMS.filter((item) => item.section === 'piggyBank');
-export const PINNED_ITEMS = NAV_ITEMS.filter((item) => item.section === 'pinned');
+/** The nav items of one section (or the pinned footer), in display order. */
+export function navItemsInSection(id: NavSection): NavItemDef[] {
+  return NAV_ITEMS.filter((item) => item.section === id);
+}
+
+const ROUTED_NAV_ITEMS = NAV_ITEMS.filter((item) => !item.external);
+
+/**
+ * The nav item for a route: the most specific visible, non-external item whose path is
+ * the route or an ancestor of it (`/pod/cookbook/<id>` → Family Cookbook,
+ * `/pod/<memberId>/overview` → Meet the Beans). The one lookup for both "which
+ * row is current" and "which section owns this route".
+ */
+export function activeNavItem(routePath: string): NavItemDef | undefined {
+  let best: NavItemDef | undefined;
+  for (const item of ROUTED_NAV_ITEMS) {
+    // A flag-hidden item is never rendered, so it must never win the match.
+    if (!isRouteActive(routePath, item.path) || !isItemFlagEnabled(item)) continue;
+    if (!best || item.path.length > best.path.length) best = item;
+  }
+  return best;
+}
 
 // =============================================================================
 // Badge registry — single source of truth for which attention/info badges
@@ -287,39 +318,10 @@ export const KNOWN_BADGE_KEYS = [
 export type KnownBadgeKey = (typeof KNOWN_BADGE_KEYS)[number];
 const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);
 
-/**
- * Flat list of every nav entry (parents AND children), carrying only the
- * fields downstream lookups need. Built once at module load. Drives
- * `getBadgeKeyForPath`, `MOBILE_TAGGED_NAV_ITEMS`, and the badge-key
- * invariant check below.
- */
-const NAV_ITEMS_FLAT: ReadonlyArray<{
-  path: string;
-  badgeKey?: string;
-  mobileCategories: MobileCategoryId[];
-}> = (() => {
-  const flat: Array<{
-    path: string;
-    badgeKey?: string;
-    mobileCategories: MobileCategoryId[];
-  }> = [];
-  for (const item of NAV_ITEMS) {
-    flat.push({
-      path: item.path,
-      badgeKey: item.badgeKey,
-      mobileCategories: mobileCategoriesOf(item),
-    });
-    for (const child of item.children ?? []) {
-      flat.push({ path: child.path, mobileCategories: mobileCategoriesOf(child) });
-    }
-  }
-  return flat;
-})();
-
 // Module-load invariant — every NAV_ITEM.badgeKey must be a known key.
 // Throws on typo / stale reference so it can never ship; the navigation
 // unit test exercises this path.
-for (const entry of NAV_ITEMS_FLAT) {
+for (const entry of NAV_ITEMS) {
   if (entry.badgeKey && !KNOWN_BADGE_KEY_SET.has(entry.badgeKey)) {
     throw new Error(
       `[navigation] NAV_ITEM "${entry.path}" has badgeKey "${entry.badgeKey}" which is not in KNOWN_BADGE_KEYS. ` +
@@ -341,8 +343,8 @@ for (const item of NAV_ITEMS) {
   }
 }
 
-const NAV_ITEMS_BY_PATH: ReadonlyMap<string, (typeof NAV_ITEMS_FLAT)[number]> = new Map(
-  NAV_ITEMS_FLAT.map((entry) => [entry.path, entry])
+const NAV_ITEMS_BY_PATH: ReadonlyMap<string, NavItemDef> = new Map(
+  NAV_ITEMS.map((entry) => [entry.path, entry])
 );
 
 /** Look up the badge key registered for a route path, if any. */
@@ -356,8 +358,8 @@ export function getBadgeKeyForPath(path: string): KnownBadgeKey | undefined {
 export const MOBILE_TAGGED_NAV_ITEMS: ReadonlyArray<{
   path: string;
   mobileCategory: MobileCategoryId;
-}> = NAV_ITEMS_FLAT.flatMap((e) =>
-  e.mobileCategories.map((mobileCategory) => ({ path: e.path, mobileCategory }))
+}> = NAV_ITEMS.flatMap((e) =>
+  mobileCategoriesOf(e).map((mobileCategory) => ({ path: e.path, mobileCategory }))
 );
 
 // =============================================================================
@@ -373,10 +375,15 @@ export interface MobileNavStackItem {
   requiresFlag?: DevFlag;
 }
 
-export interface MobileNavCategory {
-  id: MobileCategoryId;
+/** Tab label + anchor. `emoji` is always set; `iconSrc`, when present, replaces it (emoji = fallback). */
+interface MobileCategoryMeta {
   labelKey: UIStringKey;
   emoji: string;
+  iconSrc?: string;
+}
+
+export interface MobileNavCategory extends MobileCategoryMeta {
+  id: MobileCategoryId;
   /** A leaf category (Nook, Calendar) renders as a direct router-push tab. */
   rootPath?: string;
   /** A stackable category (Planning, Money, Pod) renders as a bean stack. */
@@ -413,16 +420,16 @@ const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
 /** Display order for the 5 mobile tabs. Nook first; Calendar centred. */
 const CATEGORY_ORDER: MobileCategoryId[] = ['nook', 'planning', 'calendar', 'money', 'pod'];
 
-const CATEGORY_META: Record<MobileCategoryId, { labelKey: UIStringKey; emoji: string }> = {
+const CATEGORY_META: Record<MobileCategoryId, MobileCategoryMeta> = {
   nook: { labelKey: 'mobile.nook', emoji: '\u{1F3E1}' },
   planning: { labelKey: 'mobile.planning', emoji: '\u{1F333}' },
   calendar: { labelKey: 'mobile.calendar', emoji: '\u{1F4C5}' },
   money: { labelKey: 'mobile.money', emoji: '\u{1F437}' },
-  pod: { labelKey: 'mobile.pod', emoji: '\u{1F331}' },
+  pod: { labelKey: 'mobile.pod', emoji: '\u{1F331}', iconSrc: POD_ANCHOR_SRC },
 };
 
 /**
- * Walk NAV_ITEMS (and their children) once, collecting every entry with a
+ * Walk NAV_ITEMS once, collecting every entry with a
  * `mobileCategory` tag. Throws on tagged routes without a hint key —
  * caught by the navigation unit test, never ships.
  */
@@ -450,11 +457,6 @@ function collectTaggedRoutes(): Array<{
         requiresFlag: item.requiresFlag,
       });
     }
-    for (const child of item.children ?? []) {
-      for (const category of mobileCategoriesOf(child)) {
-        out.push({ path: child.path, labelKey: child.labelKey, emoji: child.emoji, category });
-      }
-    }
   }
   return out;
 }
@@ -481,12 +483,7 @@ function buildMobileNavCategories(): MobileNavCategory[] {
           `[navigation] mobile leaf category "${id}" has no tagged route; expected exactly one`
         );
       }
-      categories.push({
-        id,
-        labelKey: meta.labelKey,
-        emoji: meta.emoji,
-        rootPath: root.path,
-      });
+      categories.push({ id, ...meta, rootPath: root.path });
       continue;
     }
 
@@ -507,12 +504,7 @@ function buildMobileNavCategories(): MobileNavCategory[] {
       };
     });
 
-    categories.push({
-      id,
-      labelKey: meta.labelKey,
-      emoji: meta.emoji,
-      items,
-    });
+    categories.push({ id, ...meta, items });
   }
 
   return categories;

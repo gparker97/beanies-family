@@ -1233,6 +1233,7 @@ const STRING_DEFS = {
   'installNudge.installed': { en: 'Already installed', beanie: "i've already done it!" },
   'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
   'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
+  'nav.section.beanPod': { en: 'The Bean Pod', beanie: 'the bean pod' },
   'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
   'nav.activities': { en: 'Family Activities', beanie: 'our activities' },
   'nav.travel': { en: 'Travel Plans', beanie: 'travel plans' },

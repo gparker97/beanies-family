@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { reactive, ref, computed } from 'vue';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
+import { POD_ANCHOR_SRC } from '@/constants/navigation';
+
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 const mockRoute = reactive({ path: '/nook' });
 const mockPush = vi.fn(() => Promise.resolve());
@@ -99,6 +102,21 @@ describe('MobileBottomNav v3', () => {
     expect(text.indexOf('mobile.calendar')).toBeGreaterThan(text.indexOf('mobile.planning'));
     expect(text.indexOf('mobile.money')).toBeGreaterThan(text.indexOf('mobile.calendar'));
     expect(text.indexOf('mobile.pod')).toBeGreaterThan(text.indexOf('mobile.money'));
+  });
+
+  it('the Pod tab shows the hugging beanies instead of an emoji; other tabs keep theirs', async () => {
+    const wrapper = mount(MobileBottomNav);
+    const pod = wrapper.find('button[aria-label="mobile.pod"]');
+    const img = pod.find('img');
+    expect(img.exists()).toBe(true);
+    expect(img.attributes('src')).toBe(POD_ANCHOR_SRC);
+    expect(img.attributes('alt')).toBe('');
+    expect(wrapper.find('button[aria-label="mobile.money"] img').exists()).toBe(false);
+
+    // A failed load falls back to the emoji rather than a broken-image box.
+    await img.trigger('error');
+    expect(pod.find('img').exists()).toBe(false);
+    expect(pod.text()).toContain('\u{1F331}');
   });
 
   it('Nook tap → router.push(/nook), no stack opens', async () => {

@@ -1,152 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import AppNavMenu from '@/components/common/AppNavMenu.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
-import NavBadge from '@/components/ui/NavBadge.vue';
-import AppSidebarSubNav from '@/components/common/AppSidebarSubNav.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
-import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNavBadges';
-import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
-import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { getProductVersionLabel } from '@/utils/diagnosticContext';
-import { isRouteActive } from '@/utils/route';
-import { openExternal } from '@/utils/openExternal';
-import {
-  NAV_SECTIONS,
-  TREEHOUSE_ITEMS,
-  PIGGY_BANK_ITEMS,
-  PINNED_ITEMS,
-  isItemFlagEnabled,
-  type NavItemDef,
-  type NavSubItemDef,
-} from '@/constants/navigation';
-import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSyncStore } from '@/stores/syncStore';
 
-const route = useRoute();
-const router = useRouter();
 const { t } = useTranslation();
-const { openFeedback } = useFeedbackModal();
 /** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
 const productVersionLabel = getProductVersionLabel();
 const familyStore = useFamilyStore();
 const syncStore = useSyncStore();
-const { isOpen, toggle, isItemExpanded, toggleItem } = useSidebarAccordion();
-const { canViewFinances } = usePermissions();
-const { badgeFor } = useNavBadges();
-
-function mapItems(items: NavItemDef[]) {
-  return items.filter(isItemFlagEnabled).map((item) => ({
-    label: t(item.labelKey),
-    path: item.path,
-    emoji: item.emoji,
-    comingSoon: item.comingSoon ?? false,
-    badge: badgeFor(item.path),
-    external: item.external ?? false,
-    externalUrl: item.externalUrl,
-    children: item.children,
-  }));
-}
-
-/**
- * Augment the row's accessible name when an attention count badge is
- * present so screen readers announce e.g. "Goals, 3 need attention"
- * rather than just "Goals". Informational dots stay decorative.
- */
-function ariaLabelFor(item: { label: string; badge: NavBadgeType | null }): string {
-  if (item.badge?.kind === 'count' && item.badge.count > 0) {
-    return t('nav.aria.countAttention')
-      .replace('{label}', item.label)
-      .replace('{count}', String(item.badge.count));
-  }
-  return item.label;
-}
-
-type MappedNavItem = ReturnType<typeof mapItems>[number];
-
-const treehouseItems = computed(() => mapItems(TREEHOUSE_ITEMS));
-const piggyBankItems = computed(() => mapItems(PIGGY_BANK_ITEMS));
-const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
-// #45: pinned footer is split into two groups — "connect with us" (Discord +
-// Share feedback) and "operate the app" (Help + Settings, Settings anchored last).
-const pinnedCommunity = computed(() => pinnedItems.value.filter((i) => i.path === '/discord'));
-const pinnedApp = computed(() => pinnedItems.value.filter((i) => i.path !== '/discord'));
 
 const currentMemberRef = computed(() => familyStore.currentMember ?? familyStore.owner ?? null);
 const { variant: memberVariant, color: memberColor } = useMemberAvatar(currentMemberRef);
-
-function isActive(path: string): boolean {
-  return route.path === path;
-}
-
-/**
- * Parent-item active state: highlighted when the current route is any
- * descendant of the parent path (e.g. /pod/cookbook keeps "The Pod" active).
- */
-function isParentActive(item: MappedNavItem): boolean {
-  if (!item.children) return isActive(item.path);
-  return isRouteActive(route.path, item.path);
-}
-
-function navigateTo(item: MappedNavItem) {
-  if (item.external && item.externalUrl) {
-    openExternal(item.externalUrl);
-    return;
-  }
-  router.push(item.path);
-}
-
-function navigateSub(path: string) {
-  router.push(path);
-}
-
-function onParentClick(item: MappedNavItem) {
-  if (item.children) {
-    // Parent with children: navigate to parent path AND ensure expanded
-    if (!isItemExpanded(item.path)) {
-      toggleItem(item.path);
-    }
-    if (route.path !== item.path) router.push(item.path);
-    return;
-  }
-  navigateTo(item);
-}
-
-function onParentChevronClick(item: MappedNavItem, event: Event) {
-  event.stopPropagation();
-  toggleItem(item.path);
-}
 
 const encryptionTitle = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFileConfigured');
   return t('sidebar.dataEncryptedFull');
 });
-
-const SECTION_COLORS: Record<string, string> = {
-  treehouse: 'text-primary-500',
-  piggyBank: 'text-[#27AE60]',
-};
-
-const sections = computed(() =>
-  NAV_SECTIONS.filter((section) => section.id !== 'piggyBank' || canViewFinances.value).map(
-    (section) => ({
-      id: section.id,
-      label: t(section.labelKey),
-      emoji: section.emoji,
-      color: SECTION_COLORS[section.id] ?? 'text-white/50',
-      items: section.id === 'treehouse' ? treehouseItems.value : piggyBankItems.value,
-    })
-  )
-);
-
-function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
-  return item.children ?? [];
-}
 </script>
 
 <template>
@@ -170,128 +46,8 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
       </div>
     </div>
 
-    <!-- Accordion Navigation -->
-    <nav class="flex-1 space-y-0.5 overflow-y-auto">
-      <div v-for="section in sections" :key="section.id">
-        <!-- Section Header -->
-        <button
-          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tracking-wide uppercase transition-colors"
-          :class="section.color"
-          @click="toggle(section.id as 'treehouse' | 'piggyBank')"
-        >
-          <span class="text-base">{{ section.emoji }}</span>
-          <span class="flex-1 text-left">{{ section.label }}</span>
-          <BeanieIcon
-            name="chevron-down"
-            size="xs"
-            class="text-white/30 transition-transform duration-200"
-            :class="{ 'rotate-180': !isOpen(section.id as 'treehouse' | 'piggyBank') }"
-          />
-        </button>
-
-        <!-- Section Items -->
-        <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
-          <template v-for="item in section.items" :key="item.path">
-            <button
-              class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
-              :class="[
-                isParentActive(item)
-                  ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-                  : 'border-l-4 border-transparent hover:bg-white/[0.05]',
-                item.comingSoon && !isParentActive(item)
-                  ? 'text-white/25'
-                  : !isParentActive(item)
-                    ? 'text-white/40 hover:text-white/70'
-                    : '',
-              ]"
-              :aria-label="ariaLabelFor(item)"
-              @click="onParentClick(item)"
-            >
-              <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-              <span class="flex-1">{{ item.label }}</span>
-              <!-- Attention/info badge — see useNavBadges -->
-              <NavBadge :badge="item.badge" />
-              <!-- Coming soon indicator -->
-              <span
-                v-if="item.comingSoon"
-                class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
-              >
-                {{ t('nav.comingSoon') }}
-              </span>
-              <!-- Expander chevron for parents with children -->
-              <span
-                v-if="item.children"
-                class="-mr-1 flex h-6 w-6 items-center justify-center rounded-lg text-white/30 hover:text-white/70"
-                role="button"
-                :aria-label="isItemExpanded(item.path) ? t('action.close') : t('action.confirm')"
-                @click="onParentChevronClick(item, $event)"
-              >
-                <BeanieIcon
-                  name="chevron-down"
-                  size="xs"
-                  class="transition-transform duration-200"
-                  :class="{ 'rotate-180': !isItemExpanded(item.path) }"
-                />
-              </span>
-            </button>
-            <AppSidebarSubNav
-              v-if="item.children && isItemExpanded(item.path)"
-              :items="subItemsOf(item)"
-              :active-path="route.path"
-              @navigate="navigateSub"
-            />
-          </template>
-        </div>
-      </div>
-
-      <!-- Divider -->
-      <div class="mx-2 my-2 h-px bg-white/[0.08]" />
-
-      <!-- Connect with us: Beanies Discord + Share feedback -->
-      <button
-        v-for="item in pinnedCommunity"
-        :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
-        :class="
-          isActive(item.path)
-            ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-            : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
-        "
-        @click="navigateTo(item)"
-      >
-        <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-        <span>{{ item.label }}</span>
-      </button>
-
-      <!-- #45: Share feedback — opens the feedback modal (not a route), so it lives
-           outside NAV_ITEMS but reuses the inactive pinned-item styling. -->
-      <button
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl border-l-4 border-transparent px-3.5 py-2 text-left text-lg font-medium text-white/40 transition-all duration-150 hover:bg-white/[0.05] hover:text-white/70"
-        @click="openFeedback('nav')"
-      >
-        <span class="w-6 text-center text-base" aria-hidden="true">📣</span>
-        <span>{{ t('feedback.shareEntry') }}</span>
-      </button>
-
-      <!-- Divider -->
-      <div class="mx-2 my-2 h-px bg-white/[0.08]" />
-
-      <!-- Operate the app: Help + Settings (Settings anchored last) -->
-      <button
-        v-for="item in pinnedApp"
-        :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
-        :class="
-          isActive(item.path)
-            ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-            : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
-        "
-        @click="navigateTo(item)"
-      >
-        <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-        <span>{{ item.label }}</span>
-      </button>
-    </nav>
+    <!-- Navigation: accordion sections + pinned footer (shared with the drawer) -->
+    <AppNavMenu density="sidebar" class="flex-1 space-y-0.5 overflow-y-auto" />
 
     <!-- User Profile Card -->
     <div v-if="currentMemberRef" class="mt-3 rounded-2xl bg-white/[0.04] p-3">

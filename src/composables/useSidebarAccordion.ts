@@ -1,126 +1,94 @@
-import { reactive, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { NAV_ITEMS, type NavSection } from '@/constants/navigation';
+import { reactive } from 'vue';
+import { NAV_SECTIONS, type AccordionSectionId } from '@/constants/navigation';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { readStoredJson, writeStoredJson } from '@/utils/storedJson';
+
+/**
+ * Open/closed state of the sidebar + hamburger accordion sections, shared
+ * across both surfaces (module-level singleton) and persisted to localStorage.
+ *
+ * Auto-opening the current route's section is NOT done here: `AppNavMenu` owns
+ * that watch, so it runs whenever a menu is mounted (the desktop sidebar comes
+ * and goes with the breakpoint, and the drawer's menu unmounts on every close).
+ */
 
 const STORAGE_KEY = 'sidebar-accordion-state';
-const EXPANDED_ITEMS_KEY = 'sidebar-expanded-items';
+const LABEL = 'useSidebarAccordion';
+const SURFACE = 'sidebar-accordion';
 
-type AccordionSection = Exclude<NavSection, 'pinned'>;
+function defaults(): Record<AccordionSectionId, boolean> {
+  return Object.fromEntries(NAV_SECTIONS.map((s) => [s.id, true])) as Record<
+    AccordionSectionId,
+    boolean
+  >;
+}
 
-const sectionState = reactive<Record<AccordionSection, boolean>>({
-  treehouse: true,
-  piggyBank: true,
-});
-
-const expandedItems = reactive<Record<string, boolean>>({});
-
+const sectionState = reactive(defaults());
 let initialized = false;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function loadState() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (typeof parsed.treehouse === 'boolean') sectionState.treehouse = parsed.treehouse;
-      if (typeof parsed.piggyBank === 'boolean') sectionState.piggyBank = parsed.piggyBank;
+  const read = readStoredJson(STORAGE_KEY, LABEL);
+  if (read.kind === 'missing') return;
+  if (read.kind === 'ok' && isPlainObject(read.value)) {
+    // Copy only known ids; a section added since the state was saved (e.g.
+    // beanPod for users with { treehouse, piggyBank } stored) stays open.
+    const stored = read.value;
+    for (const { id } of NAV_SECTIONS) {
+      if (typeof stored[id] === 'boolean') sectionState[id] = stored[id];
     }
-  } catch {
-    // Ignore parse errors
+    return;
   }
-  try {
-    const stored = localStorage.getItem(EXPANDED_ITEMS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as Record<string, boolean>;
-      for (const [path, open] of Object.entries(parsed)) {
-        if (typeof open === 'boolean') expandedItems[path] = open;
-      }
-    }
-  } catch {
-    // Ignore parse errors
-  }
+  logEvent({
+    level: 'warn',
+    surface: SURFACE,
+    message: 'stored accordion state unparseable; using defaults',
+    context: { action: 'load' },
+  });
 }
 
 function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      treehouse: sectionState.treehouse,
-      piggyBank: sectionState.piggyBank,
-    })
-  );
-}
-
-function saveExpandedItems() {
-  localStorage.setItem(EXPANDED_ITEMS_KEY, JSON.stringify({ ...expandedItems }));
-}
-
-function isPathUnderParent(path: string, parentPath: string): boolean {
-  if (path === parentPath) return true;
-  return path.startsWith(`${parentPath}/`);
+  const write = writeStoredJson(STORAGE_KEY, { ...sectionState }, LABEL);
+  if (write.ok) return;
+  logEvent({
+    level: 'warn',
+    surface: SURFACE,
+    message: 'accordion state not persisted; kept in memory',
+    context: { action: 'save' },
+    error: write.error,
+  });
 }
 
 export function useSidebarAccordion() {
-  const route = useRoute();
-
   if (!initialized) {
     initialized = true;
     loadState();
-
-    watch(
-      () => route.path,
-      (path) => {
-        const activeItem = NAV_ITEMS.find(
-          (item) => item.path === path || (item.children && isPathUnderParent(path, item.path))
-        );
-        if (
-          activeItem &&
-          (activeItem.section === 'treehouse' || activeItem.section === 'piggyBank')
-        ) {
-          sectionState[activeItem.section] = true;
-          saveState();
-          if (activeItem.children && isPathUnderParent(path, activeItem.path)) {
-            expandedItems[activeItem.path] = true;
-          }
-        }
-
-        // Auto-collapse any parent whose sub-tree the user is NOT currently in.
-        // Keeps the sidebar tight: the Pod's five children only show up while
-        // the user is actually browsing /pod/*. Users can still pin a parent
-        // open via the chevron on any given page — that overrides on next nav.
-        let changed = false;
-        for (const item of NAV_ITEMS) {
-          if (!item.children) continue;
-          if (isPathUnderParent(path, item.path)) continue;
-          if (expandedItems[item.path]) {
-            expandedItems[item.path] = false;
-            changed = true;
-          }
-        }
-        if (changed || expandedItems[activeItem?.path ?? '']) {
-          saveExpandedItems();
-        }
-      },
-      { immediate: true }
-    );
   }
 
-  function isOpen(section: AccordionSection): boolean {
+  function isOpen(section: AccordionSectionId): boolean {
     return sectionState[section];
   }
 
-  function toggle(section: AccordionSection) {
+  function toggle(section: AccordionSectionId) {
     sectionState[section] = !sectionState[section];
     saveState();
   }
 
-  function isItemExpanded(path: string): boolean {
-    return !!expandedItems[path];
+  /** Open a section (e.g. the one owning the current route). No write when already open. */
+  function reveal(section: AccordionSectionId) {
+    if (sectionState[section]) return;
+    sectionState[section] = true;
+    saveState();
   }
 
-  function toggleItem(path: string) {
-    expandedItems[path] = !expandedItems[path];
-    saveExpandedItems();
-  }
+  return { isOpen, toggle, reveal };
+}
 
-  return { isOpen, toggle, isItemExpanded, toggleItem };
+/** Test hook: forget the loaded state so the next call re-reads storage. */
+export function __resetSidebarAccordionForTesting() {
+  initialized = false;
+  Object.assign(sectionState, defaults());
 }

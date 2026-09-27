@@ -101,24 +101,14 @@ type Destination = {
   tab?: UIStringKey;
   /** The nav item itself. Used as the fan-out card AND the sidebar button. */
   item: UIStringKey;
-  /** Sidebar parent to click first (the pod's children live under it). */
-  sidebarParent?: UIStringKey;
 };
 
 const NOOK: Destination = { item: 'nav.nook' };
 const PLANNER: Destination = { tab: 'mobile.planning', item: 'nav.activities' };
 const TRAVEL: Destination = { tab: 'mobile.planning', item: 'nav.travel' };
 const MONEY: Destination = { tab: 'mobile.money', item: 'nav.overview' };
-const BEANS: Destination = {
-  tab: 'mobile.pod',
-  item: 'nav.pod.meetBeans',
-  sidebarParent: 'nav.pod',
-};
-const SCRAPBOOK: Destination = {
-  tab: 'mobile.pod',
-  item: 'nav.pod.scrapbook',
-  sidebarParent: 'nav.pod',
-};
+const BEANS: Destination = { tab: 'mobile.pod', item: 'nav.pod.meetBeans' };
+const SCRAPBOOK: Destination = { tab: 'mobile.pod', item: 'nav.pod.scrapbook' };
 
 /**
  * Navigate to a destination, whichever layout is on screen. Throws on a miss —
@@ -145,20 +135,13 @@ async function goTo(page: Page, dest: Destination, mobile: boolean): Promise<voi
       }
     }
   } else {
-    // Sidebar. Both accordions default open (useSidebarAccordion), but a parent
-    // with children must be clicked before its children mount.
+    // Sidebar. Every accordion section (incl. The Bean Pod) defaults open
+    // (useSidebarAccordion), and there are no nested groups, so each item is a
+    // top-level row: click it directly.
     //
-    // Matching is LOOSE here, not anchored: `AppSidebar.ariaLabelFor` builds the
+    // Matching is LOOSE here, not anchored: `AppNavMenu.ariaLabelFor` builds the
     // accessible name from a template that appends badge text, so a nav item can
     // read "travel plans, 1 unbooked" and an exact match never fires.
-    if (dest.sidebarParent) {
-      const parent = page.getByRole('button', { name: labelLoose(dest.sidebarParent) }).first();
-      await expect(parent, `sidebar parent "${dest.sidebarParent}"`).toBeVisible({
-        timeout: 10000,
-      });
-      await parent.click({ timeout: CLICK_TIMEOUT });
-      await page.waitForTimeout(400);
-    }
     const item = page.getByRole('button', { name: labelLoose(dest.item) }).first();
     await expect(item, `sidebar item "${dest.item}"`).toBeVisible({ timeout: 10000 });
     await item.click({ timeout: CLICK_TIMEOUT });
