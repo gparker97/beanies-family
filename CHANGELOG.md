@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-27
+
+_Not yet released._
+
+### Added
+
+- The Who Owns What overview has a **Deal the Remaining** button, and tapping a category opens it in the deck.
+
 ## 2026-09-26
 
 _Not yet released._
