@@ -12668,10 +12668,13 @@ const STRING_DEFS = {
     en: '{inPlay} in play, out of {total} in the full set',
     beanie: '{inPlay} in play, out of {total} in the full set',
   },
-  'whoOwnsWhat.overview.dealLast.one': { en: 'Deal the Last Card', beanie: 'deal the last card' },
-  'whoOwnsWhat.overview.dealLast.other': {
-    en: 'Deal the Last {count}',
-    beanie: 'deal the last {count}',
+  'whoOwnsWhat.overview.dealRemaining.one': {
+    en: 'Deal the Last Card',
+    beanie: 'deal the last card',
+  },
+  'whoOwnsWhat.overview.dealRemaining.other': {
+    en: 'Deal the Remaining {count}',
+    beanie: 'deal the remaining {count}',
   },
   'whoOwnsWhat.overview.seeSkipped': { en: 'See the Skipped Pile', beanie: 'see the skipped pile' },
   'whoOwnsWhat.overview.byCategory': { en: 'By Category', beanie: 'by category' },
@@ -12682,6 +12685,10 @@ const STRING_DEFS = {
   'whoOwnsWhat.overview.allDealt': { en: 'All {count} dealt', beanie: 'all {count} dealt' },
   'whoOwnsWhat.overview.catWaiting': { en: '{count} waiting', beanie: '{count} waiting' },
   'whoOwnsWhat.overview.catToSort': { en: '{count} to sort', beanie: '{count} to sort' },
+  'whoOwnsWhat.overview.openCategory': {
+    en: 'Open {category} in the deck',
+    beanie: 'open {category} in the deck',
+  },
   'whoOwnsWhat.overview.waitingTitle': {
     en: 'Waiting for a Holder',
     beanie: 'waiting for a holder',
