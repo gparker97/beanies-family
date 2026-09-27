@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
@@ -153,7 +154,8 @@ function birthdaysForDay(dateStr: string) {
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
-type Occurrence = { activity: FamilyActivity; date: string };
+/** The shared occurrence shape (`calendar/occurrence.ts`). */
+type Occurrence = ActivityOccurrence;
 
 const weekActivities = computed(() => {
   const days = weekDays.value;
@@ -337,10 +339,10 @@ const allDayResult = computed(() => {
   // Flatten all per-day occurrences for the week into one list. The util
   // dedupes by activity.id so multi-day activities (one occurrence per
   // covered day) collapse to a single span entry.
-  const occurrences: Array<{ activity: FamilyActivity; date: string }> = [];
+  const occurrences: Occurrence[] = [];
   for (const day of days) {
     const occs = weekActivities.value.get(day.dateStr) ?? [];
-    for (const occ of occs) occurrences.push({ activity: occ.activity, date: day.dateStr });
+    for (const occ of occs) occurrences.push({ ...occ, date: day.dateStr });
   }
   return computeAllDaySpans(occurrences, days);
 });
@@ -758,7 +760,7 @@ function onStripDayClick(dateStr: string) {
              (single source of truth shared with the monthly view). -->
         <div
           v-for="span in spanningActivities"
-          :key="'span-' + span.activity.id"
+          :key="'span-' + span.activity.id + '-' + span.startYmd"
           class="min-w-0"
           :style="{ gridColumn: `${span.startCol + 2} / span ${span.span}` }"
         >
@@ -767,7 +769,13 @@ function onStripDayClick(dateStr: string) {
             :is-start="true"
             :is-end="true"
             class="block w-full"
-            @click="emit('view-activity', span.activity.id, span.activity.date)"
+            @click="
+              emit(
+                'view-activity',
+                span.activity.id,
+                weekDays[span.startCol]?.dateStr ?? span.startYmd
+              )
+            "
           />
         </div>
 

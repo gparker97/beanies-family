@@ -33,7 +33,7 @@ import {
 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
-import { diffPayload } from '@/utils/diffPayload';
+import { rescheduleDelta } from '@/utils/calendar/rescheduleDelta';
 import { BaseButton } from '@/components/ui';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
@@ -51,6 +51,7 @@ import LinkedLists from '@/components/lists/LinkedLists.vue';
 import ListDetailModal from '@/components/lists/ListDetailModal.vue';
 import { openExternal } from '@/utils/openExternal';
 import { safeExternalHref } from '@/utils/url';
+import { shiftSpan, spanOffsetDays } from '@/utils/calendar/activityDays';
 // SECURITY: authorises the href. ensureHttpUrl preserves `javascript://…` (see url.ts).
 const activityLinkHref = computed(() => safeExternalHref(props.activity?.link));
 import { MARKETING_URL } from '@/utils/marketing';
@@ -158,6 +159,27 @@ const activity = computed(() =>
 // fallbacks are harmless `Map.get` misses → no callout. Acknowledging writes the
 // family-shared memory; every surface then flips active→quiet reactively.
 const overlapAckStore = useOverlapAckStore();
+/**
+ * The day the event shown here STARTS (this repeat's first day, or a one-off
+ * trip's start): the occurrence key for scope edits, overrides, splits, and the
+ * base a reschedule starts from. `props.occurrenceDate` stays the day that was
+ * clicked, which duty ticks use (a Sunday tick belongs to Sunday even when the
+ * weekend started on Friday).
+ */
+const seriesDate = computed(() =>
+  activity.value && props.occurrenceDate
+    ? activityStore.repeatStartFor(activity.value, props.occurrenceDate)
+    : props.occurrenceDate
+);
+
+/** "Lasts 3 days" for a repeating multi-day activity; null otherwise. */
+const lastsLabel = computed(() => {
+  if (!activity.value || !isRecurring.value) return null;
+  const days = spanOffsetDays(activity.value) + 1;
+  if (days < 2) return null;
+  return fillTemplate(t('planner.field.lastsDays.other'), { n: String(days) });
+});
+
 const clashOccurrenceDate = computed(
   () => props.occurrenceDate ?? activity.value?.date?.split('T')[0] ?? ''
 );
@@ -423,7 +445,10 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           if (!scope) return; // cancelled — discard edit
 
           if (scope === 'all') {
-            if (!(await activityStore.updateActivity(editing.id, update))) {
+            // An inline date move carries the series' span (`updateActivity`).
+            if (
+              !(await activityStore.updateActivity(editing.id, update, { source: 'inline-all' }))
+            ) {
               reportSessionActionFailed();
               return;
             }
@@ -431,7 +456,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           } else if (scope === 'this-only') {
             const override = await activityStore.materializeOverride(
               editing.id,
-              props.occurrenceDate,
+              seriesDate.value!,
               update
             );
             if (!override) {
@@ -442,7 +467,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
             emit('activity-swapped', override.id);
             // Override has recurrence:'none' so future edits skip scope naturally
           } else if (scope === 'this-and-future') {
-            const newTemplate = await activityStore.splitActivity(editing.id, props.occurrenceDate);
+            const newTemplate = await activityStore.splitActivity(editing.id, seriesDate.value!);
             if (!newTemplate) {
               reportSessionActionFailed();
               return;
@@ -470,7 +495,11 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         } else {
           // Non-recurring, or scope already resolved — direct update
           const targetId = effectiveTargetId.value ?? editing.id;
-          if (!(await activityStore.updateActivity(targetId, update))) {
+          // A date move on an override child or a series keeps its span
+          // (`updateActivity` owns that; a plain one-off keeps its absolute end).
+          if (
+            !(await activityStore.updateActivity(targetId, update, { source: 'inline-direct' }))
+          ) {
             reportSessionActionFailed();
             return;
           }
@@ -666,7 +695,7 @@ async function handleDelete() {
       // Bind the result — an unbound call let the drawer whoosh shut on a
       // failed cancel while the session stayed on the calendar.
       if (
-        !(await activityStore.materializeOverride(act.id, props.occurrenceDate, {
+        !(await activityStore.materializeOverride(act.id, seriesDate.value!, {
           isActive: false,
         }))
       ) {
@@ -680,7 +709,7 @@ async function handleDelete() {
     }
 
     if (scope === 'this-and-future') {
-      const dayBefore = toDateInputValue(addDays(parseLocalDate(props.occurrenceDate), -1));
+      const dayBefore = toDateInputValue(addDays(parseLocalDate(seriesDate.value!), -1));
       // #70: end `rule.end` too — the shadow alone no longer truncates.
       if (!(await activityStore.updateActivity(act.id, endSeriesPatch(act, dayBefore)))) {
         reportSessionActionFailed();
@@ -689,7 +718,7 @@ async function handleDelete() {
       // End-dating the master does NOT touch its override children (they are
       // `recurrence:'none'` one-offs). Reap the ones on/after the cut so they
       // don't survive as ghosts — Recurring Invariant 7.
-      await activityStore.deleteChildrenFrom(act.id, props.occurrenceDate);
+      await activityStore.deleteChildrenFrom(act.id, seriesDate.value!);
       playWhoosh();
       emit('deleted', act.id);
       emit('close');
@@ -777,8 +806,8 @@ const canReschedule = computed(() => !!activity.value);
 function toggleReschedule() {
   showReschedule.value = !showReschedule.value;
   if (showReschedule.value && activity.value) {
-    rescheduleDate.value = props.occurrenceDate ?? activity.value.date?.split('T')[0] ?? '';
-    rescheduleEndDate.value = activity.value.endDate?.split('T')[0] ?? '';
+    rescheduleDate.value = seriesDate.value ?? activity.value.date?.split('T')[0] ?? '';
+    rescheduleEndDate.value = rescheduleBaseEndDate() ?? '';
     rescheduleStartTime.value = activity.value.startTime ?? '';
     rescheduleEndTime.value = activity.value.endTime ?? '';
   }
@@ -805,6 +834,19 @@ function handleRescheduleEndTime(value: string) {
   }
 }
 
+/**
+ * The end date as seen from the occurrence being rescheduled. A repeat's stored
+ * `endDate` is relative to the SERIES start, so it is shifted onto this repeat's
+ * start; a one-off's is absolute. Seeding with the series value clamped against
+ * an end BEFORE the occurrence.
+ */
+function rescheduleBaseEndDate(): string | undefined {
+  const a = activity.value;
+  if (!a) return undefined;
+  if (isRecurring.value && seriesDate.value) return shiftSpan(a, seriesDate.value);
+  return a.endDate?.split('T')[0];
+}
+
 async function confirmReschedule() {
   if (!activity.value || !rescheduleDate.value) return;
 
@@ -819,8 +861,8 @@ async function confirmReschedule() {
   // and the UI still reported success. Same template-vs-occurrence confusion
   // this change fixed in `ActivityModal.onEdit`.
   const base = {
-    date: props.occurrenceDate ?? activity.value.date,
-    endDate: activity.value.endDate,
+    date: seriesDate.value ?? activity.value.date,
+    endDate: rescheduleBaseEndDate(),
     startTime: activity.value.startTime,
     endTime: activity.value.endTime,
   };
@@ -831,13 +873,13 @@ async function confirmReschedule() {
     next.startTime = rescheduleStartTime.value || undefined;
     next.endTime = rescheduleEndTime.value || undefined;
   }
-  const delta = diffPayload(base, next);
+  const delta = rescheduleDelta(base, next, viewIsAllDay.value);
 
-  if (isRecurring.value && props.occurrenceDate) {
+  if (isRecurring.value && seriesDate.value) {
     // Recurring MASTER: materialize an override for this occurrence.
     const override = await activityStore.materializeOverride(
       activity.value.id,
-      props.occurrenceDate,
+      seriesDate.value,
       delta
     );
     if (override) {
@@ -861,7 +903,12 @@ async function confirmReschedule() {
       update.originalOccurrenceDate = activity.value.originalOccurrenceDate ?? activity.value.date;
     }
 
-    if (!(await activityStore.updateActivity(activity.value.id, update))) {
+    // A child moved again keeps its days (`updateActivity` owns that rule).
+    if (
+      !(await activityStore.updateActivity(activity.value.id, update, {
+        source: 'reschedule-child',
+      }))
+    ) {
       reportSessionActionFailed();
       return;
     }
@@ -1059,6 +1106,16 @@ async function confirmReschedule() {
                 class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
               >
                 {{ recurrenceLabel }}
+              </span>
+            </div>
+            <div v-if="lastsLabel" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.lasts') }}
+              </span>
+              <span
+                class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]"
+              >
+                {{ lastsLabel }}
               </span>
             </div>
             <div v-if="endDateFormatted" class="flex items-center gap-2">

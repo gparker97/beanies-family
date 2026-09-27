@@ -115,7 +115,11 @@ describe('useActivityScopeEdit', () => {
         const { handleScopedSave } = useActivityScopeEdit();
         await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'New name' });
 
-        expect(store.updateActivity).toHaveBeenCalledWith(TEMPLATE_ID, { title: 'New name' });
+        expect(store.updateActivity).toHaveBeenCalledWith(
+          TEMPLATE_ID,
+          { title: 'New name' },
+          { source: 'scope-all' }
+        );
       });
 
       it('translates a moved occurrence into a DELTA on the series start', async () => {
@@ -125,7 +129,11 @@ describe('useActivityScopeEdit', () => {
 
         // The series start must shift by the same +1 day, NOT jump to the
         // occurrence date — which would drag the whole series to April.
-        expect(store.updateActivity).toHaveBeenCalledWith(TEMPLATE_ID, { date: '2026-03-05' });
+        expect(store.updateActivity).toHaveBeenCalledWith(
+          TEMPLATE_ID,
+          { date: '2026-03-05' },
+          { source: 'scope-all' }
+        );
       });
 
       it('preserves the weekday when applying the delta (load-bearing for daysOfWeek)', async () => {
@@ -285,6 +293,82 @@ describe('useActivityScopeEdit', () => {
       expect(await scope.handleScopedDelete(oneOff)).toBe(true);
       expect(chooseScope).not.toHaveBeenCalled();
       expect(store.deleteActivity).toHaveBeenCalledWith(TEMPLATE_ID);
+    });
+  });
+
+  describe('multi-day repeats (a weekly Fri-Sun weekend)', () => {
+    // 2026-05-01 is a Friday; each repeat lasts Fri-Sun.
+    const weekend = () =>
+      makeTemplate({
+        date: '2026-05-01',
+        endDate: '2026-05-03',
+        isAllDay: true,
+        daysOfWeek: [5],
+      } as Partial<FamilyActivity>);
+
+    beforeEach(() => {
+      store.activities = [weekend()];
+      vi.spyOn(store, 'splitActivity').mockResolvedValue(
+        makeTemplate({ id: 'tpl-2', date: '2026-05-15', endDate: '2026-05-17', isAllDay: true })
+      );
+    });
+
+    it("'all' + a move shifts the series start (the store carries the span)", async () => {
+      chooseScope.mockResolvedValue('all');
+      const { handleScopedSave } = useActivityScopeEdit();
+      // Move the 2026-05-15 repeat to Saturday the 16th.
+      await handleScopedSave(TEMPLATE_ID, '2026-05-15', { date: '2026-05-16' });
+      // `updateActivity` re-bases `endDate` itself (store test covers it).
+      expect(store.updateActivity).toHaveBeenCalledWith(
+        TEMPLATE_ID,
+        { date: '2026-05-02' },
+        { source: 'scope-all' }
+      );
+    });
+
+    it("'all' + a Lasts change re-expresses it on the series start", async () => {
+      chooseScope.mockResolvedValue('all');
+      const { handleScopedSave } = useActivityScopeEdit();
+      // The form (seeded on the 15th) now says "Lasts 2 days": endDate the 16th.
+      await handleScopedSave(TEMPLATE_ID, '2026-05-15', { endDate: '2026-05-16' });
+      expect(store.updateActivity).toHaveBeenCalledWith(
+        TEMPLATE_ID,
+        expect.objectContaining({ endDate: '2026-05-02' }),
+        { source: 'scope-all' }
+      );
+    });
+
+    it("'all' + Lasts back to 1 day clears the span even with a move", async () => {
+      chooseScope.mockResolvedValue('all');
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, '2026-05-15', {
+        date: '2026-05-16',
+        endDate: undefined,
+      });
+      const patch = vi.mocked(store.updateActivity).mock.calls[0]![1];
+      expect(patch.date).toBe('2026-05-02');
+      expect('endDate' in patch).toBe(true);
+      expect(patch.endDate).toBeUndefined();
+    });
+
+    it("'this-and-future' + a move shifts the new template (the store carries the span)", async () => {
+      chooseScope.mockResolvedValue('this-and-future');
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, '2026-05-15', { date: '2026-05-16' });
+      expect(store.updateActivity).toHaveBeenCalledWith(
+        'tpl-2',
+        { date: '2026-05-16' },
+        { source: 'scope-this-and-future' }
+      );
+    });
+
+    it('⭐ an edit opened from a continuation day targets the repeat it belongs to', () => {
+      const { openViewModal, handleViewOpenEdit, viewingOccurrenceDate } = useActivityScopeEdit();
+      openViewModal(TEMPLATE_ID, '2026-05-17'); // the Sunday
+      // Duty ticks stay on the clicked day ...
+      expect(viewingOccurrenceDate.value).toBe('2026-05-17');
+      // ... while the edit keys on the repeat's Friday.
+      expect(handleViewOpenEdit(weekend()).occurrenceDate).toBe('2026-05-15');
     });
   });
 });

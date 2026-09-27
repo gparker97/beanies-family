@@ -13,16 +13,21 @@
  */
 
 import type { FamilyActivity } from '@/types/models';
-import { isRepeatingActivity } from '@/utils/calendar/activityDays';
+import { isRepeatingActivity, spanOffsetDays } from '@/utils/calendar/activityDays';
+import { occurrenceStart, type ActivityOccurrence } from '@/utils/calendar/occurrence';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Shape returned by `activityStore.monthActivities()` and `weekActivities`. */
-export interface ActivityOccurrence {
-  activity: FamilyActivity;
-  date: string; // YYYY-MM-DD
-}
+export type { ActivityOccurrence };
 
 export interface AllDaySpan {
   activity: FamilyActivity;
+  /**
+   * The day this event starts: the one-off's `date`, or the START of this repeat
+   * of a multi-day repeating activity. Keys the span (two repeats can share a
+   * row) and is the date a click opens.
+   */
+  startYmd: string;
   /** 0-indexed column within the days[] array passed in. */
   startCol: number;
   /** Number of cells covered, clamped to the visible day range. */
@@ -52,20 +57,17 @@ export interface AllDaySpansResult {
  * of days. Pass exactly the days you want to render — typically 7 (one
  * week-row).
  *
- * Edge cases — never silent. Every odd-shaped record logs `console.warn`
- * with the activity id + offending field so a real data corruption is
- * diagnosable in production telemetry:
+ * Edge cases — never silent. Odd records are reported once per activity per
+ * session (`reportOddRecord`, surface `all-day-spans`):
  *
- *   - `endDate < startDate` → log + skip the activity entirely.
- *   - Timed activity with `endDate` set (not currently possible per the
- *     schema, but a defensive guard for future drift) → log + skip.
- *   - `endDate` outside the visible day range → clamp; chip's `isStart` /
- *     `isEnd` flags get suppressed accordingly by the caller (the caller
- *     compares each cell's date against `activity.date` / `activity.endDate`
- *     to decide which corners to round).
- *   - `monthActivities()` produces one occurrence per day for multi-day
- *     activities. Dedupe by `activity.id` so a 3-day activity becomes ONE
- *     `AllDaySpan` entry, not three.
+ *   - `endDate < startDate` → reported, drawn as a single day (as the store
+ *     expands it) rather than vanishing.
+ *   - Timed activity with `endDate` set (schema drift) → reported, skipped.
+ *   - `endDate` outside the visible day range → clamp.
+ *   - A one-off multi-day activity arrives as one occurrence per day; it is
+ *     deduped by `activity.id` into ONE span.
+ *   - A multi-day REPEAT arrives the same way per repeat; it is grouped by
+ *     `id + repeatStart` into one span per repeat.
  */
 export function computeAllDaySpans(
   occurrences: ActivityOccurrence[],
@@ -79,11 +81,26 @@ export function computeAllDaySpans(
     return { spans, singleByDate, spanningIds };
   }
 
-  // Track which activities we've already processed (in either bucket) so a
-  // multi-day activity expanded into N occurrences only contributes one
-  // span entry, and a single-day activity that somehow appears twice only
-  // contributes once per date.
+  // A one-off contributes ONE span per row (its occurrences all share its id);
+  // a multi-day REPEAT contributes one per repeat, so it is grouped by
+  // `id + repeat start` and drawn over the days actually emitted for that repeat
+  // in this row (which already respects month look-back, clamping and the
+  // store's overlap dedupe).
   const seenSpanIds = new Set<string>();
+  const repeatGroups = new Map<
+    string,
+    { activity: FamilyActivity; start: string; dates: string[] }
+  >();
+
+  const pushSingle = (a: FamilyActivity, date: string) => {
+    const list = singleByDate.get(date) ?? [];
+    // Dedupe within the same date — guard against the (unusual) case of
+    // a single-day activity expanded into multiple occurrences for one date.
+    if (!list.some((x) => x.id === a.id)) {
+      list.push(a);
+      singleByDate.set(date, list);
+    }
+  };
 
   for (const occ of occurrences) {
     const a = occ.activity;
@@ -92,78 +109,86 @@ export function computeAllDaySpans(
     // all-day lane.
     if (!a.isAllDay) {
       // Defensive: a timed activity with endDate set is a schema-drift
-      // signal, not a normal record. Surface it loudly.
-      if (a.endDate) {
-        console.warn(
-          `[allDaySpans] Activity ${a.id} has endDate=${a.endDate} but isAllDay is not true. ` +
-            `Schema drift — skipping from spans.`
-        );
-      }
+      // signal, not a normal record.
+      if (a.endDate) reportOddRecord(a, 'timed_with_end_date');
       continue;
     }
 
-    // Only a ONE-OFF spans days here, exactly as the store expands it
-    // (`expandOneOff` honours `endDate`; the repeating expansions emit one
-    // occurrence per repeat day and ignore it). A repeating activity can carry an
-    // `endDate` (a Google import of a weekly Sat-Sun event, or a value left over
-    // from a multi-day one-off switched to repeating), and treating it as a span
-    // deduped every repeat into the ANCHOR's span, so every repeat after the first
-    // vanished from the all-day rows. Each repeat is bucketed by its own date.
-    // `endDate` itself is untouched: Google export and clash detection still read
-    // it through `resolveActivityDays`.
-    const endDate = isRepeatingActivity(a) ? undefined : a.endDate;
-    // Multi-day = endDate is set AND strictly after start. If endDate equals
-    // the start, treat as single-day (no real span).
-    const hasMultiDay = !!endDate && endDate > a.date;
-
-    // Catch invalid records: endDate before startDate. Skip the activity
-    // so it doesn't pollute either bucket; the rest of the row still renders.
-    if (endDate && endDate < a.date) {
-      console.warn(
-        `[allDaySpans] Activity ${a.id} has endDate=${endDate} before date=${a.date}. ` +
-          `Invalid record — skipping.`
-      );
+    // An end BEFORE the start: the store draws it as a single day (an older
+    // client moved it without its span), so it is bucketed as one here too
+    // rather than vanishing from the row.
+    if (a.endDate && a.endDate < a.date) {
+      reportOddRecord(a, 'end_before_start');
+      pushSingle(a, occ.date);
       continue;
     }
 
-    if (hasMultiDay) {
-      if (seenSpanIds.has(a.id)) continue;
-      seenSpanIds.add(a.id);
+    if (spanOffsetDays(a) === 0) {
+      pushSingle(a, occ.date);
+      continue;
+    }
 
-      // Find the first visible day at or after the activity's start, and the
-      // last visible day at or before the activity's end. Clamp to the row.
-      const startCol = days.findIndex((d) => d.dateStr >= a.date);
-      // findLastIndex is broadly available in modern runtimes; use a
-      // reverse-iter fallback for safety with older targets.
-      let endCol = -1;
-      for (let i = days.length - 1; i >= 0; i--) {
-        if (days[i]!.dateStr <= endDate!) {
-          endCol = i;
-          break;
-        }
-      }
+    if (isRepeatingActivity(a)) {
+      const start = occurrenceStart(occ);
+      const key = `${a.id}:${start}`;
+      const group = repeatGroups.get(key) ?? { activity: a, start, dates: [] };
+      group.dates.push(occ.date);
+      repeatGroups.set(key, group);
+      continue;
+    }
 
-      // If the activity falls entirely outside the row, both indices are -1
-      // (or startCol < 0). Skip — there's nothing to render in this row.
-      if (startCol < 0 || endCol < 0 || endCol < startCol) continue;
-
-      spans.push({
-        activity: a,
-        startCol,
-        span: endCol - startCol + 1,
-      });
-      spanningIds.add(a.id);
-    } else {
-      // Single-day all-day. Bucket by occurrence date.
-      const list = singleByDate.get(occ.date) ?? [];
-      // Dedupe within the same date — guard against the (unusual) case of
-      // a single-day activity expanded into multiple occurrences for one date.
-      if (!list.some((x) => x.id === a.id)) {
-        list.push(a);
-        singleByDate.set(occ.date, list);
+    if (seenSpanIds.has(a.id)) continue;
+    seenSpanIds.add(a.id);
+    // Find the first visible day at or after the activity's start, and the
+    // last visible day at or before the activity's end. Clamp to the row.
+    const startCol = days.findIndex((d) => d.dateStr >= a.date);
+    let endCol = -1;
+    for (let i = days.length - 1; i >= 0; i--) {
+      if (days[i]!.dateStr <= a.endDate!) {
+        endCol = i;
+        break;
       }
     }
+    // If the activity falls entirely outside the row, there is nothing to render.
+    if (startCol < 0 || endCol < 0 || endCol < startCol) continue;
+    spans.push({ activity: a, startYmd: a.date, startCol, span: endCol - startCol + 1 });
+    spanningIds.add(a.id);
+  }
+
+  for (const group of repeatGroups.values()) {
+    const cols = group.dates
+      .map((date) => days.findIndex((d) => d.dateStr === date))
+      .filter((c) => c >= 0);
+    if (!cols.length) continue;
+    const startCol = Math.min(...cols);
+    spans.push({
+      activity: group.activity,
+      startYmd: group.start,
+      startCol,
+      span: Math.max(...cols) - startCol + 1,
+    });
+    spanningIds.add(group.activity.id);
   }
 
   return { spans, singleByDate, spanningIds };
+}
+
+/**
+ * Odd all-day records, reported once per activity per session: this runs on
+ * every render of every all-day row, so an unconditional log would flood. A
+ * fixed message with a structured code; the id goes to the local console only
+ * (`activity_id` is not an allowlisted context key).
+ */
+const reportedOddRecords = new Set<string>();
+function reportOddRecord(a: FamilyActivity, code: string): void {
+  const key = `${code}:${a.id}`;
+  if (reportedOddRecords.has(key)) return;
+  reportedOddRecords.add(key);
+  console.warn(`[allDaySpans] ${code}:`, a.id);
+  logEvent({
+    level: 'warn',
+    surface: 'all-day-spans',
+    message: 'all_day_odd_record',
+    context: { action: 'layout', error_code: code },
+  });
 }

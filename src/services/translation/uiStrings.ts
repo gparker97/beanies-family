@@ -8813,6 +8813,14 @@ const STRING_DEFS = {
   'planner.field.date': { en: 'Start Date', beanie: 'start date' },
   'planner.field.dateOnly': { en: 'Date', beanie: 'date' },
   'planner.field.endDate': { en: 'End Date', beanie: 'end date' },
+  'planner.field.lasts': { en: 'Lasts', beanie: 'lasts' },
+  'planner.field.lastsUnit.one': { en: 'day', beanie: 'day' },
+  'planner.field.lastsUnit.other': { en: 'days', beanie: 'days' },
+  'planner.field.lastsDays.other': { en: '{n} days', beanie: '{n} days' },
+  'planner.validation.lastsRange': {
+    en: 'Enter a number from 1 to {max}, so each repeat ends before the next one starts.',
+    beanie: 'enter a number from 1 to {max}, so each repeat ends before the next one starts.',
+  },
   'planner.field.startTime': { en: 'Start Time', beanie: 'start time' },
   'planner.field.endTime': { en: 'End Time', beanie: 'end time' },
   'planner.field.category': { en: 'Category', beanie: 'category' },
@@ -12739,8 +12747,8 @@ const STRING_DEFS = {
     beanie: '{count} cards are split',
   },
   'whoOwnsWhat.facts.splitHint': {
-    en: 'By child or by label, each part with its own holder',
-    beanie: 'by child or by label, each part with its own holder',
+    en: 'By child or into custom parts, each with its own holder',
+    beanie: 'by child or into custom parts, each with its own holder',
   },
   'whoOwnsWhat.facts.kids': {
     en: 'The kids are in the game',
@@ -12861,7 +12869,7 @@ const STRING_DEFS = {
     beanie: 'since {date}, before that {name}',
   },
   'whoOwnsWhat.card.splitChild': { en: 'Split by child', beanie: 'split by child' },
-  'whoOwnsWhat.card.splitLabel': { en: 'Split by label', beanie: 'split by label' },
+  'whoOwnsWhat.card.splitLabel': { en: 'Custom split', beanie: 'custom split' },
   'whoOwnsWhat.card.skipped': { en: 'Skipped for Now', beanie: 'skipped for now' },
   'whoOwnsWhat.card.open': { en: 'Open {card}', beanie: 'open {card}' },
   'whoOwnsWhat.byBean.count.one': { en: '1 card', beanie: '1 card' },
@@ -12912,7 +12920,7 @@ const STRING_DEFS = {
   'whoOwnsWhat.edit.split': { en: 'Split It?', beanie: 'split it?' },
   'whoOwnsWhat.edit.split.single': { en: 'One Holder', beanie: 'one holder' },
   'whoOwnsWhat.edit.split.child': { en: 'By Child', beanie: 'by child' },
-  'whoOwnsWhat.edit.split.label': { en: 'By Label', beanie: 'by label' },
+  'whoOwnsWhat.edit.split.label': { en: 'Custom', beanie: 'custom' },
   'whoOwnsWhat.edit.parts': { en: 'Who Holds Each Part?', beanie: 'who holds each part?' },
   'whoOwnsWhat.edit.childNote': {
     en: 'A new child gets their own row, with nobody yet.',

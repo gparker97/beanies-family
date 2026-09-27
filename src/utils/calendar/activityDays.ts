@@ -9,7 +9,8 @@
 // never depends on clash code).
 
 import type { FamilyActivity } from '@/types/models';
-import { addDaysYmd, isRealYmd, isWallClockTime, parseLocalDate } from '@/utils/date';
+import type { RecurrenceRule } from '@/types/recurrence';
+import { addDaysYmd, daysBetweenYmd, isRealYmd, isWallClockTime } from '@/utils/date';
 
 export interface ActivityDays {
   /** No specific time → an all-day activity. */
@@ -108,9 +109,93 @@ export function pushBlockReason(activity: FamilyActivity): PushBlockReason | nul
   return null;
 }
 
-function dayOffset(startYmd: string, endYmd: string): number {
-  const ms = parseLocalDate(endYmd).getTime() - parseLocalDate(startYmd).getTime();
-  return Math.round(ms / 86_400_000);
+const dayOffset = daysBetweenYmd;
+
+// ── Multi-day spans ─────────────────────────────────────────────────────────
+//
+// An all-day activity spans days when its `endDate` is after its `date`. For a
+// ONE-OFF that is the trip's range; for a REPEATING activity it is the length of
+// EVERY repeat (a weekly Fri-Sun weekend), always relative to the record's own
+// `date`, exactly as `resolveActivityDays` sends it to Google. Code counts the
+// span from 0 (`spanOffsetDays`); only the form's "Lasts N days" counts from 1.
+// Decision + model: docs/plans/2026-09-27-multi-day-repeating-activities.md.
+
+/**
+ * Days after `date` the activity still covers: 0 for a single day. `isAllDay ===
+ * true` deliberately (not `isAllDayActivity`), matching the store's expansion
+ * rule, so a record with no times and no flag keeps behaving as it always has.
+ */
+export function spanOffsetDays(
+  activity: Pick<FamilyActivity, 'isAllDay' | 'date' | 'endDate'>
+): number {
+  return activity.isAllDay === true ? endDateOffsetDays(activity) : 0;
+}
+
+/**
+ * Days from `date` to `endDate` for ANY record, all-day or timed (a timed Fri
+ * 18:00 – Sun 18:00 import carries `endDate` too, and Google reads it through
+ * `resolveActivityDays`). 0 when there is no end after the start. This is what
+ * moves and splits must preserve; `spanOffsetDays` is the all-day subset the
+ * calendar draws across days.
+ */
+export function endDateOffsetDays(activity: Pick<FamilyActivity, 'date' | 'endDate'>): number {
+  if (!activity.endDate) return 0;
+  const offset = daysBetweenYmd(activity.date, activity.endDate);
+  return offset > 0 ? offset : 0;
+}
+
+/**
+ * The `endDate` that keeps `span`'s length when its start moves to `newDate`, or
+ * `undefined` when it has no span. The ONE conversion between an end date and a
+ * start: split, override, move, and a "Lasts" edit all go through it.
+ */
+export function shiftSpan(
+  span: Pick<FamilyActivity, 'date' | 'endDate'>,
+  newDate: string
+): string | undefined {
+  const offset = endDateOffsetDays(span);
+  return offset > 0 ? addDaysYmd(newDate, offset) : undefined;
+}
+
+/**
+ * A patch that moves `existing`'s `date` carries its span along, unless the patch
+ * sets `endDate` itself (`'endDate' in patch`: a present `undefined` from
+ * `diffPayload` is a deliberate clear). Without this, moving a multi-day record
+ * left its end BEFORE its start, and `expandOneOff` emitted nothing for it.
+ */
+export function withRebasedEndDate<P extends { date?: string; endDate?: string }>(
+  existing: Pick<FamilyActivity, 'date' | 'endDate'>,
+  patch: P
+): P {
+  if (!patch.date || patch.date === existing.date || 'endDate' in patch) return patch;
+  const endDate = shiftSpan(existing, patch.date);
+  return endDate ? { ...patch, endDate } : patch;
+}
+
+/**
+ * The fewest days between two consecutive starts of `rule`: the longest a repeat
+ * can last without running into the next one. Drives the form's "Lasts" cap and
+ * the overlap audit. Multi-weekday weekly rules use their tightest weekday gap;
+ * months and years use their shortest possible length.
+ */
+export function minRepeatGapDays(rule: RecurrenceRule): number {
+  const interval = Math.max(1, rule.interval);
+  switch (rule.unit) {
+    case 'day':
+      return interval;
+    case 'week': {
+      const days = [...new Set(rule.weekdays ?? [])].sort((a, b) => a - b);
+      if (days.length < 2) return 7 * interval;
+      // The wrap from the last weekday round to the first, then each step between.
+      const wrap = 7 * interval - ((days.at(-1) ?? 0) - (days.at(0) ?? 0));
+      const steps = days.slice(1).map((day, i) => day - (days.at(i) ?? day));
+      return Math.min(wrap, ...steps);
+    }
+    case 'month':
+      return 28 * interval;
+    case 'year':
+      return 365 * interval;
+  }
 }
 
 /**

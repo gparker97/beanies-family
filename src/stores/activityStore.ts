@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
@@ -14,7 +14,19 @@ import {
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
   extractDatePart,
+  addDaysYmd,
+  daysBetweenYmd,
 } from '@/utils/date';
+import {
+  isRepeatingActivity,
+  minRepeatGapDays,
+  shiftSpan,
+  spanOffsetDays,
+  withRebasedEndDate,
+} from '@/utils/calendar/activityDays';
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
+import { distinctMonths } from '@/utils/occurrenceAssembly';
+import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { occurrencesInRange, monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import { resolveActivityRule } from '@/services/recurrence/adapters';
 import { endSeriesPatch, rebaseRuleForSplit } from '@/utils/activitySeriesEnd';
@@ -107,13 +119,73 @@ export const OVERRIDE_INVALID_KEYS = [
 function completionsForDerived(
   entries: DutyCompletion[] | undefined,
   keep: (ymd: string) => boolean,
-  retarget?: ISODateString
+  retarget?: (ymd: string) => string
 ): DutyCompletion[] | undefined {
   if (!entries?.length) return undefined;
   const kept = entries
     .filter((c) => keep(c.date))
-    .map((c) => (retarget ? { ...c, date: retarget } : c));
+    .map((c) => (retarget ? { ...c, date: retarget(c.date) } : c));
   return kept.length ? kept : undefined;
+}
+
+/** A multi-day span longer than a year is corrupt data; the audit reports it. */
+const MAX_SPAN_OFFSET_DAYS = 366;
+
+/**
+ * `updateActivity` carried a multi-day span onto a moved start date, after a
+ * successful write. `source` names the calling path (scope edits, the view
+ * modal's inline and reschedule edits, an override reused) so a series that ends
+ * up the wrong length can be traced to what moved it. Record CREATION paths tag
+ * their own success events instead (`series-split`, `override-created`:
+ * `stage: 'length-rebased'`), so one user action is never counted twice.
+ */
+export function reportSpanRebased(action: string): void {
+  logEvent({
+    surface: 'activity-schedule',
+    level: 'info',
+    message: 'span_rebased',
+    context: { action, stage: 'length-rebased' },
+  });
+}
+
+export interface RepeatSpanAudit {
+  /** Repeating all-day activities that last more than one day. */
+  multiDayRepeats: string[];
+  /** Repeats that run into the next start (legacy data; the form prevents it). */
+  overlapping: string[];
+  /** Repeats (or override children) whose `endDate` is before their `date`: drawn as single days. */
+  endBeforeStart: string[];
+  /** Spans longer than a year, clamped for drawing. */
+  clamped: string[];
+}
+
+/** Pure: which activities carry multi-day repeat data, and which of it is odd. */
+export function auditRepeatSpans(list: readonly FamilyActivity[]): RepeatSpanAudit {
+  const audit: RepeatSpanAudit = {
+    multiDayRepeats: [],
+    overlapping: [],
+    endBeforeStart: [],
+    clamped: [],
+  };
+  for (const a of list) {
+    if (a.isAllDay !== true || !a.endDate) continue;
+    if (!isRepeatingActivity(a)) {
+      // An override child an older client moved without its span (drawn as one day).
+      if (a.parentActivityId && a.endDate < a.date) audit.endBeforeStart.push(a.id);
+      continue;
+    }
+    if (a.endDate < a.date) {
+      audit.endBeforeStart.push(a.id);
+      continue;
+    }
+    const offset = spanOffsetDays(a);
+    if (offset === 0) continue;
+    audit.multiDayRepeats.push(a.id);
+    if (offset > MAX_SPAN_OFFSET_DAYS) audit.clamped.push(a.id);
+    const resolved = resolveActivityRule(a);
+    if (resolved && offset >= minRepeatGapDays(resolved.rule)) audit.overlapping.push(a.id);
+  }
+  return audit;
 }
 
 /**
@@ -211,8 +283,8 @@ export const useActivityStore = defineStore('activities', () => {
     monthStart: Date,
     effectiveEnd: Date,
     stepDays: 7 | 14
-  ): { activity: FamilyActivity; date: string }[] {
-    const results: { activity: FamilyActivity; date: string }[] = [];
+  ): ActivityOccurrence[] {
+    const results: ActivityOccurrence[] = [];
     // Multi-day only for weekly (step=7); biweekly anchors to the start
     // date's weekday and ignores `daysOfWeek` (out of scope by design).
     const targetDays =
@@ -263,7 +335,51 @@ export const useActivityStore = defineStore('activities', () => {
     activity: FamilyActivity,
     year: number,
     month: number
-  ): { activity: FamilyActivity; date: string }[] {
+  ): ActivityOccurrence[] {
+    // A repeating all-day activity that lasts several days (a weekly Fri-Sun
+    // weekend) is drawn on EVERY day of every repeat, mirroring how a one-off
+    // multi-day trip expands. Everything else is one occurrence per start.
+    const offset = isRepeatingActivity(activity)
+      ? Math.min(spanOffsetDays(activity), MAX_SPAN_OFFSET_DAYS)
+      : 0;
+    if (offset === 0) return expandMonthStarts(activity, year, month);
+
+    const from = toDateInputValue(new Date(year, month, 1));
+    const to = toDateInputValue(new Date(year, month + 1, 0));
+    // Look BACK: a repeat that starts before this month can still cover its
+    // first days (a Sat-Mon weekend starting on the 31st).
+    const lookFrom = addDaysYmd(from, -offset);
+    const starts: string[] = [];
+    for (const m of distinctMonths(parseLocalDate(lookFrom), parseLocalDate(to))) {
+      for (const occ of expandMonthStarts(activity, m.year, m.month)) {
+        if (occ.date >= lookFrom && occ.date <= to) starts.push(occ.date);
+      }
+    }
+    // Earliest start wins a day two overlapping repeats both cover, so one
+    // activity is never drawn twice on a date (legacy data can overlap; the
+    // form caps new lengths at `minRepeatGapDays`).
+    starts.sort();
+    const seen = new Set<string>();
+    const results: ActivityOccurrence[] = [];
+    for (const start of starts) {
+      for (const occ of coveredDays(activity, start, offset, from, to)) {
+        if (seen.has(occ.date)) continue;
+        seen.add(occ.date);
+        results.push(occ);
+      }
+    }
+    return results.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  /**
+   * The day each repeat STARTS in a month (and a one-off's days), with the
+   * override filter applied. `expandRecurring` builds multi-day repeats on top.
+   */
+  function expandMonthStarts(
+    activity: FamilyActivity,
+    year: number,
+    month: number
+  ): ActivityOccurrence[] {
     const startDate = activity.date ? parseLocalDate(activity.date) : null;
     if (!startDate || Number.isNaN(startDate.getTime())) {
       reportError({
@@ -315,7 +431,7 @@ export const useActivityStore = defineStore('activities', () => {
     // Effective month boundary respecting end date.
     const effectiveEnd = endDate && endDate < monthEnd ? endDate : monthEnd;
 
-    let results: { activity: FamilyActivity; date: string }[];
+    let results: ActivityOccurrence[];
     switch (activity.recurrence) {
       case 'none':
         results = expandOneOff(activity, startDate, monthStart, monthEnd);
@@ -370,26 +486,47 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /** Single one-off activity (no recurrence). Multi-day all-day expands into
-   *  one occurrence per day in the range; single-day emits one occurrence. */
+   *  one occurrence per day in the range; single-day emits one occurrence. An
+   *  `endDate` before the start (an older client's move) is drawn as ONE day
+   *  rather than nothing: `spanOffsetDays` reads it as 0. */
   function expandOneOff(
     activity: FamilyActivity,
     startDate: Date,
     monthStart: Date,
     monthEnd: Date
-  ): { activity: FamilyActivity; date: string }[] {
-    const results: { activity: FamilyActivity; date: string }[] = [];
-    if (activity.isAllDay && activity.endDate) {
-      const rangeEnd = parseLocalDate(activity.endDate);
-      const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
-      const limit = rangeEnd < monthEnd ? rangeEnd : monthEnd;
-      while (cursor <= limit) {
-        if (cursor >= startDate) {
-          results.push({ activity, date: formatDate(cursor) });
-        }
-        cursor.setDate(cursor.getDate() + 1);
-      }
-    } else if (startDate >= monthStart && startDate <= monthEnd) {
-      results.push({ activity, date: formatDate(startDate) });
+  ): ActivityOccurrence[] {
+    const offset = spanOffsetDays(activity);
+    if (offset > 0) {
+      return coveredDays(
+        activity,
+        formatDate(startDate),
+        offset,
+        formatDate(monthStart),
+        formatDate(monthEnd)
+      );
+    }
+    return startDate >= monthStart && startDate <= monthEnd
+      ? [{ activity, date: formatDate(startDate) }]
+      : [];
+  }
+
+  /**
+   * Every day of one multi-day event (`start` .. `start + offset`) that falls in
+   * `[from, to]`, each tagged with `repeatStart`. Shared by one-off trips and
+   * multi-day repeats so the two can never drift.
+   */
+  function coveredDays(
+    activity: FamilyActivity,
+    start: string,
+    offset: number,
+    from: string,
+    to: string
+  ): ActivityOccurrence[] {
+    const results: ActivityOccurrence[] = [];
+    for (let i = 0; i <= offset; i++) {
+      const date = addDaysYmd(start, i);
+      if (date > to) break;
+      if (date >= from) results.push({ activity, date, repeatStart: start });
     }
     return results;
   }
@@ -400,8 +537,8 @@ export const useActivityStore = defineStore('activities', () => {
     startDate: Date,
     monthStart: Date,
     effectiveEnd: Date
-  ): { activity: FamilyActivity; date: string }[] {
-    const results: { activity: FamilyActivity; date: string }[] = [];
+  ): ActivityOccurrence[] {
+    const results: ActivityOccurrence[] = [];
     const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
     while (cursor <= effectiveEnd) {
       results.push({ activity, date: formatDate(cursor) });
@@ -420,7 +557,7 @@ export const useActivityStore = defineStore('activities', () => {
     monthStart: Date,
     monthEnd: Date,
     effectiveEnd: Date
-  ): { activity: FamilyActivity; date: string }[] {
+  ): ActivityOccurrence[] {
     const dayOfMonth = startDate.getDate();
     const candidate = new Date(year, month, Math.min(dayOfMonth, monthEnd.getDate()));
     if (candidate >= startDate && candidate >= monthStart && candidate <= effectiveEnd) {
@@ -439,7 +576,7 @@ export const useActivityStore = defineStore('activities', () => {
     month: number,
     monthStart: Date,
     effectiveEnd: Date
-  ): { activity: FamilyActivity; date: string }[] {
+  ): ActivityOccurrence[] {
     const ordinal = getWeekdayOrdinalInMonth(startDate);
     const weekday = startDate.getDay();
     const candidate = nthWeekdayOfMonth(new Date(year, month, 1), ordinal, weekday);
@@ -456,7 +593,7 @@ export const useActivityStore = defineStore('activities', () => {
     year: number,
     month: number,
     endDate: Date | null
-  ): { activity: FamilyActivity; date: string }[] {
+  ): ActivityOccurrence[] {
     // INVARIANT: `month` must be a normalized 0-11 value. This guard compares it
     // raw against `startDate.getMonth()` (0-11), so any caller passing an
     // un-normalized month (e.g. `baseMonth + i`, which can exceed 11) silently
@@ -476,7 +613,7 @@ export const useActivityStore = defineStore('activities', () => {
    * Get all occurrences (direct + recurring expanded) for a given month.
    */
   function monthActivities(year: number, month: number) {
-    const all: { activity: FamilyActivity; date: string }[] = [];
+    const all: ActivityOccurrence[] = [];
     for (const a of filteredActivities.value) {
       all.push(...expandRecurring(a, year, month));
     }
@@ -496,7 +633,7 @@ export const useActivityStore = defineStore('activities', () => {
    * activity (see the INVARIANT note on `expandRecurringYearly`).
    */
   function activitiesInRange(startYmd: string, endYmd: string) {
-    const all: { activity: FamilyActivity; date: string }[] = [];
+    const all: ActivityOccurrence[] = [];
     if (!startYmd || !endYmd || startYmd > endYmd) return all;
     const start = parseLocalDate(startYmd);
     const end = parseLocalDate(endYmd);
@@ -525,7 +662,7 @@ export const useActivityStore = defineStore('activities', () => {
    * member-filtered `monthActivities` there.
    */
   function activeActivitiesForMonth(year: number, month: number) {
-    const all: { activity: FamilyActivity; date: string }[] = [];
+    const all: ActivityOccurrence[] = [];
     for (const a of activeActivities.value) {
       all.push(...expandRecurring(a, year, month));
     }
@@ -544,14 +681,15 @@ export const useActivityStore = defineStore('activities', () => {
   const upcomingActivities = computed(() => {
     const today = parseLocalDate(todayRef.value);
     const todayStr = todayRef.value;
-    const results: { activity: FamilyActivity; date: string }[] = [];
+    const results: ActivityOccurrence[] = [];
 
     // Look ahead 90 days
     for (const a of filteredActivities.value) {
       for (let i = 0; i < 3; i++) {
-        const y = today.getFullYear();
-        const m = today.getMonth() + i;
-        const expanded = expandRecurring(a, y, m);
+        // Normalised through `Date`: a raw `getMonth() + i` past 11 silently
+        // dropped yearly activities (see `activitiesInRange`).
+        const month = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        const expanded = expandRecurring(a, month.getFullYear(), month.getMonth());
         for (const occ of expanded) {
           if (occ.date >= todayStr) {
             results.push(occ);
@@ -590,7 +728,7 @@ export const useActivityStore = defineStore('activities', () => {
    * appears by its soonest upcoming occurrence, found by walking months forward
    * through `expandRecurring` (yearly can be up to ~12 months out → 13-month bound).
    */
-  const linkableActivities = computed<{ activity: FamilyActivity; date: string }[]>(() => {
+  const linkableActivities = computed<ActivityOccurrence[]>(() => {
     const todayStr = todayRef.value;
     const base = parseLocalDate(todayStr);
     const surface = 'activityStore.linkableActivities';
@@ -640,7 +778,7 @@ export const useActivityStore = defineStore('activities', () => {
       return null;
     }
 
-    const results: { activity: FamilyActivity; date: string }[] = [];
+    const results: ActivityOccurrence[] = [];
     for (const activity of activeActivities.value) {
       try {
         const date = nextOccurrenceYmd(activity);
@@ -851,15 +989,32 @@ export const useActivityStore = defineStore('activities', () => {
     return trackFeature(result ?? null, 'activity');
   }
 
+  /**
+   * Write a patch to an activity.
+   *
+   * ONE rule lives here rather than at every caller: a patch that MOVES `date` on
+   * a series or an override child, without setting `endDate` itself, carries the
+   * record's span (its multi-day length, all-day or timed) onto the new start.
+   * Hand-applied at six call sites it kept being missed; any new path that writes
+   * `date` (drag and drop, AI update, undo) now gets it for free. A plain one-off
+   * keeps its absolute end, as it always has. `source` names the calling path
+   * for the `span_rebased` event.
+   */
   async function updateActivity(
     id: string,
-    input: UpdateFamilyActivityInput
+    input: UpdateFamilyActivityInput,
+    opts: { source?: string } = {}
   ): Promise<FamilyActivity | null> {
+    const existing = activities.value.find((a) => a.id === id);
+    let patch = input;
+    if (existing && (isRepeatingActivity(existing) || existing.parentActivityId)) {
+      patch = withRebasedEndDate(existing, input);
+    }
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const updated = await activityRepo.updateActivity(id, input);
+        const updated = await activityRepo.updateActivity(id, patch);
         if (updated) {
           // Immutable update: assign a new array so downstream computeds re-evaluate
           activities.value = activities.value.map((a) => (a.id === id ? updated : a));
@@ -868,6 +1023,7 @@ export const useActivityStore = defineStore('activities', () => {
       },
       { action: 'activityStore:updateActivity' }
     );
+    if (result && patch !== input) reportSpanRebased(opts.source ?? 'update');
     if (result) await safeSyncLinkedRecurringPayment(result);
     return result ?? null;
   }
@@ -1079,6 +1235,7 @@ export const useActivityStore = defineStore('activities', () => {
     // session renders twice, forever. Mirrors the master-first ordering
     // `deleteActivity` documents.
     const { payload, strippedKeys } = deriveFromTemplate(original, SPLIT_INVALID_KEYS);
+    const splitEndDate = shiftSpan(original, fromDate);
     // #70: the replacement CONTINUES the same cadence, so it keeps `rule` — but
     // an `afterCount` end is anchor-relative and would restart the count from
     // the split point (a 10-session course split at session 4 becoming 13, then
@@ -1095,6 +1252,9 @@ export const useActivityStore = defineStore('activities', () => {
         ...payload,
         ...(splitRule ? { rule: splitRule } : {}),
         date: fromDate,
+        // The new template starts at `fromDate`, so its per-repeat span moves with
+        // it (a copied `endDate` would sit before the new start).
+        endDate: splitEndDate,
         recurrenceEndDate: original.recurrenceEndDate,
         // Fee ownership TRANSFERS to the new template: carrying the id means the
         // existing item is updated in place rather than a second one minted.
@@ -1153,6 +1313,8 @@ export const useActivityStore = defineStore('activities', () => {
         recur_outcome: 'split',
         recur_stripped_fields: strippedKeys.join(','),
         recur_children_expected: childrenToMove.length,
+        // The span moved onto the new template's start (success path only).
+        ...(splitEndDate ? { stage: 'length-rebased' } : {}),
       },
     });
 
@@ -1239,7 +1401,8 @@ export const useActivityStore = defineStore('activities', () => {
           patch.originalOccurrenceDate = occurrenceDate;
         }
       }
-      const updated = await updateActivity(existing.id, patch);
+      // A moved multi-day child carries its span (`updateActivity` owns that).
+      const updated = await updateActivity(existing.id, patch, { source: 'override-reused' });
       logEvent({
         surface: 'activity-override',
         level: 'info',
@@ -1265,6 +1428,16 @@ export const useActivityStore = defineStore('activities', () => {
     // a computed every calendar view reads.
     const finalDate = patch.date || occurrenceDate;
     const isRescheduled = finalDate !== occurrenceDate;
+    // A multi-day repeat: the child is ONE repeat, so it keeps that repeat's
+    // days (re-based onto where it now starts) and the duty ticks of every one
+    // of them, each moved by the same delta when the repeat is rescheduled.
+    const spanOffset = isRepeatingActivity(parent) ? spanOffsetDays(parent) : 0;
+    const lastCovered = addDaysYmd(occurrenceDate, spanOffset);
+    const inRepeat = (d: string) => d >= occurrenceDate && d <= lastCovered;
+    const shiftDay = isRescheduled
+      ? (d: string) => addDaysYmd(d, daysBetweenYmd(occurrenceDate, finalDate))
+      : undefined;
+    const childEndDate = 'endDate' in patch ? patch.endDate : shiftSpan(parent, finalDate);
 
     // Also derived. Reached from DELETING a single occurrence, rescheduling one,
     // and scope-edits — so without this a delete would report as adoption.
@@ -1273,20 +1446,14 @@ export const useActivityStore = defineStore('activities', () => {
         ...payload,
         ...patch,
         date: finalDate,
+        endDate: childEndDate,
         recurrence: 'none',
         parentActivityId: parentId,
-        // Carry only THIS occurrence's completions, re-dated if the session moved,
-        // so a duty the family already ticked is not silently un-ticked.
-        dropoffCompletions: completionsForDerived(
-          parent.dropoffCompletions,
-          (d) => d === occurrenceDate,
-          isRescheduled ? finalDate : undefined
-        ),
-        pickupCompletions: completionsForDerived(
-          parent.pickupCompletions,
-          (d) => d === occurrenceDate,
-          isRescheduled ? finalDate : undefined
-        ),
+        // Carry only THIS occurrence's completions (every day of it, for a
+        // multi-day repeat), re-dated if the session moved, so a duty the family
+        // already ticked is not silently un-ticked.
+        dropoffCompletions: completionsForDerived(parent.dropoffCompletions, inRepeat, shiftDay),
+        pickupCompletions: completionsForDerived(parent.pickupCompletions, inRepeat, shiftDay),
         ...(isRescheduled ? { originalOccurrenceDate: occurrenceDate } : {}),
       })
     );
@@ -1303,6 +1470,11 @@ export const useActivityStore = defineStore('activities', () => {
         // What the PARENT derivation stripped, alongside the caller-patch strip
         // logged above — both lists reach CloudWatch, not just one.
         recur_stripped_fields: derivedStrippedKeys.join(','),
+        // A span carried onto a MOVED occurrence (a plain edit or a delete
+        // copies it unchanged, which is not a rebase).
+        ...(isRescheduled && !('endDate' in patch) && childEndDate
+          ? { stage: 'length-rebased' }
+          : {}),
       },
     });
     return created;
@@ -1324,16 +1496,78 @@ export const useActivityStore = defineStore('activities', () => {
    * Uses activeActivities so pickup/dropoff assignments are never excluded
    * by the global member filter.
    */
-  function activitiesForDate(dateStr: string): { activity: FamilyActivity; date: string }[] {
+  function activitiesForDate(dateStr: string): ActivityOccurrence[] {
     const d = parseLocalDate(dateStr);
-    const all: { activity: FamilyActivity; date: string }[] = [];
+    const all: ActivityOccurrence[] = [];
     for (const a of activeActivities.value) {
       all.push(...expandRecurring(a, d.getFullYear(), d.getMonth()));
     }
     return all.filter((occ) => occ.date === dateStr);
   }
 
+  /**
+   * The day the multi-day event drawn on `ymd` STARTS: this repeat's first day for
+   * a series (the occurrence key edits, overrides and splits use), a one-off
+   * trip's own start date for a trip. Built on the expansion itself, so a click on
+   * Sunday of a Fri-Sun weekend always opens the event that is DRAWN there, and a
+   * reschedule never mistakes a trip's third day for its start. A single-day
+   * record returns `ymd` unchanged.
+   */
+  function repeatStartFor(activity: FamilyActivity, ymd: string): string {
+    if (spanOffsetDays(activity) === 0) return ymd;
+    const d = parseLocalDate(ymd);
+    return (
+      expandRecurring(activity, d.getFullYear(), d.getMonth()).find((o) => o.date === ymd)
+        ?.repeatStart ?? ymd
+    );
+  }
+
+  // Diagnostics for multi-day repeats, from ONE gated watch rather than from the
+  // expansion (which runs inside computeds and must stay pure).
+  // One gate per signal, keyed on its own ids, so a new multi-day repeat does not
+  // re-send an unchanged overlap or end-before-start warning.
+  const countGate = createChangeGate();
+  const problemGates = {
+    overlapping: createChangeGate(),
+    endBeforeStart: createChangeGate(),
+    clamped: createChangeGate(),
+  };
+  watch(
+    activities,
+    (list) => {
+      const audit = auditRepeatSpans(list);
+      if (countGate(String(audit.multiDayRepeats.length))) {
+        logEvent({
+          surface: 'activity-schedule',
+          level: 'info',
+          message: 'multi_day_repeats',
+          context: { action: 'audit', count: audit.multiDayRepeats.length },
+        });
+      }
+      const problems = [
+        [audit.overlapping, 'repeat_overlap', problemGates.overlapping],
+        [audit.endBeforeStart, 'repeat_end_before_start', problemGates.endBeforeStart],
+        [audit.clamped, 'span_clamped', problemGates.clamped],
+      ] as const;
+      for (const [ids, code, gate] of problems) {
+        if (!ids.length || !gate(ids.join(','))) continue;
+        // A fixed message and structured fields, so a metric filter can group it.
+        // `activity_id` is not an allowlisted context key: the ids go to the
+        // local console only, for someone debugging on the device.
+        console.warn(`[activityStore] multi-day repeat ${code}:`, ids.slice(0, 5));
+        logEvent({
+          surface: 'activity-schedule',
+          level: 'warn',
+          message: 'multi_day_repeat_problem',
+          context: { action: 'audit', error_code: code, count: ids.length },
+        });
+      }
+    },
+    { immediate: true }
+  );
+
   return {
+    repeatStartFor,
     backfillReminderMinutes,
     // State
     activities,

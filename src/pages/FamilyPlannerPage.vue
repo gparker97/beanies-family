@@ -615,6 +615,10 @@ async function handleSave(
         delete patch.rule;
         delete patch.recurrence;
         delete patch.recurrenceEndDate;
+        // A "Lasts" change is relative to the OPENED repeat, not the template's
+        // start; written raw here it would stretch every repeat. It has its own
+        // scoped path too.
+        delete patch.endDate;
       }
       if (!(await activityStore.updateActivity(data.id, patch))) {
         reportSessionActionFailed();

@@ -2,7 +2,15 @@ import { ref } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { confirm } from '@/composables/useConfirm';
-import { toDateInputValue, addDays, parseLocalDate, extractDatePart } from '@/utils/date';
+import {
+  toDateInputValue,
+  addDays,
+  parseLocalDate,
+  extractDatePart,
+  addDaysYmd,
+  daysBetweenYmd,
+} from '@/utils/date';
+import { shiftSpan } from '@/utils/calendar/activityDays';
 import { lastOccurrenceOf } from '@/utils/activitySeriesEnd';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { endSeriesPatch } from '@/utils/activitySeriesEnd';
@@ -26,6 +34,16 @@ export function useActivityScopeEdit() {
   const viewingActivity = ref<FamilyActivity | null>(null);
   const viewingOccurrenceDate = ref<string | undefined>();
 
+  /**
+   * The day the repeat drawn on `date` starts: the occurrence KEY every scope
+   * edit, override, split and delete uses. `viewingOccurrenceDate` stays the day
+   * that was clicked, because duty ticks are per day (a Sunday tick belongs to
+   * Sunday even when the weekend repeat started on Friday).
+   */
+  function seriesDateOf(activity: FamilyActivity, date: string): string {
+    return activityStore.repeatStartFor(activity, date);
+  }
+
   function openViewModal(id: string, date?: string): boolean {
     const activity = activityStore.activities.find((a) => a.id === id);
     if (activity) {
@@ -45,7 +63,8 @@ export function useActivityScopeEdit() {
     activity: FamilyActivity;
     occurrenceDate?: string;
   } {
-    const occurrenceDate = viewingOccurrenceDate.value;
+    const clicked = viewingOccurrenceDate.value;
+    const occurrenceDate = clicked ? seriesDateOf(activity, clicked) : undefined;
     viewingActivity.value = null;
     return { activity, occurrenceDate };
   }
@@ -123,10 +142,20 @@ export function useActivityScopeEdit() {
 
     /** The moved occurrence's day-shift, applied to a series anchor date. */
     function shiftAnchor(anchor: ISODateString): ISODateString {
-      const deltaDays = Math.round(
-        (parseLocalDate(movedTo!).getTime() - parseLocalDate(occurrenceDate).getTime()) / 86_400_000
-      );
-      return toDateInputValue(addDays(parseLocalDate(anchor), deltaDays));
+      return addDaysYmd(anchor, daysBetweenYmd(occurrenceDate, movedTo!));
+    }
+
+    /**
+     * A "Lasts" edit arrives as an `endDate` relative to the FORM's date (the
+     * occurrence, or where it was moved to). Re-express it on `targetDate`, the
+     * start of the record the patch is actually written to.
+     */
+    function lastsOnto(targetDate: string): Pick<UpdateFamilyActivityInput, 'endDate'> {
+      if (!('endDate' in changes)) return {};
+      const formDate = movedTo ?? occurrenceDate;
+      return {
+        endDate: shiftSpan({ date: formDate, endDate: changes.endDate }, targetDate),
+      };
     }
 
     if (scope === 'all') {
@@ -154,7 +183,10 @@ export function useActivityScopeEdit() {
         return false;
       }
       if (movedTo && template) patch.date = shiftAnchor(template.date);
-      if (!(await activityStore.updateActivity(templateId, patch))) {
+      const targetDate = patch.date ?? template?.date;
+      const withLasts = targetDate ? { ...patch, ...lastsOnto(targetDate) } : patch;
+      // A move carries the series' span along (`updateActivity` owns that rule).
+      if (!(await activityStore.updateActivity(templateId, withLasts, { source: 'scope-all' }))) {
         reportSessionActionFailed();
         return false;
       }
@@ -183,13 +215,17 @@ export function useActivityScopeEdit() {
       // only carries it when the user deliberately edited the "ends on" field.
       const { date: _d, ...rest } = changes as Record<string, unknown>;
       void _d;
+      const moved = movedTo ? { date: shiftAnchor(newTemplate.date) } : {};
       const safeChanges = {
         ...rest,
-        ...(movedTo ? { date: shiftAnchor(newTemplate.date) } : {}),
+        ...moved,
+        ...lastsOnto(moved.date ?? newTemplate.date),
       } as UpdateFamilyActivityInput;
       if (
         Object.keys(safeChanges).length > 0 &&
-        !(await activityStore.updateActivity(newTemplate.id, safeChanges))
+        !(await activityStore.updateActivity(newTemplate.id, safeChanges, {
+          source: 'scope-this-and-future',
+        }))
       ) {
         reportSessionActionFailed();
         return false;
@@ -223,21 +259,18 @@ export function useActivityScopeEdit() {
     if (activity.recurrence !== 'none' && viewingOccurrenceDate.value) {
       const scope = await chooseScope();
       if (!scope) return false;
+      const seriesDate = seriesDateOf(activity, viewingOccurrenceDate.value);
 
       if (scope === 'this-only') {
-        const override = await activityStore.materializeOverride(
-          activity.id,
-          viewingOccurrenceDate.value,
-          { isActive: false }
-        );
+        const override = await activityStore.materializeOverride(activity.id, seriesDate, {
+          isActive: false,
+        });
         if (!override) reportSessionActionFailed();
         return !!override;
       }
 
       if (scope === 'this-and-future') {
-        const dayBefore = toDateInputValue(
-          addDays(parseLocalDate(viewingOccurrenceDate.value!), -1)
-        );
+        const dayBefore = addDaysYmd(seriesDate, -1);
         // #70: end the authoritative representation, not just the shadow —
         // `expandRecurring` reads `rule.end` for a rule-bearing series.
         const updated = await activityStore.updateActivity(
@@ -251,7 +284,7 @@ export function useActivityScopeEdit() {
         // End-dating the master does NOT touch its override children — they are
         // `recurrence:'none'` one-offs no end date applies to. Reap the ones on/
         // after the cut so they don't survive as ghosts (Recurring Invariant 7).
-        await activityStore.deleteChildrenFrom(activity.id, viewingOccurrenceDate.value);
+        await activityStore.deleteChildrenFrom(activity.id, seriesDate);
         return true;
       }
 

@@ -104,6 +104,20 @@ describe('computeDesiredHints — birthday (−14d, adults excl. self + pets)', 
 describe('computeDesiredHints — activities (Party group partition)', () => {
   const guest = member({ id: 'g', name: 'Guest' });
 
+  it('⭐ gives a multi-day party one hint, not one per day', () => {
+    const a = activity({ id: 'p-multi', category: 'birthday', assigneeIds: ['g'] });
+    const { hints } = computeDesiredHints(
+      baseInput({
+        members: [guest],
+        occurrences: {
+          '2026-07-26': [{ activity: a, date: '2026-07-26', repeatStart: '2026-07-26' }],
+          '2026-07-27': [{ activity: a, date: '2026-07-27', repeatStart: '2026-07-26' }],
+        },
+      })
+    );
+    expect(hints).toHaveLength(1);
+  });
+
   it("maps 'birthday' → birthday-party-gift at −2d", () => {
     const a = activity({ id: 'p1', category: 'birthday', assigneeIds: ['g'] });
     const { hints } = computeDesiredHints(

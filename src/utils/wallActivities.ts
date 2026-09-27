@@ -16,12 +16,11 @@ import { isAllDayActivity } from '@/utils/calendar/activityDays';
 import type { AllDaySpansResult } from '@/utils/allDaySpans';
 import { SHARED_EVENT_COLOR, resolveMemberColor } from '@/constants/memberColors';
 import type { DayExtra } from '@/utils/calendarDay';
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
-export interface WallOccurrence {
-  activity: FamilyActivity;
-  date: string;
-}
+/** The shared occurrence shape (`calendar/occurrence.ts`). */
+export type WallOccurrence = ActivityOccurrence;
 
 /**
  * Does this activity survive the wall's person filter?
@@ -191,7 +190,10 @@ export function wallDayAllDay(
   const rows: WallAllDaySpan[] = [];
   for (const span of result.spans) {
     rows.push({
-      occurrence: occurrenceFor(span.activity, days[span.startCol] ?? span.activity.date),
+      // The first VISIBLE day of the bar: a duty ticked from the opened sheet
+      // belongs to a day on screen. Edits map it back to the repeat's start
+      // (`repeatStartFor`).
+      occurrence: occurrenceFor(span.activity, days[span.startCol] ?? span.startYmd),
       startCol: span.startCol,
       span: span.span,
       everyone: false,

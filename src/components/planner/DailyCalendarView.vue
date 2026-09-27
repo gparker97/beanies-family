@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
@@ -105,7 +106,8 @@ const visibleMembers = computed<FamilyMember[]>(() =>
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
-type Occurrence = { activity: FamilyActivity; date: string };
+/** The shared occurrence shape (`calendar/occurrence.ts`). */
+type Occurrence = ActivityOccurrence;
 
 const dayActivities = computed<Occurrence[]>(() => {
   const dateStr = currentDay.value.dateStr;

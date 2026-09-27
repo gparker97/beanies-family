@@ -28,12 +28,7 @@ import { formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
-import type { FamilyActivity } from '@/types/models';
-
-interface ActivityOccurrence {
-  activity: FamilyActivity;
-  date: string;
-}
+import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 
 const props = defineProps<{
   occurrence: ActivityOccurrence;
