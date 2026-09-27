@@ -38,6 +38,7 @@ describe('computeAllDaySpans', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    logEvent.mockClear();
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
@@ -140,22 +141,20 @@ describe('computeAllDaySpans', () => {
     expect(warnSpy).not.toHaveBeenCalled(); // normal timed activity, no warn
   });
 
-  it('logs and skips a timed activity with endDate set (hypothetical schema drift)', () => {
+  it('skips a timed activity carrying an endDate (a synced overnight event) without reporting it', () => {
     const a = activity({
-      id: 'a-drifted',
+      id: 'a-overnight',
       date: '2026-05-13',
       endDate: '2026-05-14',
-      // isAllDay NOT set — this is the schema-drift case
+      startTime: '22:00',
+      endTime: '01:00',
     });
     const result = computeAllDaySpans([{ activity: a, date: '2026-05-13' }], week());
 
     expect(result.spans).toEqual([]);
     expect(result.singleByDate.size).toBe(0);
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'all_day_odd_record',
-        context: expect.objectContaining({ error_code: 'timed_with_end_date' }),
-      })
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'all_day_odd_record' })
     );
   });
 

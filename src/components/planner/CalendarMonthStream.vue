@@ -137,7 +137,8 @@ const renderedMonths = computed(() => {
   // each month from the prepared lookups. Doing the partition per month made it
   // O(months x span) inside the scroll rAF.
   const prepared = prepareCellData({
-    occurrences: activityStore.activitiesInRange(spanStart, spanEnd),
+    // EVENTS: one chip per event (an overnight tail is not a chip of its own).
+    occurrences: activityStore.eventsInRange(spanStart, spanEnd),
     segments: vacationStore.travelSegmentOccurrencesInRange(spanStart, spanEnd),
     vacations: vacationStore.vacations,
     extras: dayExtras.value,

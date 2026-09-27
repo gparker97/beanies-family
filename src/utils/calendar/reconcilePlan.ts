@@ -5,7 +5,7 @@
 // without a calendar client or the CRDT. The engine (calendarSyncStore) applies
 // the plan against the CalendarClient.
 
-import { pushBlockReason } from '@/utils/calendar/activityDays';
+import { isRepeatingActivity, pushBlockReason } from '@/utils/calendar/activityDays';
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { addDaysYmd } from '@/utils/date';
 import { masterEventId } from './deterministicEventId';
@@ -101,16 +101,17 @@ export function activityInWindow(
   const pastBound = addDaysYmd(todayYmd, -pastDays);
   const futureBound = addDaysYmd(todayYmd, futureDays);
 
-  // #70: this reads the legacy shadow fields DELIBERATELY, and is correct by
-  // construction — `recurrence !== 'none'` and `recurrenceEndDate` are both
-  // FAITHFUL under the shadow fidelity contract in `adapters.ts` (the latter is
-  // written iff `end.kind === 'onDate'`). A rule-bearing series with a `never`
-  // or `afterCount` end therefore lands in the ongoing branch below, which is
-  // the safe direction: this module is pure and hot (once per activity per
-  // reconcile), and a series wrongly EXCLUDED would silently stop syncing to
-  // Google. Do not import the engine or the adapters here to "improve" it —
-  // expanding an `afterCount` rule to answer a boolean walks up to HARD_CAP.
-  if (activity.recurrence !== 'none' && !activity.recurrenceEndDate) {
+  // #70: `recurrenceEndDate` is FAITHFUL under the shadow fidelity contract in
+  // `adapters.ts` (written iff `end.kind === 'onDate'`), so a series with a
+  // `never` or `afterCount` end lands in the ongoing branch below. "Repeats" is
+  // `isRepeatingActivity` (the legacy enum OR `rule`), a pure leaf check: a
+  // record that carries a `rule` but a stale `recurrence: 'none'` (a breach of
+  // that contract) was treated as a past one-off and silently STOPPED syncing to
+  // Google; now it errs toward the ongoing branch, the safe direction. Do not
+  // import the engine or the adapters here: expanding an `afterCount` rule to
+  // answer a boolean walks up to HARD_CAP, and this runs once per activity per
+  // reconcile.
+  if (isRepeatingActivity(activity) && !activity.recurrenceEndDate) {
     return start <= futureBound; // ongoing recurring
   }
   const lastRelevant = (activity.recurrenceEndDate ?? activity.endDate ?? activity.date).slice(

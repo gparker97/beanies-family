@@ -133,24 +133,16 @@ const clashWindow = computed(() => {
     startYmd = toDateInputValue(referenceDate.value);
     endYmd = startYmd;
   }
-  // Gather occurrences across every month the window spans (≤ ~42 days).
-  const occurrences: { activity: FamilyActivity; date: string }[] = [];
-  const end = parseLocalDate(endYmd);
-  let cursor = new Date(
-    parseLocalDate(startYmd).getFullYear(),
-    parseLocalDate(startYmd).getMonth(),
-    1
-  );
-  while (cursor <= end) {
-    for (const occ of activityStore.monthActivities(cursor.getFullYear(), cursor.getMonth())) {
-      if (occ.date >= startYmd && occ.date <= endYmd) occurrences.push(occ);
-    }
-    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-  }
+  // The DRAWN occurrences the grids show (tails included: `computeClashes` reads
+  // a tail as its start-day event, and the self-exclusion set needs its id).
+  const occurrences = activityStore.activitiesInRange(startYmd, endYmd);
+  // Busy data one day either side: an overnight event's range crosses midnight,
+  // so a tail on the first visible day checks the evening before, and an event
+  // starting on the last visible day checks the morning after.
   return {
-    timeMinIso: parseLocalDate(startYmd).toISOString(),
-    // exclusive upper bound = start of the day after the last visible day
-    timeMaxIso: parseLocalDate(addDaysYmd(endYmd, 1)).toISOString(),
+    timeMinIso: parseLocalDate(addDaysYmd(startYmd, -1)).toISOString(),
+    // exclusive upper bound
+    timeMaxIso: parseLocalDate(addDaysYmd(endYmd, 2)).toISOString(),
     occurrences,
   };
 });

@@ -143,7 +143,7 @@ export const useCalendarClashStore = defineStore('calendarClash', () => {
             '[calendarClash] could not derive event id for occurrence; skipping it from the self-exclusion set',
           error: e,
           severity: 'warning',
-          context: { activityId: o.activity.id },
+          context: { activity_id: o.activity.id },
         });
       }
     }

@@ -75,4 +75,27 @@ describe('DayTimeline lanes', () => {
     expect(l).toHaveLength(2);
     expect(new Set(l).size).toBe(2);
   });
+
+  it("⭐ draws a daily overnight series' tail and tonight's start as two cards", () => {
+    const night = act('night', '22:00', '01:00');
+    const w = mount(DayTimeline, {
+      props: {
+        dateStr: '2026-09-15',
+        activities: [
+          { activity: night, date: '2026-09-15', repeatStart: '2026-09-14' },
+          { activity: night, date: '2026-09-15', repeatStart: '2026-09-15' },
+        ],
+        vacations: [],
+        segments: [],
+        todos: [],
+        members: [],
+      },
+      global: { stubs: { CelebrationConfetti: true, ActivityOwnerStack: true } },
+    });
+    const tops = w
+      .findAll('button.absolute')
+      .map((b) => (b.attributes('style') ?? '').match(/top: ([^;]+)/)?.[1] ?? '');
+    expect(tops).toHaveLength(2);
+    expect(new Set(tops).size).toBe(2);
+  });
 });

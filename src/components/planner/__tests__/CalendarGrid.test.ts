@@ -21,7 +21,7 @@ vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({
     // Mirrors the real store: range-bounded, inclusive. The grid queries the
     // whole visible span (incl. prev/next-month padding cells), not the month.
-    activitiesInRange: (startYmd: string, endYmd: string) =>
+    eventsInRange: (startYmd: string, endYmd: string) =>
       mockActivityOccurrences.filter((o) => o.date >= startYmd && o.date <= endYmd),
   }),
   // Stable category color map matching what AllDayActivityChip expects.

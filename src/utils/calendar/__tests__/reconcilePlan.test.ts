@@ -49,6 +49,21 @@ describe('activityInWindow', () => {
     ).toBe(true);
   });
 
+  it('⭐ keeps a series that carries only a rule (stale legacy enum) syncing', () => {
+    // A rule with `recurrence: 'none'` breaks the shadow contract; it used to be
+    // read as a past one-off and silently stopped syncing to Google.
+    expect(
+      activityInWindow(
+        makeActivity({
+          date: '2026-01-01',
+          recurrence: 'none',
+          rule: { unit: 'week', interval: 1, end: { kind: 'never' } },
+        } as Partial<FamilyActivity>),
+        TODAY
+      )
+    ).toBe(true);
+  });
+
   it('excludes a recurring activity whose end date is in the past', () => {
     expect(
       activityInWindow(

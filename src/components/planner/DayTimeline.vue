@@ -16,7 +16,13 @@ import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
-import { useTimeGrid, groupOverlapping, plannerExtent } from '@/composables/useCalendarNavigation';
+import {
+  useTimeGrid,
+  groupOverlapping,
+  plannerExtent,
+  timedCards,
+  type TimedCard,
+} from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
@@ -97,10 +103,12 @@ const segmentBuckets = computed(() => splitTimedUntimed(props.segments));
 // ── Time grid sizing — driven by timed activities + segments on this day ──
 // Caller-side union: include segment times as 1h synthetic blocks so the
 // hour grid auto-extends past the 7am-7pm default for early/late flights.
+/** The day's timed cards, built once for the time range and the lane packer. */
+const cards = computed(() => timedCards(props.activities));
+
 const timedRef = computed(() => {
-  const items: { startTime?: string; endTime?: string }[] = props.activities
-    .filter((o) => !isAllDayActivity(o.activity))
-    .map((o) => o.activity as { startTime?: string; endTime?: string });
+  // The DRAWN windows: a 00:00 continuation must pull the day's range up too.
+  const items: { startTime?: string; endTime?: string }[] = [...cards.value];
   for (const seg of segmentBuckets.value.timed) {
     if (seg.time) items.push({ startTime: seg.time, endTime: addHourToTime(seg.time) });
   }
@@ -129,7 +137,7 @@ const hasUntimedRow = computed(
 
 // ── Timed activities, lane-packed per overlap cluster ──
 interface PositionedEvent {
-  occurrence: Occurrence;
+  card: TimedCard;
   lane: number;
   totalLanes: number;
   top: string;
@@ -137,23 +145,20 @@ interface PositionedEvent {
 }
 
 const positionedEvents = computed<PositionedEvent[]>(() => {
-  const timed = props.activities.filter((o) => !isAllDayActivity(o.activity));
-  if (timed.length === 0) return [];
-  // groupOverlapping works on the bare activity shape
-  const clusters = groupOverlapping(timed.map((o) => o.activity));
-  // Rebuild an index: activity.id → occurrence (preserves per-day date key)
-  const occByActivityId = new Map(timed.map((o) => [o.activity.id, o]));
+  // Cards, not bare activities: a continuation draws 00:00 to its end, and a
+  // daily overnight series puts two cards of one activity on a day.
+  if (cards.value.length === 0) return [];
   const result: PositionedEvent[] = [];
 
-  for (const cluster of clusters) {
+  for (const cluster of groupOverlapping(cards.value)) {
     // Greedy lane assignment inside the cluster.
     const laneEnd: number[] = []; // minute offset when each lane becomes free
     const laneOfEvent: number[] = [];
-    for (const act of cluster) {
+    for (const card of cluster) {
       // The card's RENDERED extent (floored, overnight clamped), the same one the
       // clusters were built from. Unreadable starts share one cluster at the top
       // of the grid; an end of Infinity gives each its own lane, never dropped.
-      const extent = plannerExtent(act);
+      const extent = plannerExtent(card);
       const start = extent?.start ?? 0;
       const end = extent?.end ?? Number.POSITIVE_INFINITY;
       let placed = -1;
@@ -171,12 +176,10 @@ const positionedEvents = computed<PositionedEvent[]>(() => {
       laneOfEvent.push(placed);
     }
     const totalLanes = laneEnd.length;
-    cluster.forEach((act, i) => {
-      const occ = occByActivityId.get(act.id);
-      if (!occ) return;
-      const pos = getPosition(act.startTime!, act.endTime);
+    cluster.forEach((card, i) => {
+      const pos = getPosition(card.startTime!, card.endTime);
       result.push({
-        occurrence: occ,
+        card,
         lane: laneOfEvent[i] ?? 0,
         totalLanes,
         top: pos.top,
@@ -366,26 +369,24 @@ const { identityFor } = useActivityIdentity();
         <!-- Positioned event cards -->
         <button
           v-for="ev in positionedEvents"
-          :key="ev.occurrence.activity.id"
+          :key="ev.card.key"
           type="button"
           class="dark:bg-surface-raised absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md"
-          :class="
-            identityFor(ev.occurrence.activity).celebration.celebrating ? 'is-celebration' : ''
-          "
+          :class="identityFor(ev.card.activity).celebration.celebrating ? 'is-celebration' : ''"
           :style="{
             top: ev.top,
             height: ev.height,
             left: `calc(${(ev.lane / ev.totalLanes) * 100}% + 2px)`,
             width: `calc(${(1 / ev.totalLanes) * 100}% - 4px)`,
-            ...identityFor(ev.occurrence.activity).style,
+            ...identityFor(ev.card.activity).style,
           }"
-          @click="emit('view-activity', ev.occurrence.activity.id, ev.occurrence.date)"
+          @click="emit('view-activity', ev.card.activity.id, ev.card.eventDate)"
         >
           <!-- Confetti only where the block is tall enough to hold it; a 30-minute
                slot is 24px and a scatter there is noise, not celebration. -->
           <CelebrationConfetti
-            v-if="identityFor(ev.occurrence.activity).celebration.celebrating"
-            :activity-id="ev.occurrence.activity.id"
+            v-if="identityFor(ev.card.activity).celebration.celebrating"
+            :activity-id="ev.card.activity.id"
             density="card"
           />
           <div class="flex items-start gap-1">
@@ -393,25 +394,22 @@ const { identityFor } = useActivityIdentity();
               <div
                 class="font-outfit dark:text-ink flex items-center truncate text-xs font-semibold text-gray-900"
               >
-                <span aria-hidden="true">{{ identityFor(ev.occurrence.activity).emoji }}</span>
-                <span class="truncate">{{ ev.occurrence.activity.title }}</span>
-                <PhotoIndicator :photo-ids="ev.occurrence.activity.photoIds" />
+                <span aria-hidden="true">{{ identityFor(ev.card.activity).emoji }}</span>
+                <span class="truncate">{{ ev.card.activity.title }}</span>
+                <PhotoIndicator :photo-ids="ev.card.activity.photoIds" />
                 <ClashIndicator
-                  :clash="clashFor(ev.occurrence.activity.id, ev.occurrence.date)"
+                  :clash="clashFor(ev.card.activity.id, ev.card.eventDate)"
                   class="ml-1"
                 />
               </div>
               <div class="text-secondary-500/60 dark:text-ink-soft truncate text-[0.625rem]">
-                {{ eventTimeLabel(ev.occurrence.activity)
-                }}<template v-if="ev.occurrence.activity.location">
-                  · 📍 {{ ev.occurrence.activity.location }}</template
+                {{ eventTimeLabel(ev.card.activity)
+                }}<template v-if="ev.card.activity.location">
+                  · 📍 {{ ev.card.activity.location }}</template
                 >
               </div>
             </div>
-            <ActivityOwnerStack
-              :members="identityFor(ev.occurrence.activity).stackMembers"
-              size="xs"
-            />
+            <ActivityOwnerStack :members="identityFor(ev.card.activity).stackMembers" size="xs" />
           </div>
         </button>
 

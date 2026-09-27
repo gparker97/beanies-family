@@ -76,6 +76,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // 'activity-celebration' and 'activity-owner-resolve' surfaces. Small integers only.
   'count',
   'error_code',
+  // An activity record's random id (2026-09-27): per-record UUID, diagnostics only.
+  'activity_id',
   // Beanie wall sizing (#96, surface 'beanie-wall'). Coarse integers only.
   // MIRROR of src/utils/diagnosticContext.ts — see the note at the top.
   'viewport_w',

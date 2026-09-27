@@ -10,7 +10,13 @@ import { ref, nextTick } from 'vue';
 const logEvent = vi.fn();
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (e: unknown) => logEvent(e) }));
 
-import { groupOverlapping, plannerExtent, useTimeGrid } from '@/composables/useCalendarNavigation';
+import {
+  groupOverlapping,
+  plannerExtent,
+  timedCards,
+  useTimeGrid,
+} from '@/composables/useCalendarNavigation';
+import type { FamilyActivity } from '@/types/models';
 
 const at = (id: string, startTime?: string, endTime?: string) => ({ id, startTime, endTime });
 const ids = (groups: { id: string }[][]) => groups.map((g) => g.map((i) => i.id));
@@ -130,5 +136,33 @@ describe('useTimeGrid', () => {
     items.value = [at('d', 'other-junk')];
     await nextTick();
     expect(logEvent).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe('timedCards', () => {
+  const night = {
+    id: 'n',
+    date: '2026-06-10',
+    startTime: '22:00',
+    endTime: '01:00',
+  } as FamilyActivity;
+
+  it("⭐ draws a tail from midnight, keyed apart from the same day's start", () => {
+    const cards = timedCards([
+      { activity: night, date: '2026-06-11', repeatStart: '2026-06-10' },
+      { activity: night, date: '2026-06-11', repeatStart: '2026-06-11' },
+    ]);
+    expect(cards.map((c) => [c.startTime, c.endTime, c.eventDate])).toEqual([
+      ['00:00', '01:00', '2026-06-10'],
+      ['22:00', '01:00', '2026-06-11'],
+    ]);
+    expect(new Set(cards.map((c) => c.key)).size).toBe(2);
+    // They do not overlap on the grid, so they never split a column.
+    expect(groupOverlapping(cards)).toHaveLength(2);
+  });
+
+  it('drops all-day occurrences', () => {
+    const allDay = { id: 'a', date: '2026-06-10', isAllDay: true } as FamilyActivity;
+    expect(timedCards([{ activity: allDay, date: '2026-06-10' }])).toEqual([]);
   });
 });

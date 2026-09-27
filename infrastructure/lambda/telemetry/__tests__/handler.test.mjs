@@ -317,6 +317,7 @@ describe('Telemetry Lambda handler', () => {
       const expected = [
         'account_type',
         'action',
+        'activity_id',
         'breadcrumbs',
         'browser',
         'build_sha',

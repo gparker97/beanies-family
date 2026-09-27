@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import {
+  eventDateOf,
+  occurrenceKey,
+  occurrenceWindow,
+  type ActivityOccurrence,
+} from '@/utils/calendar/occurrence';
 import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
@@ -19,7 +25,7 @@ import {
   formatNookDate,
 } from '@/utils/date';
 import { tripTypeEmoji, tripDurationDays } from '@/utils/vacation';
-import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
+import type { TodoItem, HolidayOccurrence } from '@/types/models';
 
 const props = defineProps<{
   date: string;
@@ -69,9 +75,12 @@ const dayActivities = computed(() => {
   const year = d.getFullYear();
   const month = d.getMonth();
   const occurrences = activityStore.monthActivities(year, month);
+  // Sorted by the DRAWN window: an overnight event's 00:00 tail leads the day.
   return occurrences
     .filter((o) => o.date === props.date)
-    .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
+    .sort((a, b) =>
+      (occurrenceWindow(a).startTime ?? '').localeCompare(occurrenceWindow(b).startTime ?? '')
+    );
 });
 
 /** Todos due on the selected day */
@@ -112,13 +121,15 @@ const upcomingActivities = computed(() => {
   const endDate = new Date(start);
   endDate.setDate(endDate.getDate() + 14);
 
-  const results: { activity: (typeof dayActivities.value)[0]['activity']; date: string }[] = [];
+  const results: ActivityOccurrence[] = [];
 
   // Check up to 2 months to cover the 14-day window
   for (let i = 0; i < 2; i++) {
-    const y = nextDay.getFullYear();
-    const m = nextDay.getMonth() + i;
-    const occurrences = activityStore.monthActivities(y, m);
+    // Normalised through `Date`: a raw `getMonth() + i` of 12 in December dropped
+    // January's yearly activities (the store's own walkers do the same).
+    const month = new Date(nextDay.getFullYear(), nextDay.getMonth() + i, 1);
+    // EVENTS: no overnight tails.
+    const occurrences = activityStore.monthEvents(month.getFullYear(), month.getMonth());
     for (const occ of occurrences) {
       if (occ.date > props.date && occ.date <= toDateInputValue(endDate)) {
         results.push(occ);
@@ -149,7 +160,7 @@ const groupedUpcoming = computed(() => {
   const groups: {
     date: string;
     label: string;
-    items: { activity: FamilyActivity; date: string }[];
+    items: ActivityOccurrence[];
   }[] = [];
   let currentDate = '';
 
@@ -237,11 +248,11 @@ function formatGroupDate(dateStr: string): string {
     <!-- Day's activities -->
     <div v-if="dayActivities.length > 0" class="space-y-1.5">
       <ActivityListCard
-        v-for="(occ, i) in dayActivities"
-        :key="`${occ.activity.id}-${i}`"
+        v-for="occ in dayActivities"
+        :key="occurrenceKey(occ)"
         :activity="occ.activity"
-        :date="occ.date"
-        @click="emit('edit-activity', occ.activity.id, occ.date)"
+        :date="eventDateOf(occ)"
+        @click="emit('edit-activity', occ.activity.id, eventDateOf(occ))"
       />
     </div>
 

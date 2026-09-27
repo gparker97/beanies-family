@@ -15,6 +15,15 @@ import {
   type TimedSpan,
 } from '@/utils/calendar/timeSpans';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
+import {
+  eventDateOf,
+  isTimedContinuation,
+  occurrenceKey,
+  occurrenceWindow,
+  type ActivityOccurrence,
+} from '@/utils/calendar/occurrence';
+import { isAllDayActivity } from '@/utils/calendar/activityDays';
+import type { FamilyActivity } from '@/types/models';
 import { logEvent } from '@/services/telemetry/logEvent';
 
 // ── Day Navigation ─────────────────────────────────────────────────────────
@@ -137,13 +146,15 @@ const SURFACE = 'planner-time-grid';
 interface TimedFields {
   startTime?: string;
   endTime?: string;
+  /** An overnight event's next-morning tail (set by `timedCards`). */
+  isTail?: boolean;
 }
 
 /**
  * The planner's span of a timed activity: the shared `timedSpanMinutes` with the
  * planner's 60-minute default, and an overnight end CLAMPED to midnight, because
- * the planner's day axis ends there (the tail on the next morning is not drawn;
- * a follow-up in `docs/plans/2026-09-27-calendar-time-grid-span-fixes.md`).
+ * the planner's day axis ends there. The tail is drawn on the next morning as its
+ * own card (a continuation occurrence, see `timedCards`).
  */
 function plannerSpan(item: TimedFields): TimedSpan | null {
   const span = timedSpanMinutes(item.startTime, item.endTime, PLANNER_ASSUMED_DURATION_MIN);
@@ -220,6 +231,7 @@ export function useTimeGrid(timedItems: Ref<TimedFields[]>, viewId?: PlannerGrid
   // The signature is the offending raw values (never logged), so a different bad
   // record on the next week is reported rather than suppressed as "same count".
   const overnightGate = createChangeGate();
+  const overnightTailGate = createChangeGate();
   const unreadableStartGate = createChangeGate();
   const unreadableEndGate = createChangeGate();
   watch(
@@ -227,10 +239,12 @@ export function useTimeGrid(timedItems: Ref<TimedFields[]>, viewId?: PlannerGrid
     (list) => {
       const items = timedItems.value;
       const overnight: string[] = [];
+      const tails: string[] = [];
       const badStart: string[] = [];
       const badEnd: string[] = [];
       list.forEach((span, i) => {
         const item = items[i];
+        if (item?.isTail) tails.push(`${item.startTime}-${item.endTime}`);
         if (!span) badStart.push(String(item?.startTime));
         else if (span.endUnreadable) badEnd.push(String(item?.endTime));
         else if (span.overnight) overnight.push(`${item?.startTime}-${item?.endTime}`);
@@ -258,8 +272,12 @@ export function useTimeGrid(timedItems: Ref<TimedFields[]>, viewId?: PlannerGrid
           },
         });
       };
-      // Card drawn to midnight; its tail on the next morning is not shown.
+      // Card drawn to midnight on its start day (the tail is its own card the
+      // next morning, from the store's continuation occurrence).
       emit(overnight, overnightGate, 'info', 'planner_grid_overnight_clamped', 'overnight_clamped');
+      // The next-morning tail drawn (success path: how often tails are drawn,
+      // including on a day whose start-day card is off-screen).
+      emit(tails, overnightTailGate, 'info', 'planner_grid_overnight_tail', 'overnight_tail');
       // Card pinned to the top of the grid: its position is unknown.
       emit(
         badStart,
@@ -283,6 +301,36 @@ export function useTimeGrid(timedItems: Ref<TimedFields[]>, viewId?: PlannerGrid
   );
 
   return { timeRange, hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT };
+}
+
+/**
+ * One timed card on a planner grid: an occurrence plus the window it is DRAWN in.
+ * A timed continuation (the next-morning tail of an overnight event) draws from
+ * 00:00 to its end; every other card uses the activity's own times. The activity
+ * itself is never cloned or altered, so edits, reminders and Google see it as it
+ * is. `eventDate` is where clicks, edits and the clash lookup belong
+ * (`eventDateOf`); `key` stays unique when one activity has two cards on a date
+ * (a daily overnight series: yesterday's tail and tonight's start).
+ */
+export interface TimedCard extends TimedFields {
+  occurrence: ActivityOccurrence;
+  activity: FamilyActivity;
+  eventDate: string;
+  key: string;
+}
+
+/** The timed occurrences of a day as grid cards (all-day ones are dropped). */
+export function timedCards(occurrences: readonly ActivityOccurrence[]): TimedCard[] {
+  return occurrences
+    .filter((occ) => !isAllDayActivity(occ.activity))
+    .map((occ) => ({
+      ...occurrenceWindow(occ),
+      occurrence: occ,
+      activity: occ.activity,
+      eventDate: eventDateOf(occ),
+      key: occurrenceKey(occ),
+      isTail: isTimedContinuation(occ),
+    }));
 }
 
 /**
