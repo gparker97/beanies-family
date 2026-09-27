@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-26",
-    "translationCount": 5056
+    "lastUpdated": "2026-09-27",
+    "translationCount": 5538
   },
   "translations": {
     "app.name": {
@@ -24604,7 +24604,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-26"
+      "lastUpdated": "2026-09-27"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -25029,12 +25029,12 @@
     "statementImport.row.tick": {
       "translation": "Add {name}",
       "hash": "",
-      "lastUpdated": "2026-09-26"
+      "lastUpdated": "2026-09-27"
     },
     "statementImport.row.edit": {
       "translation": "Edit {name}",
       "hash": "",
-      "lastUpdated": "2026-09-26"
+      "lastUpdated": "2026-09-27"
     },
     "statementImport.row.already": {
       "translation": "已添加{date}",
@@ -25285,6 +25285,2416 @@
       "translation": "利息",
       "hash": "ai396y",
       "lastUpdated": "2026-09-26"
+    },
+    "nav.whoOwnsWhat": {
+      "translation": "谁拥有什么",
+      "hash": "cib92j",
+      "lastUpdated": "2026-09-27"
+    },
+    "mobileNav.hint.whoOwnsWhat": {
+      "translation": "谁负责哪个工作",
+      "hash": "l12p3c",
+      "lastUpdated": "2026-09-27"
+    },
+    "action.moreOptions": {
+      "translation": "更多选项",
+      "hash": "gp8o2b",
+      "lastUpdated": "2026-09-27"
+    },
+    "action.undo": {
+      "translation": "撤销",
+      "hash": "1klxg",
+      "lastUpdated": "2026-09-27"
+    },
+    "lists.category.people": {
+      "translation": "我们所爱的人",
+      "hash": "pg1tsj",
+      "lastUpdated": "2026-09-27"
+    },
+    "lists.category.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-09-27"
+    },
+    "lists.categoryShort.people": {
+      "translation": "人物",
+      "hash": "vjxt8x",
+      "lastUpdated": "2026-09-27"
+    },
+    "celebration.deckDealt": {
+      "translation": "每张卡都有支架！",
+      "hash": "r73ol",
+      "lastUpdated": "2026-09-27"
+    },
+    "celebration.checkInDone": {
+      "translation": "卡组已检查！下次入住时见。",
+      "hash": "hlsjyu",
+      "lastUpdated": "2026-09-27"
+    },
+    "planner.field.lasts": {
+      "translation": "最近",
+      "hash": "17kqyl",
+      "lastUpdated": "2026-09-27"
+    },
+    "planner.field.lastsUnit.one": {
+      "translation": "天",
+      "hash": "24kc",
+      "lastUpdated": "2026-09-27"
+    },
+    "planner.field.lastsUnit.other": {
+      "translation": "天",
+      "hash": "1txlj",
+      "lastUpdated": "2026-09-27"
+    },
+    "planner.field.lastsDays.other": {
+      "translation": "{n}天",
+      "hash": "y89mp9",
+      "lastUpdated": "2026-09-27"
+    },
+    "planner.validation.lastsRange": {
+      "translation": "输入一个从1到{max}的数字，这样每次重复都在下一次开始之前结束。",
+      "hash": "ufnrkg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.error.readOnly": {
+      "translation": "只有成年人才能更换卡组",
+      "hash": "xxa9me",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.error.readOnlyHelp": {
+      "translation": "要求家长处理、跳过或编辑卡片。",
+      "hash": "qalg7k",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.error.cardGone": {
+      "translation": "该卡牌已不在您的卡组中",
+      "hash": "mlf1su",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.error.cardGoneHelp": {
+      "translation": "可能有人在另一台设备上更改了卡组。请再看一遍，然后重试。",
+      "hash": "eechwg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.error.saveFailed": {
+      "translation": "无法将更改保存到卡组",
+      "hash": "hs4o6v",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.undo.stale": {
+      "translation": "无法撤消",
+      "hash": "8nwplp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.undo.staleHelp": {
+      "translation": "该卡已在另一台设备上更改，因此未撤消任何操作。",
+      "hash": "7ebh3d",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.dealt": {
+      "translation": "{card}现在由{name}持有",
+      "hash": "yra95z",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.cleared": {
+      "translation": "{card}暂时没有人",
+      "hash": "7hjiu",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.kept": {
+      "translation": "{card}正在等待持有人",
+      "hash": "zayb1f",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.skipped.one": {
+      "translation": "已跳过{card}",
+      "hash": "qx4l5q",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.skipped.other": {
+      "translation": "已跳过{count}张卡",
+      "hash": "z5o8ak",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.broughtBack": {
+      "translation": "{card}又回到你的卡组了",
+      "hash": "cpyas4",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.saved": {
+      "translation": "已保存卡",
+      "hash": "jjxytz",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.created": {
+      "translation": "卡牌已添加到您的卡组",
+      "hash": "usnm01",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.toast.undone": {
+      "translation": "未完成",
+      "hash": "t1ylhh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.label": {
+      "translation": "入住节奏",
+      "hash": "q7xdfw",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.delete.title": {
+      "translation": "删除这张卡",
+      "hash": "loc76m",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.delete.message": {
+      "translation": "这是您家人制作的卡牌，因此删除它会永久删除它及其历史记录。",
+      "hash": "216vih",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.delete.done": {
+      "translation": "银行卡已删除.",
+      "hash": "xw376x",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.title": {
+      "translation": "恢复默认卡牌并重新开始？",
+      "hash": "ifetjt",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.message": {
+      "translation": "每张内置卡都会回来，包括您跳过的卡。每个持有人、拆分和卡片历史记录都被清除，交易再次开始。此操作无法撤消。",
+      "hash": "e0vu3",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.keepCustom": {
+      "translation": "保留我们自己的卡片（ {count}张）",
+      "hash": "8ijeyq",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.clearCustom": {
+      "translation": "也清理我们自己的卡牌",
+      "hash": "bweqkq",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.confirm": {
+      "translation": "恢复并重新开始",
+      "hash": "tm91v",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.done": {
+      "translation": "默认卡牌已恢复，发牌吧！",
+      "hash": "ees0sy",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.failed": {
+      "translation": "无法恢复默认卡牌",
+      "hash": "d1xldp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.restore.failedHelp": {
+      "translation": "您的卡片未重置。请重试。",
+      "hash": "8jewa",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.welcomeSubtitle": {
+      "translation": "本周谁将举办什么活动？ 🙋",
+      "hash": "xqvkro",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.addCard": {
+      "translation": "添加银行卡",
+      "hash": "f442ya",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.view.overview": {
+      "translation": "概述",
+      "hash": "9u3rtl",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.view.deal": {
+      "translation": "秒杀",
+      "hash": "19kek",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.view.deck": {
+      "translation": "甲板",
+      "hash": "19kg9",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.menu.share": {
+      "translation": "分享卡组",
+      "hash": "zert5l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.menu.export": {
+      "translation": "导出为 PDF",
+      "hash": "nrwtrk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.menu.rhythm": {
+      "translation": "入住节奏",
+      "hash": "b2hgto",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.menu.skipped": {
+      "translation": "查看跳过的卡牌",
+      "hash": "4nfldy",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.menu.restore": {
+      "translation": "恢复默认卡牌",
+      "hash": "3oslzm",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.title": {
+      "translation": "家人应该多久入住一次？",
+      "hash": "xg15pk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.message": {
+      "translation": "一起办理入住手续十分钟即可查看露台，并更换任何不起作用的东西。当到期时， beanies会在每日简报中提醒成年人。",
+      "hash": "nm70yi",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.every2": {
+      "translation": "每2周",
+      "hash": "s8xbo",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.every4": {
+      "translation": "每4周",
+      "hash": "skjn4e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.every8": {
+      "translation": "每8周",
+      "hash": "g90q1e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.off": {
+      "translation": "关闭",
+      "hash": "1p3j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.rhythm.saved": {
+      "translation": "入住节奏已保存",
+      "hash": "bydodv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deepLink.missing": {
+      "translation": "该卡牌已不在您的卡组中",
+      "hash": "mlf1su",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deepLink.missingHelp": {
+      "translation": "它可能已被删除，或者卡组已在其他设备上恢复。",
+      "hash": "lobq3j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.dealt": {
+      "translation": "发牌",
+      "hash": "8wdljf",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.ringLabel": {
+      "translation": "{total}张卡中的{held}张有持有人",
+      "hash": "l6tpks",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.allHeld": {
+      "translation": "卡组中的每张卡片都有支架。",
+      "hash": "z7r08t",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.waiting.one": {
+      "translation": "即将到达。1张卡片正在等待有人领取。",
+      "hash": "csa6vk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.waiting.other": {
+      "translation": "即将完成。{count}张卡片正在等待有人领取。",
+      "hash": "2n1kdo",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.toSort": {
+      "translation": "{total}张卡中的{held}张有一个持有人。还有{count}张要排序。",
+      "hash": "x4nykw",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.empty": {
+      "translation": "你的卡组是空的。带回跳过的卡片或添加自己的卡片。",
+      "hash": "yj1oh3",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.legend.held": {
+      "translation": "处理和持有",
+      "hash": "3ju6ie",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.legend.waiting": {
+      "translation": "等待支架",
+      "hash": "g79l85",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.legend.unsorted": {
+      "translation": "仍需排序",
+      "hash": "sn163",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.legend.skipped": {
+      "translation": "已跳过，不适用于此家庭",
+      "hash": "mrrwgy",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.legend.total": {
+      "translation": "{inPlay}在播放中，全集中的{total}",
+      "hash": "vy37wc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.dealRemaining.one": {
+      "translation": "发最后一张牌",
+      "hash": "3njbo7",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.dealRemaining.other": {
+      "translation": "处理剩余的{count}",
+      "hash": "oydayk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.seeSkipped": {
+      "translation": "查看跳过的堆",
+      "hash": "lajw8u",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.byCategory": {
+      "translation": "按分类",
+      "hash": "t5qgfb",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.byCategoryHint": {
+      "translation": "谁加入，哪些仍在营业",
+      "hash": "i8f3mu",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.allDealt": {
+      "translation": "全部{count}笔交易",
+      "hash": "szp782",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.catWaiting": {
+      "translation": "{count}个正在等待",
+      "hash": "goxe16",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.catToSort": {
+      "translation": "{count}个待排序",
+      "hash": "fth11o",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.openCategory": {
+      "translation": "在卡组中打开{category}",
+      "hash": "yuhvrh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.waitingTitle": {
+      "translation": "等待持有人",
+      "hash": "4be7zp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.openDeal": {
+      "translation": "打开交易视图",
+      "hash": "sxuz04",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.deal": {
+      "translation": "秒杀",
+      "hash": "19kek",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.waitingMore": {
+      "translation": "+ 另外 %{count} 个",
+      "hash": "sxf3bg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.recentTitle": {
+      "translation": "最近的动作",
+      "hash": "qjxz1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.recentHint": {
+      "translation": "上个月",
+      "hash": "gok1gb",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.overview.recentEmpty": {
+      "translation": "上个月没有任何动静。",
+      "hash": "5vk6k4",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.redeal": {
+      "translation": "{card}从{from}到{to}",
+      "hash": "jmdxuk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.custom": {
+      "translation": "已添加您自己的卡片： {card}",
+      "hash": "lqd3yq",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.split": {
+      "translation": "{card}已拆分",
+      "hash": "vzal3p",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.skip": {
+      "translation": "{card}已跳过",
+      "hash": "pmxh05",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.checkin": {
+      "translation": "家庭入住",
+      "hash": "289kpy",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.recent.checkinRedealt": {
+      "translation": "家庭入住， {count}次转手",
+      "hash": "4gif29",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.meOk": {
+      "translation": "每个成年人都拿着一张为我准备的卡片",
+      "hash": "k04a2c",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.meOkHint": {
+      "translation": "只有你的时间也算是一份工作",
+      "hash": "iloh4s",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.meNudge": {
+      "translation": "不是每个成年人都有我的卡片",
+      "hash": "ryhksh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.meNudgeHint": {
+      "translation": "向每个成年人发放一张来自“专属于我”的卡片。只有你的时间也很重要。",
+      "hash": "651s7e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.split.one": {
+      "translation": "1张卡被拆分",
+      "hash": "wdryth",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.split.other": {
+      "translation": "{count}张卡被拆分",
+      "hash": "wq7g06",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.splitHint": {
+      "translation": "通过儿童或定制零件，每个零件都有自己的支架",
+      "hash": "sggca6",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.kids": {
+      "translation": "孩子们在游戏中",
+      "hash": "q4nt8s",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.facts.kidsHint": {
+      "translation": "他们持有自己的卡片",
+      "hash": "uhy6ir",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.title": {
+      "translation": "家庭入住",
+      "hash": "3ar4g6",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.every": {
+      "translation": "每{weeks}周",
+      "hash": "1c60r7",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.off": {
+      "translation": "已取消办理入住手续。",
+      "hash": "kuqh7m",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.setRhythm": {
+      "translation": "设定节奏",
+      "hash": "ga9o3",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.last": {
+      "translation": "最后一个是{date}。",
+      "hash": "jwbk2a",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.none": {
+      "translation": "尚未入住。",
+      "hash": "byam59",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.next": {
+      "translation": "下一个截止日期为{date}。",
+      "hash": "dge0g",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.notYet": {
+      "translation": "首先安排露台，然后戴上帽子，建议您办理入住手续。",
+      "hash": "63t55s",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.due": {
+      "translation": "是时候了。十分钟的时间一起看一看幻灯片，换掉任何不起作用的东西。",
+      "hash": "gff7e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.agenda": {
+      "translation": "议题",
+      "hash": "zgsol8",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.agendaNobody.one": {
+      "translation": "1张没有人的卡片",
+      "hash": "9u3b7o",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.agendaNobody.other": {
+      "translation": "{count}张没有人的卡牌",
+      "hash": "bddwmh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.agendaMoved": {
+      "translation": "{card} ，移动于{date}",
+      "hash": "d00l6h",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.agendaUnchanged": {
+      "translation": "{card} ，自{date}起保持不变",
+      "hash": "rpu97f",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.start": {
+      "translation": "开始入住",
+      "hash": "ezl8yv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.later": {
+      "translation": "稍后提醒我",
+      "hash": "86wp5t",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkin.snoozed": {
+      "translation": "我们会在一周后再次提醒您",
+      "hash": "rq80pl",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.title": {
+      "translation": "让我们来处理卡组 ✨",
+      "hash": "ovzu63",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.body": {
+      "translation": "{count}张卡片涵盖了维持家庭生活的大部分内容：晚餐、学校表格、垃圾、大型假期。挑选属于你的，然后发给他们。没有人会陷入困境。",
+      "hash": "wwcbdp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step1": {
+      "translation": "保留或跳过每张卡片",
+      "hash": "1tfib4",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step1Hint": {
+      "translation": "跳过那些不是您家人的。添加您自己的。",
+      "hash": "8gp4ve",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step2": {
+      "translation": "说出谁是其所有者",
+      "hash": "7neldl",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step2Hint": {
+      "translation": "保留卡片并轻触姓名。将孩子的卡片分给孩子。",
+      "hash": "nve5pn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step3": {
+      "translation": "让豆子做剩下的事",
+      "hash": "x0vy7u",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.step3Hint": {
+      "translation": "厨师、清单所有者和礼品提示请自行填写。",
+      "hash": "qrviby",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.start": {
+      "translation": "开始交易",
+      "hash": "4ugglk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.browse": {
+      "translation": "首先浏览卡组",
+      "hash": "dow5ha",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.anyTime": {
+      "translation": "您可以随时重新发牌",
+      "hash": "y3dmn8",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.help": {
+      "translation": "卡组工作原理",
+      "hash": "9mwytm",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.childNote": {
+      "translation": "一个成年人处理卡组。在此期间，您可以浏览银行卡。",
+      "hash": "hzakl0",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.first.imageAlt": {
+      "translation": "Beanies一家拥抱",
+      "hash": "hlava7",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.nobody": {
+      "translation": "嘿嘿，还没有拿到哦～",
+      "hash": "86331n",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.skippedPill": {
+      "translation": "已跳过· {count}",
+      "hash": "ikng9c",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.byBean": {
+      "translation": "依据 %{person}",
+      "hash": "yzxo3i",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.skippedBanner.one": {
+      "translation": "已跳过1张卡牌。",
+      "hash": "om55cv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.skippedBanner.other": {
+      "translation": "已跳过{count}张卡牌。",
+      "hash": "slonma",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.skippedBannerBody": {
+      "translation": "它们不会出现在你的卡组和电话号码中。每当开始涂抹时，请带回任何东西。",
+      "hash": "luc5gw",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.bringBack": {
+      "translation": "带回来",
+      "hash": "2lal85",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.emptyFilter": {
+      "translation": "目前没有卡片。",
+      "hash": "opf1g0",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.deck.noSkipped": {
+      "translation": "没有跳过。每张卡牌都在您的卡组中。",
+      "hash": "xtvjll",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.unsorted": {
+      "translation": "尚未排序",
+      "hash": "hwlg8e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.forChild": {
+      "translation": "适用于{name}",
+      "hash": "nw54oe",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.since": {
+      "translation": "Since {date}",
+      "hash": "",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.sinceBefore": {
+      "translation": "自{date}起，在{name}之前",
+      "hash": "yg81b7",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.splitChild": {
+      "translation": "按子项拆分",
+      "hash": "8welx5",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.splitLabel": {
+      "translation": "自定义拆分",
+      "hash": "f16qt1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.skipped": {
+      "translation": "暂时跳过",
+      "hash": "d25o1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.card.open": {
+      "translation": "Open {card}",
+      "hash": "",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.byBean.count.one": {
+      "translation": "1张卡",
+      "hash": "nqm6qn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.byBean.count.other": {
+      "translation": "{count}张卡牌",
+      "hash": "qs7qic",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.byBean.none": {
+      "translation": "还没有卡片",
+      "hash": "rf1mwc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.title": {
+      "translation": "卡详细信息",
+      "hash": "9hlz9q",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.heldBy": {
+      "translation": "已由 {0} 待定",
+      "hash": "u6i9jy",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.beforeThat": {
+      "translation": "在此之前",
+      "hash": "8hxw2w",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.parts": {
+      "translation": "谁持有每个零件",
+      "hash": "o82jjw",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.status": {
+      "translation": "状态",
+      "hash": "twsvse",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.done": {
+      "translation": "完成看起来像，至少",
+      "hash": "9rx5x3",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.usesFor": {
+      "translation": "beanies使用此卡用于",
+      "hash": "20u9c0",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.useMeal": {
+      "translation": "膳食计划表中的新{slot}餐从此卡的持卡人作为厨师开始。您可以在任何餐点上更改。",
+      "hash": "tars68",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.useList": {
+      "translation": "{list}模板中的新列表以此卡的持有人为所有者。",
+      "hash": "4fnlz2",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.useHint": {
+      "translation": "有关此问题的有用提示将转到待办事项列表上的此卡持有人。",
+      "hash": "4fpffv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.details.builtInDelete": {
+      "translation": "这是内置卡，因此无法删除。您可以随时跳过它，以将其排除在您的堆栈之外。",
+      "hash": "z0sqsk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.title": {
+      "translation": "编辑卡",
+      "hash": "1am9gm",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.newTitle": {
+      "translation": "新卡",
+      "hash": "mv01cg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.name": {
+      "translation": "工作是什么？",
+      "hash": "oz2wtd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.namePlaceholder": {
+      "translation": "游泳装备",
+      "hash": "ewzg1l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.nameNoun": {
+      "translation": "Card Name",
+      "hash": "s3wgbf",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.partNames": {
+      "translation": "零件名称",
+      "hash": "1idsf9",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.emoji": {
+      "translation": "选择表情符号",
+      "hash": "g6v7ua",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.category": {
+      "translation": "类别",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.holder": {
+      "translation": "谁持有此卡？",
+      "hash": "zgzcyt",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.split": {
+      "translation": "拆分？",
+      "hash": "v87h02",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.split.single": {
+      "translation": "一个支架",
+      "hash": "du0cfa",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.split.child": {
+      "translation": "按儿童",
+      "hash": "xjjtf",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.split.label": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.parts": {
+      "translation": "每个零件由谁持有？",
+      "hash": "ue1rnf",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.childNote": {
+      "translation": "一个新的孩子得到他们自己的行，还没有人。",
+      "hash": "hoj8jb",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.noChildren": {
+      "translation": "将一个孩子添加到您的家庭，以按孩子拆分此卡。",
+      "hash": "dv6p9w",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.addPart": {
+      "translation": "添加部件",
+      "hash": "f3vs3z",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.partName": {
+      "translation": "Part Name",
+      "hash": "28qe8o",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.partPlaceholder": {
+      "translation": "楼上，公寓……",
+      "hash": "rtalhg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.removePart": {
+      "translation": "删除此项",
+      "hash": "v645o9",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.done": {
+      "translation": "完成的样子（最低限度）",
+      "hash": "6woqrq",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.donePlaceholder": {
+      "translation": "周五前将袋子里的毛巾和护目镜擦干",
+      "hash": "pyn4lr",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.doneDefaultHint": {
+      "translation": "留空将使用默认.",
+      "hash": "tuhw76",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.skip": {
+      "translation": "暂时跳过此卡",
+      "hash": "q6bv3k",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.skipHint": {
+      "translation": "跳过的卡牌不会出现在你的卡组中，直到你把它们带回来。",
+      "hash": "m59vgb",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.create": {
+      "translation": "添加到我们的卡组",
+      "hash": "6wnf37",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.edit.redealNote": {
+      "translation": "{name}现在持有此卡，并将在每日简报中看到此变化。",
+      "hash": "iz2mfa",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.cleaning": {
+      "translation": "清洁",
+      "hash": "e4y0wp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.cooking": {
+      "translation": "Cooking",
+      "hash": "rr40w6",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.laundry": {
+      "translation": "洗衣",
+      "hash": "qs2cjh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.shopping": {
+      "translation": "購物",
+      "hash": "4mlg1k",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.driving": {
+      "translation": "驾驶",
+      "hash": "bqom6x",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.kids": {
+      "translation": "儿童",
+      "hash": "1e4ct",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.pets": {
+      "translation": "宠物 ",
+      "hash": "1h8pg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.garden": {
+      "translation": "花园",
+      "hash": "z5m4ph",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.fixing": {
+      "translation": "维修榜",
+      "hash": "yt2swd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.paperwork": {
+      "translation": "文书",
+      "hash": "wxwwhv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.party": {
+      "translation": "聚会",
+      "hash": "19rwli",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.sports": {
+      "translation": "運動",
+      "hash": "tyr5up",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.health": {
+      "translation": "健康",
+      "hash": "zcjszo",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.travel": {
+      "translation": "旅行",
+      "hash": "tguthi",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.people": {
+      "translation": "人物",
+      "hash": "vjxt8x",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.emoji.me": {
+      "translation": "只是为我自己",
+      "hash": "mv3nr1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.toGo.one": {
+      "translation": "还剩{count}张卡牌",
+      "hash": "cr3vjg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.toGo.other": {
+      "translation": "还剩{count}张卡牌",
+      "hash": "1woi3d",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.question": {
+      "translation": "保留此卡，还是跳过此卡？",
+      "hash": "y05rk5",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.keep": {
+      "translation": "保留",
+      "hash": "1e1et",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.skip": {
+      "translation": "跳过",
+      "hash": "1j9un",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.kept": {
+      "translation": "保留！谁拥有它？",
+      "hash": "lt44dc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.whoOwns": {
+      "translation": "谁拥有它?。",
+      "hash": "3rhnwd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.decideLater": {
+      "translation": "稍后决定",
+      "hash": "hut3cc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.split": {
+      "translation": "拆分",
+      "hash": "uslolr",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.skipped": {
+      "translation": "已跳过",
+      "hash": "7zhkhc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.noMembers": {
+      "translation": "将某人添加到您的家人以向其发卡。",
+      "hash": "qs0g1s",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.car": {
+      "translation": "暂无数据！",
+      "hash": "9kk112",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.yard": {
+      "translation": "没有院子？",
+      "hash": "c8p60q",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.pool": {
+      "translation": "没有泳池？",
+      "hash": "cdefks",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.baby": {
+      "translation": "没有小家伙？",
+      "hash": "ht1qh3",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.pet": {
+      "translation": "请勿携带宠物。",
+      "hash": "cdkpkk",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.group.school": {
+      "translation": "没有学童？",
+      "hash": "kf6a3p",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.groupBody": {
+      "translation": "一次跳过所有{count}张卡牌",
+      "hash": "p6336q",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.groupAction": {
+      "translation": "Skip {count}",
+      "hash": "",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.empty": {
+      "translation": "这里没有什么可交易的了。",
+      "hash": "9u97bd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.doneTitle": {
+      "translation": "那就是卡组！ ✨",
+      "hash": "y515do",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.doneWaiting.one": {
+      "translation": "每张卡片都已整理。1张卡片仍在等待持卡人。",
+      "hash": "g6efg2",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.doneWaiting.other": {
+      "translation": "每张卡片都已排序。{count}张卡片仍在等待持有人。",
+      "hash": "i58ijd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.dealWaiting": {
+      "translation": "发放等候卡片",
+      "hash": "qjn8ul",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.seeOverview": {
+      "translation": "查看概览",
+      "hash": "wzfb2j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.celebrateTitle": {
+      "translation": "每张卡都有支架！ 🎉",
+      "hash": "a9a1so",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.celebrateBody": {
+      "translation": "{count}个职位，每个职位都有一个名字。没有人再需要把整个名单记在脑子里了。",
+      "hash": "5bq73t",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.pillSplit.one": {
+      "translation": "1张拆分卡",
+      "hash": "llx7f",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.pillSplit.other": {
+      "translation": "{count}张拆分卡牌",
+      "hash": "smxqkm",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.pillKids.one": {
+      "translation": "1个孩子投球",
+      "hash": "95dy3q",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.pillKids.other": {
+      "translation": "{count}个孩子参与进来",
+      "hash": "1mzopz",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.pillSkipped": {
+      "translation": "已跳过{count}个",
+      "hash": "czc0p",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.nextCheckIn": {
+      "translation": "接下来： {date}的家庭入住",
+      "hash": "kluz4e",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.position": {
+      "translation": "{category} ·卡片{n}/{total}",
+      "hash": "e9wap8",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.prev": {
+      "translation": "上一张名片( P)",
+      "hash": "7tjh5l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.next": {
+      "translation": "下一张名片( N)",
+      "hash": "iqt78j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.withSince": {
+      "translation": "自{date}起与{name}合作",
+      "hash": "dmbcgn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.waitingBanner": {
+      "translation": "正在等待支架",
+      "hash": "jgu4lx",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.giveToSomeoneElse": {
+      "translation": "给别人",
+      "hash": "4r884a",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.skipInstead": {
+      "translation": "改为跳过",
+      "hash": "r3xvtr",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.backTo": {
+      "translation": "返回{card}",
+      "hash": "209zr2",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.boardView": {
+      "translation": "棋盘视图",
+      "hash": "9zfvhd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.listKept": {
+      "translation": "事件日志应该如何保存",
+      "hash": "1e1oe",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.cardByCard": {
+      "translation": "一张卡一张卡",
+      "hash": "ctsm7d",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.pile.imageAlt": {
+      "translation": "The beanies celebrating",
+      "hash": "ki8kcc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.title": {
+      "translation": "还剩下9个红桃。",
+      "hash": "i7t2yg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.toDeal.one": {
+      "translation": "还剩1张卡牌",
+      "hash": "trm6yg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.toDeal.other": {
+      "translation": "{count}张卡牌尚未发牌",
+      "hash": "oiwnl1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.allDealt": {
+      "translation": "每张卡牌都已发牌",
+      "hash": "2p196l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.search": {
+      "translation": "搜索所有{count}张卡片…",
+      "hash": "dy7m1d",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.filterToDeal": {
+      "translation": "待交易",
+      "hash": "7g5wc1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.filterAll": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.newCard": {
+      "translation": "新卡",
+      "hash": "mv01cg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.tip": {
+      "translation": "将一张卡片拖到某人身上进行发牌，或拖到“跳过”上进行跳过。或轻触卡片进行选择。",
+      "hash": "bk6b3m",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.noMatch": {
+      "translation": "没有匹配的卡牌。",
+      "hash": "he0dhh",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.nothingToDeal": {
+      "translation": "没有什么可交易的了。切换到全部以重新发牌。",
+      "hash": "ellvnv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.skippedRow": {
+      "translation": "已跳过",
+      "hash": "7zhkhc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.dropDeal": {
+      "translation": "下拉即可享受优惠",
+      "hash": "bh3y8w",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.dropSkip": {
+      "translation": "拖放以跳过",
+      "hash": "bgu8st",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.more": {
+      "translation": "+ 另外 %{count} 个",
+      "hash": "xdbj93",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.less": {
+      "translation": "收起",
+      "hash": "p4ukc",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.dealCard": {
+      "translation": "发{card}",
+      "hash": "rgctt2",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.board.rowLabel": {
+      "translation": "{name}的卡片",
+      "hash": "5ur07u",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.title": {
+      "translation": "家庭入住",
+      "hash": "3ar4g6",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.intro": {
+      "translation": "一起大概十分钟。没有分数，只是一个说话的机会。",
+      "hash": "qh6mox",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.finish": {
+      "translation": "完成盘点",
+      "hash": "84l9ft",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.nobody": {
+      "translation": "还是没人",
+      "hash": "m390th",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.moved": {
+      "translation": "自上次以来移动",
+      "hash": "k68a2k",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.unchanged": {
+      "translation": "好久没搬家了",
+      "hash": "feqjtb",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.dealNow": {
+      "translation": "立即交易",
+      "hash": "9hdgde",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.settling": {
+      "translation": "入驻",
+      "hash": "3ordvn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.talk": {
+      "translation": "让我们来谈谈",
+      "hash": "5j4hzv",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.stillWorks": {
+      "translation": "仍然有效",
+      "hash": "avqpje",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.redeal": {
+      "translation": "重新交易",
+      "hash": "qfd4re",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.movedLine": {
+      "translation": "{date} {from}至{to}",
+      "hash": "gnrtgn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.heldSince": {
+      "translation": "自{date}起{name}",
+      "hash": "ksei71",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.dealt": {
+      "translation": "已处理给{name}",
+      "hash": "k6hqv8",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.empty": {
+      "translation": "这次议程上没有任何内容。每张卡都有一个支架，没有任何东西移动。",
+      "hash": "4qyek5",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.doneTitle": {
+      "translation": "卡组已检查 ✨",
+      "hash": "4r6tgo",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.doneBody": {
+      "translation": "感谢您与我们沟通。",
+      "hash": "vq7i7a",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.doneTalk": {
+      "translation": "在您本周聊天的列表中： {cards}。",
+      "hash": "syoo5l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.doneNext": {
+      "translation": "下次入住{date}。它将在到期时显示在您的简报中。",
+      "hash": "36pxsm",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.stillWorks.one": {
+      "translation": "1个仍然有效",
+      "hash": "rfel5n",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.stillWorks.other": {
+      "translation": "{count}个仍然有效",
+      "hash": "to3wcg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.talk.one": {
+      "translation": "1谈论",
+      "hash": "zb7men",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.talk.other": {
+      "translation": "{count}个要讨论的内容",
+      "hash": "m5xmd5",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.redealt.one": {
+      "translation": "1次重置",
+      "hash": "i9a7wj",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.redealt.other": {
+      "translation": "{count}笔再交易",
+      "hash": "7r5btx",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.dealtNow.one": {
+      "translation": "现已处理1笔交易",
+      "hash": "jk5ss1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.checkinDrawer.count.dealtNow.other": {
+      "translation": "现在已处理{count}个",
+      "hash": "5gzl9j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.building": {
+      "translation": "正在准备…",
+      "hash": "bncl36",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.heading": {
+      "translation": "谁拥有什么",
+      "hash": "cib92j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.accent": {
+      "translation": "每个工作都有一个名字 ✨",
+      "hash": "g1wrv0",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.dealtAsOf": {
+      "translation": "交易截止日期",
+      "hash": "hu5ukz",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.page": {
+      "translation": "谁拥有什么·第{page}页，共{total}页",
+      "hash": "rndwh1",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.holders": {
+      "translation": "持有人",
+      "hash": "pg0lax",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.writeIn": {
+      "translation": "- - -还有待处理，请在",
+      "hash": "z98ebe",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.shareTitle": {
+      "translation": "谁拥有什么",
+      "hash": "cib92j",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.failed": {
+      "translation": "无法创建帖子",
+      "hash": "utcu21",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.export.failedHelp": {
+      "translation": "准备冰箱床单时出错。请重试。",
+      "hash": "oqc7p7",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.default.holds": {
+      "translation": "{name}在谁拥有什么中持有{card}。",
+      "hash": "kadcpn",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.default.hintAssigned": {
+      "translation": "从谁拥有什么分配",
+      "hash": "lm6nyp",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.mine": {
+      "translation": "您在“谁拥有什么”中的卡片",
+      "hash": "z0iuxw",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.mineCount.one": {
+      "translation": "您的1张卡",
+      "hash": "ithxrg",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.mineCount.other": {
+      "translation": "您的{count}张卡片",
+      "hash": "artyjl",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.movedAway": {
+      "translation": "{card}已于{date}移至{name}。",
+      "hash": "m2dcp4",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.movedToYou": {
+      "translation": "您现在持有来自{name}的{card}。",
+      "hash": "lnycsd",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.nobody.one": {
+      "translation": "{names}还没有人。",
+      "hash": "hdy52l",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.nobody.other": {
+      "translation": "{count}张卡片还没有人： {names}。",
+      "hash": "fl4usz",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.checkIn": {
+      "translation": "您的家庭入住时间已到",
+      "hash": "fefmuz",
+      "lastUpdated": "2026-09-27"
+    },
+    "whoOwnsWhat.briefing.checkInCaption": {
+      "translation": "十分钟在一起讨论谁拥有什么",
+      "hash": "9tp41h",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.cookingDinner.name": {
+      "translation": "烹饪晚餐",
+      "hash": "7xps7c",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.cookingDinner.done": {
+      "translation": "每个人都吃了七顿饭，大多数夜晚",
+      "hash": "77afm8",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.breakfast.name": {
+      "translation": "早餐",
+      "hash": "1rfliz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.breakfast.done": {
+      "translation": "每个人肚子里都有东西出门",
+      "hash": "d9cwuz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.dishes.name": {
+      "translation": "菜肴",
+      "hash": "xuwc88",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.dishes.done": {
+      "translation": "睡前水槽空空如也",
+      "hash": "fkojxc",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.laundry.name": {
+      "translation": "洗衣",
+      "hash": "qs2cjh",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.laundry.done": {
+      "translation": "清洁、干燥并放回抽屉中",
+      "hash": "r23smz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.floors.name": {
+      "translation": "地面",
+      "hash": "yukkcn",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.floors.done": {
+      "translation": "在面包屑赢之前吸尘",
+      "hash": "ah7s6w",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.sparklingBathrooms.name": {
+      "translation": "闪闪发光的卫生间",
+      "hash": "riimfs",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.sparklingBathrooms.done": {
+      "translation": "足够干净，房客可以在不发出警告的情况下使用",
+      "hash": "80znu7",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.trashNight.name": {
+      "translation": "垃圾之夜",
+      "hash": "ejxm28",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.trashNight.done": {
+      "translation": "垃圾日出门，第二天早上回来",
+      "hash": "iphjgs",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeSupplies.name": {
+      "translation": "家居用品",
+      "hash": "p3x626",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeSupplies.done": {
+      "translation": "卫生纸、肥皂或洗洁精永远不要用完",
+      "hash": "vwjhx5",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.fixingThings.name": {
+      "translation": "修复事物",
+      "hash": "4gd4pk",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.fixingThings.done": {
+      "translation": "摇摇晃晃的架子和滴水的水龙头整理好了",
+      "hash": "f3f5fh",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.seasonalSwap.name": {
+      "translation": "季节性交换",
+      "hash": "dq1ee",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.seasonalSwap.done": {
+      "translation": "冬季外套，夏季衣服，车库和阁楼整洁",
+      "hash": "769y22",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.decluttering.name": {
+      "translation": "整理",
+      "hash": "3i8eoa",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.decluttering.done": {
+      "translation": "捐赠的物品在堆积之前就已用完",
+      "hash": "pd4rvl",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.mailAndPaperwork.name": {
+      "translation": "邮件和文书工作",
+      "hash": "imj3zf",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.mailAndPaperwork.done": {
+      "translation": "每周打开、处理、归档或回收",
+      "hash": "df1wsa",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeRentMortgageInsurance.name": {
+      "translation": "房屋租金/抵押贷款/保险",
+      "hash": "khvv9g",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeRentMortgageInsurance.done": {
+      "translation": "按时付款，在失效前续订",
+      "hash": "s3ry0s",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.familyBudgetCheck.name": {
+      "translation": "家庭预算检查",
+      "hash": "jgtq2i",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.familyBudgetCheck.done": {
+      "translation": "看看钱去了哪里，每月一次",
+      "hash": "kudgzh",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.payingTheBills.name": {
+      "translation": "支付账单",
+      "hash": "p4onsn",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.payingTheBills.done": {
+      "translation": "每笔在到期日前支付的账单",
+      "hash": "3golec",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.familyCalendar.name": {
+      "translation": "家庭日历",
+      "hash": "krvzf",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.familyCalendar.done": {
+      "translation": "BEANS的每项活动和约会，没有人重复预订",
+      "hash": "qzvsal",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.wifiGadgetsPasswords.name": {
+      "translation": "无线网络、小工具和密码",
+      "hash": "fb4783",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.wifiGadgetsPasswords.done": {
+      "translation": "无线网络正常，设备已更新，密码位于安全的地方",
+      "hash": "16iarw",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.petCare.name": {
+      "translation": "宠物经济",
+      "hash": "8202b6",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.petCare.done": {
+      "translation": "美联储，步行，兽医准时就诊",
+      "hash": "h36qfu",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.plants.name": {
+      "translation": "植物",
+      "hash": "vgc86w",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.plants.done": {
+      "translation": "绿色，不酥脆",
+      "hash": "u8skfa",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.snowAndIce.name": {
+      "translation": "冰雪",
+      "hash": "6zh545",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.snowAndIce.done": {
+      "translation": "人行道铲盐，汽车刮",
+      "hash": "kpz3x0",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.groceryShopping.name": {
+      "translation": "•买菜",
+      "hash": "194863",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.groceryShopping.done": {
+      "translation": "本周冰箱和储藏室已满",
+      "hash": "ou4c3x",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.carCare.name": {
+      "translation": "汽车保养",
+      "hash": "445b7",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.carCare.done": {
+      "translation": "燃气、机油更换和按时检查",
+      "hash": "x9vhib",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.packagesAndReturns.name": {
+      "translation": "包裹和退货",
+      "hash": "d6y7y1",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.packagesAndReturns.done": {
+      "translation": "在退货窗口关闭前退货",
+      "hash": "ob7quy",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.pointsAndCoupons.name": {
+      "translation": "积分和礼金券",
+      "hash": "8igs1l",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.pointsAndCoupons.done": {
+      "translation": "过期前使用的积分",
+      "hash": "666j1g",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.lunchboxes.name": {
+      "translation": "午餐盒",
+      "hash": "6n3gtr",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.lunchboxes.done": {
+      "translation": "前一天晚上打包，吃过（大部分）",
+      "hash": "qxnl1a",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.babysittersAndNannies.name": {
+      "translation": "保姆和保姆",
+      "hash": "ruhob9",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.babysittersAndNannies.done": {
+      "translation": "有人排队等候约会之夜和病假",
+      "hash": "5vdv3g",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolForms.name": {
+      "translation": "学校表格",
+      "hash": "dl68ar",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolForms.done": {
+      "translation": "当天签名并放回背包",
+      "hash": "vpgc6l",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolVacations.name": {
+      "translation": "学校假期",
+      "hash": "33sv4a",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolVacations.done": {
+      "translation": "休息开始前计划的营地和护理",
+      "hash": "xe61ou",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolDropOff.name": {
+      "translation": "学校下车",
+      "hash": "fupagz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.schoolDropOff.done": {
+      "translation": "在铃铛旁边，背着背包回家",
+      "hash": "b4wj5n",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.kidsBagsForTheDay.name": {
+      "translation": "当日儿童包包",
+      "hash": "s946pl",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.kidsBagsForTheDay.done": {
+      "translation": "装满水瓶、零食和毛衣",
+      "hash": "vwami3",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.sportsAndClubs.name": {
+      "translation": "体育和俱乐部",
+      "hash": "esmmj7",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.sportsAndClubs.done": {
+      "translation": "已注册，工具包已准备就绪，行程已排序",
+      "hash": "e0civ0",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.tutorsAndLessons.name": {
+      "translation": "导师和课程",
+      "hash": "64s9f5",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.tutorsAndLessons.done": {
+      "translation": "在此期间预订、支付和练习",
+      "hash": "jfhcf9",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.morningRoutine.name": {
+      "translation": "早上的例行常规",
+      "hash": "9iogk8",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.morningRoutine.done": {
+      "translation": "按时穿衣、喂食和出门，没有崩溃",
+      "hash": "7qgggb",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bedtimeRoutine.name": {
+      "translation": "入睡流程",
+      "hash": "en6sky",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bedtimeRoutine.done": {
+      "translation": "八点前熄灭牙齿、故事和灯光",
+      "hash": "i1xr5e",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bathTimeAndHaircuts.name": {
+      "translation": "洗澡时间和理发",
+      "hash": "wfkm3i",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bathTimeAndHaircuts.done": {
+      "translation": "清洁孩子，在他们需要马尾辫之前修剪",
+      "hash": "2espyz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.clothesThatFit.name": {
+      "translation": "合身的衣服",
+      "hash": "ob3j80",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.clothesThatFit.done": {
+      "translation": "没有脚趾穿过鞋子",
+      "hash": "mg5fc5",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.pottyTrainingAndDiapers.name": {
+      "translation": "如厕训练和尿布",
+      "hash": "bw0z07",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.pottyTrainingAndDiapers.done": {
+      "translation": "尿布库存充足，如厕胜利欢呼",
+      "hash": "ss3arg",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeworkAndSchoolSupplies.name": {
+      "translation": "家庭作业和学校用品",
+      "hash": "w7xbds",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.homeworkAndSchoolSupplies.done": {
+      "translation": "作业完成，铅笔锋利，项目不在午夜",
+      "hash": "afkfqg",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.talkingToTeachers.name": {
+      "translation": "与教师交谈",
+      "hash": "ofltp0",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.talkingToTeachers.done": {
+      "translation": "已回复电子邮件，已参加会议",
+      "hash": "mly4os",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.helpingAtSchool.name": {
+      "translation": "在学校提供帮助",
+      "hash": "tqutnm",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.helpingAtSchool.done": {
+      "translation": "涵盖志愿者轮班和烘焙销售",
+      "hash": "gzi5tp",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.newSchoolNewYear.name": {
+      "translation": "新学校，新年",
+      "hash": "g0ve79",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.newSchoolNewYear.done": {
+      "translation": "购买用品，表格入库，首日就绪",
+      "hash": "2oq3ql",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.friendsAndScreens.name": {
+      "translation": "好友和屏幕",
+      "hash": "5uvw25",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.friendsAndScreens.done": {
+      "translation": "已计划播放日期，保留屏幕时间规则",
+      "hash": "u7ebtd",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.nightWakeUps.name": {
+      "translation": "夜间唤醒",
+      "hash": "wvdve1",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.nightWakeUps.done": {
+      "translation": "为恶梦和病夜值班的人",
+      "hash": "c11krx",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.learningAtHome.name": {
+      "translation": "在家学习",
+      "hash": "1azmcq",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.learningAtHome.done": {
+      "translation": "一起阅读，满足好奇心",
+      "hash": "fpv4ho",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.beingThere.name": {
+      "translation": "身处其中",
+      "hash": "j73gcd",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.beingThere.done": {
+      "translation": "观众中有人观看戏剧、游戏和集会",
+      "hash": "98h8lk",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.doctorAndDentist.name": {
+      "translation": "医生和牙医",
+      "hash": "jxd0t5",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.doctorAndDentist.done": {
+      "translation": "在任何人逾期之前预约体检",
+      "hash": "kk5dfb",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.medicineCabinet.name": {
+      "translation": "药柜",
+      "hash": "pmu6ia",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.medicineCabinet.done": {
+      "translation": "创可贴入库，发热药品备货，未过期",
+      "hash": "5dmt5j",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.ourEmergencyPlan.name": {
+      "translation": "应急预案",
+      "hash": "nigmic",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.ourEmergencyPlan.done": {
+      "translation": "每个人都知道该给谁打电话，在哪里见面",
+      "hash": "ij6hfm",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.healthInsuranceAndClaims.name": {
+      "translation": "健康保险和索赔",
+      "hash": "3myzka",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.healthInsuranceAndClaims.done": {
+      "translation": "已提交索赔，已续保",
+      "hash": "3z4qex",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.willsAndLifeInsurance.name": {
+      "translation": "遗嘱和人寿保险",
+      "hash": "6ych5q",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.willsAndLifeInsurance.done": {
+      "translation": "最新，有人知道他们在哪里",
+      "hash": "cdew4m",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.specialNeedsSupport.name": {
+      "translation": "儿童的特殊需求和心理健康支持",
+      "hash": "aa0kwv",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.specialNeedsSupport.done": {
+      "translation": "保留约会，循环上学，没有人独自携带",
+      "hash": "975pvu",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theBigHolidays.name": {
+      "translation": "重要假期",
+      "hash": "f9dl9m",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theBigHolidays.done": {
+      "translation": "装饰品、食物和谁来，都计划好了",
+      "hash": "7h2ygg",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.birthdayParties.name": {
+      "translation": "生日派对",
+      "hash": "fe6nxb",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.birthdayParties.done": {
+      "translation": "邀请出门，吃蛋糕，没人哭",
+      "hash": "ikirpc",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.giftsForOthers.name": {
+      "translation": "送给他人的礼物",
+      "hash": "slcje1",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.giftsForOthers.done": {
+      "translation": "派对前购买，不在途中",
+      "hash": "5flzbp",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.cardsAndThankYous.name": {
+      "translation": "贺卡和感谢卡",
+      "hash": "3b8799",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.cardsAndThankYous.done": {
+      "translation": "一周内",
+      "hash": "8gvp34",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.toothFairyDuty.name": {
+      "translation": "牙仙",
+      "hash": "mvjgg7",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.toothFairyDuty.done": {
+      "translation": "早上之前枕头下的硬币",
+      "hash": "n0bohf",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.havingPeopleOver.name": {
+      "translation": "让人们过来",
+      "hash": "l1rqlm",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.havingPeopleOver.done": {
+      "translation": "邀请，喂食，没有人忘记冰",
+      "hash": "9ccr3d",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.photosAndMemories.name": {
+      "translation": "照片和回忆",
+      "hash": "j6b6br",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.photosAndMemories.done": {
+      "translation": "保存在剪贴簿中的最佳照片，不会在手机上丢失",
+      "hash": "ab0g71",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.weekendPlans.name": {
+      "translation": "周末计划",
+      "hash": "2djrgv",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.weekendPlans.done": {
+      "translation": "大多数周末都会安排有趣的活动",
+      "hash": "qgiysa",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.givingBack.name": {
+      "translation": "回馈",
+      "hash": "9pck3r",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.givingBack.done": {
+      "translation": "作为一个家庭的好事或捐赠，偶尔",
+      "hash": "kkd6mw",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.faithAndTraditions.name": {
+      "translation": "信仰和传统",
+      "hash": "57sfia",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.faithAndTraditions.done": {
+      "translation": "对我们来说重要的传统一直延续至今",
+      "hash": "v51qvj",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.dateNights.name": {
+      "translation": "约会之夜",
+      "hash": "uvgyz1",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.dateNights.done": {
+      "translation": "一个月的一个晚上，只有我们两个",
+      "hash": "kxrpky",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.grandparents.name": {
+      "translation": "祖父母",
+      "hash": "77ui71",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.grandparents.done": {
+      "translation": "计划参观，周日进行视频通话",
+      "hash": "yxub02",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.keepingUpWithFamily.name": {
+      "translation": "与家人保持联系",
+      "hash": "fgic9o",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.keepingUpWithFamily.done": {
+      "translation": "表兄弟的生日被记住，消息传来",
+      "hash": "4osvav",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.agingParentCare.name": {
+      "translation": "年迈的父母或姻亲照顾",
+      "hash": "n1ny44",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.agingParentCare.done": {
+      "translation": "覆盖预约，无人独自携带",
+      "hash": "pck1s",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.tripPacking.name": {
+      "translation": "行程包装",
+      "hash": "5ed4j2",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.tripPacking.done": {
+      "translation": "每人一袋，什么都不会忘记",
+      "hash": "yzr0u8",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.planningTrips.name": {
+      "translation": "规划行程",
+      "hash": "242naj",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.planningTrips.done": {
+      "translation": "在我们出发前已预订、已规划和已入住",
+      "hash": "imt6gk",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.passportsAndDocuments.name": {
+      "translation": "护照和文件",
+      "hash": "8zriz4",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.passportsAndDocuments.done": {
+      "translation": "未过期、未包装且位于同一位置",
+      "hash": "h5bspi",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.outingsAndCulture.name": {
+      "translation": "郊游和文化",
+      "hash": "6zu3q4",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.outingsAndCulture.done": {
+      "translation": "博物馆、展览和外出，时不时",
+      "hash": "orfrap",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theYard.name": {
+      "translation": "The Yard",
+      "hash": "i86f2h",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theYard.done": {
+      "translation": "割草、浇水，而不是丛林",
+      "hash": "8gh0yz",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.furnitureAndDecorations.name": {
+      "translation": "家具和装饰品",
+      "hash": "s1war8",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.furnitureAndDecorations.done": {
+      "translation": "房子感觉像家一样，坏了的椅子被换掉了",
+      "hash": "9rk0ov",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theRenovation.name": {
+      "translation": "装修",
+      "hash": "fmfkn2",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theRenovation.done": {
+      "translation": "中的报价，已做出决定",
+      "hash": "sb3p60",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.moving.name": {
+      "translation": "正在移動",
+      "hash": "wtgeqa",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.moving.done": {
+      "translation": "箱子已打包，地址已更改，什么都没有留下",
+      "hash": "iqtiyf",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bikes.name": {
+      "translation": "自行车",
+      "hash": "127qmq",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.bikes.done": {
+      "translation": "已充气轮胎，已找到头盔",
+      "hash": "8gqhu0",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.thePool.name": {
+      "translation": "\"全局设置\"",
+      "hash": "i80yi3",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.thePool.done": {
+      "translation": "清水，盖上",
+      "hash": "2ppd1c",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.campingGear.name": {
+      "translation": "露营装备",
+      "hash": "o804we",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.campingGear.done": {
+      "translation": "帐篷干燥，车库内没有发霉",
+      "hash": "w4tk61",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.vegetablePatch.name": {
+      "translation": "The Vegetable Patch",
+      "hash": "qe15ru",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.vegetablePatch.done": {
+      "translation": "行除草，豆类采摘",
+      "hash": "k995a4",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theFireplace.name": {
+      "translation": "壁炉",
+      "hash": "4ykcpu",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.theFireplace.done": {
+      "translation": "烟囱每年扫一次，登录",
+      "hash": "en3q8n",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.timeToMyself.name": {
+      "translation": "Time to Myself",
+      "hash": "934idy",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.timeToMyself.done": {
+      "translation": "每周只有我的几个小时",
+      "hash": "422hvb",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.movingMyBody.name": {
+      "translation": "移动我的身体",
+      "hash": "ldpeck",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.movingMyBody.done": {
+      "translation": "出汗，每周三次",
+      "hash": "aszoa6",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.seeingMyFriends.name": {
+      "translation": "看到我的朋友",
+      "hash": "fowf82",
+      "lastUpdated": "2026-09-27"
+    },
+    "cards.seeingMyFriends.done": {
+      "translation": "每月至少与朋友聊聊一次",
+      "hash": "njaij9",
+      "lastUpdated": "2026-09-27"
     }
   }
 }
