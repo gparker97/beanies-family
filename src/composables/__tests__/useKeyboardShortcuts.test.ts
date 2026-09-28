@@ -156,6 +156,31 @@ describe('useKeyboardShortcuts', () => {
     expect(k).toHaveBeenCalledTimes(1);
   });
 
+  it('a surface inside a drawer (overlayDepth 1) acts in its own drawer, not under a layer on top', async () => {
+    const d = vi.fn(() => true);
+    const inDrawer = effectScope();
+    inDrawer.run(() =>
+      useKeyboardShortcuts({ d }, { enabled: ref(true), tag: 'drawer', overlayDepth: 1 })
+    );
+    // The drawer itself: one overlay + one Escape layer.
+    lockBodyScroll();
+    const drawer = effectScope();
+    drawer.run(() => useEscapeClose(ref(true), () => {}));
+    press('d');
+    await flush();
+    expect(d).toHaveBeenCalledTimes(1);
+    // A confirm opened over the drawer: one more of each, so the key pauses.
+    lockBodyScroll();
+    const confirm = effectScope();
+    confirm.run(() => useEscapeClose(ref(true), () => {}));
+    press('d');
+    await flush();
+    expect(d).toHaveBeenCalledTimes(1);
+    confirm.stop();
+    drawer.stop();
+    inDrawer.stop();
+  });
+
   it('logs a throwing or rejecting handler and reports it through onError', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const onError = vi.fn();

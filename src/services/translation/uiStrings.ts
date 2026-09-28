@@ -12878,13 +12878,28 @@ const STRING_DEFS = {
   'whoOwnsWhat.byBean.none': { en: 'No cards yet', beanie: 'no cards yet' },
 
   'whoOwnsWhat.details.title': { en: 'Card Details', beanie: 'card details' },
-  'whoOwnsWhat.details.heldBy': { en: 'Held By', beanie: 'held by' },
-  'whoOwnsWhat.details.beforeThat': { en: 'Before That', beanie: 'before that' },
-  'whoOwnsWhat.details.parts': { en: 'Who Holds Each Part', beanie: 'who holds each part' },
-  'whoOwnsWhat.details.status': { en: 'Status', beanie: 'status' },
-  'whoOwnsWhat.details.done': {
-    en: 'Done Looks Like, at a Minimum',
-    beanie: 'done looks like, at a minimum',
+  'whoOwnsWhat.details.heldByName': { en: 'Held by {name}', beanie: 'held by {name}' },
+  'whoOwnsWhat.history.title': { en: 'History', beanie: 'history' },
+  'whoOwnsWhat.history.sorted': {
+    en: 'Sorted for the first time',
+    beanie: 'sorted for the first time',
+  },
+  'whoOwnsWhat.history.dealt': { en: 'Dealt to {to}', beanie: 'dealt to {to}' },
+  'whoOwnsWhat.history.moved': {
+    en: 'Moved from {from} to {to}',
+    beanie: 'moved from {from} to {to}',
+  },
+  'whoOwnsWhat.history.cleared': {
+    en: 'Back to nobody (was {from})',
+    beanie: 'back to nobody (was {from})',
+  },
+  'whoOwnsWhat.history.someone': {
+    en: 'someone no longer in the family',
+    beanie: 'someone no longer in the pod',
+  },
+  'whoOwnsWhat.details.position': {
+    en: '{list} · {n} of {total}',
+    beanie: '{list} · {n} of {total}',
   },
   'whoOwnsWhat.details.usesFor': {
     en: 'beanies Uses This Card For',
@@ -13102,8 +13117,29 @@ const STRING_DEFS = {
   'whoOwnsWhat.board.skippedRow': { en: 'Skipped', beanie: 'skipped' },
   'whoOwnsWhat.board.dropDeal': { en: 'Drop to deal', beanie: 'drop to deal' },
   'whoOwnsWhat.board.dropSkip': { en: 'Drop to skip', beanie: 'drop to skip' },
-  'whoOwnsWhat.board.more': { en: '+{count} more', beanie: '+{count} more' },
-  'whoOwnsWhat.board.less': { en: 'Show less', beanie: 'show less' },
+  'whoOwnsWhat.board.idleTitle': {
+    en: 'Not Holding Any Cards Yet',
+    beanie: 'not holding any cards yet',
+  },
+  'whoOwnsWhat.board.dropTo': {
+    en: 'Drop a card here to deal it to {name}',
+    beanie: 'drop a card here to deal it to {name}',
+  },
+  'whoOwnsWhat.board.idleHint': {
+    en: 'Drop a card on a bean to deal it',
+    beanie: 'drop a card on a bean to deal it',
+  },
+  'whoOwnsWhat.board.skippedSummary.one': {
+    en: '{count} card, not for this family',
+    beanie: '{count} card, not for this pod',
+  },
+  'whoOwnsWhat.board.skippedSummary.other': {
+    en: '{count} cards, not for this family',
+    beanie: '{count} cards, not for this pod',
+  },
+  'whoOwnsWhat.board.showSkipped': { en: 'Show', beanie: 'show' },
+  'whoOwnsWhat.board.hideSkipped': { en: 'Hide', beanie: 'hide' },
+  'whoOwnsWhat.dealMode.label': { en: 'Deal Layout', beanie: 'deal layout' },
   'whoOwnsWhat.board.dealCard': { en: 'Deal {card}', beanie: 'deal {card}' },
   'whoOwnsWhat.board.rowLabel': { en: "{name}'s cards", beanie: "{name}'s cards" },
 

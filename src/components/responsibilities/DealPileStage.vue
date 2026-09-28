@@ -6,23 +6,37 @@
  *
  * The card is about 300px wide at md+ and 196px on a phone; the arrows are 48px / 40px
  * squircles with translated aria-labels.
+ *
+ * Also the Card Details drawer's "card in hand" (`size="hand"`, `testid="card-view"`): 15rem
+ * at md+, and the card grows with its content instead of clipping it (a long custom done
+ * line, a split card's holder lines in the default slot, under the category chip). The pile
+ * passes nothing new: fixed 5:7, `deal-pile-*` test ids, arrows on.
  */
-import { computed, useTemplateRef } from 'vue';
+import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { categoryTint } from '@/constants/listCategories';
+import { categoryTint, getListCategory } from '@/constants/listCategories';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
+import CardBack from '@/components/responsibilities/CardBack.vue';
 
-const props = defineProps<{
-  card: ResolvedCard;
-  /** Hidden after its flight so it can't flash back before the next card replaces it. */
-  leaving: boolean;
-  canPrev: boolean;
-  canNext: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    card: ResolvedCard;
+    /** Hidden after its flight so it can't flash back before the next card replaces it. */
+    leaving?: boolean;
+    canPrev: boolean;
+    canNext: boolean;
+    /** `pile`: the deal pile. `hand`: the Card Details drawer (smaller, grows with content). */
+    size?: 'pile' | 'hand';
+    /** Test id prefix: `${testid}-card-<id>`, `${testid}-prev` / `-next`, `${testid}-name`. */
+    testid?: string;
+    arrows?: boolean;
+  }>(),
+  { leaving: false, size: 'pile', testid: 'deal-pile', arrows: true }
+);
 const emit = defineEmits<{ step: [dir: -1 | 1] }>();
 
 const { t } = useTranslation();
@@ -30,44 +44,85 @@ const { categoryLabel } = useListCategoryLabel();
 const { cardName, cardDone } = useResponsibilityCardLabel();
 
 const tint = computed(() => categoryTint(props.card.category));
+const isHand = computed(() => props.size === 'hand');
+/** A category from a newer client reads "Other", never its raw id. */
+const categoryText = computed(() =>
+  getListCategory(props.card.category)
+    ? categoryLabel(props.card.category)
+    : t('lists.category.other')
+);
 
 const cardEl = useTemplateRef<HTMLElement>('cardEl');
 defineExpose({ cardEl });
+
+// Stepping to an end disables the arrow just pressed; a disabled button drops focus to the
+// page (out of a drawer, for a screen reader and the next Tab). Hand it to the other arrow,
+// or to the card when both are off (the pile while busy, a list that shrank to one).
+const prevEl = useTemplateRef<HTMLButtonElement>('prevEl');
+const nextEl = useTemplateRef<HTMLButtonElement>('nextEl');
+function keepFocus(
+  can: () => boolean,
+  self: () => HTMLButtonElement | null,
+  other: () => HTMLButtonElement | null
+): void {
+  watch(
+    can,
+    (enabled) => {
+      if (enabled || document.activeElement !== self()) return;
+      void nextTick(() => {
+        const next = other();
+        if (next && !next.disabled) next.focus();
+        else cardEl.value?.focus({ preventScroll: true });
+      });
+    },
+    { flush: 'pre' }
+  );
+}
+keepFocus(
+  () => props.canPrev,
+  () => prevEl.value,
+  () => nextEl.value
+);
+keepFocus(
+  () => props.canNext,
+  () => nextEl.value,
+  () => prevEl.value
+);
 </script>
 
 <template>
   <div class="flex items-center justify-center gap-2.5 md:gap-7">
     <button
+      v-if="arrows"
+      ref="prevEl"
       type="button"
       class="arrow"
       :disabled="!canPrev"
       :aria-label="t('whoOwnsWhat.pile.prev')"
       aria-keyshortcuts="ArrowLeft"
-      data-testid="deal-pile-prev"
+      :data-testid="`${testid}-prev`"
       @click="emit('step', -1)"
     >
       <BeanieIcon name="chevron-left" size="md" />
     </button>
-    <div class="pile relative shrink-0">
-      <div class="card-back back-2" aria-hidden="true">
-        <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />
-      </div>
-      <div class="card-back back-1" aria-hidden="true">
-        <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />
-      </div>
+    <div class="pile relative shrink-0" :class="{ 'is-hand': isHand }">
+      <CardBack class="back back-2" />
+      <CardBack class="back back-1" />
       <article
         ref="cardEl"
         :key="card.id"
-        class="pile-card dark:bg-surface-raised dark:border-line-strong absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white"
-        :class="{ 'is-leaving': leaving }"
+        tabindex="-1"
+        class="pile-card dark:bg-surface-raised dark:border-line-strong flex flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white outline-none"
+        :class="[isHand ? 'relative' : 'absolute inset-0', { 'is-leaving': leaving }]"
         :style="{ '--cat': tint }"
-        :data-testid="`deal-pile-card-${card.id}`"
+        :data-testid="`${testid}-card-${card.id}`"
       >
         <div class="slab relative grid place-items-center overflow-hidden">
           <CardArt
             :card="card"
-            img-class="h-24 w-24 md:h-36 md:w-36"
-            class="text-6xl leading-none md:text-7xl"
+            :img-class="isHand ? 'h-24 w-24 md:h-28 md:w-28' : 'h-24 w-24 md:h-36 md:w-36'"
+            class="text-6xl leading-none"
+            :class="{ 'md:text-7xl': !isHand }"
           />
           <span
             class="pointer-events-none absolute -right-1.5 -bottom-3.5 text-6xl leading-none opacity-[0.07] md:text-7xl"
@@ -75,9 +130,11 @@ defineExpose({ cardEl });
             >{{ card.emoji }}</span
           >
         </div>
-        <div class="flex flex-1 flex-col gap-1 p-3 md:gap-1.5 md:p-4">
+        <div class="flex flex-1 flex-col gap-1 p-3" :class="{ 'md:gap-1.5 md:p-4': !isHand }">
           <p
-            class="font-outfit dark:text-ink text-lg leading-tight font-semibold text-[var(--color-text)] md:text-xl"
+            class="font-outfit dark:text-ink text-lg leading-tight font-semibold text-[var(--color-text)]"
+            :class="{ 'md:text-xl': !isHand }"
+            :data-testid="`${testid}-name`"
           >
             {{ cardName(card) }}
           </p>
@@ -90,20 +147,21 @@ defineExpose({ cardEl });
           <span
             class="cat-chip font-outfit dark:text-ink-soft mt-auto inline-flex items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-xs font-semibold text-[var(--color-text)]"
           >
-            <i class="h-2 w-2 rounded-full" :style="{ background: tint }" />{{
-              categoryLabel(card.category)
-            }}
+            <i class="h-2 w-2 rounded-full" :style="{ background: tint }" />{{ categoryText }}
           </span>
+          <slot />
         </div>
       </article>
     </div>
     <button
+      v-if="arrows"
+      ref="nextEl"
       type="button"
       class="arrow"
       :disabled="!canNext"
       :aria-label="t('whoOwnsWhat.pile.next')"
       aria-keyshortcuts="ArrowRight"
-      data-testid="deal-pile-next"
+      :data-testid="`${testid}-next`"
       @click="emit('step', 1)"
     >
       <BeanieIcon name="chevron-right" size="md" />
@@ -168,24 +226,9 @@ html.dark .arrow {
   }
 }
 
-.card-back {
-  background: linear-gradient(155deg, #f15d22, #e67e22);
-  border: 4px solid #fff;
-  border-radius: 1rem;
-  box-shadow: var(--card-shadow);
-  display: grid;
+.back {
   inset: 0;
-  place-items: center;
   position: absolute;
-}
-
-html.dark .card-back {
-  border-color: var(--color-surface-raised);
-}
-
-.card-back img {
-  opacity: 0.9;
-  width: 35%;
 }
 
 .back-1 {
@@ -235,5 +278,30 @@ html.dark .slab {
 
 html.dark .cat-chip {
   background: color-mix(in srgb, var(--cat) 22%, transparent);
+}
+
+/* The card in hand grows with its content: a grid item in flow at least 5:7 tall, with a
+   fixed-height slab (a percentage of a content-sized card would hug the art or push the
+   text under the clip). */
+.pile.is-hand {
+  aspect-ratio: auto;
+  display: grid;
+  min-height: 17.15rem;
+}
+
+.pile.is-hand .slab {
+  flex: none;
+  height: 7.2rem;
+}
+
+@media (width >= 48rem) {
+  .pile.is-hand {
+    min-height: 21rem;
+    width: 15rem;
+  }
+
+  .pile.is-hand .slab {
+    height: 8.8rem;
+  }
 }
 </style>

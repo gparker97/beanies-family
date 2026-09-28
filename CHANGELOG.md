@@ -15,6 +15,17 @@ _Not yet released._
 ### Added
 
 - Ten Who Owns What cards (cooking dinner, laundry, trash night, grocery shopping, school drop-off, bedtime, the big holidays, birthday parties, date nights and time to myself) now have their own beanie illustrations, shown everywhere the card appears: the deck, the deal pile, the board, the lists, the check-in and the card details. Skipped and unowned cards show theirs greyed out.
+- Card Details now opens on the card itself, as it looks when it is dealt, with the card's full history below it (when it was sorted, every deal and hand-over). Arrows, the arrow keys or a swipe move to the next or previous card in the list you opened it from.
+
+### Changed
+
+- The desktop deal board now fills the screen, and its cards show the art and what done looks like. Anyone not holding a card yet folds into one row you can still drop cards on, and Skipped folds away until you want it.
+- Share the Deck and Export as PDF are now on every Who Owns What view, and the Deal view's Card by Card / Board View switch is easier to find.
+
+### Fixed
+
+- Export as PDF now saves the PDF on the web instead of sometimes failing with "That file didn't save" (a multi-page PDF took longer to build than the browser allows a share to wait). Share buttons fall back to a download if the browser refuses to open the share sheet.
+- Deal board lanes no longer overlap when one person holds a lot of cards.
 
 ## 2026-09-27
 

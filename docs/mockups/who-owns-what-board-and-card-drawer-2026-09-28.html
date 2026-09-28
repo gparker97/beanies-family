@@ -1,0 +1,482 @@
+<title>Deal Board &amp; Card in Hand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── showcase page (follows the viewer's theme) ───────────────────────── */
+  :root {
+    --orange: #f15d22; --slate: #2c3e50; --silk: #aed6f1;
+    --pg-bg: #eef1f4; --pg-card: #ffffff; --pg-ink: #2c3e50; --pg-soft: #4d5d6c; --pg-faint: #64748b;
+    --pg-line: rgba(44,62,80,.12); --pg-accent: #f15d22; --pg-tint: rgba(241,93,34,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; --pg-bg: #101820; --pg-card: #1e2a36; --pg-ink: #f2f5f7; --pg-soft: #c3ced6; --pg-faint: #9aa9b4; --pg-line: #4a5b69; --pg-accent: #ff8b5e; --pg-tint: rgba(241,93,34,.14); }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; --pg-bg: #101820; --pg-card: #1e2a36; --pg-ink: #f2f5f7; --pg-soft: #c3ced6; --pg-faint: #9aa9b4; --pg-line: #4a5b69; --pg-accent: #ff8b5e; --pg-tint: rgba(241,93,34,.14); }
+
+  /* ── app frame tokens (mirror packages/brand/theme.css; CIG slides 8-9) ─ */
+  .frame.light {
+    --bg: #f9fafb; --raised: #ffffff; --overlay: #f3f5f7; --hover: #e9edf1;
+    --ink: #2c3e50; --ink-soft: #4d5d6c; --ink-faint: #64748b; --line: #e2e8f0; --line-strong: rgba(44,62,80,.25);
+    --accent: #f15d22; --tint-o8: rgba(241,93,34,.08); --tint-o15: rgba(241,93,34,.15); --tint-s5: rgba(44,62,80,.05); --tint-silk: rgba(174,214,241,.18);
+    --shadow: 0 4px 20px rgba(44,62,80,.05); --lift: 0 18px 40px rgba(44,62,80,.16); --scrim: rgba(44,62,80,.35);
+    color-scheme: light;
+  }
+  .frame.dark {
+    --bg: #151e27; --raised: #1e2a36; --overlay: #26343f; --hover: #2f3e4b;
+    --ink: #f2f5f7; --ink-soft: #c3ced6; --ink-faint: #9aa9b4; --line: #4a5b69; --line-strong: #7a8a97;
+    --accent: #ff8b5e; --tint-o8: rgba(241,93,34,.12); --tint-o15: rgba(241,93,34,.22); --tint-s5: rgba(255,255,255,.05); --tint-silk: rgba(143,199,232,.12);
+    --shadow: 0 4px 20px rgba(0,0,0,.25); --lift: 0 18px 40px rgba(0,0,0,.45); --scrim: rgba(0,0,0,.55);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--pg-bg); color: var(--pg-ink); font-family: Inter, system-ui, sans-serif; line-height: 1.5; padding-block: 32px 80px; padding-inline: 20px; }
+  .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+  h1, h2, h3, .outfit { font-family: Outfit, Inter, system-ui, sans-serif; }
+  h1 { font-size: clamp(1.9rem, 4.5vw, 2.75rem); font-weight: 800; line-height: 1.08; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.5rem; font-weight: 700; margin: 0; text-wrap: balance; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+  .eyebrow { font-family: Caveat, cursive; font-size: 1.35rem; font-weight: 700; color: var(--pg-accent); margin: 0; }
+  .lede { font-size: 1.0625rem; color: var(--pg-soft); max-width: 62ch; margin: 0; }
+  .brand { font-family: Outfit, sans-serif; font-weight: 700; } .brand span { color: var(--pg-accent); }
+  header.top { display: flex; flex-direction: column; gap: 14px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 14px; }
+  .sec-head p { margin: 4px 0 0; color: var(--pg-soft); max-width: 70ch; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .seg { display: inline-flex; background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { font: 600 .8125rem Outfit, sans-serif; border: 0; background: transparent; color: var(--pg-soft); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--pg-accent); color: #fff; }
+  button:focus-visible { outline: 3px solid var(--silk); outline-offset: 2px; }
+  .stage { background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 20px; padding: 14px; overflow: hidden; }
+  .scaler { transform-origin: top left; }
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 16px; }
+  .note { background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 16px; padding: 14px 16px; }
+  .note h3 { margin-bottom: 6px; }
+  .note ul { margin: 0; padding-left: 1.1rem; color: var(--pg-soft); font-size: .9375rem; display: grid; gap: 4px; }
+  .note.ask { border-color: var(--pg-accent); background: var(--pg-tint); }
+  .phones { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; }
+
+  /* ── the app frame ────────────────────────────────────────────────────── */
+  .frame { background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; font-size: 14px; display: grid; grid-template-columns: 15rem 1fr; overflow: hidden; border-radius: 14px; position: relative; }
+  .side { background: #2c3e50; color: #fff; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .frame.dark .side { background: #0f1720; }
+  .side .logo { font: 700 1rem Outfit, sans-serif; padding: 2px 8px 14px; } .side .logo span { color: #ff8b5e; }
+  .side .sect { font: 700 .75rem Outfit, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8fc7e8; padding: 10px 8px 4px; }
+  .side .row { font: 500 .875rem Outfit, sans-serif; color: rgba(255,255,255,.72); padding: 6px 10px; border-radius: 10px; display: flex; gap: 8px; }
+  .side .row.on { background: rgba(241,93,34,.22); color: #fff; font-weight: 700; }
+  .main { display: flex; flex-direction: column; min-width: 0; padding: 18px 24px 20px; gap: 14px; }
+  .pagehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .pagehead h4 { font: 700 1.25rem Outfit, sans-serif; margin: 0; }
+  .pagehead .cav { font: 700 1.05rem Caveat, cursive; color: var(--accent); }
+  .addbtn { font: 600 .8125rem Outfit, sans-serif; background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; border-radius: 14px; padding: 8px 14px; }
+  .tabsrow { display: flex; justify-content: space-between; align-items: center; }
+  .tabs { display: inline-flex; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 3px; }
+  .tabs span { font: 600 .8125rem Outfit, sans-serif; padding: 5px 14px; border-radius: 11px; color: var(--ink-soft); }
+  .tabs span.on { background: #f15d22; color: #fff; }
+  .modelink { font: 600 .875rem Outfit, sans-serif; color: var(--ink-soft); }
+
+  /* board */
+  .board { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 17rem minmax(0,1fr); background: var(--raised); border: 1px solid var(--line); border-radius: 24px; overflow: hidden; }
+  .board.now { flex: 0 0 auto; align-self: stretch; }
+  .rail { border-right: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .rail .t { font: 700 .875rem Outfit, sans-serif; }
+  .rail .togo { font: 600 .75rem Outfit, sans-serif; color: var(--accent); margin-top: -8px; }
+  .rail .search { border: 1px solid var(--line-strong); border-radius: 12px; padding: 7px 12px; color: var(--ink-faint); font-size: .8125rem; }
+  .pills { display: flex; gap: 4px; } .pills span { font: 600 .75rem Outfit, sans-serif; padding: 4px 10px; border-radius: 999px; background: var(--tint-s5); color: var(--ink-soft); } .pills span.on { background: #f15d22; color: #fff; }
+  .rlist { display: flex; flex-direction: column; gap: 8px; overflow: hidden; min-height: 0; flex: 1 1 auto; }
+  .board.now .rlist { max-height: 34rem; flex: none; }
+  .rcat { font: 600 .6875rem Outfit, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-faint); margin-top: 4px; }
+  .rcard { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 8px 10px; background: var(--raised); }
+  .rcard .grip { width: 8px; height: 14px; background-image: radial-gradient(circle, var(--line-strong) 1.4px, transparent 1.5px); background-size: 4px 5px; flex: none; }
+  .rcard b { font: 600 .8125rem Outfit, sans-serif; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rcard small { display: block; font-size: .6875rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rcard > div { min-width: 0; }
+  .newc { border: 1.5px dashed rgba(241,93,34,.5); background: var(--tint-o8); color: var(--accent); border-radius: 14px; padding: 9px; font: 700 .8125rem Outfit, sans-serif; text-align: center; }
+
+  .thumb { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--cat) 14%, transparent); font-size: 16px; overflow: hidden; }
+  .frame.dark .thumb { background: color-mix(in srgb, var(--cat) 24%, transparent); }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+
+  .lanes { display: flex; flex-direction: column; gap: 10px; padding: 14px; min-height: 0; overflow: auto; }
+  .lane { display: grid; grid-template-columns: 7.5rem minmax(0,1fr); border-radius: 16px; background: color-mix(in srgb, var(--m) 7%, transparent); flex: none; }
+  .frame.dark .lane { background: color-mix(in srgb, var(--m) 12%, transparent); }
+  .lane .who { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 4px; padding: 14px 8px; text-align: center; border-right: 1px solid color-mix(in srgb, var(--m) 14%, transparent); }
+  .lane .who b { font: 700 .875rem Outfit, sans-serif; }
+  .lane .who small { font-size: .75rem; color: var(--ink-faint); }
+  .lane .cells { padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr)); gap: 8px; align-content: start; }
+  .mini { display: flex; gap: 10px; align-items: center; background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 7px 10px 7px 7px; min-width: 0; }
+  .mini .thumb { width: 42px; height: 42px; border-radius: 10px; font-size: 20px; }
+  .mini b { font: 600 .8125rem Outfit, sans-serif; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini small { display: block; font-size: .6875rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini small.part { color: var(--accent); font-weight: 600; }
+  .mini > div { min-width: 0; }
+  .lane.skipped { --m: #64748b; }
+  .lane.skipped .mini { opacity: .7; }
+  .lane.skipped .mini .thumb { filter: grayscale(1); }
+
+  /* now-state chips */
+  .lane.nowlane .cells { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--raised); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 3px; font: 600 .75rem Outfit, sans-serif; max-width: 12rem; }
+  .chip .thumb { width: 26px; height: 26px; border-radius: 999px; font-size: 13px; }
+  .chip span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* idle strip + collapsed skipped */
+  .idle { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; border: 1.5px dashed var(--line-strong); border-radius: 16px; padding: 10px 14px; flex: none; }
+  .idle .lbl { font: 700 .75rem Outfit, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .idle .hint { font-size: .75rem; color: var(--ink-faint); margin-left: auto; }
+  .bean { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 3px 12px 3px 3px; background: var(--raised); border: 1px solid var(--line); font: 600 .8125rem Outfit, sans-serif; }
+  .bean.over { border-color: #f15d22; box-shadow: 0 0 0 3px var(--tint-o15); background: var(--tint-o8); }
+  .ghost { position: absolute; display: flex; align-items: center; gap: 8px; background: var(--raised); border: 1.5px solid #f15d22; border-radius: 12px; padding: 6px 12px 6px 6px; box-shadow: var(--lift); font: 600 .8125rem Outfit, sans-serif; transform: rotate(-3deg); pointer-events: none; z-index: 5; }
+  .ghost .thumb { width: 36px; height: 36px; }
+  .skiprow { display: flex; align-items: center; gap: 12px; border-radius: 16px; padding: 10px 14px; background: var(--tint-s5); flex: none; }
+  .skiprow b { font: 700 .875rem Outfit, sans-serif; }
+  .skiprow .stack { display: flex; } .skiprow .stack .thumb { width: 28px; height: 28px; margin-left: -6px; border: 2px solid var(--raised); filter: grayscale(1); opacity: .8; font-size: 13px; }
+  .skiprow .show { margin-left: auto; font: 600 .8125rem Outfit, sans-serif; color: var(--accent); }
+
+  /* avatars */
+  .av { width: var(--s, 44px); height: var(--s, 44px); border-radius: 50%; border: 2.5px solid var(--m); background: color-mix(in srgb, var(--m) 16%, var(--raised)); display: grid; place-items: center; overflow: hidden; flex: none; }
+  .av img { width: 86%; height: 86%; object-fit: contain; margin-top: 12%; }
+
+  /* ── card view drawer ─────────────────────────────────────────────────── */
+  .dim { position: absolute; inset: 0; background: var(--scrim); }
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 30rem; background: var(--raised); box-shadow: var(--lift); display: flex; flex-direction: column; }
+  .dhead { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 8px; }
+  .dhead h5 { font: 700 1.125rem Outfit, sans-serif; margin: 0; }
+  .x { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; color: var(--ink-faint); font-size: 18px; }
+  .dbody { flex: 1 1 auto; overflow: auto; padding: 4px 22px 18px; display: flex; flex-direction: column; gap: 16px; }
+  .where { font: 600 .75rem Outfit, sans-serif; color: var(--ink-faint); text-align: center; }
+  .hand { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .arrow { width: 40px; height: 40px; border-radius: 14px; border: 1.5px solid var(--line-strong); background: var(--raised); display: grid; place-items: center; color: var(--ink); font-size: 20px; flex: none; }
+  .arrow.off { opacity: .35; }
+  .pcard { position: relative; width: 15rem; aspect-ratio: 5 / 7; flex: none; }
+  .pcard .behind { position: absolute; inset: 0; border-radius: 18px; background: linear-gradient(160deg, #f15d22, #e67e22); transform: rotate(4deg) translate(6px, 4px); opacity: .9; }
+  .pcard .face { position: absolute; inset: 0; border-radius: 18px; background: var(--raised); border: 1px solid var(--line); box-shadow: var(--lift); overflow: hidden; display: flex; flex-direction: column; }
+  .frame.dark .pcard .face { border-color: var(--line-strong); }
+  .face .slab { flex: 0 0 42%; display: grid; place-items: center; background: color-mix(in srgb, var(--cat) 12%, transparent); position: relative; overflow: hidden; }
+  .frame.dark .face .slab { background: color-mix(in srgb, var(--cat) 18%, transparent); }
+  .face .slab img { width: 62%; height: 88%; object-fit: contain; }
+  .face .slab .wm { position: absolute; right: -6px; bottom: -14px; font-size: 64px; opacity: .07; }
+  .face .txt { flex: 1 1 auto; padding: 12px 14px 12px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .face .txt b { font: 700 1.125rem Outfit, sans-serif; line-height: 1.2; }
+  .face .txt p { margin: 0; font-size: .8125rem; color: var(--ink-soft); line-height: 1.4; }
+  .face .foot { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .catchip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font: 600 .6875rem Outfit, sans-serif; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--cat) 12%, transparent); color: var(--ink); }
+  .catchip i { width: 7px; height: 7px; border-radius: 50%; background: var(--cat); }
+  .held { display: flex; align-items: center; gap: 8px; border-top: 1px dashed var(--line); padding-top: 8px; font-size: .75rem; color: var(--ink-faint); }
+  .held b { font: 700 .8125rem Outfit, sans-serif; color: var(--ink); }
+  .held .av { --s: 28px; border-width: 2px; }
+  .parts { display: flex; flex-direction: column; gap: 4px; }
+  .parts div { display: flex; align-items: center; gap: 6px; font-size: .75rem; color: var(--ink-faint); }
+  .parts b { color: var(--ink); font: 600 .75rem Outfit, sans-serif; }
+  .parts .av { --s: 22px; border-width: 2px; }
+  .flabel { font: 600 .6875rem Outfit, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .uses { background: var(--tint-silk); border-radius: 12px; padding: 9px 12px; font-size: .8125rem; color: var(--ink); }
+  .kv { display: flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--ink-soft); }
+  .mchip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px 2px 2px; background: var(--tint-s5); font: 600 .75rem Outfit, sans-serif; color: var(--ink); }
+  .mchip .av { --s: 22px; border-width: 2px; }
+  .dfoot { border-top: 1px solid var(--line); padding: 12px 22px; display: flex; gap: 10px; }
+  .dfoot span { font: 600 .875rem Outfit, sans-serif; border-radius: 14px; padding: 10px; text-align: center; }
+  .dfoot .sec { flex: 1; border: 1.5px solid var(--line-strong); color: var(--ink); }
+  .dfoot .pri { flex: 1.3; background: #f15d22; color: #fff; }
+  .swipehint { text-align: center; font-size: .75rem; color: var(--ink-faint); margin-top: -6px; }
+  .dots { display: flex; justify-content: center; gap: 5px; margin-top: -6px; } .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); } .dots i.on { background: #f15d22; width: 16px; border-radius: 3px; }
+
+  /* deck behind the drawer */
+  .deckbg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .tile { background: var(--raised); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; height: 13rem; display: flex; flex-direction: column; }
+  .tile .s { height: 5.5rem; display: grid; place-items: center; background: color-mix(in srgb, var(--cat) 12%, transparent); font-size: 32px; }
+  .tile .s img { width: 72px; height: 72px; object-fit: contain; }
+  .tile b { font: 600 .8125rem Outfit, sans-serif; padding: 10px 12px 0; }
+  .tile small { padding: 2px 12px; font-size: .6875rem; color: var(--ink-faint); }
+
+  /* phone */
+  .phone { width: 400px; height: 840px; border-radius: 36px; border: 10px solid #1b2530; overflow: hidden; position: relative; flex: none; display: block; grid-template-columns: none; }
+  .phone .drawer { width: 100%; top: 44px; border-radius: 22px 22px 0 0; }
+  .phone .pcard { width: 12.25rem; }
+  .phone .face .txt b { font-size: 1rem; }
+  .phone .face .slab { flex-basis: 36%; }
+  .phone .face .txt { padding: 10px 12px; }
+  .phone .face .txt p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .phone .parts { flex-direction: row; flex-wrap: wrap; gap: 4px 10px; }
+  .phone .dbody { padding: 4px 18px 16px; }
+  .phone .hand { gap: 10px; }
+  .phone .arrow { width: 36px; height: 36px; border-radius: 12px; font-size: 18px; }
+  .phone .statusbar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font: 600 .8125rem Outfit, sans-serif; color: #fff; background: var(--scrim); position: relative; z-index: 1; }
+
+  @media (prefers-reduced-motion: no-preference) { .seg button { transition: background .15s; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="brand">beanies<span>.family</span></div>
+    <p class="eyebrow">Who Owns What, round 8</p>
+    <h1>A board that fills the screen, and a card you can hold</h1>
+    <p class="lede">Two changes before the next deploy. The deal board gives its space to the people holding cards, and a bean with nothing yet folds into one strip you can still deal to. The card details drawer opens on the card itself, with arrows and swipe to move through the pile.</p>
+    <div class="controls" role="group" aria-label="Frame theme">
+      <span class="outfit" style="font-weight:600;color:var(--pg-soft);font-size:.875rem">App frames:</span>
+      <div class="seg" id="themeSeg">
+        <button type="button" data-v="light" aria-pressed="true">Light</button>
+        <button type="button" data-v="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 1. Board ─────────────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div>
+        <h2>1. The deal board (desktop)</h2>
+        <p>A realistic family: greg holds 14 cards, Sofia 17, Leo 3, Mia none yet, and 9 are skipped. 39 still to deal.</p>
+      </div>
+      <div class="controls">
+        <div class="seg" id="boardMode" aria-label="Board version">
+          <button type="button" data-v="now" aria-pressed="false">Today</button>
+          <button type="button" data-v="new" aria-pressed="true">Proposed</button>
+        </div>
+        <div class="seg" id="boardWidth" aria-label="Screen width">
+          <button type="button" data-v="1440" aria-pressed="true">1440 × 900</button>
+          <button type="button" data-v="1280" aria-pressed="false">1280 × 800</button>
+        </div>
+        <div class="seg" id="boardDrag" aria-label="Drag state">
+          <button type="button" data-v="off" aria-pressed="true">At rest</button>
+          <button type="button" data-v="on" aria-pressed="false">Dropping on Mia</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage" id="boardStage"><div class="scaler" id="boardScaler"></div></div>
+    <div class="notes">
+      <div class="note"><h3>What changes</h3><ul>
+        <li>The board fills the screen below the tabs. The rail's list and the lanes each scroll on their own, so the rail no longer sets the board's height.</li>
+        <li>Lane chips become small cards: the art at 42px, the name, and the split part or the done line. A lane reads at a glance.</li>
+        <li>A bean holding nothing folds into one strip at the top. Each face is still a drop target, and gets a full lane once it holds a card.</li>
+        <li>Skipped folds to one row with a Show link, and is still a drop target.</li>
+      </ul></div>
+      <div class="note"><h3>Why this way</h3><ul>
+        <li>The wall already folds idle beans into one strip, so the pattern is familiar.</li>
+        <li>Nothing that works today is lost: every member and Skipped can still take a dropped card.</li>
+        <li>Lanes keep the family's order and grow with their cards, so the space goes to whoever holds the most.</li>
+      </ul></div>
+      <div class="note ask"><h3>Your call</h3><ul>
+        <li>Idle strip at the top (shown) or at the bottom above Skipped?</li>
+        <li>Second line on a lane card: the done line (shown), or the category?</li>
+        <li>Skipped folded by default (shown), or open?</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <!-- ── 2. Drawer desktop ────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div>
+        <h2>2. Card details, desktop</h2>
+        <p>Opened from the Deck. The card sits under the title, exactly as it looks when it is dealt, with who holds it on the card. The arrows (and ← →) move through the list you opened it from.</p>
+      </div>
+      <div class="controls">
+        <div class="seg" id="drawerCard" aria-label="Example card">
+          <button type="button" data-v="cooking-dinner" aria-pressed="true">One holder</button>
+          <button type="button" data-v="school-drop-off" aria-pressed="false">Split card</button>
+          <button type="button" data-v="snow-and-ice" aria-pressed="false">No art</button>
+        </div>
+      </div>
+    </div>
+    <div class="stage" id="drawerStage"><div class="scaler" id="drawerScaler"></div></div>
+  </section>
+
+  <!-- ── 3. Drawer phone ──────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <div>
+        <h2>3. Card details, phone</h2>
+        <p>The same card at the deal pile's phone size. Swipe left or right on the card, or use the arrows. The details scroll underneath.</p>
+      </div>
+    </div>
+    <div class="phones" id="phones"></div>
+    <div class="notes">
+      <div class="note"><h3>What changes</h3><ul>
+        <li>The card face is shared with the deal pile (one component), so the two never drift apart.</li>
+        <li>"Done looks like" moves onto the card; the drawer no longer repeats it below.</li>
+        <li>The header icon goes: the card right under it already shows the art.</li>
+        <li>Held by and since live on the card. Before that, split parts and "beanies uses this card for" stay below.</li>
+      </ul></div>
+      <div class="note"><h3>Moving between cards</h3><ul>
+        <li>Order is the list you opened it from: the Deck in its current filter, a board lane, or the Overview list.</li>
+        <li>Arrows beside the card on every width, ← → on a keyboard, swipe on touch.</li>
+        <li>"Home &amp; Household · 1 of 15" above the card says where you are, like the deal pile does.</li>
+      </ul></div>
+      <div class="note ask"><h3>Your call</h3><ul>
+        <li>Drop the header icon (shown), or keep it?</li>
+        <li>On the phone: position dots under the card are only useful for short lists. Leave them out (the counter above does the job)?</li>
+      </ul></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const CARDS = [["cooking-dinner","home","🍳","Cooking Dinner","Everyone fed by seven, most nights",true],["breakfast","home","🥣","Breakfast","Everyone out the door with something in their tummy",false],["dishes","home","🍽️","Dishes","Sink empty before bed",false],["laundry","home","🧺","Laundry","Clean, dry and back in drawers",true],["floors","home","🧹","Floors","Vacuumed before the crumbs win",false],["sparkling-bathrooms","home","🛁","Sparkling Bathrooms","Clean enough that guests can use them without a warning",false],["trash-night","home","🗑️","Trash Night","Out on trash day, back in by the next morning",true],["home-supplies","home","🧻","Home Supplies","Never out of toilet paper, soap or dish soap",false],["fixing-things","home","🔧","Fixing Things","The wobbly shelf and the drippy faucet sorted",false],["seasonal-swap","home","📦","The Seasonal Swap","Winter coats out, summer clothes in, garage and attic tidy",false],["decluttering","home","🎁","Decluttering","Outgrown things donated before they pile up",false],["mail-and-paperwork","home","📬","Mail and Paperwork","Opened, dealt with, filed or recycled each week",false],["home-rent-mortgage-insurance","home","🏠","Home Rent / Mortgage / Insurance","Paid on time, renewed before it lapses",false],["family-budget-check","home","📊","The Family Budget Check","A look at where the money went, once a month",false],["paying-the-bills","home","💳","Paying the Bills","Every bill paid before it's due",false],["family-calendar","home","📅","The Family Calendar","Every activity and appointment in beanies, nobody double-booked",false],["wifi-gadgets-passwords","home","📶","Wifi, Gadgets and Passwords","Wifi working, devices updated, passwords somewhere safe",false],["pet-care","home","🐾","Pet Care","Fed, walked, vet visits on time",false],["plants","home","🪴","Plants","Green, not crispy",false],["snow-and-ice","home","❄️","Snow and Ice","Sidewalk shoveled and salted, car scraped",false],["grocery-shopping","out","🛒","Grocery Shopping","Fridge and pantry full for the week",true],["car-care","out","🚗","Car Care","Gas, oil changes and inspection on time",false],["packages-and-returns","out","📦","Packages and Returns","Sent back before the return window closes",false],["points-and-coupons","out","🏷️","Points and Coupons","Points used before they expire",false],["lunchboxes","kids","🥪","Lunchboxes","Packed the night before, eaten (mostly)",false],["babysitters-and-nannies","kids","🧑‍🍼","Babysitters and Nannies","Someone lined up for date night and sick days",false],["school-forms","kids","📋","School Forms","Signed and back in the backpack the same day",false],["school-vacations","kids","🏖️","School Vacations","Camps and care planned before the break starts",false],["school-drop-off","kids","🎒","School Drop-off","There by the bell, home with the backpack",true],["kids-bags-for-the-day","kids","🧢","Kids' Bags for the Day","Water bottle, snack and sweater packed",false],["sports-and-clubs","kids","⚽","Sports and Clubs","Signed up, kit ready, rides sorted",false],["tutors-and-lessons","kids","🎹","Tutors and Lessons","Booked, paid and practiced in between",false],["morning-routine","kids","🌅","Morning Routine","Dressed, fed and out on time without a meltdown",false],["bedtime-routine","kids","🌙","Bedtime Routine","Teeth, story, lights out by eight",true],["bath-time-and-haircuts","kids","🛀","Bath Time and Haircuts","Clean kids, trims before they need a ponytail",false],["clothes-that-fit","kids","👕","Clothes That Fit","No toes poking through shoes",false],["potty-training-and-diapers","kids","🧷","Potty Training and Diapers","Diapers stocked, potty wins cheered",false],["homework-and-school-supplies","kids","✏️","Homework and School Supplies","Homework done, pencils sharp, projects not at midnight",false],["talking-to-teachers","kids","🍎","Talking to Teachers","Emails answered, conferences attended",false],["helping-at-school","kids","🙋","Helping at School","Volunteer shifts and bake sales covered",false],["new-school-new-year","kids","🏫","New School, New Year","Supplies bought, forms in, first day ready",false],["friends-and-screens","kids","📱","Friends and Screens","Playdates planned, screen time rules kept",false],["night-wake-ups","kids","🧸","Night Wake-ups","Someone on duty for bad dreams and sick nights",false],["learning-at-home","kids","📚","Learning at Home","Reading together, curiosity fed",false],["being-there","kids","👏","Being There","Someone in the audience for plays, games and assemblies",false],["doctor-and-dentist","health","🩺","Doctor and Dentist","Checkups booked before anyone is overdue",false],["medicine-cabinet","health","💊","Medicine Cabinet","Band-aids in, fever medicine stocked, nothing expired",false],["our-emergency-plan","health","🚨","Our Emergency Plan","Everyone knows who to call and where to meet",false],["health-insurance-and-claims","health","🧾","Health Insurance and Claims","Claims filed, coverage renewed",false],["wills-and-life-insurance","health","📜","Wills and Life Insurance","Up to date, and someone knows where they are",false],["special-needs-support","health","💙","Kid's Special Needs and Mental Health Support","Appointments kept, school in the loop, nobody carrying it alone",false],["the-big-holidays","celebrations","🎄","The Big Holidays","Decorations, food and who is coming, all planned",true],["birthday-parties","celebrations","🎂","Birthday Parties","Invites out, cake in, nobody cries",true],["gifts-for-others","celebrations","🎁","Gifts for Others","Bought before the party, not on the way",false],["cards-and-thank-yous","celebrations","💌","Cards and Thank-yous","Sent within a week",false],["tooth-fairy-duty","celebrations","🦷","Tooth Fairy Duty","Coins under the pillow before morning",false],["having-people-over","celebrations","🥂","Having People Over","Invited, fed and nobody forgot the ice",false],["photos-and-memories","celebrations","📸","Photos and Memories","Best photos saved in the scrapbook, not lost on a phone",false],["weekend-plans","celebrations","🗺️","Weekend Plans","Something fun planned most weekends",false],["giving-back","celebrations","🤲","Giving Back","A good deed or donation as a family, now and then",false],["faith-and-traditions","celebrations","🕯️","Faith and Traditions","The traditions that matter to us, kept going",false],["date-nights","people","🕯️","Date Nights","One evening a month that is just the two of us",true],["grandparents","people","👵","Grandparents","Visits planned, video calls on Sundays",false],["keeping-up-with-family","people","📞","Keeping Up with Family","Cousins' birthdays remembered, news passed on",false],["aging-parent-care","people","🤝","Aging Parent or In-law Care","Appointments covered, nobody carrying it alone",false],["trip-packing","trips","🧳","Trip Packing","One bag each, nothing forgotten",false],["planning-trips","trips","✈️","Planning Trips","Booked, planned and in beanies before we go",false],["passports-and-documents","trips","🛂","Passports and Documents","Not expired, packed, and in the same place",false],["outings-and-culture","trips","🎨","Outings and Culture","Museums, shows and days out, now and then",false],["the-yard","projects","🌱","The Yard","Mowed, watered, not a jungle",false],["furniture-and-decorations","projects","🛋️","Furniture and Decorations","The house feels like home, and the broken chair gets replaced",false],["the-renovation","projects","🏗️","The Renovation","Quotes in, a decision made",false],["moving","projects","🚚","Moving","Boxes packed, address changed, nothing left behind",false],["bikes","projects","🚲","Bikes","Tires pumped, helmets found",false],["the-pool","projects","🏊","The Pool","Clear water, cover on",false],["camping-gear","projects","⛺","Camping Gear","Tent dry, nothing moldy in the garage",false],["vegetable-patch","projects","🥕","The Vegetable Patch","Rows weeded, beans picked",false],["the-fireplace","projects","🔥","The Fireplace","Chimney swept once a year, logs in",false],["time-to-myself","me","✨","Time to Myself","A few hours a week that are only mine",true],["moving-my-body","me","🏃","Moving My Body","Something sweaty, three times a week",false],["seeing-my-friends","me","🍻","Seeing My Friends","A catch-up with friends at least once a month",false]];
+const byId = Object.fromEntries(CARDS.map(c => [c[0], { id: c[0], cat: c[1], emoji: c[2], name: c[3], done: c[4], art: c[5] }]));
+const CAT = { home: ['#E67E22','Home & Household'], out: ['#5B9BD5','Out & Errands'], kids: ['#F15D22','Kids & School'], health: ['#27AE60','Health & Safety'], celebrations: ['#E84393','Celebrations & Traditions'], people: ['#9B59B6','People We Love'], trips: ['#2A9D8F','Trips & Packing'], projects: ['#6C5CE7','Projects & Honey-dos'], me: ['#8E7CC3','Just for Me'] };
+const M = {
+  greg: { name: 'greg', color: '#3B82F6', icon: 'beanies_father_icon_transparent_360x360.png' },
+  sofia: { name: 'Sofia', color: '#EC4899', icon: 'beanies_mother_icon_transparent_350x350.png' },
+  leo: { name: 'Leo', color: '#F59E0B', icon: 'beanies_baby_boy_icon_transparent_300x300.png' },
+  mia: { name: 'Mia', color: '#10B981', icon: 'beanies_baby_girl_icon_transparent_300x300.png' },
+};
+const HOLD = {
+  greg: ['laundry','trash-night','grocery-shopping','car-care','fixing-things','paying-the-bills','wifi-gadgets-passwords','bedtime-routine',['school-drop-off','for Mia'],'sports-and-clubs','packages-and-returns','family-budget-check','bikes','the-yard'],
+  sofia: ['cooking-dinner','breakfast','family-calendar','school-forms','lunchboxes','birthday-parties','the-big-holidays',['school-drop-off','for Leo'],'talking-to-teachers','clothes-that-fit','homework-and-school-supplies','mail-and-paperwork','date-nights','home-supplies','time-to-myself','doctor-and-dentist','gifts-for-others'],
+  leo: ['dishes','pet-care','plants'],
+  mia: [],
+};
+const SKIPPED = ['snow-and-ice','potty-training-and-diapers','babysitters-and-nannies','points-and-coupons','the-pool','the-fireplace','camping-gear','the-renovation','moving'];
+const held = new Set(Object.values(HOLD).flat().map(x => Array.isArray(x) ? x[0] : x));
+const RAIL = CARDS.map(c => c[0]).filter(id => !held.has(id) && !SKIPPED.includes(id));
+
+// Assets: published next to the page, or read from the repo when opened from docs/mockups/.
+function img(path, repoPath) {
+  return `<img src="${path}" alt="" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='${repoPath}'}" />`;
+}
+const art = c => c.art ? img(`cards/${c.id}.webp`, `../../packages/brand/assets/shared/cards/${c.id}.webp`) : c.emoji;
+const thumb = c => `<span class="thumb" style="--cat:${CAT[c.cat][0]}">${art(c)}</span>`;
+const avatar = (k, s) => `<span class="av" style="--m:${M[k].color};${s ? `--s:${s}px` : ''}">${img(`avatars/${M[k].icon}`, `../../packages/brand/assets/shared/${M[k].icon}`)}</span>`;
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+function sidebar() {
+  return `<nav class="side"><div class="logo">beanies<span>.family</span></div>
+    <div class="sect">🌳 The Treehouse</div>
+    ${['🏡 Family Dashboard','📅 Family Activities','✈️ Travel Plans','✅ To-Dos','🧾 Beanie Lists','🍲 Meal Planner'].map(r => `<div class="row">${r}</div>`).join('')}
+    <div class="row on">🙋 Who Owns What</div>
+    <div class="sect">🐷 The Piggy Bank</div>
+    ${['📊 Overview','🏦 Accounts','💵 Budgets'].map(r => `<div class="row">${r}</div>`).join('')}
+    <div class="sect">The Bean Pod</div>
+    ${['🫘 Meet the Beans','📖 Family Cookbook'].map(r => `<div class="row">${r}</div>`).join('')}
+  </nav>`;
+}
+function pagehead(tab) {
+  return `<div class="pagehead"><div><h4>Who Owns What</h4><div class="cav">Who's holding what this week? 🙋</div></div><span class="addbtn">+ Add a Card</span></div>
+  <div class="tabsrow"><div class="tabs">${['Overview','Deal','Deck'].map(t => `<span class="${t === tab ? 'on' : ''}">${t}</span>`).join('')}</div>${tab === 'Deal' ? '<span class="modelink">Card by Card ›</span>' : ''}</div>`;
+}
+
+function rail() {
+  let out = '', lastCat = '';
+  for (const id of RAIL) {
+    const c = byId[id];
+    if (c.cat !== lastCat) { out += `<div class="rcat">${CAT[c.cat][1]}</div>`; lastCat = c.cat; }
+    out += `<div class="rcard"><span class="grip"></span>${thumb(c)}<div><b>${esc(c.name)}</b><small>${esc(c.done)}</small></div></div>`;
+  }
+  return `<aside class="rail"><div class="t">🙋 The Deck</div><div class="togo">${RAIL.length} cards still to deal</div>
+    <div class="search">Search all 81 cards…</div><div class="pills"><span class="on">To Deal</span><span>All</span></div>
+    <div class="rlist">${out}</div><div class="newc">+ New Card</div></aside>`;
+}
+
+function laneNew(k) {
+  const cards = HOLD[k].map(x => Array.isArray(x) ? [byId[x[0]], x[1]] : [byId[x], null]);
+  const cells = cards.map(([c, part]) => `<div class="mini">${thumb(c)}<div><b>${esc(c.name)}</b>${part ? `<small class="part">${part}</small>` : `<small>${esc(c.done)}</small>`}</div></div>`).join('');
+  return `<section class="lane" style="--m:${M[k].color}"><div class="who">${avatar(k)}<b>${M[k].name}</b><small>${cards.length} cards</small></div><div class="cells">${cells}</div></section>`;
+}
+function laneNow(k) {
+  const cards = HOLD[k].map(x => Array.isArray(x) ? byId[x[0]] : byId[x]);
+  const cells = cards.length ? cards.map(c => `<span class="chip">${thumb(c)}<span>${esc(c.name)}</span></span>`).join('') : '<span style="color:var(--ink-faint);font-size:.75rem;padding:6px">Drop a card here</span>';
+  return `<section class="lane nowlane" style="--m:${M[k].color}"><div class="who" style="justify-content:center">${avatar(k)}<b>${M[k].name}</b><small>${cards.length} ${cards.length === 1 ? 'card' : 'cards'}</small></div><div class="cells">${cells}</div></section>`;
+}
+
+function board(mode, drag) {
+  const members = Object.keys(M);
+  if (mode === 'now') {
+    const skipped = SKIPPED.map(id => `<span class="chip">${thumb(byId[id])}<span>${esc(byId[id].name)}</span></span>`).join('');
+    return `<div class="board now">${rail()}<div class="lanes" style="overflow:visible">${members.map(laneNow).join('')}
+      <section class="lane nowlane skipped"><div class="who" style="justify-content:center"><span style="font-size:22px">⏭️</span><b>Skipped</b><small>${SKIPPED.length}</small></div><div class="cells">${skipped}</div></section></div></div>`;
+  }
+  const busy = members.filter(k => HOLD[k].length), idle = members.filter(k => !HOLD[k].length);
+  const idleStrip = idle.length ? `<div class="idle"><span class="lbl">Not holding any cards yet</span>${idle.map(k => `<span class="bean ${drag && k === 'mia' ? 'over' : ''}" id="bean-${k}">${avatar(k, 30)}${M[k].name}</span>`).join('')}<span class="hint">Drop a card on a bean to deal it</span></div>` : '';
+  const stack = SKIPPED.slice(0, 6).map(id => thumb(byId[id])).join('');
+  const skip = `<div class="skiprow"><span style="font-size:18px">⏭️</span><b>Skipped</b><span style="color:var(--ink-faint);font-size:.8125rem">${SKIPPED.length} cards, not for this family</span><span class="stack">${stack}</span><span class="show">Show ›</span></div>`;
+  return `<div class="board">${rail()}<div class="lanes">${idleStrip}${busy.map(laneNew).join('')}${skip}</div></div>`;
+}
+
+let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+const state = { mode: 'new', width: 1440, drag: false, card: 'cooking-dinner' };
+
+function renderBoard() {
+  const w = state.width, h = w === 1440 ? 900 : 800;
+  const el = document.getElementById('boardScaler');
+  el.innerHTML = `<div class="frame ${theme}" style="width:${w}px;height:${h}px">${sidebar()}<div class="main">${pagehead('Deal')}${board(state.mode, state.drag)}</div></div>`;
+  if (state.mode === 'now') el.querySelector('.main').style.overflow = 'hidden';
+  if (state.drag && state.mode === 'new') {
+    const frame = el.firstElementChild, bean = frame.querySelector('#bean-mia');
+    if (bean) {
+      const fr = frame.getBoundingClientRect(), br = bean.getBoundingClientRect(), s = fr.width / w;
+      const g = document.createElement('div');
+      g.className = 'ghost';
+      g.innerHTML = `${thumb(byId['grocery-shopping'])}Grocery Shopping`;
+      g.style.left = ((br.left - fr.left) / s + 60) + 'px';
+      g.style.top = ((br.top - fr.top) / s + 14) + 'px';
+      frame.appendChild(g);
+    }
+  }
+  fit('boardStage', 'boardScaler', w, h);
+}
+
+function holderOf(id) {
+  const out = [];
+  for (const [k, list] of Object.entries(HOLD)) for (const x of list) {
+    if ((Array.isArray(x) ? x[0] : x) === id) out.push([k, Array.isArray(x) ? x[1] : null]);
+  }
+  return out;
+}
+function cardFace(c) {
+  const hs = holderOf(c.id);
+  let foot = '';
+  if (hs.length > 1) foot = `<div class="held" style="flex-direction:column;align-items:stretch"><div class="parts">${hs.map(([k, p]) => `<div>${avatar(k, 22)}<b>${M[k].name}</b> ${p}</div>`).join('')}</div></div>`;
+  else if (hs.length === 1) foot = `<div class="held">${avatar(hs[0][0], 28)}<span>Held by <b>${M[hs[0][0]].name}</b><br />since Mon, 28 Sep</span></div>`;
+  else foot = `<div class="held"><span>Skipped, not for this family</span></div>`;
+  return `<div class="pcard"><div class="behind"></div><div class="face" style="--cat:${CAT[c.cat][0]}">
+    <div class="slab">${c.art ? img(`cards/${c.id}.webp`, `../../packages/brand/assets/shared/cards/${c.id}.webp`) : `<span style="font-size:72px">${c.emoji}</span>`}<span class="wm">${c.emoji}</span></div>
+    <div class="txt"><b>${esc(c.name)}</b><p>${esc(c.done)}</p><div class="foot"><span class="catchip"><i></i>${CAT[c.cat][1]}</span>${foot}</div></div></div></div>`;
+}
+function drawer(c, phone) {
+  const hs = holderOf(c.id);
+  const uses = { 'cooking-dinner': 'New dinner meals in the meal planner start with this card\'s holder as the cook. You can change it on any meal.', 'school-drop-off': 'Drop-off reminders for each child go to the grown-up holding that part.' }[c.id];
+  const pos = c.cat === 'home' ? '1 of 15' : c.cat === 'kids' ? '6 of 21' : '4 of 15';
+  const before = c.id === 'cooking-dinner' ? `<div><div class="flabel">Before that</div><div class="kv"><span class="mchip">${avatar('greg', 22)}greg</span><span>until Sun, 27 Sep</span></div></div>` : '';
+  const split = hs.length > 1 ? `<div><div class="flabel">Split by child</div><div class="kv" style="flex-wrap:wrap">${hs.map(([k, p]) => `<span class="mchip">${avatar(k, 22)}${M[k].name} · ${p}</span>`).join('')}</div></div>` : '';
+  return `<div class="drawer"><div class="dhead"><h5>Card Details</h5><span class="x">×</span></div>
+    <div class="dbody"><div class="where">${CAT[c.cat][1]} · ${pos}</div>
+    <div class="hand"><span class="arrow ${pos.startsWith('1 ') ? 'off' : ''}">‹</span>${cardFace(c)}<span class="arrow">›</span></div>
+    ${phone ? '<div class="swipehint">Swipe the card to see the next one</div>' : ''}
+    ${before}${split}${uses ? `<div><div class="flabel">beanies uses this card for</div><div class="uses">${uses}</div></div>` : ''}</div>
+    <div class="dfoot"><span class="sec">✏️ Edit</span><span class="pri">Close</span></div></div>`;
+}
+function deckBehind() {
+  const ids = ['cooking-dinner','breakfast','dishes','laundry','floors','sparkling-bathrooms','trash-night','home-supplies','fixing-things','seasonal-swap'];
+  return `<div class="deckbg">${ids.map(id => { const c = byId[id]; return `<div class="tile" style="--cat:${CAT[c.cat][0]}"><div class="s">${c.art ? img(`cards/${c.id}.webp`, `../../packages/brand/assets/shared/cards/${c.id}.webp`) : c.emoji}</div><b>${esc(c.name)}</b><small>${esc(c.done)}</small></div>`; }).join('')}</div>`;
+}
+function renderDrawer() {
+  const c = byId[state.card];
+  document.getElementById('drawerScaler').innerHTML = `<div class="frame ${theme}" style="width:1280px;height:820px">${sidebar()}<div class="main">${pagehead('Deck')}${deckBehind()}</div><div class="dim"></div>${drawer(c, false)}</div>`;
+  fit('drawerStage', 'drawerScaler', 1280, 820);
+  document.getElementById('phones').innerHTML = ['cooking-dinner', 'school-drop-off'].map(id =>
+    `<div class="frame ${theme} phone"><div class="statusbar"><span>9:41</span><span>●●● 🔋</span></div><div class="main" style="padding:10px 16px">${pagehead('Deck')}${deckBehind()}</div><div class="dim"></div>${drawer(byId[id], true)}</div>`).join('');
+}
+
+function fit(stageId, scalerId, w, h) {
+  const stage = document.getElementById(stageId), el = document.getElementById(scalerId);
+  const avail = stage.clientWidth - 28, s = Math.min(1, avail / w);
+  el.style.transform = `scale(${s})`;
+  el.style.width = w + 'px';
+  stage.style.height = (h * s + 28) + 'px';
+}
+function seg(id, key, cast) {
+  const root = document.getElementById(id);
+  root.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    root.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    if (key === 'theme') theme = b.dataset.v; else state[key] = cast ? cast(b.dataset.v) : b.dataset.v;
+    render();
+  });
+}
+function render() { renderBoard(); renderDrawer(); }
+seg('themeSeg', 'theme'); seg('boardMode', 'mode'); seg('boardWidth', 'width', Number); seg('boardDrag', 'drag', v => v === 'on'); seg('drawerCard', 'card');
+document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === theme)));
+addEventListener('resize', render);
+render();
+</script>

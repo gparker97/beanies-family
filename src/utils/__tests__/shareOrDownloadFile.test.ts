@@ -86,6 +86,22 @@ describe('shareOrDownloadFile', () => {
     expect(result.error).toBeUndefined();
   });
 
+  it('downloads instead when the browser refuses the share sheet (gesture expired)', async () => {
+    // A multi-page PDF takes longer to build than Chrome's ~5s user-activation window,
+    // so navigator.share rejects with NotAllowedError: the file must still reach the user.
+    (navigator as { canShare?: unknown }).canShare = vi.fn(() => true);
+    (navigator as { share?: unknown }).share = vi.fn(async () => {
+      throw new DOMException('Must be handling a user gesture', 'NotAllowedError');
+    });
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const result = await shareOrDownloadFile(blob, 'deck.pdf', 'application/pdf', 'The deck');
+    expect(result.outcome).toBe('downloaded');
+    expect(result.delivered).toBe(true);
+    expect(result.mechanism).toBe('anchor-after-share');
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('returns failed (with the error) when share throws a real error', async () => {
     (navigator as { canShare?: unknown }).canShare = vi.fn(() => true);
     const boom = new Error('share pipe broke');

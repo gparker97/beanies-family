@@ -33,19 +33,18 @@ const props = withDefaults(
 const emit = defineEmits<{ give: []; 'skip-instead': []; split: []; 'bring-back': [] }>();
 
 const { t } = useTranslation();
-const { heldSince, partCaption } = useResponsibilityCardLabel();
+const { holderLines } = useResponsibilityCardLabel();
 
 const isSplit = computed(() => props.card.splitMode !== 'single');
 
 const lines = computed(() =>
-  props.card.parts.flatMap((part) => {
-    const held = heldSince(props.card, part);
-    if (!held || !part.holderId) return [];
+  holderLines(props.card).flatMap(({ key, memberId, caption, held }) => {
+    if (!held || !memberId) return [];
     return [
       {
-        key: part.key,
-        memberId: part.holderId,
-        caption: isSplit.value ? partCaption(props.card, part) : '',
+        key,
+        memberId,
+        caption,
         text: held.date ? fillTemplate(t('whoOwnsWhat.pile.withSince'), held) : held.name,
       },
     ];

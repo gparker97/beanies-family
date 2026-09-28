@@ -32,7 +32,11 @@ export type ShareOrDownloadOutcome = 'shared' | 'downloaded' | 'cancelled' | 'fa
  */
 export type DeliveryStage = 'source' | 'plugin' | 'encode' | 'write' | 'share' | 'sweep' | 'anchor';
 
-export type DeliveryMechanism = 'native-share' | 'web-share' | 'anchor';
+/**
+ * `anchor-after-share`: the browser refused the share sheet (`NotAllowedError`) and the
+ * file was downloaded instead. Its own value so the fallback rate is visible in telemetry.
+ */
+export type DeliveryMechanism = 'native-share' | 'web-share' | 'anchor' | 'anchor-after-share';
 
 export interface ShareOrDownloadResult {
   outcome: ShareOrDownloadOutcome;
@@ -63,6 +67,16 @@ const SHARE_DIR = 'shared';
 
 export function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === 'AbortError';
+}
+
+/**
+ * The browser refused to open the share sheet: `navigator.share` needs a recent user
+ * gesture (Chrome allows ~5s of "transient activation"), and a multi-page PDF takes longer
+ * than that to render. Nothing was shared and nothing was cancelled; the file is fine, so
+ * the caller downloads it instead of reporting "that file didn't save".
+ */
+export function isShareRefused(err: unknown): boolean {
+  return err instanceof Error && err.name === 'NotAllowedError';
 }
 
 /**
@@ -353,6 +367,10 @@ export async function shareOrDownloadFile(
       // Dismissing the share sheet is a normal user choice, not a failure.
       if (isAbortError(err)) {
         return { outcome: 'cancelled', delivered: false, mechanism: 'web-share' };
+      }
+      if (isShareRefused(err)) {
+        const saved = downloadFile(blob, filename);
+        return saved.delivered ? { ...saved, mechanism: 'anchor-after-share' } : saved;
       }
       return {
         outcome: 'failed',

@@ -1,0 +1,275 @@
+<title>Deal View Switch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── showcase page (follows the viewer's theme) ───────────────────────── */
+  :root {
+    --silk: #aed6f1;
+    --pg-bg: #eef1f4; --pg-card: #ffffff; --pg-ink: #2c3e50; --pg-soft: #4d5d6c; --pg-faint: #64748b;
+    --pg-line: rgba(44,62,80,.12); --pg-accent: #f15d22; --pg-tint: rgba(241,93,34,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { color-scheme: dark; --pg-bg: #101820; --pg-card: #1e2a36; --pg-ink: #f2f5f7; --pg-soft: #c3ced6; --pg-faint: #9aa9b4; --pg-line: #4a5b69; --pg-accent: #ff8b5e; --pg-tint: rgba(241,93,34,.14); }
+  }
+  :root[data-theme="dark"] { color-scheme: dark; --pg-bg: #101820; --pg-card: #1e2a36; --pg-ink: #f2f5f7; --pg-soft: #c3ced6; --pg-faint: #9aa9b4; --pg-line: #4a5b69; --pg-accent: #ff8b5e; --pg-tint: rgba(241,93,34,.14); }
+
+  /* ── app frame tokens (mirror packages/brand/theme.css; CIG slides 8-9) ─ */
+  .frame.light {
+    --bg: #f9fafb; --raised: #ffffff; --overlay: #f3f5f7; --hover: #e9edf1;
+    --ink: #2c3e50; --ink-soft: #4d5d6c; --ink-faint: #64748b; --line: #e2e8f0; --line-strong: rgba(44,62,80,.25);
+    --accent: #f15d22; --tint-o8: rgba(241,93,34,.08); --tint-o15: rgba(241,93,34,.15); --tint-s5: rgba(44,62,80,.05);
+    --shadow: 0 4px 20px rgba(44,62,80,.05);
+    color-scheme: light;
+  }
+  .frame.dark {
+    --bg: #151e27; --raised: #1e2a36; --overlay: #26343f; --hover: #2f3e4b;
+    --ink: #f2f5f7; --ink-soft: #c3ced6; --ink-faint: #9aa9b4; --line: #4a5b69; --line-strong: #7a8a97;
+    --accent: #ff8b5e; --tint-o8: rgba(241,93,34,.12); --tint-o15: rgba(241,93,34,.22); --tint-s5: rgba(255,255,255,.05);
+    --shadow: 0 4px 20px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--pg-bg); color: var(--pg-ink); font-family: Inter, system-ui, sans-serif; line-height: 1.5; padding-block: 32px 80px; padding-inline: 20px; }
+  .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+  h1, h2, h3, .outfit { font-family: Outfit, Inter, system-ui, sans-serif; }
+  h1 { font-size: clamp(1.9rem, 4.5vw, 2.6rem); font-weight: 800; line-height: 1.08; margin: 0; text-wrap: balance; }
+  h2 { font-size: 1.4rem; font-weight: 700; margin: 0; text-wrap: balance; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+  .eyebrow { font-family: Caveat, cursive; font-size: 1.35rem; font-weight: 700; color: var(--pg-accent); margin: 0; }
+  .lede { font-size: 1.0625rem; color: var(--pg-soft); max-width: 64ch; margin: 0; }
+  .brand { font-family: Outfit, sans-serif; font-weight: 700; } .brand span { color: var(--pg-accent); }
+  header.top { display: flex; flex-direction: column; gap: 14px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 14px; }
+  .sec-head p { margin: 4px 0 0; color: var(--pg-soft); max-width: 70ch; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .seg { display: inline-flex; background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { font: 600 .8125rem Outfit, sans-serif; border: 0; background: transparent; color: var(--pg-soft); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--pg-accent); color: #fff; }
+  button:focus-visible { outline: 3px solid var(--silk); outline-offset: 2px; }
+  .stage { background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 20px; padding: 14px; overflow: hidden; }
+  .stage + .stage { margin-top: 14px; }
+  .stage-label { font: 600 .75rem Outfit, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--pg-faint); margin: 0 0 8px; }
+  .scaler { transform-origin: top left; }
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 16px; }
+  .note { background: var(--pg-card); border: 1px solid var(--pg-line); border-radius: 16px; padding: 14px 16px; }
+  .note h3 { margin-bottom: 6px; }
+  .note p { margin: 0; color: var(--pg-soft); font-size: .9375rem; }
+  .note.ask { border-color: var(--pg-accent); background: var(--pg-tint); }
+  .glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .glance .frame { border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+  .glance .tag { font: 700 .8125rem Outfit, sans-serif; color: var(--ink-soft); }
+  .glance .pair { display: flex; flex-wrap: wrap; gap: 18px; }
+
+  /* ── the app frame ────────────────────────────────────────────────────── */
+  .frame { background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; font-size: 14px; }
+  .app { display: grid; grid-template-columns: 15rem 1fr; overflow: hidden; border-radius: 14px; }
+  .side { background: #2c3e50; color: #fff; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .frame.dark .side { background: #0f1720; }
+  .side .logo { font: 700 1rem Outfit, sans-serif; padding: 2px 8px 14px; } .side .logo span { color: #ff8b5e; }
+  .side .sect { font: 700 .75rem Outfit, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #8fc7e8; padding: 10px 8px 4px; }
+  .side .row { font: 500 .875rem Outfit, sans-serif; color: #c3ced6; padding: 6px 10px; border-radius: 10px; }
+  .side .row.on { background: rgba(241,93,34,.22); color: #fff; font-weight: 700; }
+  .main { display: flex; flex-direction: column; min-width: 0; padding: 18px 24px 20px; gap: 16px; }
+  .pagehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .pagehead h4 { font: 700 1.25rem Outfit, sans-serif; margin: 0; }
+  .pagehead .cav { font: 700 1.05rem Caveat, cursive; color: var(--accent); }
+  .addbtn { font: 600 .8125rem Outfit, sans-serif; background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; border-radius: 14px; padding: 8px 14px; }
+  .toolrow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; }
+  .tabs { display: inline-flex; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 3px; }
+  .tabs span { font: 600 .8125rem Outfit, sans-serif; padding: 6px 16px; border-radius: 11px; color: var(--ink-soft); }
+  .tabs span.on { background: #f15d22; color: #fff; }
+  .right { display: flex; align-items: flex-end; gap: 12px; }
+  .vsep { width: 1px; align-self: stretch; background: var(--line); margin: 4px 2px; }
+  .share { font: 600 .875rem Outfit, sans-serif; background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; border-radius: 16px; padding: 10px 16px; display: inline-flex; gap: 6px; align-items: center; }
+  .export { font: 600 .875rem Outfit, sans-serif; background: var(--tint-s5); color: var(--ink); border-radius: 16px; padding: 10px 16px; display: inline-flex; gap: 6px; align-items: center; }
+  .frame.dark .export { background: var(--raised); }
+
+  /* board strip for context */
+  .strip { display: grid; grid-template-columns: 17rem 1fr; background: var(--raised); border: 1px solid var(--line); border-radius: 24px; height: 150px; overflow: hidden; }
+  .strip .rail { border-right: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .strip .rail b { font: 700 .875rem Outfit, sans-serif; }
+  .strip .rail small { font: 600 .75rem Outfit, sans-serif; color: var(--accent); }
+  .strip .rail i { display: block; height: 30px; border: 1px solid var(--line); border-radius: 12px; }
+  .strip .lanes { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .strip .lane { display: grid; grid-template-columns: 6rem 1fr; gap: 10px; background: rgba(59,130,246,.07); border-radius: 14px; padding: 8px; }
+  .frame.dark .strip .lane { background: rgba(59,130,246,.14); }
+  .strip .lane.b { background: rgba(236,72,153,.07); } .frame.dark .strip .lane.b { background: rgba(236,72,153,.14); }
+  .strip .who { font: 700 .8125rem Outfit, sans-serif; display: flex; align-items: center; justify-content: center; }
+  .strip .minis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .strip .mini { height: 34px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; display: flex; align-items: center; gap: 8px; padding: 0 8px; font: 600 .75rem Outfit, sans-serif; white-space: nowrap; overflow: hidden; }
+  .frame.dark .strip .mini { background: var(--overlay); }
+
+  /* ── the switch ───────────────────────────────────────────────────────── */
+  .vs { display: flex; flex-direction: column; gap: 5px; }
+  .vs-cap { font: 600 .75rem Outfit, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
+  .ico { width: 22px; height: 22px; display: block; flex: none; }
+  .tile { --tile-bg: var(--raised); display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--line); background: var(--tile-bg); color: var(--ink-soft); cursor: pointer; font: 600 .75rem Outfit, sans-serif; }
+  .tile .lbl { color: var(--ink-soft); }
+  .tile.on { --tile-bg: color-mix(in srgb, #f15d22 8%, var(--raised)); border-color: #f15d22; color: #f15d22; }
+  .tile.on .lbl { color: var(--ink); }
+  .frame.dark .tile.on { --tile-bg: color-mix(in srgb, #f15d22 16%, var(--raised)); border-color: #ff8b5e; color: #ff8b5e; }
+  .tile:not(.on):hover { border-color: var(--line-strong); }
+
+  /* A: icon above label, compact square-ish tiles */
+  .vs-a .tiles { display: flex; gap: 6px; }
+  .vs-a .tile { flex-direction: column; gap: 4px; width: 84px; height: 56px; border-radius: 14px; }
+
+  /* B: one joined two-segment outline control, icon left of label */
+  .vs-b { flex-direction: row; align-items: center; gap: 10px; }
+  .vs-b .tiles { display: inline-flex; border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--raised); }
+  .vs-b .tile { border: 0; border-radius: 0; gap: 7px; height: 40px; padding: 0 14px; }
+  .vs-b .tile + .tile { border-left: 1.5px solid var(--line); }
+  .vs-b .tile.on { box-shadow: inset 0 0 0 1.5px #f15d22; }
+  .frame.dark .vs-b .tile.on { box-shadow: inset 0 0 0 1.5px #ff8b5e; }
+
+  /* C: icon-only tiles, the current view named under the control */
+  .vs-c .tiles { display: flex; gap: 6px; }
+  .vs-c .tile { width: 40px; height: 40px; border-radius: 12px; }
+  .vs-c .now { font: 600 .75rem Outfit, sans-serif; color: var(--ink-soft); }
+  .vs-c .now b { color: #f15d22; font-weight: 700; }
+  .frame.dark .vs-c .now b { color: #ff8b5e; }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="brand">beanies<span>.family</span></div>
+    <p class="eyebrow">Who Owns What, the view switch</p>
+    <h1>Card by Card or Board View, drawn as layouts, not tabs</h1>
+    <p class="lede">Overview, Deal and Deck choose what you are looking at. This switch chooses how the Deal view is laid out, so it gets its own shape: outlined tiles with a small drawing of each layout, sitting on the right beside Share the Deck. It behaves exactly as the switch does today.</p>
+    <div class="controls">
+      <span class="outfit" style="font-weight:600;color:var(--pg-soft);font-size:.875rem">App frames:</span>
+      <div class="seg" id="themeSeg" aria-label="Frame theme">
+        <button type="button" data-v="light" aria-pressed="true">Light</button>
+        <button type="button" data-v="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <div>
+        <h2>The three options at a glance</h2>
+        <p>Actual size. Each shows Card by Card selected, then Board View selected.</p>
+      </div>
+    </div>
+    <div class="glance" id="glance"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <div>
+        <h2>In the Deal view header</h2>
+        <p>The real row at 1280 wide: the tabs on the left, the switch and the two sheet actions on the right, the board beneath.</p>
+      </div>
+      <div class="controls">
+        <div class="seg" id="optSeg" aria-label="Option">
+          <button type="button" data-v="a" aria-pressed="true">Option A</button>
+          <button type="button" data-v="b" aria-pressed="false">Option B</button>
+          <button type="button" data-v="c" aria-pressed="false">Option C</button>
+        </div>
+      </div>
+    </div>
+    <p class="stage-label">Card by Card selected</p>
+    <div class="stage" id="stage1"><div class="scaler" id="scale1"></div></div>
+    <p class="stage-label" style="margin-top:14px">Board View selected</p>
+    <div class="stage" id="stage2"><div class="scaler" id="scale2"></div></div>
+    <div class="notes">
+      <div class="note"><h3>A. Icon over label</h3><p>The clearest: each tile reads as a picture of the layout with its name. Tallest of the three, so the row gains a little height.</p></div>
+      <div class="note"><h3>B. One joined control</h3><p>Reads as a single "view" control, like a desktop app toolbar. Same height as the buttons beside it, so the row stays slim.</p></div>
+      <div class="note"><h3>C. Icons only</h3><p>The most compact. The current view is named under the icons, and each icon names itself on hover. Relies most on the drawings reading at a glance.</p></div>
+      <div class="note ask"><h3>Your call</h3><p>Pick A, B or C. My lean is B: it is the most clearly "one control, two layouts" and sits level with Share the Deck.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ICON_CARDS = `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+  <rect x="2.6" y="6.4" width="8.4" height="12.2" rx="1.8" transform="rotate(-18 6.8 12.5)" />
+  <rect x="13" y="6.4" width="8.4" height="12.2" rx="1.8" transform="rotate(18 17.2 12.5)" />
+  <rect x="7.8" y="4.6" width="8.4" height="13.4" rx="1.8" fill="var(--tile-bg)" />
+  <path d="M10.2 14.8h3.6M10.2 12.2h2.2" stroke-linecap="round" />
+</svg>`;
+const ICON_BOARD = `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+  <rect x="2.8" y="4.3" width="18.4" height="15.4" rx="2.4" />
+  <path d="M8.2 4.3v15.4" />
+  <path d="M8.2 9.5h13M8.2 14.5h13" />
+  <path d="M4.6 7.4h1.8M4.6 10.2h1.8M4.6 13h1.8" />
+</svg>`;
+const LABELS = { cards: 'Card by Card', board: 'Board View' };
+
+function tile(kind, on, withLabel) {
+  const icon = kind === 'cards' ? ICON_CARDS : ICON_BOARD;
+  return `<span class="tile ${on ? 'on' : ''}" role="radio" aria-checked="${on}" title="${LABELS[kind]}">${icon}${withLabel ? `<span class="lbl">${LABELS[kind]}</span>` : ''}</span>`;
+}
+function vswitch(opt, sel) {
+  const t = (k) => tile(k, sel === k, opt !== 'c');
+  const tiles = `<span class="tiles" role="radiogroup" aria-label="Switch view">${t('cards')}${t('board')}</span>`;
+  if (opt === 'a') return `<div class="vs vs-a"><span class="vs-cap">Switch view</span>${tiles}</div>`;
+  if (opt === 'b') return `<div class="vs vs-b"><span class="vs-cap">Switch view</span>${tiles}</div>`;
+  return `<div class="vs vs-c"><span class="vs-cap">Switch view</span>${tiles}<span class="now">Now: <b>${LABELS[sel]}</b></span></div>`;
+}
+
+function app(opt, sel, theme) {
+  return `<div class="frame ${theme} app" style="width:1280px">
+    <nav class="side"><div class="logo">beanies<span>.family</span></div>
+      <div class="sect">The Treehouse</div>
+      <div class="row">Family Dashboard</div><div class="row">Family Activities</div><div class="row">Meal Planner</div>
+      <div class="row on">Who Owns What</div>
+      <div class="sect">The Piggy Bank</div><div class="row">Overview</div>
+    </nav>
+    <div class="main">
+      <div class="pagehead"><div><h4>Who Owns What</h4><div class="cav">Who's holding what this week?</div></div><span class="addbtn">+ Add a Card</span></div>
+      <div class="toolrow">
+        <div class="tabs"><span>Overview</span><span class="on">Deal</span><span>Deck</span></div>
+        <div class="right">
+          ${vswitch(opt, sel)}
+          <span class="vsep"></span>
+          <span class="share">Share the Deck</span>
+          <span class="export">Export as PDF</span>
+        </div>
+      </div>
+      <div class="strip">
+        <div class="rail"><b>The Deck</b><small>19 cards still to deal</small><i></i><i></i></div>
+        <div class="lanes">
+          <div class="lane"><span class="who">greg</span><div class="minis"><span class="mini">Laundry</span><span class="mini">Trash Night</span><span class="mini">Grocery Shopping</span><span class="mini">Car Care</span></div></div>
+          <div class="lane b"><span class="who">Sofia</span><div class="minis"><span class="mini">Cooking Dinner</span><span class="mini">School Forms</span><span class="mini">Birthday Parties</span><span class="mini">Date Nights</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+let opt = 'a';
+
+function fit(stageId, scalerId, w) {
+  const stage = document.getElementById(stageId), el = document.getElementById(scalerId);
+  const s = Math.min(1, (stage.clientWidth - 28) / w);
+  el.style.transform = `scale(${s})`;
+  el.style.width = w + 'px';
+  stage.style.height = (el.firstElementChild.offsetHeight * s + 28) + 'px';
+}
+function render() {
+  document.getElementById('glance').innerHTML = ['a', 'b', 'c'].map((o) =>
+    `<div class="frame ${theme}"><span class="tag">Option ${o.toUpperCase()}</span><div class="pair">${vswitch(o, 'cards')}${vswitch(o, 'board')}</div></div>`
+  ).join('');
+  document.getElementById('scale1').innerHTML = app(opt, 'cards', theme);
+  document.getElementById('scale2').innerHTML = app(opt, 'board', theme);
+  fit('stage1', 'scale1', 1280);
+  fit('stage2', 'scale2', 1280);
+}
+function seg(id, set) {
+  const root = document.getElementById(id);
+  root.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    root.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    set(b.dataset.v); render();
+  });
+}
+seg('themeSeg', (v) => { theme = v; });
+seg('optSeg', (v) => { opt = v; });
+document.querySelectorAll('#themeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === theme)));
+addEventListener('resize', render);
+render();
+</script>

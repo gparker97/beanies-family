@@ -16,8 +16,14 @@
  * A row shows a small count caption next to the name (allowed here and in By Person only);
  * it is a caption, never a scoreboard. Writes go through `useDealActions`; the page hosts
  * the drawers (`open`, `edit`, `new-card`).
+ *
+ * Layout (2026-09-28, plan `2026-09-28-deal-board-and-card-in-hand.md`): the board fills the
+ * page (the page's flex column sizes it; no JS). The rail list and the lanes scroll on their
+ * own. Only a member holding a card gets a lane; the rest fold into one strip at the bottom,
+ * each face still a drop target, in a sticky footer with the (folded) Skipped row, so both
+ * stay on screen however long the lanes get.
  */
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -28,29 +34,38 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { groupByCategory, type ResolvedCard, type ResolvedPart } from '@/utils/responsibilityDeck';
+import {
+  cardSequence,
+  groupByCategory,
+  type CardSequence,
+  type ResolvedCard,
+  type ResolvedPart,
+} from '@/utils/responsibilityDeck';
+import { logEvent } from '@/services/telemetry/logEvent';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckActionButton from './DeckActionButton.vue';
+import DealBoardMini from './DealBoardMini.vue';
 import { useDealActions } from './useDealActions';
 
 const emit = defineEmits<{
-  open: [cardId: string];
+  open: [cardId: string, sequence: CardSequence | null];
   edit: [cardId: string];
   'new-card': [];
 }>();
 
-/** Chips shown per row before "+N more". */
-const CHIP_CAP = 10;
 const SKIPPED_ROW = '__skipped';
+/** Up to this many greyed thumbs sit in the folded Skipped row. */
+const SKIPPED_STACK = 6;
 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardDone, partCaption, memberCardsLabel } = useResponsibilityCardLabel();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 const { pulse } = useAttentionPulse();
 const { dragged, startDrag, endDrag } = useCardDrag();
@@ -136,6 +151,8 @@ async function dealTo(cardId: string, memberId: string, partKey?: string): Promi
   if (part.holderId === memberId && card.status !== 'skipped') return false;
   const res = await actions.deal(cardId, part.key, memberId);
   if (!res) return false;
+  // A first card turns an idle pill into a lane: flash the lane, after it has rendered.
+  await nextTick();
   landed(memberId);
   return true;
 }
@@ -178,7 +195,10 @@ interface Chip {
   key: string;
   card: ResolvedCard;
   part?: ResolvedPart;
+  /** The split part ("for Mia"), else what done looks like. */
   caption: string;
+  /** True when `caption` is a split part (drawn in the accent colour). */
+  accent: boolean;
 }
 
 const members = computed(() => familyStore.sortedHumans);
@@ -195,7 +215,14 @@ const chipsByMember = computed(() => {
     for (const part of card.parts) {
       if (!part.holderId) continue;
       const list = out.get(part.holderId) ?? [];
-      list.push({ key: `${card.id}:${part.key}`, card, part, caption: partCaption(card, part) });
+      const pc = partCaption(card, part);
+      list.push({
+        key: `${card.id}:${part.key}`,
+        card,
+        part,
+        caption: pc || cardDone(card),
+        accent: !!pc,
+      });
       out.set(part.holderId, list);
     }
   }
@@ -204,8 +231,23 @@ const chipsByMember = computed(() => {
 const skippedChips = computed<Chip[]>(() =>
   groupByCategory(store.resolved.filter((c) => c.status === 'skipped'))
     .flatMap((g) => g.cards)
-    .map((card) => ({ key: card.id, card, caption: '' }))
+    .map((card) => ({ key: card.id, card, caption: cardDone(card), accent: false }))
 );
+
+/** Members holding a card get a lane; the rest fold into the strip (as the wall does). */
+const busyMembers = computed(() => members.value.filter((m) => chipsByMember.value.has(m.id)));
+const idleMembers = computed(() => members.value.filter((m) => !chipsByMember.value.has(m.id)));
+const skippedOpen = ref(false);
+
+/** Open a card with the list it sits in, so the drawer can step through it. */
+function openFromLane(memberId: string, name: string, cardId: string): void {
+  const ids = (chipsByMember.value.get(memberId) ?? []).map((c) => c.card.id);
+  emit('open', cardId, cardSequence(memberCardsLabel(name), ids));
+}
+function openFromSkipped(cardId: string): void {
+  const ids = skippedChips.value.map((c) => c.card.id);
+  emit('open', cardId, cardSequence(t('whoOwnsWhat.board.skippedRow'), ids));
+}
 
 function countLine(memberId: string): string {
   const n = store.myCards(memberId).length;
@@ -213,17 +255,6 @@ function countLine(memberId: string): string {
     t(n === 1 ? 'whoOwnsWhat.byBean.count.one' : 'whoOwnsWhat.byBean.count.other'),
     { count: n }
   );
-}
-
-const expanded = ref(new Set<string>());
-function visibleChips(key: string, chips: Chip[]): Chip[] {
-  return expanded.value.has(key) ? chips : chips.slice(0, CHIP_CAP);
-}
-function toggleExpanded(key: string): void {
-  const next = new Set(expanded.value);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
-  expanded.value = next;
 }
 
 // ── Drag and drop ────────────────────────────────────────────────────────────
@@ -242,8 +273,15 @@ async function onDrop(key: string): Promise<void> {
   const payload = dragged.value;
   endDrag();
   if (!payload) return;
-  if (key === SKIPPED_ROW) await skipCard(payload.cardId);
-  else await dealTo(payload.cardId, key, payload.partKey);
+  if (key === SKIPPED_ROW) {
+    await skipCard(payload.cardId);
+    return;
+  }
+  const wasIdle = !chipsByMember.value.get(key)?.length;
+  // Success-path signal that the folded strip still works as a drop target.
+  if ((await dealTo(payload.cardId, key, payload.partKey)) && wasIdle) {
+    logEvent({ level: 'info', surface: 'responsibilities', message: 'board_deal_to_idle' });
+  }
 }
 
 function onRailKey(e: KeyboardEvent, cardId: string): void {
@@ -268,12 +306,12 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
 <template>
   <div
     ref="rootEl"
-    class="board dark:bg-surface-raised dark:border-line grid overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white md:grid-cols-[17rem_minmax(0,1fr)]"
+    class="board dark:bg-surface-raised dark:border-line grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] overflow-hidden rounded-3xl border border-[var(--color-border)] bg-white md:grid-cols-[17rem_minmax(0,1fr)]"
     data-testid="deal-board"
   >
     <!-- Rail -->
     <aside
-      class="dark:border-line flex min-w-0 flex-col gap-2.5 border-r border-[rgb(44_62_80/6%)] p-4"
+      class="dark:border-line flex min-h-0 min-w-0 flex-col gap-2.5 border-r border-[rgb(44_62_80/6%)] p-4"
     >
       <div class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">
         <span aria-hidden="true">🙋</span> {{ t('whoOwnsWhat.board.title') }}
@@ -299,7 +337,7 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
         data-testid="deal-board-filter"
       />
 
-      <div class="rail-list -mx-1 flex min-h-0 flex-col gap-2 overflow-y-auto px-1 pb-1">
+      <div class="-mx-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-1">
         <p
           v-if="!railGroups.length"
           class="dark:text-ink-soft py-4 text-center text-xs text-[var(--color-text-muted)]"
@@ -395,23 +433,25 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
       </p>
     </aside>
 
-    <!-- Rows: one per non-pet member, then Skipped. -->
-    <div class="flex min-w-0 flex-col gap-2.5 p-4">
+    <!-- Lanes: one per member holding a card; the footer keeps the idle strip + Skipped.
+         Lanes never shrink (`shrink-0`): a full deck scrolls this column instead of squeezing
+         each lane shorter than its cards, which spilled a lane's last row into the next. -->
+    <div class="flex min-h-0 min-w-0 flex-col gap-2.5 overflow-y-auto p-4" data-testid="deal-lanes">
       <section
-        v-for="m in members"
+        v-for="m in busyMembers"
         :key="m.id"
-        class="brow grid min-h-[5.75rem] grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-[14px] transition-colors"
+        class="brow grid min-h-[5.75rem] shrink-0 grid-cols-[7rem_minmax(0,1fr)] rounded-[14px] transition-colors"
         :class="{ 'is-over': overRow === m.id }"
         :style="{ '--m': memberAvatarBindings(m).color }"
         :data-row="m.id"
-        :aria-label="fillTemplate(t('whoOwnsWhat.board.rowLabel'), { name: m.name })"
+        :aria-label="memberCardsLabel(m.name)"
         :data-testid="`deal-row-${m.id}`"
         @dragover="onDragOver(m.id, $event)"
         @dragenter="onDragOver(m.id, $event)"
         @dragleave="onDragLeave(m.id)"
         @drop.prevent="onDrop(m.id)"
       >
-        <div class="flex flex-col items-center justify-center gap-1 p-2 text-center">
+        <div class="flex flex-col items-center justify-start gap-1 p-2 pt-3.5 text-center">
           <span data-face class="inline-flex">
             <BeanieAvatar v-bind="memberAvatarBindings(m)" size="md" />
           </span>
@@ -422,130 +462,176 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
             countLine(m.id)
           }}</small>
         </div>
-        <div class="cells flex flex-wrap content-start gap-1.5 p-2">
-          <button
-            v-for="chip in visibleChips(m.id, chipsByMember.get(m.id) ?? [])"
+        <div class="cells lane-grid grid content-start gap-2 p-2.5">
+          <DealBoardMini
+            v-for="chip in chipsByMember.get(m.id) ?? []"
             :key="chip.key"
-            type="button"
-            draggable="true"
-            class="chip"
-            :style="{ '--cat': categoryTint(chip.card.category) }"
+            :card="chip.card"
+            :caption="chip.caption"
+            :accent="chip.accent"
             :data-testid="`deal-chip-${m.id}-${chip.key}`"
-            @click="emit('open', chip.card.id)"
+            @click="openFromLane(m.id, m.name, chip.card.id)"
             @dragstart="startDrag({ cardId: chip.card.id, partKey: chip.part?.key }, $event)"
             @dragend="endDrag"
-          >
-            <span class="thumb" aria-hidden="true"
-              ><CardArt :card="chip.card" img-class="h-full w-full"
-            /></span>
-            <span class="truncate">{{ cardName(chip.card) }}</span>
-            <small v-if="chip.caption">{{ chip.caption }}</small>
-          </button>
-          <button
-            v-if="(chipsByMember.get(m.id)?.length ?? 0) > CHIP_CAP"
-            type="button"
-            class="chip more"
-            @click="toggleExpanded(m.id)"
-          >
-            <small>{{
-              expanded.has(m.id)
-                ? t('whoOwnsWhat.board.less')
-                : fillTemplate(t('whoOwnsWhat.board.more'), {
-                    count: (chipsByMember.get(m.id)?.length ?? 0) - CHIP_CAP,
-                  })
-            }}</small>
-          </button>
+          />
           <span v-if="dragged" class="drop">{{ t('whoOwnsWhat.board.dropDeal') }}</span>
         </div>
       </section>
 
-      <section
-        class="brow is-skipped grid min-h-[5.75rem] grid-cols-[7rem_minmax(0,1fr)] overflow-hidden rounded-[14px] transition-colors"
-        :class="{ 'is-over': overRow === SKIPPED_ROW }"
-        :data-row="SKIPPED_ROW"
-        :aria-label="t('whoOwnsWhat.board.skippedRow')"
-        data-testid="deal-row-skipped"
-        @dragover="onDragOver(SKIPPED_ROW, $event)"
-        @dragenter="onDragOver(SKIPPED_ROW, $event)"
-        @dragleave="onDragLeave(SKIPPED_ROW)"
-        @drop.prevent="onDrop(SKIPPED_ROW)"
+      <!-- Footer right under the last lane; sticky, so once the lanes scroll it stays on
+           screen as a drop target. -->
+      <div
+        class="board-foot dark:bg-surface-raised sticky bottom-0 flex flex-col gap-2.5 bg-white pt-1"
+        :class="busyMembers.length ? 'shrink-0' : 'flex-1'"
       >
-        <div class="flex flex-col items-center justify-center gap-1 p-2 text-center">
+        <div
+          v-if="idleMembers.length"
+          class="idle dark:border-line-strong flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[14px] border-[1.5px] border-dashed border-[rgb(44_62_80/25%)] px-3.5 py-2.5"
+          :class="{ 'flex-1 content-center justify-center': !busyMembers.length }"
+          data-testid="deal-idle-strip"
+        >
           <span
-            data-face
-            class="skip-face grid h-10 w-10 place-items-center rounded-full text-lg"
-            aria-hidden="true"
-            >⏭️</span
+            class="font-outfit dark:text-ink-faint text-xs font-bold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
+            >{{ t('whoOwnsWhat.board.idleTitle') }}</span
           >
-          <b class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">{{
-            t('whoOwnsWhat.board.skippedRow')
-          }}</b>
-          <small class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">{{
-            store.stats.skipped
-          }}</small>
+          <div
+            v-for="m in idleMembers"
+            :key="m.id"
+            class="idle-bean font-outfit dark:bg-surface-overlay dark:border-line dark:text-ink inline-flex items-center gap-2 rounded-full border border-[rgb(44_62_80/9%)] bg-white py-1 pr-3 pl-1 text-sm font-semibold text-[var(--color-text)] transition-colors"
+            :class="{ 'is-over': overRow === m.id }"
+            role="group"
+            :data-row="m.id"
+            :aria-label="fillTemplate(t('whoOwnsWhat.board.dropTo'), { name: m.name })"
+            :data-testid="`deal-row-${m.id}`"
+            @dragover="onDragOver(m.id, $event)"
+            @dragenter="onDragOver(m.id, $event)"
+            @dragleave="onDragLeave(m.id)"
+            @drop.prevent="onDrop(m.id)"
+          >
+            <span data-face class="inline-flex">
+              <BeanieAvatar v-bind="memberAvatarBindings(m)" size="sm" />
+            </span>
+            {{ m.name }}
+          </div>
+          <span class="dark:text-ink-faint ml-auto text-xs text-[var(--color-text-muted)]">{{
+            t('whoOwnsWhat.board.idleHint')
+          }}</span>
         </div>
-        <div class="cells flex flex-wrap content-start gap-1.5 p-2">
-          <button
-            v-for="chip in visibleChips(SKIPPED_ROW, skippedChips)"
-            :key="chip.key"
-            type="button"
-            draggable="true"
-            class="chip is-skipped"
-            :style="{ '--cat': categoryTint(chip.card.category) }"
-            :data-testid="`deal-chip-skipped-${chip.key}`"
-            @click="emit('open', chip.card.id)"
-            @dragstart="startDrag({ cardId: chip.card.id }, $event)"
-            @dragend="endDrag"
-          >
-            <span class="thumb" aria-hidden="true"
-              ><CardArt :card="chip.card" img-class="h-full w-full"
-            /></span>
-            <span class="truncate">{{ cardName(chip.card) }}</span>
-          </button>
-          <button
-            v-if="skippedChips.length > CHIP_CAP"
-            type="button"
-            class="chip more"
-            @click="toggleExpanded(SKIPPED_ROW)"
-          >
-            <small>{{
-              expanded.has(SKIPPED_ROW)
-                ? t('whoOwnsWhat.board.less')
-                : fillTemplate(t('whoOwnsWhat.board.more'), {
-                    count: skippedChips.length - CHIP_CAP,
-                  })
+
+        <section
+          class="brow is-skipped rounded-[14px] transition-colors"
+          :class="{ 'is-over': overRow === SKIPPED_ROW }"
+          :data-row="SKIPPED_ROW"
+          :aria-label="t('whoOwnsWhat.board.skippedRow')"
+          data-testid="deal-row-skipped"
+          @dragover="onDragOver(SKIPPED_ROW, $event)"
+          @dragenter="onDragOver(SKIPPED_ROW, $event)"
+          @dragleave="onDragLeave(SKIPPED_ROW)"
+          @drop.prevent="onDrop(SKIPPED_ROW)"
+        >
+          <div class="flex flex-wrap items-center gap-3 px-3.5 py-2">
+            <span
+              data-face
+              class="skip-face grid h-9 w-9 place-items-center rounded-full text-base"
+              aria-hidden="true"
+              >⏭️</span
+            >
+            <b class="font-outfit dark:text-ink text-sm font-bold text-[var(--color-text)]">{{
+              t('whoOwnsWhat.board.skippedRow')
+            }}</b>
+            <button
+              v-if="skippedChips.length"
+              type="button"
+              class="font-outfit text-primary-500 dark:text-accent-lift inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-xs font-semibold"
+              :aria-expanded="skippedOpen"
+              data-testid="deal-skipped-toggle"
+              @click="skippedOpen = !skippedOpen"
+            >
+              {{
+                skippedOpen
+                  ? t('whoOwnsWhat.board.hideSkipped')
+                  : t('whoOwnsWhat.board.showSkipped')
+              }}
+              <BeanieIcon :name="skippedOpen ? 'chevron-up' : 'chevron-down'" size="xs" />
+            </button>
+            <small class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">{{
+              fillTemplate(
+                t(
+                  skippedChips.length === 1
+                    ? 'whoOwnsWhat.board.skippedSummary.one'
+                    : 'whoOwnsWhat.board.skippedSummary.other'
+                ),
+                { count: skippedChips.length }
+              )
             }}</small>
-          </button>
-          <span v-if="dragged" class="drop">{{ t('whoOwnsWhat.board.dropSkip') }}</span>
-        </div>
-      </section>
+            <span v-if="!skippedOpen && skippedChips.length" class="stack flex" aria-hidden="true">
+              <span
+                v-for="chip in skippedChips.slice(0, SKIPPED_STACK)"
+                :key="chip.key"
+                class="stack-thumb grid h-7 w-7 place-items-center overflow-hidden rounded-lg text-sm"
+                :style="{ '--cat': categoryTint(chip.card.category) }"
+                ><CardArt :card="chip.card" img-class="h-full w-full"
+              /></span>
+            </span>
+            <span v-if="dragged" class="drop">{{ t('whoOwnsWhat.board.dropSkip') }}</span>
+          </div>
+          <div
+            v-if="skippedOpen"
+            class="lane-grid grid max-h-[12rem] content-start gap-2 overflow-y-auto px-2.5 pb-2.5"
+            data-testid="deal-skipped-grid"
+          >
+            <DealBoardMini
+              v-for="chip in skippedChips"
+              :key="chip.key"
+              :card="chip.card"
+              :caption="chip.caption"
+              muted
+              :data-testid="`deal-chip-skipped-${chip.key}`"
+              @click="openFromSkipped(chip.card.id)"
+              @dragstart="startDrag({ cardId: chip.card.id }, $event)"
+              @dragend="endDrag"
+            />
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.rail-list {
-  max-height: 34rem;
-}
-
-.chip .thumb {
-  border-radius: 0.5625rem;
-  display: grid;
-  flex: none;
-  font-size: 1rem;
-  height: 1.75rem;
-  place-items: center;
-  width: 1.75rem;
-}
-
-.rail-card .thumb,
-.chip .thumb {
+.rail-card .thumb {
   background: color-mix(in srgb, var(--cat) 14%, transparent);
 }
 
-html.dark .rail-card .thumb,
-html.dark .chip .thumb {
+html.dark .rail-card .thumb {
   background: color-mix(in srgb, var(--cat) 24%, transparent);
+}
+
+.lane-grid {
+  grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+}
+
+.stack-thumb {
+  background: color-mix(in srgb, var(--cat) 14%, var(--color-surface-raised, #fff));
+  border: 2px solid #fff;
+  filter: grayscale(1);
+  margin-left: -0.375rem;
+}
+
+html.dark .stack-thumb {
+  background: color-mix(in srgb, var(--cat) 24%, var(--color-surface-raised));
+  border-color: var(--color-surface-raised);
+}
+
+.idle-bean.is-over {
+  background: var(--tint-orange-8);
+  border-color: #f15d22;
+  box-shadow: 0 0 0 3px var(--tint-orange-15);
+}
+
+html.dark .idle-bean.is-over {
+  background: color-mix(in srgb, #f15d22 18%, var(--color-surface-overlay));
+  border-color: var(--color-accent-lift);
 }
 
 .rail-card.is-picking {
@@ -600,60 +686,6 @@ html.dark .cells {
 
 html.dark .skip-face {
   background: var(--color-surface-overlay);
-}
-
-.chip {
-  align-items: center;
-  background: #fff;
-  border: 1px solid rgb(44 62 80 / 9%);
-  border-radius: 0.8125rem;
-  box-shadow: var(--card-shadow);
-  color: var(--color-text);
-  cursor: grab;
-  display: inline-flex;
-  font-family: Outfit, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 700;
-  gap: 0.375rem;
-  max-width: 100%;
-  padding: 0.25rem 0.625rem 0.25rem 0.25rem;
-}
-
-.chip:hover {
-  border-color: rgb(241 93 34 / 38%);
-}
-
-html.dark .chip {
-  background: var(--color-surface-overlay);
-  border-color: var(--color-line);
-  color: var(--color-ink);
-}
-
-html.dark .chip:hover {
-  background: var(--color-surface-hover);
-  border-color: var(--color-line-strong);
-}
-
-.chip small {
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-html.dark .chip small {
-  color: var(--color-ink-faint);
-}
-
-.chip.is-skipped,
-.chip.more {
-  border-style: dashed;
-  box-shadow: none;
-}
-
-.chip.more {
-  cursor: pointer;
-  padding: 0.375rem 0.75rem;
 }
 
 .drop {

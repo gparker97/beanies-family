@@ -19,7 +19,9 @@
  *    listbox, a menu, a tab list, a radio group...): the arrow keeps its native meaning
  *    there. Letters and digits still act, since those widgets don't use them;
  *  - a modal or drawer is open (`hasOpenOverlays`) or any Escape layer is (popovers and
- *    menus register there), so a shortcut never acts on the page behind them.
+ *    menus register there), so a shortcut never acts on the page behind them. A surface
+ *    that itself lives inside overlays passes `overlayDepth` (how many it sits in, e.g. 1
+ *    for a drawer): its keys then pause only for layers opened ON TOP of it.
  *
  * Focus elsewhere on the page does NOT block a shortcut: the normal way in leaves focus on
  * the button that opened the surface (a view toggle, a tab), and gating on focus there
@@ -31,8 +33,8 @@
  * `onError`. This composable never toasts: store failures already toast where they happen.
  */
 import { onScopeDispose, toValue, type MaybeRefOrGetter } from 'vue';
-import { hasOpenOverlays } from '@/utils/overlayStack';
-import { hasOpenEscapeLayer } from '@/composables/useEscapeClose';
+import { openOverlayCount } from '@/utils/overlayStack';
+import { escapeLayerCount } from '@/composables/useEscapeClose';
 import { isTextEntryFocused } from '@/utils/isTextEntryFocused';
 
 /** `false`: not handled (default kept). `true` or a promise: handled (default prevented). */
@@ -78,9 +80,12 @@ export function useKeyboardShortcuts(
     enabled: MaybeRefOrGetter<boolean>;
     tag: string;
     onError?: (key: string, err: unknown) => void;
+    /** Overlays (and Escape layers) the surface itself sits in. Default 0: the page. */
+    overlayDepth?: number;
   }
 ): void {
   const { tag, onError } = options;
+  const depth = options.overlayDepth ?? 0;
 
   function fail(key: string, err: unknown): void {
     console.error(`[${tag}] shortcut "${key}" failed`, err);
@@ -95,7 +100,7 @@ export function useKeyboardShortcuts(
     const key = event.key.toLowerCase();
     const fn = map[key];
     if (!fn) return;
-    if (isTextEntryFocused() || hasOpenOverlays() || hasOpenEscapeLayer()) return;
+    if (isTextEntryFocused() || openOverlayCount() > depth || escapeLayerCount() > depth) return;
     if (key.startsWith('arrow') && arrowsBelongToFocus()) return;
 
     let result: boolean | Promise<unknown>;

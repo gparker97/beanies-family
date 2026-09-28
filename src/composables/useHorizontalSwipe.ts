@@ -39,6 +39,11 @@ export interface UseHorizontalSwipeOptions {
   edgeIgnore?: number;
   /** Optional reactive flag to disable the gesture without unmounting. */
   enabled?: Ref<boolean>;
+  /**
+   * Touch and pen only: a mouse drag is left alone (it selects text on a desktop, which a
+   * swipe must not hijack). Default false: mouse drags swipe too.
+   */
+  ignoreMouse?: boolean;
 }
 
 export function useHorizontalSwipe(
@@ -64,6 +69,7 @@ export function useHorizontalSwipe(
 
   function onPointerDown(e: PointerEvent) {
     if (options.enabled && !options.enabled.value) return;
+    if (options.ignoreMouse && e.pointerType === 'mouse') return;
     // Only primary mouse button; touch/pen always primary.
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     // iOS Safari edge-swipe-back guard. Only applies to touch — mouse / pen
