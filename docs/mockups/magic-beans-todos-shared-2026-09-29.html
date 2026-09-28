@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Magic Beans To-dos</title>
+<!-- ===========================================================================
+     Magic beans finds to-dos, and returns a shared result (2026-09-29), tracker #113
+
+     Five screens, each drawn at phone width (390) and, on a wide screen, at true
+     desktop size. Screen 2 is drawn two ways: A a right-side drawer (the
+     StatementImportModal / ActivityModal slot) and B a centered BeanieFormModal
+     (the TravelExtractReviewModal shape).
+
+     CIG-clamped. Every color comes from packages/brand/theme.css or src/style.css:
+       Heritage Orange #F15D22, Deep Slate #2C3E50, Sky Silk #AED6F1,
+       Terracotta #E67E22, Cloud White #F8F9FA, To-do purple #9B59B6 / #8E44AD
+       dark: surface-ground #151E27, surface-raised #1E2A36, surface-overlay #26343F,
+             surface-hover #2F3E4B, ink #F2F5F7, ink-soft #C3CED6, ink-faint #9AA9B4,
+             line #4A5B69, line-strong #7A8A97, accent-lift #FF8B5E,
+             purple-lift #CB95DD, danger-lift #FF8484, success-lift #5FD08A
+     Outfit (headings, chips, values) and Inter (body). rem sizes only, 12px floor.
+     Red appears in screen 5 only (a destructive confirm).
+
+     Theme: follows the OS, or force with ?theme=light / ?theme=dark, or the toggle.
+     =========================================================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    /* mockup page chrome (not the design) */
+    --page-bg: #eef1f4;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 12%);
+    --frame-edge: rgb(44 62 80 / 14%);
+
+    /* the app, light */
+    --app-bg: #f8f9fa;
+    --app-side: #2c3e50;
+    --app-block: #ffffff;
+    --app-block-2: rgb(44 62 80 / 6%);
+    --panel: #ffffff;
+    --body-bg: #f8f9fa;
+    --card: #ffffff;
+    --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+    --soft-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+    --footer-bg: #f9fafb;
+    --ink: #2c3e50;
+    --ink-soft: #506b7a;
+    --ink-faint: #64748b;
+    --line: rgb(44 62 80 / 10%);
+    --line-strong: rgb(44 62 80 / 22%);
+    --tile: rgb(44 62 80 / 5%);
+    --tile-hover: rgb(44 62 80 / 10%);
+    --chip: rgb(44 62 80 / 5%);
+    --accent: #f15d22;
+    --accent-ink: #d14d1a;
+    --accent-tint: rgb(241 93 34 / 8%);
+    --accent-tint-2: rgb(241 93 34 / 15%);
+    --purple: #9b59b6;
+    --purple-ink: #8e44ad;
+    --purple-tint: rgb(155 89 182 / 8%);
+    --purple-tint-2: rgb(155 89 182 / 12%);
+    --green-ink: #1e8449;
+    --danger: #dc2626;
+    --danger-ink: #dc2626;
+    --danger-tint: #fee2e2;
+    --danger-btn: #dc2626;
+    --silk-tint: rgb(174 214 241 / 20%);
+    --scrim: rgb(0 0 0 / 50%);
+    --scrim-soft: rgb(0 0 0 / 30%);
+    --focus: #aed6f1;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --page-bg: #101820;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #c3ced6;
+    --page-line: rgb(255 255 255 / 10%);
+    --frame-edge: #4a5b69;
+
+    --app-bg: #151e27;
+    --app-side: #101820;
+    --app-block: #1e2a36;
+    --app-block-2: #26343f;
+    --panel: #1e2a36;
+    --body-bg: #1b2631;
+    --card: #26343f;
+    --card-shadow: 0 4px 20px rgb(0 0 0 / 25%);
+    --soft-shadow: 0 8px 40px rgb(0 0 0 / 40%);
+    --footer-bg: #151e27;
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: #4a5b69;
+    --line-strong: #7a8a97;
+    --tile: #26343f;
+    --tile-hover: #2f3e4b;
+    --chip: #2f3e4b;
+    --accent: #f15d22;
+    --accent-ink: #ff8b5e;
+    --accent-tint: #2f3e4b;
+    --accent-tint-2: rgb(241 93 34 / 20%);
+    --purple: #9b59b6;
+    --purple-ink: #cb95dd;
+    --purple-tint: #2f3e4b;
+    --purple-tint-2: rgb(155 89 182 / 22%);
+    --green-ink: #5fd08a;
+    --danger: #ef4444;
+    --danger-ink: #ff8484;
+    --danger-tint: rgb(127 29 29 / 30%);
+    --danger-btn: #dc2626;
+    --silk-tint: rgb(174 214 241 / 15%);
+    --scrim: rgb(0 0 0 / 60%);
+    --scrim-soft: rgb(0 0 0 / 45%);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 28px 16px 80px; }
+  @media (min-width: 700px) { .wrap { padding-inline: 24px; } }
+
+  /* ---------- page chrome ---------- */
+  .top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { font-size: 0.875rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 70ch; margin: 0; }
+  .theme-toggle { display: inline-flex; padding: 3px; border-radius: 14px; background: var(--page-line); gap: 2px; }
+  .theme-toggle button {
+    border: 0; background: transparent; cursor: pointer; padding: 6px 14px; border-radius: 11px;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.8125rem; color: var(--page-ink-soft);
+  }
+  .theme-toggle button[aria-pressed='true'] { background: var(--panel); color: var(--page-ink); box-shadow: 0 1px 4px rgb(0 0 0 / 12%); }
+  .theme-toggle button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .source {
+    margin: 20px 0 8px; padding: 14px 16px; border-radius: 16px; background: var(--panel);
+    border: 1px solid var(--page-line); max-width: 760px;
+  }
+  .source p { margin: 0; font-size: 0.8125rem; line-height: 1.6; color: var(--page-ink-soft); }
+  .source strong { color: var(--page-ink); font-family: 'Outfit', sans-serif; font-weight: 600; }
+  .family { margin-top: 6px !important; }
+
+  section.screen { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--page-line); }
+  h2 { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 700; margin: 0 0 4px; }
+  h3 { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 600; margin: 26px 0 4px; }
+  .cap { font-size: 0.8125rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 78ch; margin: 0 0 4px; }
+  .cap b { color: var(--page-ink); font-weight: 600; }
+
+  .frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 16px; }
+  .fwrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .flabel { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--page-ink-soft); }
+  .desk-only { display: none; }
+  @media (min-width: 1180px) { .desk-only { display: flex; } .phone-note { display: none; } }
+  .phone-note { font-size: 0.75rem; color: var(--page-ink-soft); margin: 10px 0 0; }
+
+  /* ---------- device frames ---------- */
+  .phone {
+    width: min(390px, calc(100vw - 32px)); border-radius: 30px; overflow: hidden; position: relative;
+    border: 1px solid var(--frame-edge); background: var(--app-bg); box-shadow: 0 10px 40px rgb(0 0 0 / 10%);
+    display: flex; flex-direction: column; min-height: 640px;
+  }
+  .status { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px;
+    font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.75rem; color: var(--ink); background: var(--panel); }
+  .desk {
+    width: 780px; border-radius: 18px; overflow: hidden; position: relative; border: 1px solid var(--frame-edge);
+    background: var(--app-bg); box-shadow: 0 10px 40px rgb(0 0 0 / 10%); display: flex; min-height: 640px;
+  }
+  .desk.wide { width: 1180px; }
+
+  /* the app underneath, deliberately vague */
+  .appbg { position: absolute; inset: 0; display: flex; background: var(--app-bg); }
+  .appbg .side { width: 190px; background: var(--app-side); flex: none; }
+  .appbg .main { flex: 1; padding: 28px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-content: start; }
+  .appbg .blk { height: 120px; border-radius: 24px; background: var(--app-block); box-shadow: var(--card-shadow); }
+  .appbg .blk.tall { height: 220px; }
+  .appbg .bar { grid-column: 1 / -1; height: 30px; width: 40%; border-radius: 10px; background: var(--app-block-2); }
+  .phone .appbg { position: absolute; inset: 30px 0 0; }
+  .phone .appbg .side { display: none; }
+  .phone .appbg .main { grid-template-columns: 1fr; padding: 16px; }
+  .scrim { position: absolute; inset: 0; background: var(--scrim); }
+  .scrim.soft { background: var(--scrim-soft); backdrop-filter: blur(4px); }
+  .phone .scrim { top: 30px; }
+
+  /* ---------- BaseModal / BaseSidePanel / BeanieFormModal ---------- */
+  .panel { background: var(--panel); color: var(--ink); position: relative; display: flex; flex-direction: column; }
+  .panel.drawer { margin-left: auto; width: 448px; min-height: 100%; box-shadow: -10px 0 40px rgb(0 0 0 / 18%); z-index: 1; }
+  .panel.modal { width: 576px; margin: 40px auto; border-radius: 24px; overflow: hidden; z-index: 1; box-shadow: var(--soft-shadow); }
+  .panel.modal.sm { width: 384px; }
+  .phone .panel.drawer, .phone .panel.full { width: 100%; flex: 1; margin: 0; border-radius: 0; box-shadow: none; }
+  .phone .panel.modal.sm { width: calc(100% - 32px); margin: 150px auto 40px; }
+
+  .mhead { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  .ibox { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 1.25rem; flex: none; background: var(--accent-tint); }
+  .ibox.purple { background: var(--purple-tint-2); }
+  .mtitle { font-family: 'Outfit', sans-serif; font-size: 1.125rem; font-weight: 700; margin: 0; flex: 1; min-width: 0; }
+  .x { width: 32px; height: 32px; border-radius: 12px; border: 0; background: transparent; color: var(--ink-faint); display: grid; place-items: center; cursor: pointer; flex: none; }
+  .x svg { width: 20px; height: 20px; }
+  .mbody { background: var(--body-bg); padding: 20px 24px; flex: 1; }
+  .mfoot { display: flex; gap: 12px; align-items: center; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--footer-bg); }
+  .save {
+    flex: 1; border: 0; cursor: pointer; border-radius: 16px; padding: 14px 10px; color: #fff; white-space: nowrap;
+    font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.875rem;
+    background: linear-gradient(90deg, #f15d22, #e67e22); box-shadow: 0 6px 16px -8px rgb(241 93 34 / 70%);
+  }
+  .save.purple { background: linear-gradient(90deg, #8e44ad, #9b59b6); box-shadow: 0 6px 16px -8px rgb(142 68 173 / 70%); }
+  .save.green { background: linear-gradient(135deg, #27ae60, #2ecc71); box-shadow: none; }
+  .del { width: 48px; height: 48px; border-radius: 14px; border: 0; background: rgb(239 68 68 / 8%); font-size: 1.25rem; flex: none; }
+  .save:focus-visible, .skip:focus-visible, .chipbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .sub { margin: -4px 0 16px; font-size: 0.75rem; line-height: 1.5; color: var(--ink-soft); }
+  .flabel2 {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px;
+    font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+  }
+  .flabel2 .aside { text-transform: none; letter-spacing: 0; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+  .gap { height: 18px; }
+
+  /* ---------- activity summary (read-only) ---------- */
+  .actcard { background: var(--card); border-radius: 20px; padding: 14px; box-shadow: var(--card-shadow); border: 1px solid var(--line); }
+  .acthead { display: flex; gap: 12px; align-items: flex-start; }
+  .acticon { width: 40px; height: 40px; border-radius: 14px; background: var(--accent-tint-2); display: grid; place-items: center; font-size: 1.125rem; flex: none; }
+  .acttitle { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1rem; margin: 0; line-height: 1.3; }
+  .actwhen { margin: 2px 0 0; font-size: 0.8125rem; color: var(--ink-soft); line-height: 1.45; }
+  .nexttag {
+    margin-left: auto; flex: none; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600;
+    padding: 3px 9px; border-radius: 999px; background: var(--accent-tint-2); color: var(--accent-ink);
+  }
+  .actnote { margin: 10px 0 0; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 0.75rem; color: var(--ink-faint); line-height: 1.5; }
+
+  .linkrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 7px 10px; border-radius: 12px; background: var(--chip); font-size: 0.8125rem; min-width: 0; }
+  .linkrow.purple { background: var(--purple-tint); }
+  .fav { width: 16px; height: 16px; border-radius: 4px; background: #aed6f1; color: #2c3e50; display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; flex: none; line-height: 1; }
+  .linktext { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--ink-soft); }
+  .linkrow.purple .linktext { color: var(--purple-ink); }
+  .ext { width: 14px; height: 14px; color: var(--ink-faint); flex: none; }
+
+  /* ---------- to-do review rows ---------- */
+  .rows { position: relative; display: flex; flex-direction: column; gap: 10px; }
+  .rows.linked { padding-left: 18px; }
+  .rows.linked::before { content: ''; position: absolute; left: 6px; top: -12px; bottom: 22px; width: 2px; border-radius: 2px; background: var(--purple-tint-2); }
+  .rrow { position: relative; background: var(--card); border-radius: 18px; padding: 12px 12px 12px 14px; box-shadow: var(--card-shadow); border: 1px solid var(--line); }
+  .rows.linked .rrow::before {
+    content: ''; position: absolute; left: -16px; top: 20px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--panel); border: 2px solid var(--purple);
+  }
+  .rtop { display: flex; align-items: flex-start; gap: 8px; }
+  .rtitle {
+    flex: 1; min-width: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.9375rem; line-height: 1.35;
+    color: var(--ink); border-bottom: 1px dotted var(--line-strong); padding-bottom: 1px; margin: 2px 0 0;
+  }
+  .rtitle.editing { border: 0; border-radius: 8px; box-shadow: 0 0 0 2px rgb(155 89 182 / 45%); padding: 2px 6px; margin: 0 0 0 -6px; background: var(--panel); }
+  .caret { display: inline-block; width: 1.5px; height: 1em; background: var(--purple-ink); vertical-align: -2px; margin-left: 1px; }
+  .skip {
+    flex: none; display: inline-flex; align-items: center; gap: 4px; border: 0; cursor: pointer; border-radius: 10px;
+    padding: 5px 9px; background: var(--chip); color: var(--ink-soft); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600;
+  }
+  .skip svg { width: 12px; height: 12px; }
+  .rmeta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  .chipbtn {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer;
+    border-radius: 999px; padding: 3px 9px 3px 4px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink);
+  }
+  .chipbtn.date { padding-left: 9px; color: var(--accent-ink); }
+  .chipbtn.date .dnote { color: var(--ink-faint); font-weight: 500; }
+  .chipbtn.open { border-color: var(--purple); box-shadow: 0 0 0 3px rgb(155 89 182 / 16%); }
+  .dn { width: 10px; height: 10px; color: var(--ink-faint); }
+  .av { width: 20px; height: 20px; border-radius: 50%; background: var(--m); color: #fff; display: grid; place-items: center; font-size: 0.75rem; font-weight: 700; line-height: 1; flex: none; }
+  .why { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--ink-soft); padding: 3px 8px; border-radius: 999px; background: var(--chip); }
+  .why svg { width: 11px; height: 11px; color: var(--accent-ink); flex: none; }
+
+  .picker { margin-top: 10px; padding: 10px; border-radius: 14px; background: var(--purple-tint); }
+  .picker p { margin: 0 0 8px; font-size: 0.75rem; color: var(--ink-soft); }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink); }
+  .pill.on { border-color: var(--purple); box-shadow: 0 0 0 2px rgb(155 89 182 / 25%); }
+
+  .rrow.skipped { background: transparent; box-shadow: none; border-style: dashed; padding-block: 9px; }
+  .rrow.skipped .rtitle { border: 0; color: var(--ink-faint); text-decoration: line-through; font-weight: 500; font-size: 0.875rem; }
+  .undo { border: 0; background: none; padding: 0; cursor: pointer; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+  .rows.linked .rrow.skipped::before { border-color: var(--line-strong); }
+
+  /* MagicMiscategorisedBanner, at rest */
+  .notright { margin-top: 20px; border-radius: 14px; background: var(--tile); padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .notright span { font-size: 0.75rem; color: var(--ink-soft); }
+  .notright button { border: 0; background: none; padding: 0; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.75rem; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+
+  /* ---------- screen 1: AiProcessingOverlay ---------- */
+  .ovwrap { position: relative; z-index: 1; margin: auto; padding: 40px 0; }
+  .phone .ovwrap { padding: 150px 0 0; }
+  .ovcard { background: var(--panel); border-radius: 24px; padding: 24px 28px; display: flex; flex-direction: column; align-items: center; gap: 16px; box-shadow: var(--soft-shadow); }
+  .phone .ovcard { padding: 22px 18px; margin: 0 16px; }
+  .tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 5.5rem); gap: 10px; }
+  .phone .tiles { display: flex; flex-wrap: wrap; justify-content: center; max-width: calc(3 * 5.5rem + 20px); }
+  .phone .tiles li { width: 5.5rem; }
+  .tile { height: 4rem; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--tile); }
+  .tile .e { font-size: 1.25rem; line-height: 1; }
+  .tile .l { margin-top: 4px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink-faint); }
+  .tile.gone { opacity: 0.3; }
+  .tile.lit { background: linear-gradient(135deg, #f15d22, #e67e22); transform: scale(1.1); box-shadow: 0 12px 26px -10px rgb(241 93 34 / 65%); }
+  .tile.lit .l { color: #fff; }
+  .tile.new { position: relative; }
+  .ovtext { margin: 2px 0 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.875rem; color: var(--ink); text-align: center; }
+  .phone .spark { left: 22px !important; }
+  .phone .spark + .spark { left: auto !important; right: 22px !important; }
+  .spark { position: absolute; color: var(--accent-ink); width: 18px; height: 18px; }
+
+  /* ---------- screen 4: to-do list + view ---------- */
+  .pagehead { padding: 18px 16px 8px; background: var(--app-bg); }
+  .pagehead h4 { margin: 0; font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--ink); }
+  .pagehead p { margin: 2px 0 0; font-size: 0.8125rem; color: var(--ink-soft); }
+  .todolist { padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 8px; background: var(--app-bg); flex: 1; }
+  .trow { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); }
+  .tcheck { width: 24px; height: 24px; border-radius: 8px; border: 2.5px solid var(--accent); flex: none; margin-top: 1px; }
+  .tcheck.done { background: #27ae60; border-color: #27ae60; display: grid; place-items: center; color: #fff; font-size: 0.75rem; font-weight: 700; }
+  .ttitle { margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.875rem; color: var(--ink); }
+  .ttitle.done { text-decoration: line-through; color: var(--ink-faint); }
+  .tmeta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+  .tdate { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--accent-ink); }
+  .actlink {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px 2px 7px; background: var(--accent-tint);
+    border: 1px solid var(--accent-tint-2); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink); text-decoration: none;
+  }
+  .actlink .chev { width: 10px; height: 10px; color: var(--accent-ink); }
+  .ownerstack { display: inline-flex; }
+  .ownerstack .av { width: 18px; height: 18px; font-size: 0.75rem; box-shadow: 0 0 0 2px var(--card); }
+
+  .field { margin-bottom: 16px; }
+  .vtitle { margin: 0 0 16px; font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--ink); border-bottom: 1px dotted transparent; }
+  .status-open { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: var(--purple-tint-2); color: var(--purple-ink); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; }
+  .vdate { font-family: 'Outfit', sans-serif; font-size: 0.875rem; font-weight: 600; color: var(--accent-ink); }
+  .mchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px 5px 5px; border-radius: 999px; background: var(--chip); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink); }
+  .vdesc { margin: 0; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.6; }
+  .actfield {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; text-decoration: none;
+    background: var(--card); border: 1px solid var(--line); box-shadow: var(--card-shadow);
+  }
+  .actfield .acticon { width: 34px; height: 34px; border-radius: 12px; font-size: 1rem; }
+  .actfield .t1 { margin: 0; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.875rem; color: var(--ink); }
+  .actfield .t2 { margin: 1px 0 0; font-size: 0.75rem; color: var(--ink-soft); }
+  .actfield .go { margin-left: auto; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--accent-ink); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .actfield .go svg { width: 12px; height: 12px; }
+  .created { font-size: 0.75rem; color: var(--ink-faint); margin: 4px 0 0; }
+  .tolist-main { flex: 1; display: flex; flex-direction: column; background: var(--app-bg); }
+  .desk .sidebar { width: 190px; background: var(--app-side); flex: none; }
+  .desk .panel.drawer.over { position: absolute; top: 0; right: 0; bottom: 0; }
+
+  /* ---------- screen 5: ConfirmModal ---------- */
+  .cbody { padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+  .cicon { width: 48px; height: 48px; border-radius: 16px; background: var(--danger-tint); color: var(--danger-ink); display: grid; place-items: center; }
+  .cicon svg { width: 24px; height: 24px; }
+  .cmsg { margin: 0; font-size: 0.875rem; color: var(--ink-soft); line-height: 1.55; }
+  .clist { width: 100%; text-align: left; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--tile); list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .clist li { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--ink); }
+  .clist li .who { margin-left: auto; font-size: 0.75rem; color: var(--ink-faint); }
+  .clist .dot { width: 8px; height: 8px; border-radius: 3px; border: 2px solid var(--purple); flex: none; }
+  .choices { width: 100%; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+  .choice { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--panel); font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.875rem; color: var(--ink); }
+  .choice.on { border-color: var(--accent); background: rgb(241 93 34 / 8%); }
+  :root[data-theme='dark'] .choice.on { border-color: #ff8b5e; background: #2f3e4b; }
+  .radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-strong); flex: none; }
+  .choice.on .radio { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--panel); background: var(--accent); }
+  :root[data-theme='dark'] .choice.on .radio { border-color: #ff8b5e; background: #ff8b5e; box-shadow: inset 0 0 0 3px #2f3e4b; }
+  .cdetail { margin: 0; font-size: 0.75rem; color: var(--ink-faint); }
+  .cfoot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--line); background: var(--footer-bg); }
+  .cbtn { border: 0; border-radius: 16px; padding: 8px 14px; font-size: 0.875rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--ink-soft); }
+  .cbtn.danger { background: var(--danger-btn); color: #fff; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tile.lit { transition: transform 300ms; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Magic beans: to-dos, and a shared result</h1>
+      <p class="lede">Tracker #113, mockup of 2026-09-29. Magic beans learns a fifth kind, the to-do, and when one submission holds an activity and to-dos it returns both in one review box. Every surface below is drawn light and dark; use the toggle.</p>
+    </div>
+    <div class="theme-toggle" role="group" aria-label="Theme">
+      <button type="button" data-set="light">Light</button>
+      <button type="button" data-set="dark">Dark</button>
+    </div>
+  </div>
+
+  <div class="source">
+    <p><strong>The example submission</strong>, a forwarded school email: "Year 3 field trip to the Science Centre on Tuesday 13 October, 8:30am to 2:30pm. Please return the signed permission slip by Friday 9 October. Children need sunscreen, a hat and a small bag with a packed lunch on the day. Trip fee $12 via the school portal: https://portal.example-school.org/trips"</p>
+    <p class="family">Family: Greg (shared it), Sophia (owns the School Forms card in Who Owns What), Leo 10, Max 7, Sam 5.</p>
+  </div>
+
+  <!-- 1 -->
+  <section class="screen" id="s1">
+    <h2>1. Processing overlay, shared answer</h2>
+    <p class="cap">The reading overlay gains a fifth tile, <b>To-do</b>. When the answer holds both, two tiles lift together and the line under them says what was found, in place of "Counting magic beans...".</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390</span><div class="phone" data-render="overlay"></div></div>
+      <div class="fwrap desk-only"><span class="flabel">Desktop</span><div class="desk" data-render="overlay"></div></div>
+    </div>
+    <p class="cap" style="margin-top:14px">Five tiles do not fit one row on a phone, so the phone grid becomes three over two (today it is two by two for four). Both lit tiles use the same orange resolve; the second lift is the only new motion.</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="screen" id="s2">
+    <h2>2. Review box, shared result</h2>
+    <p class="cap">One box, two parts. The activity is a <b>read-only summary</b>: it is edited in the activity form, which opens straight after. The to-dos are <b>edited here</b>, one row each: title, who (with the reason it was picked), when, and a skip. The button says what happens next.</p>
+
+    <h3>A. Right-side drawer (recommended)</h3>
+    <p class="cap">The StatementImportModal shape. The activity form that follows is also a drawer (ActivityModal), so on desktop the next step opens in the same place and the hand-off reads as one flow.</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390: the who chip open on row 3</span><div class="phone" data-render="review" data-variant="drawer" data-state="picker"></div></div>
+      <div class="fwrap desk-only"><span class="flabel">Desktop, drawer 448 wide</span><div class="desk" data-render="review" data-variant="drawer" data-state="default"></div></div>
+    </div>
+
+    <h3>B. Centered modal</h3>
+    <p class="cap">The TravelExtractReviewModal shape (BeanieFormModal, default size). Fine for a short answer, but a centered box then gives way to a side drawer for the activity, which is a jump. On a phone A and B are the same full-screen surface, so the phone here shows a different state: a skipped row, and the button count following it.</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390: row 2 skipped, row 1 title being edited</span><div class="phone" data-render="review" data-variant="modal" data-state="skipped"></div></div>
+      <div class="fwrap desk-only"><span class="flabel">Desktop, modal 576 wide</span><div class="desk" data-render="review" data-variant="modal" data-state="default"></div></div>
+    </div>
+    <p class="cap" style="margin-top:14px">Reason chips (assumption): "owns School Forms" comes from Who Owns What, "you shared it" is the fallback to the person who submitted, "named in the note" wins over both. Prep with no date of its own lands the day before the activity. The purple rail marks each to-do as linked to the activity above it.</p>
+  </section>
+
+  <!-- 3 -->
+  <section class="screen" id="s3">
+    <h2>3. Review box, to-do-only result</h2>
+    <p class="cap">A forwarded "Leo still has The Wild Robot, library books are due back Friday." Same box, no activity part, so the rail goes too and the save turns to-do purple (the destination color, as travel uses teal).</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390</span><div class="phone" data-render="todoOnly" data-variant="drawer"></div></div>
+      <div class="fwrap desk-only"><span class="flabel">Desktop, drawer</span><div class="desk" data-render="todoOnly" data-variant="drawer"></div></div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="screen" id="s4">
+    <h2>4. A saved to-do shows its linked activity</h2>
+    <p class="cap">In the list, a small chip carries the activity's own icon and date (so it never reads as the to-do's due date). In Task Details it becomes a "Linked activity" row that opens the activity.</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390: Family To-Do list</span><div class="phone" data-render="todoList"></div></div>
+      <div class="fwrap"><span class="flabel">Phone, 390: Task Details</span><div class="phone" data-render="todoView"></div></div>
+    </div>
+    <div class="frames desk-only">
+      <div class="fwrap"><span class="flabel">Desktop, list with Task Details drawer open</span><div class="desk wide" data-render="todoDesk"></div></div>
+    </div>
+    <p class="cap" style="margin-top:14px">New: a link from a to-do to an activity does not exist today (TodoItem has no activity field). The slip is already done here, to show a completed row keeps its chip.</p>
+  </section>
+
+  <!-- 5 -->
+  <section class="screen" id="s5">
+    <h2>5. Deleting an activity that has linked to-dos (stretch)</h2>
+    <p class="cap">The existing ConfirmModal with its radio choice (confirmChoice). Default is <b>keep the to-dos</b>: a paid fee or a packed bag still matters if the trip is deleted by mistake or re-added, and a delete that quietly takes other people's tasks with it is the harder mistake to undo. Only open to-dos are listed; done ones are always kept.</p>
+    <div class="frames">
+      <div class="fwrap"><span class="flabel">Phone, 390: default</span><div class="phone" data-render="confirm" data-state="keep"></div></div>
+      <div class="fwrap desk-only"><span class="flabel">Desktop: "delete them too" chosen</span><div class="desk" data-render="confirm" data-state="delete"></div></div>
+    </div>
+    <p class="phone-note">Desktop frames appear on a wider screen.</p>
+  </section>
+</div>
+
+<script>
+  /* ---------- theme ---------- */
+  (function () {
+    const q = new URLSearchParams(location.search).get('theme');
+    const sys = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const set = (t) => {
+      document.documentElement.dataset.theme = t;
+      document.querySelectorAll('.theme-toggle button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.set === t)));
+    };
+    set(q === 'dark' || q === 'light' ? q : sys);
+    document.querySelectorAll('.theme-toggle button').forEach((b) => b.addEventListener('click', () => set(b.dataset.set)));
+  })();
+
+  /* ---------- data ---------- */
+  const M = {
+    greg: { n: 'Greg', c: '#3b82f6' },
+    sophia: { n: 'Sophia', c: '#ec4899' },
+    leo: { n: 'Leo', c: '#22c55e' },
+    max: { n: 'Max', c: '#f59e0b' },
+    sam: { n: 'Sam', c: '#14b8a6' },
+  };
+  const ICON = {
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    down: '<svg class="dn" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 4.5l3 3 3-3"/></svg>',
+    ext: '<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/></svg>',
+    spark: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0l1.6 5.2L15 8l-5.4 1.8L8 16l-1.6-6.2L1 8l5.4-2.8z"/></svg>',
+    chev: '<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 3l3 3-3 3"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
+  };
+  const av = (k) => `<span class="av" aria-hidden="true" style="--m:${M[k].c}">${M[k].n[0]}</span>`;
+  const status = '<div class="status"><span>9:41</span><span>5G</span></div>';
+  const appbg = '<div class="appbg" aria-hidden="true"><div class="side"></div><div class="main"><div class="bar"></div><div class="blk tall"></div><div class="blk"></div><div class="blk"></div><div class="blk tall"></div></div></div>';
+
+  const head = (icon, title, purple) =>
+    `<div class="mhead"><div class="ibox${purple ? ' purple' : ''}" aria-hidden="true">${icon}</div><p class="mtitle">${title}</p><button class="x" type="button" aria-label="Close">${ICON.x}</button></div>`;
+
+  const link = (text, purple) =>
+    `<div class="linkrow${purple ? ' purple' : ''}"><span class="fav" aria-hidden="true">S</span><span class="linktext">${text}</span>${ICON.ext}</div>`;
+
+  const TODOS = [
+    { t: 'Return the signed permission slip', who: 'sophia', why: 'owns School Forms', due: 'Fri 9 Oct', note: '' },
+    { t: 'Pay the $12 trip fee', who: 'greg', why: 'you shared it', due: 'Mon 12 Oct', note: '(day before)', link: 'portal.example-school.org/trips' },
+    { t: 'Pack sunscreen, a hat and a packed lunch', who: 'greg', why: 'you shared it', due: 'Tue 13 Oct', note: '(trip day)' },
+  ];
+
+  function row(td, opts = {}) {
+    if (opts.skipped) {
+      return `<div class="rrow skipped"><div class="rtop"><p class="rtitle">${td.t}</p><button class="undo" type="button">Undo skip</button></div></div>`;
+    }
+    const title = opts.editing
+      ? `<p class="rtitle editing">${td.t}<span class="caret"></span></p>`
+      : `<p class="rtitle">${td.t}</p>`;
+    const picker = opts.picker
+      ? `<div class="picker"><p>Who does this one?</p><div class="pills">${Object.keys(M)
+          .map((k) => `<span class="pill${k === td.who ? ' on' : ''}">${av(k)}${M[k].n}</span>`)
+          .join('')}</div></div>`
+      : '';
+    return `<div class="rrow">
+      <div class="rtop">${title}<button class="skip" type="button" aria-label="Skip this to-do">${ICON.x}Skip</button></div>
+      <div class="rmeta">
+        <button class="chipbtn${opts.picker ? ' open' : ''}" type="button">${av(td.who)}${M[td.who].n}${ICON.down}</button>
+        <span class="why">${ICON.spark}${td.why}</span>
+        <button class="chipbtn date" type="button">&#128197; ${td.due}${td.note ? ` <span class="dnote">${td.note}</span>` : ''}</button>
+      </div>
+      ${td.link ? link(td.link, true) : ''}
+      ${picker}
+    </div>`;
+  }
+
+  const notRight = '<div class="notright"><span>Not right?</span><button type="button">Tell us what this is</button></div>';
+
+  const activityCard = `
+    <div class="actcard">
+      <div class="acthead">
+        <div class="acticon" aria-hidden="true">&#128652;</div>
+        <div style="min-width:0">
+          <p class="acttitle">Year 3 field trip</p>
+          <p class="actwhen">Tue 13 Oct, 8:30am to 2:30pm<br />Science Centre</p>
+        </div>
+        <span class="nexttag">Next</span>
+      </div>
+      ${link('portal.example-school.org/trips')}
+      <p class="actnote">You'll check who's going and the rest in the activity form next.</p>
+    </div>`;
+
+  function reviewBody(state) {
+    const s = state || 'default';
+    const rows = TODOS.map((td, i) =>
+      row(td, {
+        picker: s === 'picker' && i === 2,
+        skipped: s === 'skipped' && i === 1,
+        editing: s === 'skipped' && i === 0,
+      })
+    ).join('');
+    const count = s === 'skipped' ? 2 : 3;
+    return {
+      body: `<p class="sub">From a forwarded email. Check the to-dos, then finish the activity.</p>
+        <div class="flabel2">Activity</div>
+        ${activityCard}
+        <div class="gap"></div>
+        <div class="flabel2">To-dos <span class="aside">Linked to the activity</span></div>
+        <div class="rows linked">${rows}</div>
+        ${notRight}`,
+      save: `Save ${count} to-dos, then add the activity`,
+    };
+  }
+
+  function shell(el, { variant, icon, title, purple, body, save, saveClass, footStart }) {
+    const isPhone = el.classList.contains('phone');
+    const cls = variant === 'modal' ? (isPhone ? 'panel full' : 'panel modal') : 'panel drawer';
+    const panel = `<div class="${cls}" role="dialog" aria-label="${title}">
+        ${head(icon, title, purple)}
+        <div class="mbody">${body}</div>
+        <div class="mfoot">${footStart || ''}<button class="save ${saveClass || ''}" type="button">${save}</button></div>
+      </div>`;
+    if (isPhone) {
+      el.innerHTML = status + panel;
+    } else {
+      el.innerHTML = appbg + '<div class="scrim"></div>' + panel;
+      if (variant === 'modal') el.style.alignItems = 'flex-start';
+    }
+  }
+
+  const R = {
+    overlay(el) {
+      const isPhone = el.classList.contains('phone');
+      const tiles = [
+        ['&#128197;', 'Activity', 'lit'],
+        ['&#9992;&#65039;', 'Trip', 'gone'],
+        ['&#127859;', 'Recipe', 'gone'],
+        ['&#127974;', 'Transactions', 'gone'],
+        ['&#9989;', 'To-do', 'lit'],
+      ];
+      const lis = tiles.map(([e, l, c]) => `<li><div class="tile ${c}"><span class="e" aria-hidden="true">${e}</span><span class="l">${l}</span></div></li>`).join('');
+      el.innerHTML = (isPhone ? status : '') + appbg + '<div class="scrim soft"></div>' +
+        `<div class="ovwrap"><div style="position:relative">
+          <span class="spark" style="top:-22px;left:-10px">${ICON.spark}</span>
+          <span class="spark" style="bottom:-20px;right:-6px;width:14px;height:14px">${ICON.spark}</span>
+          <div class="ovcard"><ul class="tiles">${lis}</ul>
+          <p class="ovtext" role="status">Found an activity and 3 to-dos</p></div></div></div>`;
+    },
+    review(el) {
+      const v = el.dataset.variant;
+      const r = reviewBody(el.dataset.state);
+      shell(el, { variant: v, icon: '&#10024;', title: "Here's what we found", body: r.body, save: r.save });
+    },
+    todoOnly(el) {
+      const td = { t: 'Return The Wild Robot to the library', who: 'leo', why: 'named in the note', due: 'Fri 2 Oct', note: '' };
+      const body = `<p class="sub">From a forwarded note. Check it, then save.</p>
+        <div class="flabel2">To-do</div>
+        <div class="rows">${row(td)}</div>
+        ${notRight}`;
+      shell(el, { variant: el.dataset.variant, icon: '&#9989;', title: "Here's what we found", purple: true, body, save: 'Save to-do', saveClass: 'purple' });
+    },
+    todoList(el) {
+      el.innerHTML = status + listInner();
+    },
+    todoView(el) {
+      el.innerHTML = status + viewPanel(true);
+    },
+    todoDesk(el) {
+      el.innerHTML = `<div class="sidebar" aria-hidden="true"></div><div class="tolist-main">${listInner()}</div><div class="scrim"></div>` + viewPanel(false);
+      el.style.position = 'relative';
+    },
+    confirm(el) {
+      const isPhone = el.classList.contains('phone');
+      const del = el.dataset.state === 'delete';
+      const modal = `<div class="panel modal sm" role="dialog" aria-label="Delete activity?">
+        <div class="mhead"><p class="mtitle">Delete activity?</p><button class="x" type="button" aria-label="Close">${ICON.x}</button></div>
+        <div class="cbody">
+          <div class="cicon" aria-hidden="true">${ICON.trash}</div>
+          <p class="cmsg">Year 3 field trip will be removed from the calendar. It has 2 open to-dos:</p>
+          <ul class="clist">
+            <li><span class="dot"></span>Pay the $12 trip fee<span class="who">Greg</span></li>
+            <li><span class="dot"></span>Pack sunscreen, a hat and...<span class="who">Greg</span></li>
+          </ul>
+          <div class="choices" role="radiogroup" aria-label="Linked to-dos">
+            <label class="choice${del ? '' : ' on'}"><span class="radio"></span>Keep the to-dos</label>
+            <label class="choice${del ? ' on' : ''}"><span class="radio"></span>Delete the to-dos too</label>
+          </div>
+          <p class="cdetail">Done to-dos are always kept.</p>
+        </div>
+        <div class="cfoot"><button class="cbtn" type="button">Cancel</button><button class="cbtn danger" type="button">${del ? 'Delete activity and 2 to-dos' : 'Delete activity'}</button></div>
+      </div>`;
+      el.innerHTML = (isPhone ? status : '') + appbg + '<div class="scrim"></div>' + modal;
+      if (!isPhone) el.style.alignItems = 'flex-start';
+    },
+  };
+
+  const chip = '<a class="actlink" href="#s4"><span aria-hidden="true">&#128652;</span>Year 3 field trip, Tue 13 Oct' + ICON.chev + '</a>';
+  function listInner() {
+    const trow = (title, date, who, done) => `<div class="trow">
+        <span class="tcheck${done ? ' done' : ''}" aria-hidden="true">${done ? '&#10003;' : ''}</span>
+        <div style="min-width:0;flex:1">
+          <p class="ttitle${done ? ' done' : ''}">${title}</p>
+          <div class="tmeta">${date ? `<span class="tdate">&#128197; ${date}</span>` : ''}${chip}<span class="ownerstack">${av(who)}</span></div>
+        </div></div>`;
+    return `<div class="pagehead"><h4>Family To-Do</h4><p>3 open, 1 done this week</p></div>
+      <div class="todolist">
+        ${trow('Pay the $12 trip fee', 'Mon 12 Oct', 'greg')}
+        ${trow('Pack sunscreen, a hat and a packed lunch', 'Tue 13 Oct', 'greg')}
+        <div class="trow"><span class="tcheck" aria-hidden="true"></span><div style="min-width:0;flex:1"><p class="ttitle">Book Sam's swim lessons</p><div class="tmeta"><span class="tdate">&#128197; Thu 1 Oct</span><span class="ownerstack">${av('sophia')}</span></div></div></div>
+        ${trow('Return the signed permission slip', 'Fri 9 Oct', 'sophia', true)}
+      </div>`;
+  }
+  function viewPanel(isPhone) {
+    return `<div class="panel ${isPhone ? 'full' : 'drawer over'}" role="dialog" aria-label="Task Details">
+      ${head('&#9989;', 'Task Details', true)}
+      <div class="mbody">
+        <p class="vtitle">Pay the $12 trip fee</p>
+        <div class="field"><div class="flabel2">Status</div><span class="status-open">Open</span></div>
+        <div class="field"><div class="flabel2">Due date</div><span class="vdate">Mon 12 Oct</span></div>
+        <div class="field"><div class="flabel2">Assign to</div><span class="mchip">${av('greg')}Greg</span></div>
+        <div class="field"><div class="flabel2">Linked activity</div>
+          <a class="actfield" href="#s4"><div class="acticon" aria-hidden="true">&#128652;</div>
+            <div style="min-width:0"><p class="t1">Year 3 field trip</p><p class="t2">Tue 13 Oct, 8:30am to 2:30pm</p></div>
+            <span class="go">Open${ICON.chev}</span></a></div>
+        <div class="field"><div class="flabel2">Links</div>${link('portal.example-school.org/trips', true).replace('margin-top', '')}</div>
+        <p class="created">Created by Greg with magic beans, today</p>
+      </div>
+      <div class="mfoot"><button class="del" type="button" aria-label="Delete">&#128465;&#65039;</button><button class="save green" type="button">&#10003; Mark Complete</button><button class="save purple" type="button">Close</button></div>
+    </div>`;
+  }
+
+  document.querySelectorAll('[data-render]').forEach((el) => R[el.dataset.render](el));
+</script>
+</body>
+</html>
