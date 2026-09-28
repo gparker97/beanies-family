@@ -31,6 +31,8 @@ import {
   buildCheckInAgenda,
   recentMoves,
   ymdOf,
+  cardSequence,
+  type CardSequence,
   type RecentItem,
   type ResolvedCard,
 } from '@/utils/responsibilityDeck';
@@ -54,7 +56,7 @@ const emit = defineEmits<{
   /** Open the deal pile at one card. */
   'deal-card': [cardId: string];
   'see-skipped': [];
-  'open-card': [cardId: string];
+  'open-card': [cardId: string, sequence: CardSequence | null];
   'start-check-in': [];
   'set-rhythm': [];
 }>();
@@ -112,6 +114,11 @@ const legend = computed(() => [
 ]);
 
 const waitingShown = computed(() => store.waiting.slice(0, WAITING_SHOWN));
+/** Open a Waiting row with the shown rows as the list to step through. */
+function openWaiting(cardId: string): void {
+  const ids = waitingShown.value.map((c) => c.id);
+  emit('open-card', cardId, cardSequence(t('whoOwnsWhat.overview.waitingTitle'), ids));
+}
 
 // ── Check-in ─────────────────────────────────────────────────────────────────
 const agenda = computed(() =>
@@ -287,7 +294,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
             <button
               type="button"
               class="flex min-w-0 flex-1 items-center gap-3 text-left"
-              @click="emit('open-card', card.id)"
+              @click="openWaiting(card.id)"
             >
               <CardArt :card="card" img-class="h-7 w-7" class="text-xl" />
               <span class="min-w-0">

@@ -45,6 +45,7 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
+import type { CardSequence } from '@/utils/responsibilityDeck';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
@@ -54,6 +55,7 @@ import DeckOverview from '@/components/responsibilities/DeckOverview.vue';
 import FirstDealEmptyState from '@/components/responsibilities/FirstDealEmptyState.vue';
 import DeckGrid, { type DeckFilter } from '@/components/responsibilities/DeckGrid.vue';
 import CardViewDrawer from '@/components/responsibilities/CardViewDrawer.vue';
+import DealModeSwitch from '@/components/responsibilities/DealModeSwitch.vue';
 import CardEditDrawer from '@/components/responsibilities/CardEditDrawer.vue';
 import DealPile from '@/components/responsibilities/DealPile.vue';
 import DealBoard from '@/components/responsibilities/DealBoard.vue';
@@ -148,15 +150,19 @@ async function openCategory(category: ListCategory): Promise<void> {
 }
 
 // ── Drawers ──────────────────────────────────────────────────────────────────
-const viewCardId = ref<string | null>(null);
+/** The card in the view drawer and the list it was opened from (null: a deep link). */
+const viewing = ref<{ cardId: string; sequence: CardSequence | null } | null>(null);
 const editOpen = ref(false);
 const editCardId = ref<string | null>(null);
 
-function openCard(cardId: string): void {
-  viewCardId.value = cardId;
+function openCard(cardId: string, sequence: CardSequence | null = null): void {
+  viewing.value = { cardId, sequence };
+}
+function navigateCard(cardId: string): void {
+  if (viewing.value) viewing.value = { ...viewing.value, cardId };
 }
 function editCard(cardId: string): void {
-  viewCardId.value = null;
+  viewing.value = null;
   editCardId.value = cardId;
   editOpen.value = true;
 }
@@ -215,19 +221,22 @@ const dealMode = usePersistedChoice<(typeof DEAL_MODES)[number]>(
 const showBoard = computed(
   () => !isMobile.value && dealMode.value === 'board' && dealRequest.value === null
 );
+/** The board fills the page: exactly when `DealBoard` renders (the page's flex column sizes it). */
+const fillsHeight = computed(() => view.value === 'deal' && canDeal.value && showBoard.value);
 const pileScope = computed<DealRequest['scope']>(
   () => dealRequest.value?.scope ?? (store.stats.unsorted > 0 ? 'unsorted' : 'waiting')
 );
-function toggleDealMode(): void {
-  const next = showBoard.value ? 'pile' : 'board';
-  dealMode.value = next;
+function setDealMode(mode: string): void {
+  if (mode !== 'pile' && mode !== 'board') return;
+  if (mode === (showBoard.value ? 'board' : 'pile')) return;
+  dealMode.value = mode;
   dealRequest.value = null;
   pileKey.value += 1;
   logEvent({
     level: 'info',
     surface: SURFACE,
     message: 'deal_mode_set',
-    context: { detail: next },
+    context: { detail: mode },
   });
 }
 
@@ -247,10 +256,6 @@ const hasKept = computed(() => store.stats.deck > 0);
 
 const menuItems = computed<OverflowMenuItem[]>(() => {
   const items: OverflowMenuItem[] = [];
-  if (hasKept.value) {
-    items.push({ id: 'share', labelKey: 'whoOwnsWhat.menu.share', icon: '📤' });
-    items.push({ id: 'export', labelKey: 'whoOwnsWhat.menu.export', icon: '📄' });
-  }
   if (canDeal.value) items.push({ id: 'rhythm', labelKey: 'whoOwnsWhat.menu.rhythm', icon: '🗓️' });
   items.push({ id: 'skipped', labelKey: 'whoOwnsWhat.menu.skipped', icon: '⏭️' });
   if (canDeal.value)
@@ -264,9 +269,7 @@ const menuItems = computed<OverflowMenuItem[]>(() => {
 });
 
 function onMenu(id: string): void {
-  if (id === 'share') exportDeck('png');
-  else if (id === 'export') exportDeck('pdf');
-  else if (id === 'rhythm') void chooseRhythm();
+  if (id === 'rhythm') void chooseRhythm();
   else if (id === 'skipped') seeSkipped();
   else if (id === 'restore') void restoreDefaults();
 }
@@ -406,7 +409,7 @@ async function restoreDefaults(): Promise<void> {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" :class="{ 'flex min-h-full flex-col': fillsHeight }">
     <!-- Header -->
     <div class="flex items-start justify-between gap-3">
       <PageWelcomeSubtitle :text="t('whoOwnsWhat.welcomeSubtitle')" />
@@ -429,47 +432,52 @@ async function restoreDefaults(): Promise<void> {
         data-testid="who-owns-what-views"
         @update:model-value="setView"
       />
-      <!-- md+: card by card (the default) or the board. -->
-      <button
-        v-if="view === 'deal' && canDeal && !isMobile"
-        type="button"
-        class="deal-mode font-outfit dark:text-ink-soft text-sm font-semibold text-[var(--color-text-muted)]"
-        data-testid="who-owns-what-deal-mode"
-        @click="toggleDealMode"
-      >
-        {{ showBoard ? t('whoOwnsWhat.board.cardByCard') : t('whoOwnsWhat.pile.boardView') }}
-        <span aria-hidden="true">›</span>
-      </button>
-      <!-- The fridge sheet's two conventional actions, as on the meal planner. -->
-      <div v-if="view === 'overview' && hasKept" class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-          :disabled="exporting"
-          data-testid="who-owns-what-share"
-          @click="exportDeck('png')"
-        >
-          <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
-          {{
-            exportingFormat === 'image'
-              ? t('whoOwnsWhat.export.building')
-              : t('whoOwnsWhat.menu.share')
-          }}
-        </button>
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 dark:bg-surface-raised dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          :disabled="exporting"
-          data-testid="who-owns-what-export"
-          @click="exportDeck('pdf')"
-        >
-          <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
-          {{
-            exportingFormat === 'pdf'
-              ? t('whoOwnsWhat.export.building')
-              : t('whoOwnsWhat.menu.export')
-          }}
-        </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- md+: the Deal view's layout (card by card, the default, or the board). A layout
+             control, drawn apart from the tabs on the left. -->
+        <template v-if="view === 'deal' && canDeal && !isMobile">
+          <DealModeSwitch
+            :model-value="showBoard ? 'board' : 'pile'"
+            @update:model-value="setDealMode"
+          />
+          <span
+            v-if="hasKept"
+            class="dark:bg-line mx-1 h-7 w-px bg-[var(--color-border)]"
+            aria-hidden="true"
+          />
+        </template>
+        <!-- The fridge sheet's two conventional actions, as on the meal planner: on every
+             view, since a family reaches for them wherever they are. -->
+        <template v-if="hasKept">
+          <button
+            type="button"
+            class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            :disabled="exporting"
+            data-testid="who-owns-what-share"
+            @click="exportDeck('png')"
+          >
+            <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
+            {{
+              exportingFormat === 'image'
+                ? t('whoOwnsWhat.export.building')
+                : t('whoOwnsWhat.menu.share')
+            }}
+          </button>
+          <button
+            type="button"
+            class="font-outfit text-secondary-500 dark:bg-surface-raised dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            :disabled="exporting"
+            data-testid="who-owns-what-export"
+            @click="exportDeck('pdf')"
+          >
+            <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
+            {{
+              exportingFormat === 'pdf'
+                ? t('whoOwnsWhat.export.building')
+                : t('whoOwnsWhat.menu.export')
+            }}
+          </button>
+        </template>
       </div>
     </div>
 
@@ -498,7 +506,11 @@ async function restoreDefaults(): Promise<void> {
 
     <!-- Deal: card by card at every width, or the board at md+ by choice. Children see
          the cards still to deal, read-only. -->
-    <section v-else-if="view === 'deal'" data-testid="who-owns-what-deal">
+    <section
+      v-else-if="view === 'deal'"
+      :class="{ 'flex min-h-[32rem] flex-1 basis-0 flex-col': fillsHeight }"
+      data-testid="who-owns-what-deal"
+    >
       <template v-if="canDeal">
         <DealBoard v-if="showBoard" @open="openCard" @edit="editCard" @new-card="newCard" />
         <DealPile
@@ -526,10 +538,12 @@ async function restoreDefaults(): Promise<void> {
 
     <!-- Drawers: mounted unconditionally, never `v-if`-gated (useFormModal seeds on open). -->
     <CardViewDrawer
-      :open="!!viewCardId"
-      :card-id="viewCardId"
+      :open="!!viewing"
+      :card-id="viewing?.cardId ?? null"
+      :sequence="viewing?.sequence ?? null"
       :can-edit="canDeal"
-      @close="viewCardId = null"
+      @close="viewing = null"
+      @navigate="navigateCard"
       @edit="editCard"
     />
     <CardEditDrawer :open="editOpen" :card-id="editCardId" @close="closeEdit" />
@@ -568,14 +582,6 @@ async function restoreDefaults(): Promise<void> {
 </template>
 
 <style scoped>
-.deal-mode {
-  border-bottom: 1.5px dotted rgb(44 62 80 / 30%);
-}
-
-html.dark .deal-mode {
-  border-bottom-color: var(--color-line-strong);
-}
-
 /* Off-screen host for the fridge sheet: in the layout (so fonts and images load and it has
    real dimensions to rasterise) but far off-screen and out of the a11y tree. Mirrors
    MealPlannerPage. */

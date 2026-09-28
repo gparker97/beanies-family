@@ -21,7 +21,12 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { groupByCategory, type ResolvedCard } from '@/utils/responsibilityDeck';
+import {
+  cardSequence,
+  groupByCategory,
+  type CardSequence,
+  type ResolvedCard,
+} from '@/utils/responsibilityDeck';
 import type { ListCategory } from '@/types/models';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import ResponsibilityCardTile from './ResponsibilityCardTile.vue';
@@ -43,7 +48,7 @@ const props = withDefaults(
 );
 const emit = defineEmits<{
   'update:filter': [value: DeckFilter];
-  open: [cardId: string];
+  open: [cardId: string, sequence: CardSequence | null];
 }>();
 
 const { t } = useTranslation();
@@ -70,6 +75,18 @@ interface Shelf {
   title: string;
   emoji: string;
   cards: ResolvedCard[];
+}
+
+/** Open a tile with its shelf as the list to step through. */
+function openFromShelf(shelf: Shelf, cardId: string): void {
+  emit(
+    'open',
+    cardId,
+    cardSequence(
+      shelf.title,
+      shelf.cards.map((c) => c.id)
+    )
+  );
 }
 
 /** The cards the current filter shows, before shelving. */
@@ -126,7 +143,11 @@ defineExpose({ scrollToShelf });
       @update:model-value="emit('update:filter', $event)"
     />
 
-    <DeckByBean v-if="filter === 'byBean'" :cards="cards" @open="emit('open', $event)" />
+    <DeckByBean
+      v-if="filter === 'byBean'"
+      :cards="cards"
+      @open="(id, seq) => emit('open', id, seq)"
+    />
 
     <template v-else>
       <!-- The skipped pile: a calm explainer above the cards. -->
@@ -178,7 +199,7 @@ defineExpose({ scrollToShelf });
             :key="card.id"
             :card="card"
             :can-edit="canEdit"
-            @open="emit('open', $event)"
+            @open="openFromShelf(shelf, $event)"
             @bring-back="onBringBack"
           />
         </div>

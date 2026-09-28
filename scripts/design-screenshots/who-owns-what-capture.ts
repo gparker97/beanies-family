@@ -63,7 +63,28 @@ test('who owns what walk', async ({ page }) => {
   await gotoRoot(page);
   await bypassLoginIfNeeded(page);
   const db = new IndexedDBHelper(page);
-  const ownerId = (await db.exportData()).familyMembers[0]!.id;
+  const owner = (await db.exportData()).familyMembers[0]!;
+  const ownerId = owner.id;
+  // Two more beans, so the board has someone holding nothing (the idle strip).
+  const now = new Date().toISOString();
+  const bean = (id: string, name: string, color: string, ageGroup: 'adult' | 'child') =>
+    ({
+      id,
+      name,
+      color,
+      ageGroup,
+      email: `${id}@example.test`,
+      role: 'member',
+      createdAt: now,
+      updatedAt: now,
+    }) as never;
+  await db.seedData({
+    familyMembers: [
+      owner,
+      bean('e2e-sofia', 'Sofia', '#ec4899', 'adult'),
+      bean('e2e-mia', 'Mia', '#10b981', 'child'),
+    ],
+  });
 
   await gotoRoute(page, '/who-owns-what');
   await page.getByTestId('first-deal-start').click();
@@ -138,6 +159,7 @@ test('who owns what walk', async ({ page }) => {
   await shot(page, '08-desktop-deck-dark');
   await setDark(page, false);
 
+  await expect(page.getByTestId('who-owns-what-share')).toBeVisible();
   // ── Drawers (before the Skipped filter, which the Deck then keeps) ───────
   await page.getByTestId('card-open-cooking-dinner').click();
   await page.getByTestId('card-view-name').waitFor();
@@ -168,11 +190,14 @@ test('who owns what walk', async ({ page }) => {
   // ── Board: art on the rail and chips, drag by the art ───────────────────
   await gotoRoute(page, '/who-owns-what');
   await view(page, 'deal');
-  const modeToggle = page.getByTestId('who-owns-what-deal-mode');
-  if ((await modeToggle.innerText()).includes(ui('whoOwnsWhat.pile.boardView'))) {
-    await modeToggle.click();
-  }
+  // Card by Card | Board View is a pill switch now; Share / Export show on every view.
+  await expect(page.getByTestId('who-owns-what-share')).toBeVisible();
+  await page.getByTestId('deal-mode-board').click();
   await page.getByTestId('deal-board').waitFor();
+  await shot(page, '11b-deal-mode-switch-light');
+  await setDark(page, true);
+  await shot(page, '11c-deal-mode-switch-dark');
+  await setDark(page, false);
   console.log('[walk] board art:', JSON.stringify(await artIn(page, '[data-testid="deal-board"]')));
   await shot(page, '12-desktop-board-light');
 
@@ -189,6 +214,7 @@ test('who owns what walk', async ({ page }) => {
 
   await chip.locator('img').dragTo(page.getByTestId('deal-row-skipped'));
   await page.waitForTimeout(900);
+  await page.getByTestId('deal-skipped-toggle').dispatchEvent('click');
   const skippedChip = page.locator('[data-testid^="deal-chip-skipped-"]', {
     has: page.locator('img[src$="grocery-shopping.webp"]'),
   });
@@ -198,6 +224,115 @@ test('who owns what walk', async ({ page }) => {
   await setDark(page, true);
   await shot(page, '13-desktop-board-dark');
   await setDark(page, false);
+
+  // ── Board layout: fills the page, idle beans fold, Skipped folds ────────
+  for (const [w, h] of [
+    [1440, 900],
+    [1280, 800],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(500);
+    const box = await page.getByTestId('deal-board').boundingBox();
+    const main = await page.locator('main').boundingBox();
+    const gap = Math.round(main!.y + main!.height - (box!.y + box!.height));
+    console.log(
+      `[walk] board ${w}x${h}: top ${Math.round(box!.y)}, height ${Math.round(box!.height)}, gap to main bottom ${gap}`
+    );
+    expect(gap).toBeLessThanOrEqual(32);
+    const strip = page.getByTestId('deal-idle-strip');
+    await expect(strip).toBeInViewport();
+    await shot(page, `20-board-${w}-light`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const skippedGridOpen = await page.getByTestId('deal-skipped-grid').isVisible();
+  if (skippedGridOpen) await page.getByTestId('deal-skipped-toggle').dispatchEvent('click');
+  await expect(page.getByTestId('deal-skipped-grid')).toHaveCount(0);
+
+  // Deal a first card to Sofia by dropping it on her idle face: she gets a lane.
+  // Home Supplies (unsorted): Laundry stays waiting for the phone pile check below.
+  const railCard = page.getByTestId('deal-rail-home-supplies');
+  await railCard.dragTo(page.getByTestId('deal-row-e2e-sofia'));
+  await page.waitForTimeout(900);
+  const sofiaTag = await page.getByTestId('deal-row-e2e-sofia').evaluate((el) => el.tagName);
+  console.log('[walk] Sofia after a drop on her idle face:', sofiaTag);
+  expect(sofiaTag).toBe('SECTION');
+  await expect(page.getByTestId('deal-row-e2e-mia')).toBeVisible();
+  // A full deck: deal ~25 cards to one person by tapping. Lanes must grow, never spill
+  // their last row into the next lane (greg, 2026-09-28: flex items shrank below content).
+  for (let i = 0; i < 25; i++) {
+    // Laundry stays waiting: the phone pile check below deals it.
+    const rail = page
+      .locator('[data-testid^="deal-rail-"]:not([data-testid="deal-rail-laundry"])')
+      .first();
+    if (!(await rail.count())) break;
+    await rail.click();
+    await page.getByTestId(`deal-board-pick-${ownerId}`).click();
+    await page.waitForTimeout(250);
+  }
+  const lanes = await page.locator('[data-testid="deal-lanes"] > section').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, overflow: el.scrollHeight - el.clientHeight };
+    })
+  );
+  const overlaps = lanes.slice(1).filter((l, i) => l.top < lanes[i]!.bottom - 1).length;
+  const spilled = lanes.filter((l) => l.overflow > 1).length;
+  console.log(`[walk] full deck: ${lanes.length} lanes, overlaps ${overlaps}, spilled ${spilled}`);
+  expect(overlaps).toBe(0);
+  expect(spilled).toBe(0);
+  await shot(page, '20c-board-full-deck-light');
+  await setDark(page, true);
+  await shot(page, '21-board-1440-dark');
+  await setDark(page, false);
+
+  // The Skipped toggle is reachable: not under the Quick Add button.
+  const toggleBox = await page.getByTestId('deal-skipped-toggle').boundingBox();
+  const fabBox = await page.getByRole('button', { name: 'Quick add' }).boundingBox();
+  const overlap =
+    !!toggleBox &&
+    !!fabBox &&
+    toggleBox.x < fabBox.x + fabBox.width &&
+    toggleBox.x + toggleBox.width > fabBox.x &&
+    toggleBox.y < fabBox.y + fabBox.height &&
+    toggleBox.y + toggleBox.height > fabBox.y;
+  console.log('[walk] skipped toggle overlaps the Quick Add button:', overlap);
+  expect(overlap).toBe(false);
+  await page.getByTestId('deal-skipped-toggle').click();
+  await expect(page.getByTestId('deal-skipped-grid')).toBeVisible();
+  await shot(page, '21b-board-skipped-open-light');
+  await page.getByTestId('deal-skipped-toggle').click();
+
+  // The card in hand from a board lane (the list is that lane).
+  await page.locator(`[data-testid^="deal-chip-${ownerId}-"]`).first().click();
+  await page.locator('[data-testid^="card-view-card-"]').waitFor();
+  console.log(
+    '[walk] lane drawer position shown:',
+    await page.getByTestId('card-view-position').count(),
+    '| history rows:',
+    await page.locator('[data-testid="card-view-history"] li').count()
+  );
+  await shot(page, '22-drawer-from-lane-light');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+
+  // From the Deck: arrows, ← →, and the card changes.
+  await view(page, 'deck');
+  await page.getByTestId('card-open-cooking-dinner').click();
+  await page.getByTestId('card-view-card-cooking-dinner').waitFor();
+  const pos1 = await page.getByTestId('card-view-position').innerText();
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(400);
+  const pos2 = await page.getByTestId('card-view-position').innerText();
+  console.log('[walk] deck drawer position, then after →:', pos1, '|', pos2);
+  expect(pos2).not.toBe(pos1);
+  await page.getByTestId('card-view-prev').click();
+  await page.getByTestId('card-view-card-cooking-dinner').waitFor();
+  await shot(page, '23-drawer-deck-light');
+  await setDark(page, true);
+  await shot(page, '24-drawer-deck-dark');
+  await setDark(page, false);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
 
   // ── Phone ───────────────────────────────────────────────────────────────
   await page.setViewportSize({ width: 400, height: 860 });
@@ -214,6 +349,47 @@ test('who owns what walk', async ({ page }) => {
   await view(page, 'overview');
   await shot(page, '17-phone-overview-dark');
   await setDark(page, false);
+
+  // Phone drawer: the card in hand at pile size, swipe to the next card.
+  await view(page, 'deck');
+  await page.getByTestId('card-open-cooking-dinner').click();
+  await page.getByTestId('card-view-card-cooking-dinner').waitFor();
+  await page.waitForTimeout(500);
+  const cardEl = page.getByTestId('card-view-card-cooking-dinner');
+  const cardBox = await cardEl.boundingBox();
+  const cy = cardBox!.y + cardBox!.height / 2;
+  // A mouse drag must NOT flip the card (it selects text on a desktop).
+  await page.mouse.move(cardBox!.x + cardBox!.width - 20, cy);
+  await page.mouse.down();
+  await page.mouse.move(cardBox!.x + 10, cy, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  expect(await cardEl.count()).toBe(1);
+  // A touch swipe does.
+  const touch = (type: string, x: number) =>
+    cardEl.dispatchEvent(type, {
+      pointerType: 'touch',
+      pointerId: 7,
+      isPrimary: true,
+      clientX: x,
+      clientY: cy,
+      bubbles: true,
+    });
+  await touch('pointerdown', cardBox!.x + cardBox!.width - 20);
+  await touch('pointermove', cardBox!.x + cardBox!.width - 60);
+  await touch('pointermove', cardBox!.x + 20);
+  await touch('pointerup', cardBox!.x + 10);
+  await page.waitForTimeout(500);
+  const swiped = await page.getByTestId('card-view-card-cooking-dinner').count();
+  console.log('[walk] phone touch swipe left moved off cooking-dinner:', swiped === 0);
+  expect(swiped).toBe(0);
+  await shot(page, '25-phone-drawer-light');
+  await setDark(page, true);
+  await shot(page, '26-phone-drawer-dark');
+  await setDark(page, false);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await view(page, 'overview');
 
   // A hero on the phone pile: the art must sit inside the slab, not be clipped by it.
   await page.getByTestId('overview-deal-laundry').click();

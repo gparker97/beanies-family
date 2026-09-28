@@ -66,3 +66,32 @@ describe('DeckGrid.scrollToShelf', () => {
     w.unmount();
   });
 });
+
+describe('DeckGrid opening a card', () => {
+  it('passes the list along: a shelf tile, and By Person through to the page', async () => {
+    const shelfGrid = mount(DeckGrid, {
+      props: { cards: [card('dishes'), card('laundry')], filter: null },
+      global: {
+        stubs: { ListCategoryPills: true, DeckByBean: true, ResponsibilityCardTile: true },
+      },
+    });
+    const laundryTile = shelfGrid
+      .findAllComponents({ name: 'ResponsibilityCardTile' })
+      .find((c) => c.props('card').id === 'laundry')!;
+    laundryTile.vm.$emit('open', 'laundry');
+    expect(shelfGrid.emitted('open')![0]).toEqual([
+      'laundry',
+      { label: 'lists.category.home', ids: ['dishes', 'laundry'] },
+    ]);
+    shelfGrid.unmount();
+
+    const byBean = mount(DeckGrid, {
+      props: { cards: [card('dishes')], filter: 'byBean' },
+      global: { stubs: { ListCategoryPills: true, DeckByBean: true } },
+    });
+    const seq = { label: "greg's cards", ids: ['dishes', 'laundry'] };
+    byBean.findComponent({ name: 'DeckByBean' }).vm.$emit('open', 'laundry', seq);
+    expect(byBean.emitted('open')![0]).toEqual(['laundry', seq]);
+    byBean.unmount();
+  });
+});

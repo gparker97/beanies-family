@@ -14,6 +14,9 @@ import { HELPFUL_HINT_TYPES } from '@/utils/helpfulHints';
 import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
 import {
   buildCardBriefingRows,
+  cardHistory,
+  cardSequence,
+  sequenceStep,
   buildCheckInAgenda,
   categoryCoverage,
   checkInAnchor,
@@ -837,5 +840,76 @@ describe('keptAndSkipped', () => {
     const byCat =
       home < kids ? ['dishes', 'laundry', 'lunchboxes'] : ['lunchboxes', 'dishes', 'laundry'];
     expect(keptAndSkipped(cards).kept.map((c) => c.id)).toEqual(byCat);
+  });
+});
+
+describe('card details sequences', () => {
+  it('cardSequence keeps the first place of a card listed twice (two parts of one split card)', () => {
+    expect(cardSequence('greg', ['a', 'b', 'a', 'c', 'b'])).toEqual({
+      label: 'greg',
+      ids: ['a', 'b', 'c'],
+    });
+  });
+
+  it('sequenceStep: position, neighbours, and the ends', () => {
+    const seq = cardSequence('Home', ['a', 'b', 'c']);
+    const all = () => true;
+    expect(sequenceStep(seq, 'a', all)).toEqual({ n: 1, total: 3, prevId: null, nextId: 'b' });
+    expect(sequenceStep(seq, 'b', all)).toEqual({ n: 2, total: 3, prevId: 'a', nextId: 'c' });
+    expect(sequenceStep(seq, 'c', all)).toEqual({ n: 3, total: 3, prevId: 'b', nextId: null });
+  });
+
+  it('sequenceStep skips a card deleted elsewhere, and is null without a list to step', () => {
+    const seq = cardSequence('Home', ['a', 'gone', 'c']);
+    const exists = (id: string) => id !== 'gone';
+    expect(sequenceStep(seq, 'a', exists)).toEqual({ n: 1, total: 2, prevId: null, nextId: 'c' });
+    expect(sequenceStep(null, 'a', exists)).toBeNull();
+    expect(sequenceStep(cardSequence('x', ['a', 'gone']), 'a', exists)).toBeNull();
+    // The current card is no longer in the list (deleted, or never in it).
+    expect(sequenceStep(seq, 'zzz', exists)).toBeNull();
+  });
+});
+
+describe('cardHistory', () => {
+  const state = {
+    id: 'laundry',
+    status: 'kept',
+    splitMode: 'single',
+    parts: [],
+    createdAt: '2026-09-01T09:00:00Z',
+    // Every save rewrites this: it must never date a history entry.
+    updatedAt: '2026-09-20T09:00:00Z',
+  } as never;
+  const mv = (id: string, at: string, fromId?: string, toId?: string) => ({
+    id,
+    cardId: 'laundry',
+    partKey: 'main',
+    fromId,
+    toId,
+    at,
+  });
+
+  it('lists every deal, hand-over and return to nobody, newest first, then when it was sorted', () => {
+    const h = cardHistory({ id: 'laundry', state }, [
+      mv('a', '2026-09-01T09:00:00Z', undefined, 'sofia'),
+      mv('b', '2026-09-05T09:00:00Z', 'sofia', 'greg'),
+      mv('c', '2026-09-07T09:00:00Z', 'greg', undefined),
+      mv('empty', '2026-09-08T09:00:00Z'),
+      { ...mv('x', '2026-09-06T09:00:00Z', undefined, 'mia'), cardId: 'dishes' },
+    ]);
+    expect(h.map((e) => e.kind)).toEqual(['cleared', 'moved', 'dealt', 'sorted']);
+    expect(h.some((e) => e.at === '2026-09-20T09:00:00Z')).toBe(false);
+  });
+
+  it('keeps the part and label a move was recorded on, and is empty for an unsorted card', () => {
+    const [entry] = cardHistory({ id: 'laundry', state: null }, [
+      {
+        ...mv('a', '2026-09-01T09:00:00Z', undefined, 'greg'),
+        partKey: 'p1',
+        partLabel: 'Mornings',
+      },
+    ]);
+    expect(entry).toMatchObject({ kind: 'dealt', partKey: 'p1', partLabel: 'Mornings' });
+    expect(cardHistory({ id: 'laundry', state: null }, [])).toEqual([]);
   });
 });

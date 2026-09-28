@@ -17,6 +17,16 @@ tags: [who-owns-what, responsibilities, card-art, brand, image-generation, pwa-p
 - **2026-09-28** "yes go ahead with /beanies-build-auto"
 - **2026-09-28** "Approve and build with /beanies-build-auto"
 
+- **2026-09-28** "Commit and push changes"
+- **2026-09-28** "THis looks great and almost ready. Just a couple more UI suggestions / fixes before we do final test and deploy: 1) On the board view for card dealing ... family member lanes are scrunched into the top half of the view ... we don't need to show a full lane for family members who don't hold any cards ... 2) on the 'card view' sidrbar drawer ... show the actual card ... Perhaps we can even have the ability to swipe or navigate from card to card ... what do you think?"
+- **2026-09-28** "yes pls do the mockup"
+- **2026-09-28** "mockup looks good - regarding the questions: 1) i prefer the idle strip at the bottom ... 2) keep as done line ... 3) i think folded by default is ok 4) every drawer has a header icon ... can we find something more vibrant here to represent the family sharing and breakdown of responsibilities 5) agree to leave out. go ahead with /beanies-build-auto"
+- **2026-09-28** "Looking at the view now, i can see 2 isseus: 1) The details of the card splt are not shown underneath ... 2) Let's show the full audit history below every card (rather than inside the card) ... Keep the card pure with just the image, category, done text and ownerq 3) it seems that the skipped cards row is not expandable ... is the expandion arrow hidden behind the FAB? 4) the category name above the card is getting clipped by the top of the card 5) can we show the "not holding any cards yet" row closer to the other rows? ..."
+- **2026-09-28** "one more thing - can we also have the "share the deck" / "export as pdf" buttons available on all views? ... on the "deal" view, the "board view" / "card by card" view switch could be made to be more prominent ..."
+
+Second piece of work: plan `docs/plans/2026-09-28-deal-board-and-card-in-hand.md`, mockup
+`docs/mockups/who-owns-what-board-and-card-drawer-2026-09-28.html`.
+
 ## Outcome
 
 Image prompts written (one shared style block + ten scene lines, reference images from

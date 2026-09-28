@@ -75,6 +75,14 @@ const store = reactive({
   stats: { total: 2, deck: 2, held: 2, waiting: 0, skipped: 0, unsorted: 0, splitCount: 0 },
   customCount: 1,
   rhythmWeeks: 4,
+  moves: [] as {
+    id: string;
+    cardId: string;
+    partKey: string;
+    fromId?: string;
+    toId?: string;
+    at: string;
+  }[],
   cardById(id: string) {
     return this.cards[id];
   },
@@ -371,6 +379,97 @@ describe('CardViewDrawer', () => {
     store.cards['custom-swim'] = saved;
   });
 
+  it('opens on the card itself, owner on the card, history below; done is not repeated', () => {
+    store.moves = [
+      { id: 'm1', cardId: 'laundry', partKey: 'main', toId: 'sofia', at: '2026-09-02T10:00:00Z' },
+      {
+        id: 'm2',
+        cardId: 'laundry',
+        partKey: 'main',
+        fromId: 'sofia',
+        toId: 'greg',
+        at: '2026-09-10T10:00:00Z',
+      },
+    ];
+    const w = mountView(true);
+    expect(w.find('[data-testid="card-view-card-laundry"]').exists()).toBe(true);
+    expect(w.find('[data-testid="card-view-owner"]').text()).toContain(
+      'whoOwnsWhat.details.heldByName'
+    );
+    // Newest first: the hand-over, the first deal, then when it was first sorted.
+    const history = w.findAll('[data-testid="card-view-history"] li').map((li) => li.text());
+    expect(history).toHaveLength(3);
+    expect(history[0]).toContain('whoOwnsWhat.history.moved');
+    expect(history[1]).toContain('whoOwnsWhat.history.dealt');
+    expect(history[2]).toContain('whoOwnsWhat.history.sorted');
+    store.moves = [];
+    expect(w.html()).not.toContain('whoOwnsWhat.details.done');
+    // Deep link / no list: no arrows, no counter.
+    expect(w.find('[data-testid="card-view-prev"]').exists()).toBe(false);
+    expect(w.find('[data-testid="card-view-position"]').exists()).toBe(false);
+  });
+
+  it('steps through the list it was opened from: arrows, ← →, ends disabled', async () => {
+    const w = mount(CardViewDrawer, {
+      props: {
+        open: true,
+        cardId: 'laundry',
+        sequence: { label: 'Home', ids: ['laundry', 'custom-swim', 'gone'] },
+        canEdit: true,
+      },
+      global: { stubs },
+    });
+    // 'gone' no longer exists: the list is 2 long.
+    expect(w.find('[data-testid="card-view-position"]').exists()).toBe(true);
+    expect(w.find('[data-testid="card-view-prev"]').attributes('disabled')).toBeDefined();
+    await w.find('[data-testid="card-view-next"]').trigger('click');
+    expect(w.emitted('navigate')).toEqual([['custom-swim']]);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
+    // Still on laundry (the parent owns the id): → steps again, ← is at the start.
+    expect(w.emitted('navigate')).toEqual([['custom-swim'], ['custom-swim']]);
+  });
+
+  it('reaching the end hands focus to the other arrow instead of dropping it', async () => {
+    const w = mount(CardViewDrawer, {
+      props: {
+        open: true,
+        cardId: 'laundry',
+        sequence: { label: 'Home', ids: ['laundry', 'custom-swim'] },
+      },
+      global: { stubs },
+      attachTo: document.body,
+    });
+    (w.find('[data-testid="card-view-next"]').element as HTMLButtonElement).focus();
+    await w.setProps({ cardId: 'custom-swim' });
+    await flushPromises();
+    expect(document.activeElement).toBe(w.find('[data-testid="card-view-prev"]').element);
+    w.unmount();
+  });
+
+  it('a split card lists its parts BELOW the card: an open one says Nobody Yet', () => {
+    store.cards['school-drop-off'] = {
+      ...LAUNDRY,
+      id: 'school-drop-off',
+      def: getResponsibilityCard('school-drop-off'),
+      category: 'kids',
+      emoji: '🎒',
+      status: 'waiting',
+      splitMode: 'child',
+      parts: [{ key: 'mia', holderId: 'greg' }, { key: 'leo' }],
+      state: null,
+    };
+    const w = mountView(true, 'school-drop-off');
+    // On the card: just who holds it.
+    expect(w.find('[data-testid="card-view-owner"]').text()).toContain(
+      'whoOwnsWhat.details.heldByName'
+    );
+    const split = w.find('[data-testid="card-view-split"]');
+    expect(split.findAll('li')).toHaveLength(2);
+    expect(split.text()).toContain('whoOwnsWhat.deck.nobody');
+    delete store.cards['school-drop-off'];
+  });
+
   it('a child sees the card read-only: no Edit, no delete of any kind', () => {
     for (const id of ['laundry', 'custom-swim']) {
       const w = mountView(false, id);
@@ -411,13 +510,13 @@ describe('WhoOwnsWhatPage', () => {
   it('a grown-up gets Add and every menu item', () => {
     const w = mountPage();
     expect(w.find('[data-testid="who-owns-what-add"]').exists()).toBe(true);
-    expect(menuIds(w)).toEqual(['share', 'export', 'rhythm', 'skipped', 'restore']);
+    expect(menuIds(w)).toEqual(['rhythm', 'skipped', 'restore']);
   });
 
   it('a child gets no Add and only the read-only menu items', () => {
     store.canDeal = false;
     const w = mountPage();
     expect(w.find('[data-testid="who-owns-what-add"]').exists()).toBe(false);
-    expect(menuIds(w)).toEqual(['share', 'export', 'skipped']);
+    expect(menuIds(w)).toEqual(['skipped']);
   });
 });

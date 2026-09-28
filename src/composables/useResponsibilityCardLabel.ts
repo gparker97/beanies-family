@@ -14,6 +14,15 @@ import { ymdOf } from '@/utils/responsibilityDeck';
 import type { ResponsibilityCardDef } from '@/constants/responsibilityCards';
 import type { CardSplitMode } from '@/types/models';
 
+/** One part of a card for display: who holds it and since when (`held` null = nobody yet). */
+export interface HolderLine {
+  key: string;
+  memberId: string | null;
+  /** "for Mia" / the family's label on a split card; '' on an unsplit one. */
+  caption: string;
+  held: { name: string; date: string | null } | null;
+}
+
 /** The fields label resolution needs; a `ResolvedCard` satisfies it. */
 export interface CardLabelSource {
   id: string;
@@ -70,5 +79,33 @@ export function useResponsibilityCardLabel() {
     };
   }
 
-  return { cardName, cardDone, cardEmoji, partCaption, heldSince };
+  /** Every part of the card, held or not, in part order (the pile banner keeps the held ones). */
+  function holderLines(card: {
+    splitMode: CardSplitMode;
+    state: { createdAt: string } | null;
+    parts: readonly { key: string; label?: string; holderId?: string; since?: string }[];
+  }): HolderLine[] {
+    const split = card.splitMode !== 'single';
+    return card.parts.map((part) => ({
+      key: part.key,
+      memberId: part.holderId ?? null,
+      caption: split ? partCaption(card, part) : '',
+      held: heldSince(card, part),
+    }));
+  }
+
+  /** "{name}'s cards": a board lane, a By Person row, and the list label for either. */
+  function memberCardsLabel(name: string): string {
+    return fillTemplate(t('whoOwnsWhat.board.rowLabel'), { name });
+  }
+
+  return {
+    cardName,
+    cardDone,
+    cardEmoji,
+    partCaption,
+    heldSince,
+    holderLines,
+    memberCardsLabel,
+  };
 }

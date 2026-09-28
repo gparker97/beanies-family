@@ -27,6 +27,11 @@ export function hasOpenOverlays(): boolean {
   return overlayCount > 0;
 }
 
+/** How many modals / drawers are open (a surface inside one compares against its own depth). */
+export function openOverlayCount(): number {
+  return overlayCount;
+}
+
 /** Reset counter — for test isolation only. */
 export function resetOverlayStack() {
   overlayCount = 0;
