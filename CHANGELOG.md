@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-28
+
+_Not yet released._
+
+### Added
+
+- Ten Who Owns What cards (cooking dinner, laundry, trash night, grocery shopping, school drop-off, bedtime, the big holidays, birthday parties, date nights and time to myself) now have their own beanie illustrations, shown everywhere the card appears: the deck, the deal pile, the board, the lists, the check-in and the card details. Skipped and unowned cards show theirs greyed out.
+
 ## 2026-09-27
 
 _Not yet released._

@@ -32,6 +32,7 @@ import { groupByCategory, type ResolvedCard, type ResolvedPart } from '@/utils/r
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckActionButton from './DeckActionButton.vue';
 import { useDealActions } from './useDealActions';
 
@@ -49,7 +50,7 @@ const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardDone, partCaption } = useResponsibilityCardLabel();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 const { pulse } = useAttentionPulse();
 const { dragged, startDrag, endDrag } = useCardDrag();
@@ -328,9 +329,9 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
               @dragend="endDrag"
             >
               <span class="grip" aria-hidden="true"></span>
-              <span class="thumb grid h-8 w-8 flex-none place-items-center rounded-[9px] text-lg">{{
-                cardEmoji(card)
-              }}</span>
+              <span class="thumb grid h-8 w-8 flex-none place-items-center rounded-[9px] text-lg"
+                ><CardArt :card="card" img-class="h-full w-full"
+              /></span>
               <span class="min-w-0">
                 <b
                   class="font-outfit dark:text-ink block truncate text-sm leading-tight font-semibold text-[var(--color-text)]"
@@ -434,7 +435,9 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
             @dragstart="startDrag({ cardId: chip.card.id, partKey: chip.part?.key }, $event)"
             @dragend="endDrag"
           >
-            <span class="thumb" aria-hidden="true">{{ cardEmoji(chip.card) }}</span>
+            <span class="thumb" aria-hidden="true"
+              ><CardArt :card="chip.card" img-class="h-full w-full"
+            /></span>
             <span class="truncate">{{ cardName(chip.card) }}</span>
             <small v-if="chip.caption">{{ chip.caption }}</small>
           </button>
@@ -494,7 +497,9 @@ export const useCardDrag = createDragPayload<CardDragPayload>('beanies-card');
             @dragstart="startDrag({ cardId: chip.card.id }, $event)"
             @dragend="endDrag"
           >
-            <span class="thumb" aria-hidden="true">{{ cardEmoji(chip.card) }}</span>
+            <span class="thumb" aria-hidden="true"
+              ><CardArt :card="chip.card" img-class="h-full w-full"
+            /></span>
             <span class="truncate">{{ cardName(chip.card) }}</span>
           </button>
           <button

@@ -56,6 +56,7 @@ import { formatNookDate } from '@/utils/date';
 import { groupShortcut, otherHumans, type ResolvedCard } from '@/utils/responsibilityDeck';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckActionButton from './DeckActionButton.vue';
 import DeckCelebration from './DeckCelebration.vue';
 import DealPileBanner from './DealPileBanner.vue';
@@ -98,7 +99,7 @@ const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, partCaption } = useResponsibilityCardLabel();
 const { pulse } = useAttentionPulse();
 const actions = useDealActions();
 
@@ -583,7 +584,7 @@ const waitingLine = computed(() => {
             class="shortcut dark:border-line flex w-full items-center gap-2.5 rounded-2xl border border-[var(--tint-silk-30)] px-3 py-2.5 text-xs"
             data-testid="deal-pile-shortcut"
           >
-            <span class="text-base" aria-hidden="true">{{ cardEmoji(card) }}</span>
+            <CardArt :card="card" class="text-base" />
             <span class="dark:text-ink-soft min-w-0 flex-1 text-[var(--color-text-muted)]">
               <b class="font-outfit dark:text-ink text-[var(--color-text)]">{{
                 t(GROUP_QUESTION[shortcut.group])

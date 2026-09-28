@@ -19,7 +19,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import NavBadge from '@/components/ui/NavBadge.vue';
-import NavGlyph from '@/components/ui/NavGlyph.vue';
+import ImageGlyph from '@/components/ui/ImageGlyph.vue';
 import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { useNavBadges, type NavBadge as NavBadgeType } from '@/composables/useNavBadges';
 import { usePermissions } from '@/composables/usePermissions';
@@ -172,9 +172,10 @@ const rowSize = computed(() => (props.density === 'sidebar' ? 'py-2 text-lg' : '
         :aria-expanded="isOpen(group.section.id)"
         @click="toggle(group.section.id)"
       >
-        <NavGlyph
+        <ImageGlyph
           :emoji="group.section.emoji"
-          :icon-src="group.section.iconSrc"
+          :src="group.section.iconSrc"
+          surface="nav-glyph"
           class="w-6 shrink-0 text-center text-base"
         />
         <span class="flex-1 text-left">{{ group.section.label }}</span>

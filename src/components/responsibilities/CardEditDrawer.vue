@@ -23,6 +23,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import EmojiPicker from '@/components/ui/EmojiPicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
@@ -91,6 +92,8 @@ const done = ref('');
 const skipped = ref(false);
 /** The holder the card had when the drawer opened (for the re-deal note). */
 const openedHolderId = ref<string | undefined>();
+/** The header icon: the live-picked emoji while editing a custom card's identity, else the card's art. */
+const headerArt = computed(() => (editsIdentity.value ? { emoji: emoji.value } : card.value));
 
 const { isSubmitting } = useFormModal(
   () => card.value,
@@ -225,7 +228,6 @@ const { onDelete } = useCardDrawerEnd({
     :open="open && (isNew || !!card)"
     variant="drawer"
     :title="title"
-    :icon="editsIdentity ? emoji : card ? cardEmoji(card) : undefined"
     :save-label="saveLabel"
     :save-ready="v.canSave.value"
     :is-submitting="isSubmitting"
@@ -237,6 +239,7 @@ const { onDelete } = useCardDrawerEnd({
     @save="v.attemptSave(handleSave)"
     @delete="onDelete"
   >
+    <template v-if="headerArt" #icon><CardArt :card="headerArt" img-class="h-9 w-9" /></template>
     <!-- A built-in card keeps its name, emoji and category. -->
     <p
       v-if="!editsIdentity && card"

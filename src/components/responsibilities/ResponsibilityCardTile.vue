@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Who Owns What (#109): one portrait card in the Deck view. A category-tinted slab with
- * the emoji (or the hero illustration once it exists), then the name, the done line and
+ * the card art (hero illustration, else emoji), then the name, the done line and
  * who holds it: one row per part, "Nobody Yet" for an open part, "since" and the
  * previous holder for an unsplit card. Skipped cards (the skipped filter) carry
  * "Bring Back" for grown-ups.
@@ -10,7 +10,7 @@
  * degrades loudly); "Bring Back" sits above it. Purely presentational: writes are the
  * parent's job.
  */
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -19,6 +19,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import { ymdOf, type ResolvedCard } from '@/utils/responsibilityDeck';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -32,14 +33,13 @@ const emit = defineEmits<{ open: [cardId: string]; 'bring-back': [cardId: string
 
 const { t } = useTranslation();
 const { getMemberName } = useMemberInfo();
-const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardDone, partCaption } = useResponsibilityCardLabel();
 
 /** The category colour (`categoryTint` falls back for a category newer than this build). */
 const tint = computed(() => categoryTint(props.card.category));
 
 const name = computed(() => cardName(props.card));
 const done = computed(() => cardDone(props.card));
-const emoji = computed(() => cardEmoji(props.card));
 
 const isKept = computed(() => props.card.status === 'held' || props.card.status === 'waiting');
 /** Kept, but nobody holds any part: drawn as a ghosted, dashed card. */
@@ -65,24 +65,6 @@ const splitCaption = computed(() => {
   if (props.card.splitMode === 'label') return t('whoOwnsWhat.card.splitLabel');
   return '';
 });
-
-// Hero illustrations are optional assets; until one exists the card shows its emoji.
-// A src that failed once is remembered for the session, so a missing file 404s once,
-// not on every render of every shelf.
-const illustration = computed(() =>
-  props.card.illustration && !failedIllustrations.has(props.card.illustration)
-    ? props.card.illustration
-    : undefined
-);
-const illustrationFailed = ref(false);
-function onIllustrationError(): void {
-  if (props.card.illustration) failedIllustrations.add(props.card.illustration);
-  illustrationFailed.value = true;
-}
-</script>
-
-<script lang="ts">
-const failedIllustrations = new Set<string>();
 </script>
 
 <template>
@@ -93,19 +75,16 @@ const failedIllustrations = new Set<string>();
     :data-testid="`card-tile-${card.id}`"
   >
     <div class="slab relative grid place-items-center overflow-hidden rounded-t-2xl">
-      <img
-        v-if="illustration && !illustrationFailed"
-        :src="illustration"
-        alt=""
-        class="h-20 w-20 object-contain"
-        loading="lazy"
-        @error="onIllustrationError"
+      <CardArt
+        :card="card"
+        img-class="h-20 w-20"
+        class="text-4xl leading-none"
+        :class="{ 'opacity-55 grayscale': isOpen || isSkipped }"
       />
-      <span v-else class="glyph text-4xl leading-none" aria-hidden="true">{{ emoji }}</span>
       <span
         class="pointer-events-none absolute -right-1.5 -bottom-3 text-5xl leading-none opacity-[0.07]"
         aria-hidden="true"
-        >{{ emoji }}</span
+        >{{ card.emoji }}</span
       >
     </div>
 
@@ -224,12 +203,6 @@ html.dark .card-tile.is-skipped {
 .card-tile.is-open .slab,
 .card-tile.is-skipped .slab {
   background: transparent;
-}
-
-.card-tile.is-open .glyph,
-.card-tile.is-skipped .glyph {
-  filter: grayscale(1);
-  opacity: 0.55;
 }
 
 .status-chip {

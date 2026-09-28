@@ -39,6 +39,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckCelebration from './DeckCelebration.vue';
 import { useDealActions } from './useDealActions';
 
@@ -52,7 +53,7 @@ const { today } = useToday();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
-const { cardName, cardEmoji, partCaption, heldSince } = useResponsibilityCardLabel();
+const { cardName, partCaption, heldSince } = useResponsibilityCardLabel();
 const actions = useDealActions();
 
 const EMPTY_AGENDA: CheckInAgenda = { nobody: [], moved: [], unchanged: [] };
@@ -312,12 +313,9 @@ const completedNote = computed(() =>
           :data-testid="`checkin-unchanged-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span
-              class="thumb"
-              :style="{ '--cat': categoryTint(card.category) }"
-              aria-hidden="true"
-              >{{ cardEmoji(card) }}</span
-            >
+            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
+              ><CardArt :card="card" img-class="h-full w-full"
+            /></span>
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small class="ci-meta">{{ dealtLine(card.id) || heldLine(card) }}</small>
@@ -359,12 +357,9 @@ const completedNote = computed(() =>
           :data-testid="`checkin-moved-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span
-              class="thumb"
-              :style="{ '--cat': categoryTint(card.category) }"
-              aria-hidden="true"
-              >{{ cardEmoji(card) }}</span
-            >
+            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
+              ><CardArt :card="card" img-class="h-full w-full"
+            /></span>
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small class="ci-meta">{{ movedLine(move) }}</small>
@@ -390,12 +385,9 @@ const completedNote = computed(() =>
           :data-testid="`checkin-nobody-${card.id}`"
         >
           <div class="flex items-center gap-2.5">
-            <span
-              class="thumb"
-              :style="{ '--cat': categoryTint(card.category) }"
-              aria-hidden="true"
-              >{{ cardEmoji(card) }}</span
-            >
+            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
+              ><CardArt :card="card" img-class="h-full w-full"
+            /></span>
             <div class="min-w-0 flex-1">
               <b class="ci-name">{{ cardName(card) }}</b>
               <small v-if="dealtTo[card.id]" class="ci-meta">{{ dealtLine(card.id) }}</small>

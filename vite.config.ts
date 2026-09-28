@@ -267,7 +267,9 @@ export default defineConfig({
         // switching to `injectManifest`: that switch would rewrite the tuned update flow
         // (usePwaUpdater, no skipWaiting/clientsClaim — see the note below) for one route.
         importScripts: ['/share-target-sw.js'],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,wasm}'],
+        // Who Owns What hero art (#109) is .webp; listed narrowly so the blog/help .webp
+        // files under public/ stay out of the install download.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,wasm}', 'brand/cards/*.webp'],
         // The per-country public-holiday dataset (~200 files, ~2 MB total) is
         // fetched on demand for the family's country only and cached in
         // IndexedDB (see referenceDataCacheRepository) — never precache it, or

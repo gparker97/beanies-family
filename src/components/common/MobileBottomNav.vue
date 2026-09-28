@@ -29,7 +29,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MobileNavBeanStack from '@/components/common/MobileNavBeanStack.vue';
 import NavBadge from '@/components/ui/NavBadge.vue';
-import NavGlyph from '@/components/ui/NavGlyph.vue';
+import ImageGlyph from '@/components/ui/ImageGlyph.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useNavBadges, ATTENTION_DOT } from '@/composables/useNavBadges';
 import { usePermissions } from '@/composables/usePermissions';
@@ -238,7 +238,12 @@ watch(
         <!-- Fixed 1.25rem row so an image anchor (the Pod's hugging beanies,
              1.5rem) sits on the same label baseline as the emoji tabs. -->
         <span class="flex h-5 items-center justify-center">
-          <NavGlyph :emoji="cat.emoji" :icon-src="cat.iconSrc" class="text-xl leading-none" />
+          <ImageGlyph
+            :emoji="cat.emoji"
+            :src="cat.iconSrc"
+            surface="nav-glyph"
+            class="text-xl leading-none"
+          />
         </span>
         <span
           class="font-outfit text-xs font-semibold"
