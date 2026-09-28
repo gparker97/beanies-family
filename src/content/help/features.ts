@@ -2197,8 +2197,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       'A deck of household jobs your family keeps or skips, then hands out, so who owns what is never a debate. Split cards by child, re-deal when life changes, check in together and print the deck for the fridge.',
     icon: '\u{1F64B}',
-    readTime: 7,
-    updatedDate: '2026-09-26',
+    readTime: 9,
+    updatedDate: '2026-09-28',
     sections: [
       { type: 'heading', content: 'What is Who Owns What?', level: 2, id: 'what' },
       {
@@ -2210,6 +2210,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'You’ll find it under <strong>Who Owns What</strong> in the Treehouse section of the sidebar, right after the Meal Planner (on a phone, it’s in the Planning tab). The page has three views: <strong>Overview</strong> (where you land), <strong>Deal</strong> and <strong>Deck</strong>.',
+      },
+      {
+        type: 'callout',
+        title: 'Who Owns What is in beta',
+        icon: '\u{1F9EA}',
+        content:
+          'Who Owns What is new and still in beta, so you may see it change and improve over the coming weeks. Tell us what works and what doesn’t: your feedback shapes it.',
       },
       {
         type: 'callout',
@@ -2289,7 +2296,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Jobs move around: a new work schedule, a new baby, a kid old enough to take on laundry. Re-dealing is quick, and beanies keeps a short history, so a card shows who has held it since when and who held it before.',
+          'Jobs move around: a new work schedule, a new baby, a kid old enough to take on laundry. Re-dealing is quick, and beanies keeps each card’s full history (see <a href="#card-details">Look at a card up close</a>), so you can always see who holds it, since when, and who held it before.',
       },
       {
         type: 'list',
@@ -2297,13 +2304,35 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           '<strong>From the card:</strong> open it in the <strong>Deck</strong> view, tap <strong>Edit</strong>, choose someone else under <strong>Who Holds This Card?</strong> and save.',
           '<strong>In the Deal view:</strong> the cards come one at a time, just like the first deal. Tap a card in the <strong>Kept</strong> list below the pile and choose <strong>Give It to Someone Else</strong>.',
-          '<strong>On a computer or tablet:</strong> prefer to see everything at once? Tap <strong>Board View</strong> at the top right of the Deal view. Every card is in the rail on the left and every family member has a row. Drag a card onto someone to deal it, or onto <strong>Skipped</strong> to skip it. You can also tap a card and pick a name, which works on touch screens and with a keyboard. <strong>Card by Card</strong> takes you back to the pile, and beanies remembers which one you like.',
+          '<strong>On a computer or tablet:</strong> prefer to see everything at once? Use the <strong>Card by Card</strong> | <strong>Board View</strong> switch at the top right of the Deal view (it shows a little drawing of each layout). The board fills the screen: the cards still to deal are in the rail on the left, and everyone who holds a card has a lane showing their cards. Drag a card onto someone’s lane to deal it, or tap a card in the rail and pick a name (this works on touch screens and with a keyboard). Family members who don’t hold any cards yet sit together in a row at the bottom, <strong>Not Holding Any Cards Yet</strong>: drop a card on their face to deal it and they get a lane of their own. <strong>Skipped</strong> sits folded at the very bottom; drop a card on it to skip it, or tap <strong>Show</strong> to see the skipped cards. beanies remembers which layout you like.',
         ],
       },
       {
         type: 'paragraph',
         content:
           'When a card changes hands, both the person who held it and the person who now holds it get a short note in their daily briefing.',
+      },
+      {
+        type: 'heading',
+        content: 'Look at a card up close',
+        level: 2,
+        id: 'card-details',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap any card, in the Deck view, a lane on the board, By Person, or the Overview, to open <strong>Card Details</strong>. It opens on the card itself, just as it looks when it’s dealt: its picture, the job, what done looks like, its category and who holds it.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Flip through the cards:</strong> use the arrows either side of the card, the ← and → keys on a keyboard, or swipe left and right on a phone or tablet. You move through the list you opened it from (for example, that category’s shelf in the Deck, or one person’s lane), and the line above the card shows where you are, such as <em>Home &amp; Household · 3 of 15</em>.',
+          '<strong>Split cards:</strong> a card split by child or into custom parts lists each part and who holds it below the card, including any part nobody holds yet.',
+          '<strong>History:</strong> below the card, <strong>History</strong> lists everything that happened to it, newest first: when it was first sorted, every deal and hand-over, and every time it was talked about at a <a href="/help/features/family-check-in">family check-in</a>.',
+          '<strong>beanies Uses This Card For</strong> shows where the card fills things in for you (see below).',
+          'Grown-ups can tap <strong>Edit</strong> to change the holder, split the card or change what done looks like.',
+        ],
       },
       {
         type: 'heading',
@@ -2333,6 +2362,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'The <strong>Overview</strong> shows how much of your deck has a holder, how many cards are still waiting and how many you skipped. Below that you’ll see coverage <strong>By Category</strong> with the faces of the people holding cards there, a list of cards <strong>Waiting for a Holder</strong> (each with a <strong>Deal</strong> button), <strong>Recent Moves</strong> from the last month, and your family check-in.',
       },
       {
+        type: 'paragraph',
+        content:
+          'The <strong>Good to Know</strong> panel adds a few gentle signals about how balanced your deck is: whether every grown-up holds a <em>Just for Me</em> card (time that’s only yours counts as a job too), how many cards are split between people, and whether the kids hold cards of their own.',
+      },
+      {
         type: 'callout',
         title: 'Coverage, never comparison',
         icon: '\u{1F91D}',
@@ -2348,21 +2382,12 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every few weeks, beanies suggests ten minutes together to look at the deck and swap anything that isn’t working. There are no scores, only a nudge to talk.',
-      },
-      {
-        type: 'steps',
-        content: '',
-        items: [
-          'When a check-in is due, it shows on the Overview and in your daily briefing. Tap <strong>Start a Check-in</strong>.',
-          'The agenda lists cards with nobody (tap <strong>Deal Now</strong>), cards that moved since last time, and a few that haven’t changed hands in a long while. Mark each one <strong>Still Works</strong> or <strong>Let’s Talk</strong>, or re-deal it right there.',
-          'Tap <strong>Finish Check-in</strong>. beanies lists what you wanted to talk about and shows when the next check-in is due.',
-        ],
+          'Every few weeks (every 4 weeks unless you change it), beanies suggests ten minutes together to look at the deck. The check-in brings up cards you saved from last time, a few that haven’t changed hands in a long while, cards that moved since last time, and anything still to deal. For each card you answer <strong>No Issues</strong>, <strong>We’ve Talked</strong> (recorded in the card’s history) or <strong>Save for Next Time</strong> (it comes back at the next check-in), or re-deal it on the spot. There are no scores, only a nudge to talk.',
       },
       {
         type: 'paragraph',
         content:
-          'Check-ins happen every 4 weeks unless you change it. Open the ⋯ menu and choose <strong>Check-in Rhythm</strong> to pick <strong>Every 2 Weeks</strong>, <strong>Every 4 Weeks</strong>, <strong>Every 8 Weeks</strong> or <strong>Off</strong>. Not a good week? <strong>Remind Me Later</strong> hides the reminder for a week.',
+          'While check-ins are on, start one any time from the <strong>Family Check-in</strong> panel on the Overview with <strong>Start a Check-in</strong>. For the full walkthrough, including exactly which cards come up and where to see your answers afterwards, read <a href="/help/features/family-check-in">The Family Check-in: How It Works</a>.',
       },
       {
         type: 'heading',
@@ -2373,7 +2398,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The fridge sheet puts your dealt deck on paper: every kept card by category, with each holder’s initial beside it. Cards still waiting for a holder get a dashed line so you can write a name in, and skipped cards are left off. Open the ⋯ menu and choose <strong>Export as PDF</strong> to print it (a big deck spills onto a second page, never splitting a category), or <strong>Share the Deck</strong> to send it as an image.',
+          'The fridge sheet puts your dealt deck on paper: every kept card by category, with each holder’s initial beside it. Cards still waiting for a holder get a dashed line so you can write a name in, and skipped cards are left off. <strong>Share the Deck</strong> and <strong>Export as PDF</strong> sit at the top of every Who Owns What view. <strong>Export as PDF</strong> saves a PDF you can print (on a computer it downloads straight away; in the phone apps it opens your share sheet, where you can save or print it). A big deck spills onto a second page, never splitting a category. <strong>Share the Deck</strong> sends it as an image, for example to a family chat.',
       },
       {
         type: 'heading',
@@ -2411,7 +2436,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Open the ⋯ menu and choose <strong>Restore Default Cards</strong> to bring every built-in card back (including skipped ones) and deal the deck again from the start. Choose <strong>Keep our own cards</strong> to keep the cards your family made (they come back waiting for a holder) or <strong>Clear our own cards too</strong>, then tap <strong>Restore and start over</strong>. Your check-in history is kept.',
+          'Open the ⋯ menu and choose <strong>Restore Default Cards</strong> to bring every built-in card back (including skipped ones) and deal the deck again from the start. Choose <strong>Keep our own cards</strong> to keep the cards your family made (they come back waiting for a holder) or <strong>Clear our own cards too</strong>, then tap <strong>Restore and start over</strong>. Your check-in history is kept, but cards saved for the next check-in don’t carry into the new deal.',
       },
       {
         type: 'callout',
@@ -2429,7 +2454,146 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'See how your cards show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
+          'Learn exactly how <a href="/help/features/family-check-in">the family check-in</a> works, see how your cards show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
+      },
+    ],
+  },
+  {
+    slug: 'family-check-in',
+    category: 'features',
+    title: 'The Family Check-in: How It Works',
+    excerpt:
+      'Every few weeks, ten minutes together to look at your Who Owns What deck. Which cards come up, what No Issues, We’ve Talked and Save for Next Time each do, and where to see the results afterwards.',
+    icon: '\u{1F5D3}️',
+    readTime: 5,
+    updatedDate: '2026-09-28',
+    sections: [
+      { type: 'heading', content: 'Why a check-in?', level: 2, id: 'why' },
+      {
+        type: 'paragraph',
+        content:
+          'A <a href="/help/features/who-owns-what">Who Owns What</a> deck is only useful while it matches real life. Jobs drift: someone picks up a new shift, a child gets old enough to take out the trash, a card nobody wanted quietly never gets done. The <strong>Family Check-in</strong> is a short, regular moment for the grown-ups to look at the deck together and catch that drift early. It takes about ten minutes. There are no scores and nothing is graded; it’s just a chance to talk.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'By the end of this article you’ll know when a check-in is due, which cards it brings up and why, exactly what each answer does, and where to find what you decided afterwards.',
+      },
+      {
+        type: 'callout',
+        title: 'Who can run a check-in',
+        icon: '\u{1F9D1}',
+        content:
+          'Grown-ups start and finish check-ins. Kids can see the <strong>Family Check-in</strong> panel on the Overview, but can’t run one.',
+      },
+      { type: 'heading', content: 'When a check-in is due', level: 2, id: 'when' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Every 4 weeks by default.</strong> The clock starts when your family first puts a card into the deck, and restarts each time you finish a check-in.',
+          '<strong>Change the rhythm</strong> from the ⋯ menu on the Who Owns What page: <strong>Check-in Rhythm</strong> lets you pick <strong>Every 2 Weeks</strong>, <strong>Every 4 Weeks</strong>, <strong>Every 8 Weeks</strong> or <strong>Off</strong>. With <strong>Off</strong> there are no check-ins or reminders.',
+          '<strong>When it’s due,</strong> the <strong>Family Check-in</strong> panel on the Overview says so, and grown-ups see a reminder in their <a href="/help/how-it-works/your-daily-briefing">daily briefing</a> every day until your family finishes one.',
+          '<strong>Not a good week?</strong> Tap <strong>Remind Me Later</strong> to hide the reminder for a week.',
+          '<strong>You don’t have to wait.</strong> While a rhythm is set, <strong>Start a Check-in</strong> is always on the Overview, so you can check in whenever it suits you.',
+        ],
+      },
+      { type: 'heading', content: 'Run a check-in', level: 2, id: 'run' },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Who Owns What</strong> and stay on the <strong>Overview</strong>. In the <strong>Family Check-in</strong> panel, tap <strong>Start a Check-in</strong>.',
+          'Work down the agenda together (the sections are explained below). For each card, tap the answer that fits. You can change an answer until you finish, except on a card you re-deal: that one stays <strong>Re-deal</strong> (use <strong>Undo</strong> on the toast if you change your mind).',
+          'Under <strong>Still to Deal</strong>, tap <strong>Deal Now</strong> on any card nobody holds yet and pick who takes it. Like everywhere else, a deal shows a toast with <strong>Undo</strong> for a few seconds.',
+          'Tap <strong>Finish Check-in</strong>. You’ll see <strong>Deck checked</strong> with a summary of your answers, the cards you saved for next time, and when the next check-in is due.',
+          'If cards are still waiting to be dealt, the button reads <strong>Deal the Remaining</strong> (or <strong>Deal the Last Card</strong>) and takes you straight to them. Otherwise tap <strong>Done</strong>.',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Close without finishing and your answers aren’t saved',
+        icon: '⚠️',
+        content:
+          'The answers are saved together when you tap <strong>Finish Check-in</strong>. If you close the check-in before that, the answers are dropped (any cards you dealt stay dealt). Starting again brings up the same cards.',
+      },
+      { type: 'heading', content: 'Which cards come up, and why', level: 2, id: 'agenda' },
+      {
+        type: 'paragraph',
+        content:
+          'beanies builds the agenda when you open the check-in. It’s kept short on purpose, so you talk about the cards most likely to need it. Each section only appears when it has something in it.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Saved From Last Time:</strong> cards your last check-in answered <strong>Save for Next Time</strong>. They come first, because you already decided they needed another look.',
+          '<strong>Haven’t Moved in a While:</strong> up to three cards the same person has held for three months or more, longest first. A long-held job is worth a quick “still OK with this?”.',
+          '<strong>Moved Since Last Time:</strong> cards that changed hands since your last check-in, with who they moved from and to. New owners often need a little time to settle, so it helps to ask how it’s going.',
+          '<strong>Still to Deal:</strong> cards your family kept but nobody holds yet, each with <strong>Deal Now</strong>. Below them, a line counts the cards nobody has sorted at all (kept or skipped). Those can be dealt from <strong>Deal the Remaining</strong> when you finish.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If nothing needs a look, the check-in says so: every card has a holder and nothing has moved. You can still tap <strong>Finish Check-in</strong> to record that you checked.',
+      },
+      { type: 'heading', content: 'What each answer does', level: 2, id: 'answers' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>👍 No Issues:</strong> this card is fine, nothing to follow up. The card is closed out for this check-in. Nothing changes on the card.',
+          '<strong>💬 We’ve Talked:</strong> you discussed this card together. The card is closed out, and the conversation is recorded in the card’s <strong>History</strong> as <em>Talked about at a family check-in</em>, with the date.',
+          '<strong>📌 Save for Next Time:</strong> not settled yet. Nothing changes now, and the card comes back at the top of your next check-in under <strong>Saved From Last Time</strong>.',
+          '<strong>🔁 Re-deal</strong> (on cards that haven’t moved in a while, when someone else could take it): pick who takes the card next. The card changes hands right away, the same as re-dealing it anywhere else. Once a card is re-dealt in a check-in, its answer stays Re-deal; use the toast’s <strong>Undo</strong> if you change your mind.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        title: 'Saved cards stay saved until you answer them',
+        icon: '\u{1F4CC}',
+        content:
+          'A card under <strong>Saved From Last Time</strong> starts on <strong>Save for Next Time</strong>, and it keeps coming back check-in after check-in until you answer <strong>No Issues</strong> or <strong>We’ve Talked</strong>. It never drops off by accident.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Any other card you leave unanswered is simply closed out, the same as <strong>No Issues</strong>. It isn’t counted in the summary, and it won’t come back unless it moves again, stays with the same person for a long time, or has nobody holding it.',
+      },
+      { type: 'heading', content: 'Where to see what you decided', level: 2, id: 'results' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Right after finishing:</strong> the <strong>Deck checked</strong> screen shows how many cards had no issues, were talked about, were saved, were re-dealt and were dealt, and names the cards you saved for next time.',
+          '<strong>On a card:</strong> open the card (tap it in the Deck view, or anywhere a card appears) and look under <strong>History</strong>. Every <strong>We’ve Talked</strong> shows there with its date, alongside every deal and hand-over.',
+          '<strong>On the Overview:</strong> the <strong>Family Check-in</strong> panel shows when the last check-in was and when the next is due, and previews what’s coming up, including the cards saved from last time. <strong>Recent Moves</strong> lists the check-in too.',
+          '<strong>At the next check-in:</strong> saved cards are waiting at the top.',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Talk, don’t track',
+        icon: '\u{1F91D}',
+        content:
+          'Check-ins never score anyone, never compare who holds how many cards, and never create to-dos. Your answers don’t notify anyone; they record only what you need to pick the conversation up next time. (A card you re-deal or deal during a check-in moves like any other deal, so its old and new holders see the usual note in their daily briefing.)',
+      },
+      { type: 'heading', content: 'Good to know', level: 2, id: 'good-to-know' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Every device, one check-in.</strong> A finished check-in is part of your family’s data, so the next check-in shows the same saved cards on any phone, tablet or computer in your family.',
+          '<strong>Older app versions.</strong> A check-in finished on an older version of beanies records the summary but not which cards were talked about or saved. If saved cards don’t come back, make sure everyone who runs check-ins has updated the app.',
+          '<strong>Starting over.</strong> <strong>Restore Default Cards</strong> keeps your check-in history, but saved cards don’t carry into the new deal, and a card’s history starts again from when it’s sorted.',
+        ],
+      },
+      { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+      {
+        type: 'paragraph',
+        content:
+          'Read the full <a href="/help/features/who-owns-what">Who Owns What</a> guide for dealing, splitting and re-dealing cards, and see how the check-in reminder shows up in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>.',
       },
     ],
   },

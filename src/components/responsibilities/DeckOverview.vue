@@ -50,7 +50,7 @@ const emit = defineEmits<{
   /** Open the deal view over every waiting card. */
   'deal-waiting': [];
   /** Open the deal pile over what is left: the unsorted cards first, else the waiting. */
-  'deal-remaining': [scope: 'unsorted' | 'waiting'];
+  'deal-remaining': [];
   /** Open the Deck view filtered to one category. */
   'open-category': [category: ListCategory];
   /** Open the deal pile at one card. */
@@ -74,12 +74,8 @@ const WAITING_SHOWN = 5;
 
 const stats = computed(() => store.stats);
 
-/** Every card still to deal: unsorted plus waiting. */
-const remaining = computed(() => stats.value.unsorted + stats.value.waiting);
-
-function dealRemaining(): void {
-  emit('deal-remaining', stats.value.unsorted > 0 ? 'unsorted' : 'waiting');
-}
+/** Cards still to deal: the store's ONE count (the page picks the pile's scope). */
+const remaining = computed(() => store.remaining);
 
 const headline = computed(() => {
   const { inPlay, held, waiting, unsorted } = stats.value;
@@ -229,7 +225,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
                 v-if="canDeal && remaining"
                 size="sm"
                 data-testid="overview-deal-remaining"
-                @click="dealRemaining"
+                @click="emit('deal-remaining')"
               >
                 {{
                   remaining === 1
@@ -269,6 +265,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
         :next-check-in="store.nextCheckIn"
         :due="store.checkInDue"
         :agenda="agenda"
+        :to-deal="remaining"
         :can-edit="canDeal"
         @start="emit('start-check-in')"
         @later="snoozeCheckIn"
@@ -357,7 +354,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
         </p>
       </DeckPanel>
 
-      <DeckPanel v-if="stats.deck">
+      <DeckPanel v-if="stats.deck" :title="t('whoOwnsWhat.facts.title')">
         <ul class="space-y-3.5" data-testid="overview-facts">
           <li v-if="adults.length" class="flex items-start gap-3">
             <span class="text-base leading-6" aria-hidden="true">✨</span>

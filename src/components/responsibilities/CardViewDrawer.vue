@@ -128,6 +128,7 @@ const HISTORY_KEYS: Record<CardHistoryKind, UIStringKey> = {
   moved: 'whoOwnsWhat.history.moved',
   cleared: 'whoOwnsWhat.history.cleared',
   sorted: 'whoOwnsWhat.history.sorted',
+  talked: 'whoOwnsWhat.history.talked',
 };
 
 /**
@@ -144,7 +145,7 @@ const history = computed(() => {
   const c = card.value;
   if (!c) return [];
   const who = (id?: string) => getMemberName(id, t('whoOwnsWhat.history.someone'));
-  return cardHistory(c, store.moves).map((e, i) => {
+  return cardHistory(c, store.moves, store.checkIns).map((e, i) => {
     return {
       key: `${e.at}:${e.kind}:${i}`,
       date: formatNookDate(ymdOf(e.at)),

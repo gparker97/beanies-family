@@ -4,15 +4,16 @@
  *
  * A short agenda from `buildCheckInAgenda`, snapshotted when the drawer opens so a card
  * dealt here stays on screen with "Dealt to …" instead of vanishing mid-conversation:
- *  - **Still nobody**: Deal Now opens "Who owns it?" and deals through `useDealActions`.
- *  - **Moved since last time**: Settling In / Let's Talk.
- *  - **Haven't moved in a while** (up to 3, 90+ days): Still Works / Let's Talk / Re-deal
- *    (Re-deal opens the same picker, and is offered only when someone else could take it).
- *    An Undo from a deal's toast reopens that card here.
- * Finish records one write-once check-in with the outcome counts
- * (`store.completeCheckIn`, which fires the celebration), then the drawer shows "Deck
- * checked" with the "Let's Talk" cards listed and the next due date. No to-do is created
- * in v1. Opening the drawer logs `checkin_started` (`store.startCheckIn`), so the started
+ *  - **Saved from last time**: cards the last check-in saved; pre-selected Save for Next
+ *    Time (not clearable), so a saved card only leaves when someone answers it.
+ *  - **Haven't moved in a while** (up to 3, 90+ days): No Issues / We've Talked / Save for
+ *    Next Time / Re-deal (Re-deal opens the picker; offered only when someone else could
+ *    take it). An Undo from a deal's toast reopens that card here.
+ *  - **Moved since last time**: No Issues / We've Talked / Save for Next Time.
+ *  - **Still to deal**: kept cards with nobody (Deal Now), and a line for never-sorted ones.
+ * Finish records one write-once check-in: the counts plus `talkedIds` / `savedIds`
+ * (`store.completeCheckIn`, which fires the celebration). The done screen names what was
+ * saved, and offers "Deal the Remaining N" (the page opens the deal pile) when cards are left. Opening the drawer logs `checkin_started` (`store.startCheckIn`), so the started
  * vs completed rate is measurable.
  */
 import { computed, ref, watch } from 'vue';
@@ -27,6 +28,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import {
   buildCheckInAgenda,
+  checkInCardIds,
   otherHumans,
   ymdOf,
   type CheckInAgenda,
@@ -44,9 +46,15 @@ import DeckCelebration from './DeckCelebration.vue';
 import { useDealActions } from './useDealActions';
 
 const props = defineProps<{ open: boolean }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; 'deal-remaining': [] }>();
 
-type Outcome = 'stillWorks' | 'settling' | 'talk' | 'redeal';
+/**
+ * The answers (greg, 2026-09-28): No Issues and We've Talked close a card out (We've Talked is
+ * written to the record and shows in the card's history); Save for Next Time brings it back at
+ * the next check-in. Re-deal (long-unchanged cards) hands it to someone else.
+ */
+type Outcome = 'noIssues' | 'talked' | 'saved' | 'redeal';
+type SectionId = 'saved' | 'unchanged' | 'moved' | 'nobody';
 
 const { t } = useTranslation();
 const { today } = useToday();
@@ -56,13 +64,14 @@ const { getMemberName } = useMemberInfo();
 const { cardName, partCaption, heldSince } = useResponsibilityCardLabel();
 const actions = useDealActions();
 
-const EMPTY_AGENDA: CheckInAgenda = { nobody: [], moved: [], unchanged: [] };
+const EMPTY_AGENDA: CheckInAgenda = { saved: [], nobody: [], moved: [], unchanged: [] };
 
 const agenda = ref<CheckInAgenda>(EMPTY_AGENDA);
 const outcomes = ref<Record<string, Outcome>>({});
 /** Cards dealt from this drawer: card id → who now holds it. */
 const dealtTo = ref<Record<string, string>>({});
-const picking = ref<{ cardId: string; reason: 'dealNow' | 'redeal' } | null>(null);
+/** The ROW (section + card) whose picker is open: a card can sit in two sections. */
+const picking = ref<{ rowKey: string; cardId: string; reason: 'dealNow' | 'redeal' } | null>(null);
 const submitting = ref(false);
 const completed = ref<ResponsibilityCheckIn | null>(null);
 
@@ -71,7 +80,8 @@ watch(
   (open) => {
     if (!open) return;
     agenda.value = buildCheckInAgenda(store.resolved, store.moves, store.checkInSince, today.value);
-    outcomes.value = {};
+    // A saved card stays saved unless someone answers it: it never drops off silently.
+    outcomes.value = Object.fromEntries(agenda.value.saved.map((c) => [c.id, 'saved' as const]));
     dealtTo.value = {};
     picking.value = null;
     completed.value = null;
@@ -84,51 +94,13 @@ function live(card: ResolvedCard): ResolvedCard {
   return store.cardById(card.id) ?? card;
 }
 
-const isEmpty = computed(
-  () => !agenda.value.nobody.length && !agenda.value.moved.length && !agenda.value.unchanged.length
-);
-
-function option(value: Outcome, key: UIStringKey, emoji: string) {
-  return { value, label: `${emoji} ${t(key)}`, variant: 'orange' as const };
-}
-const movedOptions = computed(() => [
-  option('settling', 'whoOwnsWhat.checkinDrawer.settling', '👍'),
-  option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
-]);
 /**
  * Who a re-deal of this card could go to: every human but the part's current holder
- * (picking them would write nothing yet toast "dealt" and count a re-deal; "Still works"
- * is the answer for keeping it where it is).
+ * (picking them would write nothing yet toast "dealt" and count a re-deal; No Issues is the
+ * answer for keeping it where it is).
  */
 function redealTargets(card: ResolvedCard) {
   return otherHumans(familyStore.sortedHumans, live(card));
-}
-/**
- * The pills for each "haven't moved" card (card id → options). Re-deal is offered only
- * when there is someone to re-deal to: never an empty picker.
- */
-const unchangedOptions = computed(() => {
-  const base = [
-    option('stillWorks', 'whoOwnsWhat.checkinDrawer.stillWorks', '👍'),
-    option('talk', 'whoOwnsWhat.checkinDrawer.talk', '💬'),
-  ];
-  const withRedeal = [...base, option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁')];
-  const byId: Record<string, typeof base> = {};
-  for (const card of agenda.value.unchanged) {
-    byId[card.id] = redealTargets(card).length ? withRedeal : base;
-  }
-  return byId;
-});
-
-function setOutcome(cardId: string, value: string): void {
-  const next = { ...outcomes.value };
-  if (!value) {
-    delete next[cardId];
-    if (picking.value?.cardId === cardId) picking.value = null;
-  } else next[cardId] = value as Outcome;
-  outcomes.value = next;
-  // Re-deal is an action: it asks who takes the card next.
-  if (value === 'redeal' && !dealtTo.value[cardId]) picking.value = { cardId, reason: 'redeal' };
 }
 
 function heldLine(card: ResolvedCard): string {
@@ -154,6 +126,126 @@ function dealtLine(cardId: string): string {
     : '';
 }
 
+// ── Sections: ONE list, one row template ─────────────────────────────────────
+interface Row {
+  key: string;
+  card: ResolvedCard;
+  meta: string;
+  holderId?: string;
+  kind: 'outcome' | 'deal';
+  /** Offer Re-deal (long-unchanged cards, when someone else could take it). */
+  redeal: boolean;
+}
+interface Section {
+  id: SectionId;
+  rows: Row[];
+}
+const SECTION_TITLE: Record<SectionId, UIStringKey> = {
+  saved: 'whoOwnsWhat.checkinDrawer.saved',
+  unchanged: 'whoOwnsWhat.checkinDrawer.unchanged',
+  moved: 'whoOwnsWhat.checkinDrawer.moved',
+  nobody: 'whoOwnsWhat.checkinDrawer.toDeal',
+};
+
+const sections = computed<Section[]>(() => {
+  const a = agenda.value;
+  const row = (id: SectionId, card: ResolvedCard, extra: Partial<Row>): Row => ({
+    key: `${id}-${card.id}`,
+    card,
+    meta: '',
+    kind: 'outcome',
+    redeal: false,
+    ...extra,
+  });
+  const holder = (c: ResolvedCard) => live(c).parts[0]?.holderId;
+  const all: Section[] = [
+    {
+      id: 'saved',
+      rows: a.saved.map((c) =>
+        row('saved', c, { meta: dealtLine(c.id) || heldLine(c), holderId: holder(c) })
+      ),
+    },
+    {
+      id: 'unchanged',
+      rows: a.unchanged.map((c) =>
+        row('unchanged', c, {
+          meta: dealtLine(c.id) || heldLine(c),
+          holderId: holder(c),
+          redeal: redealTargets(c).length > 0,
+        })
+      ),
+    },
+    {
+      id: 'moved',
+      rows: a.moved.map(({ card, move }) =>
+        row('moved', card, { meta: movedLine(move), holderId: move.toId })
+      ),
+    },
+    {
+      id: 'nobody',
+      rows: a.nobody.map((c) => row('nobody', c, { meta: dealtLine(c.id), kind: 'deal' })),
+    },
+  ];
+  // "Still to Deal" also shows when only never-sorted cards are left (the count line).
+  return all.filter((sec) => sec.rows.length || (sec.id === 'nobody' && store.stats.unsorted > 0));
+});
+
+const isEmpty = computed(() => !sections.value.length);
+
+function option(value: Outcome, key: UIStringKey, emoji: string) {
+  return { value, label: `${emoji} ${t(key)}`, variant: 'orange' as const };
+}
+const ANSWERS = computed(() => [
+  option('noIssues', 'whoOwnsWhat.checkinDrawer.noIssues', '👍'),
+  option('talked', 'whoOwnsWhat.checkinDrawer.talked', '💬'),
+  option('saved', 'whoOwnsWhat.checkinDrawer.saveNext', '📌'),
+]);
+const REDEAL = computed(() => option('redeal', 'whoOwnsWhat.checkinDrawer.redeal', '🔁'));
+function optionsFor(row: Row) {
+  return row.redeal ? [...ANSWERS.value, REDEAL.value] : ANSWERS.value;
+}
+
+/** A card re-dealt in this drawer: its answer stays Re-deal (only the toast's Undo frees it). */
+function isRedealt(cardId: string): boolean {
+  return outcomes.value[cardId] === 'redeal' && !!dealtTo.value[cardId];
+}
+
+function writeOutcome(cardId: string, value: Outcome | ''): void {
+  const next = { ...outcomes.value };
+  if (!value) delete next[cardId];
+  else next[cardId] = value;
+  outcomes.value = next;
+}
+
+/**
+ * The ONE rule for a re-deal picker going away without a deal (cancelled, or replaced by
+ * another row's picker): its Re-deal answer is cleared, so no card is left on "Re-deal" with
+ * nothing recorded.
+ */
+function abandonRedeal(p: { cardId: string; reason: 'dealNow' | 'redeal' } | null): void {
+  if (p?.reason === 'redeal' && !dealtTo.value[p.cardId]) writeOutcome(p.cardId, '');
+}
+
+/** Open a picker in one row, abandoning any other card's undealt re-deal picker. */
+function openPicker(next: { rowKey: string; cardId: string; reason: 'dealNow' | 'redeal' }): void {
+  const p = picking.value;
+  if (p && p.cardId !== next.cardId) abandonRedeal(p);
+  picking.value = next;
+}
+
+function setOutcome(row: Pick<Row, 'key' | 'card'>, value: string): void {
+  const cardId = row.card.id;
+  // The deal happened: the record must count it as re-dealt (the row hides its answers).
+  if (isRedealt(cardId)) return;
+  writeOutcome(cardId, value as Outcome | '');
+  // Leaving Re-deal closes THIS card's re-deal picker; a Deal Now picker is never touched.
+  const p = picking.value;
+  if (p?.reason === 'redeal' && p.cardId === cardId && value !== 'redeal') picking.value = null;
+  // Re-deal is an action: it asks who takes the card next.
+  if (value === 'redeal' && !dealtTo.value[cardId])
+    openPicker({ rowKey: row.key, cardId, reason: 'redeal' });
+}
+
 // ── Picker ───────────────────────────────────────────────────────────────────
 const pickingCard = computed(() =>
   picking.value ? store.cardById(picking.value.cardId) : undefined
@@ -176,8 +268,9 @@ const members = computed(() =>
 async function onPick(memberId: string): Promise<void> {
   const c = pickingCard.value;
   const part = pickingPart.value;
-  const reason = picking.value?.reason;
-  if (!c || !part || !reason) return;
+  const p = picking.value;
+  if (!c || !part || !p) return;
+  const { reason, rowKey } = p;
   // An Undo from the toast takes the deal back here too: the card is open again (Deal Now
   // shows again; a re-deal's pill clears so tapping Re-deal reopens the picker), and the
   // counts no longer include it.
@@ -187,29 +280,33 @@ async function onPick(memberId: string): Promise<void> {
       const next = { ...dealtTo.value };
       delete next[c.id];
       dealtTo.value = next;
-      if (reason === 'redeal') setOutcome(c.id, '');
+      if (reason === 'redeal') writeOutcome(c.id, '');
     },
   });
   if (!res) return;
   dealtTo.value = { ...dealtTo.value, [c.id]: memberId };
-  picking.value = null;
+  // Whatever was tapped while the deal saved, a re-dealt card records as Re-deal.
+  if (reason === 'redeal') writeOutcome(c.id, 'redeal');
+  // Close only this row's picker: another one opened meanwhile stays open.
+  if (picking.value?.rowKey === rowKey) picking.value = null;
 }
 
 function onPickerCancel(): void {
   const p = picking.value;
   picking.value = null;
-  if (p?.reason === 'redeal' && !dealtTo.value[p.cardId]) setOutcome(p.cardId, '');
+  abandonRedeal(p);
 }
 
 // ── Finish ───────────────────────────────────────────────────────────────────
 const counts = computed<CheckInOutcomes>(() => {
   const values = Object.entries(outcomes.value);
-  const redealt = values.filter(([id, o]) => o === 'redeal' && dealtTo.value[id]).length;
+  const ids = (o: Outcome) => values.filter(([, v]) => v === o).map(([id]) => id);
   const nobodyIds = new Set(agenda.value.nobody.map((c) => c.id));
   return {
-    stillWorks: values.filter(([, o]) => o === 'stillWorks' || o === 'settling').length,
-    talkAbout: values.filter(([, o]) => o === 'talk').length,
-    redealt,
+    stillWorks: ids('noIssues').length,
+    talkedIds: ids('talked'),
+    savedIds: ids('saved'),
+    redealt: ids('redeal').filter((id) => dealtTo.value[id]).length,
     dealtNow: Object.keys(dealtTo.value).filter((id) => nobodyIds.has(id)).length,
   };
 });
@@ -240,22 +337,26 @@ function plural(base: string, n: number): string {
 const completedPills = computed(() => {
   const c = completed.value;
   if (!c) return [];
+  const saved = checkInCardIds(c, 'savedIds').length;
   const out: string[] = [];
-  if (c.stillWorks) out.push(plural('whoOwnsWhat.checkinDrawer.count.stillWorks', c.stillWorks));
-  if (c.talkAbout) out.push(plural('whoOwnsWhat.checkinDrawer.count.talk', c.talkAbout));
+  if (c.stillWorks) out.push(plural('whoOwnsWhat.checkinDrawer.count.noIssues', c.stillWorks));
+  if (c.talkAbout) out.push(plural('whoOwnsWhat.checkinDrawer.count.talked', c.talkAbout));
+  if (saved) out.push(plural('whoOwnsWhat.checkinDrawer.count.saved', saved));
   if (c.redealt) out.push(plural('whoOwnsWhat.checkinDrawer.count.redealt', c.redealt));
   if (c.dealtNow) out.push(plural('whoOwnsWhat.checkinDrawer.count.dealtNow', c.dealtNow));
   return out;
 });
 const completedBody = computed(() => {
-  const talk = Object.entries(outcomes.value)
-    .filter(([, o]) => o === 'talk')
-    .map(([id]) => store.cardById(id))
-    .filter((c): c is ResolvedCard => !!c)
-    .map((c) => cardName(c));
+  const c = completed.value;
+  const saved = c
+    ? checkInCardIds(c, 'savedIds')
+        .map((id) => store.cardById(id))
+        .filter((card): card is ResolvedCard => !!card)
+        .map((card) => cardName(card))
+    : [];
   const parts = [t('whoOwnsWhat.checkinDrawer.doneBody')];
-  if (talk.length)
-    parts.push(fillTemplate(t('whoOwnsWhat.checkinDrawer.doneTalk'), { cards: talk.join(', ') }));
+  if (saved.length)
+    parts.push(fillTemplate(t('whoOwnsWhat.checkinDrawer.doneSaved'), { cards: saved.join(', ') }));
   return parts.join(' ');
 });
 const completedNote = computed(() =>
@@ -265,6 +366,16 @@ const completedNote = computed(() =>
       })
     : ''
 );
+/** After Finish: "Deal the Remaining N" when cards are still to deal, else Done. */
+const doneAction = computed(() =>
+  store.remaining > 0
+    ? plural('whoOwnsWhat.overview.dealRemaining', store.remaining)
+    : t('action.done')
+);
+function onDoneAction(): void {
+  if (store.remaining > 0) emit('deal-remaining');
+  else emit('close');
+}
 </script>
 
 <template>
@@ -283,11 +394,11 @@ const completedNote = computed(() =>
       :title="t('whoOwnsWhat.checkinDrawer.doneTitle')"
       :body="completedBody"
       :pills="completedPills"
-      :action-label="t('action.done')"
+      :action-label="doneAction"
       :note="completedNote"
       :image-alt="t('whoOwnsWhat.pile.imageAlt')"
       data-testid="checkin-done"
-      @action="emit('close')"
+      @action="onDoneAction"
     />
 
     <template v-else>
@@ -303,37 +414,56 @@ const completedNote = computed(() =>
         {{ t('whoOwnsWhat.checkinDrawer.empty') }}
       </p>
 
-      <!-- Haven't moved in a while -->
-      <section v-if="agenda.unchanged.length" class="space-y-2">
-        <h3 class="ci-label">{{ t('whoOwnsWhat.checkinDrawer.unchanged') }}</h3>
+      <section
+        v-for="section in sections"
+        :key="section.id"
+        class="space-y-2"
+        :data-testid="`checkin-section-${section.id}`"
+      >
+        <h3 class="ci-label">{{ t(SECTION_TITLE[section.id]) }}</h3>
         <div
-          v-for="card in agenda.unchanged"
-          :key="card.id"
+          v-for="row in section.rows"
+          :key="row.key"
           class="ci-item"
-          :data-testid="`checkin-unchanged-${card.id}`"
+          :class="{ 'is-open': row.kind === 'deal' }"
+          :data-testid="`checkin-${row.key}`"
         >
           <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
-              ><CardArt :card="card" img-class="h-full w-full"
+            <span
+              class="thumb"
+              :style="{ '--cat': categoryTint(row.card.category) }"
+              aria-hidden="true"
+              ><CardArt :card="row.card" img-class="h-full w-full"
             /></span>
             <div class="min-w-0 flex-1">
-              <b class="ci-name">{{ cardName(card) }}</b>
-              <small class="ci-meta">{{ dealtLine(card.id) || heldLine(card) }}</small>
+              <b class="ci-name">{{ cardName(row.card) }}</b>
+              <small v-if="row.meta" class="ci-meta">{{ row.meta }}</small>
             </div>
-            <MemberChip
-              v-if="live(card).parts[0]?.holderId"
-              :member-id="live(card).parts[0]!.holderId!"
-              size="sm"
-            />
+            <template v-if="row.kind === 'deal'">
+              <button
+                v-if="!dealtTo[row.card.id]"
+                type="button"
+                class="font-outfit text-primary-500 dark:text-accent-lift shrink-0 rounded-full bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-bold hover:bg-[var(--tint-orange-15)] dark:hover:bg-[var(--tint-orange-15)]"
+                :data-testid="`checkin-deal-${row.card.id}`"
+                @click="openPicker({ rowKey: row.key, cardId: row.card.id, reason: 'dealNow' })"
+              >
+                {{ t('whoOwnsWhat.checkinDrawer.dealNow') }}
+              </button>
+              <span v-else aria-hidden="true">✅</span>
+            </template>
+            <MemberChip v-else-if="row.holderId" :member-id="row.holderId" size="sm" />
           </div>
+          <!-- Three or four answers: wrap rather than run past the drawer's edge. -->
           <TogglePillGroup
-            :model-value="outcomes[card.id] ?? ''"
-            :options="unchangedOptions[card.id]"
-            clearable
-            @update:model-value="setOutcome(card.id, $event)"
+            v-if="row.kind === 'outcome' && !isRedealt(row.card.id)"
+            class="max-w-full flex-wrap"
+            :model-value="outcomes[row.card.id] ?? ''"
+            :options="optionsFor(row)"
+            :clearable="section.id !== 'saved'"
+            @update:model-value="setOutcome(row, $event)"
           />
           <InlineMemberPicker
-            v-if="picking?.cardId === card.id && pickingCard"
+            v-if="picking?.rowKey === row.key && pickingCard"
             :members="members"
             :title="t('whoOwnsWhat.pile.whoOwns')"
             :subtitle="pickingPart ? partCaption(pickingCard, pickingPart) || undefined : undefined"
@@ -345,77 +475,13 @@ const completedNote = computed(() =>
             @cancel="onPickerCancel"
           />
         </div>
-      </section>
-
-      <!-- Moved since last time -->
-      <section v-if="agenda.moved.length" class="space-y-2">
-        <h3 class="ci-label">{{ t('whoOwnsWhat.checkinDrawer.moved') }}</h3>
-        <div
-          v-for="{ card, move } in agenda.moved"
-          :key="card.id"
-          class="ci-item"
-          :data-testid="`checkin-moved-${card.id}`"
+        <p
+          v-if="section.id === 'nobody' && store.stats.unsorted > 0"
+          class="dark:text-ink-faint px-1 text-xs text-[var(--color-text-muted)]"
+          data-testid="checkin-unsorted"
         >
-          <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
-              ><CardArt :card="card" img-class="h-full w-full"
-            /></span>
-            <div class="min-w-0 flex-1">
-              <b class="ci-name">{{ cardName(card) }}</b>
-              <small class="ci-meta">{{ movedLine(move) }}</small>
-            </div>
-            <MemberChip v-if="move.toId" :member-id="move.toId" size="sm" />
-          </div>
-          <TogglePillGroup
-            :model-value="outcomes[card.id] ?? ''"
-            :options="movedOptions"
-            clearable
-            @update:model-value="setOutcome(card.id, $event)"
-          />
-        </div>
-      </section>
-
-      <!-- Still nobody -->
-      <section v-if="agenda.nobody.length" class="space-y-2">
-        <h3 class="ci-label">{{ t('whoOwnsWhat.checkinDrawer.nobody') }}</h3>
-        <div
-          v-for="card in agenda.nobody"
-          :key="card.id"
-          class="ci-item is-open"
-          :data-testid="`checkin-nobody-${card.id}`"
-        >
-          <div class="flex items-center gap-2.5">
-            <span class="thumb" :style="{ '--cat': categoryTint(card.category) }" aria-hidden="true"
-              ><CardArt :card="card" img-class="h-full w-full"
-            /></span>
-            <div class="min-w-0 flex-1">
-              <b class="ci-name">{{ cardName(card) }}</b>
-              <small v-if="dealtTo[card.id]" class="ci-meta">{{ dealtLine(card.id) }}</small>
-            </div>
-            <button
-              v-if="!dealtTo[card.id]"
-              type="button"
-              class="font-outfit text-primary-500 dark:text-accent-lift shrink-0 rounded-full bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-bold hover:bg-[var(--tint-orange-15)] dark:hover:bg-[var(--tint-orange-15)]"
-              :data-testid="`checkin-deal-${card.id}`"
-              @click="picking = { cardId: card.id, reason: 'dealNow' }"
-            >
-              {{ t('whoOwnsWhat.checkinDrawer.dealNow') }}
-            </button>
-            <span v-else aria-hidden="true">✅</span>
-          </div>
-          <InlineMemberPicker
-            v-if="picking?.cardId === card.id && pickingCard"
-            :members="members"
-            :title="t('whoOwnsWhat.pile.whoOwns')"
-            :subtitle="pickingPart ? partCaption(pickingCard, pickingPart) || undefined : undefined"
-            :back-label="t('action.cancel')"
-            :empty-message="t('whoOwnsWhat.pile.noMembers')"
-            tile-testid-prefix="checkin-pick-"
-            dismiss-style="close"
-            @pick="onPick"
-            @cancel="onPickerCancel"
-          />
-        </div>
+          {{ plural('whoOwnsWhat.checkinDrawer.unsorted', store.stats.unsorted) }}
+        </p>
       </section>
     </template>
   </BeanieFormModal>

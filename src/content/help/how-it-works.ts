@@ -448,7 +448,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
           '<strong>Your cards</strong> \u{1F64B}: When you hold at least one card, a row reminds you which ones: up to three card names, plus how many you hold. It is only ever about your own cards.',
           '<strong>A card moved</strong> \u{1F64B}: When someone else re-deals a card to you or away from you, you see a note like <em>"Laundry moved to Sofia on Mon, 21 Sep."</em> or <em>"You now hold Laundry, from Sofia."</em> for up to two weeks. Tick it to dismiss it; it stays dismissed on all your devices. You never get a note for a change you made yourself.',
           '<strong>Cards with nobody</strong> \u{1FAE5}: For grown-ups, a row names the first few cards still waiting for a holder. Tap it to go straight to dealing.',
-          '<strong>Family check-in due</strong> \u{1F5D3}\uFE0F: For grown-ups, a reminder appears from the day a check-in is due until your family finishes it. Tick it to be reminded again in a week. It never appears when check-ins are turned off.',
+          '<strong>Family check-in due</strong> \u{1F5D3}\uFE0F: For grown-ups, a reminder appears from the day a check-in is due until your family finishes it. Tick it to be reminded again in a week. It never appears when check-ins are turned off. See <a href="/help/features/family-check-in">how the family check-in works</a>.',
         ],
       },
       {

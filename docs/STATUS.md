@@ -1,6 +1,8 @@
 # Project Status
 
-> **Last updated:** 2026-09-28, session 1, part 2 (**Who Owns What board + card in hand: BUILT, REVIEWED, NOT COMMITTED, NOT DEPLOYED** (plan `docs/plans/2026-09-28-deal-board-and-card-in-hand.md`, mockup `docs/mockups/who-owns-what-board-and-card-drawer-2026-09-28.html`). Desktop board fills the page, idle beans fold into a strip, Skipped folds; Card Details opens on the card (shared `DealPileStage` size="hand") with full history below and ← → / arrows / touch swipe through the list it came from; Share / Export on every view; Card by Card | Board View is a pill switch. Checks owed by greg before deploy: see the build report.)
+> **Last updated:** 2026-09-28, session 1, part 3 (**Check-in outcomes (No Issues / We've Talked / Save for Next Time), Still to Deal, Good to Know, help articles: BUILT + REVIEWED; deploying via `/deploy-prod-auto`** (plan `docs/plans/2026-09-28-check-in-outcomes-and-still-to-deal.md`). New help article `family-check-in`. Earlier today, already on `main` (`42338020`): the board / card-in-hand / Export-as-PDF work.)
+>
+> Part 2 (**Who Owns What board + card in hand: BUILT, REVIEWED, NOT COMMITTED, NOT DEPLOYED** (plan `docs/plans/2026-09-28-deal-board-and-card-in-hand.md`, mockup `docs/mockups/who-owns-what-board-and-card-drawer-2026-09-28.html`). Desktop board fills the page, idle beans fold into a strip, Skipped folds; Card Details opens on the card (shared `DealPileStage` size="hand") with full history below and ← → / arrows / touch swipe through the list it came from; Share / Export on every view; Card by Card | Board View is a pill switch. Checks owed by greg before deploy: see the build report.)
 >
 > Earlier 2026-09-28 (**#109 Who Owns What card art: BUILT, REVIEWED, NOT DEPLOYED** (plan `docs/plans/2026-09-28-who-owns-what-card-art.md`; see Pending item 2).)
 >

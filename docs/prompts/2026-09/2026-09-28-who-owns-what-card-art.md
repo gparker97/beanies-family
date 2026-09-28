@@ -24,6 +24,18 @@ tags: [who-owns-what, responsibilities, card-art, brand, image-generation, pwa-p
 - **2026-09-28** "Looking at the view now, i can see 2 isseus: 1) The details of the card splt are not shown underneath ... 2) Let's show the full audit history below every card (rather than inside the card) ... Keep the card pure with just the image, category, done text and ownerq 3) it seems that the skipped cards row is not expandable ... is the expandion arrow hidden behind the FAB? 4) the category name above the card is getting clipped by the top of the card 5) can we show the "not holding any cards yet" row closer to the other rows? ..."
 - **2026-09-28** "one more thing - can we also have the "share the deck" / "export as pdf" buttons available on all views? ... on the "deal" view, the "board view" / "card by card" view switch could be made to be more prominent ..."
 
+- **2026-09-28** "THis looks much better and just have the belwo comments: 1) there seems to be a minor UI bug where the cards overlap the container in some situations ... 2) the 'card by card / board view' switch ... i was thinking to have a custom small icon / graphic ..."
+- **2026-09-28** "for (2) yes go ahead to create the mockup ... i also hit this erroe when hitting hte "export as pdf" button: that file didn't save ..."
+- **2026-09-28** "also agree to quiet the memberChip watning if it's not useful"
+- **2026-09-28** "go with option B but we don't need to put "switch view" ..."
+- **2026-09-28** "Also i've tried tapping the export as PDF button ... did you change the functionality of the button to share?"
+- **2026-09-28** "ok looking much better - on minor UI issue - it seems the outline of the card by card / board view switch has gaps ..."
+- **2026-09-28** "Just a functional question regarding the check-in - ... "settling in" or "let's talk" ... what does that actually mean? ..."
+- **2026-09-28** "Ok understand - to keep things simple let's do the following: ... no issues ... we've talked ... save for next time ... also a small thing - on the overview page, the tile in the bottom right ... has no title"
+- **2026-09-28** "yes to all 3, commit and push first then build it with /beanies-build-auto"
+
+Third piece of work: plan `docs/plans/2026-09-28-check-in-outcomes-and-still-to-deal.md`.
+
 Second piece of work: plan `docs/plans/2026-09-28-deal-board-and-card-in-hand.md`, mockup
 `docs/mockups/who-owns-what-board-and-card-drawer-2026-09-28.html`.
 

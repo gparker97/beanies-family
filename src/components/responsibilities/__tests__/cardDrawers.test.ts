@@ -83,6 +83,7 @@ const store = reactive({
     toId?: string;
     at: string;
   }[],
+  checkIns: [] as unknown[],
   cardById(id: string) {
     return this.cards[id];
   },

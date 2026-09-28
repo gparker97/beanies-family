@@ -393,14 +393,41 @@ describe('buildRestoreDefaults', () => {
 
 describe('buildCheckIn', () => {
   it('records a write-once check-in with its own id, dated by the local day', () => {
-    const outcomes = { stillWorks: 2, talkAbout: 1, redealt: 1, dealtNow: 3 };
+    const outcomes = {
+      stillWorks: 2,
+      talkedIds: ['laundry'],
+      savedIds: ['dishes', 'trash-night'],
+      redealt: 1,
+      dealtNow: 3,
+    };
     const r = buildCheckIn(outcomes, 'greg', NOW, '2026-09-26');
     expect(r.ops).toEqual([{ op: 'setCheckIn', checkIn: r.checkIn }]);
-    expect(r.checkIn).toMatchObject({ kind: 'checkin', completedAt: NOW, byId: 'greg' });
+    expect(r.checkIn).toMatchObject({
+      kind: 'checkin',
+      completedAt: NOW,
+      byId: 'greg',
+      // The count is derived from the list, so the two never disagree.
+      talkAbout: 1,
+      talkedIds: ['laundry'],
+      savedIds: ['dishes', 'trash-night'],
+    });
     expect(r.checkIn.id).toMatch(/^2026-09-26-[0-9a-f]{8}$/);
-    expect(r.telemetry[0]!.context.count).toBe(7);
+    // Answers + deals (as before); saved cards only in `detail`.
+    expect(r.telemetry[0]!.context).toMatchObject({ count: 7, detail: 'talked=1;saved=2' });
     // A second check-in the same day is a second record, never an overwrite.
     expect(buildCheckIn(outcomes, 'sofia', NOW, '2026-09-26').checkIn.id).not.toBe(r.checkIn.id);
+  });
+
+  it('writes no lists when nothing was talked about or saved (old records look the same)', () => {
+    const r = buildCheckIn(
+      { stillWorks: 1, talkedIds: [], savedIds: [], redealt: 0, dealtNow: 0 },
+      'greg',
+      NOW,
+      '2026-09-26'
+    );
+    expect(r.checkIn.talkedIds).toBeUndefined();
+    expect(r.checkIn.savedIds).toBeUndefined();
+    expect(r.checkIn.talkAbout).toBe(0);
   });
 });
 

@@ -257,6 +257,13 @@ test('who owns what walk', async ({ page }) => {
   console.log('[walk] Sofia after a drop on her idle face:', sofiaTag);
   expect(sofiaTag).toBe('SECTION');
   await expect(page.getByTestId('deal-row-e2e-mia')).toBeVisible();
+  // Re-deal cooking dinner (owner → Sofia) so it counts as "moved since last time".
+  await page
+    .getByTestId(`deal-chip-${ownerId}-cooking-dinner:main`)
+    .dragTo(page.getByTestId('deal-row-e2e-sofia'));
+  await page.waitForTimeout(900);
+  expect(await page.locator(`[data-testid^="deal-chip-e2e-sofia-cooking-dinner"]`).count()).toBe(1);
+
   // A full deck: deal ~25 cards to one person by tapping. Lanes must grow, never spill
   // their last row into the next lane (greg, 2026-09-28: flex items shrank below content).
   for (let i = 0; i < 25; i++) {
@@ -301,6 +308,77 @@ test('who owns what walk', async ({ page }) => {
   await expect(page.getByTestId('deal-skipped-grid')).toBeVisible();
   await shot(page, '21b-board-skipped-open-light');
   await page.getByTestId('deal-skipped-toggle').click();
+
+  // ── Check-in: No Issues / We've Talked / Save for Next Time, Still to Deal ──
+  await view(page, 'overview');
+  await page.getByTestId('check-in-start').click();
+  await page.getByTestId('checkin-moved-cooking-dinner').waitFor();
+  console.log(
+    '[walk] check-in sections:',
+    JSON.stringify(
+      await page
+        .locator('[data-testid^="checkin-section-"]')
+        .evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')))
+    ),
+    '| unsorted line:',
+    await page.getByTestId('checkin-unsorted').count()
+  );
+  const answer = (row: string, label: string) =>
+    page
+      .getByTestId(row)
+      .getByRole('button', { name: new RegExp(label) })
+      .click();
+  await answer('checkin-moved-cooking-dinner', ui('whoOwnsWhat.checkinDrawer.saveNext'));
+  await shot(page, '27-checkin-answers-light');
+  await setDark(page, true);
+  await shot(page, '28-checkin-answers-dark');
+  await setDark(page, false);
+  await page.getByRole('button', { name: ui('whoOwnsWhat.checkinDrawer.finish') }).click();
+  await page.getByTestId('checkin-done').waitFor();
+  const doneText = await page.getByTestId('checkin-done').innerText();
+  console.log(
+    '[walk] done screen names the saved card:',
+    doneText.includes(ui('cards.cookingDinner.name'))
+  );
+  expect(doneText).toContain(ui('cards.cookingDinner.name'));
+  await shot(page, '29-checkin-done-light');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+
+  // Next check-in: the saved card comes first, still on Save for Next Time.
+  await page.getByTestId('check-in-start').click();
+  const savedRow = page.getByTestId('checkin-saved-cooking-dinner');
+  await savedRow.waitFor();
+  // The selected pill carries the orange gradient (TogglePillGroup's selected classes).
+  const pressed = await savedRow
+    .getByRole('button', { name: new RegExp(ui('whoOwnsWhat.checkinDrawer.saveNext')) })
+    .evaluate((el) => el.classList.contains('text-white'));
+  console.log('[walk] saved card pre-selected on Save for Next Time:', pressed);
+  expect(pressed).toBe(true);
+  await answer('checkin-saved-cooking-dinner', ui('whoOwnsWhat.checkinDrawer.talked'));
+  await page.getByRole('button', { name: ui('whoOwnsWhat.checkinDrawer.finish') }).click();
+  await page.getByTestId('checkin-done').waitFor();
+  // Deal the Remaining from the done screen opens the deal pile.
+  const action = page.getByTestId('deck-celebration-action');
+  console.log('[walk] done action:', await action.innerText());
+  await action.click();
+  await page.getByTestId('deal-pile').waitFor();
+  console.log('[walk] Deal the Remaining opened the pile');
+  // The talked card's history shows the check-in.
+  await view(page, 'deck');
+  await page.getByTestId('card-open-cooking-dinner').click();
+  await page.getByTestId('card-view-history').waitFor();
+  const history = await page.getByTestId('card-view-history').innerText();
+  console.log(
+    '[walk] history mentions the check-in:',
+    history.includes(ui('whoOwnsWhat.history.talked'))
+  );
+  expect(history).toContain(ui('whoOwnsWhat.history.talked'));
+  await shot(page, '30-history-talked-light');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await gotoRoute(page, '/who-owns-what');
+  await view(page, 'deal');
 
   // The card in hand from a board lane (the list is that lane).
   await page.locator(`[data-testid^="deal-chip-${ownerId}-"]`).first().click();

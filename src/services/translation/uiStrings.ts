@@ -12726,6 +12726,7 @@ const STRING_DEFS = {
     en: 'Family check-in, {count} re-dealt',
     beanie: 'family check-in, {count} re-dealt',
   },
+  'whoOwnsWhat.facts.title': { en: 'Good to Know', beanie: 'good to know' },
   'whoOwnsWhat.facts.meOk': {
     en: 'Every grown-up holds a just-for-me card',
     beanie: 'every grown-up holds a just-for-me card',
@@ -12783,13 +12784,14 @@ const STRING_DEFS = {
       "it's time. ten minutes together to look at the deck and swap anything that isn't working.",
   },
   'whoOwnsWhat.checkin.agenda': { en: 'On the Agenda', beanie: 'on the agenda' },
-  'whoOwnsWhat.checkin.agendaNobody.one': {
-    en: '1 card with nobody',
-    beanie: '1 card with nobody',
+  'whoOwnsWhat.checkin.agendaToDeal.one': { en: '1 card to deal', beanie: '1 card to deal' },
+  'whoOwnsWhat.checkin.agendaToDeal.other': {
+    en: '{count} cards to deal',
+    beanie: '{count} cards to deal',
   },
-  'whoOwnsWhat.checkin.agendaNobody.other': {
-    en: '{count} cards with nobody',
-    beanie: '{count} cards with nobody',
+  'whoOwnsWhat.checkin.agendaSaved': {
+    en: '{card}, saved from last time',
+    beanie: '{card}, saved from last time',
   },
   'whoOwnsWhat.checkin.agendaMoved': { en: '{card}, moved {date}', beanie: '{card}, moved {date}' },
   'whoOwnsWhat.checkin.agendaUnchanged': {
@@ -12883,6 +12885,10 @@ const STRING_DEFS = {
   'whoOwnsWhat.history.sorted': {
     en: 'Sorted for the first time',
     beanie: 'sorted for the first time',
+  },
+  'whoOwnsWhat.history.talked': {
+    en: 'Talked about at a family check-in',
+    beanie: 'talked about at a pod check-in',
   },
   'whoOwnsWhat.history.dealt': { en: 'Dealt to {to}', beanie: 'dealt to {to}' },
   'whoOwnsWhat.history.moved': {
@@ -13150,7 +13156,19 @@ const STRING_DEFS = {
     beanie: 'about ten minutes, together. no scores, just a chance to talk.',
   },
   'whoOwnsWhat.checkinDrawer.finish': { en: 'Finish Check-in', beanie: 'finish check-in' },
-  'whoOwnsWhat.checkinDrawer.nobody': { en: 'Still Nobody', beanie: 'still nobody' },
+  'whoOwnsWhat.checkinDrawer.toDeal': { en: 'Still to Deal', beanie: 'still to deal' },
+  'whoOwnsWhat.checkinDrawer.saved': {
+    en: 'Saved From Last Time',
+    beanie: 'saved from last time',
+  },
+  'whoOwnsWhat.checkinDrawer.unsorted.one': {
+    en: 'And 1 card not sorted yet. You can deal it when you finish.',
+    beanie: 'and 1 card not sorted yet. you can deal it when you finish.',
+  },
+  'whoOwnsWhat.checkinDrawer.unsorted.other': {
+    en: 'And {count} cards not sorted yet. You can deal them when you finish.',
+    beanie: 'and {count} cards not sorted yet. you can deal them when you finish.',
+  },
   'whoOwnsWhat.checkinDrawer.moved': {
     en: 'Moved Since Last Time',
     beanie: 'moved since last time',
@@ -13160,9 +13178,12 @@ const STRING_DEFS = {
     beanie: "haven't moved in a while",
   },
   'whoOwnsWhat.checkinDrawer.dealNow': { en: 'Deal Now', beanie: 'deal now' },
-  'whoOwnsWhat.checkinDrawer.settling': { en: 'Settling In', beanie: 'settling in' },
-  'whoOwnsWhat.checkinDrawer.talk': { en: "Let's Talk", beanie: "let's talk" },
-  'whoOwnsWhat.checkinDrawer.stillWorks': { en: 'Still Works', beanie: 'still works' },
+  'whoOwnsWhat.checkinDrawer.noIssues': { en: 'No Issues', beanie: 'no issues' },
+  'whoOwnsWhat.checkinDrawer.talked': { en: "We've Talked", beanie: "we've talked" },
+  'whoOwnsWhat.checkinDrawer.saveNext': {
+    en: 'Save for Next Time',
+    beanie: 'save for next time',
+  },
   'whoOwnsWhat.checkinDrawer.redeal': { en: 'Re-deal', beanie: 're-deal' },
   'whoOwnsWhat.checkinDrawer.movedLine': {
     en: '{from} to {to} on {date}',
@@ -13182,26 +13203,34 @@ const STRING_DEFS = {
     en: 'Thanks for talking it through.',
     beanie: 'thanks for talking it through.',
   },
-  'whoOwnsWhat.checkinDrawer.doneTalk': {
-    en: 'On your list to chat about this week: {cards}.',
-    beanie: 'on your list to chat about this week: {cards}.',
+  'whoOwnsWhat.checkinDrawer.doneSaved': {
+    en: 'Saved for next time: {cards}.',
+    beanie: 'saved for next time: {cards}.',
+  },
+  'whoOwnsWhat.checkinDrawer.count.noIssues.one': {
+    en: '1 with no issues',
+    beanie: '1 with no issues',
+  },
+  'whoOwnsWhat.checkinDrawer.count.noIssues.other': {
+    en: '{count} with no issues',
+    beanie: '{count} with no issues',
+  },
+  'whoOwnsWhat.checkinDrawer.count.talked.one': { en: '1 talked about', beanie: '1 talked about' },
+  'whoOwnsWhat.checkinDrawer.count.talked.other': {
+    en: '{count} talked about',
+    beanie: '{count} talked about',
+  },
+  'whoOwnsWhat.checkinDrawer.count.saved.one': {
+    en: '1 saved for next time',
+    beanie: '1 saved for next time',
+  },
+  'whoOwnsWhat.checkinDrawer.count.saved.other': {
+    en: '{count} saved for next time',
+    beanie: '{count} saved for next time',
   },
   'whoOwnsWhat.checkinDrawer.doneNext': {
     en: 'Next check-in {date}. It will show in your briefing when it is due.',
     beanie: 'next check-in {date}. it will show in your briefing when it is due.',
-  },
-  'whoOwnsWhat.checkinDrawer.count.stillWorks.one': {
-    en: '1 still works',
-    beanie: '1 still works',
-  },
-  'whoOwnsWhat.checkinDrawer.count.stillWorks.other': {
-    en: '{count} still work',
-    beanie: '{count} still work',
-  },
-  'whoOwnsWhat.checkinDrawer.count.talk.one': { en: '1 to talk about', beanie: '1 to talk about' },
-  'whoOwnsWhat.checkinDrawer.count.talk.other': {
-    en: '{count} to talk about',
-    beanie: '{count} to talk about',
   },
   'whoOwnsWhat.checkinDrawer.count.redealt.one': { en: '1 re-dealt', beanie: '1 re-dealt' },
   'whoOwnsWhat.checkinDrawer.count.redealt.other': {
