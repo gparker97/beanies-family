@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-27",
-    "translationCount": 5538
+    "lastUpdated": "2026-09-28",
+    "translationCount": 5539
   },
   "translations": {
     "app.name": {
@@ -24604,7 +24604,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -25029,12 +25029,12 @@
     "statementImport.row.tick": {
       "translation": "Add {name}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "statementImport.row.edit": {
       "translation": "Edit {name}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "statementImport.row.already": {
       "translation": "已添加{date}",
@@ -26019,7 +26019,7 @@
     "whoOwnsWhat.card.since": {
       "translation": "Since {date}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "whoOwnsWhat.card.sinceBefore": {
       "translation": "自{date}起，在{name}之前",
@@ -26044,7 +26044,7 @@
     "whoOwnsWhat.card.open": {
       "translation": "Open {card}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "whoOwnsWhat.byBean.count.one": {
       "translation": "1张卡",
@@ -26424,7 +26424,7 @@
     "whoOwnsWhat.pile.groupAction": {
       "translation": "Skip {count}",
       "hash": "",
-      "lastUpdated": "2026-09-27"
+      "lastUpdated": "2026-09-28"
     },
     "whoOwnsWhat.pile.empty": {
       "translation": "这里没有什么可交易的了。",
@@ -27695,6 +27695,11 @@
       "translation": "每月至少与朋友聊聊一次",
       "hash": "njaij9",
       "lastUpdated": "2026-09-27"
+    },
+    "nav.section.beanPod": {
+      "translation": "The Bean Pod",
+      "hash": "hju4ec",
+      "lastUpdated": "2026-09-28"
     }
   }
 }
