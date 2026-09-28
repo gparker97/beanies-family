@@ -18,6 +18,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -45,7 +46,7 @@ const emit = defineEmits<{ close: []; edit: [cardId: string] }>();
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, cardEmoji, partCaption } = useResponsibilityCardLabel();
+const { cardName, cardDone, partCaption } = useResponsibilityCardLabel();
 
 const card = computed(() => (props.cardId ? store.cardById(props.cardId) : undefined));
 const category = computed(() => (card.value ? getListCategory(card.value.category) : undefined));
@@ -99,7 +100,6 @@ const { onDelete } = useCardDrawerEnd({
     :open="open && !!card"
     variant="drawer"
     :title="t('whoOwnsWhat.details.title')"
-    :icon="card ? cardEmoji(card) : undefined"
     :save-label="t('action.close')"
     :show-delete="canEdit && !!card?.isCustom"
     :delete-disabled-reason="
@@ -109,6 +109,7 @@ const { onDelete } = useCardDrawerEnd({
     @save="emit('close')"
     @delete="onDelete"
   >
+    <template v-if="card" #icon><CardArt :card="card" img-class="h-9 w-9" /></template>
     <template v-if="card">
       <div class="space-y-2">
         <p

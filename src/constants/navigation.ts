@@ -48,7 +48,7 @@ export interface NavSectionDef {
   labelKey: UIStringKey;
   /** Always set: the anchor itself, or the fallback when `iconSrc` fails to load. */
   emoji: string;
-  /** Optional image anchor shown in place of the emoji (see NavGlyph). */
+  /** Optional image anchor shown in place of the emoji (see ImageGlyph). */
   iconSrc?: string;
   /** Label colour on the Deep Slate sidebar/drawer (both modes): a `-lift` token. */
   colorClass: string;

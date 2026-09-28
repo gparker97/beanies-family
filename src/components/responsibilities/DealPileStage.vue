@@ -14,6 +14,7 @@ import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardL
 import { categoryTint } from '@/constants/listCategories';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 
 const props = defineProps<{
   card: ResolvedCard;
@@ -26,7 +27,7 @@ const emit = defineEmits<{ step: [dir: -1 | 1] }>();
 
 const { t } = useTranslation();
 const { categoryLabel } = useListCategoryLabel();
-const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
+const { cardName, cardDone } = useResponsibilityCardLabel();
 
 const tint = computed(() => categoryTint(props.card.category));
 
@@ -63,13 +64,15 @@ defineExpose({ cardEl });
         :data-testid="`deal-pile-card-${card.id}`"
       >
         <div class="slab relative grid place-items-center overflow-hidden">
-          <span class="text-6xl leading-none md:text-7xl" aria-hidden="true">{{
-            cardEmoji(card)
-          }}</span>
+          <CardArt
+            :card="card"
+            img-class="h-24 w-24 md:h-36 md:w-36"
+            class="text-6xl leading-none md:text-7xl"
+          />
           <span
             class="pointer-events-none absolute -right-1.5 -bottom-3.5 text-6xl leading-none opacity-[0.07] md:text-7xl"
             aria-hidden="true"
-            >{{ cardEmoji(card) }}</span
+            >{{ card.emoji }}</span
           >
         </div>
         <div class="flex flex-1 flex-col gap-1 p-3 md:gap-1.5 md:p-4">
