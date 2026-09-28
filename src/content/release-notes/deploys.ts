@@ -17,6 +17,74 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.28',
+    date: '2026-09-28',
+    month: '28 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Who Owns What is here, in beta: a deck of household cards that shows who looks after what.',
+      beanie:
+        'who owns what is here, in beta: a deck of household cards that shows who looks after what.',
+    },
+    features: [
+      {
+        icon: '\u{1F0CF}',
+        title: { en: 'Who Owns What (beta)', beanie: 'who owns what (beta)' },
+        description: {
+          en: 'Find it in The Treehouse. About 80 cards cover the jobs that keep a family running, from cooking dinner to date nights. Keep or skip each one, hand it to someone in one tap, split it by child or by place, and re-deal it whenever life changes. It is still in beta, so tell us what works and what does not.',
+          beanie:
+            'find it in the treehouse. about 80 cards cover the jobs that keep a family running, from cooking dinner to date nights. keep or skip each one, hand it to someone in one tap, split it by child or by place, and re-deal it whenever life changes. it is still in beta, so tell us what works and what does not.',
+        },
+        tryItRoute: '/who-owns-what',
+      },
+      {
+        title: { en: 'Family check-ins', beanie: 'family check-ins' },
+        description: {
+          en: "Every few weeks the cards worth talking about come up. Mark each one No Issues, We've Talked or Save for Next Time, and deal any card nobody holds yet.",
+          beanie:
+            "every few weeks the cards worth talking about come up. mark each one no issues, we've talked or save for next time, and deal any card nobody holds yet.",
+        },
+      },
+      {
+        title: { en: 'The card in hand', beanie: 'the card in hand' },
+        description: {
+          en: 'Cards have their own illustrations, and opening one shows the card with its full history. The desktop board fills the screen, and the deck prints as a fridge sheet.',
+          beanie:
+            'cards have their own illustrations, and opening one shows the card with its full history. the desktop board fills the screen, and the deck prints as a fridge sheet.',
+        },
+      },
+      {
+        title: { en: 'The Bean Pod in the sidebar', beanie: 'the bean pod in the sidebar' },
+        description: {
+          en: 'Meet the Beans, the Scrapbook, Milestones, the Cookbook, Care & Safety and Emergency Contacts are now one click away.',
+          beanie:
+            'meet the beans, the scrapbook, milestones, the cookbook, care & safety and emergency contacts are now one click away.',
+        },
+      },
+      {
+        title: { en: 'Also new', beanie: 'also new' },
+        description: {
+          en: 'All-day activities that repeat can now last several days, overnight events show on the next morning too, and several calendar layout fixes.',
+          beanie:
+            'all-day activities that repeat can now last several days, overnight events show on the next morning too, and several calendar layout fixes.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.25',
     date: '2026-09-25',
     month: '25 september 2026',
