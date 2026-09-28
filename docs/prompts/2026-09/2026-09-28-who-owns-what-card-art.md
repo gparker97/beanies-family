@@ -33,6 +33,9 @@ tags: [who-owns-what, responsibilities, card-art, brand, image-generation, pwa-p
 - **2026-09-28** "Just a functional question regarding the check-in - ... "settling in" or "let's talk" ... what does that actually mean? ..."
 - **2026-09-28** "Ok understand - to keep things simple let's do the following: ... no issues ... we've talked ... save for next time ... also a small thing - on the overview page, the tile in the bottom right ... has no title"
 - **2026-09-28** "yes to all 3, commit and push first then build it with /beanies-build-auto"
+- **2026-09-28** "ALso with this change, please ensure all the relevant help and support articles for who owns what and how the family check-in works is updated ..."
+- **2026-09-28** "Once all of the above and the code review is compelte, run /deploy-prod-auto, spotlight release note and make it clear that 'who owns what' is still in beta, update minor version, build both apps and push to production track and ios auto-release"
+- **2026-09-28** "/end-session"
 
 Third piece of work: plan `docs/plans/2026-09-28-check-in-outcomes-and-still-to-deal.md`.
 
@@ -47,3 +50,5 @@ a grey beanie on the terracotta grown-up). The ten were cut out and exported as 
 built per the plan: `ImageGlyph` (from `NavGlyph`) + `CardArt`, art on every card surface, greyed
 on skipped/unowned tiles, precached. Validate green, browser walk green, two `/code-review high`
 rounds. See the plan's Outcome section.
+
+Shipped as **0.24** (`7be107ea`): prod web, Astro (help articles incl. the new `family-check-in`), Android Play production (Google review), iOS App Store review with automatic release (build 84). Spotlight note 2026.09.28 leads with Who Owns What (beta).

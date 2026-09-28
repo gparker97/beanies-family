@@ -1,6 +1,8 @@
 # Project Status
 
-> **Last updated:** 2026-09-28, session 1, part 3 (**Check-in outcomes (No Issues / We've Talked / Save for Next Time), Still to Deal, Good to Know, help articles: BUILT + REVIEWED; deploying via `/deploy-prod-auto`** (plan `docs/plans/2026-09-28-check-in-outcomes-and-still-to-deal.md`). New help article `family-check-in`. Earlier today, already on `main` (`42338020`): the board / card-in-hand / Export-as-PDF work.)
+> **Last updated:** 2026-09-28, session 1 close (**0.24 SHIPPED (`7be107ea`) to all four surfaces: prod web, Astro, Android Play PRODUCTION (in Google review), iOS SUBMITTED TO APP STORE REVIEW (`appstore-automatic`, build 84).** Spotlight release note 2026.09.28 leads with Who Owns What (beta). Carries all of #109 Who Owns What (deck, dealing, board, card art, card in hand + history, check-in outcomes No Issues / We've Talked / Save for Next Time, Still to Deal, Good to Know, fridge sheet, Export as PDF download fix), The Bean Pod sidebar section, the calendar fixes + multi-day repeats + overnight events, and the new `family-check-in` help article. Update floor unchanged at 0.21.1.)
+>
+> Part 3: 2026-09-28 (**Check-in outcomes (No Issues / We've Talked / Save for Next Time), Still to Deal, Good to Know, help articles: BUILT + REVIEWED; deploying via `/deploy-prod-auto`** (plan `docs/plans/2026-09-28-check-in-outcomes-and-still-to-deal.md`). New help article `family-check-in`. Earlier today, already on `main` (`42338020`): the board / card-in-hand / Export-as-PDF work.)
 >
 > Part 2 (**Who Owns What board + card in hand: BUILT, REVIEWED, NOT COMMITTED, NOT DEPLOYED** (plan `docs/plans/2026-09-28-deal-board-and-card-in-hand.md`, mockup `docs/mockups/who-owns-what-board-and-card-drawer-2026-09-28.html`). Desktop board fills the page, idle beans fold into a strip, Skipped folds; Card Details opens on the card (shared `DealPileStage` size="hand") with full history below and ← → / arrows / touch swipe through the list it came from; Share / Export on every view; Card by Card | Board View is a pill switch. Checks owed by greg before deploy: see the build report.)
 >
@@ -2447,6 +2449,17 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 ## Pending / Next Session
 
+> **Validated 2026-09-28 (session 1 close).** Pending block re-checked: the ⭐ NEXT SESSION items 2 (card art), 3 (The Bean Pod section) and 4 (deploy) are SHIPPED in 0.24 (`7be107ea`), and the calendar work in item 1 shipped with it. Their check lists below are still owed, now on prod / the store builds instead of before deploy. The hero-images instructions in the 2026-09-26/27 record are done (`packages/brand/assets/shared/cards/`). 5 Dependabot PRs still open (their branches are the only non-`main` refs, kept).
+>
+> **⭐ NEXT SESSION (after 0.24):**
+>
+> 1. **Watch the store reviews:** Android production (Google review) and iOS 0.24 build 84 (auto-releases on Apple approval, ~1-3 days).
+> 2. **Test 0.24 on prod and the store builds** (desktop + phone, light + dark): the calendar checks in item 1 below, the card-art checks (item 2), the Bean Pod checks (item 3), plus the 2026-09-28 Who Owns What work: (a) a check-in: mark one card No Issues, one We've Talked, one Save for Next Time; the We've Talked card's Card Details history shows the talk; the next check-in opens with the saved card first under Saved From Last Time; (b) with unsorted or unheld cards, Still to Deal shows the count and the done screen's Deal the Remaining N opens the deal on exactly those; (c) Card Details: arrows / arrow keys / swipe step through the list you opened it from; (d) Export as PDF on web downloads a PDF (no "That file didn't save"); Share the Deck opens the share sheet on a phone; (e) desktop board: someone holding 15+ cards, lanes never overlap, the idle strip accepts a drop, Skipped folds and opens.
+> 3. **Watch CloudWatch:** surfaces `responsibilities` (`invalid_checkin`, `checkin_deal_remaining`, `card_view_navigate`, `board_deal_to_idle`), `card-art`, `file-delivery` (`anchor-after-share` rate).
+> 4. **Decide (carried):** should every sidebar section default open (item 3 below); `/beanies-pre-plan #110`; raising the update floor (only on greg's instruction).
+>
+> The block below is the pre-0.24 record, kept for its check lists.
+>
 > **Validated 2026-09-27 (session close).** Pending block re-checked: the #107 statement tests and the 0.23 store releases were already recorded as closed (2026-09-26 update). Still open: the real-statement-data-in-git-history decision, `/beanies-pre-plan #110`, 5 Dependabot PRs (#345, #347-#350; their branches are the only non-`main` refs, kept).
 >
 > **Validated 2026-09-27 (session 3 close).** Pending block re-checked: item 3 (The Bean Pod sidebar section) is DONE this session (`AppNavMenu`, `NAV_SECTIONS.beanPod` in `src/`), replaced below by its manual checks; hero images (`public/brand/cards/` absent) and the card-art component (no `CardArt`) still pending; 5 Dependabot PRs still open; no stale branches.
