@@ -1143,7 +1143,7 @@ const STRING_DEFS = {
   'communityNudge.snooze': { en: 'Not now', beanie: 'not now' },
   'communityNudge.joined': { en: "I'm already there!", beanie: "i'm already there!" },
   // #45 — in-app feedback / NPS
-  'feedback.shareEntry': { en: 'Share Feedback', beanie: 'share feedback 💬' },
+  'feedback.shareEntry': { en: 'Share Feedback', beanie: 'share feedback' },
   'feedback.form.title': { en: 'Share Your Feedback', beanie: 'share your feedback' },
   'feedback.form.send': { en: 'Send Feedback', beanie: 'send feedback' },
   'feedback.form.commentGeneric': {

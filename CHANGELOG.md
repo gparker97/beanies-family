@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Beanstalk feature posts can now open with **the long and short of it**: a short box at the top with what we built, how it helps you, and where to find it in the app, so you can get the gist without reading the whole post. Thirteen existing feature posts now have one.
 
+### Fixed
+
+- In beanie mode, the sidebar's share feedback link now fits on one line.
+
 ## 2026-09-28
 
 _Released in 0.24 (web, Android production; iOS in App Store review)._

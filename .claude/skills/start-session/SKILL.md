@@ -126,7 +126,7 @@ beanies.family competes in the family-technology ("famtech") space, and greg wan
 Search several angles, not one query — comprehensiveness is the point:
 
 - **Category events:** `"family organizer app" OR "family calendar app" funding OR acquired OR "shutting down" 2026`, `famtech OR "family tech" startup funding OR acquisition 2026`, `family finance app kids allowance news 2026`, `"shared family calendar" app launch OR update 2026`.
-- **Named products** (seed list — not exhaustive; add any you know, drop any that have clearly died): Cozi, Maple, FamilyWall, Picniic, Hearth Display, Skylight (Calendar), TimeTree, Jam, OurHome, Google Family Link, Life360, Greenlight, GoHenry, BusyKid, FamZoo, Bark, Qustodio, Canopy, Milo. Search the notable ones by `<name> news OR funding OR "shutting down" OR update 2026`.
+- **Named products** (seed list — not exhaustive; add any you know, drop any that have clearly died): Cozi, Maple, FamilyWall, Picniic, Hearth Display, Skylight (Calendar), TimeTree, Jam, OurHome, Google Family Link, Life360, Greenlight, GoHenry, BusyKid, FamZoo, Bark, Qustodio, Canopy, Milo, Famnest (Stockholm, getfamnest.com), Nuet (nuet.ai), Fambot. Search the notable ones by `<name> news OR funding OR "shutting down" OR update 2026`.
 - **People moves:** founders/execs of the above joining, leaving, or starting something new.
 
 **Freshness:** favor the last ~30 days, lead with anything from the last 7. Famtech news is lower-frequency than world news, so a wider window is correct — a competitor shutdown or raise from three weeks ago is still worth surfacing if it hasn't come up before. Dedupe within the sweep; don't list the same story twice, and don't re-run identical searches across angles.
