@@ -44,6 +44,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
   categoryCoverage,
   checkInAnchor,
+  invalidCheckIns,
   deckStats,
   defaultHolderFor as pureDefaultHolderFor,
   isCheckInDue,
@@ -107,6 +108,8 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   );
   const resolved = computed<ResolvedCard[]>(() => resolvedDeck.value.cards);
   const stats = computed(() => deckStats(resolved.value));
+  /** Cards still to deal: never sorted plus kept-with-nobody ("Deal the Remaining N"). */
+  const remaining = computed(() => stats.value.unsorted + stats.value.waiting);
   const coverage = computed(() => categoryCoverage(resolved.value));
   const waiting = computed(() => resolved.value.filter((c) => c.status === 'waiting'));
   const customCount = computed(() => resolved.value.filter((c) => c.isCustom).length);
@@ -185,6 +188,14 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
         loggedBadIds.add(key);
         log('warn', message);
       }
+    }
+    // A check-in's talked / saved list written wrong by another client: read as empty.
+    // `detail` names the field, so the client shape can be triaged from the logs alone.
+    for (const bad of invalidCheckIns(checkIns.value)) {
+      const key = `invalid_checkin:${bad.key}`;
+      if (loggedBadIds.has(key)) continue;
+      loggedBadIds.add(key);
+      log('warn', 'invalid_checkin', { detail: bad.list });
     }
   }
 
@@ -550,6 +561,7 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
     // Getters
     resolved,
     stats,
+    remaining,
     coverage,
     waiting,
     customCount,

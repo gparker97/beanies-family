@@ -15,6 +15,9 @@ import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
 import {
   buildCardBriefingRows,
   cardHistory,
+  checkInCardIds,
+  invalidCheckIns,
+  remainingScope,
   cardSequence,
   sequenceStep,
   buildCheckInAgenda,
@@ -552,6 +555,34 @@ describe('buildCheckInAgenda', () => {
     // first; car-care (Sep) is too recent.
     expect(agenda.unchanged.map((c) => c.id)).toEqual(['bikes', 'dishes']);
   });
+  it('Saved From Last Time: listed once, first, and never takes an unchanged slot', () => {
+    const old = (id: string) =>
+      state(id, { parts: [{ key: 'main', holderId: 'greg' }], createdAt: noon('2026-01-01') });
+    // Five long-unchanged cards; laundry and dishes were saved last time.
+    const states = ['laundry', 'dishes', 'bikes', 'car-care', 'lunchboxes'].map(old);
+    const moves = [
+      move({ cardId: 'laundry', fromId: 'sofia', toId: 'greg', at: noon('2026-09-15') }),
+    ];
+    const { cards } = resolve(states, moves);
+    const last: ResponsibilityCheckIn = {
+      id: '2026-09-01',
+      kind: 'checkin',
+      completedAt: noon('2026-09-01'),
+      stillWorks: 0,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+      savedIds: ['laundry', 'dishes', 'deleted-card'],
+    };
+    const agenda = buildCheckInAgenda(cards, moves, last, TODAY);
+    expect(agenda.saved.map((c) => c.id)).toEqual(['laundry', 'dishes']);
+    // laundry moved but is listed once, in Saved.
+    expect(agenda.moved).toEqual([]);
+    // Three unchanged slots still go to the other three.
+    expect(agenda.unchanged.map((c) => c.id).sort()).toEqual(['bikes', 'car-care', 'lunchboxes']);
+    // A cycle-start anchor carries nothing.
+    expect(buildCheckInAgenda(cards, moves, { ...last, kind: 'start' }, TODAY).saved).toEqual([]);
+  });
 });
 
 describe('groupShortcut', () => {
@@ -890,26 +921,111 @@ describe('cardHistory', () => {
   });
 
   it('lists every deal, hand-over and return to nobody, newest first, then when it was sorted', () => {
-    const h = cardHistory({ id: 'laundry', state }, [
-      mv('a', '2026-09-01T09:00:00Z', undefined, 'sofia'),
-      mv('b', '2026-09-05T09:00:00Z', 'sofia', 'greg'),
-      mv('c', '2026-09-07T09:00:00Z', 'greg', undefined),
-      mv('empty', '2026-09-08T09:00:00Z'),
-      { ...mv('x', '2026-09-06T09:00:00Z', undefined, 'mia'), cardId: 'dishes' },
-    ]);
+    const h = cardHistory(
+      { id: 'laundry', state },
+      [
+        mv('a', '2026-09-01T09:00:00Z', undefined, 'sofia'),
+        mv('b', '2026-09-05T09:00:00Z', 'sofia', 'greg'),
+        mv('c', '2026-09-07T09:00:00Z', 'greg', undefined),
+        mv('empty', '2026-09-08T09:00:00Z'),
+        { ...mv('x', '2026-09-06T09:00:00Z', undefined, 'mia'), cardId: 'dishes' },
+      ],
+      []
+    );
     expect(h.map((e) => e.kind)).toEqual(['cleared', 'moved', 'dealt', 'sorted']);
     expect(h.some((e) => e.at === '2026-09-20T09:00:00Z')).toBe(false);
   });
 
   it('keeps the part and label a move was recorded on, and is empty for an unsorted card', () => {
-    const [entry] = cardHistory({ id: 'laundry', state: null }, [
-      {
-        ...mv('a', '2026-09-01T09:00:00Z', undefined, 'greg'),
-        partKey: 'p1',
-        partLabel: 'Mornings',
-      },
-    ]);
+    const [entry] = cardHistory(
+      { id: 'laundry', state: null },
+      [
+        {
+          ...mv('a', '2026-09-01T09:00:00Z', undefined, 'greg'),
+          partKey: 'p1',
+          partLabel: 'Mornings',
+        },
+      ],
+      []
+    );
     expect(entry).toMatchObject({ kind: 'dealt', partKey: 'p1', partLabel: 'Mornings' });
-    expect(cardHistory({ id: 'laundry', state: null }, [])).toEqual([]);
+    expect(cardHistory({ id: 'laundry', state: null }, [], [])).toEqual([]);
+  });
+
+  it("shows We've Talked from check-ins in this card's life only, and ignores bad lists", () => {
+    const ci = (id: string, completedAt: string, talkedIds?: unknown) => ({
+      id,
+      kind: 'checkin',
+      completedAt,
+      stillWorks: 0,
+      talkAbout: 1,
+      redealt: 0,
+      dealtNow: 0,
+      talkedIds,
+    });
+    const h = cardHistory(
+      { id: 'laundry', state },
+      [],
+      [
+        ci('talked', '2026-09-10T09:00:00Z', ['laundry']),
+        // Before the card's current life (Restore defaults keeps check-ins): not shown.
+        ci('old', '2026-08-01T09:00:00Z', ['laundry']),
+        ci('other', '2026-09-11T09:00:00Z', ['dishes']),
+        ci('broken', '2026-09-12T09:00:00Z', 'laundry'),
+        null,
+      ]
+    );
+    expect(h.map((e) => e.kind)).toEqual(['talked', 'sorted']);
+    expect(h[0]!.at).toBe('2026-09-10T09:00:00Z');
+    // A card with no state (unsorted) has no history at all.
+    expect(
+      cardHistory(
+        { id: 'laundry', state: null },
+        [],
+        [ci('t', '2026-09-10T09:00:00Z', ['laundry'])]
+      )
+    ).toEqual([]);
+  });
+});
+
+describe('check-in lists and the remaining rule', () => {
+  const ci = (extra: Record<string, unknown>) => ({
+    id: 'c1',
+    kind: 'checkin',
+    completedAt: '2026-09-10T09:00:00Z',
+    stillWorks: 0,
+    talkAbout: 0,
+    redealt: 0,
+    dealtNow: 0,
+    ...extra,
+  });
+
+  it('checkInCardIds reads only string entries of an array; invalidCheckIns names bad records', () => {
+    expect(checkInCardIds(ci({ savedIds: ['a', 7, 'b'] }) as never, 'savedIds')).toEqual([
+      'a',
+      'b',
+    ]);
+    expect(checkInCardIds(ci({ savedIds: 'a' }) as never, 'savedIds')).toEqual([]);
+    expect(checkInCardIds(ci({}) as never, 'talkedIds')).toEqual([]);
+    expect(
+      invalidCheckIns([
+        ci({ id: 'ok', savedIds: ['a'] }),
+        ci({ id: 'none' }),
+        ci({ id: 'bad', talkedIds: ['a', 3] }),
+        ci({ id: 'worse', savedIds: {}, talkedIds: 'x' }),
+        ci({ id: 7, savedIds: 'x' }),
+        null,
+      ])
+    ).toEqual([
+      { key: 'bad', list: 'talkedIds' },
+      { key: 'worse', list: 'both' },
+      // A record a foreign client wrote without an id is still reported, never skipped.
+      { key: 'no-id@2026-09-10T09:00:00Z', list: 'savedIds' },
+    ]);
+  });
+
+  it('remainingScope: never-sorted cards first, else the waiting ones', () => {
+    expect(remainingScope({ unsorted: 3 })).toBe('unsorted');
+    expect(remainingScope({ unsorted: 0 })).toBe('waiting');
   });
 });

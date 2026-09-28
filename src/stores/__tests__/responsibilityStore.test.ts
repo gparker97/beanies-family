@@ -157,6 +157,32 @@ describe('loading', () => {
     expect(JSON.stringify(logEvent.mock.calls)).not.toContain('from-the-future');
     expect(store.cardById('laundry')!.status).toBe('unsorted');
   });
+
+  it('logs a check-in whose talked / saved list is malformed, once, without the id', async () => {
+    db.checkIns.set('ci-bad', {
+      id: 'ci-bad',
+      kind: 'checkin',
+      completedAt: '2026-09-01T10:00:00.000Z',
+      stillWorks: 0,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+      savedIds: 'laundry',
+    } as never);
+    await store.load();
+    await store.load();
+    expect(logged('invalid_checkin')).toHaveLength(1);
+    expect(logged('invalid_checkin')[0]![0]).toMatchObject({ context: { detail: 'savedIds' } });
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain('ci-bad');
+  });
+
+  it('remaining counts never-sorted plus kept-with-nobody cards', async () => {
+    await store.load();
+    const before = store.remaining;
+    expect(before).toBe(store.stats.unsorted + store.stats.waiting);
+    await store.keep('laundry'); // unsorted → waiting: still to deal
+    expect(store.remaining).toBe(before);
+  });
 });
 
 describe('deal / keep / skip / bring back', () => {
@@ -372,7 +398,13 @@ describe('edit, custom cards and restore', () => {
 
 describe('check-in and celebrations', () => {
   it('records a check-in and celebrates', async () => {
-    const r = await store.completeCheckIn({ stillWorks: 1, talkAbout: 0, redealt: 0, dealtNow: 2 });
+    const r = await store.completeCheckIn({
+      stillWorks: 1,
+      talkedIds: [],
+      savedIds: [],
+      redealt: 0,
+      dealtNow: 2,
+    });
     expect(r).toMatchObject({ byId: 'greg' });
     expect(db.checkIns.has(r!.id)).toBe(true);
     expect(celebrate).toHaveBeenCalledWith('check-in-done');
@@ -383,14 +415,16 @@ describe('check-in and celebrations', () => {
     await store.keep('laundry'); // something in the deck, so the clock runs
     const first = await store.completeCheckIn({
       stillWorks: 1,
-      talkAbout: 0,
+      talkedIds: [],
+      savedIds: [],
       redealt: 0,
       dealtNow: 0,
     });
     tick();
     const second = await store.completeCheckIn({
       stillWorks: 0,
-      talkAbout: 2,
+      talkedIds: ['laundry', 'dishes'],
+      savedIds: [],
       redealt: 0,
       dealtNow: 0,
     });
@@ -441,7 +475,13 @@ describe('check-in and celebrations', () => {
 
   it('Restore then re-deal restarts the clock, even with an old check-in on record', async () => {
     await store.createCustom({ name: 'Hens', emoji: '🐔', category: 'home', holderId: 'leo' });
-    await store.completeCheckIn({ stillWorks: 1, talkAbout: 0, redealt: 0, dealtNow: 0 });
+    await store.completeCheckIn({
+      stillWorks: 1,
+      talkedIds: [],
+      savedIds: [],
+      redealt: 0,
+      dealtNow: 0,
+    });
     const old = store.lastCheckIn!;
     at('2026-12-01');
     await store.restoreDefaults({ keepCustom: true });

@@ -19,6 +19,9 @@ _Not yet released._
 
 ### Changed
 
+- Family check-ins are clearer: each card gets **No Issues**, **We've Talked** or **Save for Next Time**. We've Talked shows in the card's history, and saved cards come back first at the next check-in. A **Still to Deal** section covers every card nobody holds yet, and the done screen can take you straight to dealing them.
+- The Who Owns What overview's tips panel is now titled **Good to Know**.
+
 - The desktop deal board now fills the screen, and its cards show the art and what done looks like. Anyone not holding a card yet folds into one row you can still drop cards on, and Skipped folds away until you want it.
 - Share the Deck and Export as PDF are now on every Who Owns What view, and the Deal view's Card by Card / Board View switch is easier to find.
 
