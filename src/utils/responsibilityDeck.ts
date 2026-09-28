@@ -315,7 +315,7 @@ export function groupByCategory(cards: readonly ResolvedCard[]): CategoryGroup[]
 }
 
 // ── Card history ────────────────────────────────────────────────────────────────
-export type CardHistoryKind = 'dealt' | 'moved' | 'cleared' | 'sorted';
+export type CardHistoryKind = 'dealt' | 'moved' | 'cleared' | 'sorted' | 'talked';
 
 export interface CardHistoryEntry {
   kind: CardHistoryKind;
@@ -340,10 +340,16 @@ export interface CardHistoryEntry {
  * Only timestamps that record the event itself are used: `updatedAt` changes on every save
  * (an edit to the done line), so a "skipped on" date from it would be wrong. A move with
  * neither side recorded carries no information and is left out.
+ *
+ * `checkIns` adds a `talked` entry for every finished check-in that answered this card
+ * We've Talked (read through `checkInCardIds`), dated `completedAt`. Only check-ins in the
+ * card's current life count (`completedAt >= state.createdAt`): Restore defaults keeps
+ * check-ins but wipes states and moves, so an older one belongs to a previous deck.
  */
 export function cardHistory(
   card: Pick<ResolvedCard, 'id' | 'state'>,
-  moves: readonly ResponsibilityMove[]
+  moves: readonly ResponsibilityMove[],
+  checkIns: readonly unknown[]
 ): CardHistoryEntry[] {
   const out: CardHistoryEntry[] = [];
   for (const m of moves) {
@@ -359,7 +365,17 @@ export function cardHistory(
       toId: m.toId,
     });
   }
-  if (card.state) out.push({ kind: 'sorted', at: card.state.createdAt });
+  if (card.state) {
+    const since = card.state.createdAt;
+    out.push({ kind: 'sorted', at: since });
+    // "We've Talked" at a check-in. Only this life of the card: Restore defaults keeps the
+    // check-ins but wipes states and moves, and a check-in can only discuss a kept card.
+    for (const c of checkIns) {
+      if (!isReadableCheckIn(c) || isCycleStart(c) || c.completedAt < since) continue;
+      if (checkInCardIds(c, 'talkedIds').includes(card.id))
+        out.push({ kind: 'talked', at: c.completedAt });
+    }
+  }
   return out.sort((a, b) => b.at.localeCompare(a.at));
 }
 
@@ -649,9 +665,14 @@ export function isCheckInDue(
 export const UNCHANGED_MIN_DAYS = 90;
 
 export interface CheckInAgenda {
+  /**
+   * Cards the last check-in saved for this one (Save for Next Time), in deck order: listed
+   * here once, never also in `moved` / `unchanged`.
+   */
+  saved: ResolvedCard[];
   /** Cards with nobody: "deal now". */
   nobody: ResolvedCard[];
-  /** Cards re-dealt since the anchor (latest move per card): "settling in" / "let's talk". */
+  /** Cards re-dealt since the anchor (latest move per card): No Issues / We've Talked / Save. */
   moved: { card: ResolvedCard; move: ResponsibilityMove }[];
   /** Up to 3 held cards unchanged for the longest (at least 90 days). */
   unchanged: ResolvedCard[];
@@ -671,6 +692,14 @@ export function buildCheckInAgenda(
 ): CheckInAgenda {
   const byId = new Map(cards.map((c) => [c.id, c]));
   const nobody = cards.filter((c) => c.status === 'waiting');
+  // Saved by the last FINISHED check-in (a cycle start carries nothing), still kept.
+  const savedIds = new Set(
+    anchor && !isCycleStart(anchor) ? checkInCardIds(anchor, 'savedIds') : []
+  );
+  const saved = cards.filter(
+    (c) => savedIds.has(c.id) && (c.status === 'held' || c.status === 'waiting')
+  );
+  const isSaved = new Set(saved.map((c) => c.id));
 
   const movedByCard = new Map<string, ResponsibilityMove>();
   for (const m of moves) {
@@ -679,6 +708,7 @@ export function buildCheckInAgenda(
     const card = byId.get(m.cardId);
     if (card?.status !== 'held' && card?.status !== 'waiting') continue;
     if (!isCurrentMove(card, m)) continue;
+    if (isSaved.has(m.cardId)) continue;
     const prev = movedByCard.get(m.cardId);
     if (!prev || m.at > prev.at) movedByCard.set(m.cardId, m);
   }
@@ -688,7 +718,8 @@ export function buildCheckInAgenda(
 
   const cutoff = addDaysYmd(today, -UNCHANGED_MIN_DAYS);
   const unchanged = cards
-    .filter((c) => c.status === 'held' && !movedByCard.has(c.id))
+    // Saved cards leave BEFORE the cap, so they never take one of the 3 slots.
+    .filter((c) => c.status === 'held' && !movedByCard.has(c.id) && !isSaved.has(c.id))
     .map((c) => {
       const sinces = c.parts.map((p) => p.since).filter((s): s is string => !!s);
       const changed = sinces.length ? sinces.sort().at(-1)! : c.state!.createdAt;
@@ -699,7 +730,51 @@ export function buildCheckInAgenda(
     .slice(0, 3)
     .map(({ c }) => c);
 
-  return { nobody, moved, unchanged };
+  return { saved, nobody, moved, unchanged };
+}
+
+/**
+ * The ONE reader of a check-in's card lists: the string entries of an array (a mixed list
+ * keeps its strings; a non-array reads as empty). `invalidCheckIns` reports any list that
+ * is not purely strings, so a bad shape from another client is logged, not silent.
+ */
+export function checkInCardIds(c: ResponsibilityCheckIn, key: 'talkedIds' | 'savedIds'): string[] {
+  const list: unknown = c[key];
+  return Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [];
+}
+
+/**
+ * Readable check-ins whose `talkedIds` / `savedIds` is present but not a list of strings:
+ * `key` identifies the record for once-per-session logging (its id, or its date when a
+ * foreign client wrote no id), `list` says which field is wrong, for triage from the logs.
+ */
+export function invalidCheckIns(
+  checkIns: readonly unknown[]
+): { key: string; list: 'talkedIds' | 'savedIds' | 'both' }[] {
+  const bad: { key: string; list: 'talkedIds' | 'savedIds' | 'both' }[] = [];
+  for (const c of checkIns) {
+    if (!isReadableCheckIn(c)) continue;
+    const broken = (['talkedIds', 'savedIds'] as const).filter((key) => {
+      const list: unknown = c[key];
+      return (
+        list !== undefined && !(Array.isArray(list) && list.every((id) => typeof id === 'string'))
+      );
+    });
+    if (!broken.length) continue;
+    bad.push({
+      key: typeof c.id === 'string' ? c.id : `no-id@${c.completedAt}`,
+      list: broken.length === 2 ? 'both' : broken[0]!,
+    });
+  }
+  return bad;
+}
+
+/**
+ * Where "Deal the Remaining" opens the pile: the never-sorted cards first, else the kept
+ * ones waiting for a holder. The ONE rule (Overview, check-in, the page's default scope).
+ */
+export function remainingScope(stats: Pick<DeckStats, 'unsorted'>): 'unsorted' | 'waiting' {
+  return stats.unsorted > 0 ? 'unsorted' : 'waiting';
 }
 
 /** "No car? Skip all 3": the other unsorted cards in the top card's group, when > 1. */

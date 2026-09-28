@@ -908,10 +908,19 @@ export interface ResponsibilityCheckIn {
   /** When the check-in was finished, or the cycle started. */
   completedAt: ISODateString;
   byId?: UUID;
+  /** No Issues answers (named before the 2026-09-28 rename; kept for old records). */
   stillWorks: number;
+  /** We've Talked answers; equals `talkedIds.length` when the list is present. */
   talkAbout: number;
   redealt: number;
   dealtNow: number;
+  /**
+   * Cards answered We've Talked (shown in each card's history). Optional: absent on records
+   * from before 2026-09-28 and when empty. Read only through `checkInCardIds`.
+   */
+  talkedIds?: string[];
+  /** Cards answered Save for Next Time: they open the next check-in. Read via `checkInCardIds`. */
+  savedIds?: string[];
 }
 
 /**

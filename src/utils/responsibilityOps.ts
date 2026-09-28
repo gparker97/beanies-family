@@ -506,8 +506,12 @@ export function buildRestoreDefaults(
 }
 
 export interface CheckInOutcomes {
+  /** No Issues answers. */
   stillWorks: number;
-  talkAbout: number;
+  /** We've Talked: the count written is `talkedIds.length`, so the two never disagree. */
+  talkedIds: string[];
+  /** Save for Next Time. */
+  savedIds: string[];
   redealt: number;
   dealtNow: number;
 }
@@ -526,15 +530,27 @@ export function buildCheckIn(
     completedAt: nowIso,
     byId: actorId,
     stillWorks: outcomes.stillWorks,
-    talkAbout: outcomes.talkAbout,
+    talkAbout: outcomes.talkedIds.length,
     redealt: outcomes.redealt,
     dealtNow: outcomes.dealtNow,
+    // Absent when empty (the repository strips undefined): old records look the same.
+    talkedIds: outcomes.talkedIds.length ? [...outcomes.talkedIds] : undefined,
+    savedIds: outcomes.savedIds.length ? [...outcomes.savedIds] : undefined,
   };
-  const count = outcomes.stillWorks + outcomes.talkAbout + outcomes.redealt + outcomes.dealtNow;
+  const talked = outcomes.talkedIds.length;
+  const saved = outcomes.savedIds.length;
+  // Same meaning as before 2026-09-28 (answers + deals); saved cards are in `detail` only, as
+  // carried-over saves are pre-selected and would inflate an untouched check-in.
+  const count = outcomes.stillWorks + talked + outcomes.redealt + outcomes.dealtNow;
   return {
     checkIn,
     ops: [{ op: 'setCheckIn', checkIn }],
-    telemetry: [{ message: 'checkin_completed', context: { count } }],
+    telemetry: [
+      {
+        message: 'checkin_completed',
+        context: { count, detail: `talked=${talked};saved=${saved}` },
+      },
+    ],
   };
 }
 

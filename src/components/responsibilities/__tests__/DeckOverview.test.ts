@@ -64,6 +64,9 @@ const store = reactive({
   get resolved() {
     return deck.resolved;
   },
+  get remaining() {
+    return stats.value.unsorted + stats.value.waiting;
+  },
   get stats() {
     return stats.value;
   },
@@ -109,21 +112,22 @@ beforeEach(() => {
 });
 
 describe('DeckOverview: Deal the Remaining', () => {
-  it('counts unsorted plus waiting and opens the unsorted pile first', async () => {
+  it('counts unsorted plus waiting (store.remaining) and asks the page to deal them', async () => {
     const w = mountOverview();
     const btn = w.find(DEAL);
     expect(btn.text()).toBe('whoOwnsWhat.overview.dealRemaining.other');
     await btn.trigger('click');
-    expect(w.emitted('deal-remaining')).toEqual([['unsorted']]);
+    // No payload: the page picks the pile with `remainingScope` (the ONE rule).
+    expect(w.emitted('deal-remaining')).toEqual([[]]);
   });
 
-  it('opens the waiting cards once nothing is unsorted, and says Last Card for one', async () => {
+  it('says Last Card for one', () => {
     deck.resolved = [card('laundry', 'held', 'sofia'), card('dishes', 'waiting')];
-    const w = mountOverview();
-    const btn = w.find(DEAL);
-    expect(btn.text()).toBe('whoOwnsWhat.overview.dealRemaining.one');
-    await btn.trigger('click');
-    expect(w.emitted('deal-remaining')).toEqual([['waiting']]);
+    expect(mountOverview().find(DEAL).text()).toBe('whoOwnsWhat.overview.dealRemaining.one');
+  });
+
+  it('titles the facts tile Good to Know', () => {
+    expect(mountOverview().text()).toContain('whoOwnsWhat.facts.title');
   });
 
   it('hides when everything is dealt, and for children', () => {

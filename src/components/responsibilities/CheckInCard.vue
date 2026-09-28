@@ -25,6 +25,8 @@ const props = withDefaults(
     nextCheckIn: string | null;
     due: boolean;
     agenda: CheckInAgenda;
+    /** Cards still to deal (never sorted + kept with nobody): `store.remaining`. */
+    toDeal: number;
     canEdit?: boolean;
   }>(),
   { lastCheckIn: undefined, canEdit: false }
@@ -59,19 +61,28 @@ const lines = computed(() => {
 const chips = computed(() => {
   if (!props.rhythmWeeks) return [];
   const out: { key: string; text: string; tone: 'nobody' | 'plain' }[] = [];
-  const nobody = props.agenda.nobody.length;
-  if (nobody) {
+  const toDeal = props.toDeal;
+  if (toDeal) {
     out.push({
       key: 'nobody',
       tone: 'nobody',
       text: fillTemplate(
         t(
-          nobody === 1
-            ? 'whoOwnsWhat.checkin.agendaNobody.one'
-            : 'whoOwnsWhat.checkin.agendaNobody.other'
+          toDeal === 1
+            ? 'whoOwnsWhat.checkin.agendaToDeal.one'
+            : 'whoOwnsWhat.checkin.agendaToDeal.other'
         ),
-        { count: nobody }
+        { count: toDeal }
       ),
+    });
+  }
+  for (const card of props.agenda.saved.slice(0, AGENDA_PER_KIND)) {
+    out.push({
+      key: `saved-${card.id}`,
+      tone: 'plain',
+      text: `${cardEmoji(card)} ${fillTemplate(t('whoOwnsWhat.checkin.agendaSaved'), {
+        card: cardName(card),
+      })}`,
     });
   }
   for (const { card, move } of props.agenda.moved.slice(0, AGENDA_PER_KIND)) {

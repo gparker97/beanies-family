@@ -48,8 +48,10 @@ const store = reactive({
   resolved: [card('laundry', 'greg'), card('dishes')],
   moves: [],
   lastCheckIn: undefined,
-  checkInSince: undefined,
+  checkInSince: undefined as unknown,
   nextCheckIn: null,
+  stats: { unsorted: 0 },
+  remaining: 0 as number,
   cardById(id: string) {
     return this.resolved.find((c) => c.id === id);
   },
@@ -71,7 +73,7 @@ const PickerStub = defineComponent({
 });
 const PillsStub = defineComponent({
   name: 'TogglePillGroup',
-  props: ['modelValue', 'options'],
+  props: ['modelValue', 'options', 'clearable'],
   emits: ['update:modelValue'],
   template: '<div />',
 });
@@ -113,6 +115,9 @@ const optionsOf = (w: ReturnType<typeof mountDrawer>, id: string) =>
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
+  store.checkInSince = undefined;
+  store.remaining = 0;
+  store.resolved = [card('laundry', 'greg'), card('dishes')];
   resetDealActionsForTest();
   family.members = [
     { id: 'greg', name: 'greg', role: 'owner', ageGroup: 'adult' },
@@ -139,7 +144,7 @@ describe('CheckInDrawer', () => {
   it('offers no Re-deal when the holder is the only member (never an empty picker)', () => {
     family.members = [{ id: 'greg', name: 'greg', role: 'owner', ageGroup: 'adult' }];
     const w = mountDrawer();
-    expect(optionsOf(w, 'laundry')).toEqual(['stillWorks', 'talk']);
+    expect(optionsOf(w, 'laundry')).toEqual(['noIssues', 'talked', 'saved']);
   });
 
   it('an Undo from the Deal Now toast reopens the card and drops it from the counts', async () => {
@@ -178,5 +183,142 @@ describe('CheckInDrawer', () => {
     );
     expect(dismissToast).toHaveBeenCalledWith(41);
     expect(store.undo).not.toHaveBeenCalled();
+  });
+
+  it('a card saved last time comes first, stays saved unless answered, and is written again', async () => {
+    store.checkInSince = {
+      id: 'ci-1',
+      kind: 'checkin',
+      completedAt: '2026-09-01T10:00:00.000Z',
+      stillWorks: 0,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+      savedIds: ['laundry'],
+    };
+    store.completeCheckIn.mockResolvedValueOnce({ id: 'ci-2', completedAt: OLD });
+    const w = mountDrawer();
+    const saved = w.find('[data-testid="checkin-saved-laundry"]');
+    expect(saved.exists()).toBe(true);
+    // Listed once: not also under "haven't moved in a while".
+    expect(w.find('[data-testid="checkin-unchanged-laundry"]').exists()).toBe(false);
+    const pills = saved.findComponent(PillsStub);
+    expect(pills.props('modelValue')).toBe('saved');
+    expect(pills.props('clearable')).toBe(false);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.completeCheckIn).toHaveBeenLastCalledWith(
+      expect.objectContaining({ savedIds: ['laundry'], talkedIds: [], stillWorks: 0 })
+    );
+  });
+
+  it("writes We've Talked and No Issues answers as the record's lists and counts", async () => {
+    store.completeCheckIn.mockResolvedValueOnce({ id: 'ci', completedAt: OLD });
+    const w = mountDrawer();
+    w.find('[data-testid="checkin-unchanged-laundry"]')
+      .findComponent(PillsStub)
+      .vm.$emit('update:modelValue', 'talked');
+    await flushPromises();
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.completeCheckIn).toHaveBeenLastCalledWith(
+      expect.objectContaining({ talkedIds: ['laundry'], savedIds: [], stillWorks: 0 })
+    );
+  });
+
+  it('a card in two sections (saved and still to deal) opens exactly one picker', async () => {
+    store.checkInSince = {
+      id: 'ci-1',
+      kind: 'checkin',
+      completedAt: '2026-09-01T10:00:00.000Z',
+      stillWorks: 0,
+      talkAbout: 0,
+      redealt: 0,
+      dealtNow: 0,
+      savedIds: ['dishes'],
+    };
+    const w = mountDrawer();
+    expect(w.find('[data-testid="checkin-saved-dishes"]').exists()).toBe(true);
+    await w.find('[data-testid="checkin-deal-dishes"]').trigger('click');
+    expect(w.findAllComponents(PickerStub)).toHaveLength(1);
+    expect(w.find('[data-testid="checkin-nobody-dishes"]').findComponent(PickerStub).exists()).toBe(
+      true
+    );
+  });
+
+  it('leaving Re-deal for another answer closes the re-deal picker', async () => {
+    const w = mountDrawer();
+    const pills = () =>
+      w.find('[data-testid="checkin-unchanged-laundry"]').findComponent(PillsStub);
+    pills().vm.$emit('update:modelValue', 'redeal');
+    await flushPromises();
+    expect(w.findComponent(PickerStub).exists()).toBe(true);
+    pills().vm.$emit('update:modelValue', 'noIssues');
+    await flushPromises();
+    expect(w.findComponent(PickerStub).exists()).toBe(false);
+  });
+
+  it('the done screen deals the remaining cards when some are left, and just closes otherwise', async () => {
+    store.completeCheckIn.mockResolvedValue({ id: 'ci', completedAt: OLD });
+    store.remaining = 3;
+    const w = mountDrawer();
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    w.findComponent({ name: 'DeckCelebration' }).vm.$emit('action');
+    expect(w.emitted('deal-remaining')).toHaveLength(1);
+    expect(w.emitted('close')).toBeUndefined();
+    store.remaining = 0;
+    const w2 = mountDrawer();
+    await w2.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    w2.findComponent({ name: 'DeckCelebration' }).vm.$emit('action');
+    expect(w2.emitted('close')).toHaveLength(1);
+    expect(w2.emitted('deal-remaining')).toBeUndefined();
+  });
+
+  it('answering another card never closes a Deal Now picker', async () => {
+    const w = mountDrawer();
+    await w.find('[data-testid="checkin-deal-dishes"]').trigger('click');
+    w.find('[data-testid="checkin-unchanged-laundry"]')
+      .findComponent(PillsStub)
+      .vm.$emit('update:modelValue', 'noIssues');
+    await flushPromises();
+    expect(w.find('[data-testid="checkin-nobody-dishes"]').findComponent(PickerStub).exists()).toBe(
+      true
+    );
+  });
+
+  it("Re-deal on a second card clears the first card's undealt Re-deal answer", async () => {
+    store.resolved = [card('laundry', 'greg'), card('dishes'), card('bikes', 'sofia')];
+    const w = mountDrawer();
+    const pills = (id: string) =>
+      w.find(`[data-testid="checkin-unchanged-${id}"]`).findComponent(PillsStub);
+    pills('laundry').vm.$emit('update:modelValue', 'redeal');
+    await flushPromises();
+    pills('bikes').vm.$emit('update:modelValue', 'redeal');
+    await flushPromises();
+    expect(pills('laundry').props('modelValue')).toBe('');
+    expect(w.findAllComponents(PickerStub)).toHaveLength(1);
+  });
+
+  it('a card re-dealt here stays Re-deal: the record counts the deal', async () => {
+    store.deal.mockResolvedValue({ result: store.resolved[0], undo: TOKEN });
+    store.completeCheckIn.mockResolvedValueOnce({ id: 'ci', completedAt: OLD });
+    const w = mountDrawer();
+    const pills = () =>
+      w.find('[data-testid="checkin-unchanged-laundry"]').findComponent(PillsStub);
+    pills().vm.$emit('update:modelValue', 'redeal');
+    await flushPromises();
+    w.findComponent(PickerStub).vm.$emit('pick', 'sofia');
+    await flushPromises();
+    // The answers are replaced by "Dealt to Sofia": nothing left to change by mistake.
+    expect(
+      w.find('[data-testid="checkin-unchanged-laundry"]').findComponent(PillsStub).exists()
+    ).toBe(false);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.completeCheckIn).toHaveBeenLastCalledWith(
+      expect.objectContaining({ redealt: 1, stillWorks: 0 })
+    );
   });
 });

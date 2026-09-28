@@ -45,7 +45,7 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { fillTemplate } from '@/utils/fillTemplate';
-import type { CardSequence } from '@/utils/responsibilityDeck';
+import { remainingScope, type CardSequence } from '@/utils/responsibilityDeck';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
@@ -224,8 +224,24 @@ const showBoard = computed(
 /** The board fills the page: exactly when `DealBoard` renders (the page's flex column sizes it). */
 const fillsHeight = computed(() => view.value === 'deal' && canDeal.value && showBoard.value);
 const pileScope = computed<DealRequest['scope']>(
-  () => dealRequest.value?.scope ?? (store.stats.unsorted > 0 ? 'unsorted' : 'waiting')
+  () => dealRequest.value?.scope ?? remainingScope(store.stats)
 );
+/** "Deal the Remaining N" (Overview and the check-in's done screen): returns the scope opened. */
+function dealRemaining(): DealRequest['scope'] {
+  const scope = remainingScope(store.stats);
+  openDeal({ scope });
+  return scope;
+}
+/** From the check-in's done screen: close it, open the pile, log which pile. */
+function dealRemainingFromCheckIn(): void {
+  checkInOpen.value = false;
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'checkin_deal_remaining',
+    context: { detail: dealRemaining() },
+  });
+}
 function setDealMode(mode: string): void {
   if (mode !== 'pile' && mode !== 'board') return;
   if (mode === (showBoard.value ? 'board' : 'pile')) return;
@@ -494,7 +510,7 @@ async function restoreDefaults(): Promise<void> {
         v-else
         :can-deal="canDeal"
         @deal-waiting="openDeal({ scope: 'waiting' })"
-        @deal-remaining="openDeal({ scope: $event })"
+        @deal-remaining="dealRemaining"
         @open-category="openCategory"
         @deal-card="openDeal({ scope: 'waiting', cardId: $event })"
         @see-skipped="seeSkipped"
@@ -547,7 +563,11 @@ async function restoreDefaults(): Promise<void> {
       @edit="editCard"
     />
     <CardEditDrawer :open="editOpen" :card-id="editCardId" @close="closeEdit" />
-    <CheckInDrawer :open="checkInOpen" @close="checkInOpen = false" />
+    <CheckInDrawer
+      :open="checkInOpen"
+      @close="checkInOpen = false"
+      @deal-remaining="dealRemainingFromCheckIn"
+    />
 
     <!-- Off-screen fridge sheet: rendered declaratively so it inherits Pinia / i18n; one
          ExportSheet per page (the PDF's pages), stacked (the Share PNG). Unmounted by
