@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   RESPONSIBILITY_CARDS,
@@ -775,6 +777,17 @@ describe('deck drift guards', () => {
     const heroes = RESPONSIBILITY_CARDS.filter((c) => c.illustration);
     expect(heroes).toHaveLength(10);
     for (const c of heroes) expect(c.illustration).toBe(`/brand/cards/${c.id}.webp`);
+  });
+
+  it('every hero has its art in the brand source, and the folder holds nothing else', () => {
+    // public/brand is build output (sync-brand-assets), so the masters are what ships. The
+    // reverse check keeps the precache glob (`brand/cards/*.webp`) equal to "hero art only".
+    const dir = 'packages/brand/assets/shared/cards';
+    const heroes = RESPONSIBILITY_CARDS.filter((c) => c.illustration);
+    for (const c of heroes) expect(existsSync(join(dir, basename(c.illustration!)))).toBe(true);
+    // Dotfiles (.DS_Store) aside, anything here ships and may be precached (a .png would be).
+    const art = readdirSync(dir).filter((f) => !f.startsWith('.'));
+    expect(art.sort()).toEqual(heroes.map((c) => basename(c.illustration!)).sort());
   });
 });
 

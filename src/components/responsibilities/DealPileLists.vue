@@ -30,6 +30,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { keptAndSkipped, type ResolvedCard } from '@/utils/responsibilityDeck';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 
 const props = withDefaults(defineProps<{ currentId?: string | null; disabled?: boolean }>(), {
   currentId: null,
@@ -41,7 +42,7 @@ const { t } = useTranslation();
 const store = useResponsibilityStore();
 const { isMobile } = useBreakpoint();
 const { getMemberById } = useMemberInfo();
-const { cardName, cardEmoji } = useResponsibilityCardLabel();
+const { cardName } = useResponsibilityCardLabel();
 
 const lists = computed(() => keptAndSkipped(store.resolved));
 const initial = isMobile.value ? 3 : 6;
@@ -106,7 +107,9 @@ function jump(cardId: string): void {
             :data-testid="`deal-list-kept-${card.id}`"
             @click="jump(card.id)"
           >
-            <span class="thumb" aria-hidden="true">{{ cardEmoji(card) }}</span>
+            <span class="thumb" aria-hidden="true"
+              ><CardArt :card="card" img-class="h-full w-full"
+            /></span>
             <span class="min-w-0 flex-1 truncate">{{ cardName(card) }}</span>
             <span
               class="font-outfit dark:text-ink-soft inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[var(--color-text-muted)]"
@@ -161,7 +164,9 @@ function jump(cardId: string): void {
             :data-testid="`deal-list-skipped-${card.id}`"
             @click="jump(card.id)"
           >
-            <span class="thumb" aria-hidden="true">{{ cardEmoji(card) }}</span>
+            <span class="thumb" aria-hidden="true"
+              ><CardArt :card="card" img-class="h-full w-full"
+            /></span>
             <span class="min-w-0 flex-1 truncate">{{ cardName(card) }}</span>
           </button>
           <button

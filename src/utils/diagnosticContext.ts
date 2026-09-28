@@ -88,7 +88,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // no recipe names, notes, guest names, or member names ever ship: `kind`
   // (recipe|eat_out|leftovers|skip|other), `slot` (breakfast|lunch|dinner|snack),
   // `quick_add` (bool), `share_scope` (day|week), `overwrote` (bool). Same
-  // Diagnostics category already declared to the stores.
+  // Diagnostics category already declared to the stores. Also reused by
+  // 'card-art' / 'nav-glyph' (ImageGlyph): the file name of an app-bundled
+  // /brand/ illustration that failed to load, never anything else (see the
+  // runbook's "brand art fallback" declaration).
   'kind',
   'slot',
   'quick_add',

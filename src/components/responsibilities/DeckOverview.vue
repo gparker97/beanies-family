@@ -32,10 +32,12 @@ import {
   recentMoves,
   ymdOf,
   type RecentItem,
+  type ResolvedCard,
 } from '@/utils/responsibilityDeck';
 import type { FamilyMember, ListCategory } from '@/types/models';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckPanel from './DeckPanel.vue';
 import DeckRing from './DeckRing.vue';
 import CategoryCoverage from './CategoryCoverage.vue';
@@ -63,7 +65,7 @@ const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
 const notificationsStore = useNotificationsStore();
 const { getMemberName } = useMemberInfo();
-const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
+const { cardName, cardDone } = useResponsibilityCardLabel();
 
 /** Waiting cards listed before "Open the Deal View" takes over. */
 const WAITING_SHOWN = 5;
@@ -125,17 +127,20 @@ function snoozeCheckIn(): void {
 }
 
 // ── Recent moves ─────────────────────────────────────────────────────────────
-const recent = computed(() =>
-  recentMoves(store.moves, store.checkIns, store.states, today.value, 5)
+/** Each recent move with its card looked up once; `art` is what the row's icon shows. */
+const recentRows = computed(() =>
+  recentMoves(store.moves, store.checkIns, store.states, today.value, 5).map((item) => {
+    const card = item.kind === 'checkin' ? undefined : store.cardById(item.cardId);
+    return { item, card, art: card ?? { emoji: item.kind === 'checkin' ? '🗓️' : '🃏' } };
+  })
 );
 
-function recentText(item: RecentItem): string {
+function recentText(item: RecentItem, card: ResolvedCard | undefined): string {
   if (item.kind === 'checkin') {
     return item.checkIn.redealt
       ? fillTemplate(t('whoOwnsWhat.recent.checkinRedealt'), { count: item.checkIn.redealt })
       : t('whoOwnsWhat.recent.checkin');
   }
-  const card = store.cardById(item.cardId);
   const name = card ? cardName(card) : '';
   if (item.kind === 'redeal') {
     return fillTemplate(t('whoOwnsWhat.recent.redeal'), {
@@ -151,12 +156,6 @@ function recentText(item: RecentItem): string {
         ? 'whoOwnsWhat.recent.split'
         : 'whoOwnsWhat.recent.skip';
   return fillTemplate(t(key), { card: name });
-}
-
-function recentIcon(item: RecentItem): string {
-  if (item.kind === 'checkin') return '🗓️';
-  const card = store.cardById(item.cardId);
-  return card ? cardEmoji(card) : '🃏';
 }
 
 // ── Facts ────────────────────────────────────────────────────────────────────
@@ -290,7 +289,7 @@ const kidsHolding = computed<FamilyMember[]>(() =>
               class="flex min-w-0 flex-1 items-center gap-3 text-left"
               @click="emit('open-card', card.id)"
             >
-              <span class="text-xl" aria-hidden="true">{{ cardEmoji(card) }}</span>
+              <CardArt :card="card" img-class="h-7 w-7" class="text-xl" />
               <span class="min-w-0">
                 <span
                   class="font-outfit dark:text-ink block truncate text-sm font-semibold text-[var(--color-text)]"
@@ -329,15 +328,15 @@ const kidsHolding = computed<FamilyMember[]>(() =>
         :title="t('whoOwnsWhat.overview.recentTitle')"
         :hint="t('whoOwnsWhat.overview.recentHint')"
       >
-        <ul v-if="recent.length" class="space-y-2.5">
+        <ul v-if="recentRows.length" class="space-y-2.5">
           <li
-            v-for="item in recent"
+            v-for="{ item, card, art } in recentRows"
             :key="`${item.kind}:${item.at}`"
             class="flex items-start gap-3"
           >
-            <span class="text-base leading-6" aria-hidden="true">{{ recentIcon(item) }}</span>
+            <CardArt :card="art" class="text-base leading-6" />
             <span class="dark:text-ink min-w-0 flex-1 text-sm text-[var(--color-text)]">
-              {{ recentText(item) }}
+              {{ recentText(item, card) }}
             </span>
             <span
               class="dark:text-ink-faint text-xs whitespace-nowrap text-[var(--color-text-muted)]"
