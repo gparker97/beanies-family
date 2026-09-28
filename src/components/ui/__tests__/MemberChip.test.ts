@@ -60,3 +60,20 @@ describe('MemberChip', () => {
     expect(wrapper.find('span').exists()).toBe(false);
   });
 });
+
+describe('MemberChip attribute fallthrough', () => {
+  it("a caller's class reaches the chip (dot and pill), with no fragment warning", () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (const size of ['dot', 'sm'] as const) {
+      const w = mount(MemberChip, {
+        props: { memberId: 'm-greg', size },
+        attrs: { class: 'shrink-0' },
+      });
+      expect(w.classes()).toContain('shrink-0');
+      w.unmount();
+    }
+    const extraneous = warn.mock.calls.filter((c) => String(c[0]).includes('Extraneous non-props'));
+    expect(extraneous).toHaveLength(0);
+    warn.mockRestore();
+  });
+});

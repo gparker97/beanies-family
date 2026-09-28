@@ -16,6 +16,16 @@ import { resolveMemberColor } from '@/constants/memberColors';
 // component: `dot` is a face (identity, where the surrounding context does not name
 // the member), `sm`/`md` are NAME pills (where the member IS the content, e.g. a
 // detail modal's assignee row).
+//
+// `dot` delegates rather than drawing its own circle, so there is ONE avatar
+// implementation in the app. It grows 16px → 24px in doing so: the collision rule can
+// widen an initial to two letters, and two letters cannot sit legibly in a 16px circle
+// against the 12px type floor with Large reading mode scaling it. The same trade was made
+// for MemberChipFilter (18px → 24px).
+//
+// ⚠️ One element per branch at the template ROOT (no wrapping `<template v-if>`, no HTML
+// comments there): either makes the root a fragment, so a caller's `class` is dropped with
+// an "Extraneous non-props attributes" warning. Pinned by MemberChip.test.ts.
 const props = withDefaults(
   defineProps<{
     memberId: string;
@@ -44,35 +54,26 @@ const color = computed(() => resolveMemberColor(member.value?.color));
 </script>
 
 <template>
-  <template v-if="member">
-    <!--
-      `dot` delegates rather than drawing its own circle, so there is ONE avatar
-      implementation in the app. It grows 16px → 24px in doing so: the collision rule
-      can widen an initial to two letters, and two letters cannot sit legibly in a 16px
-      circle against the 12px type floor with Large reading mode scaling it. The same
-      trade was made for MemberChipFilter (18px → 24px).
-    -->
-    <BeanieAvatar
-      v-if="size === 'dot'"
-      v-bind="memberAvatarBindings(member)"
-      fallback="initials"
-      size="xs"
-      :title="name"
-      class="dark:ring-surface-raised ring-1 ring-white"
-    />
-    <span
-      v-else
-      class="inline-flex items-center text-xs font-medium text-white"
-      :class="
-        size === 'sm'
-          ? 'rounded-full px-2 py-0.5'
-          : 'font-outfit rounded-full px-3 py-1.5 font-semibold'
-      "
-      :style="{
-        background: size === 'sm' ? color : `linear-gradient(135deg, ${color}, ${color}cc)`,
-      }"
-    >
-      {{ name }}
-    </span>
-  </template>
+  <BeanieAvatar
+    v-if="member && size === 'dot'"
+    v-bind="memberAvatarBindings(member)"
+    fallback="initials"
+    size="xs"
+    :title="name"
+    class="dark:ring-surface-raised ring-1 ring-white"
+  />
+  <span
+    v-else-if="member"
+    class="inline-flex items-center text-xs font-medium text-white"
+    :class="
+      size === 'sm'
+        ? 'rounded-full px-2 py-0.5'
+        : 'font-outfit rounded-full px-3 py-1.5 font-semibold'
+    "
+    :style="{
+      background: size === 'sm' ? color : `linear-gradient(135deg, ${color}, ${color}cc)`,
+    }"
+  >
+    {{ name }}
+  </span>
 </template>

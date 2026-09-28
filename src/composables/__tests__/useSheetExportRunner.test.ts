@@ -116,6 +116,8 @@ describe('useSheetExportRunner', () => {
       mimeType: 'application/pdf',
       kind: 'meal-plan-pdf',
       title: 'share title',
+      // "Export as PDF" saves (download on the web), never the share sheet.
+      preferDownload: true,
     });
     expect(showToast).not.toHaveBeenCalled();
   });
@@ -133,6 +135,8 @@ describe('useSheetExportRunner', () => {
     expect(vi.mocked(deliverFile).mock.calls[0]![0]).toMatchObject({
       filename: 'beanies-deck.png',
       kind: 'meal-plan-png',
+      // "Share" opens the share sheet.
+      preferDownload: false,
     });
   });
 

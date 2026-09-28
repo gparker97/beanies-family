@@ -91,6 +91,11 @@ export function hasOpenEscapeLayer(): boolean {
   return escapeStack.length > 0;
 }
 
+/** How many Escape-closable layers are open (a surface inside one compares against its depth). */
+export function escapeLayerCount(): number {
+  return escapeStack.length;
+}
+
 /**
  * Test-only: clear the module-global stack + detach the shared listener between
  * tests. The stack intentionally persists across consumers (that's the whole

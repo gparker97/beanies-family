@@ -15,17 +15,17 @@ import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardL
 import { useFamilyStore } from '@/stores/familyStore';
 import { categoryTint } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
-import type { ResolvedCard } from '@/utils/responsibilityDeck';
+import { cardSequence, type CardSequence, type ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 
 const props = defineProps<{ cards: readonly ResolvedCard[] }>();
-const emit = defineEmits<{ open: [cardId: string] }>();
+const emit = defineEmits<{ open: [cardId: string, sequence: CardSequence | null] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
 const { memberAvatarBindings } = useMemberAvatarBindings();
-const { cardName, cardEmoji } = useResponsibilityCardLabel();
+const { cardName, cardEmoji, memberCardsLabel } = useResponsibilityCardLabel();
 
 interface Mini {
   key: string;
@@ -59,6 +59,19 @@ const rows = computed(() =>
     return { member, minis, count };
   })
 );
+
+/** Open a card with this bean's cards as the list to step through. */
+function open(row: { member: { name: string }; minis: Mini[] }, cardId: string): void {
+  const label = memberCardsLabel(row.member.name);
+  emit(
+    'open',
+    cardId,
+    cardSequence(
+      label,
+      row.minis.map((m) => m.cardId)
+    )
+  );
+}
 
 function countLabel(count: number): string {
   return fillTemplate(
@@ -95,7 +108,7 @@ function countLabel(count: number): string {
           type="button"
           class="mini font-outfit dark:text-ink dark:bg-surface-overlay dark:hover:bg-surface-hover rounded-full bg-[var(--tint-slate-5)] py-1 pr-2.5 pl-2 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-slate-10)]"
           :style="{ '--cat': mini.tint }"
-          @click="emit('open', mini.cardId)"
+          @click="open(row, mini.cardId)"
         >
           {{ mini.label }}
         </button>

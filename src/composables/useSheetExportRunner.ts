@@ -148,6 +148,9 @@ export function useSheetExportRunner(options: SheetExportRunnerOptions) {
         mimeType: mime,
         title: options.shareTitle(),
         kind: format === 'pdf' ? options.kind.pdf : options.kind.image,
+        // "Export as PDF" (a download icon) SAVES on the web; "Share" opens the sheet. Native
+        // ignores this: the share sheet is where "Save to Files" lives there.
+        preferDownload: format === 'pdf',
       });
     } catch (err) {
       const failStage = err instanceof ExportError ? err.stage : stage;

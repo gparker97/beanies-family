@@ -314,6 +314,103 @@ export function groupByCategory(cards: readonly ResolvedCard[]): CategoryGroup[]
   return out;
 }
 
+// ── Card history ────────────────────────────────────────────────────────────────
+export type CardHistoryKind = 'dealt' | 'moved' | 'cleared' | 'sorted';
+
+export interface CardHistoryEntry {
+  kind: CardHistoryKind;
+  at: string;
+  /** The part a move was on, as recorded (a split card); absent for card-level entries. */
+  partKey?: string;
+  /** A label split's label at the time of the move. */
+  partLabel?: string;
+  fromId?: string;
+  toId?: string;
+}
+
+/**
+ * Everything that happened to one card, newest first: every deal, hand-over and return to
+ * nobody (from the move log; an undone move is deleted), and when it was first sorted (kept
+ * or skipped: `state.createdAt`, written once). A card nobody has moved still shows when it
+ * was sorted and first dealt. A deal lost to a simultaneous one on another device still
+ * shows, as it happened on that device; who holds the card now is on the card itself.
+ * Malformed records (a half-synced move from another client) are skipped, as every other
+ * reader of the move log does.
+ *
+ * Only timestamps that record the event itself are used: `updatedAt` changes on every save
+ * (an edit to the done line), so a "skipped on" date from it would be wrong. A move with
+ * neither side recorded carries no information and is left out.
+ */
+export function cardHistory(
+  card: Pick<ResolvedCard, 'id' | 'state'>,
+  moves: readonly ResponsibilityMove[]
+): CardHistoryEntry[] {
+  const out: CardHistoryEntry[] = [];
+  for (const m of moves) {
+    if (!m || typeof m.cardId !== 'string' || typeof m.at !== 'string') continue;
+    if (m.cardId !== card.id || (!m.fromId && !m.toId)) continue;
+    const kind: CardHistoryKind = !m.toId ? 'cleared' : m.fromId ? 'moved' : 'dealt';
+    out.push({
+      kind,
+      at: m.at,
+      partKey: m.partKey,
+      partLabel: m.partLabel,
+      fromId: m.fromId,
+      toId: m.toId,
+    });
+  }
+  if (card.state) out.push({ kind: 'sorted', at: card.state.createdAt });
+  return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+
+// ── Card details sequences ──────────────────────────────────────────────────────
+/**
+ * The list a card was opened from (a Deck shelf, a bean's cards, a board lane, Skipped,
+ * the Overview's Waiting rows), so the details drawer can step through it.
+ */
+export interface CardSequence {
+  ids: string[];
+  label: string;
+}
+
+/**
+ * The ONE way to build a sequence. De-duplicated, first place kept: one member can hold
+ * several parts of the same split card, and a card appearing twice would break "n of N".
+ */
+export function cardSequence(label: string, ids: readonly string[]): CardSequence {
+  return { label, ids: [...new Set(ids)] };
+}
+
+export interface SequenceStep {
+  /** 1-based position among the cards that still exist. */
+  n: number;
+  total: number;
+  prevId: string | null;
+  nextId: string | null;
+}
+
+/**
+ * Where `cardId` sits in `seq`, over the ids that still `exist` (status does not matter, so
+ * Skipped flips like any list; only a card deleted elsewhere drops out). Null when there is
+ * no list, one card left, or the card is no longer in it: the drawer then shows no arrows.
+ */
+export function sequenceStep(
+  seq: CardSequence | null,
+  cardId: string,
+  exists: (id: string) => boolean
+): SequenceStep | null {
+  if (!seq) return null;
+  const ids = seq.ids.filter(exists);
+  const i = ids.indexOf(cardId);
+  if (ids.length < 2 || i < 0) return null;
+  return {
+    n: i + 1,
+    total: ids.length,
+    prevId: ids[i - 1] ?? null,
+    nextId: ids[i + 1] ?? null,
+  };
+}
+
 export interface CategoryCoverage {
   category: ListCategory;
   /** Every card in the category that is not skipped: held + waiting + unsorted. */
