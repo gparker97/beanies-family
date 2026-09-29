@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>3 beanie bullets - blog summary box mockup</title>
+<title>the long and short of it - blog summary box mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Outfit:wght@400..800&display=swap" rel="stylesheet">
@@ -64,12 +64,6 @@ body { margin: 0; background: #e9ecef; font-family: Outfit, system-ui, sans-seri
   letter-spacing: -0.015em;
   color: var(--deep-slate);
 }
-/* The trio of beans beside the title: the brand's hand-holding pair plus
-   one, a quiet echo of "3" without repeating the numeral. */
-.bb-trio { display: inline-flex; gap: 3px; transform: translateY(1px); }
-.bb-trio svg { width: 11px; height: 14px; fill: var(--tint-hex); }
-.bb-trio svg:nth-child(2) { opacity: 0.7; }
-.bb-trio svg:nth-child(3) { opacity: 0.45; }
 
 .bb-intro {
   margin: 0 0 16px;
@@ -82,16 +76,19 @@ body { margin: 0; background: #e9ecef; font-family: Outfit, system-ui, sans-seri
 
 .bb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .bb-item { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; }
-/* The bullet IS a bean: the one bold move. Tilted like the logo's beans,
-   never rotated past a gentle lean. */
-.bb-bean { width: 18px; height: 23px; margin-top: 2px; fill: var(--tint-hex); transform: rotate(-12deg); }
+/* The bullet is the beanie face: the site favicon
+   (beanies_small_bean_favicon), an existing brand mark. */
+.bb-bean { width: 22px; height: 22px; margin-top: 1px; display: block; }
+/* Role label in the site's small-caps label style (kicker, previous/next),
+   so italics stay reserved for the Fraunces voice: subtitle, intro, lead. */
 .bb-role {
   display: block;
-  font-family: Fraunces, Georgia, serif;
-  font-style: italic;
-  font-size: 0.9rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--tint-ink);
-  margin-bottom: 1px;
+  margin-bottom: 3px;
 }
 .bb-text { margin: 0; font-size: 1rem; line-height: 1.55; color: rgb(44 62 80 / 90%); }
 .bb-text strong { font-weight: 650; color: var(--deep-slate); }
@@ -119,17 +116,8 @@ code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 
 </head>
 <body>
 
-<!-- One bean glyph, reused -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <symbol id="bean" viewBox="0 0 18 23">
-      <path d="M9.4 0.6C4.2 0.6 0.8 5.3 0.8 11.2c0 6.3 3.6 11.2 8.4 11.2 4.9 0 8.2-4.2 8.2-9.6 0-2.7-1.3-4-1.3-6.1C16.1 3.4 13.5 0.6 9.4 0.6z"/>
-    </symbol>
-  </defs>
-</svg>
-
 <div class="mock-note">
-  <h1>3 beanie bullets: summary box for feature posts</h1>
+  <h1>the long and short of it: summary box for feature posts</h1>
   <p>Real copy from issue 24 (<em>behold: a beanie wall for your whole family</em>). The box sits between the header and the "the post" divider, so a busy reader gets the answer before the story starts, and the divider is where they choose to keep reading. It takes the colour of each issue's tint (left: orange, right: sky on a phone).</p>
 </div>
 
@@ -150,21 +138,20 @@ code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 
 
           <section class="beanie-bullets" aria-labelledby="bb-title-1">
             <div class="bb-head">
-              <h2 class="bb-title" id="bb-title-1">3 beanie bullets</h2>
-              <span class="bb-trio" aria-hidden="true"><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg></span>
+              <h2 class="bb-title" id="bb-title-1">the long and short of it</h2>
             </div>
-            <p class="bb-intro">we know our beanies are busy, so here are the key points from this post:</p>
+            <p class="bb-intro">we know our families are busy, so here's the beanie breakdown</p>
             <ul class="bb-list">
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">what we built</span><p class="bb-text">the <strong>beanie wall</strong>: a family calendar and chore board that runs on a tablet you already own.</p></div>
               </li>
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">how it helps you</span><p class="bb-text">everyone sees the week and ticks off their own chores, so you stop being the family's reminder service. no new hardware, no subscription.</p></div>
               </li>
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">where to find it</span><p class="bb-text"><span class="bb-path">Settings › Beanie Wall</span> - open it on the tablet and follow the setup tips.</p></div>
               </li>
             </ul>
@@ -195,21 +182,20 @@ code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 
 
           <section class="beanie-bullets" aria-labelledby="bb-title-2">
             <div class="bb-head">
-              <h2 class="bb-title" id="bb-title-2">3 beanie bullets</h2>
-              <span class="bb-trio" aria-hidden="true"><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg></span>
+              <h2 class="bb-title" id="bb-title-2">the long and short of it</h2>
             </div>
-            <p class="bb-intro">we know our beanies are busy, so here are the key points from this post:</p>
+            <p class="bb-intro">we know our families are busy, so here's the beanie breakdown</p>
             <ul class="bb-list">
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">what we built</span><p class="bb-text">the <strong>beanie wall</strong>: a family calendar and chore board that runs on a tablet you already own.</p></div>
               </li>
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">how it helps you</span><p class="bb-text">everyone sees the week and ticks off their own chores, so you stop being the family's reminder service.</p></div>
               </li>
               <li class="bb-item">
-                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <img class="bb-bean" src="../../packages/brand/assets/shared/beanies_small_bean_favicon_100x100.png" alt="" width="22" height="22">
                 <div><span class="bb-role">where to find it</span><p class="bb-text"><span class="bb-path">Settings › Beanie Wall</span> on the tablet.</p></div>
               </li>
             </ul>
@@ -229,8 +215,8 @@ code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 
   <div class="opt">
     <h2>Why it looks like this</h2>
     <ul>
-      <li>The bullets are beans. That is the one playful touch; everything else stays quiet.</li>
-      <li>Each bullet carries its role (what / how it helps / where) in small italic, so readers learn to jump straight to "where to find it".</li>
+      <li>Each bullet is the beanie face from the site favicon: an existing brand mark, and the one playful touch.</li>
+      <li>Each bullet carries its role (what / how it helps / where) in the site's small-caps label style, so readers learn to jump straight to "where to find it". Italics stay reserved for the Fraunces voice lines (subtitle, intro, lead paragraph).</li>
       <li>The app path is drawn as a chip, because it's the line people act on.</li>
       <li>The colour comes from the issue's tint, so the box belongs to that issue instead of looking like a generic callout.</li>
     </ul>
@@ -238,7 +224,7 @@ code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 
   <div class="opt">
     <h2>How it's built</h2>
     <ul>
-      <li>Frontmatter <code>beanieBullets:</code>, a 3-item tuple in the Zod schema: the build fails on 2 or 4.</li>
+      <li>Frontmatter <code>longAndShort:</code>, a 3-item tuple in the Zod schema: the build fails on 2 or 4.</li>
       <li>The layout renders the box, not the markdown, so the drop cap on the first paragraph still lands on the story.</li>
       <li>No field, no box: story posts (aloe vera, Japan) stay as they are.</li>
       <li>Plain <code>&lt;ul&gt;</code> HTML near the top of the page, which AI crawlers can quote directly.</li>
