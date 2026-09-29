@@ -182,6 +182,18 @@ describe('toCreateTodoInput', () => {
     });
   });
 
+  it('carries an activity link only with an id, through the link writer', () => {
+    expect(
+      toCreateTodoInput({ title: 'Sign', activityId: 'series', activityDate: '2026-10-06' }, 'm-1')
+    ).toMatchObject({ activityId: 'series', activityDate: '2026-10-06' });
+    const whole = toCreateTodoInput({ title: 'Sign', activityId: 'one-off' }, 'm-1');
+    expect(whole.activityId).toBe('one-off');
+    expect(whole.activityDate).toBeUndefined();
+    // A date without an id is not a link: nothing is written.
+    const none = toCreateTodoInput({ title: 'Sign', activityDate: '2026-10-06' }, 'm-1');
+    expect(Object.keys(none).sort()).toEqual(['completed', 'createdBy', 'title']);
+  });
+
   it('drops a time that has no date', () => {
     const input = toCreateTodoInput({ title: 'Call', dueTime: '09:30' }, 'm-1');
     expect(input).not.toHaveProperty('dueTime');

@@ -118,9 +118,26 @@ export function createAutomergeRepository<
   }
 
   /**
+   * Split an update input into the keys to write and the keys to delete. A key explicitly
+   * set to `undefined` is DELETED from the stored entity (e.g. clearing `goalId` to unlink
+   * a goal); a key absent from the input is left untouched. Automerge rejects `undefined`,
+   * so it can never travel in the patch itself. Shared by `update` and `patchMany` so a
+   * batched clear behaves exactly like a single one.
+   */
+  function splitPatch(input: UpdateInput): {
+    patch: Record<string, unknown>;
+    deleteKeys: string[];
+  } {
+    const raw = input as Record<string, unknown>;
+    const deleteKeys = Object.keys(raw).filter((key) => raw[key] === undefined);
+    return { patch: toPlain(stripUndefined(raw)), deleteKeys };
+  }
+
+  /**
    * Apply the same patch to several entities in ONE Automerge change. An id that is absent
-   * (deleted here or on another device) is skipped, never a failure. Returns the entities
-   * that were patched, read back from the projection.
+   * (deleted here or on another device) is skipped, never a failure. A key set to
+   * `undefined` is deleted on every entity (see `splitPatch`). Returns the entities that
+   * were patched, read back from the projection.
    */
   async function patchMany(
     ids: readonly string[],
@@ -129,12 +146,13 @@ export function createAutomergeRepository<
   ): Promise<Entity[]> {
     if (!ids.length) return [];
     const now = toISODateString(new Date());
-    const cleanPatch = toPlain(stripUndefined(patch as Record<string, unknown>));
+    const { patch: cleanPatch, deleteKeys } = splitPatch(patch);
     const ops: MutationOp[] = ids.map((id) => ({
       op: 'patch',
       collection: collectionName,
       id,
       patch: cleanPatch,
+      deleteKeys,
       updatedAt: now,
       onMissing: options.onMissing,
     }));
@@ -161,16 +179,7 @@ export function createAutomergeRepository<
     if (!projectionGetById(collectionName, id)) return undefined;
 
     const now = toISODateString(new Date());
-    const rawInput = input as Record<string, unknown>;
-
-    // Keys explicitly set to undefined are deleted from the doc (e.g. clearing
-    // goalId to unlink a goal). Keys NOT present in the input are left untouched.
-    const keysToDelete: string[] = [];
-    for (const key of Object.keys(rawInput)) {
-      if (rawInput[key] === undefined) keysToDelete.push(key);
-    }
-
-    const cleanInput = toPlain(stripUndefined(rawInput));
+    const { patch: cleanInput, deleteKeys: keysToDelete } = splitPatch(input);
     // `onMissing:'skip'` tolerates the concurrent-delete TOCTOU race: the up-front
     // check passed, but a poll-merge on another device may have deleted the entity
     // before the worker applies this patch. Rather than a rejected RPC + spurious

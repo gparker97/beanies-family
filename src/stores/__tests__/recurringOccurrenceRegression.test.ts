@@ -40,7 +40,11 @@ vi.mock('@/composables/useToday', () => ({
 }));
 
 vi.mock('@/stores/listStore', () => ({
-  useListStore: () => ({ clearLinksFor: vi.fn() }),
+  useListStore: () => ({ clearLinksFor: vi.fn(), lists: [], linkListsToActivity: vi.fn() }),
+}));
+// `splitActivity` relinks session-dated to-dos (#114); none here.
+vi.mock('@/stores/todoStore', () => ({
+  useTodoStore: () => ({ todos: [], linkTodosToActivity: vi.fn() }),
 }));
 
 // Mocked so assertions don't run the real enrich/queue path (which reaches

@@ -23,8 +23,11 @@ import type { TodoItem } from '@/types/models';
 
 export const TODO_CREATE_SURFACE = 'todo-create';
 
-/** Which single-to-do surface created it: the To-Dos page's sidebar or quick-add bar, or the Nook. */
-export type TodoCreateSource = 'sidebar' | 'quick_bar' | 'nook';
+/**
+ * Which single-to-do surface created it: the To-Dos page's sidebar or quick-add bar, the Nook,
+ * or an activity's To-dos section (#114).
+ */
+export type TodoCreateSource = 'sidebar' | 'quick_bar' | 'nook' | 'activity';
 
 interface NoAuthorToast {
   titleKey: UIStringKey;
@@ -63,11 +66,13 @@ export function useTodoCreate() {
     if (!author) return null;
     const created = await todoStore.createTodo(toCreateTodoInput(fields, author));
     if (created) {
+      // `kind` only when linked: one session of a repeating activity, or the whole activity.
+      const kind = fields.activityDate ? 'session' : fields.activityId ? 'whole' : undefined;
       logEvent({
         level: 'info',
         surface: TODO_CREATE_SURFACE,
         message: 'created',
-        context: { action: 'created', detail: source },
+        context: { action: 'created', detail: source, ...(kind ? { kind } : {}) },
       });
     }
     return created;

@@ -107,12 +107,14 @@ describe('buildCopySeeds', () => {
     const seeds = build(
       source({
         linkedActivityId: 'a-1',
+        activityDate: '2026-10-01',
         linkedVacationId: 'v-1',
         dueDate: '2026-09-30',
         templateKey: 'kids-chores',
       })
     );
     expect(seeds[0].linkedActivityId).toBeUndefined();
+    expect(seeds[0].activityDate).toBeUndefined();
     expect(seeds[0].linkedVacationId).toBeUndefined();
     expect(seeds[0].dueDate).toBeUndefined();
     expect(seeds[0].templateKey).toBeUndefined();
@@ -258,6 +260,7 @@ describe('buildRecipeListSeed', () => {
     const s = seed() as Record<string, unknown>;
     expect(s.linkedRecipeId).toBe('r1');
     expect(s.linkedActivityId).toBeUndefined();
+    expect(s.activityDate).toBeUndefined();
     expect(s.linkedVacationId).toBeUndefined();
   });
 

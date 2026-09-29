@@ -139,4 +139,41 @@ describe('useDeepLinkParam', () => {
     expect(opened).toEqual([]);
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
+
+  describe('companions (#114)', () => {
+    function mountWithCompanion() {
+      const calls: Array<{ id: string; extras: Record<string, string> }> = [];
+      const Harness = defineComponent({
+        setup() {
+          useDeepLinkParam({
+            param: 'activity',
+            companions: ['date'],
+            open: (id, extras) => {
+              calls.push({ id, extras });
+              return true;
+            },
+            ready: () => 1,
+          });
+          return () => null;
+        },
+      });
+      mount(Harness);
+      return calls;
+    }
+
+    it('hands the companion to open and clears it with the main param', async () => {
+      mockRoute.query = { activity: 'a1', date: '2026-10-10', keep: 'yes' };
+      const calls = mountWithCompanion();
+      await nextTick();
+      expect(calls[0]).toEqual({ id: 'a1', extras: { date: '2026-10-10' } });
+      expect(mockRouter.replace).toHaveBeenCalledWith({ query: { keep: 'yes' } });
+    });
+
+    it('passes empty extras when the companion is absent', async () => {
+      mockRoute.query = { activity: 'a1' };
+      const calls = mountWithCompanion();
+      await nextTick();
+      expect(calls[0]).toEqual({ id: 'a1', extras: {} });
+    });
+  });
 });

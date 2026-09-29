@@ -6,7 +6,7 @@ import { useRoute } from 'vue-router';
 import { parseIntentFromQuery, useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSounds } from '@/composables/useSounds';
-import { TODO_CREATE_SURFACE, useTodoCreate } from '@/composables/useTodoCreate';
+import { TODO_CREATE_SURFACE } from '@/composables/useTodoCreate';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { matchesAssigneeFilter } from '@/utils/assignees';
 import { waitForElement } from '@/utils/waitForElement';
@@ -40,8 +40,6 @@ const { playWhoosh } = useSounds();
 const todoStore = useTodoStore();
 const familyStore = useFamilyStore();
 const authStore = useAuthStore();
-
-const { createTodoFrom } = useTodoCreate();
 
 /**
  * Arrived from the quick-add sheet's To-do tile: `useQuickAddIntent` opens the sidebar, but only
@@ -171,19 +169,9 @@ const hasAnyTodos = computed(
 );
 
 // Actions
-// Every create below is already counted: `createTodoFrom` logs the single creates, the review
-// drawer its own confirm events. The page only shows the new to-do.
-async function handleQuickAdd(payload: {
-  title: string;
-  dueDate?: string;
-  assigneeIds?: string[];
-}) {
-  const created = await createTodoFrom(payload, 'FamilyTodoPage', 'quick_bar');
-  // null: already toasted (no author, or the store failed and reported).
-  if (!created) return;
-  void revealTodo(created.id);
-}
-
+// Every create below is already counted: `createTodoFrom` logs the single creates (the quick-add
+// bar and the sidebar both go through it), the review drawer its own confirm events. The page
+// only shows the new to-do.
 function handleCreated(id: string) {
   showCreate.value = false;
   void revealTodo(id);
@@ -358,7 +346,13 @@ async function handleAcknowledge(id: string) {
     </div>
 
     <!-- Quick add bar -->
-    <QuickAddBar v-if="canEditActivities" ref="quickAddBar" @add="handleQuickAdd" />
+    <QuickAddBar
+      v-if="canEditActivities"
+      ref="quickAddBar"
+      source="quick_bar"
+      caller-tag="FamilyTodoPage"
+      @created="revealTodo($event.id)"
+    />
 
     <!-- #40: Helpful Hints — gentle auto-suggested prep to-dos, shown above the
          family's own tasks. One-tap Keep (acknowledge) or Dismiss on each row. -->

@@ -21,6 +21,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A time in a note ("walk the dog tomorrow at 10am") is now kept on the to-do.
 - The To-Dos page now has the same Add and magic beans buttons as the other pages. Add opens a sidebar for a to-do's details (who, date, time, notes), and the quick-add sheet's To-do tile opens it too. The new to-do is scrolled into view with a brief highlight.
 - After an activity is added, the calendar now moves to it, scrolls it into view and gives it a brief highlight. The "Activity Created" confirmation has a new View Activity button.
+- Every activity now shows its to-dos. Open an activity to see what goes with it, tick things off right there, or add a new to-do in one line: it is given to you and due the day before.
+- Lists can now be started from an activity: New List or From a Template, already linked. Parties and days out suggest the template that fits. A new blank list you close without adding anything is removed again, so a curious tap leaves nothing behind.
+- On a repeating activity, a to-do or list you add belongs to the session you opened. To-dos from a shared note show on every session, marked Every Session.
+- A to-do's activity chip now shows the date of its own session and opens the calendar right on it.
 
 ### Changed
 
@@ -29,6 +33,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - In beanie mode, the sidebar's share feedback link now fits on one line.
+- Adding a to-do from the To-Dos page no longer loses what you typed if saving fails, and a double press of Enter no longer adds it twice.
+- Date and person pickers inside a drawer opened on top of another drawer now appear in front instead of behind.
 - On larger phones and small tablets, the Activities header no longer draws its view toggles, people filter and buttons over the title, bell and search. A long member name in the filter no longer pushes the add button off screen.
 
 ## 2026-09-28

@@ -15,6 +15,7 @@ import {
   monthGridRange,
   weekStartOffset,
   startOfWeekYmd,
+  defaultDueBeforeEvent,
 } from '../date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -494,5 +495,29 @@ describe('startOfWeekYmd', () => {
     expect(startOfWeekYmd('2026-13-45', 1)).toBe('2026-13-45');
     expect(startOfWeekYmd('2026-02-30', 1)).toBe('2026-02-30');
     expect(startOfWeekYmd('0000-00-00', 1)).toBe('0000-00-00');
+  });
+});
+
+describe('defaultDueBeforeEvent', () => {
+  it('is the day before a future event', () => {
+    expect(defaultDueBeforeEvent('2026-10-06', '2026-09-29')).toBe('2026-10-05');
+    // Across a month boundary.
+    expect(defaultDueBeforeEvent('2026-11-01', '2026-09-29')).toBe('2026-10-31');
+  });
+
+  it('is today when the event is tomorrow (the day before IS today)', () => {
+    expect(defaultDueBeforeEvent('2026-09-30', '2026-09-29')).toBe('2026-09-29');
+  });
+
+  it('is today, never the past, when the event is today or already over', () => {
+    expect(defaultDueBeforeEvent('2026-09-29', '2026-09-29')).toBe('2026-09-29');
+    expect(defaultDueBeforeEvent('2026-09-28', '2026-09-29')).toBe('2026-09-29');
+    expect(defaultDueBeforeEvent('2026-01-01', '2026-09-29')).toBe('2026-09-29');
+  });
+
+  it('accepts full ISO strings', () => {
+    expect(defaultDueBeforeEvent('2026-10-06T10:00:00', '2026-09-29T08:00:00.000Z')).toBe(
+      '2026-10-05'
+    );
   });
 });

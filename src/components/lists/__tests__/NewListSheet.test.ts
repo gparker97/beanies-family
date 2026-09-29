@@ -8,8 +8,9 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const createFromTemplate = vi.fn(async () => ({ id: 'new-list' }));
+const createBlankList = vi.fn(async () => ({ id: 'blank-list' }));
 vi.mock('@/stores/listStore', () => ({
-  useListStore: () => ({ createFromTemplate, createList: vi.fn() }),
+  useListStore: () => ({ createFromTemplate, createBlankList }),
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ currentMember: { id: 'me' } }),
@@ -70,5 +71,74 @@ describe('NewListSheet — card holder default (#109)', () => {
     await tile(wrapper, 'lists.template.honeydo.name').trigger('click');
     expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', {});
     expect(logEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewListSheet — blank list', () => {
+  it('creates through listStore.createBlankList with the current member and category', async () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await tile(wrapper, 'lists.new.blank').trigger('click');
+    await Promise.resolve();
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'home' });
+    expect(wrapper.emitted('created')?.[0]).toEqual(['blank-list']);
+  });
+});
+
+describe('NewListSheet — caller overrides (#114)', () => {
+  const link = { linkedActivityId: 'act-1', activityDate: '2026-10-10' };
+
+  it('spreads the overrides into a template list and emits the template key', async () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, overrides: link },
+      global: { stubs },
+    });
+    await tile(wrapper, 'lists.template.honeydo.name').trigger('click');
+    await Promise.resolve();
+    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', link);
+    expect(wrapper.emitted('created')?.[0]).toEqual(['new-list', 'honey-do']);
+  });
+
+  it('keeps the card holder as owner alongside the link', async () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, overrides: link },
+      global: { stubs },
+    });
+    await tile(wrapper, 'lists.template.grocery.name').trigger('click');
+    expect(createFromTemplate).toHaveBeenCalledWith('grocery', 'me', {
+      ownerId: 'sofia',
+      ...link,
+    });
+  });
+
+  it('spreads the overrides into a blank list', async () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, overrides: link },
+      global: { stubs },
+    });
+    await tile(wrapper, 'lists.new.blank').trigger('click');
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'home', ...link });
+  });
+});
+
+describe('NewListSheet — suggested template (#114)', () => {
+  function templateTiles(wrapper: ReturnType<typeof mount>) {
+    return wrapper.findAll('button').filter((b) => b.text().includes('lists.template.'));
+  }
+
+  it('lists the suggested template first with a badge', () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, suggestedTemplateKey: 'party-prep' },
+      global: { stubs },
+    });
+    const tiles = templateTiles(wrapper);
+    expect(tiles[0]!.text()).toContain('lists.template.partyPrep.name');
+    expect(tiles[0]!.find('[data-testid="suggested-badge"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="suggested-badge"]')).toHaveLength(1);
+  });
+
+  it('keeps the default order and no badge without a suggestion', () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    expect(templateTiles(wrapper)[0]!.text()).toContain('lists.template.grocery.name');
+    expect(wrapper.find('[data-testid="suggested-badge"]').exists()).toBe(false);
   });
 });

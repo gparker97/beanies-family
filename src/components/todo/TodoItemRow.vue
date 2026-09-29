@@ -11,6 +11,8 @@ import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
+import EverySessionTag from '@/components/ui/EverySessionTag.vue';
+import type { SessionLinkScope } from '@/utils/activityLinks';
 import type { FamilyMember, TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -20,8 +22,14 @@ const props = withDefaults(
   defineProps<{
     todo: TodoItem;
     compact?: boolean;
+    /**
+     * Set when the row is drawn inside its own activity (#114): the chip back to that activity
+     * is hidden, and `'every-session'` (linked to the whole of a repeating activity) shows the
+     * "Every Session" tag instead.
+     */
+    activityScope?: SessionLinkScope;
   }>(),
-  { compact: false }
+  { compact: false, activityScope: undefined }
 );
 
 const emit = defineEmits<{
@@ -36,6 +44,8 @@ const emit = defineEmits<{
 }>();
 
 const isSomeday = computed(() => !!props.todo.someday);
+/** A done to-do (an activity's To-dos section lists them under "Done", #114). */
+const isDone = computed(() => !!props.todo.completed);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
 const isDueToday = computed(() => isTodoDueToday(props.todo));
 // #40: `isHintRow` = any hint (drives the persistent subtle marker). `isFreshHint`
@@ -93,6 +103,8 @@ const containerClass = computed(() => {
 });
 
 const checkboxClass = computed(() => {
+  // Filled controls keep the true brand colour with white ink in both themes.
+  if (isDone.value) return 'border-[#27ae60] bg-[#27ae60] text-white';
   if (isSomeday.value)
     return 'border-[var(--color-sky-silk-300)] hover:bg-[var(--tint-silk-20)] dark:border-sky-400/70';
   if (!isHintRow.value && isOverdue.value)
@@ -108,7 +120,8 @@ const actionPillStyle = computed(() => {
 });
 
 const formattedDate = computed(() => {
-  if (!props.todo.dueDate) return null;
+  // A done to-do's due date no longer matters (and never reads as overdue).
+  if (isDone.value || !props.todo.dueDate) return null;
   return formatNookDate(props.todo.dueDate);
 });
 
@@ -150,14 +163,22 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
       type="button"
       class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
       :class="[compact ? '' : 'md:h-7 md:w-7', checkboxClass]"
+      :aria-pressed="isDone"
       @click.stop="emit('toggle', todo.id)"
-    />
+    >
+      <span v-if="isDone" class="text-xs font-bold" aria-hidden="true">✓</span>
+    </button>
 
     <!-- Content -->
     <div class="min-w-0 flex-1" :class="compact ? '' : 'cursor-pointer'">
       <p
-        class="font-outfit text-sm font-semibold text-[var(--color-text)]"
-        :class="compact ? 'truncate' : 'md:text-base'"
+        class="font-outfit text-sm font-semibold"
+        :class="[
+          compact ? 'truncate' : 'md:text-base',
+          isDone
+            ? 'dark:text-ink-faint text-[var(--color-text-muted)] line-through'
+            : 'text-[var(--color-text)]',
+        ]"
       >
         <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
         <span v-if="isSomeday" aria-hidden="true">💭&nbsp;</span
@@ -230,13 +251,21 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
         </span>
 
         <!-- No date (full mode only; a someday row's 💭 prefix already conveys "no date") -->
-        <span v-else-if="!compact && !isSomeday" class="text-[0.625rem] opacity-35 md:text-xs">
+        <span
+          v-else-if="!compact && !isSomeday && !isDone"
+          class="dark:text-ink-faint text-[0.625rem] text-[var(--color-text-muted)] md:text-xs"
+        >
           {{ t('todo.noDateSet') }}
         </span>
 
         <!-- Linked activity (renders nothing when the activity no longer resolves; its click
              never opens the row) -->
-        <LinkedActivityChip v-if="todo.activityId" :activity-id="todo.activityId" />
+        <LinkedActivityChip
+          v-if="todo.activityId && !activityScope"
+          :activity-id="todo.activityId"
+          :activity-date="todo.activityDate"
+        />
+        <EverySessionTag v-else-if="activityScope === 'every-session'" />
 
         <!-- Assignee chips -->
         <ActivityOwnerStack :members="ownersOf(todo)" size="xs" />

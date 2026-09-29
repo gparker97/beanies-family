@@ -46,8 +46,9 @@ export interface BuildCopySeedsArgs {
  * One `CreateFamilyListInput` per owner. Pure: same inputs, same output, always.
  *
  * What is deliberately ABSENT from the seed is as load-bearing as what is present:
- * `linkedActivityId` / `linkedVacationId` (a copy of a packing list must not also be
- * attached to the original trip), `completedBy` / `completedAt`, `dueDate`, and
+ * `linkedActivityId` (and its session `activityDate`) / `linkedVacationId` (a copy of a
+ * packing list must not also be attached to the original trip), `completedBy` /
+ * `completedAt`, `dueDate`, and
  * `templateKey` (it means "which curated template seeded this", and a copy of a copy
  * was seeded by neither — carrying it would corrupt template analytics).
  */

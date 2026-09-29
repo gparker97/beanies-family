@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { useTodoCreate } from '@/composables/useTodoCreate';
+import { useTodoDraft } from '@/composables/useTodoDraft';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
@@ -13,14 +13,14 @@ import NookSectionCard from './NookSectionCard.vue';
 const { t } = useTranslation();
 const todoStore = useTodoStore();
 const familyStore = useFamilyStore();
-const { createTodoFrom } = useTodoCreate();
 
-// ── Quick-add state ─────────────────────────────────────────────────────────
-const newTaskTitle = ref('');
-const newTaskDate = ref('');
-const newTaskAssignees = ref<string[]>([]);
-/** A create in flight: a second Enter (or tap) must not add the same to-do twice. */
-const isAdding = ref(false);
+// ── Quick-add state (the draft, its double-submit guard and reset rules live in useTodoDraft)
+const {
+  title: newTaskTitle,
+  dueDate: newTaskDate,
+  assigneeIds: newTaskAssignees,
+  add: addTask,
+} = useTodoDraft({ source: 'nook', callerTag: 'NookTodoWidget' });
 
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
@@ -48,33 +48,6 @@ const selectedTodoId = ref<string | null>(null);
 const selectedTodo = computed(() =>
   selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
 );
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-function sameIds(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((id, i) => id === b.at(i));
-}
-
-async function addTask() {
-  if (isAdding.value || !newTaskTitle.value.trim()) return;
-  isAdding.value = true;
-  // What was submitted. The inputs stay editable while the create is in flight, so anything
-  // typed or picked since belongs to the NEXT to-do and must survive this one's success.
-  const submitted = {
-    title: newTaskTitle.value,
-    dueDate: newTaskDate.value,
-    assigneeIds: [...newTaskAssignees.value],
-  };
-  try {
-    const created = await createTodoFrom(submitted, 'NookTodoWidget', 'nook');
-    // null: already toasted; keep what was typed so it can be retried.
-    if (!created) return;
-    if (newTaskTitle.value === submitted.title) newTaskTitle.value = '';
-    if (newTaskDate.value === submitted.dueDate) newTaskDate.value = '';
-    if (sameIds(newTaskAssignees.value, submitted.assigneeIds)) newTaskAssignees.value = [];
-  } finally {
-    isAdding.value = false;
-  }
-}
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
