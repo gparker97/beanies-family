@@ -8,6 +8,7 @@ vi.mock('@/services/automerge/repositories/listRepository', () => ({
   createList: vi.fn(),
   updateList: vi.fn(),
   deleteList: vi.fn(),
+  patchLists: vi.fn(),
 }));
 vi.mock('@/services/automerge/repositories/listCycleRepository', () => ({
   getAllCycles: vi.fn().mockResolvedValue([]),
@@ -222,6 +223,33 @@ describe('listStore', () => {
     expect(cycleRepo.deleteListWithCycles).not.toHaveBeenCalled();
   });
 
+  describe('discardIfUntouched (#114)', () => {
+    it('discards a list with no items that was never edited', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'x' })];
+      projection.lists = [list({ id: 'x' })];
+      expect(await store.discardIfUntouched('x')).toBe('discarded');
+      expect(cycleRepo.deleteListWithCycles).toHaveBeenCalledWith('x');
+    });
+
+    it('keeps a list with an item, or one edited since it was created', async () => {
+      const store = useListStore();
+      store.lists = [
+        list({ id: 'with-item', items: [item({ id: 'i1' })] }),
+        list({ id: 'renamed', updatedAt: '2026-06-01T00:00:05.000Z' }),
+      ];
+      expect(await store.discardIfUntouched('with-item')).toBe('kept');
+      expect(await store.discardIfUntouched('renamed')).toBe('kept');
+      expect(cycleRepo.deleteListWithCycles).not.toHaveBeenCalled();
+    });
+
+    it('reports gone for a list already deleted', async () => {
+      const store = useListStore();
+      store.lists = [];
+      expect(await store.discardIfUntouched('x')).toBe('gone');
+    });
+  });
+
   it('toggleItem files a one-off list when the last item is checked and celebrates once', async () => {
     const store = useListStore();
     const l = list({
@@ -401,8 +429,106 @@ describe('listStore', () => {
     expect(store.lists.find((l) => l.id === 'a')!.linkedVacationId).toBeUndefined();
     expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBe('act1'); // untouched
 
+    vi.mocked(listRepo.patchLists).mockImplementation(async (ids, input) =>
+      store.lists
+        .filter((x) => ids.includes(x.id))
+        .map((x) => ({ ...x, ...(input as Partial<FamilyList>) }) as FamilyList)
+    );
     await store.clearLinksFor('activity', 'act1');
     expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBeUndefined();
+    // ONE batched write for the activity branch, id + session date cleared together.
+    expect(listRepo.patchLists).toHaveBeenCalledTimes(1);
+    expect(listRepo.patchLists).toHaveBeenCalledWith(
+      ['b'],
+      { linkedActivityId: undefined, activityDate: undefined },
+      { onMissing: 'skip' }
+    );
+  });
+
+  describe('activity links (#114)', () => {
+    const patchEcho = () =>
+      vi.mocked(listRepo.patchLists).mockImplementation(async (ids, input) =>
+        useListStore()
+          .lists.filter((x) => ids.includes(x.id))
+          .map((x) => ({ ...x, ...(input as Partial<FamilyList>) }) as FamilyList)
+      );
+
+    it('linkListsToActivity writes the id and session date together in one batch', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'a', linkedActivityId: 'old', activityDate: '2026-10-06' })];
+      patchEcho();
+
+      const linked = await store.linkListsToActivity(['a', 'gone'], { activityId: 'act-2' });
+
+      expect(listRepo.patchLists).toHaveBeenCalledWith(
+        ['a', 'gone'],
+        { linkedActivityId: 'act-2', activityDate: undefined },
+        { onMissing: 'skip' }
+      );
+      const patch = vi.mocked(listRepo.patchLists).mock.calls[0]![1];
+      expect(Object.keys(patch).sort()).toEqual(['activityDate', 'linkedActivityId']);
+      expect(linked).toHaveLength(1);
+      expect(store.lists[0]!.linkedActivityId).toBe('act-2');
+    });
+
+    it('linkListsToActivity with no ids writes nothing', async () => {
+      expect(await useListStore().linkListsToActivity([], null)).toEqual([]);
+      expect(listRepo.patchLists).not.toHaveBeenCalled();
+    });
+
+    it('linkListsToActivity returns null on a failed write and leaves the lists', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'a', linkedActivityId: 'act-1' })];
+      vi.mocked(listRepo.patchLists).mockRejectedValue(new Error('write failed'));
+
+      expect(await store.linkListsToActivity(['a'], null)).toBeNull();
+      expect(store.lists[0]!.linkedActivityId).toBe('act-1');
+    });
+
+    it('listsForActivitySession returns the session and every-session lists of a series', () => {
+      const store = useListStore();
+      store.lists = [
+        list({ id: 'whole', linkedActivityId: 'series' }),
+        list({ id: 'this', linkedActivityId: 'series', activityDate: '2026-10-06' }),
+        list({ id: 'next', linkedActivityId: 'series', activityDate: '2026-10-13' }),
+        list({ id: 'none' }),
+      ];
+      const master = { id: 'series', date: '2026-09-01', recurrence: 'weekly' } as never;
+
+      expect(
+        store.listsForActivitySession(master, '2026-10-06').map((m) => [m.item.id, m.scope])
+      ).toEqual([
+        ['whole', 'every-session'],
+        ['this', 'session'],
+      ]);
+    });
+
+    it('createBlankList seeds a one-off list and spreads overrides last', async () => {
+      const store = useListStore();
+      vi.mocked(listRepo.createList).mockImplementation(
+        async (input) => ({ ...list(), ...input, id: 'new' }) as FamilyList
+      );
+
+      await store.createBlankList('m-1', {
+        category: 'out',
+        linkedActivityId: 'series',
+        activityDate: '2026-10-06',
+      });
+
+      expect(listRepo.createList).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'lists.new.blankTitle',
+          category: 'out',
+          ownerId: 'm-1',
+          createdBy: 'm-1',
+          items: [],
+          lifecycle: 'oneoff',
+          completed: false,
+          linkedActivityId: 'series',
+          activityDate: '2026-10-06',
+        })
+      );
+    });
   });
 
   it('loadLists surfaces a repo failure via wrapAsync (returns no throw, error set)', async () => {

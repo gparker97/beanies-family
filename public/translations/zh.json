@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-29",
-    "translationCount": 5608
+    "translationCount": 5620
   },
   "translations": {
     "app.name": {
@@ -3137,7 +3137,7 @@
       "lastUpdated": "2026-09-29"
     },
     "todo.newTask": {
-      "translation": "新建待办@ info",
+      "translation": "新建待办",
       "hash": "1cjd7n",
       "lastUpdated": "2026-09-29"
     },
@@ -3152,7 +3152,7 @@
       "lastUpdated": "2026-09-29"
     },
     "todo.deleteTask": {
-      "translation": "删除待办事宜@ info",
+      "translation": "删除待办",
       "hash": "yhnq8o",
       "lastUpdated": "2026-09-29"
     },
@@ -3272,7 +3272,7 @@
       "lastUpdated": "2026-09-29"
     },
     "confirm.deleteTodoTitle": {
-      "translation": "删除待办事宜@ info",
+      "translation": "删除待办",
       "hash": "yhnq8o",
       "lastUpdated": "2026-09-29"
     },
@@ -27616,6 +27616,36 @@
       "hash": "jvx7ts",
       "lastUpdated": "2026-09-29"
     },
+    "activityTodos.title": {
+      "translation": "待办",
+      "hash": "tjfroq",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityTodos.openCount": {
+      "translation": "{count} 项未完成",
+      "hash": "sxgdq9",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityTodos.done": {
+      "translation": "已完成",
+      "hash": "19s4i",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityTodos.addPlaceholder": {
+      "translation": "添加待办",
+      "hash": "tffa4f",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityTodos.addSessionPlaceholder": {
+      "translation": "为这次活动添加待办",
+      "hash": "fjdzp0",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityTodos.linksToSession": {
+      "translation": "关联到 {date} 这次活动",
+      "hash": "ilbiwn",
+      "lastUpdated": "2026-09-29"
+    },
     "todo.addTodo": {
       "translation": "添加待办事项",
       "hash": "8imzry",
@@ -27639,6 +27669,36 @@
     "todo.magicHint": {
       "translation": "捕捉备注、列表或学校电子邮件",
       "hash": "x3jt1g",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityLists.section": {
+      "translation": "清单",
+      "hash": "17puut",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityLists.newList": {
+      "translation": "+ 新建清单",
+      "hash": "7yohfx",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityLists.fromTemplate": {
+      "translation": "从模板创建",
+      "hash": "idvslr",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityLists.empty": {
+      "translation": "还没有清单",
+      "hash": "b85gta",
+      "lastUpdated": "2026-09-29"
+    },
+    "lists.new.suggested": {
+      "translation": "建议",
+      "hash": "wo0v0d",
+      "lastUpdated": "2026-09-29"
+    },
+    "activityLinks.everySession": {
+      "translation": "每次活动",
+      "hash": "jgt8wh",
       "lastUpdated": "2026-09-29"
     },
     "planner.viewCreatedActivity": {
@@ -27712,7 +27772,7 @@
       "lastUpdated": "2026-09-29"
     },
     "magicTodos.title": {
-      "translation": "這 就是 我們 所 發現 的 。",
+      "translation": "这是我们发现的内容",
       "hash": "bj6c8o",
       "lastUpdated": "2026-09-29"
     },
@@ -27762,7 +27822,7 @@
       "lastUpdated": "2026-09-29"
     },
     "magicTodos.next": {
-      "translation": "下一頁",
+      "translation": "下一步",
       "hash": "1fytv",
       "lastUpdated": "2026-09-29"
     },
@@ -27962,12 +28022,12 @@
       "lastUpdated": "2026-09-29"
     },
     "whoOwnsWhat.board.showSkipped": {
-      "translation": "顯示",
+      "translation": "显示",
       "hash": "1j7rx",
       "lastUpdated": "2026-09-29"
     },
     "whoOwnsWhat.board.hideSkipped": {
-      "translation": "隱藏",
+      "translation": "隐藏",
       "hash": "1c7du",
       "lastUpdated": "2026-09-29"
     },

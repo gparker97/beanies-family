@@ -347,15 +347,74 @@ describe('todoStore: batch actions (magic beans shared result)', () => {
       todo({ id: 'b', activityId: 'act-1' }),
     ]);
 
-    const linked = await store.linkTodosToActivity(['a', 'b', 'gone'], 'act-1');
+    const linked = await store.linkTodosToActivity(['a', 'b', 'gone'], { activityId: 'act-1' });
 
+    // Both keys always travel: `activityDate: undefined` deletes any stale session date.
+    const patch = vi.mocked(todoRepo.patchTodos).mock.calls[0]![1];
+    expect(Object.keys(patch).sort()).toEqual(['activityDate', 'activityId']);
     expect(todoRepo.patchTodos).toHaveBeenCalledWith(
       ['a', 'b', 'gone'],
-      { activityId: 'act-1' },
+      { activityId: 'act-1', activityDate: undefined },
       { onMissing: 'skip' }
     );
     expect(linked).toHaveLength(2);
     expect(store.todos.map((t) => t.activityId)).toEqual(['act-1', 'act-1', undefined]);
+  });
+
+  it('linkTodosToActivity(null) clears the id and the session date together', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'a', activityId: 'act-1', activityDate: '2026-10-06' })];
+    vi.mocked(todoRepo.patchTodos).mockResolvedValue([todo({ id: 'a' })]);
+
+    await store.linkTodosToActivity(['a'], null);
+
+    const patch = vi.mocked(todoRepo.patchTodos).mock.calls[0]![1] as Record<string, unknown>;
+    expect('activityId' in patch && 'activityDate' in patch).toBe(true);
+    expect(patch.activityId).toBeUndefined();
+    expect(patch.activityDate).toBeUndefined();
+  });
+
+  it('todosForActivitySession: session + every-session items, open by due date, done newest first', () => {
+    const store = useTodoStore();
+    const master = {
+      id: 'series',
+      date: '2026-10-06',
+      recurrence: 'weekly',
+    } as unknown as import('@/types/models').FamilyActivity;
+    store.todos = [
+      todo({ id: 'undated', activityId: 'series', activityDate: '2026-10-06' }),
+      todo({ id: 'late', activityId: 'series', dueDate: '2026-10-05' }),
+      todo({
+        id: 'early',
+        activityId: 'series',
+        activityDate: '2026-10-06',
+        dueDate: '2026-10-01',
+      }),
+      todo({ id: 'other-session', activityId: 'series', activityDate: '2026-10-13' }),
+      todo({ id: 'other-activity', activityId: 'else' }),
+      todo({
+        id: 'done-old',
+        activityId: 'series',
+        completed: true,
+        completedAt: '2026-10-01T00:00:00.000Z',
+      }),
+      todo({
+        id: 'done-new',
+        activityId: 'series',
+        activityDate: '2026-10-06',
+        completed: true,
+        completedAt: '2026-10-03T00:00:00.000Z',
+      }),
+    ];
+
+    const { open, done } = store.todosForActivitySession(master, '2026-10-06');
+
+    expect(open.map((o) => [o.item.id, o.scope])).toEqual([
+      ['early', 'session'],
+      ['late', 'every-session'],
+      ['undated', 'session'],
+    ]);
+    expect(done.map((d) => d.item.id)).toEqual(['done-new', 'done-old']);
   });
 
   it('deleteTodos removes in one batch and syncs memory', async () => {

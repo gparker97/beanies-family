@@ -39,6 +39,8 @@ export const getListById = repo.getById;
 export const createList = repo.create;
 export const updateList = repo.update;
 export const deleteList = repo.remove;
+/** Apply one patch to several lists in ONE Automerge change (see `createAutomergeRepository`). */
+export const patchLists = repo.patchMany;
 
 /**
  * Create several lists as ONE Automerge change.

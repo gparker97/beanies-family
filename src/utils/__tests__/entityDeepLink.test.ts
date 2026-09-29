@@ -32,4 +32,15 @@ describe('entityDeepLink', () => {
     expect(entityDeepLink('asset', 'x')).toEqual({ path: '/assets', query: { view: 'x' } });
     expect(entityDeepLink('member', 'x')).toEqual({ path: '/family', query: { edit: 'x' } });
   });
+
+  it('adds companion params, and the id param always wins (#114)', () => {
+    expect(entityDeepLink('activity', 'a1', { date: '2026-10-10' })).toEqual({
+      path: '/activities',
+      query: { date: '2026-10-10', activity: 'a1' },
+    });
+    expect(entityDeepLink('activity', 'a1', { activity: 'other' })).toEqual({
+      path: '/activities',
+      query: { activity: 'a1' },
+    });
+  });
 });

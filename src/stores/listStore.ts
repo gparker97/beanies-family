@@ -13,6 +13,8 @@ import { list as projectionList } from '@/services/automerge/projection';
 import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/listLifecycle';
 import { buildCopySeeds, freshItems } from '@/utils/listSeed';
 import { getListTemplateByKey } from '@/constants/listTemplates';
+import { getListCategory } from '@/constants/listCategories';
+import { itemsForSession, listLink, listLinkPatch, type ActivityLink } from '@/utils/activityLinks';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -30,6 +32,7 @@ import type {
   UpdateFamilyListInput,
   ListCategory,
   ListLifecycle,
+  FamilyActivity,
 } from '@/types/models';
 
 /**
@@ -449,9 +452,34 @@ export const useListStore = defineStore('lists', () => {
         lists.value = [...lists.value, list];
         return list;
       },
-      { action: 'listStore:createList' }
+      { action: 'listStore:createList', surface: 'lists' }
     );
     return trackFeature(result ?? null, 'list');
+  }
+
+  /**
+   * Create a blank one-off list. `memberId` becomes the creator and the default owner;
+   * `overrides` are spread last (a category, an owner, an activity link via `listLinkPatch`).
+   * The emoji follows the (overridden) category. Mirrors `createFromTemplate`. `null` has
+   * already been toasted and reported by `createList`.
+   */
+  async function createBlankList(
+    memberId: string,
+    overrides: Partial<CreateFamilyListInput> = {}
+  ): Promise<FamilyList | null> {
+    const category = overrides.category ?? 'home';
+    return createList({
+      title: useTranslationStore().t('lists.new.blankTitle'),
+      // Read, not hardcoded: `getListCategory` is nullable, the fallback unreachable by construction.
+      emoji: getListCategory(category)?.emoji ?? '📝',
+      category,
+      ownerId: memberId,
+      items: [],
+      lifecycle: 'oneoff',
+      completed: false,
+      createdBy: memberId,
+      ...overrides,
+    });
   }
 
   /**
@@ -467,7 +495,17 @@ export const useListStore = defineStore('lists', () => {
     overrides: Partial<CreateFamilyListInput> = {}
   ): Promise<FamilyList | null> {
     const tmpl = getListTemplateByKey(key);
-    if (!tmpl) return null;
+    if (!tmpl) {
+      // Only reachable through a stale key (templates are picked from the same table), so
+      // it is a code defect, not a user error: log it loudly rather than returning quietly.
+      logEvent({
+        level: 'error',
+        surface: 'lists',
+        message: 'template_unknown',
+        context: { action: 'template_unknown', kind: key },
+      });
+      return null;
+    }
     const translate = useTranslationStore();
     const seed: CreateFamilyListInput = {
       title: translate.t(tmpl.nameKey),
@@ -657,6 +695,23 @@ export const useListStore = defineStore('lists', () => {
       { action: 'listStore:deleteList' }
     );
     return result ?? null;
+  }
+
+  /**
+   * Discard a blank list that was created up front (so it could open straight away) and
+   * then closed without being touched: no items, and never edited since it was created
+   * (`updatedAt` still equals `createdAt`; every edit restamps it). Anything else is kept.
+   *
+   * @returns `discarded` · `kept` (touched) · `gone` (already deleted, e.g. from inside the
+   *   list) · `failed` (`deleteList` threw; `wrapAsync` has already toasted and reported).
+   */
+  async function discardIfUntouched(id: string): Promise<'discarded' | 'kept' | 'gone' | 'failed'> {
+    const list = lists.value.find((l) => l.id === id);
+    if (!list) return 'gone';
+    if (list.items.length > 0 || list.updatedAt !== list.createdAt) return 'kept';
+    const result = await deleteList(id);
+    if (result === true) return 'discarded';
+    return result === false ? 'gone' : 'failed';
   }
 
   /**
@@ -944,13 +999,52 @@ export const useListStore = defineStore('lists', () => {
    * after the parent has already atomically gone. Do not "fix" the asymmetry.
    */
   async function clearLinksFor(kind: 'trip' | 'activity', id: string): Promise<void> {
+    if (kind === 'activity') {
+      // ONE batched write that clears the id AND any session date, reported via `wrapAsync`.
+      const ids = lists.value.filter((l) => l.linkedActivityId === id).map((l) => l.id);
+      await linkListsToActivity(ids, null);
+      return;
+    }
     for (const l of lists.value) {
-      if (kind === 'trip' && l.linkedVacationId === id) {
+      if (l.linkedVacationId === id) {
         await updateList(l.id, { linkedVacationId: undefined });
-      } else if (kind === 'activity' && l.linkedActivityId === id) {
-        await updateList(l.id, { linkedActivityId: undefined });
       }
     }
+  }
+
+  /**
+   * Link (or, for `null`, unlink) lists to an activity in ONE write, always writing the id and
+   * the session date together (`listLinkPatch`). A list deleted meanwhile (here or on another
+   * device) is skipped, never a failure. Returns the patched lists, or `null` when the write
+   * failed (already toasted + reported by `wrapAsync`). Mirrors `todoStore.linkTodosToActivity`.
+   */
+  async function linkListsToActivity(
+    ids: readonly string[],
+    link: ActivityLink | null
+  ): Promise<FamilyList[] | null> {
+    if (!ids.length) return [];
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const patched = await listRepo.patchLists(ids, listLinkPatch(link), {
+          onMissing: 'skip',
+        });
+        const byId = new Map(patched.map((l) => [l.id, l]));
+        lists.value = lists.value.map((l) => byId.get(l.id) ?? l);
+        return patched;
+      },
+      { action: 'listStore:linkListsToActivity', surface: 'lists' }
+    );
+    return result ?? null;
+  }
+
+  /**
+   * The lists that belong to `activity`'s `sessionYmd` session, with their scope
+   * (`'every-session'` = linked to the whole of a repeating activity). See `utils/activityLinks`.
+   */
+  function listsForActivitySession(activity: FamilyActivity, sessionYmd: string) {
+    return itemsForSession(lists.value, listLink, activity, sessionYmd);
   }
 
   /**
@@ -1103,10 +1197,12 @@ export const useListStore = defineStore('lists', () => {
     // Actions
     loadLists,
     createList,
+    createBlankList,
     createFromTemplate,
     copyListForMembers,
     updateList,
     deleteList,
+    discardIfUntouched,
     toggleItem,
     addItem,
     removeItem,
@@ -1117,6 +1213,8 @@ export const useListStore = defineStore('lists', () => {
     setLifecycle,
     setAllItemsCompleted,
     clearLinksFor,
+    linkListsToActivity,
+    listsForActivitySession,
     reconcileRecurringLists,
     resetState,
   };

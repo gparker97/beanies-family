@@ -722,6 +722,12 @@ export interface TodoItem {
    * so every reader resolves it against `activityStore` and ignores a miss.
    */
   activityId?: UUID;
+  /**
+   * The session of a repeating activity this links to. Absent = the whole activity. Set only
+   * when the link targets a repeating series' generated session. Always written together with
+   * the id (see `utils/activityLinks.ts`).
+   */
+  activityDate?: ISODateString; // YYYY-MM-DD
 }
 
 /** Helpful Hints (#40) — the closed set of rule-based hint triggers. */
@@ -965,6 +971,12 @@ export interface FamilyList {
   lastResetDate?: ISODateString; // recurring bookkeeping (last auto-reset day)
   cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
   linkedActivityId?: UUID; // optional attach to an activity
+  /**
+   * The session of a repeating activity this links to. Absent = the whole activity. Set only
+   * when the link targets a repeating series' generated session. Always written together with
+   * the id (see `utils/activityLinks.ts`).
+   */
+  activityDate?: ISODateString; // YYYY-MM-DD
   linkedVacationId?: UUID; // optional attach to a trip
   /**
    * The recipe this shopping list was built from (#88).

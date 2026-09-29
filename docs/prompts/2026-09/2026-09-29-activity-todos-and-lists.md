@@ -16,6 +16,8 @@ tags: [activities, todos, lists, recurring, magic-beans, mockup]
 - **2026-09-29** Mockup: "open as a claude artifact" -> https://claude.ai/artifact/VEQrGsHvUMBF2MCw3y5uu4; chose "A: two stacked sections" (`docs/mockups/activity-todos-and-lists-2026-09-29.html`).
 - **2026-09-29** Plan approved (4 passes). "go ahead and build with /beanies-build-auto"
 
+- **2026-09-29** (mid-build) "1) I don't see a way to create a list or todo when creating or editing an activity, but i can see it from the 'view' activity modal. is this expected? ... 2) When creating a list from an activity view, it seems the list gets created and saved immediately, even if no items are added. Is this expected? ... Perhaps we can avoid saving/linking the list until the list is saved (or at least one item is added, etc?) What are your thoughts?"
+
 ## Outcome
 
-_In progress._
+Built, browser-verified and reviewed (2 rounds) via `/beanies-build-auto`; not committed, not deployed (ships with #113). See the plan's Outcome section.

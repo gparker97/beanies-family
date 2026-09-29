@@ -7,6 +7,11 @@
  * on another device), so this resolves it against `activityStore` and renders NOTHING on a
  * miss. There is never a dangling chip.
  *
+ * A session link (`activityDate`, #114) resolves through `activityStore.resolveActivityLink`,
+ * the same rule the activity drawer uses to list its items: an edited session resolves to its
+ * own record, a cancelled one to nothing (no chip). The label shows that session's date and a
+ * tap opens the drawer on that session (`?activity=<id>&date=<ymd>`).
+ *
  * Two looks from the approved mockup: `chip` (the to-do row's metadata line) and `row` (the
  * "Linked Activity" field in To-do Details). Both carry the activity's own icon rather than
  * 📅, so the chip never reads as the to-do's due date beside the real one.
@@ -22,6 +27,8 @@ import { formatNookDate, formatTime12 } from '@/utils/date';
 const props = withDefaults(
   defineProps<{
     activityId: string;
+    /** The session of a repeating activity the link targets (`TodoItem.activityDate`). */
+    activityDate?: string;
     variant?: 'chip' | 'row';
   }>(),
   { variant: 'chip' }
@@ -36,13 +43,18 @@ const { t } = useTranslation();
 const router = useRouter();
 const activityStore = useActivityStore();
 
-const activity = computed(() => activityStore.activities.find((a) => a.id === props.activityId));
+// `props` IS the link (`activityId` + optional `activityDate`), so it goes to the
+// resolver as-is rather than being rebuilt by hand.
+const resolved = computed(() => activityStore.resolveActivityLink(props));
+const activity = computed(() => resolved.value?.activity);
 
 const icon = computed(() =>
   activity.value ? (activity.value.icon ?? getActivityFallbackEmoji(activity.value.category)) : ''
 );
 
-const dateLabel = computed(() => (activity.value ? formatNookDate(activity.value.date) : ''));
+const dateLabel = computed(() =>
+  activity.value ? formatNookDate(resolved.value?.date ?? activity.value.date) : ''
+);
 
 const whenLabel = computed(() => {
   if (!activity.value) return '';
@@ -51,8 +63,11 @@ const whenLabel = computed(() => {
 });
 
 function openActivity(): void {
-  void router.push(entityDeepLink('activity', props.activityId));
-  emit('open', props.activityId);
+  const target = resolved.value;
+  if (!target) return;
+  const date = target.date;
+  void router.push(entityDeepLink('activity', target.activity.id, date ? { date } : undefined));
+  emit('open', target.activity.id);
 }
 </script>
 

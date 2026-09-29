@@ -6843,6 +6843,19 @@ const STRING_DEFS = {
     en: 'Keep track of to-dos for the whole family',
     beanie: 'what are your beanies busy with today?',
   },
+  // An activity's To-dos section (#114)
+  'activityTodos.title': { en: 'To-dos', beanie: 'to-dos' },
+  'activityTodos.openCount': { en: '{count} open', beanie: '{count} open' },
+  'activityTodos.done': { en: 'Done', beanie: 'done' },
+  'activityTodos.addPlaceholder': { en: 'Add a to-do', beanie: 'add a to-do' },
+  'activityTodos.addSessionPlaceholder': {
+    en: 'Add a to-do for this session',
+    beanie: 'add a to-do for this session',
+  },
+  'activityTodos.linksToSession': {
+    en: 'Links to the {date} session',
+    beanie: 'links to the {date} session',
+  },
   'todo.newTask': { en: 'New To-do', beanie: 'new to-do' },
   'todo.addTodo': { en: 'Add To-do', beanie: 'add to-do' },
   'todo.error.noAuthor': {
@@ -7047,8 +7060,18 @@ const STRING_DEFS = {
     en: 'No upcoming activities',
     beanie: 'no upcoming activities',
   },
+  // Activity Details Lists section (#114): start a list linked to the session being viewed.
+  'activityLists.section': { en: 'Lists', beanie: 'lists' },
+  'activityLists.newList': { en: '+ New List', beanie: '+ new list' },
+  'activityLists.fromTemplate': { en: 'From a Template', beanie: 'from a template' },
+  'activityLists.empty': { en: 'No lists yet', beanie: 'no lists yet' },
+  // The badge on the template suggested for the activity's category (NewListSheet).
+  'lists.new.suggested': { en: 'Suggested', beanie: 'suggested' },
   // Embedded linked list (rendered on a trip page or an activity drawer)
   'lists.embed.section': { en: 'Checklists', beanie: 'checklists' },
+  // Activity to-dos and lists (#114): the tag on an item linked to the whole of a repeating
+  // activity, shown on every session.
+  'activityLinks.everySession': { en: 'Every Session', beanie: 'every session' },
   'lists.embed.provenance': { en: 'Beanie list', beanie: 'beanie list' },
   'lists.embed.open': { en: 'Open list', beanie: 'open list' },
   'lists.embed.openShort': { en: 'Open', beanie: 'open' },

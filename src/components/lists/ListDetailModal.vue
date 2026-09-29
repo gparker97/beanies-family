@@ -337,8 +337,10 @@ function linkTrip(id: string): void {
   if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: id });
   editingLink.value = null;
 }
+// Activity links are written whole (id + session date together) so relinking from here
+// never leaves a stale session date behind. The picker links the whole activity.
 function linkActivity(id: string): void {
-  if (list.value) void listStore.updateList(list.value.id, { linkedActivityId: id });
+  if (list.value) void listStore.linkListsToActivity([list.value.id], { activityId: id });
   editingLink.value = null;
 }
 const shortDate = (d?: string): string => (d ? formatDateShort(d) : '');
@@ -346,7 +348,7 @@ function unlinkTrip(): void {
   if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: undefined });
 }
 function unlinkActivity(): void {
-  if (list.value) void listStore.updateList(list.value.id, { linkedActivityId: undefined });
+  if (list.value) void listStore.linkListsToActivity([list.value.id], null);
 }
 
 async function handleDelete(): Promise<void> {

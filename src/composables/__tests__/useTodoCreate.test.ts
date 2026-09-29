@@ -78,6 +78,31 @@ describe('useTodoCreate', () => {
     });
   });
 
+  it('links the to-do and tags the count with its link kind when created from an activity', async () => {
+    const { createTodoFrom } = useTodoCreate();
+    await createTodoFrom(
+      { title: 'Sign the form', activityId: 'series', activityDate: '2026-10-06' },
+      'ActivityTodos',
+      'activity'
+    );
+    expect(createTodo).toHaveBeenCalledWith(
+      expect.objectContaining({ activityId: 'series', activityDate: '2026-10-06' })
+    );
+    expect(vi.mocked(logEvent).mock.calls[0]![0].context).toEqual({
+      action: 'created',
+      detail: 'activity',
+      kind: 'session',
+    });
+
+    vi.mocked(logEvent).mockClear();
+    await createTodoFrom({ title: 'Kit', activityId: 'one-off' }, 'ActivityTodos', 'activity');
+    expect(vi.mocked(logEvent).mock.calls[0]![0].context).toEqual({
+      action: 'created',
+      detail: 'activity',
+      kind: 'whole',
+    });
+  });
+
   it('writes nothing and returns null when there is no author', async () => {
     resolveOrToast.mockReturnValue(null);
     const { createTodoFrom } = useTodoCreate();

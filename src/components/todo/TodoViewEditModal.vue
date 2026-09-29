@@ -18,6 +18,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import LinkList from '@/components/ui/LinkList.vue';
 import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
+import { todoLink } from '@/utils/activityLinks';
 import { extractUrls } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
@@ -28,6 +29,10 @@ type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description
 
 const props = defineProps<{
   todo: TodoItem | null;
+  /** Opened over another drawer (e.g. an activity's, #114): sits on the overlay layer. */
+  stacked?: boolean;
+  /** Opened from inside the linked activity itself: hide the row pointing back at it. */
+  hideActivityLink?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -170,13 +175,13 @@ const viewFormattedDate = computed(() => {
 });
 
 // The field hides with the chip: `activityId` is a soft reference that may point at a
-// deleted activity.
+// deleted activity or a cancelled session. Same resolver as the chip, so the label and
+// its body can never disagree (#114).
 const activityStore = useActivityStore();
-const linkedActivityShown = computed(
-  () =>
-    !!todo.value?.activityId &&
-    activityStore.activities.some((a) => a.id === todo.value!.activityId)
-);
+const linkedActivityShown = computed(() => {
+  const link = todo.value ? todoLink(todo.value) : null;
+  return !props.hideActivityLink && !!link && !!activityStore.resolveActivityLink(link);
+});
 
 // Detected links from title + description (rendered, with safe hrefs, by LinkList)
 const detectedLinks = computed(() => {
@@ -271,6 +276,7 @@ async function handleDelete() {
     v-if="todo"
     variant="drawer"
     :open="true"
+    :layer="stacked ? 'overlay' : 'base'"
     :title="t('todo.viewTask')"
     icon="✅"
     icon-bg="var(--tint-purple-12)"
@@ -545,7 +551,12 @@ async function handleDelete() {
       <!-- Linked activity (magic beans shared result). LinkedActivityChip renders nothing
            when the activity no longer resolves, so the field hides with it. -->
       <FormFieldGroup v-if="linkedActivityShown" :label="t('todo.linkedActivity')">
-        <LinkedActivityChip :activity-id="todo.activityId!" variant="row" @open="handleClose" />
+        <LinkedActivityChip
+          :activity-id="todo.activityId!"
+          :activity-date="todo.activityDate"
+          variant="row"
+          @open="handleClose"
+        />
       </FormFieldGroup>
 
       <!-- Detected links -->

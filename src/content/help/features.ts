@@ -914,6 +914,38 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'See and add to-dos from the activity',
+        level: 3,
+        id: 'add-from-activity',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Open any activity in the planner and its <strong>To-dos</strong> section lists everything linked to it, open ones first. Tick one off right there, or tap it to see the details. Ticking works from either place: the To-Dos page and the activity always agree.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the activity in the planner',
+          'Type the to-do in the <strong>Add a To-do</strong> row under To-dos',
+          'Press Enter. It is linked to the activity straight away',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A new to-do is given to you and due the day before the activity (or today, if that day has already passed). Change either one in the add row before you press Enter.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'On a repeating activity, a to-do you add belongs to the session you opened: add \u201Cbring orange slices\u201D on Saturday the 10th and it shows on that Saturday only. To-dos that came from a shared note belong to the whole activity, so they show on every session with an <strong>Every Session</strong> tag. Deleting a single session never deletes its to-dos; they stay on your To-Dos page.',
+        title: 'Repeating activities',
+        icon: '\u{1F501}',
+      },
+      {
+        type: 'heading',
         content: 'To-dos on the Family Nook',
         level: 2,
         id: 'nook-integration',
@@ -1619,6 +1651,16 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'You can link to your upcoming trips and activities. To remove a link later, open the list and tap <strong>Unlink</strong>.',
         title: 'Good to know',
         icon: '\u{1F517}',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can also start a list from the activity itself. Open the activity and, under <strong>Lists</strong>, tap <strong>+ New List</strong> for a blank one or <strong>From a Template</strong> to pick a ready-made list. Either way it is linked to the activity and opens so you can fill it in. A blank list you close without adding anything is removed again. For a party or a day out, the template that fits best is marked <strong>Suggested</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On a repeating activity, a list you start this way belongs to the session you opened, the same as a to-do. A list linked to the whole activity shows on every session with an <strong>Every Session</strong> tag.',
       },
 
       { type: 'heading', content: 'History for repeating lists', level: 2, id: 'history' },
