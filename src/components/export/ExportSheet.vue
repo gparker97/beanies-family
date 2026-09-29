@@ -124,6 +124,12 @@ withDefaults(
   font-weight: 800;
   letter-spacing: -0.01em;
   margin: 0;
+
+  /* Header text never wraps. If the fonts could not be embedded (offline, a blocked fetch),
+     html-to-image draws the text in a fallback face inside boxes measured for the real one;
+     wrapping there scrambled the header into two-line fragments. Overflowing into the
+     spacer's free room instead keeps it on one line. */
+  white-space: nowrap;
 }
 
 .export-accent {
@@ -131,6 +137,7 @@ withDefaults(
   font-family: Caveat, cursive;
   font-size: 22px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .export-header-compact .export-mark {
@@ -146,7 +153,9 @@ withDefaults(
   align-items: flex-end;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .export-dates-label {
