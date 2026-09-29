@@ -36,7 +36,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Adding a to-do from the To-Dos page no longer loses what you typed if saving fails, and a double press of Enter no longer adds it twice.
 - Date and person pickers inside a drawer opened on top of another drawer now appear in front instead of behind.
 - The Who Owns What fridge sheet PDF now shows its header in the right fonts on the installed app and the live site (it had fallen back to plain system fonts and wrapped onto two lines), and the Meal Planner export benefits too.
-- A long category on the fridge sheet now continues into the next column instead of shrinking the whole page, so every page fills a landscape sheet.
+- The fridge sheet now uses every column: a long category continues into the next column or onto the next page instead of shrinking the page or leaving a column blank.
 - On larger phones and small tablets, the Activities header no longer draws its view toggles, people filter and buttons over the title, bell and search. A long member name in the filter no longer pushes the add button off screen.
 
 ## 2026-09-28

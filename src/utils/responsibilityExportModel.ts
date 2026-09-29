@@ -11,10 +11,10 @@
  *    card nobody holds is drawn as a dashed write-in line. Skipped and unsorted cards are
  *    not printed (they are not in the family's deck).
  *  - `paginateExport`: blocks flow top-to-bottom through three columns, page after page, by
- *    ESTIMATED height. A category taller than the room left in its column continues into
- *    the next column of the SAME page under a "continued" header; a page break only ever
- *    falls between categories (greg, 26 + 29 Sep). An underestimate is safe:
- *    `pngBlobsToPdf` scales each page to fit and never clips.
+ *    ESTIMATED height, filling every column. A category that runs out of room continues in
+ *    the next column (or at the top of the next page) under a "continued" header (greg,
+ *    29 Sep: no blank columns). An underestimate is safe: `pngBlobsToPdf` scales each page
+ *    to fit and never clips.
  */
 import type { ExportPerson } from '@/utils/mealExportModel';
 import { groupByCategory, type ResolvedCard, type ResolvedPart } from '@/utils/responsibilityDeck';
@@ -153,78 +153,15 @@ export function estimateBlockHeight(
   return block.cards.reduce((h, card) => h + rowHeight(card, layout), layout.blockHeader);
 }
 
-/** Where a piece of a category lands: its column on the page, and the rows it carries. */
-interface Placement {
-  col: number;
-  block: ExportBlock;
-}
-
-/**
- * Lay `block` out from column `col` (with `used` px already filled) across the rest of the
- * page, one piece per column, each piece under its own header. `null` when it does not fit
- * in the columns that are left. A piece always carries at least `MIN_PIECE_ROWS` rows (or
- * the whole remainder), so a header is never stranded at the foot of a column.
- */
+/** A piece never carries fewer rows than this (unless it is the whole remainder). */
 const MIN_PIECE_ROWS = 2;
-function packAcross(
-  block: ExportBlock,
-  col: number,
-  used: number,
-  layout: ExportLayout,
-  /** Let the page's last column take whatever is left (a category taller than a page). */
-  lastColumnUnbounded = false
-): { placements: Placement[]; col: number; used: number } | null {
-  const placements: Placement[] = [];
-  let cards = block.cards;
-  let piece = 0;
-  while (cards.length) {
-    if (col >= layout.columns) return null;
-    const cap =
-      lastColumnUnbounded && col === layout.columns - 1
-        ? Number.POSITIVE_INFINITY
-        : layout.pageCapacity;
-    const gap = used ? layout.blockGap : 0;
-    let h = gap + layout.blockHeader;
-    let take = 0;
-    while (take < cards.length && used + h + rowHeight(cards[take]!, layout) <= cap) {
-      h += rowHeight(cards[take]!, layout);
-      take += 1;
-    }
-    // Too few rows fit here (and this isn't the whole remainder): start in the next column.
-    if (take < Math.min(MIN_PIECE_ROWS, cards.length)) {
-      if (used) {
-        col += 1;
-        used = 0;
-        continue;
-      }
-      take = Math.max(take, 1); // an empty column always takes something
-    }
-    placements.push({
-      col,
-      block: {
-        ...block,
-        key: piece ? `${block.key}~${piece}` : block.key,
-        cards: cards.slice(0, take),
-        ...(piece ? { continued: true } : {}),
-      },
-    });
-    used += h;
-    cards = cards.slice(take);
-    piece += 1;
-    if (cards.length) {
-      col += 1;
-      used = 0;
-    }
-  }
-  return { placements, col, used };
-}
 
 /**
- * Flow blocks down column 1, then 2, then 3, then onto the next page. A block that fits the
- * room left in its column goes in whole; one that does not continues into the following
- * columns of the same page; one that cannot finish on this page starts a fresh page. Only a
- * category too tall for a whole page (three columns) is still left to overflow its last
- * column, and that page is scaled down to fit A4 rather than cut.
+ * Flow the categories down column 1, then 2, then 3, then onto the next page, filling every
+ * column. A category that runs out of room continues in the next column, or at the top of
+ * the next page, under a "(continued)" header (greg, 29 Sep: no blank columns). A piece
+ * always carries at least `MIN_PIECE_ROWS` rows, so a header is never stranded at the foot
+ * of a column; when fewer fit, the category starts in the next column instead.
  */
 export function paginateExport(
   blocks: readonly ExportBlock[],
@@ -236,26 +173,50 @@ export function paginateExport(
     pages.push(page);
     return page;
   };
-  if (!blocks.length) return [newPage()];
-
   let page = newPage();
   let col = 0;
   let used = 0;
-  const pageIsEmpty = () => page.columns.every((c) => !c.length);
-  for (const block of blocks) {
-    let packed = packAcross(block, col, used, layout);
-    if (!packed && !pageIsEmpty()) {
+  const nextColumn = () => {
+    col += 1;
+    used = 0;
+    if (col >= layout.columns) {
       page = newPage();
       col = 0;
-      used = 0;
-      packed = packAcross(block, col, used, layout);
     }
-    // Taller than a whole page: fill the columns in turn, the last one taking the rest. An
-    // unbounded last column always fits, so this never comes back null.
-    packed ??= packAcross(block, col, used, layout, true)!;
-    for (const p of packed.placements) page.columns[p.col]!.push(p.block);
-    col = packed.col;
-    used = packed.used;
+  };
+
+  for (const block of blocks) {
+    let cards = block.cards;
+    let piece = 0;
+    while (cards.length) {
+      const gap = used ? layout.blockGap : 0;
+      let h = gap + layout.blockHeader;
+      let take = 0;
+      while (
+        take < cards.length &&
+        used + h + rowHeight(cards[take]!, layout) <= layout.pageCapacity
+      ) {
+        h += rowHeight(cards[take]!, layout);
+        take += 1;
+      }
+      if (take < Math.min(MIN_PIECE_ROWS, cards.length)) {
+        if (used) {
+          nextColumn();
+          continue;
+        }
+        take = Math.max(take, 1); // an empty column always takes something
+      }
+      page.columns[col]!.push({
+        ...block,
+        key: piece ? `${block.key}~${piece}` : block.key,
+        cards: cards.slice(0, take),
+        ...(piece ? { continued: true } : {}),
+      });
+      used += h;
+      cards = cards.slice(take);
+      piece += 1;
+      if (cards.length) nextColumn();
+    }
   }
   return pages;
 }
