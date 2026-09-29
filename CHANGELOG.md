@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- Beanstalk feature posts can now open with **the long and short of it**: a short box at the top with what we built, how it helps you, and where to find it in the app, so you can get the gist without reading the whole post.
+- Beanstalk feature posts can now open with **the long and short of it**: a short box at the top with what we built, how it helps you, and where to find it in the app, so you can get the gist without reading the whole post. Thirteen existing feature posts now have one.
 
 ## 2026-09-28
 
