@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Owner Email Campaigns</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!--
+  #115 owner email campaigns: mockup, 2026-09-29.
+  The campaign email (approved direction A, the letter; direction B, a letterhead, was rejected)
+  in a phone mail client in light and dark, plus the unsubscribe confirmation page on beanies.family.
+  Sample content is greg's EARLY, UNPOLISHED draft from the Notion Emails DB (row #18), used
+  verbatim only to test the design. The production email will be table-based HTML with inline
+  styles; this mockup shows the look, not the markup.
+-->
+<style>
+  :root {
+    --slate: #2C3E50;
+    --orange: #F15D22;
+    --silk: #AED6F1;
+    --terracotta: #E67E22;
+    --cloud: #F8F9FA;
+    --white: #FFFFFF;
+    --slate-soft: #5B6B7A;
+    --slate-faint: #6E7D8A;
+    --line: #E3E8EC;
+
+    /* dark ladder (packages/brand/theme.css) */
+    --ground: #151E27;
+    --raised: #1E2A36;
+    --overlay: #26343F;
+    --ink: #F2F5F7;
+    --ink-soft: #C3CED6;
+    --ink-faint: #9AA9B4;
+    --accent-lift: #FF8B5E;
+    --silk-lift: #8FC7E8;
+    --dline: #33434F;
+
+    /* the mockup page itself */
+    --page-bg: #EEF2F5;
+    --page-ink: var(--slate);
+    --page-ink-soft: var(--slate-soft);
+    --page-card: var(--white);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: var(--ground);
+      --page-ink: var(--ink);
+      --page-ink-soft: var(--ink-soft);
+      --page-card: var(--raised);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-bg: var(--ground);
+    --page-ink: var(--ink);
+    --page-ink-soft: var(--ink-soft);
+    --page-card: var(--raised);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1, h2, h3 { font-family: Outfit, system-ui, sans-serif; margin: 0; }
+  h1 { font-size: 1.875rem; font-weight: 800; letter-spacing: -0.01em; }
+  h2 { font-size: 1.5rem; font-weight: 700; margin-top: 3.5rem; }
+  .lede { max-width: 46rem; color: var(--page-ink-soft); margin: 0.75rem 0 0; font-size: 0.9375rem; }
+  .lede strong { color: var(--page-ink); }
+  .section-note { max-width: 46rem; color: var(--page-ink-soft); font-size: 0.875rem; margin: 0.5rem 0 1.5rem; }
+
+  .phones { display: flex; flex-wrap: wrap; gap: 2rem; align-items: flex-start; }
+  .phone-col { display: flex; flex-direction: column; gap: 0.75rem; }
+  .phone-label { font-family: Outfit, sans-serif; font-weight: 600; font-size: 0.875rem; color: var(--page-ink-soft); }
+
+  /* phone frame */
+  .phone {
+    width: 375px; max-width: calc(100vw - 2rem);
+    height: 780px;
+    border-radius: 2.75rem;
+    border: 10px solid #0F1720;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 1.5rem 3rem -1rem rgba(21, 30, 39, 0.35);
+  }
+  .client-bar {
+    flex: none;
+    padding: 2.1rem 1.1rem 0.75rem;
+    font-size: 0.8125rem;
+    border-bottom: 1px solid;
+  }
+  .client-bar .from { display: flex; gap: 0.6rem; align-items: center; }
+  .avatar {
+    width: 2.25rem; height: 2.25rem; border-radius: 50%;
+    display: grid; place-items: center; flex: none;
+    font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.875rem;
+    background: var(--orange); color: var(--white);
+  }
+  .client-bar .name { font-weight: 600; }
+  .client-bar .addr, .client-bar .to { opacity: 1; }
+  .client-bar .subject {
+    font-family: Outfit, sans-serif; font-weight: 600; font-size: 1.0625rem; line-height: 1.3;
+    margin: 0.65rem 0 0;
+  }
+  .scroll { flex: 1; overflow-y: auto; }
+
+  .light .client-bar { background: var(--white); color: var(--slate); border-color: var(--line); }
+  .light .client-bar .addr, .light .client-bar .to { color: var(--slate-faint); }
+  .dark .client-bar { background: var(--ground); color: var(--ink); border-color: var(--dline); }
+  .dark .client-bar .addr, .dark .client-bar .to { color: var(--ink-faint); }
+
+  /* ── the email ─────────────────────────────────────────────── */
+  .mail { display: flow-root; font-family: Inter, Helvetica, Arial, sans-serif; font-size: 1rem; line-height: 1.6; }
+  .mail p { margin: 0 0 1rem; }
+  .mail a { text-decoration: underline; text-underline-offset: 2px; }
+  .mail .cta {
+    display: inline-block;
+    font-family: Outfit, Helvetica, Arial, sans-serif; font-weight: 600; font-size: 1rem;
+    text-decoration: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 0.875rem;
+    background: var(--orange); color: var(--white);
+  }
+  .mail .foot { font-size: 0.8125rem; line-height: 1.55; }
+  .mail .foot p { margin: 0 0 0.6rem; }
+
+  /* light */
+  .light .mail { background: var(--cloud); color: var(--slate); }
+  .light .mail a:not(.cta) { color: var(--orange); }
+  .light .mail .sheet { background: var(--white); }
+  .light .mail .foot { color: var(--slate-faint); }
+  .light .mail .foot a { color: var(--slate-soft); }
+  .light .mail .rule { border-top: 1px solid var(--line); }
+  /* dark: Apple Mail + iOS honour prefers-color-scheme; tokens from theme.css */
+  .dark .mail { background: var(--ground); color: var(--ink); }
+  .dark .mail a:not(.cta) { color: var(--accent-lift); }
+  .dark .mail .sheet { background: var(--raised); }
+  .dark .mail .foot { color: var(--ink-faint); }
+  .dark .mail .foot a { color: var(--ink-soft); }
+  .dark .mail .rule { border-top: 1px solid var(--dline); }
+
+  /* Direction A: the letter */
+  .a .sheet { margin: 1rem 0.75rem; border-radius: 1.25rem; padding: 1.5rem 1.35rem 1.35rem; }
+  .a .brandline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+  .a .brandline img { width: 2rem; height: 2rem; }
+  .wordmark { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.01em; }
+  .light .wordmark .b { color: var(--slate); }
+  .dark .wordmark .b { color: var(--ink); }
+  .wordmark .f { color: var(--orange); }
+  .dark .wordmark .f { color: var(--accent-lift); }
+  .a .signature {
+    display: flex; align-items: center; gap: 0.85rem;
+    margin-top: 1.5rem; padding-top: 1.25rem;
+  }
+  .a .signature img { width: 3.5rem; height: 3.5rem; flex: none; }
+  .a .sig-name { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.25rem; line-height: 1.1; }
+  .a .sig-role { font-size: 0.8125rem; }
+  .light .a .sig-role { color: var(--slate-soft); }
+  .dark .a .sig-role { color: var(--ink-soft); }
+  .a .cta-row { margin: 1.25rem 0 0.25rem; }
+  .a .foot { padding: 0.25rem 1.6rem 2rem; }
+
+
+  .placeholder { outline: 2px dashed var(--terracotta); outline-offset: 2px; border-radius: 0.25rem; }
+
+  /* annotations */
+  .notes { max-width: 22rem; font-size: 0.875rem; color: var(--page-ink-soft); }
+  .notes h3 { font-size: 1rem; font-weight: 600; color: var(--page-ink); margin: 0 0 0.5rem; }
+  .notes ul { margin: 0; padding-left: 1.1rem; }
+  .notes li { margin-bottom: 0.45rem; }
+  .notes code { font-size: 0.8125rem; }
+  .card { background: var(--page-card); border-radius: 1.25rem; padding: 1.25rem 1.35rem; }
+
+  /* unsubscribe page */
+  .unsub {
+    height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    padding: 2rem 1.75rem;
+    font-family: Inter, sans-serif;
+  }
+  .light .unsub { background: var(--cloud); color: var(--slate); }
+  .dark .unsub { background: var(--ground); color: var(--ink); }
+  .unsub img { width: 7.5rem; height: 7.5rem; margin-bottom: 1rem; }
+  .unsub h3 { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.5rem; margin-bottom: 0.6rem; }
+  .unsub p { margin: 0 0 0.9rem; font-size: 0.9375rem; max-width: 19rem; }
+  .light .unsub .soft { color: var(--slate-soft); }
+  .dark .unsub .soft { color: var(--ink-soft); }
+  .light .unsub a { color: var(--orange); }
+  .dark .unsub a { color: var(--accent-lift); }
+  .unsub .home {
+    margin-top: 0.5rem; display: inline-block; padding: 0.7rem 1.35rem; border-radius: 0.875rem;
+    font-family: Outfit, sans-serif; font-weight: 600; text-decoration: none; font-size: 0.9375rem;
+  }
+  .light .unsub .home { background: var(--white); color: var(--slate); border: 1px solid var(--line); }
+  .dark .unsub .home { background: var(--raised); color: var(--ink); border: 1px solid var(--dline); }
+  .url-bar { font-size: 0.75rem; text-align: center; padding: 2.1rem 1rem 0.6rem; }
+  .light .url-bar { background: var(--white); color: var(--slate-faint); border-bottom: 1px solid var(--line); }
+  .dark .url-bar { background: var(--raised); color: var(--ink-faint); border-bottom: 1px solid var(--dline); }
+
+  @media (max-width: 420px) {
+    .phone { height: 700px; border-width: 6px; border-radius: 2rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Owner email campaigns</h1>
+  <p class="lede">
+    The approved campaign email (direction A, the letter) in a phone mail client in light and dark,
+    and the unsubscribe page. The copy is <strong>greg's early draft</strong> from the Notion Emails DB,
+    used as-is to test the layout.
+  </p>
+
+  <h2>The letter</h2>
+  <p class="section-note">
+    Reads like a note from greg, not a newsletter: a small logo, the body, then a signature with the
+    hugging beanies. Suits win-back and feedback emails, which are most of what you plan to send.
+  </p>
+  <div class="phones" id="dir-a"></div>
+
+
+  <h2>Unsubscribe page</h2>
+  <p class="section-note">
+    Where the footer link lands, on beanies.family. One tap unsubscribes (no "are you sure" step);
+    the page only confirms it.
+  </p>
+  <div class="phones" id="unsub"></div>
+</div>
+
+<script>
+  const LOGO = '../../packages/brand/assets/shared/beanies_logo_transparent_logo_only_192x192.png';
+  const HUG = '../../packages/brand/assets/shared/beanies_family_hugging_transparent_192x192.png';
+
+  // Notion Emails row #18, verbatim (early draft).
+  const email = {
+    fromName: 'greg at beanies.family',
+    fromAddr: 'cbc@beanies.family',
+    subject: 'a message of hope, from the chief bean counter himself',
+    body: [
+      'Hi to all my early beanies,',
+      "this is not a bot, this is not ai, you have not been automatically subscribed to some random newsletter that you'll now get every week from now until the end of time. this is just me. hey. how's it going?",
+      "every one of you receiving this mail has something in common: you've all, at one point or another in your lives, started (or finished) creating a bean pod on beanies.family. and for that i just wanted to say: thank you for being an early bean (even if you didn't stay).",
+      "i mentioned at the start of this email that this was a message of hope. well, i have a confession to make: most of that hope is on my side.",
+      "if you started creating a beanpod, but didn't finish for whatever reason, i hope you'll tell me why, did you hit a bug? an error? decided that saving your beanpod to google drive wasn't for you? i'm here and listening, and i hope you'll come back.",
+      "if you created a beanpod, took a look around, but decided not to stay - no hard feelings, but i hope you'll tell me why.",
+      'if you\'re using <a href="#">beanies.family</a> actively, but there\'s something missing that you wish was there, i hope you\'ll tell me what it is.',
+      "and if you're an active beanies/family user and you love it, i hope you'll tell me that too!",
+      "i hope you're all also aware that v1 will be released very soon (current eta is roughly mid-october) - and that is when pricing will start. i wanted you all to be aware that as an early beanie you are entitled to 50% off for life. On top of that, if you have downloaded the app and you leave a rating and review, just let me know, and your first 6 months with beanies will be compeltely free - this offer still stands for the next 10 families!",
+      "more than anything else, i hope you enjoy using beanies. if you started a pod but didn't finish, here's your chance to come back and claim your early beanie discount. if you're using beanies, but you think it could be better, tell me what to do.",
+      'you can always reach me here or on discord.',
+      'take care my beans, and hope to see you on beanies soon!',
+    ],
+    // Example only: the draft's CTA Label / CTA URL are empty.
+    cta: 'come back to your pod',
+  };
+
+  const paras = () => email.body.map((p) => `<p>${p}</p>`).join('');
+
+  const footer = () => `
+    <div class="foot">
+      <p>you're getting this because you created a family on beanies.family. reply to this email any time, it comes straight to greg.</p>
+      <p><a href="#">join us on discord</a> &nbsp;&nbsp; <a href="#">unsubscribe</a></p>
+      <p><span class="placeholder">postal address line (required by CAN-SPAM)</span></p>
+    </div>`;
+
+  const clientBar = () => `
+    <div class="client-bar">
+      <div class="from">
+        <div class="avatar" aria-hidden="true">g</div>
+        <div>
+          <div class="name">${email.fromName}</div>
+          <div class="addr">${email.fromAddr}</div>
+        </div>
+      </div>
+      <div class="to">to you</div>
+      <div class="subject">${email.subject}</div>
+    </div>`;
+
+  function letter() {
+    return `
+      <div class="mail a">
+        <div class="sheet">
+          <div class="brandline">
+            <img src="${LOGO}" alt="">
+            <span class="wordmark"><span class="b">beanies</span><span class="f">.family</span></span>
+          </div>
+          ${paras()}
+          <div class="cta-row"><a class="cta placeholder" href="#">${email.cta}</a></div>
+          <div class="signature rule">
+            <img src="${HUG}" alt="">
+            <div>
+              <div class="sig-name">greg</div>
+              <div class="sig-role">chief bean counter, beanies.family</div>
+            </div>
+          </div>
+        </div>
+        ${footer()}
+      </div>`;
+  }
+
+
+  function unsubscribePage() {
+    return `
+      <div class="url-bar">beanies.family/unsubscribe</div>
+      <div class="scroll">
+        <div class="unsub">
+          <img src="${HUG}" alt="">
+          <h3>you're unsubscribed</h3>
+          <p>we won't send you emails like that one again.</p>
+          <p class="soft">we'll still write if there's ever a serious problem with your family's account. your family and its data are untouched.</p>
+          <p class="soft">changed your mind? just reply to any email from <a href="#">cbc@beanies.family</a>.</p>
+          <a class="home" href="#">go to beanies.family</a>
+        </div>
+      </div>`;
+  }
+
+  function phone(mode, label, inner, withBar = true) {
+    return `
+      <div class="phone-col">
+        <div class="phone-label">${label}</div>
+        <div class="phone ${mode}">
+          ${withBar ? clientBar() + `<div class="scroll">${inner}</div>` : inner}
+        </div>
+      </div>`;
+  }
+
+  const notesA = `
+    <div class="notes card">
+      <h3>What comes from Notion</h3>
+      <ul>
+        <li><strong>Subject</strong>: the row title.</li>
+        <li><strong>Preheader</strong>: the grey preview line in the inbox list. Empty in this draft, so the first body line would be used.</li>
+        <li><strong>Body</strong>: the page content. Paragraphs, links, bold and lists carry over; anything fancier is flagged at preview.</li>
+        <li><strong>CTA Label / CTA URL</strong>: the orange button. Dashed here because the draft has none; with no CTA the button is left out.</li>
+        <li>Dashed orange outlines mark example or missing content, not design.</li>
+      </ul>
+      <h3 style="margin-top:1rem">Dark mode</h3>
+      <ul>
+        <li>Apple Mail and iOS follow these dark colours exactly. The Gmail app picks its own dark colours; the layout and button survive it.</li>
+      </ul>
+    </div>`;
+
+  document.getElementById('dir-a').innerHTML =
+    phone('light', 'Light', letter()) + phone('dark', 'Dark', letter()) + notesA;
+  document.getElementById('unsub').innerHTML =
+    phone('light', 'Light', unsubscribePage(), false) + phone('dark', 'Dark', unsubscribePage(), false);
+</script>
+</body>
+</html>
