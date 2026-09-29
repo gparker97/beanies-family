@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Activity To-dos and Lists</title>
+<!-- ===========================================================================
+     From an activity, see and add its to-dos and lists (2026-09-29), tracker #114
+
+     The Activity Details drawer (ActivityViewEditModal) gains a To-dos section and
+     the existing Lists section (LinkedLists) gains New List / From a Template.
+     APPROVED: direction A, two sections stacked under Recent Transactions (greg,
+     2026-09-29). Rejected and removed: B (one "Getting Ready" block with a switch)
+     and C (a summary strip that expands in place). Drawn at phone width (390),
+     the desktop drawer width (448), and the nothing-linked-yet state.
+
+     Decisions carried in (greg, 2026-09-29):
+       - an add row is always there, even with nothing linked
+       - a new to-do goes to whoever adds it, due the day before the session
+         (today if that has passed)
+       - on a repeating activity, adding links to THIS session only; items linked
+         to the whole activity (no date, e.g. from #113) show on every session and
+         carry a small "Every Session" tag
+       - no chip pointing back at the activity you are already in
+
+     CIG-clamped. Colors from packages/brand/theme.css + src/style.css:
+       Heritage Orange #F15D22, Deep Slate #2C3E50, Sky Silk #AED6F1,
+       Cloud White #F8F9FA, To-do purple #9B59B6
+       dark: surface-ground #151E27, surface-raised #1E2A36, surface-overlay #26343F,
+             surface-hover #2F3E4B, ink #F2F5F7, ink-soft #C3CED6, ink-faint #9AA9B4,
+             line #4A5B69, line-strong #7A8A97, accent-lift #FF8B5E, purple-lift #CB95DD,
+             success-lift #5FD08A
+     Outfit (headings, chips, values) and Inter (body). rem sizes only, 12px floor.
+     No red anywhere: nothing here is destructive.
+
+     Interactive: tick a to-do, type in an add row and press Enter, open From a
+     Template. Theme follows the OS, or ?theme=light / ?theme=dark, or the toggle.
+     =========================================================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --page-bg: #eef1f4;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 12%);
+    --frame-edge: rgb(44 62 80 / 14%);
+
+    --panel: #ffffff;
+    --card: #ffffff;
+    --card-shadow: 0 2px 10px rgb(44 62 80 / 5%);
+    --ink: #2c3e50;
+    --ink-soft: #506b7a;
+    --ink-faint: #64748b;
+    --line: rgb(44 62 80 / 10%);
+    --line-strong: rgb(44 62 80 / 22%);
+    --tile: rgb(44 62 80 / 5%);
+    --tile-hover: rgb(241 93 34 / 8%);
+    --chip: rgb(44 62 80 / 6%);
+    --accent: #f15d22;
+    --accent-ink: #d14d1a;
+    --accent-tint: rgb(241 93 34 / 8%);
+    --accent-tint-2: rgb(241 93 34 / 15%);
+    --purple: #9b59b6;
+    --purple-ink: #8e44ad;
+    --purple-tint: rgb(155 89 182 / 10%);
+    --green: #27ae60;
+    --green-ink: #1e8449;
+    --silk-tint: rgb(174 214 241 / 25%);
+    --silk-ink: #2c6a93;
+    --list-a: #27ae60;
+    --list-a-tint: rgb(39 174 96 / 9%);
+    --list-a-tint-2: rgb(39 174 96 / 16%);
+    --list-b: #3498db;
+    --list-b-tint: rgb(52 152 219 / 9%);
+    --list-b-tint-2: rgb(52 152 219 / 16%);
+    --skel: rgb(44 62 80 / 7%);
+    --focus: #aed6f1;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --page-bg: #101820;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #c3ced6;
+    --page-line: rgb(255 255 255 / 10%);
+    --frame-edge: #4a5b69;
+
+    --panel: #1e2a36;
+    --card: #26343f;
+    --card-shadow: 0 2px 10px rgb(0 0 0 / 25%);
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: #4a5b69;
+    --line-strong: #7a8a97;
+    --tile: #26343f;
+    --tile-hover: #2f3e4b;
+    --chip: #2f3e4b;
+    --accent: #f15d22;
+    --accent-ink: #ff8b5e;
+    --accent-tint: #2f3e4b;
+    --accent-tint-2: rgb(241 93 34 / 20%);
+    --purple: #9b59b6;
+    --purple-ink: #cb95dd;
+    --purple-tint: rgb(155 89 182 / 22%);
+    --green: #27ae60;
+    --green-ink: #5fd08a;
+    --silk-tint: rgb(174 214 241 / 14%);
+    --silk-ink: #aed6f1;
+    --list-a: #5fd08a;
+    --list-a-tint: #26343f;
+    --list-a-tint-2: rgb(95 208 138 / 18%);
+    --list-b: #7cc3f0;
+    --list-b-tint: #26343f;
+    --list-b-tint-2: rgb(124 195 240 / 18%);
+    --skel: #2f3e4b;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 28px 16px 80px; }
+  @media (min-width: 700px) { .wrap { padding-inline: 24px; } }
+
+  /* ---------- page chrome ---------- */
+  .top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { font-size: 0.875rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 72ch; margin: 0; }
+  .lede b { color: var(--page-ink); }
+  .theme-toggle { display: inline-flex; padding: 3px; border-radius: 14px; background: var(--page-line); gap: 2px; }
+  .theme-toggle button { border: 0; background: transparent; padding: 6px 12px; border-radius: 11px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; color: var(--page-ink-soft); }
+  .theme-toggle button[aria-pressed='true'] { background: var(--panel); color: var(--page-ink); box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }
+
+  .direction { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--page-line); }
+  .direction h2 { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; }
+  .direction h2 .tag { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 0.875rem; margin-right: 8px; vertical-align: 2px; }
+  .direction p.why { font-size: 0.875rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 72ch; margin: 0 0 4px; }
+  .frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 18px; }
+  .frame-label { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--page-ink-soft); margin: 0 0 8px; }
+  .desk-only { display: none; }
+  @media (min-width: 1000px) { .desk-only { display: block; } }
+
+  /* ---------- device frames ---------- */
+  .phone { width: 390px; max-width: 100%; border-radius: 40px; border: 1px solid var(--frame-edge); background: var(--panel); overflow: hidden; box-shadow: 0 20px 60px rgb(0 0 0 / 12%); }
+  .phone .notch { height: 30px; display: flex; align-items: center; justify-content: center; }
+  .phone .notch span { width: 110px; height: 22px; border-radius: 12px; background: #000; }
+  .desk { width: 448px; border-radius: 24px 0 0 24px; border: 1px solid var(--frame-edge); background: var(--panel); overflow: hidden; box-shadow: -10px 0 40px rgb(0 0 0 / 14%); }
+
+  /* ---------- the drawer ---------- */
+  .dr-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+  .dr-emoji { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 1.375rem; background: var(--accent-tint); flex: none; }
+  .dr-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.125rem; color: var(--ink); margin: 0; }
+  .dr-sub { font-size: 0.8125rem; color: var(--ink-soft); margin-top: 2px; }
+  .dr-sub .rep { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--silk-tint); color: var(--silk-ink); font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.75rem; }
+  .dr-close { margin-left: auto; width: 32px; height: 32px; border-radius: 10px; border: 0; background: var(--tile); color: var(--ink-soft); cursor: pointer; flex: none; }
+  .dr-body { padding: 16px 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .skel-group .lbl { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .skel { height: 38px; border-radius: 12px; background: var(--skel); }
+  .skel.short { width: 62%; }
+
+  /* the existing section eyebrow, as in LinkedLists / Recent Transactions */
+  .eyebrow { display: flex; align-items: center; gap: 6px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 10px; }
+  .eyebrow .count { letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--ink-faint); }
+  .eyebrow .acts { margin-left: auto; display: inline-flex; gap: 6px; letter-spacing: 0; text-transform: none; }
+  .mini-btn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; background: var(--accent-tint); color: var(--accent-ink); }
+  .mini-btn:hover { background: var(--accent-tint-2); }
+  .mini-btn.quiet { background: var(--tile); color: var(--ink-soft); }
+  .mini-btn.quiet:hover { background: var(--tile-hover); }
+
+  /* compact to-do row (TodoItemRow compact) */
+  .todos { display: flex; flex-direction: column; gap: 8px; }
+  .todo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); cursor: pointer; transition: background 0.15s; }
+  .todo:hover { background: var(--tile-hover); }
+  .chk { width: 22px; height: 22px; flex: none; border-radius: 8px; border: 2px solid var(--accent); background: transparent; display: grid; place-items: center; cursor: pointer; padding: 0; color: #fff; font-size: 0.75rem; }
+  .chk:hover { background: var(--accent-tint); }
+  .todo.done .chk { background: var(--green); border-color: var(--green); }
+  .todo .txt { flex: 1; min-width: 0; }
+  .todo .t1 { font-size: 0.875rem; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .todo.done .t1 { text-decoration: line-through; color: var(--ink-faint); }
+  .todo .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; background: var(--chip); color: var(--ink-soft); }
+  .pill.due { background: var(--accent-tint); color: var(--accent-ink); }
+  .pill.every { background: var(--silk-tint); color: var(--silk-ink); }
+  .face { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.75rem; color: #fff; }
+  .f-you { background: #f15d22; }
+  .f-sam { background: #3498db; }
+  .f-mia { background: #9b59b6; }
+  .done-sep { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink-faint); margin: 4px 2px 0; }
+
+  /* the add row: the one bold piece */
+  .add { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 16px; border: 1.5px dashed var(--line-strong); background: transparent; }
+  .add:focus-within { border-style: solid; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 3px rgb(241 93 34 / 12%); }
+  .add .plus { color: var(--accent-ink); font-weight: 700; font-family: 'Outfit', sans-serif; }
+  .add input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 0.875rem; color: var(--ink); padding: 8px 0; }
+  .add input::placeholder { color: var(--ink-faint); }
+  .add .defaults { display: none; gap: 6px; flex-wrap: wrap; }
+  .add:focus-within .defaults, .add.show .defaults { display: flex; }
+  .add .go { border: 0; cursor: pointer; padding: 8px 14px; border-radius: 12px; background: var(--accent); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.8125rem; display: none; }
+  .add:focus-within .go, .add.show .go { display: inline-block; }
+  .add-wrap .defaults-line { display: none; gap: 6px; flex-wrap: wrap; margin: 8px 2px 0; align-items: center; }
+  .add-wrap:focus-within .defaults-line, .add-wrap.show .defaults-line { display: flex; }
+  .defaults-line .hint { font-size: 0.75rem; color: var(--ink-faint); }
+  .pill.btn { border: 0; cursor: pointer; }
+  .pill.btn:hover { background: var(--tile-hover); }
+
+  /* linked list card (LinkedLists) */
+  .lists { display: flex; flex-direction: column; gap: 12px; }
+  .lcard { border-radius: 20px; overflow: hidden; box-shadow: var(--card-shadow); display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 14px; cursor: pointer; }
+  .lcard.a { background: linear-gradient(135deg, var(--list-a-tint), var(--card)); }
+  .lcard.b { background: linear-gradient(135deg, var(--list-b-tint), var(--card)); }
+  :root[data-theme='dark'] .lcard { background: var(--card); }
+  .lcard .ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 1.375rem; }
+  .lcard.a .ic { background: var(--list-a-tint-2); }
+  .lcard.b .ic { background: var(--list-b-tint-2); }
+  .lcard .prov { display: flex; justify-content: space-between; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); }
+  .lcard .prov .open { letter-spacing: 0; text-transform: none; }
+  .lcard.a .prov .open { color: var(--list-a); }
+  .lcard.b .prov .open { color: var(--list-b); }
+  .lcard .ttl { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9375rem; color: var(--ink); margin-top: 2px; }
+  .lcard .bar { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .lcard .track { flex: 1; height: 6px; border-radius: 999px; overflow: hidden; }
+  .lcard.a .track { background: var(--list-a-tint-2); }
+  .lcard.b .track { background: var(--list-b-tint-2); }
+  .lcard .fill { height: 100%; border-radius: 999px; }
+  .lcard.a .fill { background: var(--list-a); }
+  .lcard.b .fill { background: var(--list-b); }
+  .lcard .n { font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+  .empty-lists { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; border: 1.5px dashed var(--line-strong); font-size: 0.8125rem; color: var(--ink-faint); }
+  .empty-lists .acts { margin-left: auto; display: flex; gap: 6px; }
+
+  /* template popover */
+  .tpl { position: relative; }
+  .tpl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; width: 240px; padding: 6px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 12px 40px rgb(0 0 0 / 18%); display: none; }
+  .tpl.open .tpl-menu { display: block; }
+  .tpl-menu button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 0; background: transparent; border-radius: 12px; cursor: pointer; text-align: left; font-size: 0.8125rem; color: var(--ink); }
+  .tpl-menu button:hover { background: var(--tile-hover); }
+  .tpl-menu .sug { margin-left: auto; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--accent-ink); }
+
+  .notes { margin-top: 18px; max-width: 72ch; font-size: 0.8125rem; line-height: 1.6; color: var(--page-ink-soft); padding-left: 18px; }
+  .notes li + li { margin-top: 4px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>From an activity, see and add its to-dos and lists</h1>
+      <p class="lede">
+        Tracker #114, drawn in the Activity Details drawer. The example is
+        <b>Soccer Practice</b>, which repeats every Saturday, opened on the
+        <b>Sat, Oct 10</b> session. Two to-dos belong to this session; one came from a
+        school note and is linked to the whole activity, so it shows on every session.
+        Tick a to-do, type in an add row and press Enter, or open From a Template.
+      </p>
+    </div>
+    <div class="theme-toggle" role="group" aria-label="Theme">
+      <button type="button" data-theme-btn="light">Light</button>
+      <button type="button" data-theme-btn="dark">Dark</button>
+    </div>
+  </div>
+
+  <section class="direction" id="dirA">
+    <h2><span class="tag">A</span>Two sections, stacked (approved 2026-09-29)</h2>
+    <p class="why">
+      Closest to today's drawer. To-dos sits above Lists, both under Recent Transactions,
+      each with the same eyebrow the drawer already uses. The add row is always there;
+      tap it and your name and the day before the session are already filled in.
+    </p>
+    <div class="frames">
+      <div><p class="frame-label">Phone, 390</p><div class="phone"><div class="notch"><span></span></div><div data-render="A"></div></div></div>
+      <div class="desk-only"><p class="frame-label">Desktop drawer, 448</p><div class="desk"><div data-render="A"></div></div></div>
+      <div><p class="frame-label">Nothing linked yet</p><div class="phone"><div class="notch"><span></span></div><div data-render="A-empty"></div></div></div>
+    </div>
+    <ul class="notes">
+      <li>Open to-dos first, done after a small "Done" line. Tapping a row opens the to-do; the tick works in place.</li>
+      <li>No chip back to Soccer Practice on these rows. The "Every Session" tag marks an item linked to the whole activity.</li>
+      <li>New List and From a Template sit in the Lists eyebrow and stay when there are no lists.</li>
+    </ul>
+  </section>
+
+</div>
+
+<script>
+  // ---- theme ----
+  const root = document.documentElement;
+  const param = new URLSearchParams(location.search).get('theme');
+  function setTheme(t) {
+    root.dataset.theme = t;
+    document.querySelectorAll('[data-theme-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeBtn === t)));
+  }
+  setTheme(param || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themeBtn)));
+
+  // ---- content ----
+  const seedTodos = () => [
+    { t: 'Bring orange slices for the team', who: 'you', due: 'Fri, Oct 9', done: false },
+    { t: 'Pay the term fees', who: 'you', due: 'Oct 15', done: false, every: true },
+    { t: 'Wash Sam’s kit', who: 'mia', due: 'Fri, Oct 9', done: true },
+  ];
+  const faces = { you: ['f-you', 'You'], sam: ['f-sam', 'S'], mia: ['f-mia', 'M'] };
+  const lists = [
+    { c: 'a', ic: '\u{1F392}', ttl: 'Kit Bag', pct: 60, n: '3 of 5' },
+  ];
+  const tplItems = [
+    ['\u{1F392}', 'Kit Bag', true],
+    ['\u{1F9F3}', 'Vacation Packing', false],
+    ['\u{1F6D2}', 'Shopping', false],
+    ['\u{1F4DD}', 'Blank List', false],
+  ];
+
+  const head = () => `
+    <div class="dr-head">
+      <div class="dr-emoji" aria-hidden="true">⚽</div>
+      <div>
+        <p class="dr-title">Soccer Practice</p>
+        <div class="dr-sub">Sat, Oct 10 · 9:00 to 10:30 AM<span class="rep">↻ Every Saturday</span></div>
+      </div>
+      <button class="dr-close" type="button" aria-label="Close">✕</button>
+    </div>`;
+  const skeleton = () => `
+    <div class="skel-group"><div class="lbl">Who</div><div class="skel short"></div></div>
+    <div class="skel-group"><div class="lbl">Location</div><div class="skel"></div></div>
+    <div class="skel-group"><div class="lbl">Recent Transactions</div><div class="skel"></div></div>`;
+
+  function todoRow(td, i) {
+    const [fc, fl] = faces[td.who];
+    return `<div class="todo ${td.done ? 'done' : ''}" data-i="${i}">
+      <button class="chk" type="button" aria-label="${td.done ? 'Mark as not done' : 'Mark as done'}">${td.done ? '✓' : ''}</button>
+      <div class="txt"><div class="t1">${td.t}</div>
+        <div class="meta">${td.done ? '' : `<span class="pill due">⏰ ${td.due}</span>`}${td.every ? '<span class="pill every">↻ Every Session</span>' : ''}</div>
+      </div>
+      <span class="face ${fc}" title="${fl}">${fl === 'You' ? 'Y' : fl}</span>
+    </div>`;
+  }
+  function todoList(todos) {
+    const open = todos.map((t, i) => [t, i]).filter(([t]) => !t.done);
+    const done = todos.map((t, i) => [t, i]).filter(([t]) => t.done);
+    return `<div class="todos">
+      ${open.map(([t, i]) => todoRow(t, i)).join('')}
+      ${done.length ? `<div class="done-sep">Done</div>${done.map(([t, i]) => todoRow(t, i)).join('')}` : ''}
+    </div>`;
+  }
+  const addRow = (show) => `
+    <div class="add-wrap ${show ? 'show' : ''}" style="margin-top:8px">
+      <div class="add ${show ? 'show' : ''}">
+        <span class="plus" aria-hidden="true">+</span>
+        <input type="text" placeholder="Add a to-do for this session" aria-label="Add a to-do" ${show ? 'value="Sign the tournament form"' : ''} />
+        <button class="go" type="button">Add</button>
+      </div>
+      <div class="defaults-line">
+        <button class="pill btn" type="button"><span class="face f-you" style="width:16px;height:16px;font-size:0.75rem">Y</span> You</button>
+        <button class="pill btn due" type="button">⏰ Fri, Oct 9 (day before)</button>
+        <span class="hint">Links to the Sat, Oct 10 session</span>
+      </div>
+    </div>`;
+  const tplButton = () => `
+    <span class="tpl"><button class="mini-btn quiet" type="button" data-tpl>From a Template</button>
+      <span class="tpl-menu" role="menu">${tplItems
+        .map(([e, n, s]) => `<button type="button" role="menuitem"><span aria-hidden="true">${e}</span>${n}${s ? '<span class="sug">Suggested</span>' : ''}</button>`)
+        .join('')}</span></span>`;
+  function listCards() {
+    return `<div class="lists">${lists
+      .map(
+        (l) => `<div class="lcard ${l.c}"><div class="ic" aria-hidden="true">${l.ic}</div><div>
+          <div class="prov"><span>List</span><span class="open">Open ›</span></div>
+          <div class="ttl">${l.ttl}</div>
+          <div class="bar"><div class="track"><div class="fill" style="width:${l.pct}%"></div></div><span class="n">${l.n}</span></div>
+        </div></div>`
+      )
+      .join('')}</div>`;
+  }
+  const listsEyebrow = () => `<p class="eyebrow"><span aria-hidden="true">\u{1F4CB}</span>Lists<span class="acts"><button class="mini-btn" type="button">+ New List</button>${tplButton()}</span></p>`;
+  const todosEyebrow = (n) => `<p class="eyebrow"><span aria-hidden="true">✅</span>To-dos${n ? ` <span class="count">${n} open</span>` : ''}</p>`;
+
+  const renderers = {
+    A: (s) => `${head()}<div class="dr-body">${skeleton()}
+      <section>${todosEyebrow(s.todos.filter((t) => !t.done).length)}${todoList(s.todos)}${addRow(false)}</section>
+      <section>${listsEyebrow()}${listCards()}</section></div>`,
+    'A-empty': () => `${head()}<div class="dr-body">${skeleton()}
+      <section>${todosEyebrow(0)}${addRow(true)}</section>
+      <section><p class="eyebrow"><span aria-hidden="true">\u{1F4CB}</span>Lists</p>
+        <div class="empty-lists">No lists yet<span class="acts"><button class="mini-btn" type="button">+ New List</button>${tplButton()}</span></div></section></div>`,
+  };
+
+  // Each frame keeps its own state so ticking in one does not move another.
+  document.querySelectorAll('[data-render]').forEach((el) => {
+    const state = { todos: seedTodos() };
+    const draw = () => {
+      el.innerHTML = renderers[el.dataset.render](state);
+    };
+    draw();
+    el.addEventListener('click', (e) => {
+      const chk = e.target.closest('.chk');
+      if (chk) {
+        const i = Number(chk.closest('.todo').dataset.i);
+        state.todos[i].done = !state.todos[i].done;
+        draw();
+        return;
+      }
+      const tpl = e.target.closest('[data-tpl]');
+      if (tpl) {
+        tpl.parentElement.classList.toggle('open');
+        return;
+      }
+      const go = e.target.closest('.go');
+      if (go) add(go.parentElement.querySelector('input'));
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.matches('.add input')) add(e.target);
+    });
+    function add(input) {
+      const v = input.value.trim();
+      if (!v) return;
+      state.todos.unshift({ t: v, who: 'you', due: 'Fri, Oct 9', done: false });
+      draw();
+      el.querySelector('.add input')?.focus();
+    }
+  });
+</script>
+</body>
+</html>
