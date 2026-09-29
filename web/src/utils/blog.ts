@@ -107,3 +107,24 @@ export function fmtIssueStamp(d: Date): string {
 export function padIssue(n: number): string {
   return n.toString().padStart(2, '0');
 }
+
+/** The three bullets of a post's "the long and short of it" summary box. */
+export type LongAndShort = NonNullable<CollectionEntry<'blog'>['data']['longAndShort']>;
+
+/**
+ * Role label for each summary bullet. Key order is render order. `satisfies`
+ * fails the build if the schema's keys and these labels ever drift apart.
+ */
+export const LONG_AND_SHORT_ROLES = {
+  built: 'what we built',
+  helps: 'how it helps you',
+  where: 'where to find it',
+} satisfies Record<keyof LongAndShort, string>;
+
+/** `[role label, bullet text]` in render order. Used by the post page and llms-full.txt. */
+export function longAndShortEntries(summary: LongAndShort): [string, string][] {
+  return (Object.keys(LONG_AND_SHORT_ROLES) as (keyof LongAndShort)[]).map((key) => [
+    LONG_AND_SHORT_ROLES[key],
+    summary[key],
+  ]);
+}

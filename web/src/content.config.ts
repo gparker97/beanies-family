@@ -52,6 +52,20 @@ const blog = defineCollection({
      *  sitemap, RSS, direct URL). Visible in `npm run dev:web` so drafts
      *  can be iterated locally. See `isPublished()` in utils/content.ts. */
     draft: z.boolean().default(false),
+    /** Optional "the long and short of it" summary box at the top of a
+     *  feature-style post (see `LongAndShort.astro`). No field, no box.
+     *  Golden source: the Notion Blog Posts properties `L&S: What We Built`,
+     *  `L&S: How It Helps`, `L&S: Where to Find It`. Text in backticks
+     *  renders as an app-path chip. `.strict()` so a misspelled key fails the
+     *  build instead of being dropped. */
+    longAndShort: z
+      .object({
+        built: z.string().trim().min(1),
+        helps: z.string().trim().min(1),
+        where: z.string().trim().min(1),
+      })
+      .strict()
+      .optional(),
   }),
 });
 

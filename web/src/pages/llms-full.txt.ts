@@ -9,6 +9,7 @@ import { getCollection } from 'astro:content';
 import { ALL_ARTICLES, getArticleSearchText, HELP_CATEGORIES } from '@/content/help';
 import { SITE_URL } from '@beanies/brand/nav';
 import { isPublished } from '~/utils/content';
+import { longAndShortEntries } from '~/utils/blog';
 
 export const GET: APIRoute = async () => {
   const posts = (await getCollection('blog', isPublished)).sort(
@@ -35,6 +36,13 @@ export const GET: APIRoute = async () => {
     lines.push(`Date: ${post.data.date.toISOString().slice(0, 10)}`);
     lines.push(`Author: ${post.data.author}`);
     lines.push('');
+    if (post.data.longAndShort) {
+      lines.push('Summary:');
+      for (const [role, text] of longAndShortEntries(post.data.longAndShort)) {
+        lines.push(`- ${role}: ${text}`);
+      }
+      lines.push('');
+    }
     lines.push(post.body ?? '');
     lines.push('');
     lines.push('---');

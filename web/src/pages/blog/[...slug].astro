@@ -14,6 +14,7 @@ import Byline from '../../components/Byline.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import RelatedArticles from '../../components/RelatedArticles.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
+import LongAndShort from '../../components/LongAndShort.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 // Fraunces drives the post's italic editorial accents — italic kicker
@@ -165,6 +166,8 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
           )}
         </div>
       </header>
+
+      {post.data.longAndShort && <LongAndShort summary={post.data.longAndShort} />}
 
       <div class="post-fresh-divider" aria-hidden="true">
         <span class="post-fresh-divider-rule"></span>
