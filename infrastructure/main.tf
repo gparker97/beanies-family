@@ -172,3 +172,13 @@ module "ai_extract" {
   correction_grants_enabled = true
 }
 
+
+# ── email — SES sending identity (added 2026-09-29) ──────────────────────────
+# Domain + DKIM + bounce.<apex> MAIL FROM only. Migadu keeps the apex MX/SPF.
+# Sending code (segments, templates, unsubscribe) comes with the campaigns plan.
+module "email" {
+  source = "./modules/email"
+
+  domain_name    = var.domain_name
+  hosted_zone_id = var.hosted_zone_id
+}
