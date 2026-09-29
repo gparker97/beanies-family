@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-28",
-    "translationCount": 5539
+    "lastUpdated": "2026-09-29",
+    "translationCount": 5608
   },
   "translations": {
     "app.name": {
@@ -3132,14 +3132,14 @@
       "lastUpdated": "2026-03-03"
     },
     "todo.subtitle": {
-      "translation": "跟踪全家人的任务",
-      "hash": "5mc3by",
-      "lastUpdated": "2026-02-25"
+      "translation": "跟踪全家人的待办事项",
+      "hash": "fl9ov0",
+      "lastUpdated": "2026-09-29"
     },
     "todo.newTask": {
-      "translation": "新任务",
-      "hash": "mvaw5h",
-      "lastUpdated": "2026-03-03"
+      "translation": "新建待办@ info",
+      "hash": "1cjd7n",
+      "lastUpdated": "2026-09-29"
     },
     "todo.quickAddPlaceholder": {
       "translation": "需要做什么？",
@@ -3147,29 +3147,29 @@
       "lastUpdated": "2026-02-25"
     },
     "todo.editTask": {
-      "translation": "编辑任务",
-      "hash": "1ax49n",
-      "lastUpdated": "2026-03-03"
+      "translation": "编辑待办事宜( E)...",
+      "hash": "umdvuh",
+      "lastUpdated": "2026-09-29"
     },
     "todo.deleteTask": {
-      "translation": "删除任务",
-      "hash": "81w15m",
-      "lastUpdated": "2026-03-03"
+      "translation": "删除待办事宜@ info",
+      "hash": "yhnq8o",
+      "lastUpdated": "2026-09-29"
     },
     "todo.deleteConfirm": {
-      "translation": "您确认要删除此任务吗？",
-      "hash": "ohxfjb",
-      "lastUpdated": "2026-02-25"
+      "translation": "确定要删除这个?",
+      "hash": "m2wjc3",
+      "lastUpdated": "2026-09-29"
     },
     "todo.noTodos": {
-      "translation": "还没有任务",
-      "hash": "ygnaaf",
-      "lastUpdated": "2026-03-03"
+      "translation": "尚无待办事项",
+      "hash": "kh9jz1",
+      "lastUpdated": "2026-09-29"
     },
     "todo.getStarted": {
-      "translation": "添加您的第一个任务以开始！",
-      "hash": "s9rpbi",
-      "lastUpdated": "2026-02-25"
+      "translation": "添加您的第一个待办事项，即可开始！",
+      "hash": "j9di6q",
+      "lastUpdated": "2026-09-29"
     },
     "todo.filter.all": {
       "translation": "所有食谱",
@@ -3212,9 +3212,9 @@
       "lastUpdated": "2026-03-03"
     },
     "todo.section.open": {
-      "translation": "未完成的任务",
-      "hash": "e37l88",
-      "lastUpdated": "2026-03-03"
+      "translation": "打开待办事项",
+      "hash": "arb898",
+      "lastUpdated": "2026-09-29"
     },
     "todo.section.completed": {
       "translation": "已完成",
@@ -3267,14 +3267,14 @@
       "lastUpdated": "2026-03-03"
     },
     "todo.taskTitle": {
-      "translation": "任务标题",
-      "hash": "ouxt7h",
-      "lastUpdated": "2026-03-03"
+      "translation": "待办事项标题",
+      "hash": "svz05n",
+      "lastUpdated": "2026-09-29"
     },
     "confirm.deleteTodoTitle": {
-      "translation": "删除任务",
-      "hash": "81w15m",
-      "lastUpdated": "2026-03-03"
+      "translation": "删除待办事宜@ info",
+      "hash": "yhnq8o",
+      "lastUpdated": "2026-09-29"
     },
     "passkey.wrongFamilyError": {
       "translation": "此生物识别不属于当前家庭。请重试。",
@@ -3282,9 +3282,9 @@
       "lastUpdated": "2026-02-26"
     },
     "todo.viewTask": {
-      "translation": "任务详细信息",
-      "hash": "reft0n",
-      "lastUpdated": "2026-03-03"
+      "translation": "待办事项详情",
+      "hash": "fhbu2n",
+      "lastUpdated": "2026-09-29"
     },
     "todo.noDescription": {
       "translation": "无说明",
@@ -5532,9 +5532,9 @@
       "lastUpdated": "2026-03-06"
     },
     "todo.reopenTask": {
-      "translation": "重新启动的任务",
-      "hash": "tnj6x4",
-      "lastUpdated": "2026-03-07"
+      "translation": "重新打开待办事项",
+      "hash": "44q9c6",
+      "lastUpdated": "2026-09-29"
     },
     "homepage.getStarted": {
       "translation": "开始",
@@ -24604,7 +24604,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -25029,12 +25029,12 @@
     "statementImport.row.tick": {
       "translation": "Add {name}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "statementImport.row.edit": {
       "translation": "Edit {name}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "statementImport.row.already": {
       "translation": "已添加{date}",
@@ -25856,16 +25856,6 @@
       "hash": "zgsol8",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.checkin.agendaNobody.one": {
-      "translation": "1张没有人的卡片",
-      "hash": "9u3b7o",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkin.agendaNobody.other": {
-      "translation": "{count}张没有人的卡牌",
-      "hash": "bddwmh",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.checkin.agendaMoved": {
       "translation": "{card} ，移动于{date}",
       "hash": "d00l6h",
@@ -26019,7 +26009,7 @@
     "whoOwnsWhat.card.since": {
       "translation": "Since {date}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "whoOwnsWhat.card.sinceBefore": {
       "translation": "自{date}起，在{name}之前",
@@ -26044,7 +26034,7 @@
     "whoOwnsWhat.card.open": {
       "translation": "Open {card}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "whoOwnsWhat.byBean.count.one": {
       "translation": "1张卡",
@@ -26064,31 +26054,6 @@
     "whoOwnsWhat.details.title": {
       "translation": "卡详细信息",
       "hash": "9hlz9q",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.details.heldBy": {
-      "translation": "已由 {0} 待定",
-      "hash": "u6i9jy",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.details.beforeThat": {
-      "translation": "在此之前",
-      "hash": "8hxw2w",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.details.parts": {
-      "translation": "谁持有每个零件",
-      "hash": "o82jjw",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.details.status": {
-      "translation": "状态",
-      "hash": "twsvse",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.details.done": {
-      "translation": "完成看起来像，至少",
-      "hash": "9rx5x3",
       "lastUpdated": "2026-09-27"
     },
     "whoOwnsWhat.details.usesFor": {
@@ -26424,7 +26389,7 @@
     "whoOwnsWhat.pile.groupAction": {
       "translation": "Skip {count}",
       "hash": "",
-      "lastUpdated": "2026-09-28"
+      "lastUpdated": "2026-09-29"
     },
     "whoOwnsWhat.pile.empty": {
       "translation": "这里没有什么可交易的了。",
@@ -26626,16 +26591,6 @@
       "hash": "bgu8st",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.board.more": {
-      "translation": "+ 另外 %{count} 个",
-      "hash": "xdbj93",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.board.less": {
-      "translation": "收起",
-      "hash": "p4ukc",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.board.dealCard": {
       "translation": "发{card}",
       "hash": "rgctt2",
@@ -26661,11 +26616,6 @@
       "hash": "84l9ft",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.checkinDrawer.nobody": {
-      "translation": "还是没人",
-      "hash": "m390th",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.checkinDrawer.moved": {
       "translation": "自上次以来移动",
       "hash": "k68a2k",
@@ -26679,21 +26629,6 @@
     "whoOwnsWhat.checkinDrawer.dealNow": {
       "translation": "立即交易",
       "hash": "9hdgde",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.settling": {
-      "translation": "入驻",
-      "hash": "3ordvn",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.talk": {
-      "translation": "让我们来谈谈",
-      "hash": "5j4hzv",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.stillWorks": {
-      "translation": "仍然有效",
-      "hash": "avqpje",
       "lastUpdated": "2026-09-27"
     },
     "whoOwnsWhat.checkinDrawer.redeal": {
@@ -26731,34 +26666,9 @@
       "hash": "vq7i7a",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.checkinDrawer.doneTalk": {
-      "translation": "在您本周聊天的列表中： {cards}。",
-      "hash": "syoo5l",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.checkinDrawer.doneNext": {
       "translation": "下次入住{date}。它将在到期时显示在您的简报中。",
       "hash": "36pxsm",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.count.stillWorks.one": {
-      "translation": "1个仍然有效",
-      "hash": "rfel5n",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.count.stillWorks.other": {
-      "translation": "{count}个仍然有效",
-      "hash": "to3wcg",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.count.talk.one": {
-      "translation": "1谈论",
-      "hash": "zb7men",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.checkinDrawer.count.talk.other": {
-      "translation": "{count}个要讨论的内容",
-      "hash": "m5xmd5",
       "lastUpdated": "2026-09-27"
     },
     "whoOwnsWhat.checkinDrawer.count.redealt.one": {
@@ -27700,6 +27610,441 @@
       "translation": "The Bean Pod",
       "hash": "hju4ec",
       "lastUpdated": "2026-09-28"
+    },
+    "time.clearAriaLabel": {
+      "translation": "清除时间",
+      "hash": "jvx7ts",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.addTodo": {
+      "translation": "添加待办事项",
+      "hash": "8imzry",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.error.noAuthor": {
+      "translation": "我们无法记录谁在添加此待办事项。",
+      "hash": "w5d28r",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.error.noAuthorHelp": {
+      "translation": "未找到已登录的家庭成员。登录并重试。",
+      "hash": "x3fkny",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.field.title": {
+      "translation": "任务",
+      "hash": "1c6l8d",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.magicHint": {
+      "translation": "捕捉备注、列表或学校电子邮件",
+      "hash": "x3jt1g",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.viewCreatedActivity": {
+      "translation": "查看动态",
+      "hash": "ibqzme",
+      "lastUpdated": "2026-09-29"
+    },
+    "ai.capture.dest.todo": {
+      "translation": "任务",
+      "hash": "1c6l8d",
+      "lastUpdated": "2026-09-29"
+    },
+    "ai.capture.noun.todo": {
+      "translation": "添加任务",
+      "hash": "k3gcym",
+      "lastUpdated": "2026-09-29"
+    },
+    "ai.capture.pick.as.todo": {
+      "translation": "我们会将此作为待办事项来阅读。",
+      "hash": "ysk0in",
+      "lastUpdated": "2026-09-29"
+    },
+    "ai.found.eventWithTodos.one": {
+      "translation": "找到一个活动和1个待办事项",
+      "hash": "lskycp",
+      "lastUpdated": "2026-09-29"
+    },
+    "ai.found.eventWithTodos.other": {
+      "translation": "找到一个活动和{count}个待办事项",
+      "hash": "deftsi",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.linkedActivity": {
+      "translation": "链接的活动",
+      "hash": "orrpkm",
+      "lastUpdated": "2026-09-29"
+    },
+    "todo.linkedActivity.open": {
+      "translation": "打开活动",
+      "hash": "s7yklw",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.title": {
+      "translation": "删除此活动？",
+      "hash": "lrh5h9",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.message": {
+      "translation": "一些待办事项已链接到它。他们应该怎么办？",
+      "hash": "77lk4a",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.message.one": {
+      "translation": "1个待办事项已链接到它。它应该怎么办？",
+      "hash": "z0dz31",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.keep": {
+      "translation": "保留待办事项",
+      "hash": "bra6n4",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.delete": {
+      "translation": "也删除{count}个待办事项",
+      "hash": "nt07c5",
+      "lastUpdated": "2026-09-29"
+    },
+    "planner.deleteLinkedTodos.delete.one": {
+      "translation": "也删除待办事项",
+      "hash": "ubqkt",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.title": {
+      "translation": "這 就是 我們 所 發現 的 。",
+      "hash": "bj6c8o",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.source.link": {
+      "translation": "通过共享链接。",
+      "hash": "bqom1e",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.source.photo": {
+      "translation": "来自一张照片。",
+      "hash": "yz9zsh",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.source.document": {
+      "translation": "来自文档。",
+      "hash": "mfdd0e",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.source.text": {
+      "translation": "来自您分享的备注。",
+      "hash": "q4l0z3",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.subtitle.shared": {
+      "translation": "查看待办事项，然后完成活动。",
+      "hash": "s58xnv",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.subtitle.todoOnly": {
+      "translation": "查看待办事项，然后保存。",
+      "hash": "753k01",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.section.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.section.todos": {
+      "translation": "待办",
+      "hash": "tjfroq",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.linkedToActivity": {
+      "translation": "已链接到活动",
+      "hash": "cw5pj8",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.activityHelper": {
+      "translation": "接下来，您将在活动表单中查看谁将参加，其余的人将参加。",
+      "hash": "pq9zaq",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.skip": {
+      "translation": "跳过",
+      "hash": "1j9un",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.undoSkip": {
+      "translation": "撤消跳过",
+      "hash": "jn66u3",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.duplicate.open": {
+      "translation": "已在您的心愿单中",
+      "hash": "gvoha",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.duplicate.done": {
+      "translation": "已完成",
+      "hash": "81z7h2",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.duplicate.addAnyway": {
+      "translation": "仍然添加",
+      "hash": "dw97ge",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.titlePlaceholder": {
+      "translation": "需要做什么？",
+      "hash": "uhav95",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.save.shared.one": {
+      "translation": "保存1个待办事项，然后添加活动",
+      "hash": "xiqisf",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.save.shared.other": {
+      "translation": "保存{count}个待办事项，然后添加活动",
+      "hash": "3z18ys",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.save.todoOnly.one": {
+      "translation": "保存1个待办事项",
+      "hash": "pe1u5n",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.save.todoOnly.other": {
+      "translation": "保存{count}个待办事项",
+      "hash": "9wzow",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.save.activityOnly": {
+      "translation": "添加活动",
+      "hash": "5tv3kz",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.reason.named": {
+      "translation": "在注释中命名",
+      "hash": "vgceid",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.reason.submitter": {
+      "translation": "您分享了它",
+      "hash": "kd18ud",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.due.eventDay": {
+      "translation": "活动日",
+      "hash": "qwtn9n",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.due.dayBefore": {
+      "translation": "日方可",
+      "hash": "lx9j1",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.error.build": {
+      "translation": "我们无法从中读取待办事项。活动仍在这里。",
+      "hash": "4tushb",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.error.save": {
+      "translation": "您的待办事项未保存。请重试。",
+      "hash": "lsocer",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.error.buildTodoOnly": {
+      "translation": "我们无法从中读取待办事项。请重试。",
+      "hash": "mk1caw",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.error.noAuthor": {
+      "translation": "我们无法记录谁在添加这些待办事项。",
+      "hash": "44wrf1",
+      "lastUpdated": "2026-09-29"
+    },
+    "magicTodos.error.noAuthorHelp": {
+      "translation": "未找到已登录的家庭成员。登录并重试。",
+      "hash": "x3fkny",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.facts.title": {
+      "translation": "须知",
+      "hash": "gl8zxp",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkin.agendaToDeal.one": {
+      "translation": "1张卡牌可交易",
+      "hash": "b91ms0",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkin.agendaToDeal.other": {
+      "translation": "{count}张卡牌可发牌",
+      "hash": "dewhlv",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkin.agendaSaved": {
+      "translation": "{card} ，上次已保存",
+      "hash": "yhur34",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.details.heldByName": {
+      "translation": "由{name}持有",
+      "hash": "8b1ap7",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.title": {
+      "translation": "历史",
+      "hash": "s65cb0",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.sorted": {
+      "translation": "首次排序",
+      "hash": "6rmzdy",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.talked": {
+      "translation": "在家庭入住时谈论",
+      "hash": "6se3qa",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.dealt": {
+      "translation": "已成交至{to}",
+      "hash": "hn6xbg",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.moved": {
+      "translation": "已从{from}移动到{to}",
+      "hash": "victf7",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.cleared": {
+      "translation": "返回无人（来自{from} ）",
+      "hash": "foic1v",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.history.someone": {
+      "translation": "不再是家里的人",
+      "hash": "rt8dm0",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.details.position": {
+      "translation": "{list} · {n}/{total}",
+      "hash": "55wpga",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.idleTitle": {
+      "translation": "尚未持有任何卡牌",
+      "hash": "6kbz59",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.dropTo": {
+      "translation": "在此处放一张卡牌，发给{name}",
+      "hash": "3tk8g6",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.idleHint": {
+      "translation": "在豆子上放一张卡牌即可发牌",
+      "hash": "4nnj86",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.skippedSummary.one": {
+      "translation": "{count}张卡，不适用于此家庭",
+      "hash": "nln6xl",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.skippedSummary.other": {
+      "translation": "{count}张卡牌，不适用于此家庭",
+      "hash": "k4gku6",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.showSkipped": {
+      "translation": "顯示",
+      "hash": "1j7rx",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.board.hideSkipped": {
+      "translation": "隱藏",
+      "hash": "1c7du",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.dealMode.label": {
+      "translation": "交易网格布局",
+      "hash": "56k9y6",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.toDeal": {
+      "translation": "仍有待交易",
+      "hash": "dzhbp5",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.saved": {
+      "translation": "上次保存的时间",
+      "hash": "2fyhgm",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.unsorted.one": {
+      "translation": "还有1张卡片尚未排序。完成后即可处理。",
+      "hash": "8qhp2a",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.unsorted.other": {
+      "translation": "还有{count}张卡片尚未排序。完成后即可处理。",
+      "hash": "5zw2dm",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.noIssues": {
+      "translation": "No Issues",
+      "hash": "",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.talked": {
+      "translation": "我们已经讨论过了",
+      "hash": "6m0co3",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.saveNext": {
+      "translation": "为下次省钱",
+      "hash": "78kav4",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.doneSaved": {
+      "translation": "已保存以供下次使用： {cards}。",
+      "hash": "nd6u47",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.noIssues.one": {
+      "translation": "1没有问题",
+      "hash": "cege1e",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.noIssues.other": {
+      "translation": "{count}个无问题",
+      "hash": "ie5kkq",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.talked.one": {
+      "translation": "谈到了",
+      "hash": "9uxvcp",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.talked.other": {
+      "translation": "{count}个已谈论",
+      "hash": "y4294f",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.saved.one": {
+      "translation": "已保存1个，供下次使用",
+      "hash": "fsr75n",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.checkinDrawer.count.saved.other": {
+      "translation": "{count}个已保存，供下次使用",
+      "hash": "whmjl9",
+      "lastUpdated": "2026-09-29"
     }
   }
 }
