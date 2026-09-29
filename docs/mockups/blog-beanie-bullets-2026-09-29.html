@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 beanie bullets - blog summary box mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Outfit:wght@400..800&display=swap" rel="stylesheet">
+<style>
+/* ── Mockup chrome (not part of the design) ─────────────────────────── */
+:root { --deep-slate: #2c3e50; --cloud: #f8f9fa; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #e9ecef; font-family: Outfit, system-ui, sans-serif; color: var(--deep-slate); }
+.mock-note { max-width: 1180px; margin: 0 auto; padding: 28px 16px 8px; font-size: 0.95rem; line-height: 1.55; }
+.mock-note h1 { font-size: 1.35rem; margin: 0 0 6px; }
+.mock-note p { margin: 0 0 6px; max-width: 80ch; }
+.mock-grid { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 28px; align-items: start; }
+@media (max-width: 980px) { .mock-grid { grid-template-columns: 1fr; } }
+.mock-label { font-size: 0.85rem; font-weight: 600; margin: 0 0 8px; color: rgb(44 62 80 / 70%); }
+.frame { background: #fff; border-radius: 22px; overflow: hidden; box-shadow: 0 1px 0 rgb(44 62 80 / 8%); }
+.frame.phone { max-width: 390px; border: 10px solid #1d2733; border-radius: 40px; }
+
+/* ── Approximation of the real post page (web/src/pages/blog/[...slug].astro) ── */
+.post-page { position: relative; padding: 40px 48px 56px; }
+.phone .post-page { padding: 26px 16px 40px; }
+.post-hero-wash { position: absolute; inset: 0 0 auto 0; height: 340px; background: var(--tint-wash); opacity: 0.55; pointer-events: none; }
+.post-content { position: relative; max-width: 680px; margin: 0 auto; }
+.post-kicker { display: flex; gap: 10px; align-items: center; font-size: 0.7rem; letter-spacing: 0.2em; color: var(--tint-ink); font-weight: 600; margin-bottom: 14px; }
+.post-kicker-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tint-hex); }
+.post-title { font-weight: 800; font-size: clamp(1.6rem, 4.2vw, 2.4rem); line-height: 1.08; letter-spacing: -0.025em; margin: 0 0 12px; max-width: 28ch; }
+.phone .post-title { font-size: 1.6rem; }
+.post-subtitle { font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 1.2rem; line-height: 1.4; color: rgb(44 62 80 / 72%); margin: 0 0 16px; max-width: 52ch; }
+.phone .post-subtitle { font-size: 1rem; }
+.post-byline { font-size: 0.85rem; color: rgb(44 62 80 / 65%); }
+.post-fresh-divider { display: flex; gap: 14px; align-items: center; justify-content: center; color: var(--tint-hex); margin: 30px 0 22px; }
+.post-fresh-divider span.rule { flex: 1; max-width: 140px; height: 1px; background: linear-gradient(to right, transparent, color-mix(in srgb, var(--tint-hex) 36%, transparent), transparent); }
+.post-fresh-divider span.txt { font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 0.95rem; }
+.blog-prose p { font-size: 1rem; line-height: 1.78; color: rgb(44 62 80 / 78%); margin: 0 0 1rem; }
+.blog-prose p.lead { font-family: Fraunces, Georgia, serif; font-style: italic; font-size: 1.15rem; line-height: 1.55; color: rgb(44 62 80 / 84%); }
+.fade { -webkit-mask-image: linear-gradient(#000 40%, transparent); mask-image: linear-gradient(#000 40%, transparent); }
+
+/* ════════════════════════════════════════════════════════════════════════
+   THE DESIGN: .beanie-bullets
+   Sits between </header> and the "the post" divider. Rendered by the
+   layout from frontmatter `beanieBullets` (exactly 3), never from markdown.
+   Picks up the issue's tint, so it belongs to this issue of the beanstalk.
+   ════════════════════════════════════════════════════════════════════════ */
+.beanie-bullets {
+  position: relative;
+  margin: 28px 0 0;
+  padding: 22px 26px 22px 24px;
+  background: color-mix(in srgb, var(--tint-hex) 7%, #fff);
+  border: 1px solid color-mix(in srgb, var(--tint-hex) 22%, transparent);
+  border-radius: 22px;
+}
+.phone .beanie-bullets { padding: 18px 16px 18px 16px; border-radius: 18px; }
+
+.bb-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 4px; }
+.bb-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.015em;
+  color: var(--deep-slate);
+}
+/* The trio of beans beside the title: the brand's hand-holding pair plus
+   one, a quiet echo of "3" without repeating the numeral. */
+.bb-trio { display: inline-flex; gap: 3px; transform: translateY(1px); }
+.bb-trio svg { width: 11px; height: 14px; fill: var(--tint-hex); }
+.bb-trio svg:nth-child(2) { opacity: 0.7; }
+.bb-trio svg:nth-child(3) { opacity: 0.45; }
+
+.bb-intro {
+  margin: 0 0 16px;
+  font-family: Fraunces, Georgia, serif;
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: rgb(44 62 80 / 76%);
+}
+
+.bb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.bb-item { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; }
+/* The bullet IS a bean: the one bold move. Tilted like the logo's beans,
+   never rotated past a gentle lean. */
+.bb-bean { width: 18px; height: 23px; margin-top: 2px; fill: var(--tint-hex); transform: rotate(-12deg); }
+.bb-role {
+  display: block;
+  font-family: Fraunces, Georgia, serif;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--tint-ink);
+  margin-bottom: 1px;
+}
+.bb-text { margin: 0; font-size: 1rem; line-height: 1.55; color: rgb(44 62 80 / 90%); }
+.bb-text strong { font-weight: 650; color: var(--deep-slate); }
+/* "where to find it" gets the app path set as a breadcrumb chip, because
+   that is the line people act on. */
+.bb-path {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid color-mix(in srgb, var(--tint-hex) 28%, transparent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--tint-ink);
+  white-space: nowrap;
+}
+
+/* Variant for the side note panel */
+.opts { max-width: 1180px; margin: 0 auto; padding: 8px 16px 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.opt { background: #fff; border-radius: 18px; padding: 18px 20px; font-size: 0.93rem; line-height: 1.55; }
+.opt h2 { font-size: 1rem; margin: 0 0 6px; }
+.opt ul { margin: 6px 0 0; padding-left: 18px; }
+code { font-size: 0.85em; background: #eef1f4; padding: 1px 5px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<!-- One bean glyph, reused -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="bean" viewBox="0 0 18 23">
+      <path d="M9.4 0.6C4.2 0.6 0.8 5.3 0.8 11.2c0 6.3 3.6 11.2 8.4 11.2 4.9 0 8.2-4.2 8.2-9.6 0-2.7-1.3-4-1.3-6.1C16.1 3.4 13.5 0.6 9.4 0.6z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="mock-note">
+  <h1>3 beanie bullets: summary box for feature posts</h1>
+  <p>Real copy from issue 24 (<em>behold: a beanie wall for your whole family</em>). The box sits between the header and the "the post" divider, so a busy reader gets the answer before the story starts, and the divider is where they choose to keep reading. It takes the colour of each issue's tint (left: orange, right: sky on a phone).</p>
+</div>
+
+<div class="mock-grid">
+  <!-- ── Desktop, orange tint ── -->
+  <div>
+    <p class="mock-label">Desktop, orange tint</p>
+    <div class="frame">
+      <div class="post-page" style="--tint-hex:#f15d22; --tint-ink:#a83a11; --tint-wash:linear-gradient(140deg,#fff6ef 0%,#ffe9d6 100%)">
+        <div class="post-hero-wash" aria-hidden="true"></div>
+        <div class="post-content">
+          <header>
+            <div class="post-kicker"><span class="post-kicker-dot"></span>issue 24 · sep 11, 2026 · 7 min read</div>
+            <h1 class="post-title">behold: a beanie wall for your whole family</h1>
+            <p class="post-subtitle">an alternative to skylight digital family calendar and chores board that works for all your beans, so you can stay one step ahead</p>
+            <div class="post-byline">by greg · feature announcement</div>
+          </header>
+
+          <section class="beanie-bullets" aria-labelledby="bb-title-1">
+            <div class="bb-head">
+              <h2 class="bb-title" id="bb-title-1">3 beanie bullets</h2>
+              <span class="bb-trio" aria-hidden="true"><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg></span>
+            </div>
+            <p class="bb-intro">we know our beanies are busy, so here are the key points from this post:</p>
+            <ul class="bb-list">
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">what we built</span><p class="bb-text">the <strong>beanie wall</strong>: a family calendar and chore board that runs on a tablet you already own.</p></div>
+              </li>
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">how it helps you</span><p class="bb-text">everyone sees the week and ticks off their own chores, so you stop being the family's reminder service. no new hardware, no subscription.</p></div>
+              </li>
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">where to find it</span><p class="bb-text"><span class="bb-path">Settings › Beanie Wall</span> - open it on the tablet and follow the setup tips.</p></div>
+              </li>
+            </ul>
+          </section>
+
+          <div class="post-fresh-divider" aria-hidden="true"><span class="rule"></span><span class="txt">the post</span><span class="rule"></span></div>
+          <div class="blog-prose fade">
+            <p class="lead">Every year, without fail, my mom pinned a monthly calendar to the kitchen wall.</p>
+            <p>The squares of that family calendar, each one filled to the brim with scribbled notes handwritten in erasable pen, were always there to let us know something special was coming up.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Phone, sky tint ── -->
+  <div>
+    <p class="mock-label">Phone (390px), sky tint</p>
+    <div class="frame phone">
+      <div class="post-page" style="--tint-hex:#3a82b3; --tint-ink:#1f4d6d; --tint-wash:linear-gradient(140deg,#f1f8fd 0%,#dceaf6 100%)">
+        <div class="post-hero-wash" aria-hidden="true"></div>
+        <div class="post-content">
+          <header>
+            <div class="post-kicker"><span class="post-kicker-dot"></span>issue 24 · 7 min</div>
+            <h1 class="post-title">behold: a beanie wall for your whole family</h1>
+            <p class="post-subtitle">an alternative to skylight that works for all your beans</p>
+          </header>
+
+          <section class="beanie-bullets" aria-labelledby="bb-title-2">
+            <div class="bb-head">
+              <h2 class="bb-title" id="bb-title-2">3 beanie bullets</h2>
+              <span class="bb-trio" aria-hidden="true"><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg><svg><use href="#bean"/></svg></span>
+            </div>
+            <p class="bb-intro">we know our beanies are busy, so here are the key points from this post:</p>
+            <ul class="bb-list">
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">what we built</span><p class="bb-text">the <strong>beanie wall</strong>: a family calendar and chore board that runs on a tablet you already own.</p></div>
+              </li>
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">how it helps you</span><p class="bb-text">everyone sees the week and ticks off their own chores, so you stop being the family's reminder service.</p></div>
+              </li>
+              <li class="bb-item">
+                <svg class="bb-bean" aria-hidden="true"><use href="#bean"/></svg>
+                <div><span class="bb-role">where to find it</span><p class="bb-text"><span class="bb-path">Settings › Beanie Wall</span> on the tablet.</p></div>
+              </li>
+            </ul>
+          </section>
+
+          <div class="post-fresh-divider" aria-hidden="true"><span class="rule"></span><span class="txt">the post</span><span class="rule"></span></div>
+          <div class="blog-prose fade">
+            <p class="lead">Every year, without fail, my mom pinned a monthly calendar to the kitchen wall.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="opts">
+  <div class="opt">
+    <h2>Why it looks like this</h2>
+    <ul>
+      <li>The bullets are beans. That is the one playful touch; everything else stays quiet.</li>
+      <li>Each bullet carries its role (what / how it helps / where) in small italic, so readers learn to jump straight to "where to find it".</li>
+      <li>The app path is drawn as a chip, because it's the line people act on.</li>
+      <li>The colour comes from the issue's tint, so the box belongs to that issue instead of looking like a generic callout.</li>
+    </ul>
+  </div>
+  <div class="opt">
+    <h2>How it's built</h2>
+    <ul>
+      <li>Frontmatter <code>beanieBullets:</code>, a 3-item tuple in the Zod schema: the build fails on 2 or 4.</li>
+      <li>The layout renders the box, not the markdown, so the drop cap on the first paragraph still lands on the story.</li>
+      <li>No field, no box: story posts (aloe vera, Japan) stay as they are.</li>
+      <li>Plain <code>&lt;ul&gt;</code> HTML near the top of the page, which AI crawlers can quote directly.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>
