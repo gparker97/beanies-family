@@ -9,6 +9,10 @@ subtitle: "this feature wasn't actually my idea"
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'beanie lists: checklists for one-off projects or recurring chores that can reset on a schedule and attach to a trip or activity.'
+  helps: 'packing lists and weekly grocery runs stay out of your to-dos, and the ones that are due show up in your daily briefing.'
+  where: '`The Treehouse › Beanie Lists`'
 ---
 
 Hi, my beans! Welcome to another episode of (say it with me): _What can beanies do?!_

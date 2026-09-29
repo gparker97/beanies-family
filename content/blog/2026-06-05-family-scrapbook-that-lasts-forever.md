@@ -10,6 +10,10 @@ subtitle: 'no memories will be wiped clean today'
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'a family scrapbook where you capture photos and the funny things your kids say, as they happen or backfilled from years ago.'
+  helps: "the little moments you swear you'll remember get saved for good, in your own family file rather than a notes app."
+  where: '`The Bean Pod › Family Scrapbook`'
 ---
 
 What's the best way to tell the difference between humans and AI? Hit the clear button, and AI can't remember what happened 5 minutes ago, let alone 10 years ago.

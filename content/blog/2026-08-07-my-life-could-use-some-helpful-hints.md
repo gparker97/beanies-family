@@ -9,6 +9,10 @@ subtitle: "i can't afford to hire an assistant, so i built one"
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'helpful hints, automatic nudges for things families forget, like visas before a trip or a gift before a birthday party.'
+  helps: "the stuff that usually slips through the cracks shows up in your to-dos days ahead, while there's still time to sort it."
+  where: '`The Treehouse › To-Dos`, under `Helpful Hints`, with on/off switches in `Settings › Reminders`'
 ---
 
 A couple months ago, I was preparing for a family vacation to China. Then disaster struck.

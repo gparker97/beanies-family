@@ -10,6 +10,10 @@ subtitle: "keeping track of your family's (or your pet's) medications"
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'a medications tab for every family member, pets included, holding dose, schedule, notes, label photos and a log of each dose given.'
+  helps: 'anyone in the family can check who gave the last dose and when, so nobody doubles up or misses one.'
+  where: '`The Bean Pod › Meet the Beans`, then tap a bean and open the `Medications` tab'
 ---
 
 Time to get real - no more tired intros about how this post wasn't written by AI, because I suppose you all get it by now, and anyway, this new feature is _actually_ super cool and useful, and I don't want anything to distract from it.

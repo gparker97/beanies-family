@@ -10,6 +10,10 @@ subtitle: 'an alternative to skylight digital family calendar and chores board t
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: "the beanie wall, a full-screen family display for a spare tablet showing the week's calendar and a chore board for each kid."
+  helps: "everyone can see what's on and tick off their own chores, so you know who really earned their allowance."
+  where: '`Settings › Beanie Wall`, then tap `Start the wall`'
 ---
 
 Every year, without fail, my mom pinned a monthly calendar to the kitchen wall.

@@ -10,6 +10,10 @@ subtitle: 'learning to share can be a good thing'
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: "a beanies.family option in your phone's share menu, so a flyer photo or booking email becomes a filled-in calendar activity or travel plan."
+  helps: 'event details land on the family calendar in seconds instead of sinking into your camera roll.'
+  where: "your phone's share menu › `beanies.family`, in the iPhone or Android app"
 ---
 
 I’d like to introduce you to the wonderful world of sharing.
