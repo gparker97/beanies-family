@@ -154,20 +154,21 @@ describe('paginateExport', () => {
       expect(colHeight(col)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
   });
 
-  it('breaks pages only between categories, never inside one', () => {
-    const blocks = Array.from({ length: 9 }, (_, i) => block(`cat${i}`, 12));
+  it('fills every column before starting a new page: a category continues onto the next page', () => {
+    // Home & Household fills columns 1-2; the next category must start in column 3, not on page 2.
+    const blocks = [block('home', 19), block('out', 2), block('kids', 19), block('health', 9)];
     const pages = paginateExport(blocks);
-    expect(pages.length).toBeGreaterThan(1);
-    // Each category lives on exactly one page, and categories stay in order.
-    const pageOf = new Map<string, Set<number>>();
-    pages.forEach((p, i) =>
-      p.columns
-        .flat()
-        .forEach((b) => pageOf.set(baseKey(b), (pageOf.get(baseKey(b)) ?? new Set()).add(i)))
+    const first = pages[0]!.columns;
+    expect(first.every((c) => c.length > 0)).toBe(true);
+    expect(first[2]!.map(baseKey)).toContain('kids');
+    // Only the last page may have empty columns, and only at its end.
+    for (const page of pages.slice(0, -1)) expect(page.columns.every((c) => c.length)).toBe(true);
+    // Every card placed once, in order; continued pieces flagged; no column over capacity.
+    const placed = pages.flatMap((p) => p.columns.flat());
+    expect(placed.flatMap((b) => b.cards.map((c) => c.id))).toEqual(
+      blocks.flatMap((b) => b.cards.map((c) => c.id))
     );
-    for (const set of pageOf.values()) expect(set.size).toBe(1);
-    const order = pages.flatMap((p) => p.columns.flat().map(baseKey));
-    expect([...new Set(order)]).toEqual(blocks.map((b) => b.key));
+    for (const b of placed) expect(!!b.continued).toBe(b.key.includes('~'));
     for (const page of pages)
       for (const col of page.columns)
         expect(colHeight(col)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
@@ -179,13 +180,13 @@ describe('paginateExport', () => {
       expect(b.cards.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('spreads a category taller than a whole page over its columns, the last taking the rest', () => {
+  it('flows a category taller than a whole page onto the next page', () => {
     const pages = paginateExport([block('huge', 60)]);
-    expect(pages).toHaveLength(1);
-    const cols = pages[0]!.columns;
-    expect(cols.every((c) => c.length === 1)).toBe(true);
-    expect(cols.flat().reduce((n, b) => n + b.cards.length, 0)).toBe(60);
-    expect(colHeight(cols[0]!)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
+    expect(pages.length).toBeGreaterThan(1);
+    expect(pages.flatMap((p) => p.columns.flat()).reduce((n, b) => n + b.cards.length, 0)).toBe(60);
+    for (const page of pages)
+      for (const col of page.columns)
+        expect(colHeight(col)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
   });
 
   it('returns one empty page for an empty deck', () => {
