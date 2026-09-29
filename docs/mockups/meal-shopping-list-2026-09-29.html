@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meal Shopping List</title>
+<!-- ===========================================================================
+     Weekly shopping list from the meal planner (2026-09-29), tracker #116
+
+     APPROVED: direction B "by meal", simplified (greg, 2026-09-29). Directions A
+     (one merged list) and C (two steps) were rejected and removed, and so was all
+     cross-recipe merging (rules and magic beans) and the "already on your list" flag.
+
+     Rules drawn here (greg, 2026-09-29):
+       - the week's list is grouped by recipe; a recipe planned more than once in the
+         week is ONE section
+       - batches per meal = ceil(people eating / recipe servings); the section's
+         multiplier is the SUM over the meals it is served at (Tue 5 + Fri 3 eating,
+         serves 4 -> 2 + 1 = x3)
+       - if either number is missing for a meal, that meal counts as 1 batch (the
+         recipe's own amounts)
+       - ingredient lines with a leading amount are scaled; lines without one are kept
+         as written
+       - Recipe.servings becomes a number; old text converts once to its first number
+         ("Serves 4-6" -> 4); text with no count ("12 muffins") is cleared
+       - destination at review: New List (default) or Add to a List; no duplicate checks
+       - one shared checklist: the week drawer, the edit-meal drawer (scaled for that
+         meal) and the recipe page's Shopping List sheet (#88, recipe amounts)
+
+     CIG-clamped. Heritage Orange #F15D22, Deep Slate #2C3E50, Sky Silk #AED6F1,
+     Cloud White #F8F9FA, shopping green #27AE60.
+     dark: surface-ground #151E27, surface-raised #1E2A36, surface-overlay #26343F,
+           surface-hover #2F3E4B, ink #F2F5F7, ink-soft #C3CED6, ink-faint #9AA9B4,
+           line #4A5B69, line-strong #7A8A97, accent-lift #FF8B5E, success-lift #5FD08A
+     Outfit (headings, chips, values) and Inter (body). rem sizes only, 12px floor.
+     No red anywhere: nothing here is destructive.
+     =========================================================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --page-bg: #eef1f4;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 12%);
+    --frame-edge: rgb(44 62 80 / 14%);
+
+    --panel: #ffffff;
+    --ground: #f8f9fa;
+    --card: #ffffff;
+    --ink: #2c3e50;
+    --ink-soft: #506b7a;
+    --ink-faint: #64748b;
+    --line: rgb(44 62 80 / 10%);
+    --line-strong: rgb(44 62 80 / 22%);
+    --tile: rgb(44 62 80 / 5%);
+    --tile-hover: rgb(241 93 34 / 8%);
+    --chip: rgb(44 62 80 / 6%);
+    --accent: #f15d22;
+    --accent-ink: #d14d1a;
+    --accent-tint: rgb(241 93 34 / 8%);
+    --accent-tint-2: rgb(241 93 34 / 15%);
+    --purple: #9b59b6;
+    --purple-ink: #8e44ad;
+    --purple-tint: rgb(155 89 182 / 9%);
+    --purple-line: rgb(155 89 182 / 35%);
+    --green: #27ae60;
+    --green-ink: #1e8449;
+    --green-tint: rgb(39 174 96 / 10%);
+    --silk-tint: rgb(174 214 241 / 28%);
+    --silk-ink: #2c6a93;
+    --skel: rgb(44 62 80 / 7%);
+    --focus: #aed6f1;
+    --r1: #e67e22; /* recipe dot colours: the meal planner's own per-day palette */
+    --r2: #3498db;
+    --r3: #27ae60;
+    --r4: #9b59b6;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --page-bg: #101820;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #c3ced6;
+    --page-line: rgb(255 255 255 / 10%);
+    --frame-edge: #4a5b69;
+
+    --panel: #1e2a36;
+    --ground: #151e27;
+    --card: #26343f;
+    --ink: #f2f5f7;
+    --ink-soft: #c3ced6;
+    --ink-faint: #9aa9b4;
+    --line: #4a5b69;
+    --line-strong: #7a8a97;
+    --tile: #26343f;
+    --tile-hover: #2f3e4b;
+    --chip: #2f3e4b;
+    --accent: #f15d22;
+    --accent-ink: #ff8b5e;
+    --accent-tint: #2f3e4b;
+    --accent-tint-2: rgb(241 93 34 / 20%);
+    --purple: #9b59b6;
+    --purple-ink: #cb95dd;
+    --purple-tint: rgb(155 89 182 / 16%);
+    --purple-line: rgb(203 149 221 / 45%);
+    --green: #27ae60;
+    --green-ink: #5fd08a;
+    --green-tint: rgb(95 208 138 / 14%);
+    --silk-tint: rgb(174 214 241 / 14%);
+    --silk-ink: #aed6f1;
+    --skel: #2f3e4b;
+    --r1: #f0a35e;
+    --r2: #7cc3f0;
+    --r3: #5fd08a;
+    --r4: #cb95dd;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible, [contenteditable]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 28px 16px 80px; }
+  @media (min-width: 700px) { .wrap { padding-inline: 24px; } }
+
+  /* ---------- page chrome ---------- */
+  .top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .lede { font-size: 0.875rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 72ch; margin: 0; }
+  .lede b { color: var(--page-ink); }
+  .theme-toggle { display: inline-flex; padding: 3px; border-radius: 14px; background: var(--page-line); gap: 2px; }
+  .theme-toggle button { border: 0; background: transparent; padding: 6px 12px; border-radius: 11px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; color: var(--page-ink-soft); }
+  .theme-toggle button[aria-pressed='true'] { background: var(--panel); color: var(--page-ink); box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }
+
+  .section { margin-top: 44px; padding-top: 28px; border-top: 1px solid var(--page-line); }
+  .section h2 { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; }
+  .section h2 .tag { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 0.875rem; margin-right: 8px; vertical-align: 2px; }
+  .section p.why { font-size: 0.875rem; line-height: 1.6; color: var(--page-ink-soft); max-width: 72ch; margin: 0 0 4px; }
+  .frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; margin-top: 18px; }
+  .frame-label { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--page-ink-soft); margin: 0 0 8px; }
+
+  /* ---------- device frames ---------- */
+  .phone { width: 390px; max-width: 100%; border-radius: 40px; border: 1px solid var(--frame-edge); background: var(--panel); overflow: hidden; box-shadow: 0 20px 60px rgb(0 0 0 / 12%); }
+  .phone .notch { height: 30px; display: flex; align-items: center; justify-content: center; }
+  .phone .notch span { width: 110px; height: 22px; border-radius: 12px; background: #000; }
+  .desk { width: 448px; max-width: 100%; border-radius: 24px 0 0 24px; border: 1px solid var(--frame-edge); background: var(--panel); overflow: hidden; box-shadow: -10px 0 40px rgb(0 0 0 / 14%); }
+  .pagebar { width: 820px; max-width: 100%; border-radius: 20px; border: 1px solid var(--frame-edge); background: var(--ground); padding: 20px 22px; }
+
+  /* ---------- meal planner header (entry point 1) ---------- */
+  .mp-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .mp-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.5rem; color: var(--ink); margin: 0; }
+  .mp-sub { font-size: 0.875rem; color: var(--ink-soft); margin-top: 2px; }
+  .mp-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hbtn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 16px; font-family: 'Outfit', sans-serif; font-size: 0.875rem; font-weight: 600; background: var(--tile); color: var(--ink); }
+  .hbtn:hover { background: var(--tile-hover); }
+  .hbtn.grad { background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; }
+  .hbtn.shop { background: var(--green-tint); color: var(--green-ink); }
+  .hbtn.shop:hover { background: rgb(39 174 96 / 18%); }
+  .hbtn[disabled] { cursor: not-allowed; background: var(--tile); color: var(--ink-faint); }
+  .hbtn .n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--green); color: #fff; font-size: 0.75rem; font-weight: 700; }
+  :root[data-theme='dark'] .hbtn .n { background: #1e8449; }
+  .hint { font-size: 0.75rem; color: var(--ink-faint); margin-top: 8px; }
+  .weekstrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 16px; }
+  .day { border-radius: 14px; background: var(--card); border: 1px solid var(--line); padding: 8px; min-height: 64px; }
+  .day .d { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--ink-faint); }
+  .day .m { font-size: 0.75rem; color: var(--ink); margin-top: 4px; line-height: 1.35; }
+  .day .m.other { color: var(--ink-faint); font-style: italic; }
+  @media (max-width: 720px) { .weekstrip { grid-template-columns: repeat(4, 1fr); } }
+
+  /* ---------- the drawer ---------- */
+  .dr-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+  .dr-emoji { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 1.375rem; background: var(--green-tint); flex: none; }
+  .dr-emoji.meal { background: var(--accent-tint); }
+  .dr-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1.125rem; color: var(--ink); margin: 0; }
+  .dr-sub { font-size: 0.8125rem; color: var(--ink-soft); margin-top: 2px; }
+  .dr-close { margin-left: auto; width: 32px; height: 32px; border-radius: 10px; border: 0; background: var(--tile); color: var(--ink-soft); cursor: pointer; flex: none; }
+  .dr-body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .dr-foot { display: flex; gap: 10px; padding: 14px 20px 20px; border-top: 1px solid var(--line); background: var(--panel); }
+  .btn { flex: 1; border: 0; cursor: pointer; padding: 12px 16px; border-radius: 16px; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9375rem; }
+  .btn.quiet { flex: none; background: var(--tile); color: var(--ink-soft); }
+  .btn.go { background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; box-shadow: 0 4px 14px rgb(241 93 34 / 25%); }
+  .skel-group .lbl { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .skel { height: 38px; border-radius: 12px; background: var(--skel); }
+  .skel.short { width: 62%; }
+
+  .eyebrow { display: flex; align-items: center; gap: 6px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 8px; }
+  .eyebrow .count { letter-spacing: 0; text-transform: none; font-weight: 600; }
+  .eyebrow .acts { margin-left: auto; display: inline-flex; gap: 6px; letter-spacing: 0; text-transform: none; }
+  .link { border: 0; background: none; cursor: pointer; padding: 0; font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--accent-ink); }
+  .mini-btn { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; background: var(--accent-tint); color: var(--accent-ink); }
+  .mini-btn:hover { background: var(--accent-tint-2); }
+  .mini-btn.quiet { background: var(--tile); color: var(--ink-soft); }
+  .mini-btn.purple { background: var(--purple); color: #fff; }
+  .mini-btn.purple-quiet { background: transparent; color: var(--purple-ink); }
+
+  /* ---------- THE SHARED CHECKLIST (IngredientChecklist) ---------- */
+  .ck { display: flex; flex-direction: column; }
+  .ck-line { display: flex; align-items: flex-start; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); }
+  .ck-line:last-child { border-bottom: 0; }
+  .box { width: 22px; height: 22px; flex: none; margin-top: 1px; border-radius: 8px; border: 2px solid var(--line-strong); background: transparent; display: grid; place-items: center; cursor: pointer; padding: 0; color: #fff; font-size: 0.75rem; font-weight: 800; }
+  .ck-line.on .box { background: var(--accent); border-color: var(--accent); }
+  .ck-line .txt { flex: 1; min-width: 0; }
+  .ck-line .t1 { font-size: 0.875rem; font-weight: 500; color: var(--ink); line-height: 1.4; border-radius: 6px; padding: 0 2px; margin: 0 -2px; outline: none; }
+  .ck-line .t1:hover { background: var(--tile); }
+  .ck-line .t1 .q { font-family: 'Outfit', sans-serif; font-weight: 700; }
+  .ck-line:not(.on) .t1 { color: var(--ink-faint); }
+  .ck-line .src { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; font-size: 0.75rem; color: var(--ink-faint); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+  .d1 { background: var(--r1); } .d2 { background: var(--r2); } .d3 { background: var(--r3); } .d4 { background: var(--r4); }
+  .merged-pill { border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--silk-tint); color: var(--silk-ink); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; }
+  .dup { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; }
+  .parts { margin: 6px 0 2px; padding: 6px 10px; border-radius: 12px; background: var(--tile); display: none; }
+  .ck-line.open .parts { display: block; }
+  .parts div { display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; color: var(--ink-soft); padding: 2px 0; }
+  .parts .split { margin-top: 4px; }
+  .ck-add { display: flex; align-items: center; gap: 10px; padding: 10px 4px 2px; }
+  .ck-add .plus { width: 22px; height: 22px; border-radius: 8px; border: 2px dashed var(--line-strong); display: grid; place-items: center; color: var(--ink-faint); font-weight: 700; flex: none; }
+  .ck-add input { flex: 1; border: 0; background: transparent; font-size: 0.875rem; color: var(--ink); outline: none; }
+  .ck-add input::placeholder { color: var(--ink-faint); }
+  .ck-head { display: flex; align-items: center; gap: 8px; padding: 0 4px 6px; }
+  .ck-head .all { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; cursor: pointer; padding: 0; font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+  .ck-head .all .box { width: 20px; height: 20px; border-radius: 7px; }
+  .ck-head .all.on .box { background: var(--accent); border-color: var(--accent); }
+  .ck-head .tally { margin-left: auto; font-size: 0.75rem; color: var(--ink-faint); }
+
+  /* magic beans suggestion */
+  .mb { border-radius: 16px; border: 1px solid var(--purple-line); background: var(--purple-tint); padding: 12px 14px; }
+  .mb-h { display: flex; align-items: center; gap: 6px; font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 700; color: var(--purple-ink); }
+  .mb-row { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--purple-line); }
+  .mb-row:first-of-type { border-top: 0; padding-top: 0; }
+  .mb-from { font-size: 0.8125rem; color: var(--ink-soft); line-height: 1.5; }
+  .mb-to { font-size: 0.875rem; color: var(--ink); font-weight: 600; margin-top: 2px; }
+  .mb-acts { display: flex; gap: 6px; margin-top: 8px; }
+  .mb-row.done .mb-acts { display: none; }
+  .mb-row.done .mb-to::after { content: '  ✓ merged'; font-family: 'Outfit', sans-serif; font-size: 0.75rem; color: var(--purple-ink); }
+  .mb-row.kept .mb-acts { display: none; }
+  .mb-row.kept .mb-to::after { content: '  kept apart'; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 500; color: var(--ink-faint); }
+  .mb-inline { display: flex; align-items: center; gap: 8px; margin: 2px 0 2px 32px; padding: 7px 10px; border-radius: 12px; border: 1px dashed var(--purple-line); background: var(--purple-tint); font-size: 0.8125rem; color: var(--ink); }
+  .mb-inline .s { color: var(--purple-ink); font-family: 'Outfit', sans-serif; font-weight: 700; }
+  .mb-inline .grow { flex: 1; min-width: 0; }
+  .mb-thinking { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; color: var(--purple-ink); font-family: 'Outfit', sans-serif; font-weight: 600; }
+
+  /* destination */
+  .dest { border-radius: 16px; border: 1px solid var(--line); background: var(--ground); padding: 12px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 14px; background: var(--tile); gap: 3px; }
+  .seg button { border: 0; cursor: pointer; padding: 8px; border-radius: 11px; background: transparent; font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 700; color: var(--ink-soft); }
+  .seg button[aria-pressed='true'] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }
+  :root[data-theme='dark'] .seg button[aria-pressed='true'] { background: var(--card); }
+  .dest-pane { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .field { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); font-size: 0.875rem; color: var(--ink); }
+  :root[data-theme='dark'] .field { background: var(--card); }
+  .field .k { font-size: 0.75rem; color: var(--ink-faint); font-family: 'Outfit', sans-serif; font-weight: 600; min-width: 64px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .face { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.75rem; color: #fff; background: #f15d22; }
+  .listpick { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; }
+  :root[data-theme='dark'] .listpick { background: var(--card); }
+  .listpick.sel { border-color: var(--accent); }
+  .listpick .nm { flex: 1; font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+  .listpick .pr { font-size: 0.75rem; color: var(--ink-faint); }
+  .hidden { display: none !important; }
+
+  /* B: grouped sections */
+  .grp { border-radius: 16px; border: 1px solid var(--line); background: var(--card); padding: 10px 12px 4px; }
+  .grp-h { display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif; font-size: 0.875rem; font-weight: 700; color: var(--ink); padding: 2px 4px 6px; }
+  .grp-h .day { all: unset; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink-faint); }
+  .grp-h .ta { margin-left: auto; }
+  .grp.shared { background: var(--silk-tint); border-color: transparent; }
+  .dest-inline { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--ground); border: 1px solid var(--line); font-size: 0.875rem; color: var(--ink-soft); }
+  .dest-inline b { color: var(--ink); font-weight: 600; }
+  .dest-inline .chev { margin-left: auto; color: var(--ink-faint); }
+
+  /* C: steps */
+  .steps { display: flex; gap: 6px; }
+  .steps span { flex: 1; height: 4px; border-radius: 999px; background: var(--tile); }
+  .steps span.on { background: var(--accent); }
+  .step-t { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: var(--ink); margin: 0; }
+  .destcard { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; border: 2px solid var(--line); background: var(--card); cursor: pointer; }
+  .destcard.sel { border-color: var(--accent); background: var(--accent-tint); }
+  :root[data-theme='dark'] .destcard.sel { background: var(--tile-hover); }
+  .destcard .ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: var(--green-tint); flex: none; font-size: 1.125rem; }
+  .destcard .nm { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9375rem; color: var(--ink); }
+  .destcard .ds { font-size: 0.8125rem; color: var(--ink-soft); margin-top: 2px; }
+
+  /* meal drawer + recipe sheet */
+  .recipe-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); font-size: 0.875rem; color: var(--ink); }
+  :root[data-theme='dark'] .recipe-card { background: var(--card); }
+  .recipe-card .link { margin-left: auto; font-size: 0.75rem; }
+  .ck-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .ck-foot .to { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px; background: var(--tile); font-size: 0.8125rem; color: var(--ink-soft); }
+  .ck-foot .to b { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-foot .add { border: 0; cursor: pointer; padding: 9px 14px; border-radius: 12px; background: var(--green); color: #fff; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.8125rem; white-space: nowrap; }
+  :root[data-theme='dark'] .ck-foot .add { background: #1e8449; }
+  .made { font-size: 0.75rem; color: var(--ink-faint); margin-top: 8px; }
+  .made a { color: var(--accent-ink); font-family: 'Outfit', sans-serif; font-weight: 600; text-decoration: none; }
+  .note { font-size: 0.8125rem; line-height: 1.55; color: var(--page-ink-soft); max-width: 390px; margin: 10px 0 0; }
+  .note b { color: var(--page-ink); }
+</style>
+<style>
+  /* ---------- v2 additions: scaled sections ---------- */
+  .rs { border-radius: 16px; border: 1px solid var(--line); background: var(--card); padding: 12px 12px 4px; }
+  .rs-h { display: flex; align-items: flex-start; gap: 10px; padding: 0 4px 8px; }
+  .rs-h .em { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: var(--accent-tint); flex: none; font-size: 1.0625rem; }
+  .rs-h .nm { font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ink); line-height: 1.3; }
+  .rs-h .why { font-size: 0.75rem; color: var(--ink-soft); margin-top: 2px; line-height: 1.45; }
+  .rs-h .right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
+  .mult { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.8125rem; background: var(--green-tint); color: var(--green-ink); font-variant-numeric: tabular-nums; }
+  .mult.plain { background: var(--tile); color: var(--ink-soft); font-weight: 600; }
+  .served { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .served .pill { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; background: var(--chip); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .ck-line .was { font-size: 0.75rem; color: var(--ink-faint); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .stepper { display: inline-flex; align-items: center; gap: 0; border: 2px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+  :root[data-theme='dark'] .stepper { background: var(--card); }
+  .stepper button { border: 0; background: var(--tile); width: 38px; height: 38px; cursor: pointer; font-weight: 700; color: var(--ink-soft); font-size: 1rem; }
+  .stepper input { width: 52px; border: 0; text-align: center; background: transparent; font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stepper-row { display: flex; align-items: center; gap: 10px; }
+  .stepper-row .u { font-size: 0.875rem; color: var(--ink-soft); }
+  .flabel { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .flabel .opt { letter-spacing: 0; text-transform: none; font-weight: 500; margin-left: 4px; }
+  .fhint { font-size: 0.75rem; color: var(--ink-faint); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>🛒 Shopping List from the Meal Planner</h1>
+      <p class="lede">
+        Tracker #116, <b>revised after greg's review (direction B, simplified)</b>. The week's
+        list is grouped <b>by recipe</b>. A recipe planned twice is one section. Amounts are
+        scaled by <b>how many are eating each time</b> against the recipe's <b>servings</b>,
+        rounded up to a whole batch per meal, then added up. If either number is missing, the
+        recipe's own amounts are used. No merging across recipes and no duplicate checks.
+      </p>
+    </div>
+    <div class="theme-toggle" role="group" aria-label="Theme">
+      <button type="button" data-set-theme="light">Light</button>
+      <button type="button" data-set-theme="dark">Dark</button>
+    </div>
+  </div>
+
+  <!-- ============================ 1. ENTRY ============================ -->
+  <div class="section">
+    <h2><span class="tag">1</span>The Meal Planner header</h2>
+    <p class="why">
+      "Shopping List" sits beside Share and Export as PDF and covers the week shown. The count
+      is the number of recipes it will use (Tacos twice still counts once). With no recipe meals
+      that week it is disabled, with a one-line reason under it.
+    </p>
+    <div class="frames">
+      <div>
+        <p class="frame-label">Desktop, a week with 4 recipes</p>
+        <div class="pagebar">
+          <div class="mp-head">
+            <div>
+              <p class="mp-title">🍲 Meal Planner</p>
+              <div class="mp-sub">What's cooking this week?</div>
+            </div>
+            <div class="mp-btns">
+              <button class="hbtn" type="button">⧉ Copy Last Week</button>
+              <button class="hbtn shop" type="button">🛒 Shopping List <span class="n">4</span></button>
+              <button class="hbtn grad" type="button">Share</button>
+              <button class="hbtn" type="button">Export as PDF</button>
+            </div>
+          </div>
+          <div class="weekstrip">
+            <div class="day"><div class="d">Mon 28</div><div class="m">Chicken Tikka Masala</div></div>
+            <div class="day"><div class="d">Tue 29</div><div class="m">Beef Tacos</div></div>
+            <div class="day"><div class="d">Wed 30</div><div class="m other">Eat out</div></div>
+            <div class="day"><div class="d">Thu 1</div><div class="m">Veggie Stir-Fry</div></div>
+            <div class="day"><div class="d">Fri 2</div><div class="m">Beef Tacos</div></div>
+            <div class="day"><div class="d">Sat 3</div><div class="m">Spaghetti Bolognese</div></div>
+            <div class="day"><div class="d">Sun 4</div><div class="m other">Leftovers</div></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">A week with no recipe meals</p>
+        <div class="pagebar" style="width: 360px">
+          <div class="mp-btns">
+            <button class="hbtn" type="button" disabled>🛒 Shopping List</button>
+          </div>
+          <div class="hint">Plan a recipe this week to build a shopping list.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 2. WEEK DRAWER ============================ -->
+  <div class="section">
+    <h2><span class="tag">2</span>The week's list, by recipe</h2>
+    <p class="why">
+      One section per recipe, in the order it's first served. The header says when it's served,
+      how many are eating, and the batch count (<b>×3</b>). Lines with an amount are scaled
+      (the old amount is shown faintly); lines without one ("salt to taste") are kept as
+      written. Each section has its own Untick All, so "we already have everything for the
+      stir-fry" is one tap. Every line can still be edited, and you can add your own.
+    </p>
+    <div class="frames">
+      <div>
+        <p class="frame-label">Phone (390), New List</p>
+        <div class="phone">
+          <div class="notch"><span></span></div>
+          <div data-drawer="week"></div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">Desktop drawer (448), Add to a List picked</p>
+        <div class="desk">
+          <div data-drawer="week" data-dest="existing"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 3. MEAL DRAWER ============================ -->
+  <div class="section">
+    <h2><span class="tag">3</span>Edit meal: this meal's ingredients, scaled</h2>
+    <p class="why">
+      The early adopter's preferred flow. Opening Tuesday's tacos shows the recipe's ingredients,
+      scaled for the 5 eating that night (serves 4, so ×2), with the same checklist. Changing
+      who's eating in this drawer updates the amounts straight away.
+    </p>
+    <div class="frames">
+      <div>
+        <p class="frame-label">Phone (390)</p>
+        <div class="phone">
+          <div class="notch"><span></span></div>
+          <div class="dr-head">
+            <div class="dr-emoji meal">🍽️</div>
+            <div>
+              <p class="dr-title">Edit Meal</p>
+              <div class="dr-sub">Tuesday dinner</div>
+            </div>
+            <button class="dr-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <div class="dr-body">
+            <div>
+              <div class="eyebrow">Recipe</div>
+              <div class="recipe-card">🌮 Beef Tacos <button class="link" type="button">Edit Recipe</button></div>
+            </div>
+            <div>
+              <div class="eyebrow">Ingredients <span class="count">for 5, serves 4</span>
+                <span class="acts"><span class="mult">×2</span></span>
+              </div>
+              <div class="ck" data-list="meal"></div>
+              <div class="ck-foot">
+                <span class="to">Add to <b>🛒 Weekly Groceries</b> ▾</span>
+                <button class="add" type="button">Add 7</button>
+              </div>
+            </div>
+            <div class="skel-group"><div class="lbl">Cook</div><div class="skel short"></div></div>
+            <div class="skel-group"><div class="lbl">Who's eating</div><div class="skel"></div></div>
+          </div>
+        </div>
+        <p class="note">
+          <b>"Add to" remembers the last list you used</b> (falls back to New List). Tapping the
+          row opens the same destination picker as the week drawer.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 4. RECIPE SHEET + FORM ============================ -->
+  <div class="section">
+    <h2><span class="tag">4</span>The recipe page and the recipe form</h2>
+    <p class="why">
+      From the recipe page there's no meal, so the Shopping List sheet (#88) uses the recipe's
+      own amounts, now in the same checklist instead of the free-text box. The recipe form's
+      Servings becomes a number ("Serves 4"). Old text is converted once by taking its first
+      number ("Serves 4-6" becomes 4). Text with no count, like "12 muffins", is cleared.
+    </p>
+    <div class="frames">
+      <div>
+        <p class="frame-label">Recipe page: Shopping List sheet</p>
+        <div class="desk" style="border-radius: 24px">
+          <div class="dr-head">
+            <div class="dr-emoji" style="background: var(--accent-tint)">🛒</div>
+            <div>
+              <p class="dr-title">Shopping List</p>
+              <div class="dr-sub">Spaghetti Bolognese, serves 4</div>
+            </div>
+            <button class="dr-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <div class="dr-body">
+            <div>
+              <div class="ck-head">
+                <button class="all on" type="button" data-tickall><span class="box">✓</span>Tick All</button>
+                <span class="tally">9 of 9 ticked</span>
+              </div>
+              <div class="ck" data-list="recipe"></div>
+            </div>
+            <div class="dest" data-destblock></div>
+          </div>
+          <div class="dr-foot">
+            <button class="btn quiet" type="button">Cancel</button>
+            <button class="btn go" type="button">Create List</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">Recipe form: Servings</p>
+        <div class="desk" style="border-radius: 24px; width: 380px">
+          <div class="dr-body">
+            <div class="skel-group"><div class="lbl">Recipe name</div><div class="skel"></div></div>
+            <div class="row2">
+              <div class="skel-group"><div class="lbl">Prep time</div><div class="skel"></div></div>
+              <div class="skel-group"><div class="lbl">Cook time</div><div class="skel"></div></div>
+            </div>
+            <div>
+              <div class="flabel">Servings <span class="opt">(optional)</span></div>
+              <div class="stepper-row">
+                <div class="stepper">
+                  <button type="button" aria-label="Fewer" data-step="-1">−</button>
+                  <input id="serves" type="text" inputmode="numeric" value="4" aria-label="Servings" />
+                  <button type="button" aria-label="More" data-step="1">+</button>
+                </div>
+                <span class="u">people</span>
+              </div>
+              <div class="fhint">Used to size the shopping list for the people eating.</div>
+            </div>
+            <div class="skel-group"><div class="lbl">Ingredients</div><div class="skel" style="height: 90px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- theme ----------
+  const root = document.documentElement;
+  const qs = new URLSearchParams(location.search).get('theme');
+  const sys = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  function setTheme(t) {
+    root.dataset.theme = t;
+    document.querySelectorAll('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setTheme === t)));
+  }
+  setTheme(qs === 'dark' || qs === 'light' ? qs : sys);
+  document.querySelectorAll('[data-set-theme]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.setTheme)));
+
+  // ---------- data: base amounts; `s` = scaled amount, `was` = original ----------
+  const WEEK = [
+    { em: '🍛', nm: 'Chicken Tikka Masala', served: ['Mon, 4 eating'], why: 'Serves 4', mult: '×1', lines: [
+      { q: '600 g', t: 'chicken thighs' }, { q: '1 cup', t: 'plain yogurt' }, { q: '1', t: 'yellow onion, diced' },
+      { q: '3 cloves', t: 'garlic, minced' }, { q: '1 cup', t: 'basmati rice' }, { t: 'Fresh coriander, to serve' } ] },
+    { em: '🌮', nm: 'Beef Tacos', served: ['Tue, 5 eating', 'Fri, 3 eating'], why: 'Serves 4, so 2 batches on Tue and 1 on Fri', mult: '×3', lines: [
+      { q: '1500 g', was: '500 g', t: 'ground beef' }, { q: '24', was: '8', t: 'taco shells' }, { q: '3', was: '1', t: 'bell peppers' },
+      { q: '1 ½ cups', was: '½ cup', t: 'sour cream' }, { q: '3', was: '1', t: 'limes' }, { t: 'Salt, to taste' } ] },
+    { em: '🥦', nm: 'Veggie Stir-Fry', served: ['Thu'], why: "No one picked for Thursday, so the recipe's amounts", mult: 'as written', plain: true, lines: [
+      { q: '2', t: 'green bell peppers' }, { q: '1 head', t: 'broccoli' }, { q: '3 tbsp', t: 'soy sauce' }, { q: '1 thumb', t: 'fresh ginger' } ] },
+    { em: '🍝', nm: 'Spaghetti Bolognese', served: ['Sat, 8 eating'], why: 'Serves 4, so 2 batches', mult: '×2', lines: [
+      { q: '800 g', was: '400 g', t: 'spaghetti' }, { q: '500 g', was: '250 g', t: 'lean ground beef' }, { q: '2 large', was: '1 large', t: 'yellow onions' },
+      { q: '2 cans', was: '1 can', t: 'chopped tomatoes' }, { t: 'Parmesan, to serve' } ] },
+  ];
+  const MEAL = [
+    { q: '1000 g', was: '500 g', t: 'ground beef' }, { q: '16', was: '8', t: 'taco shells' }, { q: '2', was: '1', t: 'bell peppers' },
+    { q: '1 cup', was: '½ cup', t: 'sour cream' }, { q: '2', was: '1', t: 'limes' }, { q: '2 cups', was: '1 cup', t: 'grated cheddar' }, { t: 'Salt, to taste' },
+  ];
+  const RECIPE = [
+    { q: '400 g', t: 'spaghetti' }, { q: '250 g', t: 'lean ground beef' }, { q: '1 large', t: 'yellow onion, finely chopped' },
+    { q: '2 cloves', t: 'garlic, crushed' }, { q: '1', t: 'carrot, grated' }, { q: '1 can', t: 'chopped tomatoes' },
+    { q: '2 tbsp', t: 'tomato paste' }, { q: '1 tbsp', t: 'olive oil' }, { t: 'Parmesan, to serve' },
+  ];
+
+  function line(it) {
+    const el = document.createElement('div');
+    el.className = 'ck-line on';
+    el.innerHTML = `<button class="box" type="button" aria-label="Include">✓</button>
+      <div class="txt"><div class="t1"><span contenteditable="true" spellcheck="false">${it.q ? `<span class="q">${it.q}</span> ` : ''}${it.t}</span>${it.was ? `<span class="was">(${it.was})</span>` : ''}</div></div>`;
+    return el;
+  }
+  function addRow() {
+    const el = document.createElement('div');
+    el.className = 'ck-add';
+    el.innerHTML = `<span class="plus">+</span><input type="text" placeholder="Add an item" aria-label="Add an item" />`;
+    return el;
+  }
+  function fill(host, items, add = true) {
+    items.forEach((it) => host.appendChild(line(it)));
+    if (add) host.appendChild(addRow());
+  }
+
+  function destBlock(mode) {
+    return `<div class="seg" role="group" aria-label="Where it goes">
+        <button type="button" data-dest-btn="new" aria-pressed="${mode !== 'existing'}">New List</button>
+        <button type="button" data-dest-btn="existing" aria-pressed="${mode === 'existing'}">Add to a List</button>
+      </div>
+      <div class="dest-pane ${mode === 'existing' ? 'hidden' : ''}" data-pane="new">
+        <div class="field"><span class="k">Name</span>Shopping for Sep 28</div>
+        <div class="row2">
+          <div class="field"><span class="k">Who shops</span><span class="face">G</span>Greg</div>
+          <div class="field"><span class="k">By</span>Sun, Sep 28</div>
+        </div>
+      </div>
+      <div class="dest-pane ${mode === 'existing' ? '' : 'hidden'}" data-pane="existing">
+        <div class="listpick sel">🛒 <span class="nm">Weekly Groceries</span><span class="pr">14 items</span></div>
+        <div class="listpick">🧺 <span class="nm">Costco Run</span><span class="pr">12 items</span></div>
+      </div>`;
+  }
+
+  function drawerWeek(host) {
+    const existing = host.dataset.dest === 'existing';
+    const total = WEEK.reduce((n, r) => n + r.lines.length, 0);
+    host.innerHTML = `<div class="dr-head"><div class="dr-emoji">🛒</div><div><p class="dr-title">Shopping List</p><div class="dr-sub">Week of Sep 28, 4 recipes, 5 meals</div></div><button class="dr-close" type="button" aria-label="Close">✕</button></div>
+      <div class="dr-body">
+        ${WEEK.map((r, i) => `<div class="rs">
+          <div class="rs-h"><div class="em">${r.em}</div>
+            <div style="min-width:0"><div class="nm">${r.nm}</div><div class="why">${r.why}</div>
+              <div class="served">${r.served.map((s) => `<span class="pill">${s}</span>`).join('')}</div></div>
+            <div class="right"><span class="mult${r.plain ? ' plain' : ''}">${r.mult}</span><button class="link" type="button" data-tickall>Untick All</button></div>
+          </div>
+          <div class="ck" data-sec="${i}"></div></div>`).join('')}
+        <div><div class="eyebrow">Where it goes</div><div class="dest">${destBlock(existing ? 'existing' : 'new')}</div></div>
+      </div>
+      <div class="dr-foot"><button class="btn quiet" type="button">Cancel</button><button class="btn go" type="button">${existing ? `Add ${total} Items` : 'Create List'}</button></div>`;
+    WEEK.forEach((r, i) => fill(host.querySelector(`[data-sec="${i}"]`), r.lines));
+  }
+
+  document.querySelectorAll('[data-drawer="week"]').forEach(drawerWeek);
+  fill(document.querySelector('[data-list="meal"]'), MEAL, false);
+  fill(document.querySelector('[data-list="recipe"]'), RECIPE);
+  document.querySelector('[data-destblock]').innerHTML = destBlock('new');
+
+  // ---------- interactions ----------
+  document.addEventListener('click', (e) => {
+    const box = e.target.closest('.ck-line .box');
+    if (box) { const l = box.closest('.ck-line'); l.classList.toggle('on'); box.textContent = l.classList.contains('on') ? '✓' : ''; return; }
+    const ta = e.target.closest('[data-tickall]');
+    if (ta) {
+      const scope = ta.closest('.rs, .dr-body > div') || document;
+      const lines = scope.querySelectorAll('.ck-line');
+      const allOn = [...lines].every((l) => l.classList.contains('on'));
+      lines.forEach((l) => { l.classList.toggle('on', !allOn); l.querySelector('.box').textContent = allOn ? '' : '✓'; });
+      if (ta.classList.contains('all')) { ta.classList.toggle('on', !allOn); ta.querySelector('.box').textContent = allOn ? '' : '✓'; }
+      else ta.textContent = allOn ? 'Tick All' : 'Untick All';
+      return;
+    }
+    const st = e.target.closest('[data-step]');
+    if (st) { const i = document.getElementById('serves'); i.value = Math.max(1, (parseInt(i.value, 10) || 0) + Number(st.dataset.step)); return; }
+    const d = e.target.closest('[data-dest-btn]');
+    if (d) {
+      const blk = d.closest('.dest');
+      blk.querySelectorAll('[data-dest-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b === d)));
+      blk.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== d.dataset.destBtn));
+      return;
+    }
+    const lp = e.target.closest('.listpick');
+    if (lp) { lp.parentElement.querySelectorAll('.listpick').forEach((x) => x.classList.toggle('sel', x === lp)); }
+  });
+</script>
+</body>
+</html>
