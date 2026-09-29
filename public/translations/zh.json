@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-09-29",
-    "translationCount": 5620
+    "translationCount": 5621
   },
   "translations": {
     "app.name": {
@@ -28104,6 +28104,11 @@
     "whoOwnsWhat.checkinDrawer.count.saved.other": {
       "translation": "{count}个已保存，供下次使用",
       "hash": "whmjl9",
+      "lastUpdated": "2026-09-29"
+    },
+    "whoOwnsWhat.export.continued": {
+      "translation": "（续）",
+      "hash": "p2aafo",
       "lastUpdated": "2026-09-29"
     }
   }
