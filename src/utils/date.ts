@@ -221,6 +221,18 @@ export function addDaysYmd(ymd: string, days: number): string {
 }
 
 /**
+ * The default due date for a to-do added for an event on `eventYmd`: the day before, or
+ * `todayYmd` when that day has already passed, so a new to-do is never born overdue (#114).
+ * Both are `YYYY-MM-DD` (longer ISO strings are sliced). Deliberately separate from
+ * `resolveTodoDue` (magic beans), which needs the unclamped date.
+ */
+export function defaultDueBeforeEvent(eventYmd: string, todayYmd: string): string {
+  const dayBefore = addDaysYmd(eventYmd, -1);
+  const today = todayYmd.slice(0, 10);
+  return dayBefore > today ? dayBefore : today;
+}
+
+/**
  * Signed whole days from `fromYmd` to `toYmd` (`'2026-05-01' → '2026-05-04'` is 3).
  * Computed on UTC midnights, so a DST change inside the range can never round a
  * day away. The one day-difference for calendar dates; `YYYY-MM-DD` prefixes of

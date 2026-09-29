@@ -52,6 +52,7 @@ import {
   toDateInputValue,
   monthGridRange,
   addDaysYmd,
+  isRealYmd,
 } from '@/utils/date';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -105,9 +106,24 @@ const {
 // Open activity view modal from query param (e.g. /activities?activity=abc).
 // Robust to cold-start: only clears the param once the activity is found, and
 // retries when the store hydrates (e.g. opening the link from Google Calendar).
+// A `date` companion opens one session of a repeating activity (#114: a to-do's
+// chip links to the session it belongs to). A malformed date is logged and
+// ignored, so the activity still opens on its default session.
 useDeepLinkParam({
   param: 'activity',
-  open: (id) => openViewModal(id),
+  companions: ['date'],
+  open: (id, { date }) => {
+    if (date && !isRealYmd(date)) {
+      logEvent({
+        level: 'warn',
+        surface: 'activity-links',
+        message: 'deeplink_date_invalid',
+        context: { action: 'deeplink_date_invalid', detail: 'activity' },
+      });
+      return openViewModal(id);
+    }
+    return openViewModal(id, date);
+  },
   ready: () => activityStore.activities.length,
 });
 
@@ -372,7 +388,7 @@ function commitTodoLink(activityId: string | undefined): void {
   pendingTodoLinkIds.value = [];
   void (async () => {
     await nextTick();
-    const linked = await todoStore.linkTodosToActivity(ids, activityId);
+    const linked = await todoStore.linkTodosToActivity(ids, { activityId });
     if (!linked) return;
     logEvent({
       level: 'info',

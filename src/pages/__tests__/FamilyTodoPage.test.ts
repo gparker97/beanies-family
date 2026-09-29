@@ -8,7 +8,8 @@
  *   - saving the review closes it and reveals the TOPMOST new to-do as the list draws it (not
  *     counted here: the review drawer logs its own confirm events),
  *   - overlapping reveals never fight: only the latest one scrolls and pulses,
- *   - the quick-add bar with nobody to credit stops: no write, never `createdBy: ''`,
+ *   - a to-do the quick-add bar created is revealed (the bar's own create rules are pinned in
+ *     `QuickAddBar.test.ts` / `useTodoDraft.test.ts`),
  *   - desktop focuses the quick-add bar, unless the page was opened to add a to-do.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -18,7 +19,6 @@ import { defineComponent, h, nextTick, ref } from 'vue';
 import FamilyTodoPage from '@/pages/FamilyTodoPage.vue';
 import type { QuickAddIntentHandler } from '@/composables/useQuickAddIntent';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { showToast } from '@/composables/useToast';
 import { useTodoStore } from '@/stores/todoStore';
 import type { TodoItem } from '@/types/models';
 
@@ -82,7 +82,7 @@ vi.mock('@/composables/useBreakpoint', () => ({
 const focusBar = vi.fn();
 const QuickAddBarStub = defineComponent({
   name: 'QuickAddBar',
-  emits: ['add'],
+  emits: ['created'],
   setup(_, { expose }) {
     expose({ focus: focusBar });
     return () => h('div');
@@ -248,22 +248,14 @@ describe('FamilyTodoPage: add affordances', () => {
     );
   });
 
-  it('stops a quick add with nobody to credit: no write, and a toast', async () => {
+  it('reveals the to-do the quick-add bar created', async () => {
     const w = mountPage();
-    const createTodo = vi.spyOn(useTodoStore(), 'createTodo');
+    const el = row(w, 'todo-quick');
 
-    w.findComponent({ name: 'QuickAddBar' }).vm.$emit('add', { title: 'Pack the lunch' });
+    w.findComponent({ name: 'QuickAddBar' }).vm.$emit('created', openTodo('todo-quick'));
     await settle();
 
-    expect(createTodo).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(
-      'error',
-      'todo.error.noAuthor',
-      'todo.error.noAuthorHelp'
-    );
-    expect(logEvent).not.toHaveBeenCalledWith(
-      expect.objectContaining({ context: expect.objectContaining({ action: 'created' }) })
-    );
+    expect(reveal).toHaveBeenCalledWith(el, 'attention-ring');
   });
 
   it('focuses the quick-add bar on desktop, except when arriving to add a to-do', async () => {

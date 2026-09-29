@@ -34,6 +34,13 @@ import { endSeriesPatch, rebaseRuleForSplit } from '@/utils/activitySeriesEnd';
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees } from '@/utils/assignees';
 import { overrideOccurrenceYmd } from '@/utils/calendar/overrideOccurrenceYmd';
+import {
+  listLink,
+  resolveLink,
+  todoLink,
+  type ActivityLink,
+  type ResolvedActivityLink,
+} from '@/utils/activityLinks';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
 import { selectActivitiesToBackfill } from '@/utils/activityReminderBackfill';
 import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
@@ -1105,6 +1112,104 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
+   * After a split, move the SESSION-DATED to-dos and lists on or after `fromDate` from the
+   * old series (`fromId`) to the new one (`toId`), each keeping its own date. Whole-activity
+   * (dateless) items stay on the original series. `patchMany` applies one patch to every id,
+   * so items are grouped by date and relinked once per group.
+   *
+   * Reached through dynamic `import()` because `todoStore` imports this store. A failed
+   * relink has already been toasted + reported by the target store's `wrapAsync`; here it is
+   * only counted (`split_relink_failed`). Never throws and never rolls the split back: the
+   * items stay dated to the old series, visible on the To-Dos page.
+   */
+  async function moveSessionLinks(
+    fromId: string,
+    toId: string,
+    fromDate: string,
+    skipDates: ReadonlySet<string> = new Set()
+  ): Promise<void> {
+    const cut = fromDate.slice(0, 10);
+    async function relink<T extends { id: string }>(
+      detail: 'todos' | 'lists',
+      load: () => Promise<{
+        items: readonly T[];
+        toLink: (item: T) => ActivityLink | null;
+        write: (ids: readonly string[], link: ActivityLink) => Promise<unknown[] | null>;
+      }>
+    ): Promise<void> {
+      const context = { action: 'split_relink_failed', activity_id: toId, detail };
+      try {
+        const { items, toLink, write } = await load();
+        const byDate = new Map<string, string[]>();
+        for (const item of items) {
+          const link = toLink(item);
+          if (
+            link?.activityId !== fromId ||
+            !link.activityDate ||
+            link.activityDate < cut ||
+            skipDates.has(link.activityDate)
+          ) {
+            continue;
+          }
+          byDate.set(link.activityDate, [...(byDate.get(link.activityDate) ?? []), item.id]);
+        }
+        let count = 0;
+        let failed = 0;
+        for (const [activityDate, ids] of byDate) {
+          const moved = await write(ids, { activityId: toId, activityDate });
+          if (moved) count += moved.length;
+          else failed += ids.length;
+        }
+        // Emitted at count 0 too, so the relink rate is measurable against splits.
+        logEvent({
+          surface: 'activity-links',
+          level: 'info',
+          message: 'split_relinked',
+          context: { action: 'split_relinked', activity_id: toId, count, detail },
+        });
+        if (failed) {
+          logEvent({
+            surface: 'activity-links',
+            level: 'warn',
+            message: 'split_relink_failed',
+            context: { ...context, count: failed },
+          });
+        }
+      } catch (err) {
+        // Only the dynamic import can throw here (a stale chunk): nothing was relinked.
+        logEvent({
+          surface: 'activity-links',
+          level: 'warn',
+          message: 'split_relink_failed',
+          context: { ...context, count: 0 },
+          error: err,
+        });
+      }
+    }
+    await relink('todos', async () => {
+      const { useTodoStore } = await import('@/stores/todoStore');
+      const store = useTodoStore();
+      return { items: store.todos, toLink: todoLink, write: store.linkTodosToActivity };
+    });
+    await relink('lists', async () => {
+      const { useListStore } = await import('@/stores/listStore');
+      const store = useListStore();
+      return { items: store.lists, toLink: listLink, write: store.linkListsToActivity };
+    });
+  }
+
+  /**
+   * The calendar session a to-do's or list's link opens (the override child when that session
+   * was edited, `null` when it does not resolve or was cancelled). See `utils/activityLinks`.
+   */
+  function resolveActivityLink(link: ActivityLink): ResolvedActivityLink | null {
+    return resolveLink(link, {
+      byId: (id) => activities.value.find((a) => a.id === id),
+      overrideFor: (seriesId, ymd) => overridesByParent.value.get(seriesId)?.get(ymd),
+    });
+  }
+
+  /**
    * Delete an activity and — when it is a recurring master — its override
    * children (Recurring Invariant 7).
    *
@@ -1383,8 +1488,12 @@ export const useActivityStore = defineStore('activities', () => {
       },
     });
 
+    // A child that stays on the old parent keeps matching its links under the old id,
+    // so its session's links must stay there too (#114).
+    const stayedOnOldParent = new Set<string>();
     for (const child of childrenToMove) {
       if (!(await updateActivity(child.id, { parentActivityId: newTemplate.id }))) {
+        stayedOnOldParent.add(overrideOccurrenceYmd(child));
         logEvent({
           surface: 'activity-series-split',
           level: 'warn',
@@ -1393,6 +1502,7 @@ export const useActivityStore = defineStore('activities', () => {
         });
       }
     }
+    await moveSessionLinks(original.id, newTemplate.id, fromDate, stayedOnOldParent);
     return newTemplate;
   }
 
@@ -1665,6 +1775,7 @@ export const useActivityStore = defineStore('activities', () => {
     splitActivity,
     materializeOverride,
     resetOccurrenceToSeries,
+    resolveActivityLink,
     removeFromMemory,
     resetState,
   };

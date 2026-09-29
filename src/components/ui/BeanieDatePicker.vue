@@ -359,7 +359,7 @@ const isTomorrowDisabled = computed(() => {
           v-if="isOpen"
           ref="popoverRef"
           :style="popoverStyle"
-          class="dark:border-line-strong dark:bg-surface-raised z-50 w-[260px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)]"
+          class="dark:border-line-strong dark:bg-surface-raised z-[70] w-[260px] overflow-hidden rounded-2xl border border-[var(--tint-slate-10)] bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)]"
         >
           <!-- Month navigator -->
           <div

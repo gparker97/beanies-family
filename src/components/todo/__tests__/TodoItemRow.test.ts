@@ -93,4 +93,47 @@ describe('TodoItemRow', () => {
       expect(wrapper.classes()).not.toContain('shadow-[0_0_0_3px_rgba(241,93,34,0.12)]');
     });
   });
+
+  describe('inside its own activity (#114)', () => {
+    const linked = todo({ activityId: 'act-1', activityDate: '2026-05-16' });
+    const mountRow = (props: Record<string, unknown>) =>
+      mount(TodoItemRow, {
+        props: { todo: linked, compact: true, ...props },
+        global: { stubs: { LinkedActivityChip: true, EverySessionTag: true } },
+      });
+
+    it('shows the chip (with its session date) only outside the activity', () => {
+      const outside = mountRow({});
+      expect(outside.findComponent({ name: 'LinkedActivityChip' }).props()).toMatchObject({
+        activityId: 'act-1',
+        activityDate: '2026-05-16',
+      });
+
+      const inside = mountRow({ activityScope: 'session' });
+      expect(inside.findComponent({ name: 'LinkedActivityChip' }).exists()).toBe(false);
+      expect(inside.findComponent({ name: 'EverySessionTag' }).exists()).toBe(false);
+    });
+
+    it('tags a to-do linked to the whole activity with "Every Session"', () => {
+      const w = mountRow({ activityScope: 'every-session' });
+      expect(w.findComponent({ name: 'EverySessionTag' }).exists()).toBe(true);
+      expect(w.findComponent({ name: 'LinkedActivityChip' }).exists()).toBe(false);
+    });
+
+    it('draws a done to-do ticked and struck through, without its due date', () => {
+      const w = mountRow({
+        todo: todo({ completed: true, dueDate: '2020-01-01' }),
+        activityScope: 'session',
+      });
+      const box = w.find('button');
+      expect(box.attributes('aria-pressed')).toBe('true');
+      expect(box.text()).toBe('✓');
+      expect(titleText(w)).toBe('Repaint the fence');
+      expect(w.find('p.font-outfit').classes()).toContain('line-through');
+      expect(w.text()).not.toContain('overdue');
+      expect(w.text()).not.toContain('📅');
+      box.trigger('click');
+      expect(w.emitted('toggle')).toEqual([['t-1']]);
+    });
+  });
 });

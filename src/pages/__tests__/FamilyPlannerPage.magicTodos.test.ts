@@ -143,7 +143,7 @@ describe('FamilyPlannerPage: magic beans shared result', () => {
     await settle();
 
     expect(createActivity).toHaveBeenCalledTimes(1);
-    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1'], 'act-1');
+    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1'], { activityId: 'act-1' });
     expect(loggedActions()).toContain('linked');
   });
 
@@ -160,7 +160,7 @@ describe('FamilyPlannerPage: magic beans shared result', () => {
     await settle();
 
     expect(updateActivity).toHaveBeenCalledTimes(1);
-    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1'], 'act-9');
+    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1'], { activityId: 'act-9' });
   });
 
   it('does not link, and keeps the ids, when the update fails and the form stays open', async () => {
@@ -288,7 +288,9 @@ describe('FamilyPlannerPage: magic beans shared result', () => {
     activityModal(w).vm.$emit('save', { title: 'Field trip', date: '2030-10-13' });
     await settle();
 
-    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1', 'todo-2', 'todo-3'], 'act-1');
+    expect(linkTodosToActivity).toHaveBeenCalledWith(['todo-1', 'todo-2', 'todo-3'], {
+      activityId: 'act-1',
+    });
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',

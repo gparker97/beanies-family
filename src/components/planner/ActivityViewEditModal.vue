@@ -31,6 +31,7 @@ import {
   addDays,
   parseLocalDate,
   formatTime12,
+  extractDatePart,
 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
@@ -48,8 +49,8 @@ import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useClash } from '@/composables/useClash';
 import { useOverlapAckStore } from '@/stores/overlapAckStore';
 import OverlapMark from '@/components/planner/OverlapMark.vue';
-import LinkedLists from '@/components/lists/LinkedLists.vue';
-import ListDetailModal from '@/components/lists/ListDetailModal.vue';
+import ActivityLists from '@/components/lists/ActivityLists.vue';
+import ActivityTodos from '@/components/todo/ActivityTodos.vue';
 import { openExternal } from '@/utils/openExternal';
 import { safeExternalHref } from '@/utils/url';
 import { isRepeatingActivity, shiftSpan, spanOffsetDays } from '@/utils/calendar/activityDays';
@@ -93,10 +94,6 @@ const isCelebration = computed(
 );
 const router = useRouter();
 
-// Open a linked Beanie List as a drawer stacked ON TOP of this one — no route
-// navigation, so closing it returns the user to this activity drawer where they
-// started. `null` = closed.
-const linkedListId = ref<string | null>(null);
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
 const photoStore = usePhotoStore();
@@ -553,6 +550,16 @@ const viewIsAllDay = computed(() => activity.value?.isAllDay ?? false);
 
 // The legacy enum OR the canonical `rule` (#70): one definition of "repeats".
 const isRecurring = computed(() => !!activity.value && isRepeatingActivity(activity.value));
+
+// The session this drawer shows, as YYYY-MM-DD (#114): the repeat start of the
+// clicked occurrence for a repeating series, otherwise the record's own date (an
+// edited or rescheduled session's NEW date, which is what "the day before" means).
+// Link matching for edited sessions uses the original date inside `activityLinks`.
+const sessionYmd = computed(() =>
+  activity.value
+    ? (isRecurring.value && seriesDate.value) || extractDatePart(activity.value.date)
+    : ''
+);
 
 // A one-off override child (a rescheduled/edited single occurrence of a recurring
 // series). Only ACTIVE overrides are ever shown here (a cancelled one renders
@@ -1792,7 +1799,20 @@ async function confirmReschedule() {
         </div>
 
         <!-- Beanie Lists linked to this activity (#33) -->
-        <LinkedLists :activity-id="activity.id" @open="(id: string) => (linkedListId = id)" />
+        <!-- To-dos + lists linked to this session (#114). Keyed by activity + session:
+             this drawer stays mounted while its props change, so the key resets a
+             half-typed to-do, its due default and any stacked child drawer when the
+             user moves to another activity or session. -->
+        <ActivityTodos
+          :key="`todos:${activity.id}:${sessionYmd}`"
+          :activity="activity"
+          :session-ymd="sessionYmd"
+        />
+        <ActivityLists
+          :key="`lists:${activity.id}:${sessionYmd}`"
+          :activity="activity"
+          :session-ymd="sessionYmd"
+        />
 
         <!-- Created by + when — shared subtle footer (standard convention) -->
         <CreatedMeta :created-by="activity.createdBy" :created-at="activity.createdAt" />
@@ -1816,7 +1836,4 @@ async function confirmReschedule() {
       </button>
     </template>
   </BeanieFormModal>
-
-  <!-- Linked list opens stacked over this drawer; closing returns here (#33) -->
-  <ListDetailModal :list-id="linkedListId" stacked @close="linkedListId = null" />
 </template>

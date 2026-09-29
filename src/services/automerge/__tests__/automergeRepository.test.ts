@@ -352,6 +352,26 @@ describe('createAutomergeRepository', () => {
       expect(stored!.title).toBe('Sign slip'); // untouched fields survive
     });
 
+    it('patchMany deletes a key explicitly set to undefined, like update', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: { ...input('Sign slip'), activityId: 'act-1' } },
+        { id: 'td-2', input: { ...input('Pay fee'), activityId: 'act-1' } },
+      ]);
+
+      const patched = await todoRepo.patchMany(
+        ['td-1', 'td-2'],
+        { activityId: undefined },
+        { onMissing: 'skip' }
+      );
+
+      expect(patched).toHaveLength(2);
+      for (const id of ['td-1', 'td-2']) {
+        const stored = projGetById('todos', id) as unknown as Record<string, unknown>;
+        expect('activityId' in stored).toBe(false);
+        expect(stored.title).toBeDefined(); // absent keys untouched
+      }
+    });
+
     it('removeMany deletes present ids and ignores a missing one', async () => {
       await todoRepo.createManyWithIds([
         { id: 'td-1', input: input('Sign slip') },

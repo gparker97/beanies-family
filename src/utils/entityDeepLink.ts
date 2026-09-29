@@ -54,7 +54,15 @@ export const ENTITY_DEEP_LINKS: Readonly<Record<DeepLinkType, { path: string; pa
     member: { path: '/family', param: 'edit' },
   } as const);
 
-export function entityDeepLink(type: DeepLinkType, id: string): DeepLink {
+/**
+ * `extra` adds companion query params the receiver reads beside the id, e.g.
+ * `{ date }` so an activity link opens on one session of a repeating activity.
+ */
+export function entityDeepLink(
+  type: DeepLinkType,
+  id: string,
+  extra?: Record<string, string>
+): DeepLink {
   const { path, param } = ENTITY_DEEP_LINKS[type];
-  return { path, query: { [param]: id } };
+  return { path, query: { ...extra, [param]: id } };
 }

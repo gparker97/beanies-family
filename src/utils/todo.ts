@@ -2,6 +2,7 @@ import type { CreateTodoInput, TodoItem, TodoSort } from '@/types/models';
 import { toAssigneePayload } from './assignees';
 import { localToday } from './date';
 import { parseIsoDateSafely } from './safeDate';
+import { todoLink, todoLinkPatch } from './activityLinks';
 
 /**
  * Check whether a todo item is overdue (past its due date/time).
@@ -71,6 +72,10 @@ export interface TodoCreateFields {
   dueDate?: string;
   dueTime?: string;
   assigneeIds?: string[];
+  /** Link the new to-do to this activity (#114). Ignored without an id. */
+  activityId?: string;
+  /** With `activityId`: the session of a repeating activity it belongs to (`YYYY-MM-DD`). */
+  activityDate?: string;
 }
 
 /**
@@ -81,7 +86,8 @@ export interface TodoCreateFields {
  *   - an empty or blank description, date or time is saved as absent, never as `''`
  *     (`stripUndefined` drops only `undefined`, and a cleared picker yields `''`);
  *   - a time is kept only alongside a date (reminders and "overdue" assume both);
- *   - assignees are written only when there are some.
+ *   - assignees are written only when there are some;
+ *   - an activity link is written only with an id, through `todoLinkPatch`.
  *
  * Built FIELD BY FIELD and never by spreading `fields`: the review drawer passes whole drafts,
  * which carry keys that must never be persisted (`matchDate`, `timeDropped`, `dueDerived`,
@@ -98,6 +104,8 @@ export function toCreateTodoInput(fields: TodoCreateFields, createdBy: string): 
     ...(dueDate ? { dueDate } : {}),
     ...(dueTime ? { dueTime } : {}),
     ...(assigneeIds.length ? toAssigneePayload([...assigneeIds]) : {}),
+    // Through the link writer, so the id and session date are always written together.
+    ...(fields.activityId ? todoLinkPatch(todoLink(fields)) : {}),
     completed: false,
     createdBy,
   };

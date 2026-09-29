@@ -45,6 +45,64 @@ describe('LinkedActivityChip', () => {
     expect(wrapper.emitted('open')).toEqual([['act-1']]);
   });
 
+  describe('session links (#114)', () => {
+    function seedSeries(): void {
+      seedActivity({
+        id: 'series-1',
+        title: 'Soccer practice',
+        date: '2026-10-03',
+        recurrence: 'weekly',
+        daysOfWeek: [6],
+      } as Partial<FamilyActivity>);
+    }
+
+    it('labels the chip with the session date and opens that session', async () => {
+      seedSeries();
+      const wrapper = mount(LinkedActivityChip, {
+        props: { activityId: 'series-1', activityDate: '2026-10-10' },
+      });
+      expect(wrapper.text()).toContain('10 Oct');
+      await wrapper.find('button').trigger('click');
+      expect(push).toHaveBeenCalledWith({
+        path: '/activities',
+        query: { date: '2026-10-10', activity: 'series-1' },
+      });
+    });
+
+    it('opens the edited session when that session was edited', async () => {
+      seedSeries();
+      seedActivity({
+        id: 'child-1',
+        title: 'Soccer practice (moved)',
+        date: '2026-10-11',
+        parentActivityId: 'series-1',
+        originalOccurrenceDate: '2026-10-10',
+      });
+      const wrapper = mount(LinkedActivityChip, {
+        props: { activityId: 'series-1', activityDate: '2026-10-10' },
+      });
+      await wrapper.find('button').trigger('click');
+      expect(push).toHaveBeenCalledWith({
+        path: '/activities',
+        query: { date: '2026-10-11', activity: 'child-1' },
+      });
+    });
+
+    it('renders nothing when that session was cancelled', () => {
+      seedSeries();
+      seedActivity({
+        id: 'child-2',
+        date: '2026-10-10',
+        parentActivityId: 'series-1',
+        isActive: false,
+      });
+      const wrapper = mount(LinkedActivityChip, {
+        props: { activityId: 'series-1', activityDate: '2026-10-10' },
+      });
+      expect(wrapper.find('button').exists()).toBe(false);
+    });
+  });
+
   it('row variant shows the start time', () => {
     seedActivity({ startTime: '08:30' });
     const wrapper = mount(LinkedActivityChip, { props: { activityId: 'act-1', variant: 'row' } });

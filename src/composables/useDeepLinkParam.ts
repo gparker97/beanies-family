@@ -32,8 +32,18 @@ import { useRoute, useRouter } from 'vue-router';
  */
 export function useDeepLinkParam(options: {
   param: string;
-  open: (id: string) => boolean;
+  /**
+   * Returns `true` when the target was opened. `extras` carries the current values
+   * of the `companions` params (only the string ones), e.g. `{ date: '2026-10-10' }`.
+   */
+  open: (id: string, extras: Record<string, string>) => boolean;
   ready: WatchSource<unknown>;
+  /**
+   * Params that travel WITH the main one (e.g. `date` beside `activity`). They are
+   * handed to `open` and cleared together with the main param, so a consumed link
+   * never leaves a stray companion behind to be misread by the next deep link.
+   */
+  companions?: readonly string[];
 }): void {
   const route = useRoute();
   const router = useRouter();
@@ -42,10 +52,16 @@ export function useDeepLinkParam(options: {
     const raw = route.query[options.param];
     const id = typeof raw === 'string' ? raw : undefined;
     if (!id) return;
-    if (options.open(id)) {
-      // Clear only the consumed param, preserving any others in the URL.
+    const extras: Record<string, string> = {};
+    for (const key of options.companions ?? []) {
+      const value = route.query[key];
+      if (typeof value === 'string') extras[key] = value;
+    }
+    if (options.open(id, extras)) {
+      // Clear only the consumed params, preserving any others in the URL.
       const next = { ...route.query };
       delete next[options.param];
+      for (const key of options.companions ?? []) delete next[key];
       router.replace({ query: next });
     }
   }

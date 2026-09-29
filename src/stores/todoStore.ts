@@ -7,9 +7,22 @@ import { useToday } from '@/composables/useToday';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience } from '@/utils/audience';
-import { isTodoOverdue } from '@/utils/todo';
+import { isTodoOverdue, sortTodos } from '@/utils/todo';
+import {
+  itemsForSession,
+  todoLink,
+  todoLinkPatch,
+  type ActivityLink,
+  type SessionItem,
+} from '@/utils/activityLinks';
 import { isHint, dedupeHintsByKey, type HintTodo } from '@/utils/helpfulHints';
-import type { TodoItem, CreateTodoInput, UpdateTodoInput, FamilyMember } from '@/types/models';
+import type {
+  TodoItem,
+  CreateTodoInput,
+  UpdateTodoInput,
+  FamilyMember,
+  FamilyActivity,
+} from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -224,20 +237,23 @@ export const useTodoStore = defineStore('todos', () => {
   }
 
   /**
-   * Link to-dos to an activity in ONE write. A to-do deleted meanwhile (here or on another
-   * device) is skipped, never a failure. Returns the linked to-dos, or null when the write
-   * failed (already toasted + reported by `wrapAsync`).
+   * Link (or, for `null`, unlink) to-dos to an activity in ONE write, always writing the id and
+   * the session date together (`todoLinkPatch`), so a relink never leaves a stale date. A to-do
+   * deleted meanwhile (here or on another device) is skipped, never a failure. Returns the
+   * linked to-dos, or null when the write failed (already toasted + reported by `wrapAsync`).
    */
   async function linkTodosToActivity(
     ids: readonly string[],
-    activityId: string
+    link: ActivityLink | null
   ): Promise<TodoItem[] | null> {
     if (!ids.length) return [];
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const linked = await todoRepo.patchTodos(ids, { activityId }, { onMissing: 'skip' });
+        const linked = await todoRepo.patchTodos(ids, todoLinkPatch(link), {
+          onMissing: 'skip',
+        });
         const byId = new Map(linked.map((t) => [t.id, t]));
         todos.value = todos.value.map((t) => byId.get(t.id) ?? t);
         return linked;
@@ -274,6 +290,28 @@ export const useTodoStore = defineStore('todos', () => {
   function openTodosForActivity(activityId: string): TodoItem[] {
     if (!useActivityStore().activities.some((a) => a.id === activityId)) return [];
     return todos.value.filter((t) => !t.completed && t.activityId === activityId);
+  }
+
+  /**
+   * The to-dos that belong to `activity`'s `sessionYmd` session (see `utils/activityLinks`),
+   * split for display: open ones by due date (undated last), then done ones most recently
+   * completed first. Each carries its scope (`'every-session'` = linked to the whole of a
+   * repeating activity).
+   */
+  function todosForActivitySession(
+    activity: FamilyActivity,
+    sessionYmd: string
+  ): { open: SessionItem<TodoItem>[]; done: SessionItem<TodoItem>[] } {
+    const matched = itemsForSession(todos.value, todoLink, activity, sessionYmd);
+    const scopeOf = new Map(matched.map((m) => [m.item.id, m.scope]));
+    const withScope = (list: TodoItem[]) =>
+      list.map((item) => ({ item, scope: scopeOf.get(item.id)! }));
+    const openItems = matched.filter((m) => !m.item.completed).map((m) => m.item);
+    const doneItems = matched.filter((m) => m.item.completed).map((m) => m.item);
+    return {
+      open: withScope(sortTodos(openItems, 'dueDate')),
+      done: withScope(doneItems.sort(byCompletedDesc)),
+    };
   }
 
   /**
@@ -415,6 +453,7 @@ export const useTodoStore = defineStore('todos', () => {
     linkTodosToActivity,
     deleteTodos,
     openTodosForActivity,
+    todosForActivitySession,
     updateTodo,
     deleteTodo,
     restoreTodo,

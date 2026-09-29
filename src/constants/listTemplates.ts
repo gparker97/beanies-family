@@ -3,8 +3,9 @@
 // once created the list is a normal, fully-editable record with no live link
 // back. `starterItems` are PLAIN seed text (user data, like a to-do title — not
 // translated). Adding/removing a template is a one-row edit here + its 2 keys.
-import type { ListCategory, ListLifecycle, ListFrequency } from '@/types/models';
+import type { ActivityCategory, ListCategory, ListLifecycle, ListFrequency } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { getActivityCategoryById } from '@/constants/activityCategories';
 
 export interface ListTemplate {
   key: string;
@@ -15,6 +16,12 @@ export interface ListTemplate {
   lifecycle: ListLifecycle;
   frequency?: ListFrequency;
   starterItems: string[];
+  /**
+   * Activities this template is suggested for (#114): the "Suggested" badge in the activity
+   * drawer's From a Template sheet. Matches an activity category's `group` (as in
+   * `activityCategories.ts`) or an exact category id.
+   */
+  suggestFor?: { groups?: string[]; categories?: ActivityCategory[] };
 }
 
 export const LIST_TEMPLATES: ListTemplate[] = [
@@ -42,6 +49,7 @@ export const LIST_TEMPLATES: ListTemplate[] = [
       'Travel adapters',
       'Chargers',
     ],
+    suggestFor: { categories: ['field_trip', 'beach', 'pool', 'theme_park', 'picnic'] },
   },
   {
     key: 'honey-do',
@@ -86,6 +94,7 @@ export const LIST_TEMPLATES: ListTemplate[] = [
     category: 'celebrations',
     lifecycle: 'oneoff',
     starterItems: ['Guest list', 'Send invites', 'Order cake', 'Decorations', 'Party bags'],
+    suggestFor: { groups: ['Party'], categories: ['work_party'] },
   },
 ];
 
@@ -97,4 +106,16 @@ export function getListTemplateByKey(key: string): ListTemplate | undefined {
 
 export function getListTemplatesForCategory(category: ListCategory): ListTemplate[] {
   return LIST_TEMPLATES.filter((t) => t.category === category);
+}
+
+/** The template suggested for an activity of `category`, if any (first match wins). */
+export function suggestedListTemplateFor(category: string | undefined): ListTemplate | undefined {
+  if (!category) return undefined;
+  const group = getActivityCategoryById(category)?.group;
+  return LIST_TEMPLATES.find(
+    ({ suggestFor }) =>
+      !!suggestFor &&
+      ((suggestFor.categories as readonly string[] | undefined)?.includes(category) ||
+        (!!group && !!suggestFor.groups?.includes(group)))
+  );
 }
