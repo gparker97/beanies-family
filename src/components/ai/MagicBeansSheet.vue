@@ -58,7 +58,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import AiSourceButtons from '@/components/ai/AiSourceButtons.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { MAGIC_DESTINATIONS } from '@/constants/magicDestinations';
+import { MAGIC_DESTINATIONS, magicTileCols } from '@/constants/magicDestinations';
 import { routeUrl } from '@/utils/recipeSourceUrl';
 import type { ShareKind } from '@/types/magicPayload';
 
@@ -101,17 +101,8 @@ const hint = computed(() =>
   pickedKind.value && props.kinds.includes(pickedKind.value) ? pickedKind.value : undefined
 );
 
-/**
- * Columns, from the count: three across is the row the sheet has always drawn, so up to three
- * kinds stay on one row at EVERY width (fractions, not a minimum track — a `minmax(5.5rem)`
- * grid wrapped the third tile to a half-width orphan at 320px and under Large reading mode).
- * Four kinds sit two by two; more re-flow in rows of three.
- */
-const cols = computed(() => {
-  const n = props.kinds.length;
-  if (n <= 3) return Math.max(n, 1);
-  return n === 4 ? 2 : 3;
-});
+/** Columns, from the count; the rule is shared with the reading overlay (`magicTileCols`). */
+const cols = computed(() => magicTileCols(props.kinds.length));
 
 /**
  * The selected look is the same light recipe `ChipButton` ships (Heritage Orange text, border

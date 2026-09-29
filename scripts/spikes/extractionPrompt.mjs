@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-25.1';
+export const PROMPT_VERSION = '2026-09-29.2';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -50,6 +50,7 @@ export const EXTRACTION_JSON_SHAPE = {
     'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
   category:
     'string — the single best-matching category id chosen from the category list provided below, or "" if none fits well. Use ONLY an id from that list; prefer an "other_*" id within the correct group over a wrong specific id',
+  link: 'string: the single most useful https web address for this event (a sign-up, ticket or information page), exactly as written in the source, or "" if there is none',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 };
 
@@ -410,6 +411,89 @@ export function buildStatementExtractionMessages(source, todayIso, opts = {}) {
 }
 
 /**
+ * The TO-DO shape (#113): things a person has to DO, read from a note. Returned on its own as
+ * kind="todo", or as the companion of kind="event" when one note holds both. There is no
+ * standalone to-do task; the share task (with a stated kind for a correction) covers it.
+ */
+export const TODO_JSON_SHAPE = {
+  items:
+    'array: one object per separate thing someone has to do, at most 10, in the order the source gives them. Each object has exactly these keys: title, details, dueDate, dueTime, timing, assigneeName, ownerCard, links',
+  title:
+    'string: a short instruction that starts with a verb, e.g. "Return the signed permission slip"',
+  details:
+    'string or null: the facts needed to do it that the title leaves out (an amount, where to hand it in, what to pack), or null if there are none',
+  dueDate:
+    'string or null: the deadline as YYYY-MM-DD, only when the source states it or clearly implies it (e.g. "by Friday"), otherwise null. Never guess a date',
+  dueTime:
+    'string or null: 24-hour HH:mm, only when the source states a time for doing THIS to-do (e.g. "at 10am" -> "10:00"). Never the event\'s start or end time. Otherwise null',
+  timing:
+    'string or null: only when there is also an event. "on_event_day" when it is done on the day of the event (e.g. pack sunscreen for the trip), "before_event" when it must be done before the event and no date is given, otherwise null',
+  assigneeName:
+    'string or null: the name of the person the source says must do it, exactly as written (e.g. "Mia"), or null when no one is named. A role such as "parents" or "students" is not a name',
+  ownerCard:
+    'string or null: the id from the owner list that this to-do belongs to (e.g. a permission slip belongs to "school-forms"), or null if none fits',
+  links:
+    'array of strings: the https web addresses in the source that this to-do needs (a form to fill in, a payment page), or [] if none',
+};
+
+/**
+ * The Who Owns What cards a to-do may name as its owner (#113). A CLOSED list of constant ids,
+ * never family data: the client resolves the id to whoever holds that card. Hardcoded in all
+ * three copies; a client sync test pins every id to `RESPONSIBILITY_CARDS`.
+ */
+export const TODO_OWNER_CARDS = [
+  'school-forms',
+  'school-vacations',
+  'helping-at-school',
+  'homework-and-school-supplies',
+  'talking-to-teachers',
+  'kids-bags-for-the-day',
+  'lunchboxes',
+  'sports-and-clubs',
+  'tutors-and-lessons',
+  'doctor-and-dentist',
+  'health-insurance-and-claims',
+  'paying-the-bills',
+  'mail-and-paperwork',
+  'packages-and-returns',
+  'birthday-parties',
+  'gifts-for-others',
+  'cards-and-thank-yous',
+  'passports-and-documents',
+  'car-care',
+  'pet-care',
+];
+
+/**
+ * Which companions each primary kind may carry (#113), as DATA the prompt is built from. The
+ * client's `SHARE_COMPANIONS` is the source of truth; a client sync test pins this to it.
+ */
+export const PROMPT_SHARE_COMPANIONS = {
+  event: ['todo'],
+};
+
+/** The companion rule: `kind="event" may also include a "todo" object`, one per primary kind. */
+function companionRules() {
+  return Object.entries(PROMPT_SHARE_COMPANIONS)
+    .map(
+      ([kind, companions]) =>
+        `kind="${kind}" may also include ${(companions ?? []).map((c) => `a "${c}" object`).join(' and ')}`
+    )
+    .join('; ');
+}
+
+/** The stated-kind clause for a kind that has companions; empty for any other kind. */
+function hintCompanionClause(kindHint) {
+  const companions = PROMPT_SHARE_COMPANIONS[kindHint] ?? [];
+  if (companions.length === 0) return '';
+  return ` You may still include ${companions.map((c) => `the "${c}" object`).join(' and ')} when the document also contains it.`;
+}
+
+/** How to tell a to-do from an event (#113), with the four worked examples. */
+const TODO_VS_EVENT_RULE =
+  'How to tell a to-do from an event: something a person has to DO (return, sign, pay, bring, pack, buy, book, reply) is a to-do; something a person GOES TO or takes part in at a set time or place is an event. A document with both is kind="event" with a companion "todo" object. A document with only things to do is kind="todo". Examples: a school field-trip note (the trip itself, plus "return the signed permission slip by Oct 12" and "pack sunscreen on the day") is kind="event" with a "todo" object; "please return the library book by Friday" is kind="todo"; a birthday party invitation that says "RSVP by May 3" is kind="event" with a "todo" object holding "RSVP"; a plain class schedule is kind="event" with no "todo" object.';
+
+/**
  * The SHARE task (#64): classify a shared document AND extract it, in ONE call.
  *
  * A share arrives from another app with no indication of what it is, so something has to
@@ -423,12 +507,13 @@ export function buildStatementExtractionMessages(source, todayIso, opts = {}) {
  * document that is none of the three — better than forcing a wrong item on the user.
  */
 export const SHARE_JSON_SHAPE = {
-  kind: 'exactly one of "event", "travel", "recipe", "transactions" or "none" — what this document actually is',
+  kind: 'exactly one of "event", "travel", "recipe", "transactions", "todo" or "none": what this document actually is. An "event" may also carry a companion "todo" object',
   event: 'present ONLY when kind="event": an object with the event keys described below',
   travel: 'present ONLY when kind="travel": an object with the travel keys described below',
   recipe: 'present ONLY when kind="recipe": an object with the recipe keys described below',
   transactions:
     'present ONLY when kind="transactions" (a bank or card statement, or a list of bank transactions): an object with the keys described below',
+  todo: 'present when kind="todo", OR beside kind="event" when the document also asks someone to do something for that event: an object with the to-do keys described below',
 };
 
 /**
@@ -467,7 +552,7 @@ const HINT_CONTEXT = {
 export function buildShareExtractionMessages(source, todayIso, opts = {}) {
   const { kindHint, hintReason = 'correction' } = opts;
   const system = [
-    'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, a recipe, or a bank or card statement.',
+    'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, a recipe, a bank or card statement, or a note asking someone to do something.',
     kindHint
       ? // ⚠️ The CLASSIFICATION rules are replaced, not appended to, when the user has told us
         // what the thing is. The default system message says «"none" is always better than a
@@ -476,7 +561,7 @@ export function buildShareExtractionMessages(source, todayIso, opts = {}) {
         // disagreed with came back as the original kind, the wrong-kind guard 502'd it, and the
         // family lost both the grant and the answer. The person has said what the thing is;
         // the model's job here is extraction, not adjudication.
-        `The person who shared this has told us what it is: a ${kindHint}.${HINT_CONTEXT[hintReason]} Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields. Only if the document contains nothing at all that could fill them, set kind="none".`
+        `The person who shared this has told us what it is: a ${kindHint}.${HINT_CONTEXT[hintReason]} Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields.${hintCompanionClause(kindHint)} Only if the document contains nothing at all that could fill them, set kind="none".`
       : 'First decide which ONE of these the document is, then extract it.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
@@ -484,8 +569,9 @@ export function buildShareExtractionMessages(source, todayIso, opts = {}) {
       ? []
       : [
           'Set kind="none" if the document is none of these. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+          TODO_VS_EVENT_RULE,
         ]),
-    'Include ONLY the nested object matching your chosen kind. Omit the others entirely.',
+    `Include the nested object matching your chosen kind. The only extra object allowed is a companion: ${companionRules()}, and only when the document really contains one. Omit the others entirely.`,
     'Never output any value that is not actually supported by the source. An empty field is ALWAYS better than an invented one.',
     'The JSON object must have exactly these keys: ' +
       Object.keys(SHARE_JSON_SHAPE).join(', ') +
@@ -516,6 +602,12 @@ export function buildShareExtractionMessages(source, todayIso, opts = {}) {
       '. Field meanings: ' +
       JSON.stringify(STATEMENT_IDENTITY_SHAPE) +
       '. Do NOT list the individual transactions.',
+    'When a "todo" object is included (kind="todo", or as the companion of kind="event"), it has exactly one key, "items". Field meanings: ' +
+      JSON.stringify(TODO_JSON_SHAPE) +
+      '.',
+    'For each to-do\'s "ownerCard", use ONLY an id from this list, or null if none fits: ' +
+      TODO_OWNER_CARDS.join(', ') +
+      '.',
   ].join('\n');
 
   return [

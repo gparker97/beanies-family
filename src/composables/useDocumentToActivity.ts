@@ -15,7 +15,7 @@ import type { FieldConfidence } from '@/services/ai/types';
 import { reportError } from '@/utils/errorReporter';
 import { extractionToActivityPrefill } from '@/utils/extractionToActivity';
 import type { ResultEnvelope } from '@/types/magicPayload';
-import type { ExtractionResult } from '@/services/ai/types';
+import type { ExtractionResult, TodoExtractionResult } from '@/services/ai/types';
 import { sanitiseAttachmentBase } from '@/utils/sanitiseFilename';
 import type { CreateFamilyActivityInput } from '@/types/models';
 
@@ -36,6 +36,11 @@ export interface UseDocumentToActivityOptions {
      * copy of one envelope field, and a second derived copy is a second thing to keep in step.
      */
     env: ResultEnvelope;
+    /**
+     * The to-dos the same read found for this event (#113), when it was a shared result.
+     * The page reviews them before the activity form opens; absent for a plain event.
+     */
+    todo?: TodoExtractionResult;
   }) => void;
 }
 
@@ -59,9 +64,13 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
    * — the same shape as the incident the catch was originally added for: the spinner clears,
    * the modal never opens, the user is told nothing and CloudWatch records nothing.
    */
-  function deliverEvent(data: ExtractionResult, env: ResultEnvelope): void {
+  function deliverEvent(
+    data: ExtractionResult,
+    env: ResultEnvelope,
+    todo?: TodoExtractionResult
+  ): void {
     try {
-      deliverEventInner(data, env);
+      deliverEventInner(data, env, todo);
     } catch (err) {
       reportError({
         surface: 'ai-activity-capture',
@@ -74,7 +83,11 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
     }
   }
 
-  function deliverEventInner(data: ExtractionResult, env: ResultEnvelope): void {
+  function deliverEventInner(
+    data: ExtractionResult,
+    env: ResultEnvelope,
+    todo?: TodoExtractionResult
+  ): void {
     // Loud-but-non-blocking notice FIRST, so a >cap document whose recognisable content sat
     // on a dropped page still tells the user pages weren't read (never silent).
     if (env.truncated) {
@@ -97,22 +110,24 @@ export function useDocumentToActivity(options: UseDocumentToActivityOptions) {
         )
       : undefined;
     const prefill = extractionToActivityPrefill(data);
-    // A shared LINK has no file to attach, so without this an activity from a shared event
-    // page keeps NO record of where it came from — unlike the recipe path, which has a
-    // `sourceUrl` field. An activity has no such field, so the URL goes on its own line in
-    // the notes. A URL needs no translation, so this adds no string.
-    if (env.link) {
-      // `notes`, not `description`: ActivityModal renders and edits `notes`, and the mapper
-      // routes the model's free text there for exactly that reason. Putting it on
-      // `description` would hide the provenance from the user entirely.
+    // The link rule, worked out once (#113). The activity's link field holds the event's own
+    // web address when the read found one, else the page that was shared. A shared LINK has
+    // no file to attach, so its URL is also the record of where the activity came from: when
+    // it is not already the link, it goes on its own line in the notes (`notes`, not
+    // `description`: ActivityModal renders and edits `notes`, so provenance stays visible).
+    // A URL needs no translation, so this adds no string.
+    const provenanceUrl = env.link?.provenanceUrl;
+    if (!prefill.link && provenanceUrl) prefill.link = provenanceUrl;
+    if (provenanceUrl && provenanceUrl !== prefill.link) {
       const existing = prefill.notes?.trim();
-      prefill.notes = existing ? `${existing}\n${env.link.provenanceUrl}` : env.link.provenanceUrl;
+      prefill.notes = existing ? `${existing}\n${provenanceUrl}` : provenanceUrl;
     }
     options.onActivityReady({
       prefill,
       confidence: data.confidence,
       sourcePhoto,
       env,
+      ...(todo?.items.length ? { todo } : {}),
     });
   }
 

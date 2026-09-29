@@ -48,10 +48,13 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
-  <div class="relative">
+  <!-- `min-w-0` + `max-w-full` + the name's `min-w-0`: the filter is the one control on the
+       command bar's crowded phone row that can give way, so a long filtered name truncates
+       instead of pushing "+" off the screen. -->
+  <div class="relative min-w-0">
     <button
       type="button"
-      class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-2.5 py-2 text-sm font-medium transition-all"
+      class="font-outfit inline-flex max-w-full items-center gap-1.5 rounded-2xl px-2.5 py-2 text-sm font-medium transition-all"
       :class="
         props.isAllActive
           ? 'dark:bg-surface-overlay dark:text-ink-soft bg-[var(--tint-slate-5)] text-[var(--color-text)]/65'
@@ -60,15 +63,15 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       :aria-label="t('filter.allMembers')"
       @click="open = !open"
     >
-      <span class="text-base">👨‍👩‍👧</span>
+      <span class="shrink-0 text-base">👨‍👩‍👧</span>
       <!-- "All" is the default/no-filter state — show just the icon to save space.
            When actually filtered, show who, since that's the context that matters. -->
-      <span v-if="!props.isAllActive" class="max-w-[7rem] truncate">{{
+      <span v-if="!props.isAllActive" class="max-w-[7rem] min-w-0 truncate">{{
         props.activeMemberNames.length === 1
           ? props.activeMemberNames[0]
           : `${props.activeMemberNames.length} ${t('filter.members')}`
       }}</span>
-      <span class="text-xs opacity-60">▾</span>
+      <span class="shrink-0 text-xs opacity-60">▾</span>
     </button>
 
     <div v-if="open" class="fixed inset-0 z-20" @click="open = false" />

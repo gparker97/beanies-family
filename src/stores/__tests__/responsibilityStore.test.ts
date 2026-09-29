@@ -551,4 +551,12 @@ describe('check-in and celebrations', () => {
       cardId: 'cooking-dinner',
     });
   });
+
+  it('defaultHolderFor resolves a card target (magic beans owner card) to its single holder', async () => {
+    await store.deal('school-forms', 'main', 'sofia');
+    expect(store.defaultHolderFor({ kind: 'card', cardId: 'school-forms' })).toEqual({
+      memberId: 'sofia',
+      cardId: 'school-forms',
+    });
+  });
 });

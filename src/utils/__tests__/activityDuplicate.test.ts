@@ -164,4 +164,42 @@ describe('mergeExtractionIntoActivity', () => {
       expect(merged.endTime).toBe('10:00');
     });
   });
+
+  describe('link (#113)', () => {
+    it('keeps the existing link and appends a DIFFERENT incoming link to the notes', () => {
+      const merged = mergeExtractionIntoActivity(
+        activity({ link: 'https://old.example/signup', notes: 'Bring water' }),
+        prefill({ link: 'https://new.example/update', notes: 'Room 4' })
+      );
+      expect(merged.link).toBe('https://old.example/signup');
+      expect(merged.notes).toBe('Bring water\nRoom 4\nhttps://new.example/update');
+    });
+
+    it('appends the displaced link even when the read brought no notes', () => {
+      const merged = mergeExtractionIntoActivity(
+        activity({ link: 'https://old.example/signup' }),
+        prefill({ link: 'https://new.example/update' })
+      );
+      expect(merged.link).toBe('https://old.example/signup');
+      expect(merged.notes).toBe('https://new.example/update');
+    });
+
+    it('adds no note when the incoming link is the same one', () => {
+      const merged = mergeExtractionIntoActivity(
+        activity({ link: 'https://same.example/page', notes: 'Bring water' }),
+        prefill({ link: '  https://same.example/page  ' })
+      );
+      expect(merged.link).toBe('https://same.example/page');
+      expect(merged.notes).toBe('Bring water');
+    });
+
+    it('fills a blank existing link and adds no note', () => {
+      const merged = mergeExtractionIntoActivity(
+        activity({ link: '', notes: 'Bring water' }),
+        prefill({ link: 'https://new.example/page' })
+      );
+      expect(merged.link).toBe('https://new.example/page');
+      expect(merged.notes).toBe('Bring water');
+    });
+  });
 });

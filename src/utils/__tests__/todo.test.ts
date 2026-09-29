@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isTodoOverdue, isTodoDueToday, sortTodos } from '../todo';
+import { isTodoOverdue, isTodoDueToday, sortTodos, toCreateTodoInput } from '../todo';
 import type { TodoItem } from '@/types/models';
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
@@ -146,5 +146,77 @@ describe('sortTodos', () => {
 
   it('handles an empty list', () => {
     expect(sortTodos([], 'dueDate')).toEqual([]);
+  });
+});
+
+describe('toCreateTodoInput', () => {
+  it('trims the title and writes an open to-do by the author', () => {
+    expect(toCreateTodoInput({ title: '  Sign the slip  ' }, 'm-1')).toEqual({
+      title: 'Sign the slip',
+      completed: false,
+      createdBy: 'm-1',
+    });
+  });
+
+  it('keeps every field a person gave, with assignees in both shapes', () => {
+    expect(
+      toCreateTodoInput(
+        {
+          title: 'Dentist',
+          description: ' Bring the card ',
+          dueDate: '2030-10-13',
+          dueTime: '09:30',
+          assigneeIds: ['m-2', 'm-3'],
+        },
+        'm-1'
+      )
+    ).toEqual({
+      title: 'Dentist',
+      description: 'Bring the card',
+      dueDate: '2030-10-13',
+      dueTime: '09:30',
+      assigneeIds: ['m-2', 'm-3'],
+      assigneeId: 'm-2',
+      completed: false,
+      createdBy: 'm-1',
+    });
+  });
+
+  it('drops a time that has no date', () => {
+    const input = toCreateTodoInput({ title: 'Call', dueTime: '09:30' }, 'm-1');
+    expect(input).not.toHaveProperty('dueTime');
+    expect(input).not.toHaveProperty('dueDate');
+  });
+
+  it("saves an empty or blank description, date or time as absent, never ''", () => {
+    const input = toCreateTodoInput(
+      { title: 'Call', description: '   ', dueDate: '', dueTime: '', assigneeIds: [] },
+      'm-1'
+    );
+    expect(Object.keys(input).sort()).toEqual(['completed', 'createdBy', 'title']);
+  });
+
+  it('never copies extra keys a draft carries', () => {
+    const draft = {
+      id: 'd-1',
+      title: 'Pack',
+      description: '',
+      dueDate: '2030-10-13',
+      assigneeIds: [],
+      matchDate: '2030-10-12',
+      timeDropped: 'no_date',
+      dueDerived: 'event',
+      duplicateOf: 't-9',
+      skipped: false,
+    };
+    const input = toCreateTodoInput({ ...draft }, 'm-1');
+    expect(Object.keys(input).sort()).toEqual(['completed', 'createdBy', 'dueDate', 'title']);
+  });
+
+  it("does not share the caller's assignee array", () => {
+    const ids = ['m-2'];
+    const input = toCreateTodoInput({ title: 'x', assigneeIds: ids }, 'm-1');
+    expect(input.assigneeIds).toEqual(ids);
+    expect(input.assigneeIds).not.toBe(ids);
   });
 });

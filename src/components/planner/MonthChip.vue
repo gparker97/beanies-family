@@ -102,6 +102,8 @@ function onClick(event: MouseEvent) {
     ]"
     :style="identity.style"
     :aria-label="ariaLabel"
+    :data-activity-id="occurrence.activity.id"
+    :data-occurrence-date="occurrence.date"
     data-testid="month-chip"
     @click="onClick"
   >

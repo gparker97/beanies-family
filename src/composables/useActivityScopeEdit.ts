@@ -1,7 +1,6 @@
 import { ref } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { chooseScope } from '@/composables/useRecurringEditScope';
-import { confirm } from '@/composables/useConfirm';
 import {
   toDateInputValue,
   addDays,
@@ -13,14 +12,13 @@ import {
 import { shiftSpan } from '@/utils/calendar/activityDays';
 import { lastOccurrenceOf } from '@/utils/activitySeriesEnd';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
-import { endSeriesPatch } from '@/utils/activitySeriesEnd';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry';
 import type { FamilyActivity, ISODateString, UpdateFamilyActivityInput } from '@/types/models';
 
 /**
- * Shared composable for scope-aware activity view/edit/delete.
+ * Shared composable for scope-aware activity view/edit.
  * Used by FamilyPlannerPage and FamilyNookPage to avoid duplicating
  * the recurring-scope logic in both pages.
  *
@@ -251,63 +249,11 @@ export function useActivityScopeEdit() {
     return true;
   }
 
-  /**
-   * Scope-aware delete. For recurring activities, shows scope modal first.
-   * Returns true if something was deleted/modified.
-   */
-  async function handleScopedDelete(activity: FamilyActivity): Promise<boolean> {
-    if (activity.recurrence !== 'none' && viewingOccurrenceDate.value) {
-      const scope = await chooseScope();
-      if (!scope) return false;
-      const seriesDate = seriesDateOf(activity, viewingOccurrenceDate.value);
-
-      if (scope === 'this-only') {
-        const override = await activityStore.materializeOverride(activity.id, seriesDate, {
-          isActive: false,
-        });
-        if (!override) reportSessionActionFailed();
-        return !!override;
-      }
-
-      if (scope === 'this-and-future') {
-        const dayBefore = addDaysYmd(seriesDate, -1);
-        // #70: end the authoritative representation, not just the shadow —
-        // `expandRecurring` reads `rule.end` for a rule-bearing series.
-        const updated = await activityStore.updateActivity(
-          activity.id,
-          endSeriesPatch(activity, dayBefore)
-        );
-        if (!updated) {
-          reportSessionActionFailed();
-          return false;
-        }
-        // End-dating the master does NOT touch its override children — they are
-        // `recurrence:'none'` one-offs no end date applies to. Reap the ones on/
-        // after the cut so they don't survive as ghosts (Recurring Invariant 7).
-        await activityStore.deleteChildrenFrom(activity.id, seriesDate);
-        return true;
-      }
-
-      // 'all' — fall through to standard delete with confirm
-    }
-
-    const confirmed = await confirm({
-      title: 'planner.deleteActivity',
-      message: 'planner.deleteConfirm',
-      variant: 'danger',
-    });
-    if (confirmed) {
-      return activityStore.deleteActivity(activity.id);
-    }
-    return false;
-  }
-
   return {
     viewingActivity,
     viewingOccurrenceDate,
     openViewModal,
     handleViewOpenEdit,
     handleScopedSave,
-    handleScopedDelete,
   };
 }

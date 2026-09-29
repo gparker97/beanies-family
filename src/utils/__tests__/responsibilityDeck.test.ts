@@ -5,6 +5,7 @@ import {
   RESPONSIBILITY_CARDS,
   CARD_DEFAULTS,
   cardUsesFor,
+  cardIdForTarget,
   getResponsibilityCard,
   type ResponsibilityCardDef,
 } from '@/constants/responsibilityCards';
@@ -388,6 +389,24 @@ describe('deckStats / categoryCoverage', () => {
     expect(defaultHolderFor(real, { kind: 'mealSlot', slot: 'lunch' })).toBeNull();
     expect(defaultHolderFor(real, { kind: 'listTemplate', key: 'honey-do' })).toBeNull();
     expect(defaultHolderFor(real, { kind: 'listTemplate', key: 'toString' })).toBeNull();
+  });
+
+  it('defaultHolderFor reads a card target directly, and only a single holder', () => {
+    const real = resolveDeck(
+      RESPONSIBILITY_CARDS,
+      [state('school-forms', { parts: [{ key: 'main', holderId: 'sofia' }] })],
+      [],
+      FAMILY
+    ).cards;
+    expect(cardIdForTarget({ kind: 'card', cardId: 'school-forms' })).toBe('school-forms');
+    expect(defaultHolderFor(real, { kind: 'card', cardId: 'school-forms' })).toEqual({
+      memberId: 'sofia',
+      cardId: 'school-forms',
+    });
+    // Unheld or unknown cards resolve to nobody (the caller falls back to the submitter);
+    // split cards are covered by the singleHolderOf test above.
+    expect(defaultHolderFor(real, { kind: 'card', cardId: 'pet-care' })).toBeNull();
+    expect(defaultHolderFor(real, { kind: 'card', cardId: 'no-such-card' })).toBeNull();
   });
 });
 
@@ -805,6 +824,8 @@ describe('deck drift guards', () => {
     ]);
     expect(cardUsesFor('gifts-for-others')).toHaveLength(3);
     expect(cardUsesFor('dishes')).toEqual([]);
+    // A card target names its card directly; it is never a "beanies uses this card for" line.
+    expect(cardUsesFor('school-forms')).toEqual([]);
   });
 
   it('hero illustrations follow the /brand/cards/<id>.webp convention', () => {

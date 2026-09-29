@@ -481,6 +481,8 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                   : '',
               ]"
               :style="identityFor(occ.activity, { laneMemberId: member.id }).edgeStyle"
+              :data-activity-id="occ.activity.id"
+              :data-occurrence-date="currentDay.dateStr"
               @click="emit('view-activity', occ.activity.id, currentDay.dateStr)"
             >
               <CelebrationConfetti
@@ -604,6 +606,8 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                   width: `calc(${100 / group.length}% - 2px)`,
                   ...identityFor(activity, { laneMemberId: member.id }).edgeStyle,
                 }"
+                :data-activity-id="activity.id"
+                :data-occurrence-date="eventDate"
                 @click.stop="emit('view-activity', activity.id, eventDate)"
               >
                 <!--

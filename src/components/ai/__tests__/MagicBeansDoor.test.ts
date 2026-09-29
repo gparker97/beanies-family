@@ -293,7 +293,13 @@ describe('MagicBeansDoor', () => {
       // The sheet's pick tiles, the overlay's resolve and the "not right?" banner all render
       // the SAME module. Keyed on ShareKind so adding a reader is a compile error here rather
       // than a tile that silently never lights.
-      expect(MAGIC_DESTINATION_KINDS).toEqual(['event', 'travel', 'recipe', 'transactions']);
+      expect(MAGIC_DESTINATION_KINDS).toEqual([
+        'event',
+        'travel',
+        'recipe',
+        'transactions',
+        'todo',
+      ]);
       for (const kind of MAGIC_DESTINATION_KINDS) {
         expect(MAGIC_DESTINATIONS[kind].emoji).toBeTruthy();
       }

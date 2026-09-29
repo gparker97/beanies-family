@@ -13,10 +13,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - Beanstalk feature posts can now open with **the long and short of it**: a short box at the top with what we built, how it helps you, and where to find it in the app, so you can get the gist without reading the whole post. Thirteen existing feature posts now have one.
+- Magic beans can now find to-dos. Share or paste a note like "please return the library book by Friday" and it becomes a to-do, dated and assigned, ready to check before it is saved.
+- One note can now become an activity and its to-dos together. A school field-trip email puts the trip on the calendar and turns "return the signed slip by Friday" and "pack sunscreen on the day" into to-dos, each given to the right person (whoever the note names, then whoever holds that card in Who Owns What, then whoever shared it) with a sensible due date.
+- To-dos made this way are linked to their activity: a chip on the to-do opens it. Deleting an activity with linked to-dos now asks whether to keep them (kept by default).
+- A web address in an invitation or event page now fills the activity's link field.
+- Reading the same note again no longer adds its to-dos twice: ones already on your list are shown as "Already on your list" and left out unless you tap Add anyway.
+- A time in a note ("walk the dog tomorrow at 10am") is now kept on the to-do.
+- The To-Dos page now has the same Add and magic beans buttons as the other pages. Add opens a sidebar for a to-do's details (who, date, time, notes), and the quick-add sheet's To-do tile opens it too. The new to-do is scrolled into view with a brief highlight.
+- After an activity is added, the calendar now moves to it, scrolls it into view and gives it a brief highlight. The "Activity Created" confirmation has a new View Activity button.
+
+### Changed
+
+- The To-Dos page now says "to-do" throughout ("Open To-dos", "To-do Details", "New To-do") instead of mixing in "task".
 
 ### Fixed
 
 - In beanie mode, the sidebar's share feedback link now fits on one line.
+- On larger phones and small tablets, the Activities header no longer draws its view toggles, people filter and buttons over the title, bell and search. A long member name in the filter no longer pushes the add button off screen.
 
 ## 2026-09-28
 

@@ -6,20 +6,21 @@
 //
 // The union is discriminated on `kind` so a travel result can never be handed to
 // `deliverEvent`. Every consumer narrows on it and closes with `assertNever`, so adding a
-// fourth reader is a build error at every page rather than a silent no-op at one of them.
+// new reader is a build error at every page rather than a silent no-op at one of them.
 
 import type { ExtractionSource } from '@/services/ai/types';
 import type {
   ExtractionResult,
   RecipeExtractionResult,
   StatementReadResult,
+  TodoExtractionResult,
   TravelExtractionResult,
 } from '@/services/ai/types';
 import type { ExtractionPath } from '@/services/ai/recipeSourceResolver';
 import type { JsonLdRecipe } from '@/services/ai/recipeFetchService';
 
 /** The things a shared document can turn out to be. Keep in step with `MAGIC_READERS`. */
-export type ShareKind = 'event' | 'travel' | 'recipe' | 'transactions';
+export type ShareKind = 'event' | 'travel' | 'recipe' | 'transactions' | 'todo';
 
 /**
  * Where a shared LINK came from, and what may be trusted about it (#64 links).
@@ -225,8 +226,15 @@ export function surfaceForOrigin(origin: ResultEnvelope['origin']): string {
 
 /** A classified extraction result routed to the page that owns its review modal. */
 export type SharePayload =
-  | { kind: 'event'; data: ExtractionResult; env: ResultEnvelope }
+  /**
+   * `todo` is a COMPANION (#113): the same read found things to do for this event. The
+   * primary kind stays `event`, so every single-kind guard is unchanged; which companions a
+   * kind may carry is `SHARE_COMPANIONS`, and `companionsOf` is the one reader of this field.
+   */
+  | { kind: 'event'; data: ExtractionResult; todo?: TodoExtractionResult; env: ResultEnvelope }
   | { kind: 'travel'; data: TravelExtractionResult; env: ResultEnvelope }
   | { kind: 'recipe'; source: RecipeShareSource; env: ResultEnvelope }
   // A bank statement (#107). Carries the whole read (units, dropped pages), not a bare result.
-  | { kind: 'transactions'; data: StatementReadResult; env: ResultEnvelope };
+  | { kind: 'transactions'; data: StatementReadResult; env: ResultEnvelope }
+  // Only things to do (#113). Never empty: a read with no usable item is `none` instead.
+  | { kind: 'todo'; data: TodoExtractionResult; env: ResultEnvelope };

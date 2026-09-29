@@ -107,6 +107,8 @@ export function extractionToActivityPrefill(
   if (result.title) prefill.title = result.title;
   if (result.date) prefill.date = result.date as ISODateString;
   if (result.location) prefill.location = result.location;
+  // The event's own web address (#113), already screened with `safeHttpsUrl` by the parser.
+  if (result.link) prefill.link = result.link;
   // The model's free-text overflow (prep details, what-to-bring, dress code, RSVP — one fact
   // per line) routes to the activity's VISIBLE `notes` field. The `description` field is not
   // rendered/editable in ActivityModal, so routing here would hide it from the user.

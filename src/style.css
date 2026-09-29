@@ -460,6 +460,7 @@
   .animate-beanie-shimmer,
   .attention-pulse,
   .attention-pulse-twice,
+  .attention-ring,
   .bell-ring,
   .card-bounce,
   .drop-flash,
@@ -679,6 +680,41 @@
    recovery-kit state on opening Security & Recovery). Same keyframes, same driver. */
 .attention-pulse-twice {
   animation: attention-pulse 0.8s ease-out 2;
+}
+
+/* Ring-only pulse for an element that paints its own background — a calendar chip wearing its
+   member's colour wash, or the month day card a reveal falls back to. `attention-pulse` animates background-color, which would wipe that wash
+   for the length of the pulse and then snap it back; this touches only the inset ring. Two beats,
+   because the target is small and sits among similar chips. Accents get lighter on dark
+   (CIG slide 9), so the dark ring is accent-lift. Same driver: useAttentionPulse. */
+@keyframes attention-ring {
+  0%,
+  35% {
+    box-shadow: inset 0 0 0 2px rgb(241 93 34 / 90%);
+  }
+
+  100% {
+    box-shadow: inset 0 0 0 2px rgb(241 93 34 / 0%);
+  }
+}
+
+@keyframes attention-ring-dark {
+  0%,
+  35% {
+    box-shadow: inset 0 0 0 2px rgb(255 139 94 / 95%);
+  }
+
+  100% {
+    box-shadow: inset 0 0 0 2px rgb(255 139 94 / 0%);
+  }
+}
+
+.attention-ring {
+  animation: attention-ring 0.9s ease-out 2;
+}
+
+.dark .attention-ring {
+  animation-name: attention-ring-dark;
 }
 
 /* ───── Live dot pulse ───────────────────────────────────────────────────────
@@ -1038,20 +1074,11 @@ html.dark .magic-text-shimmer {
   }
 }
 
+/* The stagger is indexed by `--tick-i` (set per tile by the overlay), so a new tile needs no
+   CSS. It replaced one `:nth-child(n)` rule per tile, which a new kind had to remember. */
 .magic-tick {
   animation: magic-tick 1.05s ease-in-out infinite;
-}
-
-.magic-tick:nth-child(2) {
-  animation-delay: 0.16s;
-}
-
-.magic-tick:nth-child(3) {
-  animation-delay: 0.32s;
-}
-
-.magic-tick:nth-child(4) {
-  animation-delay: 0.48s;
+  animation-delay: calc(var(--tick-i, 0) * 0.16s);
 }
 
 /* ───── Magic tagline band ───────────────────────────────────────────────────

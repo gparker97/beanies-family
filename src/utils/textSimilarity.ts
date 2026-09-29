@@ -1,6 +1,14 @@
-// Word-token text similarity, shared by the activity duplicate check (`activityDuplicate.ts`)
-// and the statement-import matcher (`statement/match.ts`). One implementation so the two
-// "does this look like the same thing" answers can never drift apart.
+// Word-token text similarity, shared by the activity duplicate check (`activityDuplicate.ts`),
+// the magic beans to-do duplicate check (`magicTodoDrafts.ts`) and the statement-import
+// matcher (`statement/match.ts`). One implementation so these "does this look like the same
+// thing" answers can never drift apart.
+
+/**
+ * The title-similarity bar for "this is the same thing" in the activity duplicate check. The
+ * magic beans to-do duplicate check (`markDuplicateDrafts`) sets a higher bar of its own
+ * (`TODO_MATCH_THRESHOLD`): short to-do titles that differ by one word already score 0.6.
+ */
+export const TITLE_MATCH_THRESHOLD = 0.6;
 
 /**
  * Lowercased word tokens of a string (drops punctuation + empties). Letters and digits in ANY

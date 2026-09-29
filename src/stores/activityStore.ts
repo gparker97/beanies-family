@@ -1138,7 +1138,13 @@ export const useActivityStore = defineStore('activities', () => {
       error,
       async () => {
         const success = await deleteOne(id);
-        if (!success) return false;
+        if (!success) {
+          // A non-throwing refusal (the activity was not in the doc). Reported HERE, once, so
+          // no caller has to: callers never report a `false`. A throw is already toasted by
+          // `wrapAsync`, so `result ?? false` below must not report again.
+          reportSessionActionFailed();
+          return false;
+        }
         let reaped = 0;
         for (const child of children) {
           // A child delete failing after the master is gone leaves today's

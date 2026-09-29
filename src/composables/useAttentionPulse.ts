@@ -14,7 +14,8 @@
  *
  * `reveal(el)` is the scroll-then-pulse pair for an element that may be off-screen:
  * centre it, then pulse once it has arrived. Shared by the transaction quick-link
- * picker and `useFormValidation`'s "take me to what is missing".
+ * picker, `useFormValidation`'s "take me to what is missing", and the planner's
+ * just-created activity (`useActivityReveal`).
  */
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 
@@ -89,13 +90,15 @@ export function useAttentionPulse() {
    * Scroll `el` into the middle of its scroller, then pulse it. Under reduced motion the
    * scroll is instant and the pulse starts at once (the pulse class itself is suppressed by
    * the reduced-motion block in `style.css`). A null element is a no-op, like `pulse`.
+   * `className` picks the pulse, as for `pulse` (`attention-ring` for an element that paints
+   * its own background, e.g. a calendar chip).
    */
-  function reveal(el: HTMLElement | null | undefined) {
+  function reveal(el: HTMLElement | null | undefined, className = 'attention-pulse') {
     if (!el) return;
     const reduced = prefersReducedMotion();
     el.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-    if (reduced) pulse(el);
-    else setTimeout(() => pulse(el), REVEAL_PULSE_DELAY_MS);
+    if (reduced) pulse(el, className);
+    else setTimeout(() => pulse(el, className), REVEAL_PULSE_DELAY_MS);
   }
 
   return { pulse, reveal };

@@ -3049,6 +3049,7 @@ const STRING_DEFS = {
   'time.period': { en: 'AM/PM', beanie: 'am/pm' },
   'time.now': { en: 'Now', beanie: 'now' },
   'time.clear': { en: 'Clear', beanie: 'clear' },
+  'time.clearAriaLabel': { en: 'Clear time', beanie: 'clear time' },
   'time.done': { en: 'Done', beanie: 'done' },
   'date.days': { en: 'days', beanie: 'days' },
   'date.currentMonth': { en: 'Current Month', beanie: 'current month' },
@@ -6839,24 +6840,38 @@ const STRING_DEFS = {
   // Family To-Do
   'todo.title': { en: 'To-Do List', beanie: 'our to-do list' },
   'todo.subtitle': {
-    en: 'Keep track of tasks for the whole family',
+    en: 'Keep track of to-dos for the whole family',
     beanie: 'what are your beanies busy with today?',
   },
-  'todo.newTask': { en: 'New Task', beanie: 'new task' },
+  'todo.newTask': { en: 'New To-do', beanie: 'new to-do' },
+  'todo.addTodo': { en: 'Add To-do', beanie: 'add to-do' },
+  'todo.error.noAuthor': {
+    en: "We couldn't record who's adding this to-do.",
+    beanie: "we couldn't record who's adding this to-do.",
+  },
+  'todo.error.noAuthorHelp': {
+    en: 'No signed-in family member was found. Sign in and try again.',
+    beanie: 'no signed-in family member was found. sign in and try again.',
+  },
+  'todo.field.title': { en: 'To-do', beanie: 'to-do' },
+  'todo.magicHint': {
+    en: 'Snap a note, a list or a school email',
+    beanie: 'snap a note, a list or a school email',
+  },
   'todo.quickAddPlaceholder': {
     en: 'What needs to be done?',
     beanie: 'what needs doing, my bean?',
   },
-  'todo.editTask': { en: 'Edit Task', beanie: 'edit task' },
-  'todo.deleteTask': { en: 'Delete Task', beanie: 'delete task' },
+  'todo.editTask': { en: 'Edit To-do', beanie: 'edit to-do' },
+  'todo.deleteTask': { en: 'Delete To-do', beanie: 'delete to-do' },
   'todo.deleteConfirm': {
-    en: 'Are you sure you want to delete this task?',
-    beanie: 'remove this task for good?',
+    en: 'Are you sure you want to delete this to-do?',
+    beanie: 'remove this to-do for good?',
   },
-  'todo.noTodos': { en: 'No tasks yet', beanie: 'no tasks yet' },
+  'todo.noTodos': { en: 'No to-dos yet', beanie: 'no to-dos yet' },
   'todo.getStarted': {
-    en: 'Add your first task to get started!',
-    beanie: 'add a task to get your beans moving!',
+    en: 'Add your first to-do to get started!',
+    beanie: 'add a to-do to get your beans moving!',
   },
   'todo.filter.all': { en: 'All', beanie: 'all' },
   'todo.filter.open': { en: 'Open', beanie: 'open' },
@@ -6866,7 +6881,7 @@ const STRING_DEFS = {
   'todo.sort.newest': { en: 'Newest first', beanie: 'newest first' },
   'todo.sort.oldest': { en: 'Oldest first', beanie: 'oldest first' },
   'todo.sort.dueDate': { en: 'Due date', beanie: 'due date' },
-  'todo.section.open': { en: 'Open Tasks', beanie: 'open tasks' },
+  'todo.section.open': { en: 'Open To-dos', beanie: 'open to-dos' },
   'todo.section.completed': { en: 'Completed', beanie: 'completed' },
   'todo.someday': { en: 'Someday · Maybe', beanie: 'someday · maybe' },
   'todo.somedayHint': {
@@ -6929,15 +6944,15 @@ const STRING_DEFS = {
   'todo.onCalendar': { en: 'On calendar', beanie: 'on calendar' },
   'todo.doneBy': { en: 'Done by', beanie: 'done by' },
   'todo.undo': { en: 'Undo', beanie: 'undo' },
-  'todo.taskTitle': { en: 'Task title', beanie: 'task title' },
-  'todo.viewTask': { en: 'Task Details', beanie: 'task details' },
+  'todo.taskTitle': { en: 'To-do title', beanie: 'to-do title' },
+  'todo.viewTask': { en: 'To-do Details', beanie: 'to-do details' },
   'todo.noDescription': { en: 'No description', beanie: 'no description' },
   'todo.links': { en: 'Links', beanie: 'links' },
   'todo.createdBy': { en: 'Created by', beanie: 'created by' },
   'todo.status': { en: 'Status', beanie: 'status' },
   'todo.status.open': { en: 'Open', beanie: 'open' },
   'todo.status.completed': { en: 'Completed', beanie: 'completed' },
-  'todo.reopenTask': { en: 'Reopen Task', beanie: 'reopen task' },
+  'todo.reopenTask': { en: 'Reopen To-do', beanie: 'reopen to-do' },
   'todo.noDueDate': { en: 'No due date', beanie: 'no due date' },
   'todo.noDateSet': { en: 'No date set', beanie: 'no date set' },
   'todo.addedToday': { en: 'Added today', beanie: 'added today' },
@@ -7162,7 +7177,7 @@ const STRING_DEFS = {
   // Derived "list completed" notification
   'lists.notif.finishedBy': { en: 'Finished by {finisher}', beanie: 'finished by {finisher}' },
 
-  'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'remove task' },
+  'confirm.deleteTodoTitle': { en: 'Delete To-do', beanie: 'remove to-do' },
   'confirm.deleteLocalFamilyTitle': {
     en: 'Delete Local Family Data',
     beanie: 'delete local family data',
@@ -8452,6 +8467,7 @@ const STRING_DEFS = {
     en: '+ add another activity',
     beanie: '+ add another activity',
   },
+  'planner.viewCreatedActivity': { en: 'View Activity', beanie: 'view activity' },
   'planner.activityCreatedTitle': {
     en: 'Activity Created',
     beanie: 'activity created',
@@ -10944,12 +10960,14 @@ const STRING_DEFS = {
   'ai.capture.dest.travel': { en: 'Trip', beanie: 'trip' },
   'ai.capture.dest.recipe': { en: 'Recipe', beanie: 'recipe' },
   'ai.capture.dest.transactions': { en: 'Transactions', beanie: 'transactions' },
+  'ai.capture.dest.todo': { en: 'To-do', beanie: 'to-do' },
   // The same four kinds as a noun inside a sentence ("reading it again as a bank statement").
   // The tile labels above are nouns on their own and read wrongly there ("as a Transactions").
   'ai.capture.noun.event': { en: 'an activity', beanie: 'an activity' },
   'ai.capture.noun.travel': { en: 'a trip', beanie: 'a trip' },
   'ai.capture.noun.recipe': { en: 'a recipe', beanie: 'a recipe' },
   'ai.capture.noun.transactions': { en: 'a bank statement', beanie: 'a bank statement' },
+  'ai.capture.noun.todo': { en: 'a to-do', beanie: 'a to-do' },
   // ── the optional pick (#108) ──────────────────────────────────────────────────────────
   // The tiles are tappable: "tell us what this is" is an invitation to help beanies out in
   // advance, never a question that has to be answered. Nothing selected is the default.
@@ -10977,6 +10995,10 @@ const STRING_DEFS = {
     en: "We'll read this as a bank statement.",
     beanie: "we'll read this as a bank statement.",
   },
+  'ai.capture.pick.as.todo': {
+    en: "We'll read this as a to-do.",
+    beanie: "we'll read this as a to-do.",
+  },
   // ── Bank statements (#107) ───────────────────────────────────────────────────────────
   'ai.correct.statementNotFree': {
     en: 'Reading it as a bank statement costs one bean per page.',
@@ -10984,6 +11006,107 @@ const STRING_DEFS = {
   },
   'ai.reading.statement': { en: 'Reading your statement…', beanie: 'reading your statement…' },
   'ai.reading.progress': { en: 'Page {done} of {total}', beanie: 'page {done} of {total}' },
+  // The overlay's status line once one read found an activity AND to-dos (#113).
+  'ai.found.eventWithTodos.one': {
+    en: 'Found an activity and 1 to-do',
+    beanie: 'found an activity and 1 to-do',
+  },
+  'ai.found.eventWithTodos.other': {
+    en: 'Found an activity and {count} to-dos',
+    beanie: 'found an activity and {count} to-dos',
+  },
+  // ── Magic beans to-dos (#113) ────────────────────────────────────────────────────────
+  // The review drawer, the linked-activity chip, and deleting an activity with linked
+  // to-dos. The delete and error copy keeps real nouns in beanie mode (it is on the
+  // important-surface list in `uiStrings.test.ts`).
+  'todo.linkedActivity': { en: 'Linked Activity', beanie: 'linked activity' },
+  'todo.linkedActivity.open': { en: 'Open the activity', beanie: 'open the activity' },
+  'planner.deleteLinkedTodos.title': {
+    en: 'Delete this activity?',
+    beanie: 'delete this activity?',
+  },
+  'planner.deleteLinkedTodos.message': {
+    en: 'Some to-dos are linked to it. What should happen to them?',
+    beanie: 'some to-dos are linked to it. what should happen to them?',
+  },
+  'planner.deleteLinkedTodos.message.one': {
+    en: '1 to-do is linked to it. What should happen to it?',
+    beanie: '1 to-do is linked to it. what should happen to it?',
+  },
+  'planner.deleteLinkedTodos.keep': { en: 'Keep the to-dos', beanie: 'keep the to-dos' },
+  'planner.deleteLinkedTodos.delete': {
+    en: 'Delete the {count} to-dos too',
+    beanie: 'delete the {count} to-dos too',
+  },
+  'planner.deleteLinkedTodos.delete.one': {
+    en: 'Delete the to-do too',
+    beanie: 'delete the to-do too',
+  },
+  'magicTodos.title': { en: "Here's What We Found", beanie: "here's what we found" },
+  'magicTodos.source.link': { en: 'From a shared link.', beanie: 'from a shared link.' },
+  'magicTodos.source.photo': { en: 'From a photo.', beanie: 'from a photo.' },
+  'magicTodos.source.document': { en: 'From a document.', beanie: 'from a document.' },
+  'magicTodos.source.text': { en: 'From a note you shared.', beanie: 'from a note you shared.' },
+  'magicTodos.subtitle.shared': {
+    en: 'Check the to-dos, then finish the activity.',
+    beanie: 'check the to-dos, then finish the activity.',
+  },
+  'magicTodos.subtitle.todoOnly': {
+    en: 'Check the to-dos, then save them.',
+    beanie: 'check the to-dos, then save them.',
+  },
+  'magicTodos.section.activity': { en: 'Activity', beanie: 'activity' },
+  'magicTodos.section.todos': { en: 'To-dos', beanie: 'to-dos' },
+  'magicTodos.linkedToActivity': {
+    en: 'Linked to the activity',
+    beanie: 'linked to the activity',
+  },
+  'magicTodos.next': { en: 'Next', beanie: 'next' },
+  'magicTodos.activityHelper': {
+    en: "You'll check who's going and the rest in the activity form next.",
+    beanie: "you'll check who's going and the rest in the activity form next.",
+  },
+  'magicTodos.skip': { en: 'Skip', beanie: 'skip' },
+  'magicTodos.undoSkip': { en: 'Undo skip', beanie: 'undo skip' },
+  'magicTodos.duplicate.open': { en: 'Already on your list', beanie: 'already on your list' },
+  'magicTodos.duplicate.done': { en: 'Already done', beanie: 'already done' },
+  'magicTodos.duplicate.addAnyway': { en: 'Add anyway', beanie: 'add anyway' },
+  'magicTodos.titlePlaceholder': { en: 'What needs doing?', beanie: 'what needs doing?' },
+  'magicTodos.save.shared.one': {
+    en: 'Save 1 to-do, then add the activity',
+    beanie: 'save 1 to-do, then add the activity',
+  },
+  'magicTodos.save.shared.other': {
+    en: 'Save {count} to-dos, then add the activity',
+    beanie: 'save {count} to-dos, then add the activity',
+  },
+  'magicTodos.save.todoOnly.one': { en: 'Save 1 to-do', beanie: 'save 1 to-do' },
+  'magicTodos.save.todoOnly.other': { en: 'Save {count} to-dos', beanie: 'save {count} to-dos' },
+  'magicTodos.save.activityOnly': { en: 'Add the activity', beanie: 'add the activity' },
+  'magicTodos.reason.named': { en: 'named in the note', beanie: 'named in the note' },
+  'magicTodos.reason.submitter': { en: 'you shared it', beanie: 'you shared it' },
+  'magicTodos.due.eventDay': { en: 'activity day', beanie: 'activity day' },
+  'magicTodos.due.dayBefore': { en: 'day before', beanie: 'day before' },
+  'magicTodos.error.build': {
+    en: "We couldn't read the to-dos from this. The activity is still here.",
+    beanie: "we couldn't read the to-dos from this. the activity is still here.",
+  },
+  'magicTodos.error.save': {
+    en: "Your to-dos weren't saved. Please try again.",
+    beanie: "your to-dos weren't saved. please try again.",
+  },
+  'magicTodos.error.buildTodoOnly': {
+    en: "We couldn't read the to-dos from this. Please try again.",
+    beanie: "we couldn't read the to-dos from this. please try again.",
+  },
+  'magicTodos.error.noAuthor': {
+    en: "We couldn't record who's adding these to-dos.",
+    beanie: "we couldn't record who's adding these to-dos.",
+  },
+  'magicTodos.error.noAuthorHelp': {
+    en: 'No signed-in family member was found. Sign in and try again.',
+    beanie: 'no signed-in family member was found. sign in and try again.',
+  },
   'ai.consent.statement.title': {
     en: 'This Looks Like a Bank Statement',
     beanie: 'this looks like a bank statement',

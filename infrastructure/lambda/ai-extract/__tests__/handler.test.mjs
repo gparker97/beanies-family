@@ -665,6 +665,49 @@ describe('ai-extract Lambda handler', () => {
       assert.deepEqual(counted(), []);
     });
 
+    it('answers a todo share result as none on the legacy arm (#113)', async () => {
+      // Every legacy-arm client predates `todo` and would throw "unknown kind" on it; a 502
+      // would show a false "try a clearer photo" that every retry repeats. `none` is the
+      // honest answer that build can show, and it counts like any other `none`.
+      globalThis.fetch = async () =>
+        fakeUpstream({
+          content: JSON.stringify({
+            kind: 'todo',
+            todo: { items: [{ title: 'Return the book' }] },
+          }),
+        });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { ...goodBody, task: 'share', familyId: 'fam-handler-01' },
+        })
+      );
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(JSON.parse(res.body).result, { kind: 'none' });
+      assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+    });
+
+    it('still serves an event that carries a todo companion on the legacy arm (#113)', async () => {
+      // An old client ignores the extra object and shows the activity, so only a PRIMARY
+      // `todo` is refused.
+      globalThis.fetch = async () =>
+        fakeUpstream({
+          content: JSON.stringify({
+            kind: 'event',
+            event: VALID_EXTRACTION,
+            todo: { items: [{ title: 'Sign the slip' }] },
+          }),
+        });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { ...goodBody, task: 'share', familyId: 'fam-handler-01' },
+        })
+      );
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+    });
+
     it('REFUSES a correction whose grant was not spent, rather than charging for it', async () => {
       // Without the refusal it falls through as an ordinary read: the hint is dropped, so at
       // temperature 0 on the same bytes the model returns the same wrong kind, `n` is charged,
@@ -759,6 +802,35 @@ describe('ai-extract Lambda handler', () => {
       assert.equal(res.statusCode, 422);
       assert.equal(JSON.parse(res.body).code, 'correction_disagreed');
       assert.deepEqual(counted(), [], 'a disagreement is still not a read anyone pays for');
+    });
+
+    it('says DISAGREED when a legacy correction is answered `todo` (#113)', async () => {
+      // The legacy prompt now knows `todo`, but no legacy client does: the answer becomes
+      // `none` before the correction guard, so it is the same honest disagreement as above,
+      // never a false "try a clearer photo" 502.
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      process.env.CORRECTION_GRANTS = '1';
+      globalThis.fetch = async () =>
+        fakeUpstream({
+          content: JSON.stringify({ kind: 'todo', todo: { items: [{ title: 'Sign the slip' }] } }),
+        });
+
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: {
+            ...goodBody,
+            task: 'share',
+            familyId: 'fam-handler-01',
+            correction: { token: '11111111-2222-3333-4444-555555555555', to: 'event' },
+          },
+        })
+      );
+
+      delete process.env.RATE_TABLE;
+      assert.equal(res.statusCode, 422);
+      assert.equal(JSON.parse(res.body).code, 'correction_disagreed');
+      assert.deepEqual(counted(), []);
     });
 
     it('still says model_shape when the model returns a DIFFERENT kind', async () => {

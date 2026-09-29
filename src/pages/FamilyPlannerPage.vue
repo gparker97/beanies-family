@@ -19,6 +19,11 @@ import { showToast } from '@/composables/useToast';
 import { validateSegmentTarget } from '@/utils/vacation';
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
+import MagicTodoReviewDrawer from '@/components/ai/MagicTodoReviewDrawer.vue';
+import type { TodoReviewReady } from '@/utils/magicTodoDrafts';
+import { useTodoStore } from '@/stores/todoStore';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import HolidayDetailsModal from '@/components/planner/HolidayDetailsModal.vue';
 import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
@@ -31,8 +36,10 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
+import { useActivityReveal } from '@/composables/useActivityReveal';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { confirm } from '@/composables/useConfirm';
+import { confirmAndDeleteActivity } from '@/composables/useActivityDelete';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -56,7 +63,7 @@ import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import { useDocumentToActivity } from '@/composables/useDocumentToActivity';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import { usePlannerTodayConsumer } from '@/composables/usePlannerToday';
-import type { FieldConfidence } from '@/services/ai/types';
+import type { FieldConfidence, TodoExtractionResult } from '@/services/ai/types';
 import type { ResultEnvelope } from '@/types/magicPayload';
 import type {
   FamilyActivity,
@@ -120,19 +127,20 @@ const settingsStore = useSettingsStore();
 const clashStore = useCalendarClashStore();
 const { getWeekStart } = useWeekNavigation(referenceDate);
 
-const clashWindow = computed(() => {
+/** The days the active view draws (the desktop month grid includes its padding days). */
+const visibleRange = computed((): { startYmd: string; endYmd: string } => {
   const view = activeView.value;
-  let startYmd: string;
-  let endYmd: string;
-  if (view === 'month') {
-    ({ startYmd, endYmd } = monthGridRange(referenceDate.value, settingsStore.weekStartDay));
-  } else if (view === 'week') {
-    startYmd = toDateInputValue(getWeekStart(referenceDate.value));
-    endYmd = addDaysYmd(startYmd, 6);
-  } else {
-    startYmd = toDateInputValue(referenceDate.value);
-    endYmd = startYmd;
+  if (view === 'month') return monthGridRange(referenceDate.value, settingsStore.weekStartDay);
+  if (view === 'week') {
+    const startYmd = toDateInputValue(getWeekStart(referenceDate.value));
+    return { startYmd, endYmd: addDaysYmd(startYmd, 6) };
   }
+  const day = toDateInputValue(referenceDate.value);
+  return { startYmd: day, endYmd: day };
+});
+
+const clashWindow = computed(() => {
+  const { startYmd, endYmd } = visibleRange.value;
   // The DRAWN occurrences the grids show (tails included: `computeClashes` reads
   // a tail as its start-day event, and the self-exclusion set needs its id).
   const occurrences = activityStore.activitiesInRange(startYmd, endYmd);
@@ -160,6 +168,41 @@ watch(
   },
   { immediate: true }
 );
+// ── Reveal a just-created activity ───────────────────────────────────────────
+// After a create, the calendar moves to the new activity's first occurrence and, once nothing
+// covers it, scrolls to its chip and pulses it (the shared attention pulse).
+const plannerRootRef = ref<HTMLElement | null>(null);
+
+/**
+ * Is `ymd` on screen in the active view? Two views draw less than `visibleRange`: the mobile
+ * month stream shows whole months (no padding days), and mobile week shows only the focused
+ * day's timeline below its strip.
+ */
+function isDateShown(ymd: string): boolean {
+  const shownYmd = toDateInputValue(referenceDate.value);
+  if (isMobile.value && activeView.value === 'month') {
+    return ymd.slice(0, 7) === shownYmd.slice(0, 7);
+  }
+  if (isMobile.value && activeView.value === 'week') return ymd === shownYmd;
+  const { startYmd, endYmd } = visibleRange.value;
+  return ymd >= startYmd && ymd <= endYmd;
+}
+
+/** Move the view's period to `ymd` when it is not already on screen (same view, new period). */
+function showDate(ymd: string): boolean {
+  if (isDateShown(ymd)) return false;
+  referenceDate.value = parseLocalDate(ymd);
+  // Same as paging: a drilled-in day highlight from the old period would be stale.
+  focusedDate.value = null;
+  return true;
+}
+
+const activityReveal = useActivityReveal({
+  root: plannerRootRef,
+  showDate,
+  viewKind: () => `${activeView.value}-${isMobile.value ? 'mobile' : 'desktop'}`,
+});
+
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);
@@ -204,7 +247,53 @@ const createdConfirm = ref<{
   message: string;
   details: ConfirmDetail[];
   lastCreatedDate?: string;
+  /** The activity just created, for the confirmation's "View Activity" action. */
+  activityId?: string;
 }>({ open: false, title: '', message: '', details: [], lastCreatedDate: undefined });
+
+/** OK / dismiss: the calendar is uncovered now, so reveal the activity it already moved to. */
+function handleCreatedConfirmClose() {
+  createdConfirm.value.open = false;
+  void activityReveal.flush('confirm_close');
+}
+
+/**
+ * "View Activity": open the new activity's view modal. The reveal stays parked and runs when
+ * that modal closes (see `closeViewModal`), so the pulse is never spent behind a dialog.
+ */
+async function handleCreatedView() {
+  const id = createdConfirm.value.activityId;
+  createdConfirm.value.open = false;
+  if (!id) return;
+  // One dialog at a time (the WebKit stall precedent in `handleSave`).
+  await nextTick();
+  const date =
+    activityReveal.pending.value?.id === id ? activityReveal.pending.value.date : undefined;
+  if (!openViewModal(id, date)) {
+    activityReveal.cancel();
+    reportError({
+      surface: 'planner-reveal',
+      message: 'the activity just created was not found when opening it from the confirmation',
+      severity: 'warning',
+      context: { action: 'view_created_missing', activity_id: id },
+    });
+  }
+}
+
+/**
+ * Deleted from the view modal (it emits `deleted`, then `close`): nothing is left to reveal, so
+ * drop the reveal parked by "View Activity" before `closeViewModal` would flush it.
+ */
+function handleViewDeleted(id: string) {
+  if (activityReveal.pending.value?.id === id) activityReveal.cancel();
+}
+
+/** The view modal closed: finish a reveal parked for this activity by "View Activity". */
+function closeViewModal() {
+  const id = viewingActivity.value?.id;
+  viewingActivity.value = null;
+  if (id && activityReveal.pending.value?.id === id) void activityReveal.flush('view_close');
+}
 
 function handleCreateAnother() {
   const date = createdConfirm.value.lastCreatedDate;
@@ -238,7 +327,120 @@ type PhotoActivityReady = {
   sourcePhoto?: File;
   /** Carried through to `ActivityModal` so it can offer the free "not right?" correction. */
   env: ResultEnvelope;
+  /** To-dos the same read found for this activity (#113): reviewed before the form opens. */
+  todo?: TodoExtractionResult;
 };
+
+// --- Magic beans to-dos (#113) ---
+// A shared result (an activity AND to-dos) opens the to-do review drawer FIRST. Its `ready` is
+// parked meanwhile; once the to-dos are saved the capture carries on down the normal path
+// (duplicate check, then the pre-filled activity form), and the saved ids wait in
+// `pendingTodoLinkIds` until the activity is saved, when `commitTodoLink` links them.
+const TODO_REVIEW_SURFACE = 'magic-todo-review';
+const todoStore = useTodoStore();
+const todoReview = ref<TodoReviewReady | null>(null);
+let parkedCapture: PhotoActivityReady | null = null;
+const pendingTodoLinkIds = ref<string[]>([]);
+
+/**
+ * Drop to-do ids that were waiting for an activity which will now never be saved (the form
+ * closed unsaved, or a new capture replaced this one). The to-dos stay, unlinked; logged so
+ * the unlinked rate is measurable.
+ */
+function dropPendingTodoLink(): void {
+  const count = pendingTodoLinkIds.value.length;
+  if (!count) return;
+  pendingTodoLinkIds.value = [];
+  logEvent({
+    level: 'info',
+    surface: TODO_REVIEW_SURFACE,
+    message: 'link_skipped',
+    context: { action: 'link_skipped', count },
+  });
+}
+
+/**
+ * Link the waiting to-dos to the activity just saved. Called in exactly two places in
+ * `handleSave` (create, and a successful update or scoped save), BEFORE the modal state is
+ * cleared. The ids are taken now; the write runs after the form has closed, so a slow or
+ * failed link never holds the form open. A failure is toasted + reported by the store.
+ */
+function commitTodoLink(activityId: string | undefined): void {
+  const ids = pendingTodoLinkIds.value;
+  if (!ids.length) return;
+  if (!activityId) return dropPendingTodoLink();
+  pendingTodoLinkIds.value = [];
+  void (async () => {
+    await nextTick();
+    const linked = await todoStore.linkTodosToActivity(ids, activityId);
+    if (!linked) return;
+    logEvent({
+      level: 'info',
+      surface: TODO_REVIEW_SURFACE,
+      message: 'linked',
+      context: { action: 'linked', count: linked.length, activity_id: activityId },
+    });
+    // `patchMany` skips a to-do deleted meanwhile (another device), which is correct but must
+    // not be silent: the shortfall is what tells a race apart from a projection divergence.
+    const skipped = ids.length - linked.length;
+    if (skipped > 0) {
+      logEvent({
+        level: 'warn',
+        surface: TODO_REVIEW_SURFACE,
+        message: 'link_partial',
+        context: { action: 'link_partial', count: skipped, activity_id: activityId },
+      });
+    }
+  })().catch((err) => {
+    reportError({
+      surface: TODO_REVIEW_SURFACE,
+      message: 'linking saved to-dos to their activity threw',
+      severity: 'error',
+      error: err,
+      context: { action: 'link_failed', count: ids.length, activity_id: activityId },
+    });
+  });
+}
+
+/** The drawer is done (saved, or could not build): carry the parked capture on to the form. */
+async function resumeParkedCapture(savedIds: string[], stage: string): Promise<void> {
+  const ready = parkedCapture;
+  parkedCapture = null;
+  // Never two dialogs at once: the drawer fully closes before the duplicate confirm or the
+  // activity form can open (the WebKit stall precedent in `handleSave`).
+  todoReview.value = null;
+  pendingTodoLinkIds.value = savedIds;
+  await nextTick();
+  if (!ready) return;
+  try {
+    await continueActivityCapture(ready);
+  } catch (err) {
+    showToast('error', t('ai.error.title'), t('ai.error.generic'), {
+      surface: TODO_REVIEW_SURFACE,
+      context: { stage },
+      error: err,
+    });
+  }
+}
+
+/**
+ * The drawer only emits `saved` for the capture it is still showing: a save that lands after a
+ * newer capture superseded it is dropped there (`MagicTodoReviewDrawer` checks its `ready`
+ * identity after the write), so this always belongs to the parked capture.
+ */
+function onTodoReviewSaved(ids: string[]): void {
+  void resumeParkedCapture(ids, 'resume_after_save');
+}
+
+function onTodoReviewBuildFailed(): void {
+  void resumeParkedCapture([], 'resume_after_build_failed');
+}
+
+/** ✕ on the drawer: nothing saved, nothing opened (the drawer logs `dismissed`). */
+function onTodoReviewClose(): void {
+  todoReview.value = null;
+  parkedCapture = null;
+}
 
 /**
  * Reset the shared modal context and close-then-reopen so ActivityModal's open-watch re-fires
@@ -287,12 +489,99 @@ function applyUpdateExisting(match: FamilyActivity, ready: PhotoActivityReady): 
  * 2+ matches (or a detection error) fall back to today's add-new behavior.
  */
 async function onPhotoActivityReady(ready: PhotoActivityReady): Promise<void> {
-  let match: FamilyActivity | null = null;
-  try {
-    match = findDuplicateActivity(ready.prefill, activityStore.activeActivities);
-  } catch (err) {
-    console.warn('[activity-extract] duplicate detection failed; adding new', err);
+  // Each capture owns the pending link. A second capture (the form's own magic beans card)
+  // must not link capture A's to-dos to capture B's activity.
+  dropPendingTodoLink();
+  // A capture that arrives while the drawer is still open for an earlier one (the OS share
+  // sheet reaches the page behind the drawer) supersedes it: close the drawer and drop the
+  // parked capture first, so the new form never opens over the drawer and a later save of the
+  // stale drawer can never resume capture A over capture B.
+  if (todoReview.value) {
+    todoReview.value = null;
+    parkedCapture = null;
+    logEvent({
+      level: 'info',
+      surface: TODO_REVIEW_SURFACE,
+      message: 'dismissed',
+      context: { action: 'dismissed', stage: 'superseded' },
+    });
+    await nextTick();
   }
+  if (ready.todo?.items.length) {
+    // Never a drawer over the form: close it first (it may be open for the capture above).
+    if (showModal.value) {
+      closeActivityModal();
+      await nextTick();
+    }
+    parkedCapture = ready;
+    todoReview.value = {
+      result: ready.todo,
+      eventSummary: {
+        title: ready.prefill.title ?? '',
+        icon: ready.prefill.category ? getActivityFallbackEmoji(ready.prefill.category) : undefined,
+        date: ready.prefill.date,
+        startTime: ready.prefill.isAllDay ? undefined : ready.prefill.startTime,
+        endTime: ready.prefill.isAllDay ? undefined : ready.prefill.endTime,
+        location: ready.prefill.location,
+        link: ready.prefill.link,
+      },
+      env: ready.env,
+      primaryKind: 'event',
+      // Only a hint for flagging to-dos already linked to it; the confirm step below runs
+      // its own check, and the user's choice there stands.
+      probableActivityId: detectDuplicateActivity(ready.prefill, 'todo_hint')?.id,
+    };
+    return;
+  }
+  return continueActivityCapture(ready);
+}
+
+/**
+ * Captures whose duplicate lookup already threw and was reported. A capture with to-dos looks up
+ * twice (`todo_hint`, then `confirm` on the SAME parked prefill object), and a deterministic
+ * throw would otherwise be reported twice for one capture.
+ */
+const duplicateLookupReported = new WeakSet<PhotoActivityReady['prefill']>();
+
+/**
+ * The one caller of `findDuplicateActivity` on this page, so the fallback lives in one place:
+ * a lookup that throws is reported (once per capture) and the capture is treated as new.
+ */
+function detectDuplicateActivity(
+  prefill: PhotoActivityReady['prefill'],
+  stage: 'todo_hint' | 'confirm'
+): FamilyActivity | null {
+  try {
+    return findDuplicateActivity(prefill, activityStore.activeActivities);
+  } catch (err) {
+    if (duplicateLookupReported.has(prefill)) {
+      // Already reported for this capture; still leave a trace of this stage's fallback.
+      logEvent({
+        level: 'debug',
+        surface: 'ai-activity-capture',
+        message: 'duplicate_check_failed_repeat',
+        context: { action: 'duplicate_check_failed_repeat', stage },
+      });
+      return null;
+    }
+    duplicateLookupReported.add(prefill);
+    reportError({
+      surface: 'ai-activity-capture',
+      severity: 'warning',
+      message:
+        stage === 'todo_hint'
+          ? 'duplicate activity lookup failed; no duplicate hint'
+          : 'duplicate activity lookup failed; treating as new',
+      error: err,
+      context: { action: 'duplicate_check_failed', stage },
+    });
+    return null;
+  }
+}
+
+/** The duplicate check, then the pre-filled form: the path every event capture ends on. */
+async function continueActivityCapture(ready: PhotoActivityReady): Promise<void> {
+  const match = detectDuplicateActivity(ready.prefill, 'confirm');
   if (!match) return applyAddNew(ready);
 
   const update = await confirm({
@@ -326,7 +615,7 @@ const { deliverEvent } = useDocumentToActivity({
 useMagicReaderConsumer(
   'photo',
   (payload) => {
-    if (payload) deliverEvent(payload.data, payload.env);
+    if (payload) deliverEvent(payload.data, payload.env, payload.todo);
   },
   canReadPhoto
 );
@@ -412,6 +701,9 @@ function clearActivityModalState(): void {
   activityPrefillConfidence.value = undefined;
   activitySourcePhoto.value = undefined;
   activityPrefillEnv.value = undefined;
+  // To-dos still waiting here are for an activity that was not saved (a save commits them
+  // first via `commitTodoLink`), so they stay unlinked.
+  dropPendingTodoLink();
 }
 
 function closeActivityModal(): void {
@@ -423,6 +715,8 @@ function openAddModal(date?: string, time?: string, memberId?: string) {
   // A manual add is never a photo prefill — clear any leftover so it can't leak in
   // (incl. the source photo, or it would attach to the next manually-added activity).
   clearActivityModalState();
+  // A new add supersedes revealing the previous one ("+ add another" lands here too).
+  activityReveal.cancel();
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
@@ -535,6 +829,8 @@ async function handleViewOpenEdit(activity: FamilyActivity) {
   // on for >15s. Same shape as the 2026-05-03 handleSave fix; see
   // docs/E2E_HEALTH.md for the cross-entity history.
   const { activity: target, occurrenceDate } = scopedViewOpenEdit(activity);
+  // Editing it now: a reveal parked by "View Activity" would fire on some later close.
+  activityReveal.cancel();
   await nextTick();
   // Opening an EXISTING activity is never a correction of a document, and it must not inherit
   // the previous capture's source photo either — see `clearActivityModalState`.
@@ -559,6 +855,9 @@ async function handleSave(
   // One named predicate, deliberately — two independently-written `in`
   // expressions is exactly how FamilyNookPage drifted out of step here.
   const isUpdate = 'id' in data && 'data' in data;
+  // An update-shaped save with no activity opened for edit is ActivityModal's eager create (it
+  // created the activity early to attach a photo): new to the person, so it is revealed too.
+  const isEagerCreate = isUpdate && !editingActivity.value;
   const touchedPayment = isUpdate && 'payFromAccountId' in data.data;
   const isAddingPayment =
     touchedPayment && !!data.data.payFromAccountId && !editingActivity.value?.linkedRecurringItemId;
@@ -619,6 +918,7 @@ async function handleSave(
     }
   } else {
     const created = await activityStore.createActivity(data as CreateFamilyActivityInput);
+    commitTodoLink(created?.id);
     // Close the ActivityModal BEFORE opening CreatedConfirmModal so two
     // role=dialog / aria-modal=true overlays never coexist in the DOM.
     // WebKit under CI contention has been observed to stall the second
@@ -629,8 +929,11 @@ async function handleSave(
     showModal.value = false;
     clearActivityModalState();
     if (created) {
+      // Move the calendar to it now, behind the confirmation; the scroll + pulse run once the
+      // confirmation is dismissed (`handleCreatedConfirmClose`), where they can be seen.
+      activityReveal.prepare(created.id, 'created');
       await nextTick();
-      showActivityCreatedConfirmation(data as CreateFamilyActivityInput);
+      showActivityCreatedConfirmation(data as CreateFamilyActivityInput, created.id);
     }
     return;
   }
@@ -657,6 +960,7 @@ async function handleSave(
     }
   }
 
+  commitTodoLink((data as { id: string }).id);
   showModal.value = false;
   clearActivityModalState();
 
@@ -700,9 +1004,13 @@ async function handleSave(
 
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
+
+  // No "Activity Created" confirmation follows an eager create, so reveal it now (after any
+  // payment dialog above has closed, so the pulse is not spent behind it).
+  if (isEagerCreate) void activityReveal.revealNow((data as { id: string }).id, 'eager_create');
 }
 
-function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
+function showActivityCreatedConfirmation(data: CreateFamilyActivityInput, activityId: string) {
   const dateStr = formatDateFull(data.date);
   const details: ConfirmDetail[] = [
     { label: t('planner.field.title'), value: data.title },
@@ -731,6 +1039,7 @@ function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
     message: t('planner.activityCreatedMessage'),
     details,
     lastCreatedDate: data.date,
+    activityId,
   };
 }
 
@@ -739,14 +1048,7 @@ async function handleDelete() {
   const activityToDelete = editingActivity.value;
   showModal.value = false;
   clearActivityModalState();
-  const confirmed = await confirm({
-    title: 'planner.deleteActivity',
-    message: 'planner.deleteConfirm',
-    variant: 'danger',
-  });
-  if (confirmed) {
-    await activityStore.deleteActivity(activityToDelete.id);
-  }
+  await confirmAndDeleteActivity(activityToDelete);
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
 }
@@ -759,6 +1061,10 @@ function openTodoViewModal(todo: TodoItem) {
 }
 
 function handleActivitySwapped(newId: string) {
+  // A swap follows an inline edit (an override or a split replaced the record on view). Editing
+  // it drops a reveal parked by "View Activity", as `handleViewOpenEdit` does; left parked for
+  // the old id, it would never match a close again and fire on some much later flush.
+  activityReveal.cancel();
   const newActivity = activityStore.activities.find((a) => a.id === newId);
   if (newActivity) viewingActivity.value = newActivity;
 }
@@ -769,7 +1075,7 @@ function handleActivitySwapped(newId: string) {
        command bar (its docked header sits at `top: var(--planner-cmdbar-h)`).
        The only in-flow gap we want is below the view, handled by `mt-*` on the
        inactive-activities block; everything else here is a Teleport/overlay. -->
-  <div>
+  <div ref="plannerRootRef">
     <!-- Sticky command bar — period hero + nav + view toggle + filter + Add
          + trip ribbon. The calendar is the page hero; nothing above it. -->
     <CalendarCommandBar
@@ -973,10 +1279,20 @@ function handleActivitySwapped(newId: string) {
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
 
+    <!-- Magic beans to-dos (#113): reviewed before the activity form opens. -->
+    <MagicTodoReviewDrawer
+      :open="todoReview !== null"
+      :ready="todoReview"
+      @close="onTodoReviewClose"
+      @saved="onTodoReviewSaved"
+      @build-failed="onTodoReviewBuildFailed"
+    />
+
     <ActivityViewEditModal
       :activity="viewingActivity"
       :occurrence-date="viewingOccurrenceDate"
-      @close="viewingActivity = null"
+      @close="closeViewModal"
+      @deleted="handleViewDeleted"
       @open-edit="handleViewOpenEdit"
       @activity-swapped="handleActivitySwapped"
     />
@@ -997,8 +1313,11 @@ function handleActivitySwapped(newId: string) {
       :message="createdConfirm.message"
       :details="createdConfirm.details"
       allow-create-another
-      @close="createdConfirm.open = false"
+      allow-view
+      :view-label="t('planner.viewCreatedActivity')"
+      @close="handleCreatedConfirmClose"
       @create-another="handleCreateAnother"
+      @view="handleCreatedView"
     />
   </div>
 </template>

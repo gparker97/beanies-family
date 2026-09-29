@@ -109,8 +109,14 @@ onBeforeUnmount(() => {
     ref="rootEl"
     class="dark:border-line dark:bg-surface-ground sticky top-0 z-30 -mx-4 mb-1 border-b border-gray-200/70 bg-white px-4 pt-3 pb-2.5 shadow-[0_4px_16px_-12px_rgba(44,62,80,0.18)] md:-mx-6 md:px-6 md:pt-4 md:pb-3"
   >
-    <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls -->
-    <div class="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-4">
+    <!-- Top row: period hero + nav (+ mobile menu / pinned filter / search), then controls.
+
+         ⚠️ The stack-vs-row switch keys on `headerReclaimed`, NOT on `sm:`. The reclaimed identity
+         row (hamburger, title, nav, bell, search) is all `flex-shrink-0` but the title, so it
+         only fits when it has the row to itself. `sm:flex-row` (640px) against the reclaimed
+         header's 767px left a 128px band where both halves shared one row: the controls painted
+         over the bell and search and the title shrank to nothing. Measured at 640/700/767px. -->
+    <div class="flex" :class="headerReclaimed ? 'flex-col gap-2.5' : 'flex-row items-center gap-4'">
       <!-- ⚠️ `min-w-0 flex-1` on the GROUP is what pins the nav cluster. Both halves matter and
            each was found by measuring:
              · `flex-1` — the group ALWAYS takes the free space, so the controls beside it sit
@@ -121,7 +127,7 @@ onBeforeUnmount(() => {
                shrinkable its children are, the row overflows, and everything after it moves.
            Result, measured: the prev arrow sits at 615px in month, week AND day view, and at
            every step within each. See `CalendarPeriodNav` for what it was before. -->
-      <div class="flex min-w-0 flex-1 items-center gap-2 sm:justify-start">
+      <div class="flex min-w-0 flex-1 items-center gap-2">
         <!-- Mobile only: the planner reclaims the top bar, so the hamburger that
              opens the shared MobileHamburgerMenu lives here (AppHeader is hidden). -->
         <HamburgerButton v-if="headerReclaimed" :alert="saveNeedsAttention" @click="toggleMenu" />
@@ -188,8 +194,15 @@ onBeforeUnmount(() => {
       <!-- Secondary controls — view toggle + agenda (day) + inline trip chip
            (mobile) + Add. Kept as one wrapper so Phase 2 can collapse it on
            scroll-down while the pinned member filter above stays visible. -->
-      <div class="flex items-center justify-between gap-2 sm:ml-auto sm:justify-end">
-        <div class="flex items-center gap-2">
+      <!-- On the reclaimed header the left cluster is `min-w-0` so the member filter's name can
+           truncate: in day view the agenda button joins this row, and with a filtered name the
+           row was ~30px wider than a 390px phone, pushing "+" off the screen. The right cluster
+           (trip chip, ✨, +) never shrinks. -->
+      <div
+        class="flex items-center gap-2"
+        :class="headerReclaimed ? 'justify-between' : 'ml-auto justify-end'"
+      >
+        <div class="flex min-w-0 items-center gap-2">
           <button
             v-if="activeView === 'day'"
             type="button"
@@ -247,7 +260,7 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-shrink-0 items-center gap-2">
           <!-- Mobile inline trip chip; desktop keeps the labelled ribbon row below -->
           <CalendarTripRibbon
             v-if="headerReclaimed"

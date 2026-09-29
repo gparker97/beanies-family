@@ -96,6 +96,13 @@ describe('validateCorrection — the fence in front of the model instruction', (
     );
   });
 
+  it('accepts a correction to a to-do (#113), the newest kind', () => {
+    assert.equal(
+      validateCorrection({ token: '11111111-2222-3333-4444-555555555555', to: 'todo' }),
+      null
+    );
+  });
+
   it('refuses a token that is not a UUID, so an oversized one cannot become a key', () => {
     // A key past DynamoDB's 2048-byte limit throws ValidationException, which the refusal arm
     // catches — and the family is charged for every correction while the UI promises free.

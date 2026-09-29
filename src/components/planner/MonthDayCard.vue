@@ -275,6 +275,8 @@ function onMoreClick(event: MouseEvent) {
           :activity="item.activity"
           :is-start="item.isStart"
           :is-end="item.isEnd"
+          :data-activity-id="item.activity.id"
+          :data-occurrence-date="cell.date"
           class="block w-full"
           @click.stop="emit('view-activity', item.activity.id, cell.date)"
         />

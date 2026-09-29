@@ -34,6 +34,7 @@ import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { confirm } from '@/composables/useConfirm';
+import { confirmAndDeleteActivity } from '@/composables/useActivityDelete';
 import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import type {
@@ -174,15 +175,7 @@ async function handleActivityDelete() {
   if (!editingActivity.value) return;
   const activityToDelete = editingActivity.value;
   showActivityEditModal.value = false;
-  const confirmed = await confirm({
-    title: 'planner.deleteActivity',
-    message: 'planner.deleteConfirm',
-    variant: 'danger',
-  });
-  if (confirmed) {
-    await activityStore.deleteActivity(activityToDelete.id);
-    playWhoosh();
-  }
+  if (await confirmAndDeleteActivity(activityToDelete)) playWhoosh();
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
 }

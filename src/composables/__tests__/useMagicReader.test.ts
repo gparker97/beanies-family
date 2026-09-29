@@ -53,6 +53,7 @@ import type { SharePayload } from '@/types/magicPayload';
 function resetPending(): void {
   consumePendingMagic('photo', () => {}, false);
   consumePendingMagic('document', () => {}, false);
+  consumePendingMagic('todo', () => {}, false);
 }
 
 beforeEach(() => {
@@ -68,15 +69,15 @@ beforeEach(() => {
 
 describe('availableShareKinds — the one availability rule (#108)', () => {
   it('offers every kind, in tile order, when the member can edit and every flag is on', () => {
-    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe', 'transactions']);
+    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe', 'transactions', 'todo']);
   });
 
   it('drops a kind whose reader flag is off, keeping the others in order', () => {
     h.flags.aiPhotoExtract = false;
-    expect(availableShareKinds()).toEqual(['travel', 'recipe', 'transactions']);
+    expect(availableShareKinds()).toEqual(['travel', 'recipe', 'transactions', 'todo']);
     h.flags.aiTravelExtract = false;
-    // The recipe and statement readers are ungated by decision, so they remain.
-    expect(availableShareKinds()).toEqual(['recipe', 'transactions']);
+    // The recipe, statement and to-do readers are ungated by decision, so they remain.
+    expect(availableShareKinds()).toEqual(['recipe', 'transactions', 'todo']);
   });
 
   it('offers only statements to a member who can see finances but not edit activities', () => {
@@ -86,7 +87,7 @@ describe('availableShareKinds — the one availability rule (#108)', () => {
 
   it('never offers statements to a member without finance access (#107)', () => {
     h.canViewFinances.value = false;
-    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe']);
+    expect(availableShareKinds()).toEqual(['event', 'travel', 'recipe', 'todo']);
     const r = useMagicReader();
     expect(r.canReadStatement.value).toBe(false);
     // The other readers still keep the door open.
@@ -195,6 +196,35 @@ describe('useMagicReader — dispatch', () => {
     expect(h.closeQuickAdd).toHaveBeenCalledOnce();
     expect(h.routerPush).not.toHaveBeenCalled();
     expect(h.routerReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('the to-do reader (#113)', () => {
+  it('routes a to-do payload to /todo and hands it to the todo surface', () => {
+    const payload: SharePayload = {
+      kind: 'todo',
+      data: {
+        items: [
+          {
+            title: 'Return the library book',
+            details: null,
+            dueDate: '2026-10-02',
+            dueTime: null,
+            timing: null,
+            assigneeName: null,
+            ownerCard: null,
+            links: [],
+          },
+        ],
+      },
+      env: { sourceFile: null, origin: 'in-app' },
+    };
+    dispatchSharePayload(payload);
+    expect(pendingMagicReader.value).toBe('todo');
+    expect(h.routerPush).toHaveBeenCalledWith('/todo');
+    const handler = vi.fn();
+    consumePendingMagic('todo', handler, true);
+    expect(handler).toHaveBeenCalledWith(payload);
   });
 });
 

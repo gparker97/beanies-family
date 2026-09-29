@@ -6,6 +6,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useActivityStore } from '@/stores/activityStore';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -15,7 +16,9 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
-import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
+import LinkList from '@/components/ui/LinkList.vue';
+import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
+import { extractUrls } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
@@ -166,16 +169,19 @@ const viewFormattedDate = computed(() => {
   return formatDateWithDay(dateStr);
 });
 
-// Detected links from title + description
+// The field hides with the chip: `activityId` is a soft reference that may point at a
+// deleted activity.
+const activityStore = useActivityStore();
+const linkedActivityShown = computed(
+  () =>
+    !!todo.value?.activityId &&
+    activityStore.activities.some((a) => a.id === todo.value!.activityId)
+);
+
+// Detected links from title + description (rendered, with safe hrefs, by LinkList)
 const detectedLinks = computed(() => {
   if (!todo.value) return [];
-  const texts = [todo.value.title, todo.value.description ?? ''].join(' ');
-  return extractUrls(texts).map((url) => ({
-    url,
-    domain: getUrlDomain(url),
-    label: getUrlLabel(url),
-    favicon: getFaviconUrl(url),
-  }));
+  return extractUrls([todo.value.title, todo.value.description ?? ''].join(' '));
 });
 
 // Keyboard handlers
@@ -536,42 +542,15 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
+      <!-- Linked activity (magic beans shared result). LinkedActivityChip renders nothing
+           when the activity no longer resolves, so the field hides with it. -->
+      <FormFieldGroup v-if="linkedActivityShown" :label="t('todo.linkedActivity')">
+        <LinkedActivityChip :activity-id="todo.activityId!" variant="row" @open="handleClose" />
+      </FormFieldGroup>
+
       <!-- Detected links -->
       <FormFieldGroup v-if="detectedLinks.length > 0" :label="t('todo.links')">
-        <div class="space-y-1.5">
-          <a
-            v-for="link in detectedLinks"
-            :key="link.url"
-            :href="link.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-[var(--tint-purple-8)] dark:hover:bg-purple-900/20"
-            @click.stop
-          >
-            <img
-              :src="link.favicon"
-              :alt="link.domain"
-              width="16"
-              height="16"
-              class="h-4 w-4 shrink-0 rounded-sm"
-              loading="lazy"
-            />
-            <span class="dark:text-purple-lift min-w-0 flex-1 truncate font-medium text-purple-600">
-              {{ link.label }}
-            </span>
-            <svg
-              class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"
-              />
-            </svg>
-          </a>
-        </div>
+        <LinkList :urls="detectedLinks" />
       </FormFieldGroup>
 
       <!-- Done by — non-editable (only once completed) -->
