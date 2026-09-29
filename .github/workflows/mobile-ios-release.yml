@@ -123,6 +123,10 @@ jobs:
       - name: Build web app
         run: npm run build
         env:
+          # The macOS runner's default V8 heap (~2 GB) is smaller than the Linux runners',
+          # and `vue-tsc -b` outgrew it on 2026-09-29 (FATAL "JavaScript heap out of memory"
+          # before any upload). 4 GB leaves headroom on the 7 GB arm64 runner.
+          NODE_OPTIONS: --max-old-space-size=4096
           # Full client-side config for the SHIPPED bundle — mirrors deploy.yml /
           # the Android release lane so the App Store app has Google sign-in, the
           # registry/OAuth proxy, AI document extraction, and operational alerting
