@@ -7,7 +7,24 @@ vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   createTodo: vi.fn(),
   updateTodo: vi.fn(),
   deleteTodo: vi.fn(),
+  createTodosWithIds: vi.fn(),
+  patchTodos: vi.fn(),
+  deleteTodos: vi.fn(),
 }));
+
+// `openTodosForActivity` resolves the soft `activityId` against the activity store.
+const { activityIds } = vi.hoisted(() => ({ activityIds: { value: [] as string[] } }));
+vi.mock('@/stores/activityStore', () => ({
+  useActivityStore: () => ({ activities: activityIds.value.map((id) => ({ id })) }),
+}));
+
+const { trackFeatureMock } = vi.hoisted(() => ({
+  trackFeatureMock: vi.fn(<T>(result: T) => result),
+}));
+vi.mock('@/services/analytics/plausible', () => ({ trackFeature: trackFeatureMock }));
+
+const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
+vi.mock('@/composables/useToast', () => ({ showToast: showToastMock }));
 
 vi.mock('@/composables/useCelebration', () => ({ celebrate: vi.fn() }));
 
@@ -261,5 +278,120 @@ describe('todoStore — Helpful Hints (#40)', () => {
     expect(logEventMock).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', surface: 'todos' })
     );
+  });
+});
+
+describe('todoStore: batch actions (magic beans shared result)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    activityIds.value = [];
+  });
+
+  it('createTodos writes one batch with the caller ids and tracks one feature use', async () => {
+    const store = useTodoStore();
+    const a = todo({ id: 'n-1', title: 'Sign slip' });
+    const b = todo({ id: 'n-2', title: 'Pay fee' });
+    vi.mocked(todoRepo.createTodosWithIds).mockResolvedValue([a, b]);
+
+    const { id: _ia, createdAt: _ca, updatedAt: _ua, ...inputA } = a;
+    const { id: _ib, createdAt: _cb, updatedAt: _ub, ...inputB } = b;
+    const result = await store.createTodos([
+      { ...inputA, id: 'n-1' },
+      { ...inputB, id: 'n-2' },
+    ]);
+
+    expect(todoRepo.createTodosWithIds).toHaveBeenCalledTimes(1);
+    expect(todoRepo.createTodosWithIds).toHaveBeenCalledWith([
+      { id: 'n-1', input: inputA },
+      { id: 'n-2', input: inputB },
+    ]);
+    expect(result).toEqual([a, b]);
+    expect(store.todos.map((t) => t.id)).toEqual(['n-1', 'n-2']);
+    expect(trackFeatureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('createTodos retried with the same ids keeps one copy in memory', async () => {
+    const store = useTodoStore();
+    const a = todo({ id: 'n-1' });
+    vi.mocked(todoRepo.createTodosWithIds).mockResolvedValue([a]);
+    const { id: _i, createdAt: _c, updatedAt: _u, ...input } = a;
+
+    await store.createTodos([{ ...input, id: 'n-1' }]);
+    await store.createTodos([{ ...input, id: 'n-1' }]);
+
+    expect(store.todos).toHaveLength(1);
+  });
+
+  it('createTodos failure toasts once under the todos surface and returns null', async () => {
+    const store = useTodoStore();
+    vi.mocked(todoRepo.createTodosWithIds).mockRejectedValue(new Error('write failed'));
+    const { id: _i, createdAt: _c, updatedAt: _u, ...input } = todo();
+
+    const result = await store.createTodos([{ ...input, id: 'n-1' }]);
+
+    expect(result).toBeNull();
+    expect(store.todos).toEqual([]);
+    expect(showToastMock).toHaveBeenCalledTimes(1);
+    expect(showToastMock.mock.calls[0]![3]).toMatchObject({
+      surface: 'todos',
+      context: { action: 'todoStore:createTodos' },
+    });
+  });
+
+  it('linkTodosToActivity patches in one batch with onMissing skip and syncs memory', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'a' }), todo({ id: 'b' }), todo({ id: 'c' })];
+    vi.mocked(todoRepo.patchTodos).mockResolvedValue([
+      todo({ id: 'a', activityId: 'act-1' }),
+      todo({ id: 'b', activityId: 'act-1' }),
+    ]);
+
+    const linked = await store.linkTodosToActivity(['a', 'b', 'gone'], 'act-1');
+
+    expect(todoRepo.patchTodos).toHaveBeenCalledWith(
+      ['a', 'b', 'gone'],
+      { activityId: 'act-1' },
+      { onMissing: 'skip' }
+    );
+    expect(linked).toHaveLength(2);
+    expect(store.todos.map((t) => t.activityId)).toEqual(['act-1', 'act-1', undefined]);
+  });
+
+  it('deleteTodos removes in one batch and syncs memory', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'a' }), todo({ id: 'b' }), todo({ id: 'c' })];
+    vi.mocked(todoRepo.deleteTodos).mockResolvedValue(undefined);
+
+    const ok = await store.deleteTodos(['a', 'c']);
+
+    expect(ok).toBe(true);
+    expect(todoRepo.deleteTodos).toHaveBeenCalledTimes(1);
+    expect(store.todos.map((t) => t.id)).toEqual(['b']);
+  });
+
+  it('deleteTodos failure keeps the to-dos and returns false', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'a' })];
+    vi.mocked(todoRepo.deleteTodos).mockRejectedValue(new Error('write failed'));
+
+    expect(await store.deleteTodos(['a'])).toBe(false);
+    expect(store.todos).toHaveLength(1);
+    expect(showToastMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('openTodosForActivity returns open linked to-dos only, and none for a missing activity', () => {
+    const store = useTodoStore();
+    store.todos = [
+      todo({ id: 'open', activityId: 'act-1' }),
+      todo({ id: 'done', activityId: 'act-1', completed: true }),
+      todo({ id: 'other', activityId: 'act-2' }),
+      todo({ id: 'plain' }),
+    ];
+    activityIds.value = ['act-1'];
+
+    expect(store.openTodosForActivity('act-1').map((t) => t.id)).toEqual(['open']);
+    // act-2 was deleted (soft reference): its to-dos are not "linked" to anything.
+    expect(store.openTodosForActivity('act-2')).toEqual([]);
   });
 });

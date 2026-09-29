@@ -648,9 +648,9 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       'Create tasks, assign them to family members, set due dates, and track what gets done. Your shared family task board.',
     icon: '\u2705',
-    readTime: 5,
+    readTime: 6,
     popular: true,
-    updatedDate: '2026-05-13',
+    updatedDate: '2026-09-29',
     sections: [
       {
         type: 'heading',
@@ -671,18 +671,66 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'paragraph',
-        content: 'The quick-add bar at the top of the page is the fastest way to create a task.',
+        content:
+          'There are three ways to add a to-do, all from the To-Do page: the <strong>+ Add To-do</strong> button, the quick-add bar, or <strong>\u2728 Magic beans</strong>. Whichever you use, the new to-do (the topmost of them, when magic beans adds several) is scrolled into view and glows for a moment so you can see where it landed, unless a member filter is hiding it.',
+      },
+      {
+        type: 'heading',
+        content: 'With the Add To-do button',
+        level: 3,
+        id: 'creating-sidebar',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Use this when you already know the details. It opens a side panel with room for everything at once.',
       },
       {
         type: 'steps',
         content: '',
         items: [
           'Go to <strong>To-Do</strong> in the Treehouse section of the sidebar',
+          'Tap <strong>+ Add To-do</strong> at the top right of the page (on a phone it is the round <strong>+</strong> button)',
+          'Type the task in <strong>What needs to be done?</strong>',
+          'Optionally add a <strong>description</strong> (any links you paste become buttons), choose <strong>who</strong> it is for, and set a <strong>due date</strong>. Once a date is set you can also pick a <strong>time</strong>',
+          'Tap <strong>Add To-do</strong> to save it',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On your phone, the <strong>To-do</strong> tile in the quick-add menu (the orange <strong>+</strong> button) opens the same panel.',
+      },
+      {
+        type: 'heading',
+        content: 'With the quick-add bar',
+        level: 3,
+        id: 'creating-quick-bar',
+      },
+      {
+        type: 'paragraph',
+        content: 'The quick-add bar at the top of the list is the fastest way to jot down a task.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
           'Type your task in the <strong>What needs to be done?</strong> field',
           'Optionally, click the \u{1F4C5} calendar icon to set a <strong>due date</strong>',
           'Optionally, use the assignee picker to assign the task to one or more family members',
           'Click <strong>Add</strong> (or press <strong>Enter</strong>) to create the task',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'With magic beans',
+        level: 3,
+        id: 'creating-magic',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap <strong>\u2728 Magic beans</strong> at the top of the page (or the magic beans card inside the Add To-do panel) and snap or share a note, a list or a school email. beanies reads it with <strong>To-do</strong> already picked, then shows you the to-dos it found to check before anything is saved.',
       },
       {
         type: 'infoBox',
@@ -838,6 +886,31 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Deleting a task is permanent \u2014 it can\u2019t be undone. If you\u2019re not sure, consider marking it as completed instead so you have a record of it.',
         title: 'Heads up',
         icon: '\u26A0\uFE0F',
+      },
+      {
+        type: 'heading',
+        content: 'To-dos linked to an activity',
+        level: 2,
+        id: 'linked-activity',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When magic beans finds an activity and to-dos in the same note (a field trip letter with a permission slip to return, say), it saves the to-dos first and links them to the activity once you save it. <a href="/help/features/share-to-beanies">Share Something Straight to beanies</a> explains how that works.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'In the list, a linked to-do shows a small chip with the activity\u2019s name and date. Tap it to open the activity in the planner.',
+          'In the task\u2019s detail panel, the <strong>Linked Activity</strong> row does the same.',
+          'If the activity is deleted, the chip simply disappears. The to-do stays.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Deleting an activity that still has open linked to-dos asks what should happen to them: <strong>Keep the to-dos</strong> (the default) or delete them too. To-dos that are already done are always kept. Deleting a to-do never touches its activity.',
       },
       {
         type: 'heading',
@@ -1773,10 +1846,10 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     category: 'features',
     title: 'Share Something Straight to beanies',
     excerpt:
-      'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip, a recipe or a bank statement.',
+      'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip, a recipe, a bank statement or a to-do.',
     icon: '\u{1F4E4}',
-    readTime: 5,
-    updatedDate: '2026-09-25',
+    readTime: 6,
+    updatedDate: '2026-09-29',
     sections: [
       {
         type: 'heading',
@@ -1832,7 +1905,50 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'beanies decides for itself which of four things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), a <strong>recipe</strong>, or a <strong>bank statement</strong> (its lines become transactions for you to check). If it genuinely cannot tell, it says so instead of guessing \u2014 you can still add the item yourself.',
+          'beanies decides for itself which of five things it is looking at: an <strong>activity</strong> (an invitation, a school notice, a flyer), a <strong>trip</strong> (a flight, a hotel, a booking confirmation), a <strong>recipe</strong>, a <strong>bank statement</strong> (its lines become transactions for you to check), or a <strong>to-do</strong> (something someone has to do, like returning a form). If it genuinely cannot tell, it says so instead of guessing, and you can still add the item yourself.',
+      },
+      {
+        type: 'heading',
+        content: 'When a note is also a to-do',
+        level: 2,
+        id: 'todos',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A lot of what gets forwarded is really something to do: \u201Creturn the signed permission slip by Friday\u201D, \u201Cpay the $12 trip fee\u201D, \u201Cpack sunscreen on the day\u201D. beanies picks these out as <strong>to-dos</strong>. Something you <em>do</em> (return, sign, pay, bring, pack, book, reply) is a to-do; something you <em>go to</em> at a time and place is an activity.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A note that is only a to-do, like \u201Cplease return the library book by Friday\u201D, opens the <strong>Family To-Do</strong> page with the to-do ready to check. A note that has an activity <em>and</em> things to do for it, like a field trip letter, gives you both from one read:',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'beanies shows <strong>Here\u2019s What We Found</strong>: the activity at the top (you finish it in the next step) and each to-do underneath',
+          'Check each to-do. You can change its wording, who does it and when it is due, or tap <strong>Skip</strong> to leave it out (<strong>Undo skip</strong> brings it back)',
+          'Tap the button at the bottom. It says what happens next, for example <strong>Save 3 to-dos, then add the activity</strong>',
+          'The activity form opens with the details filled in. Check it and tap <strong>Save</strong>',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Who does it.</strong> The person the note names, if they are in your family. Otherwise the person who holds the matching card in <strong>Who Owns What</strong> (School Forms, for a permission slip). Otherwise you, since you shared it. The reason shows under each to-do until you change it.',
+          '<strong>When it is due.</strong> The date the note gives. Without one, something for the day itself is due on the activity\u2019s date, and anything else is due the day before so it is ready in time. When beanies works a date out for you, it never picks one that has already passed; a date the note states is kept as written. A time the note gives (\u201Cwalk the dog tomorrow at 10am\u201D) is kept when the to-do has a date. If beanies works out today as the date and the time has already passed, the time is left off. So \u201Ccall grandma at 3pm\u201D with no day stays undated, with no time.',
+          '<strong>Already on your list.</strong> Read the same note twice and the to-dos you already have are shown as <strong>Already on your list</strong> (or <strong>Already done</strong>) and left out. Tap <strong>Add anyway</strong> if you really do want a second one.',
+          '<strong>Links.</strong> A to-do\u2019s links go in its description, where they show as buttons. The activity\u2019s own web page goes in its <strong>Link</strong> field.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Your to-dos are saved before the activity form opens, so closing the form without saving keeps them; they are just not linked to an activity. Save the activity and each to-do shows a small link to it that opens the activity. Closing <strong>Here\u2019s What We Found</strong> with the \u2715 saves nothing at all.',
+        title: 'The to-dos come first',
+        icon: '\u2705',
       },
       {
         type: 'heading',
@@ -1848,7 +1964,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'A whole message is fine \u2014 you do not need to trim it down to the useful part. beanies reads what you send and works out for itself whether it is an activity, a trip, a recipe or a bank statement, exactly as it does for a photo. A tighter selection is still read a little more precisely, so it is worth trimming an enormous thread.',
+          'A whole message is fine; you do not need to trim it down to the useful part. beanies reads what you send and works out for itself whether it is an activity, a trip, a recipe, a bank statement or a to-do, exactly as it does for a photo. A tighter selection is still read a little more precisely, so it is worth trimming an enormous thread.',
       },
       {
         type: 'callout',
@@ -1958,7 +2074,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip, recipe or bank statement) before you read it and beanies reads it as that straight away. Opened from a page, the sheet picks that page\u2019s tile for you (Transactions on the Transactions page, Trip on Travel Plans); tap it again to clear it. With no tile picked, beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
+          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip, recipe, bank statement or to-do) before you read it and beanies reads it as that straight away. Picking <strong>To-do</strong> gives you only the to-dos; picking <strong>Activity</strong> still brings along any to-dos that come with it. Opened from a page, the sheet picks that page\u2019s tile for you (Transactions on the Transactions page, Trip on Travel Plans); tap it again to clear it. With no tile picked, beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
         title: 'Tell beanies what it is first, if you like',
         icon: '\u2728',
       },

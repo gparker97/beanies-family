@@ -7,13 +7,20 @@
  * produce a confidently-wrong item; it must throw, so the funnel classifies it as
  * `malformed_output` and the shared toast mapper reports it.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const logEventMock = vi.hoisted(() => vi.fn());
+vi.mock('@/services/telemetry', () => ({ logEvent: logEventMock }));
+
 import {
   EXTRACTION_PARSERS,
   EXTRACTION_TASKS,
   SHARE_JSON_SHAPE,
+  TODO_ITEMS_MAX,
   buildShareExtractionMessages,
+  parseExtractionResult,
   parseShareExtractionResult,
+  parseTodoExtractionResult,
 } from '../extractionPrompt';
 
 const eventPayload = {
@@ -80,6 +87,7 @@ describe('share task registry (#64)', () => {
       'travel',
       'recipe',
       'transactions',
+      'todo',
     ]);
   });
 
@@ -206,5 +214,247 @@ describe('the share path carries inferredTimes too (#93)', () => {
       '2026-09-07'
     );
     expect(String(system.content)).not.toContain('Set isRecipe=false');
+  });
+});
+
+// ── To-dos and the shared result (#113) ───────────────────────────────────────────────────
+
+/** The `error_code` of the one aggregated rejection event, or null when none was logged. */
+function rejectedCodes(): string | null {
+  const call = logEventMock.mock.calls.find(
+    ([e]) => (e as { context?: { action?: string } }).context?.action === 'model-field-rejected'
+  );
+  return call
+    ? ((call[0] as { context: { error_code: string } }).context.error_code ?? null)
+    : null;
+}
+
+const slip = {
+  title: 'Return the signed permission slip',
+  details: 'Hand it to Ms Park',
+  dueDate: '2026-10-12',
+  dueTime: null,
+  timing: null,
+  assigneeName: 'Mia',
+  ownerCard: 'school-forms',
+  links: ['https://school.example/slip'],
+};
+
+describe('parseShareExtractionResult: to-dos (#113)', () => {
+  beforeEach(() => logEventMock.mockClear());
+
+  it('routes a to-do-only read to the to-do parser', () => {
+    const out = parseShareExtractionResult({ kind: 'todo', todo: { items: [slip] } });
+    expect(out).toEqual({ kind: 'todo', todo: { items: [slip] } });
+    expect(rejectedCodes()).toBeNull();
+  });
+
+  it('reads a to-do read with no usable item as "none", never an empty review', () => {
+    expect(
+      parseShareExtractionResult({ kind: 'todo', todo: { items: [{ title: '  ' }] } })
+    ).toEqual({ kind: 'none' });
+    expect(parseShareExtractionResult({ kind: 'todo', todo: {} })).toEqual({ kind: 'none' });
+  });
+
+  it('throws when kind="todo" has no todo object, like every other kind', () => {
+    expect(() => parseShareExtractionResult({ kind: 'todo' })).toThrow(/no "todo" object/);
+  });
+
+  it('carries a to-do companion on an event', () => {
+    const out = parseShareExtractionResult({
+      kind: 'event',
+      event: eventPayload,
+      todo: { items: [slip, { title: 'Pack sunscreen', timing: 'on_event_day' }] },
+    });
+    expect(out.kind).toBe('event');
+    if (out.kind !== 'event') return;
+    expect(out.event.title).toBe('Sports Day');
+    expect(out.todo?.items.map((i) => i.title)).toEqual([
+      'Return the signed permission slip',
+      'Pack sunscreen',
+    ]);
+    expect(out.todo?.items[1]).toMatchObject({ timing: 'on_event_day', dueDate: null });
+  });
+
+  it('drops a companion with zero usable items, keeping the event', () => {
+    const out = parseShareExtractionResult({
+      kind: 'event',
+      event: eventPayload,
+      todo: { items: [{ title: '' }, 'junk'] },
+    });
+    expect(Object.keys(out)).toEqual(['kind', 'event']);
+  });
+
+  it('ignores a malformed companion rather than costing the family the event', () => {
+    const out = parseShareExtractionResult({ kind: 'event', event: eventPayload, todo: 'soon' });
+    expect(Object.keys(out)).toEqual(['kind', 'event']);
+  });
+
+  it('refuses a companion SHARE_COMPANIONS does not allow for the primary kind', () => {
+    const out = parseShareExtractionResult({
+      kind: 'travel',
+      travel: travelPayload,
+      todo: { items: [slip] },
+    });
+    expect(Object.keys(out)).toEqual(['kind', 'travel']);
+  });
+});
+
+describe('parseTodoExtractionResult (#113)', () => {
+  beforeEach(() => logEventMock.mockClear());
+
+  it('drops a bad date, timing, owner card and link, and reports them once with todo. names', () => {
+    const out = parseTodoExtractionResult({
+      items: [
+        {
+          title: 'Pay the trip fee',
+          dueDate: 'next Friday',
+          timing: 'whenever',
+          ownerCard: 'not-a-card',
+          links: [
+            'javascript:alert(1)',
+            // A plain-http link is exactly what the parser must drop, so the fixture needs one.
+            // eslint-disable-next-line @microsoft/sdl/no-insecure-url
+            'http://insecure.example',
+            'https://pay.example/trip',
+          ],
+        },
+      ],
+    });
+    expect(out.items).toEqual([
+      {
+        title: 'Pay the trip fee',
+        details: null,
+        dueDate: null,
+        dueTime: null,
+        timing: null,
+        assigneeName: null,
+        ownerCard: null,
+        links: ['https://pay.example/trip'],
+      },
+    ]);
+    expect(logEventMock).toHaveBeenCalledOnce();
+    expect(rejectedCodes()).toBe('todo.timing,todo.ownerCard,todo.links,todo.dueDate');
+  });
+
+  it('dedupes links and bounds strings', () => {
+    const out = parseTodoExtractionResult({
+      items: [
+        {
+          title: 'x'.repeat(500),
+          links: ['https://a.example/f', 'https://a.example/f'],
+          assigneeName: '  Leo  ',
+        },
+      ],
+    });
+    expect(out.items[0]!.title).toHaveLength(200);
+    expect(out.items[0]!.links).toEqual(['https://a.example/f']);
+    expect(out.items[0]!.assigneeName).toBe('Leo');
+  });
+
+  it('caps a read at 10 to-dos, and skips junk entries on the way', () => {
+    const items = [
+      null,
+      { title: '' },
+      ...Array.from({ length: 15 }, (_, i) => ({ title: `Task ${i}` })),
+    ];
+    const out = parseTodoExtractionResult({ items });
+    expect(TODO_ITEMS_MAX).toBe(10);
+    expect(out.items).toHaveLength(10);
+    expect(out.items[0]!.title).toBe('Task 0');
+    expect(out.items[9]!.title).toBe('Task 9');
+  });
+
+  it('never walks a hostile array past the model list cap', () => {
+    const items = [...Array.from({ length: 5000 }, () => 'junk'), { title: 'Late' }];
+    expect(parseTodoExtractionResult({ items }).items).toEqual([]);
+  });
+
+  it('returns no items for a non-object or a missing list', () => {
+    expect(parseTodoExtractionResult(null)).toEqual({ items: [] });
+    expect(parseTodoExtractionResult({ items: 'nope' })).toEqual({ items: [] });
+  });
+
+  it('keeps a to-do link longer than the short-field cap intact, and reports nothing', () => {
+    // 260 characters: past MODEL_FIELD_MAX (200), where a cut link would still parse as a URL.
+    const prefix = 'https://forms.example/slip?token=';
+    const long = prefix + 'a'.repeat(260 - prefix.length);
+    expect(long).toHaveLength(260);
+    const out = parseTodoExtractionResult({ items: [{ title: 'Sign the form', links: [long] }] });
+    expect(out.items[0]!.links).toEqual([long]);
+    expect(logEventMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps a 24-hour due time', () => {
+    const out = parseTodoExtractionResult({
+      items: [{ title: 'Walk the dog', dueDate: '2026-09-30', dueTime: '10:00' }],
+    });
+    expect(out.items[0]).toMatchObject({ dueDate: '2026-09-30', dueTime: '10:00' });
+    expect(logEventMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a due time that is not HH:mm and reports todo.dueTime', () => {
+    const out = parseTodoExtractionResult({
+      items: [
+        { title: 'Walk the dog', dueDate: '2026-09-30', dueTime: '10am' },
+        { title: 'Feed the cat', dueTime: '25:00' },
+      ],
+    });
+    expect(out.items.map((i) => i.dueTime)).toEqual([null, null]);
+    expect(rejectedCodes()).toBe('todo.dueTime');
+  });
+
+  it('drops a non-https to-do link and reports todo.links', () => {
+    const out = parseTodoExtractionResult({
+      items: [
+        {
+          title: 'Pay the fee',
+          // A plain-http link is exactly what the parser must drop, so the fixture needs one.
+          // eslint-disable-next-line @microsoft/sdl/no-insecure-url
+          links: ['http://pay.example/fee'],
+        },
+      ],
+    });
+    expect(out.items[0]!.links).toEqual([]);
+    expect(rejectedCodes()).toBe('todo.links');
+  });
+
+  it('reports each rejected field name once when several items reject the same field', () => {
+    const out = parseTodoExtractionResult({
+      items: [
+        { title: 'One', dueDate: 'soon', links: ['mailto:office@example.org'] },
+        { title: 'Two', dueDate: 'later', links: ['javascript:alert(1)'] },
+        { title: 'Three', dueDate: 'someday' },
+      ],
+    });
+    expect(out.items).toHaveLength(3);
+    expect(logEventMock).toHaveBeenCalledOnce();
+    const codes = rejectedCodes()!.split(',');
+    expect(codes).toHaveLength(new Set(codes).size);
+    expect([...codes].sort()).toEqual(['todo.dueDate', 'todo.links']);
+  });
+});
+
+describe('the event link (#113)', () => {
+  beforeEach(() => logEventMock.mockClear());
+
+  it('keeps a safe https link', () => {
+    const out = parseExtractionResult({ ...eventPayload, link: 'https://trip.example/info' });
+    expect(out.link).toBe('https://trip.example/info');
+  });
+
+  it('is absent when the model gave none, so the parsed shape is unchanged', () => {
+    expect('link' in parseExtractionResult(eventPayload)).toBe(false);
+    expect('link' in parseExtractionResult({ ...eventPayload, link: '' })).toBe(false);
+  });
+
+  it('drops and reports an unsafe link', () => {
+    const out = parseExtractionResult({ ...eventPayload, link: 'javascript:alert(1)' });
+    expect('link' in out).toBe(false);
+    expect(rejectedCodes()).toBe('link');
+  });
+
+  it('is not a required key, so an older proxy without it still parses', () => {
+    expect(EXTRACTION_TASKS.event.requiredKeys).not.toContain('link');
   });
 });

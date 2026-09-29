@@ -290,6 +290,70 @@ describe('share ingest — the happy path', () => {
   });
 });
 
+describe('share ingest: to-dos and the shared result (#113)', () => {
+  const item = (title: string) => ({
+    title,
+    details: null,
+    dueDate: null,
+    timing: null,
+    assigneeName: null,
+    ownerCard: null,
+    links: [],
+  });
+
+  it('carries the to-do companion on the event payload, lights it, and counts it', async () => {
+    const todo = { items: [item('Sign the slip'), item('Pay the fee'), item('Pack sunscreen')] };
+    extractShareFromDocuments.mockResolvedValue({
+      ...EVENT_RESULT,
+      data: { kind: 'event', event: { isEvent: true, title: 'Field trip' }, todo },
+    });
+    // What the overlay shows at the moment the payload is handed over.
+    let stateAtDispatch: unknown;
+    dispatchSharePayload.mockImplementationOnce(() => {
+      stateAtDispatch = magicIngestState.value;
+    });
+
+    await ingestSharedContent({ files: [img()] }, meta);
+
+    expect(dispatchSharePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'event', todo })
+    );
+    expect(stateAtDispatch).toEqual(
+      expect.objectContaining({
+        phase: 'resolved',
+        kind: 'event',
+        companions: [{ kind: 'todo', count: 3 }],
+      })
+    );
+    const classified = logEvent.mock.calls.find((c) => c[0].context?.action === 'classified');
+    expect(classified?.[0].context).toEqual(
+      expect.objectContaining({ kind: 'event', count: 3, detail: 'unhinted' })
+    );
+  });
+
+  it('leaves a single-kind event without a todo field, and resolves with no companions', async () => {
+    let stateAtDispatch: unknown;
+    dispatchSharePayload.mockImplementationOnce(() => {
+      stateAtDispatch = magicIngestState.value;
+    });
+    await ingestSharedContent({ files: [img()] }, meta);
+    expect(dispatchSharePayload.mock.calls[0][0]).not.toHaveProperty('todo');
+    expect(stateAtDispatch).toEqual(expect.objectContaining({ kind: 'event', companions: [] }));
+  });
+
+  it('routes a to-do-only read to the to-do reader', async () => {
+    const todo = { items: [item('Return the library book')] };
+    extractShareFromDocuments.mockResolvedValue({
+      ...EVENT_RESULT,
+      data: { kind: 'todo', todo },
+    });
+    await ingestSharedContent({ files: [img()] }, meta);
+    expect(dispatchSharePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'todo', data: todo })
+    );
+  });
+});
+
 describe('share ingest — telling the user something is happening', () => {
   it('shows the reading overlay for the whole extraction, then clears it', async () => {
     // On a real device the app opened from a share and then sat there, visibly idle, for
@@ -1366,6 +1430,7 @@ describe('ingestInAppSource (#84)', () => {
       expect(classified?.[0].context).toEqual({
         action: 'classified',
         kind: 'event',
+        count: 0,
         detail: 'unhinted',
       });
       expect(actions()).not.toContain('hinted');
@@ -1387,6 +1452,7 @@ describe('ingestInAppSource (#84)', () => {
       expect(classified?.[0].context).toEqual({
         action: 'classified',
         kind: 'travel',
+        count: 0,
         detail: 'hinted',
       });
       expect(dispatchSharePayload).toHaveBeenCalledTimes(1);

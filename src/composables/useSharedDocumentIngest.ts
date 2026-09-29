@@ -26,6 +26,7 @@ import {
 } from './useDocumentConsent';
 import { dispatchSharePayload, isReaderEnabled, readerForShareKind } from './useMagicReader';
 import { AI_PICKER_MAX_BYTES, isAiPickerAcceptedFile } from '@/constants/aiDocumentPicker';
+import { companionsOf } from '@/constants/magicDestinations';
 import {
   MAX_SHARE_TEXT_BYTES,
   MAX_SHARE_TEXT_CEILING,
@@ -151,7 +152,13 @@ type IngestState =
       /** A statement is read page by page (#107); the overlay says "page 3 of 5". */
       progress?: { done: number; total: number };
     }
-  | { phase: 'resolved'; presentation: 'global' | 'local'; kind: ShareKind };
+  | {
+      phase: 'resolved';
+      presentation: 'global' | 'local';
+      kind: ShareKind;
+      /** What the same read found BESIDE `kind` (#113), from `companionsOf`. Usually empty. */
+      companions: { kind: ShareKind; count: number }[];
+    };
 
 /**
  * What a caller may state about a read as it starts — typed FROM the reading arm so a new
@@ -1651,15 +1658,21 @@ async function runIngest(
       showToast('info', t('ai.capture.title'), t('ai.capture.pick.unused'));
     }
   }
+  // What the same read found beside the primary kind (#113). ONE derivation, read by the log
+  // below and the resolved overlay state, so the tiles that light and the count cannot disagree.
+  const companions = outcome.kind === 'none' ? [] : companionsOf(outcome.payload);
   logEvent({
     level: 'info',
     surface: env.surface,
     message: 'share classified',
     // `detail` is how a read was steered, so "did the model return the stated kind" is this
     // event's `kind` against the preceding `hinted` event's, filtered on `detail: 'hinted'`.
+    // `count` is the companion items (#113): 0 is a single-kind result, so `count > 0` over all
+    // `classified` events is the shared-result rate.
     context: {
       action: 'classified',
       kind: outcome.kind,
+      count: companions.reduce((total, companion) => total + companion.count, 0),
       detail:
         source.kind === 'correction'
           ? 'corrected'
@@ -1709,6 +1722,7 @@ async function runIngest(
       phase: 'resolved',
       presentation: current.presentation,
       kind: outcome.kind,
+      companions,
     };
     // Only where there is something to SEE resolve. The hold exists so the app-shell overlay's
     // three tiles can fade to one; a `local` door renders no tiles, so there it is 700ms of a
@@ -2033,7 +2047,19 @@ function classify(data: ShareExtractionResult, env: ResultEnvelope): ReadOutcome
     case 'none':
       return { kind: 'none' };
     case 'event':
-      return { kind: 'event', model: true, payload: { kind: 'event', data: data.event, env } };
+      return {
+        kind: 'event',
+        model: true,
+        // The to-do companion (#113) rides on the event payload; present only when non-empty.
+        payload: {
+          kind: 'event',
+          data: data.event,
+          ...(data.todo ? { todo: data.todo } : {}),
+          env,
+        },
+      };
+    case 'todo':
+      return { kind: 'todo', model: true, payload: { kind: 'todo', data: data.todo, env } };
     case 'travel':
       return { kind: 'travel', model: true, payload: { kind: 'travel', data: data.travel, env } };
     case 'recipe':

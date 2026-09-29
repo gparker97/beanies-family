@@ -19,8 +19,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDocumentToActivity } from '../useDocumentToActivity';
-import type { ExtractionResult } from '@/services/ai/types';
-import type { ResultEnvelope } from '@/types/magicPayload';
+import type { ExtractionResult, TodoExtractionResult } from '@/services/ai/types';
+import type { ResultEnvelope, ShareLink } from '@/types/magicPayload';
 
 const showToast = vi.fn();
 vi.mock('@/composables/useToast', () => ({ useToast: () => ({ showToast }) }));
@@ -138,5 +138,65 @@ describe('useDocumentToActivity — delivery', () => {
       expect.objectContaining({ surface: 'ai-activity-capture', severity: 'error' })
     );
     expect(showToast).toHaveBeenCalledWith('error', 'ai.error.title', 'ai.error.generic');
+  });
+
+  describe('the link rule (#113)', () => {
+    const shared = (provenanceUrl: string): ShareLink => ({
+      pageUrl: provenanceUrl,
+      provenanceUrl,
+      imageCandidates: [],
+      path: 'page_text',
+      kind: 'page',
+    });
+    const prefillOf = (m: ReturnType<typeof vi.fn>) =>
+      m.mock.calls[0][0].prefill as { link?: string; notes?: string };
+
+    it("fills the link from the event's own address, leaving notes alone with no shared page", () => {
+      const { deliverEvent, onActivityReady } = setup();
+      deliverEvent({ ...SAMPLE, link: 'https://school.example.org/trip' }, env());
+      expect(prefillOf(onActivityReady)).toMatchObject({ link: 'https://school.example.org/trip' });
+      expect(prefillOf(onActivityReady).notes).toBeUndefined();
+    });
+
+    it('uses the shared page as the link when the read found none, without repeating it in notes', () => {
+      const { deliverEvent, onActivityReady } = setup();
+      deliverEvent(SAMPLE, env({ link: shared('https://events.example.org/fair') }));
+      expect(prefillOf(onActivityReady).link).toBe('https://events.example.org/fair');
+      expect(prefillOf(onActivityReady).notes).toBeUndefined();
+    });
+
+    it('keeps the shared page in notes when the link is a different address', () => {
+      const { deliverEvent, onActivityReady } = setup();
+      deliverEvent(
+        { ...SAMPLE, description: 'Bring a hat', link: 'https://tickets.example.org/fair' },
+        env({ link: shared('https://events.example.org/fair') })
+      );
+      expect(prefillOf(onActivityReady)).toMatchObject({
+        link: 'https://tickets.example.org/fair',
+        notes: 'Bring a hat\nhttps://events.example.org/fair',
+      });
+    });
+  });
+
+  it('passes the companion to-dos through, and only when there are some', () => {
+    const todo: TodoExtractionResult = {
+      items: [
+        {
+          title: 'Sign the slip',
+          details: null,
+          dueDate: null,
+          dueTime: null,
+          timing: null,
+          assigneeName: null,
+          ownerCard: null,
+          links: [],
+        },
+      ],
+    };
+    const { deliverEvent, onActivityReady } = setup();
+    deliverEvent(SAMPLE, env(), todo);
+    deliverEvent(SAMPLE, env(), { items: [] });
+    expect(onActivityReady.mock.calls[0][0].todo).toBe(todo);
+    expect(onActivityReady.mock.calls[1][0]).not.toHaveProperty('todo');
   });
 });

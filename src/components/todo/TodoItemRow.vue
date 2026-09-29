@@ -10,6 +10,7 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
 import type { FamilyMember, TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -138,8 +139,12 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
   <div
     class="group flex items-center gap-3 rounded-2xl border transition-all"
     :class="containerClass"
+    :data-todo-id="todo.id"
     @click="emit('view', todo)"
   >
+    <!-- `data-todo-id` (above) is the To-Dos page's reveal target for a just-created to-do. On
+         the row itself, not a wrapper: the `attention-ring` is an inset shadow, which a child's
+         background would hide. (Kept in here: a comment at the template root makes a fragment.) -->
     <!-- Checkbox -->
     <button
       type="button"
@@ -228,6 +233,10 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
         <span v-else-if="!compact && !isSomeday" class="text-[0.625rem] opacity-35 md:text-xs">
           {{ t('todo.noDateSet') }}
         </span>
+
+        <!-- Linked activity (renders nothing when the activity no longer resolves; its click
+             never opens the row) -->
+        <LinkedActivityChip v-if="todo.activityId" :activity-id="todo.activityId" />
 
         <!-- Assignee chips -->
         <ActivityOwnerStack :members="ownersOf(todo)" size="xs" />

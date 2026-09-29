@@ -498,6 +498,8 @@ When the UI needs to guide a user's eye to a specific field, section, or element
 
 **CSS class:** `.attention-pulse` — a Heritage Orange glow that pulses once and fades out over 1.5s. Defined in `src/style.css`.
 
+**Ring variant:** `.attention-ring` — the inset ring only, two beats, `accent-lift` on dark. Use it for an element that paints its own background (a calendar chip wearing its member's colour wash): `.attention-pulse` animates `background-color`, which would wipe that wash for the length of the pulse. `reveal(el, 'attention-ring')` / `pulse(el, 'attention-ring')`. The planner reveals a just-created activity this way (`useActivityReveal`).
+
 **Composable:** `useAttentionPulse()` from `src/composables/useAttentionPulse.ts` — provides a `pulse(el)` function that adds the class and auto-removes it after the animation completes. Supports re-triggering.
 
 ```ts

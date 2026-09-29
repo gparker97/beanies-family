@@ -716,6 +716,12 @@ export interface TodoItem {
   hintKey?: string; // stable dedup key, survives CRDT merge: `${hintType}:${scopeId}:${eventDateISO}`
   hintEventDate?: ISODateString; // the real event date (birthday/party/trip start) — expiry + display
   hintAcknowledged?: boolean; // "kept" → permanent, exempt from expiry + master-off cleanup
+  /**
+   * The activity this to-do was saved alongside (a magic beans shared result). A SOFT
+   * reference: nothing unlinks it when the activity is deleted (here or on another device),
+   * so every reader resolves it against `activityStore` and ignores a miss.
+   */
+  activityId?: UUID;
 }
 
 /** Helpful Hints (#40) — the closed set of rule-based hint triggers. */

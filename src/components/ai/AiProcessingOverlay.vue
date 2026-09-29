@@ -30,7 +30,12 @@ import { magicIngestState } from '@/composables/useSharedDocumentIngest';
 import { isReadingSharedDocument } from '@/composables/useSharedDocumentIngest';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { MAGIC_DESTINATIONS, MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
+import {
+  MAGIC_DESTINATIONS,
+  MAGIC_DESTINATION_KINDS,
+  magicTileCols,
+} from '@/constants/magicDestinations';
+import type { ShareKind } from '@/types/magicPayload';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 
 const { t } = useTranslation();
@@ -51,6 +56,34 @@ const litKind = () => {
   if (state.phase === 'resolved') return state.kind;
   return state.phase === 'reading' ? (state.hint ?? null) : null;
 };
+
+/**
+ * Is this tile lit? The lit kind, or a COMPANION the same read found beside it (#113): an
+ * activity with to-dos lifts both tiles, which is how the overlay says "shared result".
+ */
+const isLit = (kind: ShareKind): boolean => {
+  if (litKind() === kind) return true;
+  const state = magicIngestState.value;
+  return state.phase === 'resolved' && state.companions.some((c) => c.kind === kind);
+};
+
+/**
+ * What the status line says once a shared result resolves (#113): "Found an activity and 3
+ * to-dos". Null for a single-kind result, which keeps the reading line.
+ */
+const foundLine = () => {
+  const state = magicIngestState.value;
+  if (state.phase !== 'resolved' || state.kind !== 'event') return null;
+  const todos = state.companions.find((c) => c.kind === 'todo');
+  if (!todos) return null;
+  return fillTemplate(
+    t(todos.count === 1 ? 'ai.found.eventWithTodos.one' : 'ai.found.eventWithTodos.other'),
+    { count: String(todos.count) }
+  );
+};
+
+/** Tile columns on a phone (shared with the sheet); one row from `sm`. */
+const phoneCols = magicTileCols(MAGIC_DESTINATION_KINDS.length);
 
 /**
  * "page 3 of 5" while a statement is read page by page (#107), or null. Only the statement
@@ -123,21 +156,25 @@ const progressLine = () => {
            reading; on resolve the others fall back and one lifts. A read the person pre-labelled
            starts with that tile lit and nothing ticking (`litKind`). Visually unlabelled by
            design — the strings are their accessible names. -->
-        <!-- Two by two on a phone, one row of four from `sm`. Every tile is the same rem width,
+        <!-- On a phone the columns come from `magicTileCols` (shared with the sheet: five tiles
+             are three and two); one row of every tile from `sm`. Every tile is the same rem width,
              sized for the longest label ("Transactions") with padding either side, so it scales
              with Large reading mode instead of running into the tile's edges. -->
-        <ul class="grid list-none grid-cols-2 gap-2.5 p-0 sm:grid-cols-4">
-          <!-- `magic-tick` on the LI, not the tile: its stagger is `:nth-child`, so it has to sit
-             on the element that is actually the nth child of this list. -->
+        <ul
+          class="grid list-none grid-cols-[repeat(var(--cols),minmax(0,1fr))] gap-2.5 p-0 sm:grid-cols-[repeat(var(--cols-sm),minmax(0,1fr))]"
+          :style="{ '--cols': phoneCols, '--cols-sm': MAGIC_DESTINATION_KINDS.length }"
+        >
+          <!-- `--tick-i` indexes the stagger (`style.css`), so a new tile needs no CSS. -->
           <li
-            v-for="kind in MAGIC_DESTINATION_KINDS"
+            v-for="(kind, i) in MAGIC_DESTINATION_KINDS"
             :key="kind"
             :class="litKind() ? '' : 'magic-tick'"
+            :style="{ '--tick-i': i }"
           >
             <div
               class="flex h-16 w-22 flex-col items-center justify-center rounded-[14px] px-1.5 transition-all duration-300"
               :class="
-                litKind() === kind
+                isLit(kind)
                   ? 'from-primary-500 to-terracotta-400 magic-shimmer magic-shimmer-once scale-110 bg-gradient-to-br shadow-[0_12px_26px_-10px_rgba(241,93,34,0.65)]'
                   : // ⚠️ Opacity ONLY on the two tiles that are on their way out. The CIG forbids an
                     // opacity modifier on text a person reads, and the RESTING state is read —
@@ -154,9 +191,7 @@ const progressLine = () => {
               }}</span>
               <span
                 class="font-outfit relative z-[1] mt-1 block text-xs font-semibold"
-                :class="
-                  litKind() === kind ? 'text-white' : 'text-secondary-400 dark:text-ink-faint'
-                "
+                :class="isLit(kind) ? 'text-white' : 'text-secondary-400 dark:text-ink-faint'"
               >
                 {{ t(`ai.capture.dest.${kind}`) }}
               </span>
@@ -166,8 +201,11 @@ const progressLine = () => {
 
         <!-- No text colour utility here on purpose: `.magic-text-shimmer` owns the colour in both
              themes, because the gradient and the fallback have to agree. -->
-        <p class="font-outfit magic-text-shimmer text-sm font-semibold">
-          {{ litKind() === 'transactions' ? t('ai.reading.statement') : t('ai.processing') }}
+        <p class="font-outfit magic-text-shimmer text-sm font-semibold" aria-live="polite">
+          {{
+            foundLine() ??
+            (litKind() === 'transactions' ? t('ai.reading.statement') : t('ai.processing'))
+          }}
         </p>
         <p
           v-if="progressLine()"

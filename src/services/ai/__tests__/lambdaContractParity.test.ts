@@ -12,12 +12,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
-// @ts-expect-error — plain JS Lambda source, deliberately imported for parity rather than copied.
-import { sourceFingerprint } from '../../../../infrastructure/lambda/ai-extract/correctionGrant.mjs';
+import {
+  sourceFingerprint,
+  SHARE_KINDS,
+  // @ts-expect-error: plain JS Lambda source, deliberately imported for parity rather than copied.
+} from '../../../../infrastructure/lambda/ai-extract/correctionGrant.mjs';
 // @ts-expect-error — as above.
 import { SEALED_PROTOCOL } from '../../../../infrastructure/lambda/ai-extract/sealedForward.mjs';
 
 import { sourceHash } from '../providers/managedProvider';
+import { MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
 import type { ExtractionRequest } from '../types';
 
 /**
@@ -90,5 +94,11 @@ describe('client / Lambda contract parity', () => {
     expect(clientMatch, 'MANAGED_TEXT_BILL_BOUND must still exist in the client').toBeTruthy();
 
     expect(Number(clientMatch![1].replace(/_/g, ''))).toBe(Number(match![1].replace(/_/g, '')));
+  });
+
+  it('lets a correction name exactly the kinds the app can make (#113)', () => {
+    // A kind the app offers but `SHARE_KINDS` lacks would 400 every correction to it; a kind
+    // the Lambda accepts but the app lacks is a hint channel nothing uses.
+    expect([...SHARE_KINDS]).toEqual(MAGIC_DESTINATION_KINDS);
   });
 });

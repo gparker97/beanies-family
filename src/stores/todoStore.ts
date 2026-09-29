@@ -13,6 +13,7 @@ import type { TodoItem, CreateTodoInput, UpdateTodoInput, FamilyMember } from '@
 import { toISODateString } from '@/utils/date';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { useActivityStore } from '@/stores/activityStore';
 
 // Sort comparators — newest-created first / most-recently-completed first.
 const byCreatedDesc = (a: TodoItem, b: TodoItem) => b.createdAt.localeCompare(a.createdAt);
@@ -156,7 +157,7 @@ export const useTodoStore = defineStore('todos', () => {
         todos.value = [...todos.value, todo];
         return todo;
       },
-      { action: 'todoStore:createTodo' }
+      { action: 'todoStore:createTodo', surface: 'todos' }
     );
     return trackFeature(result ?? null, 'todo');
   }
@@ -192,6 +193,87 @@ export const useTodoStore = defineStore('todos', () => {
       { action: 'todoStore:deleteTodo' }
     );
     return result ?? false;
+  }
+
+  /**
+   * Create several to-dos in ONE write (all or nothing), under ids the caller minted.
+   *
+   * The ids come from the magic beans review drafts, so a retry after a failure rewrites the
+   * same records instead of duplicating them. Failures toast + report once through
+   * `wrapAsync`; the caller keeps its drafts. `trackFeature` counts the batch as one use.
+   */
+  async function createTodos(
+    inputs: readonly (CreateTodoInput & { id: string })[]
+  ): Promise<TodoItem[] | null> {
+    if (!inputs.length) return [];
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const created = await todoRepo.createTodosWithIds(
+          inputs.map(({ id, ...input }) => ({ id, input }))
+        );
+        const ids = new Set(created.map((t) => t.id));
+        // Replace-by-id so a retried batch never leaves two copies in memory either.
+        todos.value = [...todos.value.filter((t) => !ids.has(t.id)), ...created];
+        return created;
+      },
+      { action: 'todoStore:createTodos', surface: 'todos' }
+    );
+    return trackFeature(result ?? null, 'todo');
+  }
+
+  /**
+   * Link to-dos to an activity in ONE write. A to-do deleted meanwhile (here or on another
+   * device) is skipped, never a failure. Returns the linked to-dos, or null when the write
+   * failed (already toasted + reported by `wrapAsync`).
+   */
+  async function linkTodosToActivity(
+    ids: readonly string[],
+    activityId: string
+  ): Promise<TodoItem[] | null> {
+    if (!ids.length) return [];
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const linked = await todoRepo.patchTodos(ids, { activityId }, { onMissing: 'skip' });
+        const byId = new Map(linked.map((t) => [t.id, t]));
+        todos.value = todos.value.map((t) => byId.get(t.id) ?? t);
+        return linked;
+      },
+      { action: 'todoStore:linkTodosToActivity', surface: 'todos' }
+    );
+    return result ?? null;
+  }
+
+  /**
+   * Delete several to-dos in ONE write. An id that is already gone is a no-op. Returns
+   * false when the write failed (already toasted + reported by `wrapAsync`).
+   */
+  async function deleteTodos(ids: readonly string[]): Promise<boolean> {
+    if (!ids.length) return true;
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        await todoRepo.deleteTodos(ids);
+        const gone = new Set(ids);
+        todos.value = todos.value.filter((t) => !gone.has(t.id));
+        return true;
+      },
+      { action: 'todoStore:deleteTodos', surface: 'todos' }
+    );
+    return result ?? false;
+  }
+
+  /**
+   * Open (not completed) to-dos linked to an activity. `activityId` is a soft reference, so
+   * an activity that no longer resolves in `activityStore` has no linked to-dos.
+   */
+  function openTodosForActivity(activityId: string): TodoItem[] {
+    if (!useActivityStore().activities.some((a) => a.id === activityId)) return [];
+    return todos.value.filter((t) => !t.completed && t.activityId === activityId);
   }
 
   /**
@@ -329,6 +411,10 @@ export const useTodoStore = defineStore('todos', () => {
     // Actions
     loadTodos,
     createTodo,
+    createTodos,
+    linkTodosToActivity,
+    deleteTodos,
+    openTodosForActivity,
     updateTodo,
     deleteTodo,
     restoreTodo,

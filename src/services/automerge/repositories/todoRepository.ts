@@ -21,6 +21,11 @@ export const deleteTodo = repo.remove;
  */
 export const createTodoWithId = repo.createWithId;
 
+/** Batch writes, each ONE Automerge change (see `createAutomergeRepository`). */
+export const createTodosWithIds = repo.createManyWithIds;
+export const patchTodos = repo.patchMany;
+export const deleteTodos = repo.removeMany;
+
 export async function getTodosByAssignee(assigneeId: string): Promise<TodoItem[]> {
   const todos = await getAllTodos();
   return todos.filter((t) => normalizeAssignees(t).includes(assigneeId));

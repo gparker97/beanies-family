@@ -288,6 +288,8 @@ const { identityFor } = useActivityIdentity();
         :style="{
           ...identityFor(occ.activity).style,
         }"
+        :data-activity-id="occ.activity.id"
+        :data-occurrence-date="occ.date"
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
         <span class="min-w-0 flex-1 truncate">
@@ -380,6 +382,8 @@ const { identityFor } = useActivityIdentity();
             width: `calc(${(1 / ev.totalLanes) * 100}% - 4px)`,
             ...identityFor(ev.card.activity).style,
           }"
+          :data-activity-id="ev.card.activity.id"
+          :data-occurrence-date="ev.card.eventDate"
           @click="emit('view-activity', ev.card.activity.id, ev.card.eventDate)"
         >
           <!-- Confetti only where the block is tall enough to hold it; a 30-minute
