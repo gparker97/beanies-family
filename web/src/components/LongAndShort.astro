@@ -1,0 +1,143 @@
+---
+/**
+ * "the long and short of it" — the three-bullet summary box at the top of a
+ * feature-style beanstalk post (what we built / how it helps you / where to
+ * find it). Rendered by `pages/blog/[...slug].astro` between the header and
+ * the "the post" divider, only when the post sets `longAndShort`.
+ *
+ * Takes its colour from the issue tint the post page sets on `.post-page`.
+ * Text in backticks becomes an app-path chip; nothing else is interpreted.
+ * The bullet markers are CSS backgrounds, so the section's HTML (which the
+ * beanies-blog skill copies to Substack) carries no images. Role labels and
+ * chips are <strong>, so they stay distinct where the styles don't travel
+ * (Substack paste, reader mode). role="list" keeps list semantics in Safari,
+ * which drops them from a list-style: none list.
+ *
+ * Design: docs/mockups/blog-beanie-bullets-2026-09-29.html (round 2).
+ */
+import { longAndShortEntries, type LongAndShort } from '~/utils/blog';
+
+interface Props {
+  summary: LongAndShort;
+}
+
+const { summary } = Astro.props;
+const items = longAndShortEntries(summary).map(([role, text]) => ({
+  role,
+  // Odd segments sat between backticks: those are app paths.
+  segments: text.split(/`([^`]+)`/),
+}));
+---
+
+<section class="long-and-short" aria-labelledby="long-and-short-heading">
+  <h2 class="las-title" id="long-and-short-heading">the long and short of it</h2>
+  <p class="las-intro">we know our families are busy, so here's the beanie breakdown</p>
+  <ul class="las-list" role="list">
+    {
+      items.map(({ role, segments }) => (
+        <li class="las-item">
+          <strong class="las-role">{role}</strong>
+          <p class="las-text">
+            {segments.map((segment, i) =>
+              i % 2 === 1 ? <strong class="las-path">{segment}</strong> : segment
+            )}
+          </p>
+        </li>
+      ))
+    }
+  </ul>
+</section>
+
+<style>
+  .long-and-short {
+    background: color-mix(in srgb, var(--tint-hex, #f15d22) 7%, #fff);
+    border: 1px solid color-mix(in srgb, var(--tint-hex, #f15d22) 22%, transparent);
+    border-radius: 22px;
+    margin: 28px 0 0;
+    padding: 22px 26px 22px 24px;
+  }
+
+  .las-title {
+    color: var(--deep-slate, #2c3e50);
+    font-family: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    margin: 0 0 4px;
+  }
+
+  .las-intro {
+    color: #56636f;
+    font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+    font-size: 1rem;
+    font-style: italic;
+    line-height: 1.45;
+    margin: 0 0 16px;
+  }
+
+  .las-list {
+    display: grid;
+    gap: 14px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* The bullet is the beanie face from the site favicon, drawn as a
+     background so it stays decorative and out of copied HTML. */
+  .las-item {
+    padding-left: 34px;
+    position: relative;
+  }
+  .las-item::before {
+    background: url('/brand/beanies_small_bean_favicon_100x100.webp') center / contain no-repeat;
+    content: '';
+    height: 22px;
+    left: 0;
+    position: absolute;
+    top: 1px;
+    width: 22px;
+  }
+
+  /* Small-caps label, the site's signpost style (post kicker, previous/next). */
+  .las-role {
+    color: var(--tint-ink, #a83a11);
+    display: block;
+    font-family: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+
+  .las-text {
+    color: #3a4a5a;
+    font-family: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* The app path is the line people act on, so it reads as a breadcrumb chip.
+     inline-block keeps a short path on one line; a path longer than the line
+     wraps inside its chip (at any width, since .post-page clips overflow). */
+  .las-path {
+    background: #fff;
+    border: 1px solid color-mix(in srgb, var(--tint-hex, #f15d22) 28%, transparent);
+    border-radius: 999px;
+    color: var(--tint-ink, #a83a11);
+    display: inline-block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    max-width: 100%;
+    padding: 1px 9px;
+  }
+
+  @media (max-width: 520px) {
+    .long-and-short {
+      border-radius: 18px;
+      padding: 18px 16px;
+    }
+  }
+</style>

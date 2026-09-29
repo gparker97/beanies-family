@@ -34,10 +34,11 @@ Beanstalk Blog (hub page)   33a247d9-a99f-813a-b36d-ff0c93eb3544
   └── Blog Posts (database) 33a247d9-a99f-814d-bdff-c554dcff3a0b
         data_source_id      33a247d9-a99f-815e-a53a-000b24c88de0   ← what API-query-data-source / API-patch-page use
 
-MCP namespace: mcp__notion-beanies__*  (verified 2026-09-10 on this database)
-  Plain mcp__notion__* returns object_not_found on this data source, because the
-  integration behind it cannot see the page. Both namespaces expose identically-named
-  tools, so the failure looks like a bad id rather than a bad namespace. Use -beanies.
+MCP namespace: whichever mcp__notion*__* namespace is loaded in this session.
+  Which integration can see this page has changed over time (2026-09-10 only
+  -beanies could; 2026-09-29 plain mcp__notion__* could, and -beanies was not
+  loaded). Both expose identically-named tools, so object_not_found here looks like
+  a bad id. On object_not_found, try the other namespace before doubting the id.
 
 Properties (read the LIVE schema at runtime; select options drift):
   ID            unique_id    ← "find the blog by id" means THIS
@@ -47,6 +48,9 @@ Properties (read the LIVE schema at runtime; select options drift):
   Category      select       (see the category map below)
   URL           url          the live post URL, filled in after publishing
   Sub           rich_text    the post subtitle → maps to frontmatter `subtitle`
+  L&S: What We Built     rich_text  → longAndShort.built  ┐ see "The long and
+  L&S: How It Helps      rich_text  → longAndShort.helps  │ short of it" below
+  L&S: Where to Find It  rich_text  → longAndShort.where  ┘
   Substack      checkbox     ticked once cross-posted
   Notes         rich_text
 
@@ -89,6 +93,7 @@ which are real and in use. When they disagree, believe the schema.
 | `author`      | no       | defaults to `greg`                              |
 | `updatedDate` | no       | set only when revising an already-published post|
 | `draft`       | no       | `false` unless greg says to keep the flag on    |
+| `longAndShort`| no       | Notion `L&S:` ×3 — see "The long and short of it" |
 
 Some fields still have no home in Notion (`excerpt` chiefly, plus `coverEmoji` and
 `featured`). So regeneration is **not** a blind overwrite: read the existing file first,
@@ -172,6 +177,67 @@ for it here.
 
 ---
 
+## The long and short of it
+
+A summary box at the top of feature-style posts, for readers who will not read 1,000
+words: three bullets with fixed roles, **what we built**, **how it helps you**, **where
+to find it**. The box's heading, intro line, role labels and styling are fixed in
+`web/src/components/LongAndShort.astro`; a post supplies only the three bullets, as
+frontmatter `longAndShort: { built, helps, where }`. No field, no box. The Zod schema
+requires all three keys and rejects blank or misspelled ones, so a bad field fails the
+build rather than rendering half a box. Plan: `docs/plans/2026-09-29-blog-long-and-short-summary.md`.
+
+**Which posts get one.** Decide by content, not `category:` (the categories are
+inconsistent). A post that introduces or explains a feature a reader can go and use gets
+a box. A personal story, memoir, essay, pricing note or whole-product comparison gets
+none. Say which, and why, in the review report.
+
+**Drafting rules.**
+
+- One sentence per bullet, about 25 words at most, lowercase (blog voice), no em-dashes,
+  no tricolons, no marketing copy.
+- `built`: what the feature is, concretely. `helps`: the benefit to a busy family, taken
+  from what the post itself says. `where`: the exact in-app path.
+- Put the app path in backticks with ` › ` between levels, e.g.
+  `` `The Treehouse › Beanie Lists` `` or `` `Settings › Beanie Wall` ``. Backticks
+  render as a chip; nothing else is interpreted, so no bold, no links.
+- **Verify `where` against the shipped app** before proposing it: the `en` values in
+  `src/services/translation/uiStrings.ts`, `src/constants/navigation.ts` and
+  `src/router/index.ts`. A post written months ago may name a page that has since been
+  renamed; the box uses today's name.
+- No claims that will go stale quickly (e.g. "free in beta"). If a claim cannot be
+  checked against the code, leave it out.
+
+**The approval gate.** Show greg the three bullets in the review report, as YAML, next to
+the post. **Nothing reaches the repo until he approves them.** On approval, write them to
+the three `L&S:` properties in Notion first, then regenerate the markdown. Same rule as
+every other fix: a bullet that exists only in the repo is lost at the next regeneration.
+
+**Sync rules (Notion → frontmatter).**
+
+- Read the rich_text *segments*, not `plain_text`: a segment with
+  `annotations.code = true` becomes `` `…` ``. A backtick greg typed himself is kept,
+  since it marks a path the same way. Bold, italic and links are dropped. After mapping,
+  count the backticks in each value: an odd count would turn the wrong words into a
+  chip, so stop and report the row and property instead of regenerating.
+- Write each value double-quoted, escaping `\` first and then `"` (a value that starts
+  with a backtick is a YAML parse error unquoted). Then run `npx prettier --write` on the
+  file, as the commit hook will: it switches values with no apostrophe to single quotes,
+  which is still valid YAML. Don't fight it.
+- All three properties empty → omit `longAndShort`. One or two filled → stop and tell
+  greg the row ID and which properties are empty. Do not regenerate a half-filled box.
+
+**Substack.** The box leads the Substack copy: take `section.long-and-short` outerHTML
+from the same Playwright load as `.blog-prose` and put it first. The bean markers are CSS
+backgrounds, so it pastes as a heading, a line and a plain list, with no images to strip.
+The role labels and app paths are `<strong>`, so they paste as bold and stay distinct.
+
+**Renames.** `where` paths are true on the day they are written. When a post announces
+that a page or setting has been renamed, grep `content/blog` for chips containing the old
+label and propose updated bullets for those posts too (Notion first, as always).
+
+---
+
 ## The workflow
 
 ### 1. Find the post
@@ -216,6 +282,9 @@ Cover, in this order (most valuable first):
   missing it is orphaned.
 - **Images.** Present? Captioned? Alt text that describes the image rather than repeating
   the caption?
+- **The long and short of it.** For a feature-style post, propose the three summary
+  bullets (or say why the post gets none). Rules and the approval gate are in
+  "The long and short of it" above.
 
 Present findings as a list greg can accept or reject item by item. Separate the two
 kinds clearly: **mechanical** (typos, links, casing, em-dashes — safe to accept in bulk)
@@ -232,7 +301,8 @@ regenerated, and greg will re-read the old sentence in Notion and wonder why.
 ### 4. Regenerate the repo markdown from Notion
 
 Convert the Notion blocks to markdown. Preserve the frontmatter fields Notion doesn't
-model (see the table). Set `draft: false` unless greg explicitly says to keep the flag
+model (see the table). Map the three `L&S:` properties to `longAndShort` using the sync
+rules in "The long and short of it". Set `draft: false` unless greg explicitly says to keep the flag
 on. Optimize and place every image. Then verify:
 
 ```bash
@@ -300,7 +370,8 @@ to selecting the payload node and telling him to press Ctrl/Cmd+C, never to a si
 
 Build the payload from the **built HTML**, not by retyping the post: drive the dev server
 with Playwright and take `.blog-prose` innerHTML. That is the only source guaranteed to
-match what shipped.
+match what shipped. If the post has a summary box, take `section.long-and-short` outerHTML
+from the same page load and put it first (see "The long and short of it").
 
 Four transforms the Substack copy always needs, none of which the site version wants:
 
