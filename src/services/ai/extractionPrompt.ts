@@ -10,6 +10,8 @@
 // Bump PROMPT_VERSION on ANY change so drift is detectable, and update every copy together.
 
 import { isRealYmd, isWallClockTime } from '@/utils/date';
+import { safeHttpsUrl } from '@/utils/url';
+import { SHARE_COMPANIONS } from '@/constants/magicDestinations';
 import { logEvent } from '@/services/telemetry';
 import type {
   ExtractionContext,
@@ -27,11 +29,14 @@ import type {
   StatementIdentity,
   StatementLineDraft,
   StatementLineKind,
+  TodoExtractionResult,
+  TodoItemExtraction,
+  TodoTiming,
   TravelExtractionResult,
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-09-25.1';
+export const PROMPT_VERSION = '2026-09-29.2';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -82,6 +87,7 @@ export const EXTRACTION_JSON_SHAPE = {
     'string — a short lowercase label classifying the event type, e.g. "birthday", "soccer game", "dentist", "school recital", or "" if unclear',
   category:
     'string — the single best-matching category id chosen from the category list provided below, or "" if none fits well. Use ONLY an id from that list; prefer an "other_*" id within the correct group over a wrong specific id',
+  link: 'string: the single most useful https web address for this event (a sign-up, ticket or information page), exactly as written in the source, or "" if there is none',
   confidence: 'object — a 0..1 number for each of: title, date, startTime, endTime, location',
 } as const;
 
@@ -291,6 +297,19 @@ function asYmd(v: unknown, field: string, rejected: string[]): string {
 }
 
 /**
+ * A model-supplied web address, screened by `safeHttpsUrl` (https only, default port), or
+ * `null`. A non-empty value that fails the screen is recorded in `rejected`, so a model that
+ * starts returning junk URLs is visible rather than silently linkless.
+ */
+function asHttpsUrl(v: unknown, field: string, rejected: string[]): string | null {
+  const raw = asString(v, MODEL_TEXT_MAX);
+  if (!raw) return null;
+  const safe = safeHttpsUrl(raw);
+  if (!safe) rejected.push(field);
+  return safe;
+}
+
+/**
  * Report dropped model fields — ONE aggregated event, never one per field.
  *
  * Without this the drop is invisible: a model that starts answering "9:00 AM"
@@ -375,6 +394,9 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
   // Collected rather than logged inline so one capture emits ONE event, however
   // many fields the model got wrong.
   const rejectedFields: string[] = [];
+  // `link` (#113) is optional for the same reason, and screened like every machine-supplied
+  // URL: https only, default port. An unsafe one is dropped and reported, never stored.
+  const link = asHttpsUrl(obj.link, 'link', rejectedFields);
   const result = {
     isEvent: asBool(obj.isEvent),
     title: asString(obj.title, MODEL_FIELD_MAX),
@@ -389,6 +411,7 @@ export function parseExtractionResult(raw: unknown): ExtractionResult {
     confidence,
     ...(categoryHint ? { categoryHint } : {}),
     ...(category ? { category } : {}),
+    ...(link ? { link } : {}),
   };
   reportRejectedFields(rejectedFields);
   return result;
@@ -758,6 +781,97 @@ export function buildStatementExtractionMessages(
 }
 
 /**
+ * The TO-DO shape (#113): things a person has to DO, read from a note. Returned on its own as
+ * kind="todo", or as the companion of kind="event" when one note holds both. There is no
+ * standalone to-do task; the share task (with a stated kind for a correction) covers it.
+ */
+export const TODO_JSON_SHAPE = {
+  items:
+    'array: one object per separate thing someone has to do, at most 10, in the order the source gives them. Each object has exactly these keys: title, details, dueDate, dueTime, timing, assigneeName, ownerCard, links',
+  title:
+    'string: a short instruction that starts with a verb, e.g. "Return the signed permission slip"',
+  details:
+    'string or null: the facts needed to do it that the title leaves out (an amount, where to hand it in, what to pack), or null if there are none',
+  dueDate:
+    'string or null: the deadline as YYYY-MM-DD, only when the source states it or clearly implies it (e.g. "by Friday"), otherwise null. Never guess a date',
+  dueTime:
+    'string or null: 24-hour HH:mm, only when the source states a time for doing THIS to-do (e.g. "at 10am" -> "10:00"). Never the event\'s start or end time. Otherwise null',
+  timing:
+    'string or null: only when there is also an event. "on_event_day" when it is done on the day of the event (e.g. pack sunscreen for the trip), "before_event" when it must be done before the event and no date is given, otherwise null',
+  assigneeName:
+    'string or null: the name of the person the source says must do it, exactly as written (e.g. "Mia"), or null when no one is named. A role such as "parents" or "students" is not a name',
+  ownerCard:
+    'string or null: the id from the owner list that this to-do belongs to (e.g. a permission slip belongs to "school-forms"), or null if none fits',
+  links:
+    'array of strings: the https web addresses in the source that this to-do needs (a form to fill in, a payment page), or [] if none',
+} as const;
+
+/**
+ * The Who Owns What cards a to-do may name as its owner (#113). A CLOSED list of constant ids,
+ * never family data: the client resolves the id to whoever holds that card. Hardcoded in all
+ * three copies (the `.mjs` copies cannot import the card catalogue); a client sync test pins
+ * every id to `RESPONSIBILITY_CARDS`.
+ */
+export const TODO_OWNER_CARDS = [
+  'school-forms',
+  'school-vacations',
+  'helping-at-school',
+  'homework-and-school-supplies',
+  'talking-to-teachers',
+  'kids-bags-for-the-day',
+  'lunchboxes',
+  'sports-and-clubs',
+  'tutors-and-lessons',
+  'doctor-and-dentist',
+  'health-insurance-and-claims',
+  'paying-the-bills',
+  'mail-and-paperwork',
+  'packages-and-returns',
+  'birthday-parties',
+  'gifts-for-others',
+  'cards-and-thank-yous',
+  'passports-and-documents',
+  'car-care',
+  'pet-care',
+] as const;
+
+/**
+ * Which companions each primary kind may carry (#113), as DATA the prompt is built from: the
+ * companion rule and the stated-kind clause both read it. The client's `SHARE_COMPANIONS`
+ * (`constants/magicDestinations.ts`) is the source of truth; a sync test pins this to it.
+ */
+export const PROMPT_SHARE_COMPANIONS: Partial<Record<ShareKindHint, readonly ShareKindHint[]>> = {
+  event: ['todo'],
+};
+
+/** The companion rule: `kind="event" may also include a "todo" object`, one per primary kind. */
+function companionRules(): string {
+  return Object.entries(PROMPT_SHARE_COMPANIONS)
+    .map(
+      ([kind, companions]) =>
+        `kind="${kind}" may also include ${(companions ?? []).map((c) => `a "${c}" object`).join(' and ')}`
+    )
+    .join('; ');
+}
+
+/**
+ * The stated-kind clause for a kind that has companions: the pick fixes the PRIMARY kind, but
+ * picking Activity must never drop the to-dos the same note holds. Empty for any other kind.
+ */
+function hintCompanionClause(kindHint: ShareKindHint): string {
+  const companions = PROMPT_SHARE_COMPANIONS[kindHint] ?? [];
+  if (companions.length === 0) return '';
+  return ` You may still include ${companions.map((c) => `the "${c}" object`).join(' and ')} when the document also contains it.`;
+}
+
+/**
+ * How to tell a to-do from an event (#113), with the four worked examples. Part of the
+ * CLASSIFICATION rules, so a stated kind replaces it like the others.
+ */
+const TODO_VS_EVENT_RULE =
+  'How to tell a to-do from an event: something a person has to DO (return, sign, pay, bring, pack, buy, book, reply) is a to-do; something a person GOES TO or takes part in at a set time or place is an event. A document with both is kind="event" with a companion "todo" object. A document with only things to do is kind="todo". Examples: a school field-trip note (the trip itself, plus "return the signed permission slip by Oct 12" and "pack sunscreen on the day") is kind="event" with a "todo" object; "please return the library book by Friday" is kind="todo"; a birthday party invitation that says "RSVP by May 3" is kind="event" with a "todo" object holding "RSVP"; a plain class schedule is kind="event" with no "todo" object.';
+
+/**
  * The SHARE task (#64): classify a shared document AND extract it, in ONE call.
  *
  * A share arrives from another app with no indication of what it is, so something has to
@@ -771,12 +885,13 @@ export function buildStatementExtractionMessages(
  * document that is none of the three — better than forcing a wrong item on the user.
  */
 export const SHARE_JSON_SHAPE = {
-  kind: 'exactly one of "event", "travel", "recipe", "transactions" or "none" — what this document actually is',
+  kind: 'exactly one of "event", "travel", "recipe", "transactions", "todo" or "none": what this document actually is. An "event" may also carry a companion "todo" object',
   event: 'present ONLY when kind="event": an object with the event keys described below',
   travel: 'present ONLY when kind="travel": an object with the travel keys described below',
   recipe: 'present ONLY when kind="recipe": an object with the recipe keys described below',
   transactions:
     'present ONLY when kind="transactions" (a bank or card statement, or a list of bank transactions): an object with the keys described below',
+  todo: 'present when kind="todo", OR beside kind="event" when the document also asks someone to do something for that event: an object with the to-do keys described below',
 };
 
 /**
@@ -824,7 +939,7 @@ export function buildShareExtractionMessages(
 ): ChatMessage[] {
   const { kindHint, hintReason = 'correction' } = opts;
   const system = [
-    'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, a recipe, or a bank or card statement.',
+    'You are given a SINGLE item that someone shared from another app — either one or more images (the pages of one document) or the text of a web page or video. It may be an invitation or school notice, a travel booking, a recipe, a bank or card statement, or a note asking someone to do something.',
     kindHint
       ? // ⚠️ The CLASSIFICATION rules are replaced, not appended to, when the user has told us
         // what the thing is. The default system message says «"none" is always better than a
@@ -833,7 +948,7 @@ export function buildShareExtractionMessages(
         // disagreed with came back as the original kind, the wrong-kind guard 502'd it, and the
         // family lost both the grant and the answer. The person has said what the thing is;
         // the model's job here is extraction, not adjudication.
-        `The person who shared this has told us what it is: a ${kindHint}.${HINT_CONTEXT[hintReason]} Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields. Only if the document contains nothing at all that could fill them, set kind="none".`
+        `The person who shared this has told us what it is: a ${kindHint}.${HINT_CONTEXT[hintReason]} Do NOT re-decide the category — set kind="${kindHint}" and extract the ${kindHint} fields.${hintCompanionClause(kindHint)} Only if the document contains nothing at all that could fill them, set kind="none".`
       : 'First decide which ONE of these the document is, then extract it.',
     'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
     `Today's date is ${todayIso}. Resolve any relative or partial dates against it. Output dates as YYYY-MM-DD and times as 24-hour HH:mm.`,
@@ -841,8 +956,9 @@ export function buildShareExtractionMessages(
       ? []
       : [
           'Set kind="none" if the document is none of these. Do NOT force a document into a category it does not belong to — "none" is always better than a wrong guess.',
+          TODO_VS_EVENT_RULE,
         ]),
-    'Include ONLY the nested object matching your chosen kind. Omit the others entirely.',
+    `Include the nested object matching your chosen kind. The only extra object allowed is a companion: ${companionRules()}, and only when the document really contains one. Omit the others entirely.`,
     'Never output any value that is not actually supported by the source. An empty field is ALWAYS better than an invented one.',
     'The JSON object must have exactly these keys: ' +
       Object.keys(SHARE_JSON_SHAPE).join(', ') +
@@ -873,6 +989,12 @@ export function buildShareExtractionMessages(
       '. Field meanings: ' +
       JSON.stringify(STATEMENT_IDENTITY_SHAPE) +
       '. Do NOT list the individual transactions.',
+    'When a "todo" object is included (kind="todo", or as the companion of kind="event"), it has exactly one key, "items". Field meanings: ' +
+      JSON.stringify(TODO_JSON_SHAPE) +
+      '.',
+    'For each to-do\'s "ownerCard", use ONLY an id from this list, or null if none fits: ' +
+      TODO_OWNER_CARDS.join(', ') +
+      '.',
   ].join('\n');
 
   return [
@@ -909,7 +1031,11 @@ export function parseShareExtractionResult(raw: unknown): ShareExtractionResult 
     case 'none':
       return { kind: 'none' };
     case 'event':
-      return { kind: 'event', event: parseExtractionResult(requireNested(obj, 'event')) };
+      return {
+        kind: 'event',
+        event: parseExtractionResult(requireNested(obj, 'event')),
+        ...companionTodo('event', obj),
+      };
     case 'travel':
       return { kind: 'travel', travel: parseTravelExtractionResult(requireNested(obj, 'travel')) };
     case 'recipe':
@@ -920,11 +1046,116 @@ export function parseShareExtractionResult(raw: unknown): ShareExtractionResult 
       reportRejectedFields(rejected);
       return { kind: 'transactions', transactions };
     }
+    case 'todo': {
+      // A to-do read with no usable item is an honest "nothing here", not an empty review.
+      const todo = parseTodoExtractionResult(requireNested(obj, 'todo'));
+      return todo.items.length > 0 ? { kind: 'todo', todo } : { kind: 'none' };
+    }
     default:
       throw new Error(
-        `Share extraction: unknown kind ${JSON.stringify(kind)} (expected event, travel, recipe, transactions or none)`
+        `Share extraction: unknown kind ${JSON.stringify(kind)} (expected event, travel, recipe, transactions, todo or none)`
       );
   }
+}
+
+/**
+ * The `todo` companion beside a primary kind (#113), read ONLY when `SHARE_COMPANIONS` allows
+ * it for that kind: a `todo` object beside `travel` is ignored like any other stray object. A
+ * companion is optional, so a missing or non-object one is simply absent (never a throw that
+ * would cost the family the primary result), and a companion with zero usable items is dropped.
+ */
+function companionTodo(
+  primary: ShareExtractionResult['kind'],
+  obj: Record<string, unknown>
+): { todo?: TodoExtractionResult } {
+  if (primary === 'none' || !SHARE_COMPANIONS[primary]?.includes('todo')) return {};
+  const nested = obj.todo;
+  if (typeof nested !== 'object' || nested === null || Array.isArray(nested)) return {};
+  const todo = parseTodoExtractionResult(nested);
+  return todo.items.length > 0 ? { todo } : {};
+}
+
+// ── To-do parser (#113, client-only like the others) ──────────────────────────────────────
+
+/** A read yields at most this many to-dos; the prompt asks for the same cap. */
+export const TODO_ITEMS_MAX = 10;
+/** Links kept per to-do. */
+const TODO_LINKS_MAX = 5;
+const TODO_TIMINGS: ReadonlySet<string> = new Set<TodoTiming>(['on_event_day', 'before_event']);
+const TODO_OWNER_CARD_IDS: ReadonlySet<string> = new Set<string>(TODO_OWNER_CARDS);
+
+/** A trimmed, bounded string, or null when empty. */
+function asNullableString(v: unknown, max: number): string | null {
+  return asString(v, max) || null;
+}
+
+/**
+ * Validate + coerce the model's `todo` object into a typed {@link TodoExtractionResult}.
+ *
+ * Never throws on a bad item: an item with no title is dropped, and a bad date, timing, owner
+ * card or link is dropped from its item and reported ONCE per read through
+ * `reportRejectedFields` with `todo.`-prefixed names, so they stand apart from event fields in
+ * CloudWatch. The walk is BOUNDED twice: it stops once `TODO_ITEMS_MAX` items are collected,
+ * and never looks past `MODEL_LIST_MAX` entries, so a hostile ten-thousand-entry array costs
+ * nothing (the same collect-until-full shape as `toStringList`).
+ */
+export function parseTodoExtractionResult(raw: unknown): TodoExtractionResult {
+  const obj = asObject(raw);
+  const entries = Array.isArray(obj.items) ? obj.items : [];
+  const rejected: string[] = [];
+  const items: TodoItemExtraction[] = [];
+  const limit = Math.min(entries.length, MODEL_LIST_MAX);
+  for (let i = 0; i < limit && items.length < TODO_ITEMS_MAX; i++) {
+    const item = asObject(entries[i]);
+    const title = asString(item.title, MODEL_FIELD_MAX);
+    if (!title) continue;
+    items.push(parseTodoItem(item, title, rejected));
+  }
+  // One name per field, however many items dropped it: `error_code` says WHICH fields the
+  // model got wrong, and three copies of `todo.dueDate` would only inflate the list.
+  reportRejectedFields([...new Set(rejected)]);
+  return { items };
+}
+
+function parseTodoItem(
+  item: Record<string, unknown>,
+  title: string,
+  rejected: string[]
+): TodoItemExtraction {
+  const timingRaw = asString(item.timing, MODEL_FIELD_MAX);
+  const timing = TODO_TIMINGS.has(timingRaw) ? (timingRaw as TodoTiming) : null;
+  if (timingRaw && !timing) rejected.push('todo.timing');
+
+  const ownerRaw = asString(item.ownerCard, MODEL_FIELD_MAX);
+  const ownerCard = TODO_OWNER_CARD_IDS.has(ownerRaw) ? ownerRaw : null;
+  if (ownerRaw && !ownerCard) rejected.push('todo.ownerCard');
+
+  // Each link is read at the full text cap, like the event `link` (`asHttpsUrl`), NOT through
+  // `toStringList`: that trims every entry to MODEL_FIELD_MAX first, and a 260-character form
+  // link cut to 200 still looks like a valid URL, so it would be saved broken with no report.
+  const links: string[] = [];
+  let badLink = false;
+  const rawLinks = Array.isArray(item.links) ? item.links : [];
+  const linkLimit = Math.min(rawLinks.length, MODEL_LIST_MAX);
+  for (let i = 0; i < linkLimit && links.length < TODO_LINKS_MAX; i++) {
+    const candidate = asString(rawLinks[i], MODEL_TEXT_MAX).trim();
+    if (!candidate) continue;
+    const safe = safeHttpsUrl(candidate);
+    if (!safe) badLink = true;
+    else if (!links.includes(safe)) links.push(safe);
+  }
+  if (badLink) rejected.push('todo.links');
+
+  return {
+    title,
+    details: asNullableString(item.details, MODEL_TEXT_MAX),
+    dueDate: asYmd(item.dueDate, 'todo.dueDate', rejected) || null,
+    dueTime: asWallClockTime(item.dueTime, 'todo.dueTime', rejected) || null,
+    timing,
+    assigneeName: asNullableString(item.assigneeName, MODEL_FIELD_MAX),
+    ownerCard,
+    links,
+  };
 }
 
 /** The nested payload for the chosen kind must be present and object-shaped. */

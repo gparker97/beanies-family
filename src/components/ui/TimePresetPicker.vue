@@ -4,9 +4,14 @@ import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
   modelValue: string;
+  /**
+   * Show a clear (✕) beside the pill while a time is set, emitting `''`. A SIBLING of the
+   * trigger, never nested in it (a button inside a button is invalid and steals its clicks).
+   */
+  clearable?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { clearable: false });
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -85,6 +90,12 @@ function toggleDropdown() {
   }
 }
 
+function clearTime() {
+  emit('update:modelValue', '');
+  isOpen.value = false;
+  showCustomInput.value = false;
+}
+
 function selectPreset(time: string) {
   emit('update:modelValue', time);
   isOpen.value = false;
@@ -121,29 +132,51 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
 
 <template>
   <div ref="dropdownRef" class="relative">
-    <!-- Trigger button -->
-    <button
-      type="button"
-      class="font-outfit flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
-      :class="
-        modelValue
-          ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
-          : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
-      "
-      @click="toggleDropdown"
-    >
-      <span>{{ displayLabel }}</span>
-      <svg
-        class="h-3 w-3 transition-transform"
-        :class="{ 'rotate-180': isOpen }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2.5"
+    <div class="flex items-center gap-1">
+      <!-- Trigger button -->
+      <button
+        type="button"
+        class="font-outfit flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
+        :class="
+          modelValue
+            ? 'border-primary-500 text-primary-500 dark:text-accent-lift dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
+            : 'dark:bg-surface-overlay dark:text-ink-soft border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
+        "
+        data-testid="time-preset-picker-trigger"
+        @click="toggleDropdown"
       >
-        <path d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
+        <span>{{ displayLabel }}</span>
+        <svg
+          class="h-3 w-3 transition-transform"
+          :class="{ 'rotate-180': isOpen }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          stroke-width="2.5"
+        >
+          <path d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <button
+        v-if="clearable && modelValue"
+        type="button"
+        data-testid="time-preset-picker-clear"
+        :aria-label="t('time.clearAriaLabel')"
+        class="dark:text-ink-soft dark:hover:bg-surface-hover flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-10)]"
+        @click="clearTime"
+      >
+        <svg
+          class="h-3 w-3"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          stroke-width="2.5"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
 
     <!-- Dropdown -->
     <Transition
@@ -201,7 +234,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
             class="font-outfit flex w-full items-center px-4 py-1.5 text-xs font-semibold transition-colors"
             :class="
               modelValue === time
-                ? 'text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
+                ? 'text-primary-500 dark:text-accent-lift dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
                 : 'dark:text-ink-soft dark:hover:bg-surface-hover text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
             "
             @click="selectPreset(time)"

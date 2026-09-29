@@ -112,3 +112,18 @@ describe('ActivityModal — an extracted end time', () => {
     expect(timeValues(w)).toEqual(['19:00', '19:00']);
   });
 });
+
+describe('ActivityModal: an extracted link (#113)', () => {
+  it('fills the link field and opens the collapsed section it lives in', async () => {
+    const w = mountModal({ title: 'Field trip', link: 'https://school.example.org/trip' });
+
+    await nextTick();
+    await nextTick();
+
+    // The link field sits inside "Add more details", which `onNew` collapses; a prefilled
+    // link that stayed hidden there would be saved without the user ever seeing it.
+    const input = w.find('input[type="url"]');
+    expect(input.exists()).toBe(true);
+    expect((input.element as HTMLInputElement).value).toBe('https://school.example.org/trip');
+  });
+});

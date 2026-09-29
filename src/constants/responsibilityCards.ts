@@ -10,6 +10,7 @@
 // old record then resolves as an unknown id (logged, ignored) rather than as a new card.
 import type { HelpfulHintType, ListCategory, MealSlot } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { assertNever } from '@/utils/assertNever';
 
 /** Skip-shortcut groups: "No car? Skip all 3". */
 export type CardGroup = 'car' | 'yard' | 'pool' | 'baby' | 'pet' | 'school';
@@ -669,28 +670,31 @@ export const CARD_DEFAULTS = {
 export type CardDefaultTarget =
   | { kind: 'mealSlot'; slot: MealSlot }
   | { kind: 'listTemplate'; key: string }
-  | { kind: 'hint'; hintType: HelpfulHintType };
+  | { kind: 'hint'; hintType: HelpfulHintType }
+  /** A card named directly (magic beans to-dos carry an owner card id), not via `CARD_DEFAULTS`. */
+  | { kind: 'card'; cardId: string };
 
 /** The card a default target reads its holder from, or undefined when none is mapped. */
 export function cardIdForTarget(target: CardDefaultTarget): string | undefined {
-  const map: Record<string, string> =
-    target.kind === 'mealSlot'
-      ? CARD_DEFAULTS.mealSlot
-      : target.kind === 'listTemplate'
-        ? CARD_DEFAULTS.listTemplate
-        : CARD_DEFAULTS.hint;
-  const key =
-    target.kind === 'mealSlot'
-      ? target.slot
-      : target.kind === 'listTemplate'
-        ? target.key
-        : target.hintType;
-  return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+  const lookup = (map: Record<string, string>, key: string) =>
+    Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+  switch (target.kind) {
+    case 'mealSlot':
+      return lookup(CARD_DEFAULTS.mealSlot, target.slot);
+    case 'listTemplate':
+      return lookup(CARD_DEFAULTS.listTemplate, target.key);
+    case 'hint':
+      return lookup(CARD_DEFAULTS.hint, target.hintType);
+    case 'card':
+      return target.cardId;
+    default:
+      return assertNever(target, 'cardIdForTarget');
+  }
 }
 
 /** Derived "beanies uses this card for" lines for the view drawer (empty for most cards). */
-export function cardUsesFor(cardId: string): CardDefaultTarget[] {
-  const out: CardDefaultTarget[] = [];
+export function cardUsesFor(cardId: string): Exclude<CardDefaultTarget, { kind: 'card' }>[] {
+  const out: Exclude<CardDefaultTarget, { kind: 'card' }>[] = [];
   for (const [slot, id] of Object.entries(CARD_DEFAULTS.mealSlot)) {
     if (id === cardId) out.push({ kind: 'mealSlot', slot: slot as MealSlot });
   }

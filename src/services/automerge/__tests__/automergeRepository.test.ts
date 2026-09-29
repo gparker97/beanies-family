@@ -296,6 +296,75 @@ describe('createAutomergeRepository', () => {
     });
   });
 
+  describe('batch helpers', () => {
+    const todoRepo = createAutomergeRepository<'todos', import('@/types/models').TodoItem>('todos');
+    const input = (title: string) => ({ title, completed: false, createdBy: 'm-1' });
+
+    it('createManyWithIds stamps each entity like createWithId, in one write', async () => {
+      const created = await todoRepo.createManyWithIds([
+        { id: 'td-1', input: input('Sign slip') },
+        { id: 'td-2', input: { ...input('Pay fee'), description: undefined } },
+      ]);
+
+      expect(created.map((t) => t.id)).toEqual(['td-1', 'td-2']);
+      for (const t of created) {
+        expect(t.createdAt).toBeDefined();
+        expect(t.updatedAt).toBe(t.createdAt);
+      }
+      const stored = projGetById('todos', 'td-2') as unknown as Record<string, unknown>;
+      expect(stored.title).toBe('Pay fee');
+      expect('description' in stored).toBe(false); // undefined stripped, as createWithId does
+    });
+
+    it('createManyWithIds retried with the same ids does not duplicate', async () => {
+      const batch = [
+        { id: 'td-1', input: input('Sign slip') },
+        { id: 'td-2', input: input('Pay fee') },
+      ];
+      await todoRepo.createManyWithIds(batch);
+      await todoRepo.createManyWithIds(batch);
+
+      expect(await todoRepo.getAll()).toHaveLength(2);
+    });
+
+    it('createManyWithIds with no items writes nothing', async () => {
+      expect(await todoRepo.createManyWithIds([])).toEqual([]);
+      expect(await todoRepo.getAll()).toEqual([]);
+    });
+
+    it('patchMany patches every present id and skips a missing one', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: input('Sign slip') },
+        { id: 'td-2', input: input('Pay fee') },
+      ]);
+
+      const patched = await todoRepo.patchMany(
+        ['td-1', 'gone', 'td-2'],
+        { activityId: 'act-1' },
+        { onMissing: 'skip' }
+      );
+
+      expect(patched.map((t) => t.id)).toEqual(['td-1', 'td-2']);
+      expect(patched.every((t) => t.activityId === 'act-1')).toBe(true);
+      expect(await todoRepo.getById('gone')).toBeUndefined(); // not created by the skip
+      const stored = await todoRepo.getById('td-1');
+      expect(stored!.activityId).toBe('act-1');
+      expect(stored!.title).toBe('Sign slip'); // untouched fields survive
+    });
+
+    it('removeMany deletes present ids and ignores a missing one', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: input('Sign slip') },
+        { id: 'td-2', input: input('Pay fee') },
+        { id: 'td-3', input: input('Pack bag') },
+      ]);
+
+      await expect(todoRepo.removeMany(['td-1', 'gone', 'td-3'])).resolves.toBeUndefined();
+
+      expect((await todoRepo.getAll()).map((t) => t.id)).toEqual(['td-2']);
+    });
+  });
+
   // CRDT-merge behaviour now lives in the doc layer (worker) — covered by
   // worker/__tests__/{docOps,applyAndProject}.test.ts (mergeDocs + the
   // mergeRemoteEnvelope round-trip). The repository is a thin projection/RPC

@@ -9,7 +9,12 @@ import AiProcessingOverlay from '@/components/ai/AiProcessingOverlay.vue';
 type State =
   | { phase: 'idle' }
   | { phase: 'reading'; presentation: 'global' | 'local'; hint?: string }
-  | { phase: 'resolved'; presentation: 'global' | 'local'; kind: string };
+  | {
+      phase: 'resolved';
+      presentation: 'global' | 'local';
+      kind: string;
+      companions: { kind: string; count: number }[];
+    };
 
 // Hoisted: the `vi.mock` factory below runs before this module's own top level. A plain
 // `{ value }` rather than a `ref`: every case mounts fresh, so no reactivity is needed.
@@ -45,7 +50,12 @@ describe('AiProcessingOverlay', () => {
       true,
       true,
       true,
+      true,
     ]);
+    // The stagger is indexed per tile, not by `:nth-child` rules in the stylesheet.
+    expect(tiles(w).map((li) => li.attributes('style'))).toEqual(
+      [0, 1, 2, 3, 4].map((i) => `--tick-i: ${i};`)
+    );
     expect(lit(w)).toEqual([]);
     expect(w.find('[data-test="spinner"]').exists()).toBe(true);
   });
@@ -55,6 +65,7 @@ describe('AiProcessingOverlay', () => {
     const w = mountOverlay();
     expect(lit(w)).toEqual([expect.stringContaining('ai.capture.dest.travel')]);
     expect(tiles(w).map((li) => li.classes().includes('magic-tick'))).toEqual([
+      false,
       false,
       false,
       false,
@@ -69,12 +80,49 @@ describe('AiProcessingOverlay', () => {
   });
 
   it('on resolve: the answer is lit, the spinner goes, the others fade', () => {
-    state.value = { phase: 'resolved', presentation: 'global', kind: 'recipe' };
+    state.value = { phase: 'resolved', presentation: 'global', kind: 'recipe', companions: [] };
     const w = mountOverlay();
     expect(lit(w)).toEqual([expect.stringContaining('ai.capture.dest.recipe')]);
     expect(w.find('[data-test="spinner"]').exists()).toBe(false);
     expect(tiles(w).filter((li) => li.find('div').classes().includes('opacity-30'))).toHaveLength(
+      4
+    );
+    expect(w.text()).toContain('ai.processing');
+  });
+
+  it('on a SHARED resolve (#113): the activity and the to-do both lift, and the line says so', () => {
+    state.value = {
+      phase: 'resolved',
+      presentation: 'global',
+      kind: 'event',
+      companions: [{ kind: 'todo', count: 3 }],
+    };
+    const w = mountOverlay();
+    expect(lit(w)).toEqual([
+      expect.stringContaining('ai.capture.dest.event'),
+      expect.stringContaining('ai.capture.dest.todo'),
+    ]);
+    expect(tiles(w).filter((li) => li.find('div').classes().includes('opacity-30'))).toHaveLength(
       3
     );
+    // The mocked `t` echoes the key, so the plural choice is what is asserted.
+    expect(w.text()).toContain('ai.found.eventWithTodos.other');
+    expect(w.text()).not.toContain('ai.processing');
+  });
+
+  it('uses the singular found-line for one to-do', () => {
+    state.value = {
+      phase: 'resolved',
+      presentation: 'global',
+      kind: 'event',
+      companions: [{ kind: 'todo', count: 1 }],
+    };
+    expect(mountOverlay().text()).toContain('ai.found.eventWithTodos.one');
+  });
+
+  it('lays five tiles out as three and two on a phone, one row from sm', () => {
+    const grid = mountOverlay().find('ul');
+    expect(grid.attributes('style')).toContain('--cols: 3');
+    expect(grid.attributes('style')).toContain('--cols-sm: 5');
   });
 });

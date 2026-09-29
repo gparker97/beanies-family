@@ -261,9 +261,14 @@ function applyPrefill(): void {
   if (p.description !== undefined) description.value = p.description;
   // AI-extracted prep notes route to the VISIBLE `notes` field, which lives inside the
   // collapsed "Add more details" section — reveal it so the prefilled notes aren't hidden
-  // (onNew sets showMoreDetails=false before this runs; only `notes` is prefilled today).
+  // (onNew sets showMoreDetails=false before this runs).
   if (p.notes !== undefined) {
     notes.value = p.notes;
+    showMoreDetails.value = true;
+  }
+  // The event's web address (#113) sits in the same collapsed section, so it is revealed too.
+  if (p.link) {
+    link.value = p.link;
     showMoreDetails.value = true;
   }
   if (p.isAllDay !== undefined) isAllDay.value = p.isAllDay;

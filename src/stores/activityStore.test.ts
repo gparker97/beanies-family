@@ -19,6 +19,15 @@ vi.mock('@/services/automerge/repositories/activityRepository', () => ({
 
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 
+// Spy on the store's own refusal reporter (Req 16a: `deleteActivity` reports every `false` once).
+const { reportSessionActionFailedMock } = vi.hoisted(() => ({
+  reportSessionActionFailedMock: vi.fn(),
+}));
+vi.mock('@/utils/actionFailure', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/utils/actionFailure')>()),
+  reportSessionActionFailed: reportSessionActionFailedMock,
+}));
+
 // Deterministic "today" for date-relative getters (linkableActivities). The real
 // `useToday` seeds a module singleton from the wall clock at import, which would
 // make these tests drift day-to-day; pin it to a known Sunday.
@@ -240,6 +249,29 @@ describe('activityStore', () => {
       const result = await store.deleteActivity('nonexistent');
 
       expect(result).toBe(false);
+      // The store reports its own refusal exactly once; callers never do.
+      expect(reportSessionActionFailedMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not report on success', async () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity());
+      vi.mocked(activityRepo.deleteActivity).mockResolvedValue(true);
+
+      await store.deleteActivity('activity-1');
+
+      expect(reportSessionActionFailedMock).not.toHaveBeenCalled();
+    });
+
+    it('does not report a throw a second time (wrapAsync already toasted it)', async () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity());
+      vi.mocked(activityRepo.deleteActivity).mockRejectedValue(new Error('worker down'));
+
+      const result = await store.deleteActivity('activity-1');
+
+      expect(result).toBe(false);
+      expect(reportSessionActionFailedMock).not.toHaveBeenCalled();
     });
 
     it('should prevent deletion of vacation-linked activities', async () => {

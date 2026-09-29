@@ -165,6 +165,12 @@ describe('MagicBeansSheet', () => {
       ]);
     });
 
+    it('lays five kinds out three across (three and two), the rule shared with the overlay', () => {
+      const w = mountSheet(true, [...ALL_KINDS, 'todo']);
+      expect(tiles(w)).toHaveLength(5);
+      expect(w.find('[role="group"]').attributes('style')).toContain('--cols: 3');
+    });
+
     it('starts with nothing picked, and says so', () => {
       const w = mountSheet();
       expect(tiles(w).map((b) => b.attributes('aria-pressed'))).toEqual([

@@ -53,7 +53,9 @@ import { grantKey, hash, resolveClient } from './ddb.mjs';
 const GRANT_TTL_SECONDS = 3600;
 
 /** The kinds a correction may target. Re-stated here because TypeScript does not exist at runtime. */
-export const SHARE_KINDS = Object.freeze(['event', 'travel', 'recipe', 'transactions']);
+// A client sync test (`lambdaContractParity.test.ts`) pins this to the app's tiles, so a new
+// kind cannot land in the app without a correction being able to name it.
+export const SHARE_KINDS = Object.freeze(['event', 'travel', 'recipe', 'transactions', 'todo']);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 

@@ -239,6 +239,13 @@ describe('uiStrings', () => {
       // both destroy history for good. "bean" must never stand in for a card or the deck.
       'whoOwnsWhat.delete',
       'whoOwnsWhat.restore',
+      // Magic beans to-dos (#113): deleting an activity with linked to-dos, and a failed
+      // to-do save. "bean" must never stand in for the to-dos or the activity here.
+      'planner.deleteLinkedTodos.',
+      'magicTodos.error.',
+      // A single to-do with nobody to credit it to (the Add To-do sidebar, the quick-add bar,
+      // the Nook widget): "bean" must never stand in for the to-do or the family member.
+      'todo.error.',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

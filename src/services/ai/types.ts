@@ -13,6 +13,7 @@
  *  (so `Settings.aiTier` can reference it without a layering inversion); re-exported here
  *  for the AI service/provider modules. */
 export type { AiTier } from '@/types/models';
+import type { ShareKind } from '@/types/magicPayload';
 
 /**
  * Concrete inference backends. `tinfoil` is the managed-tier engine (server-held
@@ -43,8 +44,12 @@ export interface AttestedResult {
   correction?: { token: string };
 }
 
-/** The kinds a correction may assert. Kept in step with `ShareKind` by the meter's own tests. */
-export type ShareKindHint = 'event' | 'travel' | 'recipe' | 'transactions';
+/**
+ * The kinds a correction (or an up-front pick) may assert: exactly `ShareKind`. A type-only
+ * import, so this module stays free of runtime imports; it used to be a hand-kept copy of the
+ * same union. The Lambda's `SHARE_KINDS` is pinned to the tiles by a client sync test.
+ */
+export type ShareKindHint = ShareKind;
 
 /** Why a kind was stated: after a wrong answer, or before the first read. See `correction`. */
 export type HintReason = 'correction' | 'stated';
@@ -159,16 +164,56 @@ export interface ExtractionRequest {
  * common case, and saying so is better than forcing a wrong item on the user.
  */
 export type ShareExtractionResult = AttestedResult &
+  // `todo` is a COMPANION (#113), present only when the read found things to do for this
+  // event AND `SHARE_COMPANIONS` allows it beside `event`. Never an empty list.
   (
-    | { kind: 'event'; event: ExtractionResult }
+    | { kind: 'event'; event: ExtractionResult; todo?: TodoExtractionResult }
     | { kind: 'travel'; travel: TravelExtractionResult }
     | { kind: 'recipe'; recipe: RecipeExtractionResult }
     // A bank statement (#107). Deliberately LINELESS: the share read only recognises one, and
     // the lines are read afterwards by the per-page `statement` task under the statement
     // consent (which discloses the merchant list this classify call never had).
     | { kind: 'transactions'; transactions: StatementIdentity }
+    // Only things to do (#113). Never empty: zero usable items parses as `none`.
+    | { kind: 'todo'; todo: TodoExtractionResult }
     | { kind: 'none' }
   );
+
+/**
+ * When a to-do has to happen relative to the event it came with (#113). Only meaningful
+ * beside an event; the client turns it into a due date (the event day, or the day before).
+ */
+export type TodoTiming = 'on_event_day' | 'before_event';
+
+/**
+ * One thing to do, as the model read it (#113). Mirrors `TODO_JSON_SHAPE`. Every field is
+ * validated by `parseTodoExtractionResult`; an item with no title never reaches here.
+ */
+export interface TodoItemExtraction {
+  /** A short instruction, never empty. */
+  title: string;
+  details: string | null;
+  /** `YYYY-MM-DD`, only when the source states or clearly implies a date. */
+  dueDate: string | null;
+  /** `HH:mm`, only when the source states a time for doing it. Kept on a draft only with a date. */
+  dueTime: string | null;
+  timing: TodoTiming | null;
+  /**
+   * The person the source names as the one who must do it, AS WRITTEN. Matched to a family
+   * member on the client; family names are never sent to the model.
+   */
+  assigneeName: string | null;
+  /** A Who Owns What card id from the prompt's closed list, or null. */
+  ownerCard: string | null;
+  /** Safe `https:` URLs only (`safeHttpsUrl`), deduped. */
+  links: string[];
+}
+
+/** The to-dos one read found: a `todo` result, or the companion of an `event` (#113). */
+export interface TodoExtractionResult {
+  /** At most 10. */
+  items: TodoItemExtraction[];
+}
 
 export interface ExtractionResultByTask {
   event: ExtractionResult;
@@ -233,6 +278,12 @@ export interface ExtractionResult extends AttestedResult {
    */
   category?: string;
   confidence: FieldConfidence;
+  /**
+   * The single most useful web address for the event (#113), screened with `safeHttpsUrl`.
+   * OPTIONAL and absent when the model gave none or gave an unsafe one; an older proxy and the
+   * standalone event task may omit it, so it is never in `REQUIRED_KEYS`.
+   */
+  link?: string | null;
 }
 
 /**

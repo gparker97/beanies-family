@@ -769,6 +769,8 @@ function onStripDayClick(dateStr: string) {
             :activity="span.activity"
             :is-start="true"
             :is-end="true"
+            :data-activity-id="span.activity.id"
+            :data-occurrence-date="weekDays[span.startCol]?.dateStr ?? span.startYmd"
             class="block w-full"
             @click="
               emit(
@@ -814,6 +816,8 @@ function onStripDayClick(dateStr: string) {
               :activity="occ.activity"
               :is-start="true"
               :is-end="true"
+              :data-activity-id="occ.activity.id"
+              :data-occurrence-date="day.dateStr"
               class="mb-0.5 block w-full"
               @click="emit('view-activity', occ.activity.id, day.dateStr)"
             />
@@ -894,6 +898,8 @@ function onStripDayClick(dateStr: string) {
                   width: `calc(${100 / group.length}% - 2px)`,
                   ...identityFor(activity).style,
                 }"
+                :data-activity-id="activity.id"
+                :data-occurrence-date="eventDate"
                 @click.stop="emit('view-activity', activity.id, eventDate)"
               >
                 <!--

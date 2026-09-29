@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { confirmAndDeleteActivity } from '@/composables/useActivityDelete';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
@@ -731,8 +732,9 @@ async function handleDelete() {
 
   // Override child (a moved/edited single session) → CANCEL this occurrence; NEVER
   // restore the original (Reset-to-series is the only intentional restore). We emit
-  // 'deleted' although the record is only marked inactive — no consumer listens to
-  // '@deleted' today; do not couple new behaviour to it.
+  // 'deleted' although the record is only marked inactive. The planner listens to
+  // '@deleted' only to cancel a parked "just created" reveal for this id; do not couple
+  // anything that needs a real deletion to it.
   if (act.parentActivityId) {
     if (
       !(await showConfirm({
@@ -755,22 +757,12 @@ async function handleDelete() {
   }
 
   // True one-off (or a whole recurring series via the 'all' scope) → delete outright.
-  if (
-    !(await showConfirm({
-      title: 'planner.deleteActivity',
-      message: 'planner.deleteConfirm',
-      variant: 'danger',
-    }))
-  ) {
-    return;
-  }
-  const removed = await activityStore.deleteActivity(act.id);
-  if (removed) {
+  // The shared composable asks about linked to-dos; a `false` is already reported by the
+  // store, so nothing is reported here.
+  if (await confirmAndDeleteActivity(act)) {
     playWhoosh();
     emit('deleted', act.id);
     emit('close');
-  } else {
-    reportSessionActionFailed();
   }
 }
 
@@ -791,12 +783,11 @@ async function handleReset() {
     confirmLabel: 'planner.reset.confirm',
   });
   if (!ok) return;
+  // `resetOccurrenceToSeries` is `deleteActivity`, which reports its own `false`.
   const restored = await activityStore.resetOccurrenceToSeries(act.id);
   if (restored) {
     playWhoosh();
     emit('close');
-  } else {
-    reportSessionActionFailed();
   }
 }
 

@@ -234,7 +234,7 @@ const uses = computed(() => {
     } else if (target.kind === 'listTemplate') {
       const tpl = getListTemplateByKey(target.key);
       if (tpl) out.push(fillTemplate(t('whoOwnsWhat.details.useList'), { list: t(tpl.nameKey) }));
-    } else if (!hint) {
+    } else if (target.kind === 'hint' && !hint) {
       hint = true;
       out.push(t('whoOwnsWhat.details.useHint'));
     }

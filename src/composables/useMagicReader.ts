@@ -37,7 +37,7 @@ import type { QuickAddPermission } from '@/constants/quickAddItems';
 import { reportError } from '@/utils/errorReporter';
 
 /** Which AI reader an affordance asked to open. */
-export type MagicReader = 'photo' | 'document' | 'recipe' | 'statement';
+export type MagicReader = 'photo' | 'document' | 'recipe' | 'statement' | 'todo';
 
 /**
  * reader → the share kind it consumes, at the TYPE level, so a page's consumer receives
@@ -49,6 +49,7 @@ export interface ReaderShareKind {
   document: 'travel';
   recipe: 'recipe';
   statement: 'transactions';
+  todo: 'todo';
 }
 
 /** The one payload variant a given reader can ever receive. */
@@ -65,7 +66,7 @@ export type PayloadFor<R extends MagicReader> = Extract<SharePayload, { kind: Re
 /*
  * `permission` names which member permission the reader's DESTINATION needs, in the same
  * vocabulary the quick-add sheet uses. The statement reader writes transactions, so it needs
- * `finance`; the other three write activities, trips and recipes (#107).
+ * `finance`; the others write activities, trips, recipes and to-dos (#107, #113).
  */
 const MAGIC_READERS: Record<
   MagicReader,
@@ -90,6 +91,9 @@ const MAGIC_READERS: Record<
   },
   recipe: { route: '/pod/cookbook', shareKind: 'recipe', permission: 'activities' },
   statement: { route: '/transactions', shareKind: 'transactions', permission: 'finance' },
+  // To-dos (#113) are family planning, so they follow the activity-edit permission like the
+  // other planning readers. Ungated by flag, like recipes.
+  todo: { route: '/todo', shareKind: 'todo', permission: 'activities' },
 };
 
 /** Every reader id, typed, for code that must consider them all. */
@@ -348,6 +352,8 @@ export function useMagicReader() {
   const canReadRecipe = gate('recipe');
   // Statements write transactions, so this one follows `canViewFinances` (#107).
   const canReadStatement = gate('statement');
+  // To-dos (#113): the activity-edit permission, no flag.
+  const canReadTodo = gate('todo');
   // Derived from the registry, so a fifth reader cannot be forgotten here.
   const canReadAny = computed(() => MAGIC_READER_IDS.some(isReaderEnabled));
   return {
@@ -355,6 +361,7 @@ export function useMagicReader() {
     canReadDocument,
     canReadRecipe,
     canReadStatement,
+    canReadTodo,
     canReadAny,
     openDocumentReader,
   };

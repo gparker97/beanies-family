@@ -11,6 +11,8 @@ import * as spike from '../../../../scripts/spikes/extractionPrompt.mjs';
 // The server/managed copy that ships in the ai-extract Lambda.
 // @ts-expect-error — Lambda source is plain JS with no .d.ts; imported for runtime comparison only.
 import * as server from '../../../../infrastructure/lambda/ai-extract/extractionPrompt.mjs';
+import { SHARE_COMPANIONS } from '@/constants/magicDestinations';
+import { RESPONSIBILITY_CARDS } from '@/constants/responsibilityCards';
 
 // Two pages so the drift guard also covers the multi-image spread (one image_url part per url).
 const imageDataUrls = ['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB'];
@@ -107,6 +109,89 @@ describe('extraction prompt drift guard (client vs spike vs server)', () => {
       ).toEqual(expected);
     });
   }
+
+  // Every hinted kind whose clause differs (#113): `event` carries the companion clause (picking
+  // Activity must never drop the to-dos), `todo` is the newest kind and has none. Both reasons.
+  for (const kindHint of ['event', 'todo']) {
+    for (const hintReason of ['correction', 'stated']) {
+      for (const kind of Object.keys(SOURCE_FIXTURES)) {
+        it(`task "share" / source "${kind}" / kindHint "${kindHint}" (${hintReason}): built messages match across all three`, () => {
+          const fixture = SOURCE_FIXTURES[kind];
+          const hint = { kindHint, hintReason };
+          const expected = tasks(spike.EXTRACTION_TASKS, 'share').buildMessages(
+            fixture,
+            todayIso,
+            hint
+          );
+          expect(
+            tasks(client.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, hint)
+          ).toEqual(expected);
+          expect(
+            tasks(server.EXTRACTION_TASKS, 'share').buildMessages(fixture, todayIso, hint)
+          ).toEqual(expected);
+        });
+      }
+    }
+  }
+
+  it('a stated Activity keeps the category fixed but still allows the to-do companion (#113)', () => {
+    const fixture = SOURCE_FIXTURES.images;
+    const share = tasks(client.EXTRACTION_TASKS, 'share');
+    const event = JSON.stringify(share.buildMessages(fixture, todayIso, { kindHint: 'event' }));
+    const todo = JSON.stringify(share.buildMessages(fixture, todayIso, { kindHint: 'todo' }));
+    expect(event).toContain('Do NOT re-decide the category');
+    expect(event).toContain('You may still include the \\"todo\\" object');
+    // A kind with no companions gets no such clause: picking To-do returns to-dos only.
+    expect(todo).toContain('Do NOT re-decide the category');
+    expect(todo).not.toContain('You may still include');
+  });
+
+  it('the unhinted prompt carries the DO-vs-GO rule and its four worked examples (#113)', () => {
+    const plain = JSON.stringify(
+      tasks(client.EXTRACTION_TASKS, 'share').buildMessages(SOURCE_FIXTURES.text, todayIso)
+    );
+    expect(plain).toContain('something a person has to DO');
+    expect(plain).toContain('field-trip note');
+    expect(plain).toContain('return the library book by Friday');
+    expect(plain).toContain('RSVP by May 3');
+    expect(plain).toContain('a plain class schedule is kind=\\"event\\" with no \\"todo\\" object');
+    // A stated kind replaces the classification rules, this one included.
+    const hinted = JSON.stringify(
+      tasks(client.EXTRACTION_TASKS, 'share').buildMessages(SOURCE_FIXTURES.text, todayIso, {
+        kindHint: 'event',
+      })
+    );
+    expect(hinted).not.toContain('something a person has to DO');
+  });
+
+  // The companion and owner-card lists are DATA each copy holds (#113). The built-message loops
+  // above already pin the copies to each other; these pin them to the app's own registries.
+  it('PROMPT_SHARE_COMPANIONS equals SHARE_COMPANIONS in every copy (#113)', () => {
+    for (const copy of [spike, client, server]) {
+      expect(copy.PROMPT_SHARE_COMPANIONS).toEqual(SHARE_COMPANIONS);
+    }
+  });
+
+  it('every TODO_OWNER_CARDS id is a real Who Owns What card, in every copy (#113)', () => {
+    const ids = new Set(RESPONSIBILITY_CARDS.map((card) => card.id));
+    for (const copy of [spike, client, server]) {
+      const unknown = (copy.TODO_OWNER_CARDS as readonly string[]).filter((id) => !ids.has(id));
+      expect(unknown).toEqual([]);
+    }
+    expect([...spike.TODO_OWNER_CARDS]).toEqual([...client.TODO_OWNER_CARDS]);
+    expect([...server.TODO_OWNER_CARDS]).toEqual([...client.TODO_OWNER_CARDS]);
+    expect(spike.TODO_JSON_SHAPE).toEqual(client.TODO_JSON_SHAPE);
+    expect(server.TODO_JSON_SHAPE).toEqual(client.TODO_JSON_SHAPE);
+  });
+
+  it('the to-do shape asks for a due time and never the event time, in every copy', () => {
+    for (const copy of [spike, client, server]) {
+      const shape = copy.TODO_JSON_SHAPE as Record<string, string>;
+      expect(shape.items).toContain('dueDate, dueTime, timing');
+      expect(shape.dueTime).toContain('24-hour HH:mm');
+      expect(shape.dueTime).toContain("Never the event's start or end time");
+    }
+  });
 
   // The STATED reason (#108): the person picked a kind BEFORE the first read. Same three-way
   // guard, so the one clause that differs cannot drift across the copies either.

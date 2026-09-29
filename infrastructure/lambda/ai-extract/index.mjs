@@ -495,6 +495,21 @@ export async function handler(event) {
     // result; the CLIENT reproduces it there, including the `none` split below. Two copies exist
     // only until this arm is retired, and they must agree — `managedProvider.ts` cites this block.
     //
+    // A `todo` answer (#113) on THIS arm becomes `none`. Every client that still calls the
+    // legacy arm predates the sealed arm (2026-09-16) and so predates `todo`: it would throw
+    // "unknown kind" on it. A 502 is no better: the old build shows "try a clearer photo", which
+    // is false, and every retry of a pure to-do note fails the same way. `none` is the honest
+    // answer for what that build can show ("nothing I can read here"), the answer its prompt
+    // would have wanted anyway ("none is always better than a wrong guess"), and it is a normal
+    // 200 that counts like any other `none`. Companions riding on an `event` are harmless to an
+    // old client (it ignores the extra object), so only the primary kind is rewritten. It runs
+    // BEFORE the correction guard below, so a legacy correction the model answers `todo` is the
+    // same honest disagreement (422 `correction_disagreed`) as a `none`, never a false 502.
+    if (task === 'share' && result?.kind === 'todo') {
+      console.log('[ai-extract] legacy arm answered a todo share as none');
+      result = { kind: 'none' };
+    }
+
     // A correction ASSERTED what this is, so a result of a different kind is a wrong-shape
     // answer rather than a re-classification. Only reachable when a grant was actually spent.
     //

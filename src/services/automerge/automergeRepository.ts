@@ -1,6 +1,7 @@
 import type { CollectionName, CollectionEntity } from '@/types/automerge';
 import { list, getById as projectionGetById } from './projection';
 import { mutate } from './worker/docClient';
+import type { MutationOp } from './worker/protocol';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
@@ -74,8 +75,17 @@ export function createAutomergeRepository<
    * point at the recreated member.
    */
   async function createWithId(id: string, input: CreateInput): Promise<Entity> {
-    const now = toISODateString(new Date());
-    const entity = toPlain(
+    const entity = stampNew(id, input, toISODateString(new Date()));
+
+    // The worker echoes the stored entity; its delta lands in the projection
+    // before this resolves (read-after-write is safe).
+    await mutate({ op: 'set', collection: collectionName, id, entity });
+    return transform(entity);
+  }
+
+  /** The stored shape of a new entity: input + id + both timestamps, plain and undefined-free. */
+  function stampNew(id: string, input: CreateInput, now: string): Entity {
+    return toPlain(
       stripUndefined({
         ...(input as Record<string, unknown>),
         id,
@@ -83,11 +93,66 @@ export function createAutomergeRepository<
         updatedAt: now,
       })
     ) as unknown as Entity;
+  }
 
-    // The worker echoes the stored entity; its delta lands in the projection
-    // before this resolves (read-after-write is safe).
-    await mutate({ op: 'set', collection: collectionName, id, entity });
-    return transform(entity);
+  /**
+   * Create several entities with caller-minted ids in ONE Automerge change (all or nothing).
+   * Each is stamped exactly like `createWithId`. Because the ids come from the caller, a retry
+   * with the same ids rewrites the same entities rather than adding duplicates, so there is no
+   * post-write projection check (unlike `commitStatementAdds`, whose fresh ids forbid a retry).
+   */
+  async function createManyWithIds(
+    items: readonly { id: string; input: CreateInput }[]
+  ): Promise<Entity[]> {
+    if (!items.length) return [];
+    const now = toISODateString(new Date());
+    const entities = items.map(({ id, input }) => stampNew(id, input, now));
+    const ops: MutationOp[] = entities.map((entity) => ({
+      op: 'set',
+      collection: collectionName,
+      id: (entity as { id: string }).id,
+      entity,
+    }));
+    await mutate({ op: 'batch', ops });
+    return entities.map(transform);
+  }
+
+  /**
+   * Apply the same patch to several entities in ONE Automerge change. An id that is absent
+   * (deleted here or on another device) is skipped, never a failure. Returns the entities
+   * that were patched, read back from the projection.
+   */
+  async function patchMany(
+    ids: readonly string[],
+    patch: UpdateInput,
+    options: { onMissing: 'skip' }
+  ): Promise<Entity[]> {
+    if (!ids.length) return [];
+    const now = toISODateString(new Date());
+    const cleanPatch = toPlain(stripUndefined(patch as Record<string, unknown>));
+    const ops: MutationOp[] = ids.map((id) => ({
+      op: 'patch',
+      collection: collectionName,
+      id,
+      patch: cleanPatch,
+      updatedAt: now,
+      onMissing: options.onMissing,
+    }));
+    await mutate({ op: 'batch', ops });
+    return ids
+      .map((id) => projectionGetById(collectionName, id) as Entity | undefined)
+      .filter((e): e is Entity => e !== undefined)
+      .map(transform);
+  }
+
+  /**
+   * Delete several entities in ONE Automerge change. A missing id is a no-op (a `delete` op
+   * on an absent key changes nothing), so this never fails on a concurrent delete.
+   */
+  async function removeMany(ids: readonly string[]): Promise<void> {
+    if (!ids.length) return;
+    const ops: MutationOp[] = ids.map((id) => ({ op: 'delete', collection: collectionName, id }));
+    await mutate({ op: 'batch', ops });
   }
 
   async function update(id: string, input: UpdateInput): Promise<Entity | undefined> {
@@ -138,5 +203,15 @@ export function createAutomergeRepository<
     return true;
   }
 
-  return { getAll, getById, create, createWithId, update, remove };
+  return {
+    getAll,
+    getById,
+    create,
+    createWithId,
+    createManyWithIds,
+    update,
+    patchMany,
+    remove,
+    removeMany,
+  };
 }

@@ -26,14 +26,24 @@ withDefaults(
     allowCreateAnother?: boolean;
     /** Custom label for the create-another link (defaults to "+ add another"). */
     createAnotherLabel?: string;
+    /**
+     * When true, render a secondary button beside OK that opens the item just
+     * created (emits `view`). The caller owns what "open" means — the planner
+     * opens the activity's view modal.
+     */
+    allowView?: boolean;
+    /** Custom label for the view button (defaults to "View"). */
+    viewLabel?: string;
   }>(),
   {
     allowCreateAnother: false,
     createAnotherLabel: '',
+    allowView: false,
+    viewLabel: '',
   }
 );
 
-const emit = defineEmits<{ close: []; 'create-another': [] }>();
+const emit = defineEmits<{ close: []; 'create-another': []; view: [] }>();
 const { t } = useTranslation();
 </script>
 
@@ -72,9 +82,20 @@ const { t } = useTranslation();
 
     <template #footer>
       <div class="flex flex-col items-end gap-2">
-        <BaseButton variant="primary" size="sm" @click="emit('close')">
-          {{ t('action.ok') }}
-        </BaseButton>
+        <div class="flex items-center gap-2">
+          <BaseButton
+            v-if="allowView"
+            variant="secondary"
+            size="sm"
+            data-testid="created-confirm-view"
+            @click="emit('view')"
+          >
+            {{ viewLabel || t('action.view') }}
+          </BaseButton>
+          <BaseButton variant="primary" size="sm" @click="emit('close')">
+            {{ t('action.ok') }}
+          </BaseButton>
+        </div>
         <button
           v-if="allowCreateAnother"
           type="button"

@@ -8,7 +8,7 @@
 
 import type { CreateFamilyActivityInput, FamilyActivity } from '@/types/models';
 import { mergeNotes } from './segmentMerge';
-import { tokenSimilarity } from './textSimilarity';
+import { TITLE_MATCH_THRESHOLD, tokenSimilarity } from './textSimilarity';
 
 /** Jaccard token-overlap of two titles in [0, 1]. Alias kept so existing callers and tests read unchanged. */
 export const titleSimilarity = tokenSimilarity;
@@ -25,7 +25,7 @@ export const titleSimilarity = tokenSimilarity;
 export function findDuplicateActivity(
   prefill: Partial<CreateFamilyActivityInput>,
   candidates: FamilyActivity[],
-  threshold = 0.6
+  threshold = TITLE_MATCH_THRESHOLD
 ): FamilyActivity | null {
   const title = prefill.title?.trim();
   const date = prefill.date;
@@ -84,7 +84,17 @@ export function mergeExtractionIntoActivity(
     if (isBlank) bag[k] = v;
   }
 
-  const notes = mergeNotes(existing.notes, prefill.notes);
+  // A read's link only blank-fills `link` (above). When the matched activity already has a
+  // DIFFERENT link, keep the new one in the notes rather than dropping it: before the link
+  // field was filled (#113) a shared page's URL always reached the notes, and an "update
+  // existing" must not lose where the update came from.
+  const existingLink = existing.link?.trim();
+  const incomingLink = prefill.link?.trim();
+  const displacedLink = existingLink && incomingLink && existingLink !== incomingLink;
+  const incomingNotes = displacedLink
+    ? [prefill.notes?.trim(), incomingLink].filter(Boolean).join('\n')
+    : prefill.notes;
+  const notes = mergeNotes(existing.notes, incomingNotes);
   if (notes !== undefined) merged.notes = notes;
 
   const existingHasTimeSignal = !!existing.isAllDay || !!existing.startTime || !!existing.endTime;

@@ -1,4 +1,5 @@
-import type { TodoItem, TodoSort } from '@/types/models';
+import type { CreateTodoInput, TodoItem, TodoSort } from '@/types/models';
+import { toAssigneePayload } from './assignees';
 import { localToday } from './date';
 import { parseIsoDateSafely } from './safeDate';
 
@@ -61,4 +62,43 @@ export function sortTodos(items: TodoItem[], sort: TodoSort): TodoItem[] {
     default:
       return sorted;
   }
+}
+
+/** The fields a person can give a new to-do, from any of the places one is created. */
+export interface TodoCreateFields {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  dueTime?: string;
+  assigneeIds?: string[];
+}
+
+/**
+ * Build the `createTodo` input for a new to-do. Shared by the To-Dos page sidebar, its quick-add
+ * bar, the Nook widget and the magic beans review drawer, so every create follows one set of
+ * rules:
+ *   - the title is trimmed (a caller that needs a fallback title applies it before calling);
+ *   - an empty or blank description, date or time is saved as absent, never as `''`
+ *     (`stripUndefined` drops only `undefined`, and a cleared picker yields `''`);
+ *   - a time is kept only alongside a date (reminders and "overdue" assume both);
+ *   - assignees are written only when there are some.
+ *
+ * Built FIELD BY FIELD and never by spreading `fields`: the review drawer passes whole drafts,
+ * which carry keys that must never be persisted (`matchDate`, `timeDropped`, `dueDerived`,
+ * `duplicateOf`). Pure: no id, no store, no logging.
+ */
+export function toCreateTodoInput(fields: TodoCreateFields, createdBy: string): CreateTodoInput {
+  const description = fields.description?.trim() || undefined;
+  const dueDate = fields.dueDate?.trim() || undefined;
+  const dueTime = dueDate ? fields.dueTime?.trim() || undefined : undefined;
+  const assigneeIds = fields.assigneeIds ?? [];
+  return {
+    title: fields.title.trim(),
+    ...(description ? { description } : {}),
+    ...(dueDate ? { dueDate } : {}),
+    ...(dueTime ? { dueTime } : {}),
+    ...(assigneeIds.length ? toAssigneePayload([...assigneeIds]) : {}),
+    completed: false,
+    createdBy,
+  };
 }
