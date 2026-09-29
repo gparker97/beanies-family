@@ -10,6 +10,10 @@ subtitle: 'that clichéd title can only mean one thing: beanie meal plans are he
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: "a meal planner for laying out the week's meals by drag and drop, plus a family cookbook that reads recipes from links, videos or text."
+  helps: "nobody has to work out dinner at 5pm, and you can share the week's plan or print it for the fridge."
+  where: '`The Treehouse › Meal Planner`, with recipes in `The Bean Pod › Family Cookbook`'
 ---
 
 Have you ever stopped in the middle of a busy day at the office, felt your tummy grumble a little bit, and wondered, “What’s for dinner?” Then you realized, in your utterly outstretched and overworked brain, that you’re the one who has to figure that out and cook it for the whole family? And as far as you can remember, there’s nothing in your fridge but mayonnaise and toothpaste?

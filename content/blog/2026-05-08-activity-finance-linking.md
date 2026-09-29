@@ -9,6 +9,10 @@ subtitle: 'your family married to your finances (with apologies to lin-manuel mi
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'activities and loans can create a linked payment from one of your accounts, so a fee is recorded once and flows into your finances.'
+  helps: "kids' activity costs stay in step with your transactions and net worth, with no bank logins or monthly csv uploads."
+  where: '`The Treehouse › Family Activities`, add a fee to an activity and switch on `Create Monthly Payment`'
 ---
 
 As Thomas Jefferson said to James Madison after Hamilton spent an entire song reminiscing about his son Phillip, can we get back to **beanies**? I'm paraphrasing of course. (Apologies to the non-_Hamilton_ fans out there. By the way, how can you not like _Hamilton_?! But that's a topic for another post, I guess.)

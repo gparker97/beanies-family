@@ -10,6 +10,10 @@ subtitle: 'beanies (powered by AI) is finally here'
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'magic beans, private AI that reads a photo, screenshot or itinerary and fills in an activity or travel plan for you.'
+  helps: 'you skip retyping invites and booking emails, and the AI provider keeps nothing once it has finished reading.'
+  where: 'tap `Magic beans` on `The Treehouse › Family Activities` or `The Treehouse › Travel Plans`'
 ---
 
 _I never thought it would happen to us._
