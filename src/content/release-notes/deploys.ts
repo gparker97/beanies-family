@@ -17,6 +17,61 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.29',
+    date: '2026-09-29',
+    month: '29 september 2026',
+    spotlight: true,
+    summary: {
+      en: 'Magic beans now finds your to-dos, and every activity keeps its own to-dos and lists.',
+      beanie:
+        'magic beans now finds your to-dos, and every activity keeps its own to-dos and lists.',
+    },
+    features: [
+      {
+        icon: '\u2728',
+        title: { en: 'Magic beans finds to-dos', beanie: 'magic beans finds to-dos' },
+        description: {
+          en: "Just type 'remind me to walk the dog on Fri at 10am' and magic beans turns it into a to-do, time and all. Share a school letter and 'return the signed slip by Friday' becomes a to-do for the right person with a sensible date. One note can add the activity and its to-dos together, and reading it again won't add them twice.",
+          beanie:
+            "just type 'remind me to walk the dog on fri at 10am' and magic beans turns it into a to-do, time and all. share a school letter and 'return the signed slip by friday' becomes a to-do for the right person with a sensible date. one note can add the activity and its to-dos together, and reading it again won't add them twice.",
+        },
+        tryItRoute: '/todo',
+      },
+      {
+        title: {
+          en: 'To-dos and lists live with the activity',
+          beanie: 'to-dos and lists live with the activity',
+        },
+        description: {
+          en: 'Open any activity to see its to-dos, tick them off, or add one in a single line. Start a list for it too, blank or from a template. On a repeating activity, what you add belongs to that session.',
+          beanie:
+            'open any activity to see its to-dos, tick them off, or add one in a single line. start a list for it too, blank or from a template. on a repeating activity, what you add belongs to that session.',
+        },
+        tryItRoute: '/activities',
+      },
+      {
+        title: { en: 'Plus', beanie: 'plus' },
+        description: {
+          en: 'Minor bug fixes and improvements.',
+          beanie: 'minor bug fixes and improvements.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.28',
     date: '2026-09-28',
     month: '28 september 2026',
