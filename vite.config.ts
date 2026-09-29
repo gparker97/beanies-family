@@ -291,7 +291,15 @@ export default defineConfig({
         // moment, which is why registerType stays 'prompt' (not 'autoUpdate').
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            // ONLY the page's own <link> stylesheet loads (destination 'style'). Those are
+            // no-cors, so what gets cached is an OPAQUE response; handing that back to a
+            // CORS `fetch()` of the same URL fails outright. The sheet exporter's
+            // html-to-image does exactly that fetch to embed the fonts, so in production
+            // (the only place this SW runs) every export fell back to system fonts and the
+            // header wrapped. A plain fetch now goes to the network and gets a readable
+            // response; the page's stylesheet is still cached for offline.
+            urlPattern: ({ url, request }) =>
+              url.origin === 'https://fonts.googleapis.com' && request.destination === 'style',
             handler: 'CacheFirst',
             options: {
               cacheName: 'google-fonts-cache',

@@ -133,36 +133,59 @@ describe('paginateExport', () => {
     expect(pages[0]!.columns).toHaveLength(EXPORT_LAYOUT.columns);
   });
 
-  it('flows onto more pages without ever splitting a block', () => {
+  const baseKey = (b: ExportBlock) => b.key.split('~')[0]!;
+  const colHeight = (col: ExportBlock[]) =>
+    col.reduce((sum, b, i) => sum + estimateBlockHeight(b) + (i ? EXPORT_LAYOUT.blockGap : 0), 0);
+
+  it('continues a category too tall for its column into the next column of the same page', () => {
+    // ~19 cards: taller than one column (the Home & Household case that shrank page 1).
+    const pages = paginateExport([block('home', 19), block('out', 2)]);
+    expect(pages).toHaveLength(1);
+    const [c0, c1] = pages[0]!.columns;
+    expect(c0!.map((b) => b.key)).toEqual(['home']);
+    expect(c1![0]).toMatchObject({ key: 'home~1', continued: true });
+    // Every card is placed once, in order, and no column passes the page's capacity.
+    const homeCards = pages[0]!.columns
+      .flat()
+      .filter((b) => baseKey(b) === 'home')
+      .flatMap((b) => b.cards);
+    expect(homeCards.map((c) => c.id)).toEqual(block('home', 19).cards.map((c) => c.id));
+    for (const col of pages[0]!.columns)
+      expect(colHeight(col)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
+  });
+
+  it('breaks pages only between categories, never inside one', () => {
     const blocks = Array.from({ length: 9 }, (_, i) => block(`cat${i}`, 12));
     const pages = paginateExport(blocks);
     expect(pages.length).toBeGreaterThan(1);
-    const placed = pages.flatMap((p) => p.columns.flat());
-    // Every block appears exactly once, whole, and in order.
-    expect(placed.map((b) => b.key)).toEqual(blocks.map((b) => b.key));
-    for (const b of placed) expect(b.cards).toHaveLength(12);
-    // No column is filled past the page's height: the capacity, or its tallest block.
-    for (const page of pages) {
-      const cap = Math.max(
-        EXPORT_LAYOUT.pageCapacity,
-        ...page.columns.flat().map((b) => estimateBlockHeight(b))
-      );
-      for (const col of page.columns) {
-        const h = col.reduce(
-          (sum, b, i) => sum + estimateBlockHeight(b) + (i ? EXPORT_LAYOUT.blockGap : 0),
-          0
-        );
-        expect(h).toBeLessThanOrEqual(cap);
-      }
-    }
+    // Each category lives on exactly one page, and categories stay in order.
+    const pageOf = new Map<string, Set<number>>();
+    pages.forEach((p, i) =>
+      p.columns
+        .flat()
+        .forEach((b) => pageOf.set(baseKey(b), (pageOf.get(baseKey(b)) ?? new Set()).add(i)))
+    );
+    for (const set of pageOf.values()) expect(set.size).toBe(1);
+    const order = pages.flatMap((p) => p.columns.flat().map(baseKey));
+    expect([...new Set(order)]).toEqual(blocks.map((b) => b.key));
+    for (const page of pages)
+      for (const col of page.columns)
+        expect(colHeight(col)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
   });
 
-  it('never cuts an oversized block, and lets the other columns on its page fill to its height', () => {
-    const pages = paginateExport([block('huge', 60), block('a', 20), block('b', 20)]);
+  it('never strands a header at the foot of a column with fewer than two rows', () => {
+    const pages = paginateExport([block('a', 13), block('b', 10)]);
+    for (const b of pages.flatMap((p) => p.columns.flat()))
+      expect(b.cards.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('spreads a category taller than a whole page over its columns, the last taking the rest', () => {
+    const pages = paginateExport([block('huge', 60)]);
     expect(pages).toHaveLength(1);
     const cols = pages[0]!.columns;
-    expect(cols[0]!.map((b) => b.key)).toEqual(['huge']);
-    expect(cols[1]!.map((b) => b.key)).toEqual(['a', 'b']);
+    expect(cols.every((c) => c.length === 1)).toBe(true);
+    expect(cols.flat().reduce((n, b) => n + b.cards.length, 0)).toBe(60);
+    expect(colHeight(cols[0]!)).toBeLessThanOrEqual(EXPORT_LAYOUT.pageCapacity);
   });
 
   it('returns one empty page for an empty deck', () => {

@@ -586,7 +586,10 @@ async function restoreDefaults(): Promise<void> {
           :compact="i > 0"
           :tagline="t('app.tagline')"
         >
-          <ResponsibilityExportBody :page="page" />
+          <ResponsibilityExportBody
+            :page="page"
+            :continued-label="t('whoOwnsWhat.export.continued')"
+          />
           <template #legend>
             <ExportPeopleLegend
               v-if="exportModel"

@@ -13402,6 +13402,7 @@ const STRING_DEFS = {
     beanie: 'who owns what · page {page} of {total}',
   },
   'whoOwnsWhat.export.holders': { en: 'Holders', beanie: 'holders' },
+  'whoOwnsWhat.export.continued': { en: '(continued)', beanie: '(continued)' },
   'whoOwnsWhat.export.writeIn': {
     en: '- - - still to deal, write a name in',
     beanie: '- - - still to deal, write a name in',

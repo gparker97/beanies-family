@@ -4,14 +4,19 @@
  * into `ExportSheet`. Three columns of category blocks (pre-flowed by `paginateExport`);
  * each card is its emoji, name, done line and holder initial pills in the member's colour,
  * with a split part's label beside its pill. A card nobody holds gets a dashed line to
- * write a name on. A dumb renderer of a pre-built model: no store, no i18n.
+ * write a name on. A category too long for its column continues in the next one under a
+ * "(continued)" header. A dumb renderer of a pre-built model: no store, no i18n.
  *
  * Static print artifact, light only; px-pinned type to match ExportSheet (the metrics
  * here are what `EXPORT_LAYOUT` estimates).
  */
 import type { ExportPage } from '@/utils/responsibilityExportModel';
 
-defineProps<{ page: ExportPage }>();
+defineProps<{
+  page: ExportPage;
+  /** Suffix on a category that continues from the previous column, already t()-resolved. */
+  continuedLabel: string;
+}>();
 </script>
 
 <template>
@@ -26,6 +31,7 @@ defineProps<{ page: ExportPage }>();
       >
         <h4 class="block-head">
           <span aria-hidden="true">{{ block.emoji }}</span> {{ block.title }}
+          <span v-if="block.continued" class="continued">{{ continuedLabel }}</span>
         </h4>
         <div v-for="card in block.cards" :key="card.id" class="row">
           <span class="emoji" aria-hidden="true">{{ card.emoji }}</span>
@@ -92,6 +98,12 @@ defineProps<{ page: ExportPage }>();
   gap: 6px;
   grid-template-columns: 18px minmax(0, 1fr) auto;
   padding: 6px 10px;
+}
+
+.continued {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .block-head + .row {
