@@ -10,6 +10,10 @@ subtitle: 'get it on google play / download on the app store. these words i neve
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'native beanies.family apps for iPhone and Android, available now on the App Store and Google Play.'
+  helps: 'beanies opens like any other app on your phone, and you can share photos and links straight into it from the share menu.'
+  where: 'the `App Store` or `Google Play`, search for beanies.family'
 ---
 
 It’s time for another “it’ll never happen to us” moment. Are you ready for the big announcement?

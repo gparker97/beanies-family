@@ -9,6 +9,10 @@ excerpt: "It's a Monday morning. You're at your desk, sipping coffee from your f
 subtitle: 'caught in the scheduling your vacation vortex'
 featured: false
 author: greg
+longAndShort:
+  built: "a travel plan for each family trip that keeps flights and hotels next to loose ideas, even when half of it isn't booked yet."
+  helps: 'you can jot down tentative plans as they come and fill in the details later, without anything getting lost.'
+  where: '`The Treehouse › Travel Plans`'
 ---
 
 Hey my beans!

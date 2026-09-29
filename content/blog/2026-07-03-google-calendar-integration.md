@@ -10,6 +10,10 @@ subtitle: 'the inevitable (and inimitable) google calendar integration'
 featured: false
 author: greg
 draft: false
+longAndShort:
+  built: 'a Google Calendar connection that pushes your beanies activities and travel plans out to the Google calendars you choose.'
+  helps: "family members who live in Google Calendar still see every event, with who's driving and who's paying packed into the notes."
+  where: '`Settings › Google Calendar`'
 ---
 
 First off, to all the fans of my Substack who regularly heart my articles, let me apologize for missing my scheduled post last week while I was travelling. You must be feeling incredibly sad and lonely. I therefore offer my sincerest and most humble apologies, to both of you.
