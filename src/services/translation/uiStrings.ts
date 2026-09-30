@@ -12090,20 +12090,6 @@ const STRING_DEFS = {
   'quickAdd.note.hint': { en: 'Per-member journal', beanie: 'per-bean journal' },
   'quickAdd.recipe.label': { en: 'Recipe', beanie: 'recipe' },
   'quickAdd.recipe.hint': { en: 'ingredients · steps', beanie: 'ingredients · steps' },
-  'quickAdd.tripIdea.label': { en: 'Trip idea', beanie: 'trip idea' },
-  'quickAdd.tripIdea.hint': {
-    en: 'wishlist a destination',
-    beanie: 'wishlist a destination',
-  },
-  'quickAdd.tripIdea.noTripsTitle': {
-    en: 'Add a trip first',
-    beanie: 'add a trip first',
-  },
-  'quickAdd.tripIdea.noTripsMessage': {
-    en: 'Trip ideas live inside a trip — create one and then come back.',
-    beanie: 'trip ideas live inside a trip — create one and then come back.',
-  },
-  'quickAdd.tripIdea.addTripAction': { en: 'Add trip', beanie: 'add trip' },
   'quickAdd.account.label': { en: 'Account', beanie: 'account' },
   'quickAdd.account.hint': {
     en: 'checking · credit · loan',

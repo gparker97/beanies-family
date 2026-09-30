@@ -34,6 +34,7 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 ### Removed
 
 - An old sign-in redirect fallback, kept for one release after the June fix, is gone.
+- The Trip idea tile is gone from the quick-add menu (it could not find your trips). Trip ideas are still added from a trip's page.
 
 ## 2026-09-29
 
