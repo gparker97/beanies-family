@@ -117,13 +117,13 @@ export function registerGoogleAccountAssertion(): void {
     // as a mismatch and trigger a re-consent loop.
     if (interactive && isPendingAccountSwitch()) {
       disarmAccountSwitch();
-      await fam.updateMember(memberId, { googleAccountEmail: email });
+      await fam.updateMemberCredentials(memberId, { googleAccountEmail: email });
       return;
     }
 
     // First-time backfill — verified by own OAuth response.
     if (!member.googleAccountEmail) {
-      await fam.updateMember(memberId, { googleAccountEmail: email });
+      await fam.updateMemberCredentials(memberId, { googleAccountEmail: email });
       return;
     }
 

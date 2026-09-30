@@ -7679,6 +7679,10 @@ const STRING_DEFS = {
     beanie:
       "beanies.family is read-only right now, so this change wasn't saved. everything is still yours.",
   },
+  // Phase 3's band (ReadOnlyBanner). Its body reuses the sentences above via useReadOnlyCopy, and
+  // "See plans" reuses `plan.action.seePlans`. The title matches the toast's: reason-neutral.
+  'readOnly.band.title': { en: 'Read-only for now', beanie: 'read-only for now' },
+  'readOnly.band.export': { en: 'Export My Data', beanie: 'export my data' },
   'celebration.listComplete': {
     en: 'Whole list done! The beanies are cheering!',
     beanie: 'whole list done! the beanies are going wild!',
@@ -11114,6 +11118,40 @@ const STRING_DEFS = {
   'ai.error.busy.message': {
     en: 'beanies AI is busy right now. Please try again in a moment.',
     beanie: 'beanies ai is busy right now. please try again in a moment.',
+  },
+  // ── Magic-beans allowance (#95 Phase 4) ───────────────────────────────────
+  // The quota prompt (`ai.allowance.*`, an info toast on a 402) and the Settings plan card's
+  // usage line (`plan.allowance.*`, an important surface: real nouns only). `{time}` and `{date}`
+  // are the LOCAL rendering of the server's UTC reset instant; the usage day itself is UTC.
+  'ai.allowance.title': { en: 'Out of Magic Beans', beanie: 'out of magic beans' },
+  'ai.allowance.day': {
+    en: 'You have 0 of {limit} magic beans left today. More arrive at {time}, and reading with your own AI key is always unlimited.',
+    beanie:
+      'you have 0 of {limit} magic beans left today. more arrive at {time}, and reading with your own ai key is always unlimited.',
+  },
+  'ai.allowance.month': {
+    en: 'You have 0 of {limit} magic beans left this month. More arrive on {date} at {time}, and reading with your own AI key is always unlimited.',
+    beanie:
+      'you have 0 of {limit} magic beans left this month. more arrive on {date} at {time}, and reading with your own ai key is always unlimited.',
+  },
+  // When the refusal carried no usable numbers: still says what happened and the way round it.
+  'ai.allowance.generic': {
+    en: "You've used all your magic beans for now. Reading with your own AI key is always unlimited.",
+    beanie:
+      "you've used all your magic beans for now. reading with your own ai key is always unlimited.",
+  },
+  'ai.allowance.action': { en: 'AI Settings', beanie: 'ai settings' },
+  'plan.allowance.day': {
+    en: '{left} of {limit} magic beans left today, more at {time}.',
+    beanie: '{left} of {limit} magic beans left today, more at {time}.',
+  },
+  'plan.allowance.month': {
+    en: '{left} of {limit} magic beans left this month, more on {date}.',
+    beanie: '{left} of {limit} magic beans left this month, more on {date}.',
+  },
+  'plan.allowance.unavailable': {
+    en: "Magic beans usage isn't available right now.",
+    beanie: "magic beans usage isn't available right now.",
   },
   // Camera-or-file chooser shown (on touch devices) after consent, before the picker.
   'ai.picker.title': {

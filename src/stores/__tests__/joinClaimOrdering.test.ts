@@ -84,11 +84,11 @@ describe('unclaimMember gives a stuck member their invite back', () => {
   });
 
   it('checks the doc write landed instead of assuming it', async () => {
-    // `familyStore.updateMember` runs inside `wrapAsync`, which catches and resolves — it returns
+    // `familyStore.updateMemberCredentials` runs inside `wrapAsync`, which catches and resolves — it returns
     // `null` on failure rather than throwing. Ignoring that reported success for a claim it had
     // not cleared.
     const fn = await codeOfAuthStoreFn(...UNCLAIM);
-    expect(fn).toMatch(/const updated = await familyStore\.updateMember\(/);
+    expect(fn).toMatch(/const updated = await familyStore\.updateMemberCredentials\(/);
     expect(fn).toMatch(/if \(!updated\)[\s\S]*return \{ success: false/);
   });
 

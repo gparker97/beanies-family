@@ -229,7 +229,7 @@ async function rotateMemberPassword(
       // This is the only call that can throw (mid-flight envelope-clear).
       await syncStore.setMemberWrappedKey(memberId, old.wrappedKeyEntry);
       if (!opts?.wrapOnly) {
-        const restored = await familyStore.updateMember(memberId, {
+        const restored = await familyStore.updateMemberCredentials(memberId, {
           passwordHash: old.passwordHash,
           requiresPassword: old.requiresPassword,
         });
@@ -274,7 +274,7 @@ async function rotateMemberPassword(
   }
 
   const newHash = await hashPassword(newPassword);
-  const updated = await familyStore.updateMember(memberId, {
+  const updated = await familyStore.updateMemberCredentials(memberId, {
     passwordHash: newHash,
     requiresPassword: false,
   });
@@ -873,7 +873,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Track last login timestamp
       const now = toISODateString(new Date());
-      familyStore.updateMember(member.id, { lastLoginAt: now });
+      familyStore.updateMemberCredentials(member.id, { lastLoginAt: now });
       track('login', { props: { method: 'password' } });
 
       return { success: true };
@@ -961,7 +961,7 @@ export const useAuthStore = defineStore('auth', () => {
       familyStore.setCurrentMember(member.id);
 
       const now = toISODateString(new Date());
-      familyStore.updateMember(member.id, { lastLoginAt: now });
+      familyStore.updateMemberCredentials(member.id, { lastLoginAt: now });
       track('login', { props: { method: 'tap-through' } });
 
       return { success: true };
@@ -1112,8 +1112,13 @@ export const useAuthStore = defineStore('auth', () => {
       if (existingOwner) {
         // Desktop: owner present with no credential yet — set the PIN hash (and
         // any edited name) in place, preserving the rest of the step-1 doc.
-        const updated = await familyStore.updateMember(existingOwner.id, {
-          name,
+        // #95: two writes through two funnels. The name is family data (gated, and only
+        // written when it changed); the PIN is a credential (`updateMemberCredentials`).
+        if (existingOwner.name !== name) {
+          const renamed = await familyStore.updateMember(existingOwner.id, { name });
+          if (!renamed) return { success: false, error: 'Failed to set owner PIN' };
+        }
+        const updated = await familyStore.updateMemberCredentials(existingOwner.id, {
           pinHash: pinHashValue,
           pinVersion: 1,
         });
@@ -1409,7 +1414,7 @@ export const useAuthStore = defineStore('auth', () => {
     // catches, toasts and resolves — so it returns `null` on failure rather than throwing.
     // Ignoring that meant this function reported `{ success: true }` for a claim it had not
     // cleared, and the UI told the owner they could re-invite someone they still could not.
-    const updated = await familyStore.updateMember(targetMemberId, {
+    const updated = await familyStore.updateMemberCredentials(targetMemberId, {
       pinHash: undefined,
       passwordHash: undefined,
       pinVersion: (member.pinVersion ?? 0) + 1,
@@ -1584,7 +1589,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const pinHash = await hashPassword(pin);
       const pinVersion = (member.pinVersion ?? 0) + 1;
-      await familyStore.updateMember(memberId, { pinHash, pinVersion });
+      await familyStore.updateMemberCredentials(memberId, { pinHash, pinVersion });
 
       // Device wrap: only possible while the pod is open (we hold the family key).
       const { useSyncStore } = await import('./syncStore');
@@ -1671,7 +1676,7 @@ export const useAuthStore = defineStore('auth', () => {
     // just chosen. It also silently falsified the whole reason `joinFamily` needs no rollback:
     // that reasoning says the claim is the last FALLIBLE write, which is only true if a failed
     // claim is actually detected here.
-    const written = await familyStore.updateMember(memberId, { pinHash, pinVersion });
+    const written = await familyStore.updateMemberCredentials(memberId, { pinHash, pinVersion });
     if (!written) {
       reportError({
         surface: 'login-flow',
@@ -1839,7 +1844,7 @@ export const useAuthStore = defineStore('auth', () => {
       // recovery kit and reset THIS member's PIN. `loadMembers` still re-validates the id against
       // the roster it loads, so the check is deferred, not skipped.
       familyStore.preselectSessionMember(member.id);
-      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
+      familyStore.updateMemberCredentials(member.id, { lastLoginAt: toISODateString(new Date()) });
       track('login', { props: { method: 'recovery-reset' } });
       logEvent({
         level: 'info',
@@ -1914,7 +1919,7 @@ export const useAuthStore = defineStore('auth', () => {
       freshSignIn.value = true;
       await persistSession(user);
       familyStore.setCurrentMember(member.id);
-      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
+      familyStore.updateMemberCredentials(member.id, { lastLoginAt: toISODateString(new Date()) });
       track('login', { props: { method: 'pin' } });
       return { success: true };
     } catch (e) {
@@ -2192,7 +2197,7 @@ export const useAuthStore = defineStore('auth', () => {
       familyStore.preselectSessionMember(params.memberId);
 
       // Track last login timestamp for the newly joined member
-      await familyStore.updateMember(params.memberId, {
+      await familyStore.updateMemberCredentials(params.memberId, {
         lastLoginAt: toISODateString(new Date()),
       });
 
@@ -2330,7 +2335,7 @@ export const useAuthStore = defineStore('auth', () => {
     void persistSession(user);
     if (member) {
       familyStore.setCurrentMember(member.id);
-      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
+      familyStore.updateMemberCredentials(member.id, { lastLoginAt: toISODateString(new Date()) });
     }
     track('login', { props: { method: 'cross_device' } });
   }
@@ -2392,7 +2397,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Track last login timestamp
     const now = toISODateString(new Date());
-    familyStore.updateMember(member.id, { lastLoginAt: now });
+    familyStore.updateMemberCredentials(member.id, { lastLoginAt: now });
     return true;
   }
 

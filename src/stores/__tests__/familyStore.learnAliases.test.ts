@@ -26,6 +26,7 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
 import { useFamilyStore } from '@/stores/familyStore';
 import type { FamilyMember } from '@/types/models';
+import { ReadOnlyError } from '@/services/automerge/worker/writeGate';
 
 function member(id: string, over?: Partial<FamilyMember>): FamilyMember {
   return {
@@ -91,6 +92,21 @@ describe('familyStore.learnAliases', () => {
     ]);
     expect(written).toBe(2);
     expect(familyRepo.updateFamilyMember).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not count a member whose write was refused or failed (#95: read-only)', async () => {
+    const store = useFamilyStore();
+    store.members = [member('m-1'), member('m-2')];
+    // m-1's write is refused by the gate; the real wrapAsync swallows it and returns undefined.
+    vi.mocked(familyRepo.updateFamilyMember).mockImplementation(async (id, input) => {
+      if (id === 'm-1') throw new ReadOnlyError('familyMembers');
+      return { ...member(id), ...input } as FamilyMember;
+    });
+    const written = await store.learnAliases([
+      { memberId: 'm-1', alias: 'A' },
+      { memberId: 'm-2', alias: 'B' },
+    ]);
+    expect(written).toBe(1);
   });
 
   it('skips a member removed on another device rather than recreating them', async () => {

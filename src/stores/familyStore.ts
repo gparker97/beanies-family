@@ -29,6 +29,7 @@ import type {
   FamilyMember,
   CreateFamilyMemberInput,
   UpdateFamilyMemberInput,
+  MemberSystemPatch,
 } from '@/types/models';
 
 /**
@@ -618,18 +619,56 @@ export const useFamilyStore = defineStore('family', () => {
       const member = members.value.find((m) => m.id === memberId);
       // Skip a member who has vanished (removed on another device) rather than creating one.
       if (!member) continue;
-      await updateMember(memberId, { aliases: dedupedAppend(member.aliases, additions) });
-      written += 1;
+      // A refused write (read-only, #95) or a failed one returns null: that is not a write.
+      const updated = await updateMember(memberId, {
+        aliases: dedupedAppend(member.aliases, additions),
+      });
+      if (updated) written += 1;
     }
     return written;
   }
 
+  /**
+   * Edit a member's family data (name, colour, aliases, permissions...). Always behind the
+   * read-only gate (#95); credentials and sign-in bookkeeping go through
+   * `updateMemberCredentials` instead. An empty patch is a no-op: nothing reaches the gate.
+   */
   async function updateMember(
     id: string,
     input: UpdateFamilyMemberInput
   ): Promise<FamilyMember | null> {
+    return writeMember(id, input, false);
+  }
+
+  /**
+   * #95: THE member write that passes the read-only gate. Auth must keep working in a
+   * read-only family (the plan's own reason for letting the sign-in stamp through), and a PIN
+   * change, a password rotation, a claim reset or a Google identity binding is the same kind of
+   * write. `MemberSystemPatch` is the allowlist, enforced by the compiler, so no family-data
+   * field can ride along; a caller with both writes them separately (see `authStore`'s
+   * onboarding resume).
+   */
+  async function updateMemberCredentials(
+    id: string,
+    patch: MemberSystemPatch
+  ): Promise<FamilyMember | null> {
+    return writeMember(id, patch, true);
+  }
+
+  /** The one member write both public funnels share. `system` is decided by WHICH funnel was
+   *  called, never by a caller-supplied flag. */
+  async function writeMember(
+    id: string,
+    input: UpdateFamilyMemberInput,
+    system: boolean
+  ): Promise<FamilyMember | null> {
+    // Nothing to write: not a write, and never a trip through the gate.
+    if (Object.keys(input).length === 0) return members.value.find((m) => m.id === id) ?? null;
     const result = await wrapAsync(isLoading, error, async () => {
-      const updated = await familyRepo.updateFamilyMember(id, withLoginStamps(id, input));
+      const patch = withLoginStamps(id, input);
+      const updated = system
+        ? await familyRepo.updateFamilyMember(id, patch, { system: true })
+        : await familyRepo.updateFamilyMember(id, patch);
       if (updated) {
         // Immutable update: assign a new array so downstream computeds re-evaluate
         members.value = members.value.map((m) => (m.id === id ? updated : m));
@@ -958,7 +997,8 @@ export const useFamilyStore = defineStore('family', () => {
         if (Object.keys(p).length)
           ops.push({ op: 'patch', collection: 'familyMembers', id, patch: p });
       }
-      if (ops.length) await mutate({ op: 'batch', ops }, { quiet: true });
+      // `system`: the roster heal runs on load and must keep working in a read-only family (#95).
+      if (ops.length) await mutate({ op: 'batch', ops }, { quiet: true, system: true });
     } catch (e) {
       console.error(
         '[familyStore.normalizeRoles] Automerge change rejected. Pod may render without an owner until reload.',
@@ -1138,6 +1178,7 @@ export const useFamilyStore = defineStore('family', () => {
     createMember,
     createMemberWithId,
     updateMember,
+    updateMemberCredentials,
     learnAliases,
     deleteMember,
     discardDraftMember,

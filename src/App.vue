@@ -46,6 +46,7 @@ import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
 import LineageBanner from '@/components/common/LineageBanner.vue';
+import ReadOnlyBanner from '@/components/common/ReadOnlyBanner.vue';
 import LocalDocUnreadableBanner from '@/components/common/LocalDocUnreadableBanner.vue';
 import PodUnreadableBanner from '@/components/common/PodUnreadableBanner.vue';
 // REVIEW-DEMO: sample-data banner for store-review demo sessions.
@@ -2425,6 +2426,10 @@ watch(
         <DurabilityBanner />
         <LineageBanner />
         <LocalDocUnreadableBanner />
+        <!-- #95: read-only (trial ended, plan lapsed, or unconfirmed too long). A band, not a
+             wall: the page stays readable below it; the write gate refuses edits one by one.
+             Self-gated via ErrorBanner's `show`, like its siblings, so the leave transition plays. -->
+        <ReadOnlyBanner />
         <!-- REVIEW-DEMO: marks a seeded demo session. Both banners are in-flow, so
              they stack predictably rather than overlapping. -->
         <ReviewDemoBanner />

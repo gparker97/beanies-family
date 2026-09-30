@@ -1,6 +1,6 @@
 import type { CollectionName, CollectionEntity } from '@/types/automerge';
 import { list, getById as projectionGetById } from './projection';
-import { mutate } from './worker/docClient';
+import { mutate, type RequestOpts } from './worker/docClient';
 import type { MutationOp } from './worker/protocol';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
@@ -173,7 +173,13 @@ export function createAutomergeRepository<
     await mutate({ op: 'batch', ops });
   }
 
-  async function update(id: string, input: UpdateInput): Promise<Entity | undefined> {
+  /** `opts.system` marks a write that passes the read-only gate (#95). Only
+   *  `familyStore.updateMemberCredentials` sets it; see `MemberSystemPatch` for what may. */
+  async function update(
+    id: string,
+    input: UpdateInput,
+    opts?: Pick<RequestOpts, 'system'>
+  ): Promise<Entity | undefined> {
     // Existence check up front (fast path). Returning undefined preserves the
     // repository contract.
     if (!projectionGetById(collectionName, id)) return undefined;
@@ -186,15 +192,18 @@ export function createAutomergeRepository<
     // critical toast, the worker no-ops and echoes undefined; we return undefined
     // (the old graceful contract) but leave a warning breadcrumb so a genuine
     // worker/projection divergence is diagnosable (never a silent success).
-    const result = await mutate<Entity | undefined>({
-      op: 'patch',
-      collection: collectionName,
-      id,
-      patch: cleanInput,
-      deleteKeys: keysToDelete,
-      updatedAt: now,
-      onMissing: 'skip',
-    });
+    const result = await mutate<Entity | undefined>(
+      {
+        op: 'patch',
+        collection: collectionName,
+        id,
+        patch: cleanInput,
+        deleteKeys: keysToDelete,
+        updatedAt: now,
+        onMissing: 'skip',
+      },
+      opts?.system ? { system: true } : undefined
+    );
     if (!result) {
       reportError({
         surface: 'automergeRepository.update.concurrent-delete',

@@ -60,6 +60,8 @@ import {
   type CacheClearResult,
   type MergeOutcome,
 } from './protocol';
+import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } from './writeGate';
+import type { CollectionName } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
@@ -721,9 +723,14 @@ function postRaw(req: RpcRequest): void {
 
 // ─── Core request ────────────────────────────────────────────────────────────
 
-interface RequestOpts {
-  /** Suppress the auto-toast; the caller classifies (expected-degradation paths). */
+export interface RequestOpts {
+  /** Suppress the auto-toast; the caller classifies (expected-degradation paths). Also
+   * suppresses the read-only gate's toast (the refusal itself still throws). */
   quiet?: boolean;
+  /** #95: system bookkeeping, not a family-data edit (a sign-in stamp, the roster heal).
+   * Passes the read-only write gate. Set ONLY where writes funnel, never at a call site that
+   * a person's edit can reach. See `assertWritable`. */
+  system?: boolean;
   timeoutMs?: number;
   /** A7: mark this call a pure liveness probe. On timeout it does NOT recover the
    * worker, report telemetry, or auto-retry — it just throws. Used ONLY by the
@@ -1157,6 +1164,100 @@ function surface(
   return error;
 }
 
+// ─── The read-only write gate (#95 Phase 3) ──────────────────────────────────
+
+// The gate's shared pieces live in the `writeGate` leaf (see its header for why); this module
+// is their public seam. `entitlementStore` installs the verdict via `setWriteGate` at init, the
+// same inversion as `setLocalChangeHandler`, so nothing here imports a store.
+export { ReadOnlyError, setWriteGate };
+export type { WriteGateVerdict };
+
+/**
+ * Collections that are per-person bookkeeping, not family data: marking a notification read and
+ * acknowledging a calendar overlap must keep working in a read-only family. Deliberately NOT
+ * `familyMembers`: a sign-in stamp shares that collection with real member edits, so those
+ * writes pass by `opts.system` at the one place they funnel instead.
+ */
+const SYSTEM_COLLECTIONS: ReadonlySet<CollectionName> = new Set<CollectionName>([
+  'notificationReads',
+  'overlapAcknowledgments',
+]);
+
+/** Named ops that always pass. `setSettings` is every settings write: theme, language, text
+ * size, and the device sync bookkeeping that still lives in the shared doc. */
+const SYSTEM_NAMED_OPS: ReadonlySet<string> = new Set(['setSettings']);
+
+/** Kinds already logged as `would_block` this session (one event per kind, not per write). */
+const wouldBlockLogged = new Set<string>();
+
+/** The first collection (or named op) this op writes that is NOT system bookkeeping, walking
+ * batches recursively; `null` when every part of it is system (an empty batch included). */
+function gatedKind(op: MutationOp): string | null {
+  switch (op.op) {
+    case 'batch':
+      for (const sub of op.ops) {
+        const kind = gatedKind(sub);
+        if (kind !== null) return kind;
+      }
+      return null;
+    case 'named':
+      return SYSTEM_NAMED_OPS.has(op.name) ? null : op.name;
+    default:
+      return SYSTEM_COLLECTIONS.has(op.collection) ? null : op.collection;
+  }
+}
+
+/**
+ * Refuse a family-data write while the family is read-only. Runs on the MAIN thread before
+ * `requestMutate`, so the refusal never reaches the worker and never meets `surface()`.
+ *
+ * Passes: `opts.system`; no gate installed (tests, pre-store boot); a write made only of system
+ * bookkeeping. Otherwise, when the gate says `block`: an info toast (unless `opts.quiet`; the
+ * toast layer dedupes identical live toasts), one `blocked` event, then `ReadOnlyError`. When it
+ * says only `wouldBlock` (dry-run): one `would_block` event per kind per session, and the write
+ * proceeds. `system_bypass` is deliberately not logged (noise).
+ *
+ * Merges, snapshots, compaction and migrations (`mergeRemoteEnvelope`, `applyChanges`,
+ * `loadSnapshot`, `compactDoc`, `migrateDoc`) never call `mutate`, which is how a read-only
+ * family still receives a peer's edits. Keep it that way: no gate there.
+ */
+function assertWritable(op: MutationOp, opts?: RequestOpts): void {
+  if (opts?.system) return;
+  const verdict = readWriteGate();
+  if (!verdict || (!verdict.block && !verdict.wouldBlock)) return;
+  const kind = gatedKind(op);
+  if (kind === null) return;
+
+  if (verdict.block) {
+    if (!opts?.quiet) {
+      showToast(
+        'info',
+        tr('readOnly.toast.title', 'Read-only for now'),
+        tr(
+          'readOnly.toast.message',
+          "beanies.family is read-only right now, so this change wasn't saved. Everything is still yours."
+        )
+      );
+    }
+    logEvent({
+      level: 'info',
+      surface: 'read-only-gate',
+      message: 'write refused: the family is read-only',
+      context: { action: 'blocked', kind },
+    });
+    throw new ReadOnlyError(kind);
+  }
+
+  if (wouldBlockLogged.has(kind)) return;
+  wouldBlockLogged.add(kind);
+  logEvent({
+    level: 'info',
+    surface: 'read-only-gate',
+    message: 'write would be refused once enforcement is on (dry-run)',
+    context: { action: 'would_block', kind },
+  });
+}
+
 // ─── Typed method wrappers (mirror the retired docService/persistence API) ───
 
 /** Post the family key to the worker (once at unlock; re-posted on re-spawn). */
@@ -1277,6 +1378,7 @@ export async function openCache(familyId: string): Promise<{ loaded: false }> {
  * CHANGED the doc — a no-op (skipped `onMissing:'skip'` / a named op that wrote
  * nothing) leaves heads unchanged and schedules no save/persist (F10). */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
+  assertWritable(op, opts);
   const { result, changed } = await requestMutate<T>(op, opts);
   if (changed) localChangeHandler?.();
   return result;
@@ -1305,7 +1407,9 @@ function fireAndForget(
   });
 }
 
-/** Fire-and-forget a mutation whose result the caller doesn't await. */
+/** Fire-and-forget a mutation whose result the caller doesn't await. A read-only refusal
+ * needs no special case: `fireAndForget`'s catch only calls `reportError`, which drops a
+ * `ReadOnlyError` (the gate has already toasted and logged it). */
 export function fireAndForgetMutate(op: MutationOp): void {
   fireAndForget(
     () => mutate(op),
@@ -1722,4 +1826,6 @@ export function __resetDocClientForTesting(): void {
   cachePersistFailedHandler = null;
   cacheReleasedHandler = null;
   localChangeHandler = null;
+  setWriteGate(null);
+  wouldBlockLogged.clear();
 }

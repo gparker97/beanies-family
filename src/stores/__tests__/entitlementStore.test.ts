@@ -31,6 +31,8 @@ const h = vi.hoisted(() => ({
   flagOn: true,
   docLoaded: true,
   settings: null as { planToken?: string } | null,
+  /** The write gate the store installed on docClient (Phase 3). */
+  writeGate: null as (() => { block: boolean; wouldBlock: boolean }) | null,
 }));
 
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
@@ -63,6 +65,13 @@ vi.mock('@/services/automerge/docService', () => ({
   isDocLoaded: () => h.docLoaded,
 }));
 vi.mock('@/services/automerge/projection', () => ({ getSettings: () => h.settings }));
+// Keeps the real `ReadOnlyError` (errorReporter imports it); only captures the installed gate.
+vi.mock('@/services/automerge/worker/writeGate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/automerge/worker/writeGate')>()),
+  setWriteGate: (fn: () => { block: boolean; wouldBlock: boolean }) => {
+    h.writeGate = fn;
+  },
+}));
 const familyContext = reactive({ activeFamilyId: FAMILY as string | null });
 vi.mock('@/stores/familyContextStore', () => ({ useFamilyContextStore: () => familyContext }));
 
@@ -321,6 +330,20 @@ describe('isReadOnly vs wouldBeReadOnly', () => {
       expect(s.isReadOnly).toBe(c.readOnly);
       expect(s.wouldBeReadOnly).toBe(c.would);
       expect(logged('applied')[0]!.context).toMatchObject({ dry_run: !c.readOnly });
+    });
+  }
+
+  for (const c of cases) {
+    it(`installs a write gate reporting block=${c.readOnly}, wouldBlock=${c.would} (flag ${c.flag ? 'on' : 'off'}, enforced ${c.enforced})`, () => {
+      h.flagOn = c.flag;
+      seedCache(
+        ent({ state: 'read_only', reason: 'trial_ended', enforced: c.enforced }),
+        Date.now()
+      );
+      h.writeGate = null;
+      useEntitlementStore();
+      expect(h.writeGate).not.toBeNull();
+      expect(h.writeGate!()).toEqual({ block: c.readOnly, wouldBlock: c.would });
     });
   }
 

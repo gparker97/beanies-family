@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { ReadOnlyError } from '@/services/automerge/worker/writeGate';
 
 vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
@@ -365,5 +366,19 @@ describe('wrapAsync — optional report surface', () => {
       error: original,
       surface: 'responsibilities',
     });
+  });
+
+  it('treats a read-only refusal as expected: no toast, no report, no error state (#95)', async () => {
+    isLoading.value = false;
+    const result = await wrapAsync(isLoading, error, async () => {
+      throw new ReadOnlyError('todos');
+    });
+
+    expect(result).toBeUndefined();
+    // The gate already showed its info toast and logged the refusal.
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(error.value).toBeNull();
+    expect(isLoading.value).toBe(false);
   });
 });

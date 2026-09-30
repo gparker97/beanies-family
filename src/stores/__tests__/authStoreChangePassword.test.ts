@@ -18,6 +18,8 @@ vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
     members: membersRef.value,
     updateMember: updateMemberMock,
+    // #95: credential writes go through the gate-passing funnel; same spy.
+    updateMemberCredentials: updateMemberMock,
     setCurrentMember: vi.fn(),
     resetState: vi.fn(),
     createMember: vi.fn(),

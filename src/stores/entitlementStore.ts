@@ -51,6 +51,7 @@ import type { Entitlement, EntitlementState, RegistryEntry } from '@/types/model
 import { lookupFamilyResult, setRegistryEntryObserver } from '@/services/registry/registryService';
 import { readEntitlementCache, writeEntitlementCache } from '@/services/billing/entitlementCache';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { setWriteGate } from '@/services/automerge/worker/writeGate';
 import { getSettings as projectionGetSettings } from '@/services/automerge/projection';
 import { logEvent } from '@/services/telemetry';
 import { isFlagEnabled } from '@/config/flags';
@@ -377,6 +378,9 @@ export const useEntitlementStore = defineStore('entitlement', () => {
 
   // ── Wiring ─────────────────────────────────────────────────────────────────
   setRegistryEntryObserver(onRegistryEntry);
+  // Phase 3: `docClient.mutate` asks this before every family-data write. Read at call time, so
+  // it always reflects the current flag, answer and clock; `wouldBlock` feeds the dry-run soak.
+  setWriteGate(() => ({ block: isReadOnly.value, wouldBlock: wouldBeReadOnly.value }));
 
   watch(
     () => familyContextStore.activeFamilyId,
