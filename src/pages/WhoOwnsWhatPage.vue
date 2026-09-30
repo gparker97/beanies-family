@@ -13,9 +13,13 @@
  * at the top right of the Deal view switches to `DealBoard` and back; that choice is
  * remembered per device (`dealMode`) and only the toggle changes it. Every `openDeal`
  * request (the first deal, "Deal the remaining N", a card's Deal button) shows the pile at that
- * card without touching the saved choice; phones never see the board. The check-in is `CheckInDrawer`, and the fridge sheet (Share / Export as PDF, from the ⋯ menu
- * and the Overview) runs on `useSheetExportRunner` (surface `deck-export`) with one
+ * card without touching the saved choice; phones never see the board. The check-in is
+ * `CheckInDrawer`, and the fridge sheet (`SheetExportActions`: Share / Export as PDF, Share
+ * only on a phone) runs on `useSheetExportRunner` (surface `deck-export`) with one
  * `ExportSheet` per page off-screen.
+ *
+ * Phones (`isMobile`) drop the decorative tagline row, and its ＋ and ⋯ render in the
+ * controls row instead (toggle, ＋, Share, ⋯): one row above the pile.
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -61,8 +65,8 @@ import CardEditDrawer from '@/components/responsibilities/CardEditDrawer.vue';
 import DealPile from '@/components/responsibilities/DealPile.vue';
 import DealBoard from '@/components/responsibilities/DealBoard.vue';
 import CheckInDrawer from '@/components/responsibilities/CheckInDrawer.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import ExportSheet from '@/components/export/ExportSheet.vue';
+import SheetExportActions from '@/components/export/SheetExportActions.vue';
 import ExportPeopleLegend from '@/components/export/ExportPeopleLegend.vue';
 import ResponsibilityExportBody from '@/components/export/ResponsibilityExportBody.vue';
 
@@ -294,7 +298,7 @@ function onMenu(id: string): void {
 // ── The fridge sheet ─────────────────────────────────────────────────────────
 const { today } = useToday();
 const translationStore = useTranslationStore();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
 const { getMemberName } = useMemberInfo();
 const { resolveMember } = useExportMemberResolver();
@@ -315,8 +319,8 @@ const exportResolvers: DeckExportResolvers = {
   category: (id) => {
     const def = id ? getListCategory(id) : undefined;
     return id && def
-      ? { title: categoryLabel(id), emoji: def.emoji, color: def.color }
-      : { title: t('lists.category.other'), emoji: '📁', color: CATEGORY_FALLBACK_TINT };
+      ? { title: categoryLabelOrOther(id), emoji: def.emoji, color: def.color }
+      : { title: categoryLabelOrOther(null), emoji: '📁', color: CATEGORY_FALLBACK_TINT };
   },
   name: cardName,
   done: cardDone,
@@ -346,7 +350,6 @@ function pageLabel(index: number): string {
 const {
   exportMounting,
   exportingFormat,
-  exporting,
   run: runExport,
 } = useSheetExportRunner({
   surface: 'deck-export',
@@ -366,11 +369,6 @@ const {
   failedHelpKey: 'whoOwnsWhat.export.failedHelp',
   fonts: DECK_EXPORT_FONTS,
 });
-
-/** Share = one PNG with every page stacked; Export = a PDF with one A4 page per sheet page. */
-function exportDeck(format: 'png' | 'pdf'): void {
-  void runExport(format === 'png' ? 'image' : 'pdf');
-}
 
 function seeSkipped(): void {
   deckFilter.value = 'skipped';
@@ -426,8 +424,9 @@ async function restoreDefaults(): Promise<void> {
 
 <template>
   <div class="space-y-6" :class="{ 'flex min-h-full flex-col': fillsHeight }">
-    <!-- Header -->
-    <div class="flex items-start justify-between gap-3">
+    <!-- Header (md+). Phones drop this decorative tagline row; its ＋ and ⋯ move into the
+         controls row below, so the view switch and the actions share one row. -->
+    <div v-if="!isMobile" class="flex items-start justify-between gap-3">
       <PageWelcomeSubtitle :text="t('whoOwnsWhat.welcomeSubtitle')" />
       <div class="flex shrink-0 items-center gap-2">
         <AddEntityButton
@@ -462,38 +461,26 @@ async function restoreDefaults(): Promise<void> {
             aria-hidden="true"
           />
         </template>
+        <!-- Phones: the header's ＋, in the order toggle, ＋, Share, ⋯ (v-if, never
+             CSS-hidden, so only one copy is ever mounted). -->
+        <AddEntityButton
+          v-if="canDeal && isMobile"
+          :label="t('whoOwnsWhat.addCard')"
+          compact
+          data-testid="who-owns-what-add"
+          @click="newCard"
+        />
         <!-- The fridge sheet's two conventional actions, as on the meal planner: on every
-             view, since a family reaches for them wherever they are. -->
-        <template v-if="hasKept">
-          <button
-            type="button"
-            class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            :disabled="exporting"
-            data-testid="who-owns-what-share"
-            @click="exportDeck('png')"
-          >
-            <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
-            {{
-              exportingFormat === 'image'
-                ? t('whoOwnsWhat.export.building')
-                : t('whoOwnsWhat.menu.share')
-            }}
-          </button>
-          <button
-            type="button"
-            class="font-outfit text-secondary-500 dark:bg-surface-raised dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-            :disabled="exporting"
-            data-testid="who-owns-what-export"
-            @click="exportDeck('pdf')"
-          >
-            <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
-            {{
-              exportingFormat === 'pdf'
-                ? t('whoOwnsWhat.export.building')
-                : t('whoOwnsWhat.menu.export')
-            }}
-          </button>
-        </template>
+             view, since a family reaches for them wherever they are. Share = one PNG with
+             every page stacked; Export = a PDF with one A4 page per sheet page (md+ only). -->
+        <SheetExportActions
+          v-if="hasKept"
+          :exporting-format="exportingFormat"
+          :share-label="t('whoOwnsWhat.menu.share')"
+          testid="who-owns-what"
+          @run="runExport"
+        />
+        <OverflowMenu v-if="isMobile" :items="menuItems" @select="onMenu" />
       </div>
     </div>
 

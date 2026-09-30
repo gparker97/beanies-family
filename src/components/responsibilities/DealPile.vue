@@ -30,6 +30,10 @@
  * bounces; a skip flies to the Skipped list's heading. Revisit changes don't fly. Reduced
  * motion: no flight, no bounce; the undo toast still confirms every action.
  *
+ * Phones (below 48rem): the card is the hero. The position line and the question are
+ * hidden (CSS), the count rides on the card's chip (`count`), and a touch swipe on the
+ * stage steps like the arrows (`step(dir, 'swipe')`), with a one-time hint under the card.
+ *
  * Desktop shortcuts (`useKeyboardShortcuts`), unadvertised beyond `aria-keyshortcuts`:
  * K keep, S skip, 1-9 the Nth face, arrows step, U undo. Each calls the same function its
  * button does and returns false when that would do nothing, so the browser keeps the key
@@ -46,11 +50,13 @@ import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useKeyboardShortcuts, type ShortcutMap } from '@/composables/useKeyboardShortcuts';
+import { usePersistedChoice } from '@/composables/usePersistedChoice';
 import { flyTo } from '@/composables/useFlyTo';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
 import { groupShortcut, otherHumans, type ResolvedCard } from '@/utils/responsibilityDeck';
@@ -61,7 +67,7 @@ import DeckActionButton from './DeckActionButton.vue';
 import DeckCelebration from './DeckCelebration.vue';
 import DealPileBanner from './DealPileBanner.vue';
 import DealPileLists from './DealPileLists.vue';
-import DealPileStage from './DealPileStage.vue';
+import DealPileStage, { type StageStepVia } from './DealPileStage.vue';
 import { useDealActions } from './useDealActions';
 import { pileView, usePileCursor, type SettleMode } from './usePileCursor';
 
@@ -98,7 +104,7 @@ const GROUP_QUESTION: Record<NonNullable<ResolvedCard['group']>, UIStringKey> = 
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const { cardName, partCaption } = useResponsibilityCardLabel();
 const { pulse } = useAttentionPulse();
 const actions = useDealActions();
@@ -197,10 +203,16 @@ const partLine = computed(() =>
 const positionLine = computed(() => {
   const pos = position.value;
   if (!pos) return '';
-  const category = pos.category ? categoryLabel(pos.category) : t('lists.category.other');
+  const category = categoryLabelOrOther(pos.category);
   // A card visited from the lists sits outside the pile: its category, and no count.
   if (cursor.visiting.value) return category;
   return fillTemplate(t('whoOwnsWhat.pile.position'), { category, n: pos.n, total: pos.total });
+});
+/** Phones: the count on the card's chip instead (null outside the pile's queue). */
+const stageCount = computed(() => {
+  const pos = position.value;
+  if (!pos || cursor.visiting.value || pos.n === null || pos.total === null) return null;
+  return { n: pos.n, total: pos.total };
 });
 const backToLabel = computed(() => {
   const next = cursor.nextToDecide.value ? store.cardById(cursor.nextToDecide.value) : undefined;
@@ -353,10 +365,32 @@ function bringBackFromList(cardId: string): Promise<void> {
 }
 
 // ── Navigation ───────────────────────────────────────────────────────────────
-function stepBy(dir: -1 | 1): void {
+/**
+ * Phones: "Swipe to see the next card" under the card until the first step of any kind
+ * (arrow, key or swipe: someone who has stepped has found the pile moves), then never again
+ * on this device. Shown only when the pile holds more than one card, a count that an action
+ * does not change (never `canStep` at the current card, which flips at the ends), and not
+ * gated on `busy`: the hint never appears or vanishes because of a Keep or Skip.
+ */
+const swipeHint = usePersistedChoice(
+  STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT,
+  ['show', 'seen'] as const,
+  'show'
+);
+// Touch screens only (the stage's swipe ignores the mouse), never while visiting a card from
+// the lists (a swipe there goes back to the queue, not "the next card").
+const touchOnly = typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches;
+const showSwipeHint = computed(
+  () => touchOnly && swipeHint.value === 'show' && total.value >= 2 && !cursor.visiting.value
+);
+
+function stepBy(dir: -1 | 1, via: StageStepVia = 'arrow'): void {
   if (busy.value || !cursor.canStep(dir)) return;
   cursor.step(dir);
-  logOnce('pile_step', dir < 0 ? 'prev' : 'next');
+  // Only where the hint could have been seen: a desktop arrow click must not retire it.
+  if (touchOnly) swipeHint.value = 'seen';
+  const detail = dir < 0 ? 'prev' : 'next';
+  logOnce('pile_step', via === 'swipe' ? `swipe_${detail}` : detail);
 }
 function jumpTo(cardId: string): void {
   if (busy.value) return;
@@ -532,8 +566,9 @@ const waitingLine = computed(() => {
           </div>
         </div>
 
+        <!-- md+ only: phones read the count on the card's own chip. -->
         <p
-          class="font-outfit dark:text-ink-soft text-sm font-semibold text-[var(--color-text-muted)]"
+          class="font-outfit dark:text-ink-soft hidden text-sm font-semibold text-[var(--color-text-muted)] md:block"
           data-testid="deal-pile-position"
         >
           {{ positionLine }}
@@ -545,13 +580,23 @@ const waitingLine = computed(() => {
           :leaving="leaving"
           :can-prev="!busy && cursor.canStep(-1)"
           :can-next="!busy && cursor.canStep(1)"
+          :count="stageCount"
           @step="stepBy"
         />
 
+        <p
+          v-if="showSwipeHint"
+          class="dark:text-ink-faint text-xs text-[var(--color-text-muted)] md:hidden"
+          data-testid="deal-pile-swipe-hint"
+        >
+          {{ t('whoOwnsWhat.pile.swipeHint') }}
+        </p>
+
         <!-- Keep or skip. Equal, unselected buttons; Keep first. -->
         <template v-if="view === 'sort'">
+          <!-- md+ only: on a phone the card and the two buttons say it. -->
           <p
-            class="font-outfit dark:text-ink text-lg font-bold text-[var(--color-text)]"
+            class="font-outfit dark:text-ink hidden text-lg font-bold text-[var(--color-text)] md:block"
             data-testid="deal-pile-question"
           >
             {{ t('whoOwnsWhat.pile.question') }}

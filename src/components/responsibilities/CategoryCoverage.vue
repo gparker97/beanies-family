@@ -22,13 +22,13 @@ defineProps<{ rows: readonly CategoryCoverage[] }>();
 const emit = defineEmits<{ open: [category: ListCategory] }>();
 
 const { t } = useTranslation();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const familyStore = useFamilyStore();
 /** Prefix for each row's count id, which the row button uses as its description. */
 const idPrefix = useId();
 
 function name(row: CategoryCoverage): string {
-  return getListCategory(row.category) ? categoryLabel(row.category) : t('lists.category.other');
+  return categoryLabelOrOther(row.category);
 }
 
 function label(row: CategoryCoverage): string {

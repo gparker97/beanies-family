@@ -74,11 +74,11 @@ than on buttons, and I can flick through cards with my thumb.
    (including while picking).
 8. **Swipe hint:** "Swipe to see the next card" under the card on phones (`md:hidden`) while
    `usePersistedChoice(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT, ['show', 'seen'] as const, 'show')` is `'show'`
-   and `cursor.canStep(-1) || cursor.canStep(1)` (NOT gated on `busy`, so Keep / Skip never jump during an
-   action); set to `'seen'` after the first swipe that actually steps.
+   and the pile holds 2+ cards (`cursor.total >= 2`, stable across actions; not `canStep`, not `busy`); set to
+   `'seen'` after the first step of any kind (arrow, key or swipe).
 9. **i18n / a11y / dark:** new keys `whoOwnsWhat.pile.positionChip` ("{category} · {n} of {total}") and
-   `whoOwnsWhat.pile.swipeHint`; the icon Share shows `BeanieSpinner` + the building aria-label + `aria-busy`
-   while building (never an empty circle); icon buttons keep an accessible name; every changed surface has its dark
+   `whoOwnsWhat.pile.swipeHint`; the icon Share shows a white ring spinner (`<span>`, pulses under reduced motion) + the building
+   aria-label + `aria-busy` while building (never an empty circle); Export is `aria-busy` while the PDF builds; icon buttons keep an accessible name; every changed surface has its dark
    treatment (see Dark Mode Coverage).
 
 ## Important Notes & Caveats
@@ -142,7 +142,7 @@ than on buttons, and I can flick through cards with my thumb.
 5. **DealPile:** passes `:count="cursor.visiting ? null : { n, total }"` to the stage (no positionLine
    refactor); position line + question
    `hidden md:block`; `stepBy(dir, via = 'arrow')` logs `pile_step` detail `next|prev|swipe_next|swipe_prev`
-   and, right after `cursor.step`, sets the hint to `'seen'` when `via === 'swipe'`; the hint is
+   and, right after `cursor.step`, sets the hint to `'seen'` on every step; the hint is
    `usePersistedChoice(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT, ['show', 'seen'] as const, 'show')`.
 6. **CardViewDrawer:** delete its swipe + `.hand { touch-action }`; bind `@step="go"` (`go(dir, input)`
    already matches; its `'swipe'` telemetry unchanged). NEW drawer test: a touch swipe on the `card-view`
@@ -201,7 +201,7 @@ than on buttons, and I can flick through cards with my thumb.
       scroll still works; a mouse drag does nothing; no step past the pile's ends (`canStep`).
 - [ ] The Card Details drawer still swipes on touch (now via the shared stage).
 - [ ] At 360px in Large reading mode the deal page never scrolls sideways.
-- [ ] The swipe hint shows until the first swipe on the device, then never again.
+- [ ] The swipe hint shows until the first step (arrow, key or swipe) on the device, then never again.
 - [ ] Every changed surface checked in dark (desktop + phone) and matches Dark Mode Coverage.
 - [ ] Diagnostic logging in **Observability Coverage** implemented and verified.
 
@@ -223,6 +223,7 @@ than on buttons, and I can flick through cards with my thumb.
 - **Pass 2 (DRY + error handling)**: one shared `SheetExportActions` (CSS-only phone rule, one key pair, busy spinner for the icon); swipe moved into `DealPileStage` and the drawer's copy deleted; hint via `usePersistedChoice`; CSS hiding keeps test markers; chip uses one full translatable key and the real `visiting` rule; drawer sizing pinned; arrows keep 40px; taller Keep/Skip via scoped media rule.
 - **Pass 3 (Sustainability)**: fixed the AC/Req contradictions; pile width from the stage's box (no `100vw`, Large-mode safe) with in-flow overlapping arrows; one root size modifier; `touch-action` unconditional; new drawer swipe test; chip spans only when counted (`phoneChipLabel`); one `compactHeader` flag for moved elements and a written CSS-vs-JS rule; tightened `SheetExportActions` API; correct `usePersistedChoice` signature.
 - **Pass 4 (Fresh-eyes sweep)**: Req 6 rewritten as one statement (in-flow 2.5rem arrows, one width); disabled arrows muted not hidden (no flicker while busy); hint not gated on busy; arrow shadow via `--card-shadow`; `pan-y pinch-zoom`; chip via a `count` prop with one category source; `compactHeader` dropped for `isMobile`; Req 1/2 say CSS; AC lists the intended desktop changes; shared `src/test/pointerSwipe.ts`; help text updated; phone ＋ keeps `canDeal` + a phone-width page test; watermark sizes kept for the hand.
+- **Round-1 code review (after implementation)**: swipe hint changed (Req 8: any step marks it seen, shown while the pile has 2+ cards, so arrow-only users lose it and actions never toggle it); the Share spinner became a white ring and Export gained `aria-busy`; pile geometry centralised in `--pile-w` / `--slab` on `.stage` (fixes a 4px md+ overflow) with the pile art sized from the pile (`cqi`); one category label source (`categoryLabelOrOther`) for the position line and the chip; help copy says the tablet app's Export opens the share sheet.
 
 ## Prompt Log
 

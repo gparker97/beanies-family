@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-30
 
-_Released in 0.26 (web, Android production, iOS App Store)._
+_Released in 0.26 (web, Android production, iOS App Store); the quick-add, phone header, deal card and PDF font changes follow in 0.26.1._
 
 ### Added
 
@@ -21,6 +21,8 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 
 ### Changed
 
+- On phones, the Meal Planner and Who Owns What headers now fit on one row: Share is a round icon, and Export as PDF stays on bigger screens (Share makes the same PDF).
+- Who Owns What's deal view puts the card center stage on phones: a bigger card, a single progress bar, "n of total" on the card's category chip, and swipe left or right to move between cards.
 - The quick-add menu's Everyday beans are now six tiles in two rows; Saying moves to Family. In dark mode the Everyday tiles are readable again.
 - A recipe's Servings is now a number ("Serves 4") with a − / + stepper.
 - Who's eating starts with everyone picked, with a one-tap Clear / Everyone.
@@ -30,6 +32,7 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 ### Fixed
 
 - Hint bubbles no longer open behind side panels.
+- PDF exports from the live app use the app's own fonts again, so the header no longer falls back to a system font and overlaps.
 - In dark mode, the meal drawer's guest-name and note fields and the Meal Planner's week arrows are readable again.
 
 ### Removed

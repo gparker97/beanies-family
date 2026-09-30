@@ -133,8 +133,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          "<strong>Share</strong> — turns the whole week into a friendly one-page picture and hands it to your phone's share sheet, so you can drop it straight into WhatsApp, Messages or email.",
-          '<strong>Export as PDF</strong> — saves the same one-page week as a PDF, perfect for printing and sticking on the fridge.',
+          '<strong>Share</strong>: turns the whole week into a friendly one-page picture and sends it on, so you can drop it straight into WhatsApp, Messages or email.',
+          '<strong>Export as PDF</strong>: makes the same one-page week as a PDF, perfect for printing and sticking on the fridge. In a browser on a computer or tablet it saves the PDF; in the tablet app it opens your share sheet. On a phone only Share shows, as a round icon.',
         ],
       },
       {
@@ -2444,7 +2444,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Under the pile, <strong>Kept</strong> lists the cards you kept and who has each one, and <strong>Skipped</strong> lists the ones you skipped, newest first. Use the arrows on either side of the card to step back and forward through the cards, including ones you already decided. Tap a card in either list to bring it back onto the pile: from there you can <strong>Give It to Someone Else</strong>, <strong>Skip Instead</strong>, <strong>Split It</strong>, or <strong>Bring Back</strong> a skipped card. <strong>Back to</strong> takes you to the next card still to decide.',
+          'Under the pile, <strong>Kept</strong> lists the cards you kept and who has each one, and <strong>Skipped</strong> lists the ones you skipped, newest first. Use the arrows on either side of the card, or swipe on a phone, to step back and forward through the cards, including ones you already decided. Tap a card in either list to bring it back onto the pile: from there you can <strong>Give It to Someone Else</strong>, <strong>Skip Instead</strong>, <strong>Split It</strong>, or <strong>Bring Back</strong> a skipped card. <strong>Back to</strong> takes you to the next card still to decide.',
       },
       {
         type: 'paragraph',
@@ -2591,7 +2591,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The fridge sheet puts your dealt deck on paper: every kept card by category, with each holder’s initial beside it. Cards still waiting for a holder get a dashed line so you can write a name in, and skipped cards are left off. <strong>Share the Deck</strong> and <strong>Export as PDF</strong> sit at the top of every Who Owns What view. <strong>Export as PDF</strong> saves a PDF you can print (on a computer it downloads straight away; in the phone apps it opens your share sheet, where you can save or print it). A big deck spills onto a second page, never splitting a category. <strong>Share the Deck</strong> sends it as an image, for example to a family chat.',
+          'The fridge sheet puts your dealt deck on paper: every kept card by category, with each holder’s initial beside it. Cards still waiting for a holder get a dashed line so you can write a name in, and skipped cards are left off. <strong>Share the Deck</strong> and <strong>Export as PDF</strong> sit at the top of every Who Owns What view on a computer or tablet. In a browser on a computer or tablet, <strong>Export as PDF</strong> saves a PDF you can print; in the tablet app it opens your share sheet. On a phone, use the round share icon. A big deck spills onto more pages, and a long category continues on the next one under “(continued)”. <strong>Share the Deck</strong> sends a picture of it, for example to a family chat.',
       },
       {
         type: 'heading',
