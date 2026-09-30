@@ -215,7 +215,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     </div>
 
     <FormFieldGroup :label="t('cookLog.field.servings')" optional>
-      <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
+      <BaseInput v-model="servings" :placeholder="t('cookLog.placeholder.servings')" />
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('cookLog.field.wentWell')" optional>

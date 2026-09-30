@@ -17,6 +17,7 @@ import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
 import { useCookbookView } from '@/composables/useCookbookView';
 import { useRecipeCourseLabel } from '@/composables/useRecipeCourseLabel';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatServes, servingsOf } from '@/utils/recipeServings';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -46,6 +47,11 @@ const recipesStore = useRecipesStore();
 const photoStore = usePhotoStore();
 const { canEditActivities } = usePermissions();
 const familyStore = useFamilyStore();
+
+/** A card's "Serves 4", or '' when the stored text holds no people count (#116). */
+function servesText(r: Recipe): string {
+  return formatServes(servingsOf(r), t);
+}
 
 const modalOpen = ref(false);
 const editing = ref<Recipe | null>(null);
@@ -447,10 +453,10 @@ async function handleSaved(id: string): Promise<void> {
                     r.prepTime
                   }}</strong></span
                 >
-                <span v-if="r.servings"
+                <span v-if="servesText(r)"
                   >🍽️
                   <strong class="text-secondary-500 font-outfit dark:text-ink font-semibold">{{
-                    r.servings
+                    servesText(r)
                   }}</strong></span
                 >
                 <span v-if="r.ingredients?.length">

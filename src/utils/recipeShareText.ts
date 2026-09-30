@@ -14,6 +14,7 @@
  * sharing.
  */
 import { fillTemplate } from './fillTemplate';
+import { formatServes, servingsOf } from './recipeServings';
 import type { SharedRecipeFields } from './recipeShareLink';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -54,7 +55,8 @@ function metaLine(f: SharedRecipeFields, t: BuildShareTextArgs['t']): string {
   const parts: string[] = [];
   if (f.prepTime) parts.push(fillTemplate(t('recipeShare.text.prep'), { value: f.prepTime }));
   if (f.cookTime) parts.push(fillTemplate(t('recipeShare.text.cook'), { value: f.cookTime }));
-  if (f.servings) parts.push(f.servings);
+  const serves = formatServes(servingsOf(f), t);
+  if (serves) parts.push(serves);
   return parts.join(' · ');
 }
 

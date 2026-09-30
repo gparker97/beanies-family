@@ -50,7 +50,8 @@ describe('encode → decode round trip', () => {
       subtitle: 'the one that never lasts a day',
       prepTime: '20 mins',
       cookTime: '45 mins',
-      servings: 'Serves 8',
+      // Normalised on decode (#116); the recipe still holds pre-0.26 text here.
+      servings: '8',
       ingredients: ['225g unsalted butter', '4 large eggs'],
       steps: ['Heat the oven to 180C.', 'Beat the butter and sugar.'],
       notes: 'Keeps three days in a tin.',
@@ -58,6 +59,19 @@ describe('encode → decode round trip', () => {
       course: 'baking',
       mealSlots: ['snack'],
     });
+  });
+
+  it('decodes an old free-text servings link to the digit string (#116)', () => {
+    // A link made before 0.26 carries "Serves 8" on the unchanged v1 wire.
+    const old = decodeRecipeShare(asFragment({ v: 1, n: 'Cake', y: 'Serves 8' }));
+    expect(old.ok && old.fields.servings).toBe('8');
+    const digits = decodeRecipeShare(encodeRecipeShare(recipe({ servings: '4' })));
+    expect(digits.ok && digits.fields.servings).toBe('4');
+    const muffins = decodeRecipeShare(asFragment({ v: 1, n: 'Cake', y: '12 muffins' }));
+    expect(muffins.ok && 'servings' in muffins.fields).toBe(false);
+    // A non-string is refused, never coerced into a count.
+    const numeric = decodeRecipeShare(asFragment({ v: 1, n: 'Cake', y: 8 }));
+    expect(numeric.ok && 'servings' in numeric.fields).toBe(false);
   });
 
   it('survives a non-Latin-1 name — the btoa regression guard', () => {

@@ -3,7 +3,8 @@
  * Meal Planner (#27) — the week-first "meal board". Desktop/tablet shows the
  * cookbook rail + days-across week grid; mobile shows a single-day stack. Hosts
  * the single MealEditModal + MealPickerSheet, copy-week (overwrite-warned), and
- * day/week share. All CRDT work goes through mealPlanStore (MVO).
+ * day/week share, and the week's shopping list (#116). All CRDT work goes through
+ * mealPlanStore (MVO).
  */
 import { ref, computed } from 'vue';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
@@ -12,6 +13,7 @@ import MealWeekBoard from '@/components/mealplan/MealWeekBoard.vue';
 import MealDayStack from '@/components/mealplan/MealDayStack.vue';
 import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import MealPickerSheet from '@/components/mealplan/MealPickerSheet.vue';
+import MealWeekShoppingDrawer from '@/components/mealplan/MealWeekShoppingDrawer.vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
@@ -34,17 +36,19 @@ import {
   type MealExportRows,
 } from '@/utils/mealExportModel';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isFlagEnabled } from '@/config/flags';
+import { countWeekShoppingRecipes } from '@/utils/mealShoppingList';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import { formatUiDate } from '@/utils/uiLocale';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { addDays, toDateInputValue, formatDayLong } from '@/utils/date';
-import type { MealPlanEntry, MealSlot, LanguageCode } from '@/types/models';
+import type { MealPlanEntry, MealSlot } from '@/types/models';
 
 /** The meal body's faces beyond the shared shell's `SHEET_EXPORT_FONTS`. */
 const MEAL_EXPORT_FONTS = [
   '500 15px Outfit', // .day-num
   'italic 600 14px Outfit', // .dish.type name
 ];
-
-/** UI language → BCP-47 locale for the exported weekday headers. */
-const WEEKDAY_LOCALE: Record<LanguageCode, string> = { en: 'en-US', zh: 'zh-CN' };
 
 const { t } = useTranslation();
 const translationStore = useTranslationStore();
@@ -56,11 +60,9 @@ const { resolveMember } = useExportMemberResolver();
  *  language so a shared picture isn't half-translated (day number is locale-
  *  neutral). */
 function dayHeading(dateISO: string): { weekday: string; dayNum: string } {
-  const locale = WEEKDAY_LOCALE[translationStore.currentLanguage] ?? 'en-US';
-  const d = new Date(`${dateISO}T00:00:00`);
   return {
-    weekday: new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d),
-    dayNum: String(d.getDate()),
+    weekday: formatUiDate(dateISO, translationStore.currentLanguage, { weekday: 'short' }),
+    dayNum: String(new Date(`${dateISO}T00:00:00`).getDate()),
   };
 }
 
@@ -112,6 +114,37 @@ function openPicker(date: string, slot: MealSlot) {
   pickerTarget.value = { date, slot };
   pickerOpen.value = true;
 }
+
+// ── Shopping list for the week (#116) ────────────────────────────────────────
+// Same gate as the recipe page's Shopping List (#88).
+//
+// The shopping week is the week ON SCREEN: the phone day stack (below `md`, the same
+// 767px line as its `md:hidden`) shows `mobileDate`, which the day nav can move into
+// another week than the desktop board's `referenceDate`. One computed feeds the badge,
+// the disabled state and the drawer, so they can never disagree.
+const { isMobile } = useBreakpoint();
+const { weekDays: mobileWeekDays } = useWeekNavigation(mobileRef);
+const shoppingWeekDates = computed(() =>
+  (isMobile.value ? mobileWeekDays.value : weekDays.value).map((d) => d.dateStr)
+);
+
+// The badge counts the distinct recipes the list would use, by the drawer's own rule
+// (`countWeekShoppingRecipes` shares it with `buildWeekShoppingSections` and builds no
+// lines), so the number on the button is the number of sections the drawer opens with.
+const canMakeShoppingList = computed(() => isFlagEnabled('familyLists'));
+const shoppingRecipeCount = computed(() => {
+  if (!canMakeShoppingList.value) return 0;
+  const recipes = new Map(recipesStore.recipes.map((r) => [r.id, r]));
+  return countWeekShoppingRecipes(mealPlanStore.mealsForWeek(shoppingWeekDates.value), recipes);
+});
+const shoppingBadgeLabel = computed(() =>
+  shoppingRecipeCount.value === 1
+    ? t('mealPlanner.shopping.badge.one')
+    : fillTemplate(t('mealPlanner.shopping.badge.other'), {
+        n: String(shoppingRecipeCount.value),
+      })
+);
+const shoppingOpen = ref(false);
 
 // ── Copy week ───────────────────────────────────────────────────────────────
 /** The actual current calendar week's dates (target for "copy to this week"). */
@@ -254,51 +287,81 @@ const {
         </h1>
         <PageWelcomeSubtitle :text="t('mealPlanner.welcome')" />
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button
-          v-if="isCurrentWeek"
-          type="button"
-          class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
-          @click="copyLastWeek"
-        >
-          ⧉ {{ t('mealPlanner.copyLastWeek') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
-          @click="copyViewedToCurrent"
-        >
-          ⧉ {{ t('mealPlanner.copyHere') }}
-        </button>
-        <!-- Two conventional actions: social Share (image → OS share sheet) and
+      <div class="flex flex-col items-start gap-2 sm:items-end">
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-if="isCurrentWeek"
+            type="button"
+            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
+            @click="copyLastWeek"
+          >
+            ⧉ {{ t('mealPlanner.copyLastWeek') }}
+          </button>
+          <button
+            v-else
+            type="button"
+            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
+            @click="copyViewedToCurrent"
+          >
+            ⧉ {{ t('mealPlanner.copyHere') }}
+          </button>
+          <!-- The week's shopping list. Disabled (never hidden) with no recipe meals, so
+             the feature stays discoverable, with the reason right under the row. -->
+          <button
+            v-if="canMakeShoppingList"
+            type="button"
+            class="font-outfit dark:text-success-lift dark:disabled:bg-surface-overlay dark:disabled:text-ink-faint inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-success-10)] px-4 py-2.5 text-sm font-semibold text-[#1e8449] disabled:cursor-not-allowed disabled:bg-[var(--tint-slate-5)] disabled:text-[var(--color-text-muted)]"
+            :disabled="shoppingRecipeCount === 0"
+            :aria-describedby="shoppingRecipeCount === 0 ? 'mp-shopping-hint' : undefined"
+            data-testid="meal-shopping-button"
+            @click="shoppingOpen = true"
+          >
+            <span aria-hidden="true">🛒</span>
+            {{ t('mealPlanner.shopping.button') }}
+            <span
+              v-if="shoppingRecipeCount > 0"
+              class="grid h-5 min-w-5 place-items-center rounded-full bg-[#1e8449] px-1.5 text-xs font-bold text-white dark:bg-[#1e8449]"
+              :aria-label="shoppingBadgeLabel"
+              role="img"
+              >{{ shoppingRecipeCount }}</span
+            >
+          </button>
+          <!-- Two conventional actions: social Share (image → OS share sheet) and
              Export as PDF (downloads the week). Both always cover the week. -->
-        <button
-          type="button"
-          class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-          :disabled="exporting"
-          @click="runExport('image')"
+          <button
+            type="button"
+            class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            :disabled="exporting"
+            @click="runExport('image')"
+          >
+            <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
+            {{
+              exportingFormat === 'image'
+                ? t('mealPlanner.export.building')
+                : t('mealPlanner.export.share')
+            }}
+          </button>
+          <button
+            type="button"
+            class="font-outfit text-secondary-500 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            :disabled="exporting"
+            @click="runExport('pdf')"
+          >
+            <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
+            {{
+              exportingFormat === 'pdf'
+                ? t('mealPlanner.export.building')
+                : t('mealPlanner.export.exportPdf')
+            }}
+          </button>
+        </div>
+        <p
+          v-if="canMakeShoppingList && shoppingRecipeCount === 0"
+          id="mp-shopping-hint"
+          class="font-inter dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
         >
-          <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
-          {{
-            exportingFormat === 'image'
-              ? t('mealPlanner.export.building')
-              : t('mealPlanner.export.share')
-          }}
-        </button>
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-          :disabled="exporting"
-          @click="runExport('pdf')"
-        >
-          <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
-          {{
-            exportingFormat === 'pdf'
-              ? t('mealPlanner.export.building')
-              : t('mealPlanner.export.exportPdf')
-          }}
-        </button>
+          {{ t('mealPlanner.shopping.disabledHint') }}
+        </p>
       </div>
     </div>
 
@@ -382,6 +445,12 @@ const {
 
     <!-- Modals -->
     <MealEditModal :open="editorOpen" :meal="editMeal" @close="editorOpen = false" />
+    <MealWeekShoppingDrawer
+      v-if="canMakeShoppingList"
+      :open="shoppingOpen"
+      :week-dates="shoppingWeekDates"
+      @close="shoppingOpen = false"
+    />
     <MealPickerSheet
       :open="pickerOpen"
       :date="pickerTarget.date"

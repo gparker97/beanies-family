@@ -15,7 +15,7 @@ describe('entityDeepLink', () => {
   });
 
   it('list → /lists?view=', () => {
-    // Must match what `useRecipeShoppingLists.openList` pushes, or a tapped
+    // Must match what `useOpenList().openList` pushes, or a tapped
     // reminder and an in-app "open list" land in two different places.
     expect(entityDeepLink('list', 'l1')).toEqual({ path: '/lists', query: { view: 'l1' } });
   });

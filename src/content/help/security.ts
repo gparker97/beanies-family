@@ -829,7 +829,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
     icon: '\u{1FAD8}',
     readTime: 5,
-    updatedDate: '2026-09-25',
+    updatedDate: '2026-09-30',
     sections: [
       {
         type: 'heading',
@@ -857,7 +857,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every time beanies reads something for you, that counts as <strong>one magic bean</strong> — one photo, one document, one link, one piece of pasted text. Several photos of the same invitation are one thing, so they are one bean. (A bank statement is the exception: it is read page by page, one bean per page, see <strong>Bank statements</strong> below.) It counts even when beanies cannot work out what it is: we still read it for you, and counting it is what keeps "paste it again and again until something sticks" from being free for everyone else.',
+          'Every time beanies reads something for you, that counts as <strong>one magic bean</strong> — one photo, one document, one link, one piece of pasted text. Several photos of the same invitation are one thing, so they are one bean. (A bank statement is the exception: it is read page by page, one bean per page, see <strong>Bank statements</strong> below.) <strong>Finding duplicates in a shopping list is free</strong>: tapping ✨ Find Duplicates never uses a magic bean. It counts even when beanies cannot work out what it is: we still read it for you, and counting it is what keeps "paste it again and again until something sticks" from being free for everyone else.',
       },
       {
         type: 'callout',
@@ -889,9 +889,16 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          "Bank statements are the one exception, and beanies asks you about it first. To suggest categories you already use, beanies sends the names of shops and payees your family has filed before, and the category each went under. It never sends amounts, dates, account numbers or anyone's name. A statement is read page by page, so each page is one bean, and the statement sheet tells you how many before anything is sent. (If you have switched off the privacy check in Settings, that sheet appears only for your first statement; after that the page count shows as each page is read.) The statement itself is not kept, by the AI service or by beanies.",
+          "Bank statements are one exception, and beanies asks you about it first. To suggest categories you already use, beanies sends the names of shops and payees your family has filed before, and the category each went under. It never sends amounts, dates, account numbers or anyone's name. A statement is read page by page, so each page is one bean, and the statement sheet tells you how many before anything is sent. (If you have switched off the privacy check in Settings, that sheet appears only for your first statement; after that the page count shows as each page is read.) The statement itself is not kept, by the AI service or by beanies.",
         title: 'Bank statements',
         icon: '\u{1F3E6}',
+      },
+      {
+        type: 'callout',
+        content:
+          'Shopping lists are the other exception, and beanies asks you about it first too. When you tap <strong>✨ Find Duplicates</strong> on a week\'s shopping list, beanies sends the ingredient lines on that list, exactly as they read, so the AI can spot the same item written two ways (like "500 g ground beef" and "250g lean ground beef"). It never sends recipe names, meal dates or who\'s eating. The AI only says which lines match; it never writes amounts. Every merged line is built on your device from your own lines, and you see it before anything is saved. (If you have switched off the privacy check in Settings, beanies still asks the first time.) Finding duplicates is free.',
+        title: 'Shopping lists',
+        icon: '\u{1F6D2}',
       },
       {
         type: 'heading',

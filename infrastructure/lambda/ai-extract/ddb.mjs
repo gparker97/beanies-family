@@ -90,15 +90,17 @@ export const usageKey = (familyId, dayIso) => ({
 export const grantKey = (familyId, id) => ({ pk: `c#${hash(familyId)}#${id}` });
 
 /**
- * The two counters on a usage item.
+ * The counters on a usage item.
  *
  * `charged` is what an allowance is spent against. `corrected` is OUR cost, not the family's —
- * a free re-read after we inferred the wrong kind. An entitlement layer that sums the row rather
- * than reading `n` would bill families for our miscategorisations, which is the opposite of the
- * promise. A fourth counter is a new attribute here, never a second item shape: the sort key is
- * the day, and a second shape under the same `pk` breaks the metrics scan-and-sum.
+ * a free re-read after we inferred the wrong kind. `freeTask` is a read of a task we give away
+ * (#116: ✨ Find Duplicates on a shopping list; see `FREE_TASK_MAX_BYTES` in meter.mjs), counted so
+ * its volume and our cost stay visible. An entitlement layer that sums the row rather than
+ * reading `n` would bill families for our miscategorisations and our free features, which is the
+ * opposite of the promise. A further counter is a new attribute here, never a second item shape:
+ * the sort key is the day, and a second shape under the same `pk` breaks the metrics scan-and-sum.
  */
-export const USAGE_ATTRS = Object.freeze({ charged: 'n', corrected: 'c' });
+export const USAGE_ATTRS = Object.freeze({ charged: 'n', corrected: 'c', freeTask: 'f' });
 
 /**
  * Convenience default for `pull_ai_usage.mjs` ONLY — terraform owns the real name and hands it

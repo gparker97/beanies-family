@@ -29,6 +29,12 @@ import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
  * key into an object. `index.mjs` records the production bug where `EXTRACTION_TASKS['constructor']`
  * resolved up the prototype chain and threw outside the try/catch, returning a raw 502 with no CORS
  * headers to anyone holding the api key. That shape must not come back here.
+ *
+ * As a metering label it now decides ONE thing beyond the grant fence: whether the read is a free
+ * task (#116, `dedupe`). Because the label is unverifiable here, it never makes a read free on its
+ * own. `usageAttrFor` in meter.mjs also requires the `srcBytes` THIS Lambda measured (`bytes.length`
+ * below) to be within the task's `FREE_TASK_MAX_BYTES` bound, and the lookup is a `Map`, so the
+ * prototype-chain shape above cannot recur there either.
  */
 
 import { checkLimits } from './rateLimit.mjs';

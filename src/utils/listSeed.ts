@@ -148,16 +148,18 @@ export function parseDraftItems(text: string): string[] {
 }
 
 /**
- * The seed for a shopping list built from a recipe.
+ * The seed for a shopping list (#88 one recipe, #116 a recipe or a planned week).
  *
  * Writes a CLOSED set of keys, so "carries no other link field" is a property a
- * test can assert rather than a promise. In particular it sets `linkedRecipeId`
- * and NEITHER `linkedActivityId` NOR `linkedVacationId` — the same discipline
- * `buildCopySeeds` states above, for the same reason.
+ * test can assert rather than a promise. It sets `linkedRecipeId` ONLY when one is
+ * given (a list made from one recipe), and NEVER `linkedActivityId` or
+ * `linkedVacationId` — the same discipline `buildCopySeeds` states above, for the
+ * same reason. A week's list comes from several recipes and `linkedRecipeId` is
+ * single-valued, so it carries no link at all rather than a misleading one.
  *
  * `lifecycle: 'oneoff'`, not recurring: the curated `grocery` template repeats
- * weekly because a weekly shop does, but a shop for THIS recipe happens once, and
- * a recurring list would reset its ticks forever. `cycleCelebrated` is therefore
+ * weekly because a weekly shop does, but a shop for THESE ingredients happens once,
+ * and a recurring list would reset its ticks forever. `cycleCelebrated` is therefore
  * omitted entirely rather than set to false — `setLifecycle('oneoff')` clears that
  * key, which is the authoritative statement that a oneoff list should not carry it.
  *
@@ -169,14 +171,14 @@ export function parseDraftItems(text: string): string[] {
  * their list, so collapsing the two back into one id would silently delete that
  * notification for every delegated list.
  *
- * `dueDate` is OMITTED when empty rather than written as `undefined` — that keeps
- * the closed-key set honest and means an undated list carries no due-date key at
- * all, which is what `buildListReminders` reads to decide it stays briefing-only.
+ * `dueDate` (and `linkedRecipeId`) are OMITTED when empty rather than written as
+ * `undefined` — that keeps the closed-key set honest and means an undated list
+ * carries no due-date key at all, which is what `buildListReminders` reads to
+ * decide it stays briefing-only.
  *
  * `title` arrives resolved and interpolated: i18n stays out of pure code.
  */
-export function buildRecipeListSeed(args: {
-  recipeId: string;
+export function buildShoppingListSeed(args: {
   titles: string[];
   title: string;
   /** Who will do the shop. */
@@ -185,8 +187,10 @@ export function buildRecipeListSeed(args: {
   createdBy: string;
   /** ymd, or empty/absent for no due date. */
   dueDate?: string;
+  /** The recipe this list was made from; absent for a week's list. */
+  linkedRecipeId?: string;
 }): CreateFamilyListInput {
-  const { recipeId, titles, title, ownerId, createdBy, dueDate } = args;
+  const { titles, title, ownerId, createdBy, dueDate, linkedRecipeId } = args;
   return {
     title,
     // Read, not hardcoded — `getListCategory` is nullable, and the fallback is
@@ -198,7 +202,7 @@ export function buildRecipeListSeed(args: {
     lifecycle: 'oneoff',
     completed: false,
     createdBy,
-    linkedRecipeId: recipeId,
+    ...(linkedRecipeId ? { linkedRecipeId } : {}),
     ...(dueDate ? { dueDate } : {}),
   };
 }

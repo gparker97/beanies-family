@@ -40,7 +40,8 @@ import {
   type DeckExportResolvers,
   type ExportPage,
 } from '@/utils/responsibilityExportModel';
-import type { LanguageCode, ListCategory } from '@/types/models';
+import type { ListCategory } from '@/types/models';
+import { formatUiDate } from '@/utils/uiLocale';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -298,7 +299,6 @@ const { cardName, cardDone, cardEmoji } = useResponsibilityCardLabel();
 const { getMemberName } = useMemberInfo();
 const { resolveMember } = useExportMemberResolver();
 
-const EXPORT_LOCALE: Record<LanguageCode, string> = { en: 'en-US', zh: 'zh-CN' };
 /** Faces the sheet body uses beyond the shared shell's. */
 const DECK_EXPORT_FONTS = [
   '700 13px Outfit',
@@ -332,11 +332,11 @@ const exportResolvers: DeckExportResolvers = {
 };
 
 const exportDate = computed(() =>
-  new Intl.DateTimeFormat(EXPORT_LOCALE[translationStore.currentLanguage] ?? 'en-US', {
+  formatUiDate(today.value, translationStore.currentLanguage, {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(`${today.value}T00:00:00`))
+  })
 );
 function pageLabel(index: number): string {
   const total = exportPages.value.length;

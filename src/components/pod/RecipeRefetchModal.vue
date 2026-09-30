@@ -17,6 +17,7 @@ import { useRecipeCourseLabel } from '@/composables/useRecipeCourseLabel';
 import { isMealSlot, SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import type { RecipeDiff, RecipeDiffField } from '@/utils/recipeDiff';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { formatServes, parseServings } from '@/utils/recipeServings';
 
 defineProps<{
   open: boolean;
@@ -53,6 +54,10 @@ const FIELD_LABEL_KEY: Record<RecipeDiffField, UIStringKey> = {
  * ADR-008 hole the render-site resolvers exist to close. Both resolvers already exist.
  */
 function render(field: RecipeDiffField, value: unknown): string {
+  // "Serves 4", the same words the recipe page uses, parsed from either side (#116). Both
+  // sides are already normalised digit strings; parsing again keeps a stray old-format value
+  // from ever showing as raw text, and `''` falls through to "nothing yet".
+  if (field === 'servings') return formatServes(parseServings(value), t);
   if (field === 'course') return typeof value === 'string' ? courseLabel(value) : '';
   if (field === 'mealSlots') {
     return Array.isArray(value)

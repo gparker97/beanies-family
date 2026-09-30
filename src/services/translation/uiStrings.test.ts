@@ -108,6 +108,8 @@ describe('uiStrings', () => {
       // The AI failure surface. `error.` does not cover it — the keys are `ai.error.*` — so
       // every beanie value there sat outside the floor until this was added.
       'ai.error.',
+      // Consent (the ✨ Find Duplicates variant, #116): what is sent and what happens to it.
+      'ai.consent.',
       'ai.correct.refused.',
       'ai.correct.disagreed.',
       // The two hinted outcomes of the sheet's optional pick (#108): what beanies read, and
@@ -153,12 +155,12 @@ describe('uiStrings', () => {
       'shareTarget.beanpod.',
       // The awaiting-auth card carries the sign-in and account-switch copy a stuck joiner reads.
       'join.awaiting.',
-      // #88 — the three refusal surfaces in RecipeListSheet. A reader who does
-      // not know the joke must still learn that a real family member is gone and
-      // that nothing was created. The rest of `lists.fromRecipe.*` is cosmetic
+      // #88 / #116 — the refusal surfaces of the shopping-list commit. A reader who
+      // does not know the joke must still learn what is gone and that nothing was
+      // created or added. The rest of `lists.fromRecipe.*` is cosmetic
       // (labels, hints) and deliberately NOT covered.
       'lists.error.',
-      'lists.fromRecipe.ownerGone',
+      'lists.destination.listGone',
       'lists.fromRecipe.noMember',
       'lists.fromRecipe.recipeGone',
       'join.inviteToken',

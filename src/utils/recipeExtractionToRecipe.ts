@@ -17,6 +17,7 @@ import { isMealSlot, sortSlots } from '@/constants/mealSlots';
 import { isRecipeTimeField, RECIPE_TIME_FIELDS } from '@/constants/recipeTimeFields';
 import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import type { DishImagePrefill } from '@/types/magicPayload';
+import { normalizeServings } from './recipeServings';
 
 /** What the form is opened with. One object, because it always travels as a unit. */
 export interface RecipePrefill {
@@ -63,7 +64,30 @@ export interface RecipePrefill {
    * (the field is blank either way) and would otherwise be indistinguishable in CloudWatch.
    */
   taxonomyRejected: ('course' | 'meal')[];
+  /**
+   * The source gave servings TEXT that holds no people count ("12 muffins", "Makes 2
+   * loaves"), so the field was left blank (#116).
+   *
+   * REQUIRED for the same reason as `taxonomyRejected`: every construction site must answer.
+   * It exists so the capture can log the parser's miss rate on real sources; a blank field
+   * alone cannot tell "the page said nothing" from "the page said something we could not use".
+   */
+  servingsUnparsed: boolean;
   confidence: RecipeFieldConfidence;
+}
+
+/**
+ * Servings as the prefill stores it: the digit string of its people count (#116).
+ *
+ * Shared by both mappers so the AI rung and the JSON-LD rung cannot drift. `unparsed` is true
+ * only for non-empty text that yielded no count — an empty source value is simply absent.
+ */
+function prefillServings(raw: string | undefined): {
+  servings: string | undefined;
+  unparsed: boolean;
+} {
+  const servings = normalizeServings(raw);
+  return { servings, unparsed: servings === undefined && Boolean(raw?.trim()) };
 }
 
 /**
@@ -157,6 +181,8 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
   if (ingredients.length === 0 && steps.length === 0) return null;
 
   const taxonomy = validatedTaxonomy(result);
+  const servings = prefillServings(result.servings);
+  const inferredTimes = validatedInferredTimes(result.inferredTimes);
 
   return {
     fields: {
@@ -164,7 +190,7 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
       ...(result.subtitle ? { subtitle: result.subtitle } : {}),
       ...(result.prepTime ? { prepTime: result.prepTime } : {}),
       ...(result.cookTime ? { cookTime: result.cookTime } : {}),
-      ...(result.servings ? { servings: result.servings } : {}),
+      ...(servings.servings ? { servings: servings.servings } : {}),
       ingredients,
       steps,
       ...(result.notes ? { notes: result.notes } : {}),
@@ -172,9 +198,14 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
       ...(taxonomy.mealSlots ? { mealSlots: taxonomy.mealSlots } : {}),
     },
     taxonomyRejected: taxonomy.rejected,
+    servingsUnparsed: servings.unparsed,
     inferredIngredients: result.ingredients.filter((l) => l.inferred).map((l) => l.text),
     inferredSteps: result.steps.filter((l) => l.inferred).map((l) => l.text),
-    inferredTimes: validatedInferredTimes(result.inferredTimes),
+    // A servings text the parser discarded leaves the stepper blank, so it must not keep the
+    // "beanies worked this out" hint either — a hint on an empty field claims a value.
+    inferredTimes: servings.servings
+      ? inferredTimes
+      : inferredTimes.filter((f) => f !== 'servings'),
     // NO IMAGE CONCERN ON THIS PATH ANY MORE (#86). The model never had a real URL to give:
     // `htmlToText` strips every tag before it sees the page, so anything it returned here was
     // necessarily invented — which is precisely why the old same-registrable-domain screen
@@ -194,13 +225,14 @@ export function recipeExtractionToPrefill(result: RecipeExtractionResult): Recip
  * construction — nothing on this path was guessed, and marking it as such would be a lie.
  */
 export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): RecipePrefill {
+  const servings = prefillServings(recipe.servings);
   return {
     fields: {
       name: recipe.name,
       ...(recipe.subtitle ? { subtitle: recipe.subtitle } : {}),
       ...(recipe.prepTime ? { prepTime: recipe.prepTime } : {}),
       ...(recipe.cookTime ? { cookTime: recipe.cookTime } : {}),
-      ...(recipe.servings ? { servings: recipe.servings } : {}),
+      ...(servings.servings ? { servings: servings.servings } : {}),
       ingredients: recipe.ingredients,
       steps: recipe.steps,
       sourceUrl,
@@ -211,6 +243,7 @@ export function jsonLdToPrefill(recipe: JsonLdRecipe, sourceUrl: string): Recipe
     // exercise — on the one path whose whole point is that nothing is invented. Nothing was
     // offered, so nothing was rejected.
     taxonomyRejected: [],
+    servingsUnparsed: servings.unparsed,
     inferredSteps: [],
     // Empty for the same reason as the two lists above: the times on this rung were PARSED
     // out of the publisher's own structured data, not worked out. Marking one inferred would

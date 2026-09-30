@@ -26,6 +26,7 @@ import { isRecipeCourse } from '@/constants/recipeCourses';
 import { isMealSlot, sortSlots } from '@/constants/mealSlots';
 import type { Recipe } from '@/types/models';
 import type { RecipePrefill } from './recipeExtractionToRecipe';
+import { normalizeServings } from './recipeServings';
 
 /** The version this build WRITES. */
 export const SHARE_WIRE_VERSION = 1;
@@ -189,6 +190,9 @@ export function decodeRecipeShare(raw: string): ShareDecodeResult {
   // `constructor` keys, and it makes "nothing outside the allowlist survives" true by
   // construction rather than by a filter someone can later forget to update.
   const course = obj[WIRE.course];
+  // Normalised to the digit string (#116): links made before 0.26 carry free text ("Serves
+  // 8"). The wire version stays 1 — bumping it would make older clients refuse the link.
+  const servings = normalizeServings(str(obj[WIRE.servings], MAX_LINE));
   const slots = Array.isArray(obj[WIRE.mealSlots])
     ? (obj[WIRE.mealSlots] as unknown[]).filter(isMealSlot)
     : [];
@@ -200,7 +204,7 @@ export function decodeRecipeShare(raw: string): ShareDecodeResult {
     ...(str(obj[WIRE.subtitle], MAX_LINE) ? { subtitle: str(obj[WIRE.subtitle], MAX_LINE) } : {}),
     ...(str(obj[WIRE.prepTime], MAX_LINE) ? { prepTime: str(obj[WIRE.prepTime], MAX_LINE) } : {}),
     ...(str(obj[WIRE.cookTime], MAX_LINE) ? { cookTime: str(obj[WIRE.cookTime], MAX_LINE) } : {}),
-    ...(str(obj[WIRE.servings], MAX_LINE) ? { servings: str(obj[WIRE.servings], MAX_LINE) } : {}),
+    ...(servings ? { servings } : {}),
     ...(str(obj[WIRE.notes], MAX_NOTES) ? { notes: str(obj[WIRE.notes], MAX_NOTES) } : {}),
     // `safeHttpsUrl`, NOT `safeExternalHref`: the latter permits `http:` and exists for
     // user-typed links. A decoded URL is machine-supplied by definition.
@@ -235,6 +239,8 @@ export function sharedRecipeToPrefill(fields: SharedRecipeFields): RecipePrefill
     // `null` means "there was no page", which is exactly right: nothing was fetched.
     dishImage: null,
     taxonomyRejected: [],
+    // The decode already normalised servings; a person's cookbook is not a parser miss.
+    servingsUnparsed: false,
     confidence: { name: 1, ingredients: 1, steps: 1 },
   };
 }

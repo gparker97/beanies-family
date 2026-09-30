@@ -47,6 +47,8 @@ const STUBS = {
   MealDayStack: true,
   MealEditModal: true,
   MealPickerSheet: true,
+  // Its own tests cover it; unstubbed it pulls in the magic beans stack (router, toasts).
+  MealWeekShoppingDrawer: true,
   PageWelcomeSubtitle: true,
   BeanieIcon: true,
 };

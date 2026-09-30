@@ -11,7 +11,15 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { ALARMING_PREFIXES, closeRead, openRead, validateCorrection } from '../meter.mjs';
+import {
+  ALARMING_PREFIXES,
+  FREE_TASK_CHARGED_PREFIX,
+  FREE_TASK_MAX_BYTES,
+  closeRead,
+  openRead,
+  usageAttrFor,
+  validateCorrection,
+} from '../meter.mjs';
 import {
   GRANT_MISMATCH_PREFIX,
   GRANT_REFUSED_PREFIX,
@@ -751,5 +759,117 @@ describe('the byte fence is a fence, not a suggestion (#49)', () => {
     assert.match(issue.input.UpdateExpression, /#arm = :arm/, 'arm is not optional');
     assert.equal(issue.input.ExpressionAttributeValues[':bytes'].N, '4096');
     assert.equal(issue.input.ExpressionAttributeValues[':arm'].S, 'legacy');
+  });
+});
+
+// ── Free tasks (#116): which attribute a read is counted on ─────────────────────────────────
+describe('usageAttrFor — free tasks are bounded by the size THIS Lambda measured', () => {
+  const BOUND = FREE_TASK_MAX_BYTES.get('dedupe');
+  // A read as the SEALED arm opens it: the only arm a free task is free on.
+  const plain = (srcBytes) => ({ free: false, srcBytes, arm: 'sealed', wasCorrection: false });
+
+  it('has a positive whole-number bound for dedupe', () => {
+    assert.ok(Number.isInteger(BOUND) && BOUND > 0);
+  });
+
+  it('counts a dedupe read within its bound on `f`', () => {
+    assert.equal(usageAttrFor(plain(4096), 'dedupe'), USAGE_ATTRS.freeTask);
+    assert.equal(usageAttrFor(plain(BOUND), 'dedupe'), USAGE_ATTRS.freeTask, 'inclusive bound');
+  });
+
+  it('charges a dedupe on the LEGACY arm (or no arm), however small, and warns', () => {
+    // No client that calls the plaintext arm has ✨ Find Duplicates, so a free legacy dedupe
+    // would only ever be a tampered caller borrowing the label for a free plaintext read.
+    const warn = quiet('warn');
+    try {
+      for (const arm of ['legacy', null, undefined, 'SEALED', '']) {
+        assert.equal(
+          usageAttrFor({ free: false, srcBytes: 10, arm, wasCorrection: false }, 'dedupe'),
+          USAGE_ATTRS.charged,
+          String(arm)
+        );
+      }
+    } finally {
+      warn.restore();
+    }
+    assert.equal(warn.lines.length, 5);
+    assert.match(warn.lines[0], /free task charged: not the sealed arm task=dedupe arm=legacy/);
+  });
+
+  it('charges an OVERSIZED dedupe, and warns: the label alone never makes a read free', () => {
+    const warn = quiet('warn');
+    try {
+      assert.equal(usageAttrFor(plain(BOUND + 1), 'dedupe'), USAGE_ATTRS.charged);
+    } finally {
+      warn.restore();
+    }
+    assert.equal(warn.lines.length, 1);
+    assert.match(warn.lines[0], /free task charged: over its size bound task=dedupe/);
+  });
+
+  it('both charged-free-task lines start with the exported prefix, which is not (yet) alarming', () => {
+    const warn = quiet('warn');
+    try {
+      usageAttrFor(plain(BOUND + 1), 'dedupe');
+      usageAttrFor({ free: false, srcBytes: 10, arm: 'legacy', wasCorrection: false }, 'dedupe');
+    } finally {
+      warn.restore();
+    }
+    assert.equal(warn.lines.length, 2);
+    for (const line of warn.lines)
+      assert.ok(line.startsWith(`${FREE_TASK_CHARGED_PREFIX}: `), line);
+    // It has no metric filter in main.tf. Adding one? Add it to ALARMING_PREFIXES and drop this.
+    assert.ok(!Object.values(ALARMING_PREFIXES).includes(FREE_TASK_CHARGED_PREFIX));
+  });
+
+  it('charges a dedupe with no measured size (`null <= N` is true in JavaScript)', () => {
+    const warn = quiet('warn');
+    try {
+      for (const srcBytes of [null, undefined, NaN, Infinity, '100']) {
+        assert.equal(
+          usageAttrFor(plain(srcBytes), 'dedupe'),
+          USAGE_ATTRS.charged,
+          String(srcBytes)
+        );
+      }
+      assert.equal(usageAttrFor(undefined, 'dedupe'), USAGE_ATTRS.charged);
+    } finally {
+      warn.restore();
+    }
+  });
+
+  it('leaves a paid-for correction on `c`, whatever the task', () => {
+    assert.equal(usageAttrFor({ free: true, srcBytes: 10 }, 'share'), USAGE_ATTRS.corrected);
+    assert.equal(usageAttrFor({ free: true, srcBytes: 10 }, 'dedupe'), USAGE_ATTRS.corrected);
+  });
+
+  it('charges every other task, however small, and without a warning', () => {
+    const warn = quiet('warn');
+    try {
+      for (const task of ['share', 'recipe', 'statement', 'event', 'travel', 'constructor', '']) {
+        assert.equal(usageAttrFor(plain(10), task), USAGE_ATTRS.charged, task);
+      }
+    } finally {
+      warn.restore();
+    }
+    assert.deepEqual(warn.lines, []);
+  });
+
+  it('closeRead writes a small dedupe read to `f` and nothing to `n`', async () => {
+    const { sent, ddb } = stub();
+    const read = await openRead({
+      familyId: FAMILY,
+      srcHash: sourceFingerprint(SOURCE),
+      srcBytes: 4096,
+      arm: 'sealed',
+      now: NOW,
+      ddb,
+    });
+
+    await closeRead(read, { familyId: FAMILY, task: 'dedupe', now: NOW, ddb });
+
+    const attrs = sent.map((c) => c.input.ExpressionAttributeNames?.['#n']).filter(Boolean);
+    assert.ok(attrs.includes(USAGE_ATTRS.freeTask), 'counted, so dedupe volume stays visible');
+    assert.ok(!attrs.includes(USAGE_ATTRS.charged), 'and never billed to the family');
   });
 });

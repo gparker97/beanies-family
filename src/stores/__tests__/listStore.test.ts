@@ -585,6 +585,130 @@ describe('listStore', () => {
     expect(patch.cycleCelebrated).toBe(false);
   });
 
+  // ── addItems (#116): one write, same re-open rules as addItem ─────────────
+
+  describe('addItems', () => {
+    const echoUpdate = (store: ReturnType<typeof useListStore>) =>
+      vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+        const cur = store.lists.find((x) => x.id === id)!;
+        return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+      });
+
+    it('appends every title as a fresh open item in ONE write, after the existing items', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'l', items: [item({ id: 'i1', title: 'Milk' })] })];
+      echoUpdate(store);
+
+      const updated = await store.addItems('l', ['2 eggs', '500 g flour']);
+
+      expect(listRepo.updateList).toHaveBeenCalledTimes(1);
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch.items!.map((i) => i.title)).toEqual(['Milk', '2 eggs', '500 g flour']);
+      expect(patch.items!.slice(1).every((i) => !i.completed && i.id !== 'i1')).toBe(true);
+      expect(new Set(patch.items!.map((i) => i.id)).size).toBe(3);
+      expect(updated?.items).toHaveLength(3);
+    });
+
+    it('re-opens a filed one-off (completion re-derived)', async () => {
+      const store = useListStore();
+      store.lists = [
+        list({
+          id: 'l',
+          completed: true,
+          completedBy: 'm-1',
+          completedAt: '2026-06-10',
+          items: [item({ id: 'i1', completed: true })],
+        }),
+      ];
+      echoUpdate(store);
+
+      await store.addItems('l', ['Butter']);
+
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch.completed).toBe(false);
+      expect(patch.completedBy).toBeUndefined();
+      expect(patch.completedAt).toBeUndefined();
+      expect(store.activeLists.map((l) => l.id)).toEqual(['l']);
+    });
+
+    it('clears cycleCelebrated on a celebrated recurring list', async () => {
+      const store = useListStore();
+      store.lists = [
+        list({
+          id: 'r',
+          lifecycle: 'recurring',
+          frequency: 'weekly',
+          cycleCelebrated: true,
+          items: [item({ id: 'i1', completed: true })],
+        }),
+      ];
+      echoUpdate(store);
+
+      await store.addItems('r', ['Bread', 'Jam']);
+
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch.cycleCelebrated).toBe(false);
+    });
+
+    it('returns null and writes nothing when the list is missing (silent-null contract)', async () => {
+      const store = useListStore();
+      store.lists = [];
+      expect(await store.addItems('gone', ['Bread'])).toBeNull();
+      expect(await store.addItem('gone', 'Bread')).toBeNull();
+      expect(listRepo.updateList).not.toHaveBeenCalled();
+    });
+
+    it('addItem delegates: one titled item, same write path', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'l' })];
+      echoUpdate(store);
+
+      const updated = await store.addItem('l', 'Grab lunchbox');
+
+      const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+      expect(patch.items!.map((i) => i.title)).toEqual(['Grab lunchbox']);
+      expect(updated?.items[0]!.title).toBe('Grab lunchbox');
+    });
+  });
+
+  describe('shoppingDestinations', () => {
+    it('offers one-off unfiled lists only, shopping first, then newest first', () => {
+      const store = useListStore();
+      store.lists = [
+        list({ id: 'home-old', category: 'home', createdAt: '2026-06-01T00:00:00.000Z' }),
+        list({ id: 'out-old', category: 'out', createdAt: '2026-06-02T00:00:00.000Z' }),
+        list({ id: 'home-new', category: 'home', createdAt: '2026-06-05T00:00:00.000Z' }),
+        list({ id: 'out-new', category: 'out', createdAt: '2026-06-04T00:00:00.000Z' }),
+        list({
+          id: 'filed',
+          category: 'out',
+          completed: true,
+          createdAt: '2026-06-09T00:00:00.000Z',
+        }),
+        list({
+          id: 'weekly',
+          category: 'out',
+          lifecycle: 'recurring',
+          frequency: 'weekly',
+          createdAt: '2026-06-09T00:00:00.000Z',
+        }),
+      ];
+
+      expect(store.shoppingDestinations.map((l) => l.id)).toEqual([
+        'out-new',
+        'out-old',
+        'home-new',
+        'home-old',
+      ]);
+    });
+
+    it('is empty when the family has no eligible list', () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'filed', completed: true })];
+      expect(store.shoppingDestinations).toEqual([]);
+    });
+  });
+
   it('removeItem on an already-celebrated recurring list leaves completion fields untouched (no-op patch)', async () => {
     const store = useListStore();
     store.lists = [
