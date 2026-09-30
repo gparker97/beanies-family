@@ -399,8 +399,24 @@ html.dark .mp-label {
   width: 100%;
 }
 
+.mp-input::placeholder {
+  color: var(--color-text-muted);
+}
+
 .mp-input:focus {
   border-color: #aed6f1;
   box-shadow: 0 0 0 3px rgb(174 214 241 / 50%);
+}
+
+/* Dark partner: the guest-name and note fields kept Deep Slate text and a 14% slate
+   border on the dark drawer, so typed text was near-invisible. */
+html.dark .mp-input {
+  background: var(--color-surface-raised);
+  border-color: var(--color-line-strong);
+  color: var(--color-ink);
+}
+
+html.dark .mp-input::placeholder {
+  color: var(--color-ink-faint);
 }
 </style>
