@@ -87,11 +87,15 @@ function maskEmail(e) {
   if (!d) return e;
   return `${l.slice(0, 2)}${'*'.repeat(Math.max(1, l.length - 2))}@${d}`;
 }
-const daysSince = (fid) => (cw[fid] ? Math.round((NOW - cw[fid].last) / DAY) : null);
+// Whole UTC calendar days, not rounded elapsed time: cw_cache.mjs reports
+// last_seen as the END of the last active day (23:59:59.999Z), which is later
+// than NOW for anyone active today, and Math.round of that gap gave "-1d ago".
+const daysSince = (fid) => (cw[fid] ? Math.floor(NOW / DAY) - Math.floor(cw[fid].last / DAY) : null);
 
-// Reconciled active counts over the real-family pool.
-const activeReal30 = fams.filter((f) => cw[f.familyId] && NOW - cw[f.familyId].last <= 30 * DAY).length;
-const activeReal7 = fams.filter((f) => cw[f.familyId] && NOW - cw[f.familyId].last <= 7 * DAY).length;
+// Reconciled active counts over the real-family pool. Same day measure as
+// `lost` below, so active30 + lost + never partitions the families exactly.
+const activeReal30 = fams.filter((f) => daysSince(f.familyId) !== null && daysSince(f.familyId) <= 30).length;
+const activeReal7 = fams.filter((f) => daysSince(f.familyId) !== null && daysSince(f.familyId) <= 7).length;
 
 const joined = fams.map((f) => ({
   name: f.familyName || maskEmail(f.ownerEmail) || '—',
@@ -110,6 +114,11 @@ const lost = joined
   .filter((j) => j.cwDays !== null && j.cwDays > 30)
   .sort((a, b) => a.cwDays - b.cwDays)
   .map((j) => ({ name: j.name, days: j.cwDays, events: j.cwEvents }));
+// A "deep user" is in the top 10% of real families by lifetime events. The
+// went-quiet callout names any of them instead of asserting nobody deep left.
+const lifetimeEvents = joined.filter((j) => j.cwDays !== null).map((j) => j.cwEvents).sort((a, b) => a - b);
+const deepUserEvents = lifetimeEvents.length ? lifetimeEvents[Math.floor(lifetimeEvents.length * 0.9)] : null;
+const lostDeep = deepUserEvents === null ? [] : lost.filter((l) => l.events >= deepUserEvents);
 // "Never engaged" = registered but no activity signal at all: not active in the
 // last 30d and not among the went-quiet set. Defined as the remainder so the
 // engagement panel partitions the real families exactly (active7 + active8-30 +
@@ -587,6 +596,8 @@ const data = {
   churn: reg.churnTiming,
   topActive,
   lost,
+  lostDeep,
+  deepUserEvents,
   surfaces: cwRows(surf).slice(0, 10),
   plausibleAvailable: !!pl,
   mkt: pl

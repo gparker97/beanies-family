@@ -654,7 +654,13 @@ if(D.channelBreakdown&&D.channelBreakdown.length){
     co.push({c:'good',h:`${earned.channel} is the strongest earned channel`,p:`<b>${num(earned.visitors)} visitors</b>, led by <b>${esc(earned.sources[0].source)}</b> (${num(earned.sources[0].visitors)}). Earned reach is working — this is where to spend the next hour.`});
 }
 if(D.lost.length){
-  co.push({c:'',h:'The “went quiet” list is reassuring',p:`All ${D.lost.length} quiet families had only <b>1–${lostMax} lifetime events</b> — shallow trials that bounced, not deep users lost. No power user has churned.`});
+  const deep=D.lostDeep||[];
+  if(deep.length){
+    const names=deep.map(l=>`<b>${esc(l.name)}</b> (${num(l.events)} events, dark ${l.days}d)`).join(', ');
+    co.push({c:'warn',h:deep.length===1?'A deep user has gone quiet':`${deep.length} deep users have gone quiet`,p:`${names} ${deep.length===1?'was':'were'} in the top 10% of families by lifetime events (≥${num(D.deepUserEvents)}) and ${deep.length===1?'has':'have'} been dark over 30 days. Worth a personal nurture email.`});
+  }else{
+    co.push({c:'',h:'The “went quiet” list is reassuring',p:`All ${D.lost.length} quiet families had only <b>1–${lostMax} lifetime events</b>, below the top-10% bar of ${num(D.deepUserEvents)}: shallow trials that bounced, not deep users lost.`});
+  }
 }
 $('callouts').innerHTML=co.map(c=>`<div class="callout ${c.c}"><h3>${c.h}</h3><p>${c.p}</p></div>`).join('');
 
