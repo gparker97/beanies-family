@@ -213,6 +213,28 @@ the post. **Nothing reaches the repo until he approves them.** On approval, writ
 the three `L&S:` properties in Notion first, then regenerate the markdown. Same rule as
 every other fix: a bullet that exists only in the repo is lost at the next regeneration.
 
+**Write-back is part of the sequence, every time.** Whenever the bullets are generated,
+edited, or fixed (a rename, a `where` path that moved, a word greg changed), the same
+turn that produces them fits them back to Notion, in two places, before anything else
+happens:
+
+1. The three `L&S:` properties on the row. These are what regeneration reads.
+2. A summary section at the **top of the post body**: a callout titled
+   **the long and short of it** (🫘 icon) holding three bullets, each led by its bold role
+   label (`what we built:`, `how it helps you:`, `where to find it:`), with the same
+   text as the properties and the app path as a `code` segment. The callout's caption
+   says it mirrors the properties. Insert it after the first body block with
+   `API-patch-block-children` + `after`, then re-append the opening paragraph and archive
+   the original (the API has no "insert before"; the opening paragraph is re-created
+   segment for segment, so nothing is lost). If a callout is already there, update its
+   three child bullets in place instead of adding a second one.
+
+Both places carry the same words, so greg reads one thing in Notion and the site renders
+the same thing. Regeneration **skips the callout** (the box comes from the frontmatter)
+and never writes the bullets from the repo back up: the direction is always Notion → repo.
+Greg asked for this on 2026-10-01 so that Notion stays the golden source for the summary
+too, not just the prose.
+
 **Sync rules (Notion → frontmatter).**
 
 - Read the rich_text *segments*, not `plain_text`: a segment with
@@ -300,9 +322,11 @@ regenerated, and greg will re-read the old sentence in Notion and wonder why.
 
 ### 4. Regenerate the repo markdown from Notion
 
-Convert the Notion blocks to markdown. Preserve the frontmatter fields Notion doesn't
-model (see the table). Map the three `L&S:` properties to `longAndShort` using the sync
-rules in "The long and short of it". Set `draft: false` unless greg explicitly says to keep the flag
+Convert the Notion blocks to markdown. Skip the **the long and short of it** callout at
+the top of the body (it mirrors the properties; the site renders the box from
+frontmatter, so converting it would print the summary twice). Preserve the frontmatter
+fields Notion doesn't model (see the table). Map the three `L&S:` properties to
+`longAndShort` using the sync rules in "The long and short of it". Set `draft: false` unless greg explicitly says to keep the flag
 on. Optimize and place every image. Then verify:
 
 ```bash
