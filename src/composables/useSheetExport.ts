@@ -17,6 +17,15 @@
 import { withTimeout } from '@/utils/timing';
 import { blobToDataUrl } from '@/utils/blobToDataUrl';
 import { logEvent } from '@/services/telemetry';
+import {
+  familiesInList,
+  inlineFontFace,
+  mergeSameFileFaces,
+  normalizeFamily,
+  parseFontFaceBlocks,
+  selectFontFaces,
+  type FontFaceBlock,
+} from '@/utils/fontFaceEmbed';
 
 export type ExportStage = 'render' | 'rasterize' | 'pdf' | 'deliver';
 
@@ -75,33 +84,181 @@ const FONT_EMBED_TIMEOUT_MS = 6_000;
  */
 const SHEET_EXPORT_SURFACE = 'sheet-export';
 
-let fontEmbedCssPromise: Promise<string> | null = null;
+/** Cross-origin stylesheet text, fetched once per href per session. Rejections are not cached. */
+const remoteCssCache = new Map<string, Promise<string>>();
+/** Font file URL to its `data:` URL, fetched once per file per session. Rejections are not cached. */
+const fontDataUrlCache = new Map<string, Promise<string>>();
+
+function memoised(
+  cache: Map<string, Promise<string>>,
+  key: string,
+  load: () => Promise<string>
+): Promise<string> {
+  let pending = cache.get(key);
+  if (!pending) {
+    // Null-on-rejection, like `loadHtmlToImage`: one offline export must not poison the session.
+    pending = load().catch((err) => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, pending);
+  }
+  return pending;
+}
+
+async function fetchOk(url: string): Promise<Response> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+  return res;
+}
+
+function collectFontFaceText(rules: CSSRuleList, out: string[]): void {
+  for (const rule of Array.from(rules)) {
+    if (rule.cssText.startsWith('@font-face')) {
+      out.push(rule.cssText);
+    } else if ('cssRules' in rule && rule.cssRules) {
+      // @media / @supports / @layer can wrap a face.
+      collectFontFaceText(rule.cssRules as CSSRuleList, out);
+    }
+  }
+}
 
 /**
- * The `@font-face` CSS to inline into the capture, computed ONCE per session.
- *
- * ⚠️ THIS IS THE ACTUAL FIX FOR THE FIREFOX RECOVERY-KIT FAILURE, and the obvious one was a
- * no-op. `PngExportOptions.fonts` only ever fed `document.fonts.load()`; it is never passed to
- * `html-to-image` and has no effect on embedding. What actually happens without this: the
- * library's `getCSSRules` hits a `SecurityError` reading `cssRules` on our cross-origin Google
- * Fonts <link>, falls into a catch that refetches the stylesheet, and inlines EVERY `@font-face`
- * it contains — Outfit x6 weights, Inter x3, Caveat x3, each across ~7 unicode-range subsets — as
- * base64 into a single foreignObject SVG data URL. Multiple megabytes and dozens of fetches, on
- * every export in the app. Chromium tolerates it; Firefox does not, and the rasterize step fails.
- *
- * Memoised with the same null-on-rejection shape as `loadHtmlToImage` above, so one bad session
- * cannot cache a rejection forever, and so N exports pay this once rather than N times.
+ * Every `@font-face` the document declares. Same-origin sheets are read in place; a
+ * cross-origin sheet (our Google Fonts `<link>`, which has no `crossorigin` attribute and so
+ * cannot be read) is refetched with a CORS `fetch`. Google Fonts answers with
+ * `Access-Control-Allow-Origin: *`, and the service worker only handles the `<link>`'s own
+ * `destination: 'style'` load, so this reaches the network or the HTTP cache.
  */
-function getFontEmbedCss(): Promise<string> {
-  if (!fontEmbedCssPromise) {
-    fontEmbedCssPromise = loadHtmlToImage()
-      .then((m) => m.getFontEmbedCSS(document.body))
-      .catch((err) => {
-        fontEmbedCssPromise = null;
-        throw err;
-      });
+async function collectFontFaceBlocks(): Promise<{
+  blocks: FontFaceBlock[];
+  sheetFailures: number;
+}> {
+  const settled = await Promise.allSettled(
+    Array.from(document.styleSheets).map(async (sheet): Promise<FontFaceBlock[]> => {
+      let rules: CSSRuleList | null = null;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        // Cross-origin: read by fetch below.
+      }
+      if (rules) {
+        const text: string[] = [];
+        collectFontFaceText(rules, text);
+        return parseFontFaceBlocks(text.join('\n'), sheet.href ?? document.baseURI);
+      }
+      const href = sheet.href;
+      if (!href) return [];
+      const css = await memoised(remoteCssCache, href, async () => (await fetchOk(href)).text());
+      return parseFontFaceBlocks(css, href);
+    })
+  );
+  const blocks: FontFaceBlock[] = [];
+  let sheetFailures = 0;
+  for (const result of settled) {
+    if (result.status === 'fulfilled') blocks.push(...result.value);
+    else sheetFailures++;
   }
-  return fontEmbedCssPromise;
+  return { blocks, sheetFailures };
+}
+
+/** The families `el` names anywhere in its subtree, and every character it renders. */
+function usedFamiliesAndText(el: HTMLElement): { families: Set<string>; codepoints: Set<number> } {
+  const families = new Set<string>();
+  const walk = (node: Element) => {
+    for (const family of familiesInList(getComputedStyle(node).fontFamily)) families.add(family);
+    for (const child of Array.from(node.children)) walk(child);
+  };
+  walk(el);
+  const codepoints = new Set<number>();
+  for (const ch of el.textContent ?? '') codepoints.add(ch.codePointAt(0)!);
+  return { families, codepoints };
+}
+
+/** Families the document loads as web fonts (every `@font-face`, readable sheet or not). */
+function documentWebFontFamilies(): Set<string> {
+  const out = new Set<string>();
+  document.fonts?.forEach?.((face) => out.add(normalizeFamily(face.family)));
+  return out;
+}
+
+/**
+ * The `@font-face` CSS to inline into the capture of `el`: only the families `el` uses, only
+ * the script subsets its text needs, each font file fetched once and inlined as a `data:` URL.
+ *
+ * ⚠️ THIS REPLACES html-to-image's `getFontEmbedCSS`, which returned an EMPTY STRING in every
+ * production build: see `src/utils/fontFaceEmbed.ts` for why. Because it came back empty
+ * rather than throwing, no fallback log fired and nobody could see it; that is why every
+ * outcome below is logged, including success.
+ *
+ * Never throws for a missing face: it embeds what it can and reports the gap.
+ */
+async function buildFontEmbedCss(el: HTMLElement): Promise<string> {
+  const started = performance.now();
+  const { families, codepoints } = usedFamiliesAndText(el);
+  const { blocks, sheetFailures } = await collectFontFaceBlocks();
+  const faces = mergeSameFileFaces(selectFontFaces(blocks, families, codepoints));
+
+  const urls = [...new Set(faces.flatMap((face) => face.urls))];
+  const dataUrls = new Map<string, string>();
+  let fileFailures = 0;
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const dataUrl = await memoised(fontDataUrlCache, url, async () =>
+          blobToDataUrl(await (await fetchOk(url)).blob())
+        );
+        dataUrls.set(url, dataUrl);
+      } catch {
+        fileFailures++;
+      }
+    })
+  );
+
+  const css: string[] = [];
+  const embedded = new Set<string>();
+  for (const face of faces) {
+    const text = inlineFontFace(face, dataUrls);
+    if (text === null) continue;
+    css.push(text);
+    embedded.add(face.family);
+  }
+
+  // A web font the sheet asks for that the capture cannot draw: it will render in a fallback
+  // face inside boxes measured for the real one (the overlapping header greg reported).
+  const webFamilies = documentWebFontFamilies();
+  const missing = [...families].filter((f) => webFamilies.has(f) && !embedded.has(f)).sort();
+  if (missing.length > 0 || css.length === 0) {
+    console.warn('[sheet-export] fonts missing from the capture', {
+      missing,
+      sheetFailures,
+      fileFailures,
+    });
+    logEvent({
+      level: 'warn',
+      surface: SHEET_EXPORT_SURFACE,
+      message: 'sheet export could not embed every font; those faces render in a fallback',
+      context: {
+        error_code: css.length === 0 ? 'font-embed-empty' : 'font-embed-missing',
+        detail: missing.join(','),
+        count: sheetFailures, // stylesheets that could not be read or fetched
+        file_count: fileFailures, // font files that could not be fetched
+      },
+    });
+  } else {
+    logEvent({
+      level: 'info',
+      surface: SHEET_EXPORT_SURFACE,
+      message: 'sheet export fonts embedded',
+      context: {
+        action: 'font-embed',
+        count: css.length, // @font-face blocks inlined
+        file_count: urls.length,
+        perf_duration_ms: Math.round(performance.now() - started),
+      },
+    });
+  }
+  return css.join('\n');
 }
 
 /**
@@ -114,13 +271,12 @@ function getFontEmbedCss(): Promise<string> {
 export function prewarmSheetExport(): void {
   void loadHtmlToImage().catch(() => {});
   void loadJsPdf().catch(() => {});
-  // ⚠️ DELIBERATELY NOT `getFontEmbedCss()`. Warming it looked free and was the opposite:
-  // it is dozens of cross-origin font fetches and megabytes of base64, and the only surface that
-  // prewarms is the recovery-kit sheet, which opens seconds after first paint during family
-  // creation — so the warm-up competed with pod setup for the network on the one flow that must
-  // not stall. It also memoises for the whole session from whatever the DOM looked like at that
-  // moment, which is not the sheet being captured. Paying it at export time is both cheaper
-  // overall and correct.
+  // ⚠️ DELIBERATELY NOT `buildFontEmbedCss()`. Warming it looked free and was the opposite:
+  // it is cross-origin font fetches and base64, and the only surface that prewarms is the
+  // recovery-kit sheet, which opens seconds after first paint during family creation, so the
+  // warm-up competed with pod setup for the network on the one flow that must not stall. It
+  // also needs the sheet being captured, which does not exist yet. Paying it at export time is
+  // both cheaper overall and correct.
 }
 
 export interface PngExportOptions {
@@ -176,9 +332,7 @@ async function captureOnce(
     pixelRatio: opts.pixelRatio ?? 2,
     backgroundColor: opts.backgroundColor,
     filter: excludeFromExport,
-    ...(fontEmbedCss === null
-      ? { skipFonts: true }
-      : { fontEmbedCSS: fontEmbedCss, preferredFontFormat: 'woff2' as const }),
+    ...(fontEmbedCss === null ? { skipFonts: true } : { fontEmbedCSS: fontEmbedCss }),
   });
   if (!blob) throw new Error('html-to-image returned a null blob');
   return blob;
@@ -194,8 +348,8 @@ export async function exportElementToPng(
       // `allSettled`: a single failed font fetch (offline / flaky) is a cosmetic
       // fallback, NOT a reason to fail the whole export.
       //
-      // NOTE this is a FOUT guard for the on-screen element, not a font-embedding lever — see
-      // `getFontEmbedCss`, which is the one that actually reaches html-to-image.
+      // NOTE this is a FOUT guard for the on-screen element (html-to-image copies its measured
+      // boxes), not a font-embedding lever: `buildFontEmbedCss` is what reaches html-to-image.
       await Promise.allSettled(opts.fonts.map((f) => document.fonts.load(f)));
     }
     if (typeof document !== 'undefined' && document.fonts) {
@@ -210,11 +364,11 @@ export async function exportElementToPng(
       // `withTimeout` rather than an inline race: it CLEARS its timer when the promise settles
       // first, where the hand-rolled race left one pending for the full six seconds on every
       // successful export.
-      fontEmbedCss = await withTimeout(
-        getFontEmbedCss(),
-        FONT_EMBED_TIMEOUT_MS,
-        'font embed timed out'
-      );
+      // An empty result was already reported inside; `|| null` captures bare rather than
+      // handing html-to-image an empty string it would treat as "embed nothing".
+      fontEmbedCss =
+        (await withTimeout(buildFontEmbedCss(el), FONT_EMBED_TIMEOUT_MS, 'font embed timed out')) ||
+        null;
     } catch (fontErr) {
       // Not fatal, but never silent: a quality regression nobody can see is one nobody fixes.
       console.warn('[sheet-export] font embed failed; capturing without embedded fonts', fontErr);
@@ -235,8 +389,9 @@ export async function exportElementToPng(
     } catch (captureErr) {
       // ⚠️ THIS IS THE ARM THAT ACTUALLY FIXES FIREFOX, and it was missing: the degrade
       // above only fired when FETCHING the font CSS failed. The reported failure is the other
-      // shape entirely — `getFontEmbedCSS` SUCCEEDS, handing back multiple megabytes of base64
-      // `@font-face` rules, and it is the rasterize step that then dies on the resulting
+      // shape entirely: the embed SUCCEEDS (html-to-image's `getFontEmbedCSS` handed back
+      // multiple megabytes of base64; `buildFontEmbedCss` now keeps only the subsets the sheet
+      // uses, a fraction of that), and it is the rasterize step that then dies on the resulting
       // foreignObject data URL. Chromium tolerates it, Firefox does not. With one call site the
       // `skipFonts` path could not be reached on the exact failure it was written for, and the
       // comment above claimed a fallback the code did not have.

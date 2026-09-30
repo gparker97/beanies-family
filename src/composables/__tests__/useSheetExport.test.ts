@@ -20,6 +20,9 @@ vi.mock('jspdf', () => ({
   }),
 }));
 
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry', () => ({ logEvent: (...args: unknown[]) => logEvent(...args) }));
+
 import {
   exportElementToPng,
   pngBlobToPdf,
@@ -63,6 +66,91 @@ describe('exportElementToPng', () => {
     expect(fontsLoad).toHaveBeenCalledWith('400 14px Inter');
     expect(toBlob).toHaveBeenCalledTimes(1);
     expect(toBlob.mock.calls[0][1]).toMatchObject({ pixelRatio: 2 });
+  });
+
+  describe('font embedding (built by us, not html-to-image: its getFontEmbedCSS returns "" in prod)', () => {
+    /** A sheet using Caveat, with the face declared in a stylesheet like the Google Fonts one. */
+    function mountSheet(fontUrl: string): { el: HTMLElement; cleanup: () => void } {
+      const style = document.createElement('style');
+      style.textContent = `@font-face { font-family: 'Caveat'; font-weight: 700; src: url(${fontUrl}) format('woff2'); unicode-range: U+0000-00FF; }`;
+      document.head.appendChild(style);
+      const el = document.createElement('div');
+      const accent = document.createElement('span');
+      accent.style.fontFamily = 'Caveat, cursive';
+      accent.textContent = 'every job';
+      el.appendChild(accent);
+      document.body.appendChild(el);
+      return {
+        el,
+        cleanup: () => {
+          style.remove();
+          el.remove();
+        },
+      };
+    }
+
+    it('inlines the faces the sheet uses as data: URLs and logs the success', async () => {
+      toBlob.mockResolvedValue(new Blob(['png']));
+      const fetchMock = vi.fn(async () => new Response(new Blob(['woff2'])));
+      vi.stubGlobal('fetch', fetchMock);
+      const { el, cleanup } = mountSheet('https://fonts.test/caveat-ok.woff2');
+      try {
+        await exportElementToPng(el);
+      } finally {
+        cleanup();
+        vi.unstubAllGlobals();
+      }
+      const opts = toBlob.mock.calls[0][1];
+      expect(opts.skipFonts).toBeUndefined();
+      expect(opts.fontEmbedCSS).toMatch(/font-family:\s*['"]?Caveat/);
+      expect(opts.fontEmbedCSS).toContain('url(data:');
+      expect(opts.fontEmbedCSS).not.toContain('fonts.test');
+      expect(fetchMock).toHaveBeenCalledWith('https://fonts.test/caveat-ok.woff2');
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'info',
+          surface: 'sheet-export',
+          context: expect.objectContaining({ action: 'font-embed', count: 1 }),
+        })
+      );
+    });
+
+    it('never embeds silently-nothing: a face it cannot fetch is logged and the capture goes bare', async () => {
+      toBlob.mockResolvedValue(new Blob(['png']));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new TypeError('Failed to fetch');
+        })
+      );
+      Object.defineProperty(document, 'fonts', {
+        configurable: true,
+        value: {
+          load: fontsLoad,
+          ready: Promise.resolve(),
+          forEach: (cb: (f: { family: string }) => void) => cb({ family: '"Caveat"' }),
+        },
+      });
+      const { el, cleanup } = mountSheet('https://fonts.test/caveat-down.woff2');
+      try {
+        await exportElementToPng(el);
+      } finally {
+        cleanup();
+        vi.unstubAllGlobals();
+      }
+      expect(toBlob.mock.calls[0][1]).toMatchObject({ skipFonts: true });
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          surface: 'sheet-export',
+          context: expect.objectContaining({
+            error_code: 'font-embed-empty',
+            detail: 'caveat',
+            file_count: 1,
+          }),
+        })
+      );
+    });
   });
 
   it('excludes [data-export-hide] subtrees from the capture, but never the root', async () => {
