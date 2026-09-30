@@ -194,6 +194,10 @@ test.describe('Family Planner', () => {
     expect(pianoLesson!.endTime).toBe('16:00');
 
     // --- EDIT: update the one-time activity ---
+    // Saving an activity moves the calendar to it (#113's created-activity reveal), so after
+    // Piano Lesson (Mar 2026) the grid shows March. Go back to today, as a person would, so
+    // Doctor Visit's chip is on screen.
+    await page.getByTestId('calendar-today').click();
     // Click on the activity chip in the calendar grid — opens view modal first.
     // (Post `ea66dd4`, FamilyPlannerPage no longer renders the Upcoming list;
     // calendar chips are the single source for activity entry points.)
