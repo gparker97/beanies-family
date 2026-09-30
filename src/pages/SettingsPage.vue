@@ -8,6 +8,7 @@ import PinSettings from '@/components/settings/PinSettings.vue';
 import RecoverySettings from '@/components/settings/RecoverySettings.vue';
 import MagicLinkCard from '@/components/settings/MagicLinkCard.vue';
 import WallSetupCard from '@/components/settings/WallSetupCard.vue';
+import PlanCard from '@/components/settings/PlanCard.vue';
 import GoogleDisconnectCard from '@/components/settings/GoogleDisconnectCard.vue';
 import ChangePasswordSettings from '@/components/settings/ChangePasswordSettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
@@ -120,6 +121,9 @@ const { canManagePod, isOwner } = usePermissions();
 // The beanie wall's only entry point. Flag-gated, so it is invisible until
 // `beanieWall` is on; the card itself gates entry on the member having a PIN.
 const showWallCard = computed(() => isFlagEnabled('beanieWall'));
+// #95: the plan card (trial, active, read-only). Flag-gated like the wall card; the
+// entitlement store behind it is NOT (App.vue instantiates it for everyone).
+const showPlanCard = computed(() => isFlagEnabled('pricing'));
 
 const DevFlagsCard = import.meta.env.DEV
   ? defineAsyncComponent(() => import('@/components/settings/DevFeatureFlagsCard.vue'))
@@ -1964,6 +1968,9 @@ async function handleDeleteFamilyClick() {
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
     <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
+
+    <!-- ── Your plan (#95, flag `pricing`) ─────────────────────────────────── -->
+    <PlanCard v-if="showPlanCard" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so

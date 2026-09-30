@@ -246,6 +246,10 @@ export async function deleteLocalFamily(familyId: string): Promise<CacheClearRes
     await import('@/services/indexeddb/repositories/rosterCacheRepository');
   await deleteRosterCache(familyId);
 
+  // 5b. Clear the device-local entitlement cache (#95). Never throws; logs its own failure.
+  const { clearEntitlementCache } = await import('@/services/billing/entitlementCache');
+  clearEntitlementCache(familyId);
+
   // 6. Remove from local registry
   const db = await getRegistryDatabase();
   await db.delete('families', familyId);
