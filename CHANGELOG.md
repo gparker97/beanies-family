@@ -29,6 +29,7 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 ### Fixed
 
 - Hint bubbles no longer open behind side panels.
+- In dark mode, the meal drawer's guest-name and note fields and the Meal Planner's week arrows are readable again.
 
 ### Removed
 

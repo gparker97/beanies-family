@@ -497,8 +497,12 @@ const {
   width: 2.25rem;
 }
 
-.dark .mp-arrow {
-  background: var(--color-slate-800, #1e2a36);
+/* Dark: the chevron and border must lift too, not just the fill (Deep Slate on
+   surface-raised read ~1.2:1). */
+html.dark .mp-arrow {
+  background: var(--color-surface-raised);
+  border-color: var(--color-line-strong);
+  color: var(--color-ink);
 }
 
 /* Off-screen host for the export sheet: kept in the layout (so fonts/images
