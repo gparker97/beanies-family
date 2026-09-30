@@ -156,28 +156,28 @@ const MAGIC_LINK_ARTICLE: HelpArticle = {
   category: 'security',
   title: 'Your beanies Magic Link',
   excerpt:
-    'A personal link that lets you sign in on a new device with just your PIN. It lasts 7 days, and you can create a new one any time.',
+    'A link or QR code, made on the spot by someone already signed in, that opens your family file on a new device with just your PIN. It lasts 15 minutes.',
   icon: '\u{1F517}',
   readTime: 3,
-  updatedDate: '2026-09-17',
+  updatedDate: '2026-10-01',
   sections: [
     { type: 'heading', content: 'What it is', level: 2, id: 'what-it-is' },
     {
       type: 'paragraph',
       content:
-        'Your magic link unlocks your family file. Open it on a new device and you go straight to your own PIN entry — no recovery kit, no passwords. You get one when you create a family and when you join one, and you can create a new one any time in <strong>Settings → Security &amp; Recovery</strong>.',
+        'A magic link unlocks your family file. Open it on a new device (or scan its QR code with the phone’s camera) and you go straight to your own PIN entry — no recovery kit, no passwords. Anyone already signed in can make one from the profile menu, <strong>Sign In Another Device</strong>, or from <strong>Settings → Security &amp; Recovery → Magic Links</strong>. It asks who is signing in, then your PIN, and shows the link and QR code. The pod owner and admins can make one for any family member; everyone else can make one for themselves.',
     },
     { type: 'heading', content: 'Keep it somewhere you trust', level: 2, id: 'keep-it-safe' },
     {
       type: 'paragraph',
       content:
-        '<strong>Anyone who has your link can open your family’s information.</strong> It is not limited to you, and the PIN afterwards does not change that — the link is what unlocks the file. Save it the way you would save a password, on a device you trust. Do not post it in a group chat.',
+        '<strong>Anyone who has the link can open your family’s information</strong> until it expires. It is not limited to one person, and the PIN afterwards does not change that — the link is what unlocks the file. Send it straight to the person signing in, or let them scan the QR code from your screen. Do not post it in a group chat.',
     },
-    { type: 'heading', content: 'It lasts 7 days', level: 2, id: 'expiry' },
+    { type: 'heading', content: 'It lasts 15 minutes', level: 2, id: 'expiry' },
     {
       type: 'paragraph',
       content:
-        'A magic link works for 7 days from the moment you create it. After that it stops working and you need a new one. This is deliberate: a link that unlocks your family file should not sit in an old message forever.',
+        'A magic link works for 15 minutes from the moment you create it. After that it stops working and you need a new one. This is deliberate: a link that unlocks your family file should not sit in an old message. There is nothing to save — make one when you need it.',
     },
     {
       type: 'heading',
@@ -188,36 +188,37 @@ const MAGIC_LINK_ARTICLE: HelpArticle = {
     {
       type: 'paragraph',
       content:
-        'Create a new one from a device where you are <strong>already signed in</strong> — Settings → Security &amp; Recovery → Create a magic link. You cannot create one from the device you are locked out of, because making a link requires your family file to be open.',
+        'Create a new one from a device where you are <strong>already signed in</strong> — the profile menu → Sign In Another Device, or Settings → Security &amp; Recovery → Create a Magic Link. You cannot create one from the device you are locked out of, because making a link requires your family file to be open.',
     },
     {
       type: 'list',
       content: '',
       items: [
         'If you have another device signed in, create a new link there and open it on the new device.',
-        'If you do not, ask someone in your family to send you a fresh invite, or use your recovery kit.',
+        'If you do not, ask a grown-up in your family who is signed in to make one for you, or tap <strong>Show my approval code instead</strong> on the new device and have them scan it.',
+        'If nobody in your family is signed in anywhere, use your recovery kit or the family passphrase.',
         'If a link opens your browser instead of the app, open beanies and use <strong>“Have a link? Paste it here”</strong> on the first screen.',
       ],
     },
     {
       type: 'heading',
-      content: 'Creating a new link cancels the old one',
+      content: 'A link that went somewhere it should not have',
       level: 2,
       id: 'revoking',
     },
     {
       type: 'paragraph',
       content:
-        'Only one magic link works at a time. The moment you create a new one, any earlier link stops working — so if you think a link has gone somewhere it should not have, creating a new one is how you shut it off. beanies never shows you an existing link again; it can only make you a new one.',
+        'Making a new link does not cancel an earlier one; each link simply runs out on its own after 15 minutes. If a link has gone somewhere it should not have, the fix is time: it is useless a quarter of an hour after it was made, and whoever opens it still needs a family member’s PIN. beanies never shows you an existing link again; it can only make you a new one.',
     },
     { type: 'heading', content: 'Magic link, recovery kit, or invite?', level: 2, id: 'which-one' },
     {
       type: 'list',
       content: '',
       items: [
-        '<strong>Magic link</strong> — your own way onto another device. Lasts 7 days.',
-        '<strong>Recovery kit</strong> — the family’s break-glass. It does not expire, and it is the only thing that can reset a PIN.',
-        '<strong>Invite link</strong> — for someone who is not in the family yet.',
+        '<strong>Magic link</strong> — the everyday way onto another device, made by someone already signed in. Lasts 15 minutes.',
+        '<strong>Recovery kit</strong> — the family’s break-glass. It does not expire, and it gets you in when nobody is signed in anywhere.',
+        '<strong>Joining link</strong> — for someone who is not in the family yet.',
       ],
     },
   ],
