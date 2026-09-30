@@ -8,6 +8,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-01
+
+_Unreleased on `main`. Nothing in this section is visible to users yet._
+
+### Fixed
+
+- (unreleased) On Settings, the Beanie Wall card's "How to set your device up" link no longer runs into the Start button.
+
+### Changed
+
+- (unreleased, behind a flag, dry-run) Groundwork for plans: the app can now learn its plan and trial state from beanies.family, show it in Settings, go read-only with a calm band when a trial ends, and meter magic beans. None of it acts until v1; today every family reads as beta.
+
+---
+
 ## 2026-09-30
 
 _Released in 0.26 on the web. 0.26.1 (web, Android production, iOS App Store) carries all of it plus the quick-add, phone header, deal card and PDF font changes, and replaced 0.26 in store review._
