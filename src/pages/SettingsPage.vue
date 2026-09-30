@@ -22,7 +22,11 @@ import RemindersSettings from '@/components/settings/RemindersSettings.vue';
 import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
-import { CALENDAR_SYNC_OPEN, REMINDERS_OPEN } from '@/constants/settingsDeepLinks';
+import {
+  AI_SETTINGS_OPEN,
+  CALENDAR_SYNC_OPEN,
+  REMINDERS_OPEN,
+} from '@/constants/settingsDeepLinks';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
@@ -170,7 +174,7 @@ const cardOpenMap: Record<string, () => void> = {
   'family-data': () => {
     showFamilyData.value = true;
   },
-  ai: () => {
+  [AI_SETTINGS_OPEN]: () => {
     // Guarded: AI lives in the Beanie Lab — no-ops unless opted in AND a reader
     // flag (aiPhotoExtract / aiTravelExtract) is alive.
     if (aiVisible.value) showAi.value = true;

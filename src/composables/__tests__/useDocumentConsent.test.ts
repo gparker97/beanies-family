@@ -37,6 +37,12 @@ vi.mock('@/stores/settingsStore', () => ({
 const reportError = vi.fn();
 vi.mock('@/utils/errorReporter', () => ({ reportError: (...a: unknown[]) => reportError(...a) }));
 
+// #95: the read-only refusal runs first. Writable by default; one test flips it.
+const refuseManagedRead = vi.fn(() => false);
+vi.mock('@/composables/useAiCapability', () => ({
+  useAiCapability: () => ({ refuseManagedReadIfReadOnly: () => refuseManagedRead() }),
+}));
+
 // This import happens BEFORE any `setActivePinia` below. That is the boot-safety assertion:
 // if the module called `useSettingsStore()` at module scope rather than lazily inside its
 // functions, this import alone would throw and every test in the file would fail to load.
@@ -67,6 +73,7 @@ describe('useDocumentConsent (singleton, #64)', () => {
     acknowledge.mockReset().mockResolvedValue(undefined);
     acknowledgeIngredients.mockReset().mockResolvedValue(undefined);
     reportError.mockReset();
+    refuseManagedRead.mockReset().mockReturnValue(false);
     // Settle anything a previous test left open, then let the serialization tail drain.
     resolveConsent(false);
     await flush();
@@ -158,6 +165,16 @@ describe('useDocumentConsent (singleton, #64)', () => {
 
   it('resolveConsent is safe when nothing is pending', () => {
     expect(() => resolveConsent(true)).not.toThrow();
+  });
+
+  it('a read-only family is refused before any prompt, even with "don\'t ask again" set (#95)', async () => {
+    refuseManagedRead.mockReturnValue(true);
+    skipPrompt = true;
+    const { consentOpen: open } = useDocumentConsent();
+    const grant = await requestConsent();
+    expect(grant).toBeNull();
+    expect(open.value).toBe(false);
+    expect(refuseManagedRead).toHaveBeenCalledTimes(1);
   });
 
   it('exposes consentOpen through the accessor for the single global mount', () => {

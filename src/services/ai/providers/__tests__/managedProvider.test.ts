@@ -682,3 +682,114 @@ describe('managedProvider — verification gates the send', () => {
     expect(result.attestation).toEqual({ enclave: 'inference.tinfoil.sh', verified: true });
   });
 });
+
+describe('managedProvider: the magic-beans allowance (#95)', () => {
+  const REFUSAL = {
+    error: 'Magic beans allowance reached',
+    code: 'allowance_exceeded',
+    used: 1,
+    limit: 1,
+    period: 'day',
+    resetsAt: '2026-10-01T00:00:00.000Z',
+    tier: 'trial',
+  };
+
+  beforeEach(async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Drain anything a previous test left behind.
+    (await import('../managedProvider')).takeAllowanceRefusal();
+  });
+
+  it('maps OUR 402 to allowance_exceeded, carrying the numbers', async () => {
+    const err = await runExpectingError(respond(402, REFUSAL));
+    expect(err).toBeInstanceOf(ExtractionProviderError);
+    expect(err.code).toBe('allowance_exceeded');
+    expect(err.allowance).toEqual({
+      used: 1,
+      limit: 1,
+      period: 'day',
+      resetsAt: '2026-10-01T00:00:00.000Z',
+      tier: 'trial',
+    });
+  });
+
+  it('remembers the refusal once for the quota prompt, then forgets it', async () => {
+    await runExpectingError(respond(402, REFUSAL));
+    const mod = await import('../managedProvider');
+    expect(mod.takeAllowanceRefusal()?.limit).toBe(1);
+    expect(mod.takeAllowanceRefusal()).toBeNull();
+  });
+
+  it('a 402 with a malformed body still classifies, with no numbers to show', async () => {
+    const err = await runExpectingError(respond(402, { used: 'lots' }));
+    expect(err.code).toBe('allowance_exceeded');
+    expect(err.allowance).toBeUndefined();
+  });
+
+  it('is a server verdict: the attestation and model memos survive it', async () => {
+    await runExpectingError(respond(402, REFUSAL));
+    expect(invalidateEnclaveVerification).not.toHaveBeenCalled();
+  });
+
+  it('sends the plan token in the envelope when the family holds one, and not otherwise', async () => {
+    const fetchMock = routed(() => respond(200, OK_SEALED));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await managedProvider.run('share', { ...request, familyId: 'fam-1', planToken: 'tok-1' });
+    await managedProvider.run('share', { ...request, familyId: 'fam-1' });
+    const sealedBodies = fetchMock.mock.calls
+      .map((c) => JSON.parse(c[1].body as string) as Record<string, unknown>)
+      .filter((b) => b.protocol === 'ehbp-1');
+    expect(sealedBodies[0]!.planToken).toBe('tok-1');
+    expect('planToken' in sealedBodies[1]!).toBe(false);
+  });
+
+  describe('fetchAllowance', () => {
+    it('asks on the same route with protocol "allowance" and returns the usage', async () => {
+      const fetchMock = vi.fn(async () =>
+        respond(200, {
+          used: 3,
+          limit: 10,
+          period: 'day',
+          resetsAt: REFUSAL.resetsAt,
+          tier: 'full',
+        })
+      );
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+      const { fetchAllowance } = await import('../managedProvider');
+      const usage = await fetchAllowance({ familyId: 'fam-1', planToken: 'tok-1' });
+      expect(usage).toEqual({
+        used: 3,
+        limit: 10,
+        period: 'day',
+        resetsAt: REFUSAL.resetsAt,
+        tier: 'full',
+      });
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe('https://api.example.test/ai-extract');
+      expect((init.headers as Record<string, string>)['x-api-key']).toBe('soft-key');
+      expect(JSON.parse(init.body as string)).toEqual({
+        protocol: 'allowance',
+        familyId: 'fam-1',
+        planToken: 'tok-1',
+      });
+    });
+
+    it('throws a typed error on an unreadable answer, never a silent zero', async () => {
+      globalThis.fetch = vi.fn(async () => respond(200, { used: 1 })) as unknown as typeof fetch;
+      const { fetchAllowance } = await import('../managedProvider');
+      await expect(fetchAllowance({ familyId: 'fam-1' })).rejects.toMatchObject({
+        code: 'malformed_output',
+      });
+    });
+
+    it('maps the proxy saying usage is unavailable to not_available, not "busy"', async () => {
+      globalThis.fetch = vi.fn(async () =>
+        respond(503, { code: 'allowance_unavailable' })
+      ) as unknown as typeof fetch;
+      const { fetchAllowance } = await import('../managedProvider');
+      await expect(fetchAllowance({ familyId: 'fam-1' })).rejects.toMatchObject({
+        code: 'not_available',
+      });
+    });
+  });
+});

@@ -19,6 +19,7 @@
 import { ref } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { reportError } from '@/utils/errorReporter';
+import { useAiCapability } from '@/composables/useAiCapability';
 
 declare const consentBrand: unique symbol;
 
@@ -167,6 +168,12 @@ function shouldSkipPrompt(request?: ConsentRequest): boolean {
 }
 
 export function requestConsent(request?: ConsentRequest): Promise<ConsentGrant | null> {
+  // A read-only family cannot start a MANAGED read (#95). Here because every managed read, from
+  // every door (the magic-beans sheet, a share from another app, Find Duplicates, a statement,
+  // a recipe link), must mint a grant through this function first, so one check covers them all
+  // and runs before anything leaves the device. It speaks for itself (the read-only toast) and
+  // then reads to the caller exactly like a decline: nothing is sent. BYOK and on-device pass.
+  if (useAiCapability().refuseManagedReadIfReadOnly()) return Promise.resolve(null);
   if (shouldSkipPrompt(request)) return Promise.resolve(GRANT);
 
   const ahead = Promise.race([

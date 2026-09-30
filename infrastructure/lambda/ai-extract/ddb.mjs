@@ -121,7 +121,8 @@ export const usageTableName = (env, appName = 'beanies-family') =>
  * as a transient store error — the same mis-classification the `#n` alias below exists to
  * prevent, one level up.
  */
-const marshalKey = (key) => Object.fromEntries(Object.entries(key).map(([k, v]) => [k, { S: v }]));
+export const marshalKey = (key) =>
+  Object.fromEntries(Object.entries(key).map(([k, v]) => [k, { S: v }]));
 
 /**
  * Atomically increment one counter, optionally refusing above `max`.

@@ -11,6 +11,12 @@ const refuseIfBusy = vi.fn();
 const logCaptureOpened = vi.fn();
 let canReadAny = true;
 
+// #95: the read-only refusal. Writable by default; the read-only block flips it.
+const refuseManagedRead = vi.fn(() => false);
+vi.mock('@/composables/useAiCapability', () => ({
+  useAiCapability: () => ({ refuseManagedReadIfReadOnly: () => refuseManagedRead() }),
+}));
+
 vi.mock('@/composables/useDocumentConsent', () => ({
   useDocumentConsent: () => ({ requestConsent: () => requestConsent() }),
 }));
@@ -64,6 +70,7 @@ describe('MagicBeansDoor', () => {
     requestConsent.mockReset().mockResolvedValue({});
     ingestInAppSource.mockReset().mockResolvedValue(undefined);
     refuseIfBusy.mockReset().mockReturnValue(false);
+    refuseManagedRead.mockReset().mockReturnValue(false);
     logCaptureOpened.mockReset();
     pickCamera.mockReset();
     pickFile.mockReset();
@@ -105,6 +112,24 @@ describe('MagicBeansDoor', () => {
       // discard a photo the user had already taken.
       expect(requestConsent).not.toHaveBeenCalled();
       expect(pickCamera).not.toHaveBeenCalled();
+      expect(ingestInAppSource).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('read-only (#95)', () => {
+    it('refuses before consent and before the picker, on every source', async () => {
+      refuseManagedRead.mockReturnValue(true);
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('camera');
+      await sheet(w).vm.$emit('file', 'transactions');
+      await sheet(w).vm.$emit('submit', 'a pasted note');
+      await flushPromises();
+
+      expect(refuseManagedRead).toHaveBeenCalledTimes(3);
+      expect(requestConsent).not.toHaveBeenCalled();
+      expect(pickCamera).not.toHaveBeenCalled();
+      expect(pickFile).not.toHaveBeenCalled();
       expect(ingestInAppSource).not.toHaveBeenCalled();
     });
   });

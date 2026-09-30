@@ -50,6 +50,7 @@ import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
 import { deferConsentForStatement, useDocumentConsent } from '@/composables/useDocumentConsent';
 import { availableShareKinds, useMagicReader } from '@/composables/useMagicReader';
+import { useAiCapability } from '@/composables/useAiCapability';
 import {
   IN_APP_ENV,
   ingestInAppSource,
@@ -109,6 +110,7 @@ const kinds = computed(availableShareKinds);
 const destination = (): InAppDestination | undefined =>
   props.claim ? { claim: props.claim } : undefined;
 const { requestConsent } = useDocumentConsent();
+const { refuseManagedReadIfReadOnly } = useAiCapability();
 
 const sheetOpen = ref(false);
 const picker = ref<InstanceType<typeof AiDocumentPicker> | null>(null);
@@ -173,6 +175,13 @@ async function commit(hint?: ShareKind): Promise<ConsentGrant | DeferredStatemen
   if (refuseIfBusy(IN_APP_ENV)) {
     // A refusal ends this capture as surely as a decline does — the comment below applies to
     // both, so the emit has to be on both paths.
+    emit('closed');
+    return null;
+  }
+  // Read-only (#95): refuse here, before the picker, so a family never takes a photo that cannot
+  // be read. `requestConsent` checks too, but a Transactions pick defers consent until after the
+  // picker, so without this line that path would open the camera first.
+  if (refuseManagedReadIfReadOnly()) {
     emit('closed');
     return null;
   }

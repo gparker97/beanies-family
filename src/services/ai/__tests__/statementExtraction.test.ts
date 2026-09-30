@@ -423,6 +423,34 @@ describe('readStatement', () => {
     ]);
   });
 
+  it('the magic-beans allowance (#95) is terminal: a 402 on page 2 of 5 sends nothing more', async () => {
+    extractStatementMock
+      .mockResolvedValueOnce({ success: true, data: result({ lines: [lineOf(1)] }) })
+      .mockResolvedValueOnce({ success: false, errorCode: 'allowance_exceeded' });
+
+    const out = await readStatement(prepared(5), OPTS, vi.fn());
+
+    expect(extractStatementMock).toHaveBeenCalledTimes(2);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    // The paid-for page is kept; every page after the refusal carries the code, so the caller
+    // can surface it (the quota prompt) rather than import a silent partial.
+    expect(out.read.units.map((u) => [u.status, u.errorCode])).toEqual([
+      ['read', undefined],
+      ['failed', 'allowance_exceeded'],
+      ['failed', 'allowance_exceeded'],
+      ['failed', 'allowance_exceeded'],
+      ['failed', 'allowance_exceeded'],
+    ]);
+  });
+
+  it('a 402 on the first page returns ok:false with the code', async () => {
+    extractStatementMock.mockResolvedValueOnce({ success: false, errorCode: 'allowance_exceeded' });
+    const out = await readStatement(prepared(5), OPTS, vi.fn());
+    expect(extractStatementMock).toHaveBeenCalledTimes(1);
+    expect(out).toEqual({ ok: false, errorCode: 'allowance_exceeded' });
+  });
+
   it('every unit failing returns ok:false with the code', async () => {
     extractStatementMock.mockResolvedValue({ success: false, errorCode: 'malformed_output' });
     const out = await readStatement(prepared(2), OPTS, vi.fn());

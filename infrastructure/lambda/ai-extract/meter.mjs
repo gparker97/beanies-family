@@ -17,6 +17,7 @@
 
 import { COUNT_FAILED_PREFIX, COUNT_SKIPPED_PREFIX, countUsage } from './countUsage.mjs';
 import { USAGE_ATTRS } from './ddb.mjs';
+import { ALLOWANCE_STORE_ERROR_PREFIX } from './allowance.mjs';
 import {
   GRANT_MISMATCH_PREFIX,
   refusalAllowsHint,
@@ -51,6 +52,8 @@ export const ALARMING_PREFIXES = Object.freeze({
   countSkipped: COUNT_SKIPPED_PREFIX,
   grantMismatch: GRANT_MISMATCH_PREFIX,
   grantSizeMismatch: GRANT_SIZE_MISMATCH_PREFIX,
+  // #95: the allowance pre-check failed open, so managed reads are going through unchecked.
+  allowanceStoreError: ALLOWANCE_STORE_ERROR_PREFIX,
 });
 
 /**
@@ -191,18 +194,46 @@ export const FREE_TASK_CHARGED_PREFIX = '[ai-extract] free task charged';
  * JavaScript, so an unmeasured read would otherwise be free.
  */
 export function usageAttrFor(read, task) {
-  if (read?.free) return USAGE_ATTRS.corrected;
+  const { attr, warning } = classifyUsage(read, task);
+  if (warning) console.warn(`${FREE_TASK_CHARGED_PREFIX}: ${warning}`);
+  return attr;
+}
+
+/**
+ * The ladder above as a pure decision: the attribute, plus the reason a free task is being
+ * charged (or none). Split out so the allowance pre-check (#95) can ask "will this read cost a
+ * bean?" BEFORE the model without logging the free-task warning twice for one read.
+ */
+function classifyUsage(read, task) {
+  if (read?.free) return { attr: USAGE_ATTRS.corrected };
   const bound = FREE_TASK_MAX_BYTES.get(task);
-  if (bound === undefined) return USAGE_ATTRS.charged;
+  if (bound === undefined) return { attr: USAGE_ATTRS.charged };
   if (read?.arm !== 'sealed') {
-    console.warn(`${FREE_TASK_CHARGED_PREFIX}: not the sealed arm task=${task} arm=${read?.arm}`);
-    return USAGE_ATTRS.charged;
+    return {
+      attr: USAGE_ATTRS.charged,
+      warning: `not the sealed arm task=${task} arm=${read?.arm}`,
+    };
   }
-  if (Number.isFinite(read.srcBytes) && read.srcBytes <= bound) return USAGE_ATTRS.freeTask;
-  console.warn(
-    `${FREE_TASK_CHARGED_PREFIX}: over its size bound task=${task} bytes=${read.srcBytes} bound=${bound}`
-  );
-  return USAGE_ATTRS.charged;
+  if (Number.isFinite(read.srcBytes) && read.srcBytes <= bound) {
+    return { attr: USAGE_ATTRS.freeTask };
+  }
+  return {
+    attr: USAGE_ATTRS.charged,
+    warning: `over its size bound task=${task} bytes=${read.srcBytes} bound=${bound}`,
+  };
+}
+
+/**
+ * Will `closeRead` count this read against the family's allowance (`n`)? The allowance pre-check
+ * (#95) runs only when it will: a free correction and a free task spend no bean, so refusing them
+ * for being over the allowance would break the one promise both make ("this one is free").
+ *
+ * ⚠️ This is why the allowance check sits AFTER `openRead` rather than beside `checkLimits`:
+ * whether a correction is free is only known once its grant has been evaluated. A read that is
+ * not free consumed nothing in `openRead`, so a refusal after it loses the family nothing.
+ */
+export function chargesABean(read, task) {
+  return classifyUsage(read, task).attr === USAGE_ATTRS.charged;
 }
 
 /**
