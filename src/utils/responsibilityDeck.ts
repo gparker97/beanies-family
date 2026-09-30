@@ -791,12 +791,11 @@ export function groupShortcut(
 
 // ── Nook briefing ───────────────────────────────────────────────────────────────
 
-export const MOVED_NOTE_DAYS = 14;
+export const MOVED_NOTE_DAYS = 7;
 export const MOVED_NOTE_CAP = 3;
 export const CHECKIN_SNOOZE_DAYS = 7;
 
 export type CardBriefingRow =
-  | { kind: 'mine'; cardIds: string[] }
   | {
       kind: 'moved';
       move: ResponsibilityMove;
@@ -805,7 +804,6 @@ export type CardBriefingRow =
       role: 'from' | 'to';
       dismissKey: string;
     }
-  | { kind: 'nobody'; cardIds: string[]; count: number }
   | { kind: 'checkin'; dueDate: string; dismissKey: string };
 
 export interface CardBriefingInput {
@@ -821,24 +819,22 @@ export interface CardBriefingInput {
 }
 
 /**
- * The Nook briefing's card rows, in display order: the viewer's cards, card-moved notes,
- * cards with nobody (adults) and the check-in reminder (adults). Pure: `useCriticalItems`
- * only maps these, and the dismiss keys are written back through `notificationsStore`.
+ * The Nook briefing's card rows, in display order: card-moved notes and the check-in
+ * reminder (adults). Pure: `useCriticalItems` only maps these, and the dismiss keys are
+ * written back through `notificationsStore`.
+ *
+ * Deliberately NOT here (2026-09-30, docs/plans/2026-09-30-who-owns-what-briefing-trim.md):
+ * a standing "your cards" row (never actionable, never dismissable, so it read as clutter)
+ * and "cards with nobody" (an action in an area, which the app signals with the nav count
+ * badge `stillToDeal` in `useNavBadges`, like over-budget or unbooked travel).
  */
 export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow[] {
   const { cards, moves, checkIns, rhythmWeeks, readState, viewerId, viewerIsAdult, today } = input;
   const rows: CardBriefingRow[] = [];
   const byId = new Map(cards.map((c) => [c.id, c]));
 
-  const mine = cards
-    .filter(
-      (c) =>
-        (c.status === 'held' || c.status === 'waiting') &&
-        c.parts.some((p) => p.holderId === viewerId)
-    )
-    .map((c) => c.id);
-  if (mine.length) rows.push({ kind: 'mine', cardIds: mine });
-
+  // Strictly newer than MOVED_NOTE_DAYS ago: a note shows on 7 calendar days (the day of
+  // the move and the 6 after) and is gone a week after the move, as the help says.
   const from = addDaysYmd(today, -MOVED_NOTE_DAYS);
   const notes = moves
     .filter(
@@ -846,7 +842,7 @@ export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow
         isRedeal(m) &&
         m.byId !== viewerId &&
         (m.fromId === viewerId || m.toId === viewerId) &&
-        ymdOf(m.at) >= from &&
+        ymdOf(m.at) > from &&
         !readState[CARD_MOVE_PREFIX + m.id] &&
         isCurrentMove(byId.get(m.cardId), m)
     )
@@ -863,14 +859,6 @@ export function buildCardBriefingRows(input: CardBriefingInput): CardBriefingRow
   }
 
   if (viewerIsAdult) {
-    const waiting = cards.filter((c) => c.status === 'waiting');
-    if (waiting.length) {
-      rows.push({
-        kind: 'nobody',
-        cardIds: waiting.slice(0, 3).map((c) => c.id),
-        count: waiting.length,
-      });
-    }
     const due = nextCheckInDate(rhythmWeeks, checkIns, cards);
     if (due && today >= due) {
       const dismissKey = CARD_CHECKIN_PREFIX + due;

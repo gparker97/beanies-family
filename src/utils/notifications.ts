@@ -59,7 +59,7 @@ const PRUNE_EXEMPT_PREFIXES = [
  * would delete them at once; they are also unbounded (one per move), so they
  * can't join `PRUNE_EXEMPT_PREFIXES` (whose invariant is "bounded by static
  * content"). Instead they're kept while their `readAt` is younger than
- * `AGED_EXEMPT_MAX_DAYS`: a moved note shows for 14 days and a snooze lasts 7,
+ * `AGED_EXEMPT_MAX_DAYS`: a moved note shows for 7 days (`MOVED_NOTE_DAYS`) and a snooze lasts 7,
  * so nothing pruned at 30 can resurface.
  */
 export const CARD_MOVE_PREFIX = 'card-move:';
