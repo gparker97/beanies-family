@@ -177,21 +177,9 @@ export const QUICK_ADD_ITEMS = [
     requiredPermission: 'activities',
   },
   {
-    id: 'trip-idea',
-    group: 'family',
-    order: 4,
-    emoji: '\u{1F4A1}', // 💡
-    labelKey: 'quickAdd.tripIdea.label',
-    hintKey: 'quickAdd.tripIdea.hint',
-    route: '/travel',
-    action: 'add-trip-idea',
-    contextKey: 'vacationId',
-    requiredPermission: 'activities',
-  },
-  {
     id: 'milestone',
     group: 'family',
-    order: 5,
+    order: 4,
     emoji: '\u{1F31F}', // 🌟
     labelKey: 'quickAdd.milestone.label',
     hintKey: 'quickAdd.milestone.hint',
