@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { ui } from './ui-strings';
 
 const E2E_PIN = '123456';
@@ -6,6 +6,35 @@ const E2E_PIN = '123456';
 // suite also calls deleteFamilyFromRegistry() in afterEach to clean up; this
 // name is the safety net for failed tests that crash before teardown.
 const E2E_FAMILY_NAME = 'E2E Test Family';
+
+/**
+ * Resolve once `locator`'s box has held the same position for several consecutive
+ * animation frames. Playwright's own "stable" check compares only two frames, and the
+ * login layout re-centres for ~300ms after a view swap (the Next button measured
+ * 512 → 545 → 520 → 512px on webkit), so two matching frames mid-bounce let a click land
+ * on the form's padding instead of the button: no submit, no error, a 10s timeout
+ * (E2E_HEALTH 2026-09-30, `invite-join.spec.ts:7`).
+ */
+async function waitForSettled(locator: Locator, frames = 8): Promise<void> {
+  await locator.evaluate(
+    (el, need) =>
+      new Promise<void>((resolve) => {
+        let last = '';
+        let same = 0;
+        const deadline = performance.now() + 3000;
+        const tick = () => {
+          const r = el.getBoundingClientRect();
+          const key = `${Math.round(r.left)},${Math.round(r.top)}`;
+          same = key === last ? same + 1 : 0;
+          last = key;
+          if (same >= need || performance.now() > deadline) resolve();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    frames
+  );
+}
 
 /**
  * Drive the create-a-family flow from WelcomeGate up to the add-members step,
@@ -25,7 +54,9 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
   await page.getByLabel(ui('auth.familyName')).fill(familyName);
   await page.getByLabel(ui('setup.yourName')).fill('John Doe');
   await page.getByLabel(ui('form.email')).fill('john@example.com');
-  await page.getByRole('button', { name: ui('loginV6.createNext') }).click();
+  const step1Next = page.getByRole('button', { name: ui('loginV6.createNext') });
+  await waitForSettled(step1Next);
+  await step1Next.click();
 
   // Step 2 — inject the headless provider (the only un-automatable piece), then
   // drive the real Continue hand-off to the finish surface.
@@ -44,6 +75,12 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
   // (Phase 4). PinInput exposes a hidden input carrying the aria-label.
   const pinField = page.getByLabel(ui('setup.choosePinLabel'));
   await pinField.waitFor({ state: 'visible', timeout: 10000 });
+  // Gate on the surface's own "ready for input" signal: PinInput autofocuses the first PIN
+  // in `onMounted` after a `nextTick`, and on a heavy first render that focus landed
+  // between Playwright focusing Confirm PIN and inserting its text, so the digits went to
+  // the (already full) first PIN and Continue failed with "Please fill in all fields"
+  // (E2E_HEALTH 2026-09-30, `invite-join.spec.ts:7`).
+  await expect(pinField).toBeFocused({ timeout: 5000 });
   await pinField.fill(E2E_PIN);
   await page.getByLabel(ui('pin.confirmPin')).fill(E2E_PIN);
   await page.getByRole('button', { name: ui('action.continue') }).click();
@@ -123,10 +160,16 @@ export async function bypassLoginIfNeeded(
 ): Promise<void> {
   const createPodButton = page.getByTestId('create-pod-button');
 
-  const isOnWelcome = await createPodButton
-    .waitFor({ state: 'visible', timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
+  // Wait for whichever screen the app settles on: the welcome gate (fresh context) or
+  // the signed-in layout (auto-auth already set). A fixed short probe for the welcome
+  // button alone lost the race on a cold worker: the gate rendered after the probe gave
+  // up, nothing clicked Create, and the `/nook` wait below timed out (E2E_HEALTH
+  // 2026-09-30, `cross-entity.spec.ts:29`).
+  await createPodButton
+    .or(page.getByTestId('app-content'))
+    .first()
+    .waitFor({ state: 'visible', timeout: 30000 });
+  const isOnWelcome = await createPodButton.isVisible();
 
   if (isOnWelcome) {
     // Set auto-auth flag BEFORE clicking create so InviteGateOverlay and
