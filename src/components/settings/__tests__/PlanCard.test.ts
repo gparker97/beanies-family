@@ -36,6 +36,12 @@ const store = reactive({
   trialDay: null as number | null,
 });
 vi.mock('@/stores/entitlementStore', () => ({ useEntitlementStore: () => store }));
+// #95 Phase 4: the magic-beans line comes from its own composable (tested on its own).
+const allowance = vi.hoisted(() => ({ line: null as string | null }));
+vi.mock('@/composables/useAllowanceLine', async () => {
+  const { computed } = await import('vue');
+  return { useAllowanceLine: () => ({ line: computed(() => allowance.line) }) };
+});
 
 import PlanCard from '../PlanCard.vue';
 
@@ -194,5 +200,21 @@ describe('native (iOS / Android)', () => {
     expect(text).toContain('readOnly.native.trialEnded');
     expect(text).toContain('readOnly.native.plansElsewhere');
     expect(text).not.toContain('readOnly.web.');
+  });
+});
+
+describe('the magic-beans line (#95 Phase 4)', () => {
+  it("renders the composable's line when there is one", () => {
+    allowance.line = '0 of 1 magic beans left today, more at 8am.';
+    setState(TRIAL);
+    expect(render().get('[data-testid="plan-allowance"]').text()).toBe(
+      '0 of 1 magic beans left today, more at 8am.'
+    );
+  });
+
+  it('renders nothing when the line does not apply', () => {
+    allowance.line = null;
+    setState(TRIAL);
+    expect(render().find('[data-testid="plan-allowance"]').exists()).toBe(false);
   });
 });

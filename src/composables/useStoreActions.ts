@@ -1,6 +1,7 @@
 import type { Ref } from 'vue';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
+import { ReadOnlyError } from '@/services/automerge/worker/writeGate';
 import { useTranslationStore } from '@/stores/translationStore';
 
 interface WrapAsyncOptions {
@@ -76,6 +77,10 @@ export async function wrapAsync<T>(
     }
     return result;
   } catch (e) {
+    // #95: the read-only gate refused the write. An expected refusal, not a failure: the gate
+    // has already shown its info toast and logged it, so no error toast, no `reportError`, and
+    // `error.value` stays null (nothing went wrong that a view should render).
+    if (e instanceof ReadOnlyError) return undefined;
     const rawMessage = e instanceof Error ? e.message : safeT()('unexpectedError');
     error.value = rawMessage;
     if (errorToast) {

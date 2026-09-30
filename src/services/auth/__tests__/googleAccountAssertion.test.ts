@@ -28,7 +28,8 @@ const familyMembers: Array<{ id: string; googleAccountEmail?: string }> = [];
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
     members: familyMembers,
-    updateMember: (id: string, input: { googleAccountEmail?: string }) =>
+    // #95: the identity binding goes through the gate-passing funnel.
+    updateMemberCredentials: (id: string, input: { googleAccountEmail?: string }) =>
       mockUpdateMember(id, input),
   }),
 }));

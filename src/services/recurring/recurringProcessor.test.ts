@@ -6,6 +6,9 @@ import {
 } from './recurringProcessor';
 import type { RecurringItem, Account, Asset, Transaction } from '@/types/models';
 
+// #95: the read-only pause reads the REAL write-gate slot; tests install a verdict and clear it.
+vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
+
 // Mock the repositories
 vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getActiveRecurringItems: vi.fn(),
@@ -40,6 +43,8 @@ import * as transactionRepo from '@/services/automerge/repositories/transactionR
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
+import { logEvent } from '@/services/telemetry';
+import { setWriteGate, __resetWriteGateForTesting } from '@/services/automerge/worker/writeGate';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -1002,5 +1007,102 @@ describe('projectRecurringTransactions', () => {
       idPrefix: 'next-projected',
     });
     expect(rows.map((r) => r.id)).toEqual(['next-projected-rec-1-2024-02-15']);
+  });
+});
+
+describe('recurringProcessor - paused while read-only, caught up after (#95)', () => {
+  // Last generated on 15 July; "today" is 15 October, so three instances are due.
+  const salary: RecurringItem = {
+    id: 'recurring-ro',
+    accountId: 'test-account-1',
+    type: 'income',
+    amount: 3000,
+    currency: 'USD',
+    category: 'salary',
+    description: 'Monthly Salary',
+    frequency: 'monthly',
+    dayOfMonth: 15,
+    startDate: '2024-01-01T00:00:00.000Z',
+    lastProcessedDate: '2024-07-15',
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-10-15T12:00:00.000Z'));
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([salary]);
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([]);
+    vi.mocked(transactionRepo.createTransaction).mockImplementation(
+      async (input) =>
+        ({
+          ...input,
+          id: `tx-${input.date}`,
+          createdAt: input.date,
+          updatedAt: input.date,
+        }) as Transaction
+    );
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+  });
+
+  /** What the installed gate reports; flipped by each test. */
+  let readOnly = false;
+
+  beforeEach(() => {
+    readOnly = false;
+    __resetWriteGateForTesting();
+    setWriteGate(() => ({ block: readOnly, wouldBlock: false }));
+  });
+
+  afterEach(() => {
+    __resetWriteGateForTesting();
+    vi.useRealTimers();
+  });
+
+  const skippedEvents = () =>
+    vi
+      .mocked(logEvent)
+      .mock.calls.filter(
+        ([e]) =>
+          e.surface === 'recurring' &&
+          (e.context as { action?: string })?.action === 'skipped_read_only'
+      );
+
+  it('generates and deletes nothing while read-only, logging the pause once per session', async () => {
+    readOnly = true;
+
+    await expect(processRecurringItems()).resolves.toEqual({ processed: 0, errors: [] });
+    await expect(deduplicateRecurringTransactions()).resolves.toBe(0);
+    await expect(processRecurringItems()).resolves.toEqual({ processed: 0, errors: [] });
+
+    // Nothing was even read, so nothing could be written.
+    expect(recurringRepo.getActiveRecurringItems).not.toHaveBeenCalled();
+    expect(transactionRepo.getAllTransactions).not.toHaveBeenCalled();
+    expect(transactionRepo.createTransaction).not.toHaveBeenCalled();
+    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+    expect(recurringRepo.updateLastProcessedDate).not.toHaveBeenCalled();
+    expect(skippedEvents()).toHaveLength(1);
+  });
+
+  it('catches up every missed instance on the first writable run', async () => {
+    readOnly = true;
+    await processRecurringItems();
+    readOnly = false;
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(3);
+    const dates = vi
+      .mocked(transactionRepo.createTransaction)
+      .mock.calls.map(([input]) => input.date.slice(0, 10));
+    expect(dates).toEqual(['2024-08-15', '2024-09-15', '2024-10-15']);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
+      'recurring-ro',
+      '2024-10-15'
+    );
   });
 });

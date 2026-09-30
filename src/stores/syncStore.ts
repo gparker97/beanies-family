@@ -4482,7 +4482,7 @@ export const useSyncStore = defineStore('sync', () => {
     const today = toISODateString(new Date()).slice(0, 10);
     if (me.podTooLargeSeenAt === today) return; // already said so today
     void useFamilyStore()
-      .updateMember(me.id, { podTooLargeSeenAt: today })
+      .updateMemberCredentials(me.id, { podTooLargeSeenAt: today })
       .catch(() => {
         // Best effort. The message on screen is what matters; a missed mark
         // costs a heuristic, and the byte threshold still covers this family.
@@ -6058,7 +6058,7 @@ export const useSyncStore = defineStore('sync', () => {
         const fam = useFamilyStore();
         const member = fam.members.find((m) => m.id === memberId);
         if (member && member.googleAccountEmail !== verifiedEmail) {
-          await fam.updateMember(memberId, { googleAccountEmail: verifiedEmail });
+          await fam.updateMemberCredentials(memberId, { googleAccountEmail: verifiedEmail });
           memberChanged = true;
         }
       }

@@ -8,3 +8,8 @@
 
 /** How long an open-ended cached answer (`active`, `beta`) is honoured without the registry. */
 export const OFFLINE_GRACE_DAYS = 14;
+
+/** The Plan page's route name (`/settings/plan`, registered in Phase 5). `PlanCard` and
+ *  `ReadOnlyBanner` offer "See plans" only when `router.hasRoute(PLAN_ROUTE_NAME)`, so until the
+ *  page exists neither renders a button that goes nowhere. */
+export const PLAN_ROUTE_NAME = 'Plan';

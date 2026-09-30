@@ -19,6 +19,7 @@ import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { reportError } from '@/utils/errorReporter';
 import * as perfTiming from '@/utils/perfTiming';
 import { recurringInstanceDate, recurringInstanceKey } from '@/utils/recurringInstance';
+import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
 
 export interface ProcessResult {
   processed: number;
@@ -26,11 +27,23 @@ export interface ProcessResult {
 }
 
 /**
+ * #95: recurring processing PAUSES while the family is read-only, rather than being allowlisted
+ * past the write gate. A read-only family does not accumulate auto-generated transactions it
+ * never chose, and nothing is lost: once the family is writable again, the next run's
+ * `lastProcessedDate` catch-up (`getDueDatesSince`) generates every instance missed meanwhile,
+ * exactly as after any absence. Both exported writers check this, so their callers stay as they
+ * are. `skipWhileReadOnly` reads the installed gate verdict (`entitlementStore.isReadOnly`)
+ * and logs the pause once per session.
+ */
+const RECURRING_SURFACE = 'recurring';
+
+/**
  * Process all due recurring items and generate transactions.
- * Should be called on app startup.
+ * Should be called on app startup. Does nothing while the family is read-only (#95).
  */
 export async function processRecurringItems(): Promise<ProcessResult> {
   const result: ProcessResult = { processed: 0, errors: [] };
+  if (skipWhileReadOnly(RECURRING_SURFACE)) return result;
 
   const startedAt = performance.now();
   try {
@@ -446,6 +459,8 @@ export function getNextDueDateForItem(item: RecurringItem): Date | null {
  * Should be called after any CRDT merge that could introduce duplicates.
  */
 export async function deduplicateRecurringTransactions(): Promise<number> {
+  // #95: the sweep deletes, so it is a write; it resumes with processing when writable again.
+  if (skipWhileReadOnly(RECURRING_SURFACE)) return 0;
   const allTransactions = await transactionRepo.getAllTransactions();
 
   // Group recurring transactions by recurringItemId + date

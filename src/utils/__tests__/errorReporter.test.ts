@@ -23,6 +23,7 @@ vi.mock('@/services/telemetry', () => ({
 }));
 
 import { reportError, __resetErrorReporterForTesting } from '../errorReporter';
+import { ReadOnlyError } from '@/services/automerge/worker/writeGate';
 
 // Post-gate, only `severity: 'critical'` reaches Slack. The dedup/payload suites
 // below exercise the Slack path, so they report at critical via this thin wrapper
@@ -234,6 +235,34 @@ describe('errorReporter', () => {
       reportError({ surface: 'c', message: 'm3', severity: 'critical' }); // telemetry + Slack
       expect(vi.mocked(logEvent)).toHaveBeenCalledTimes(3);
       expect(fetchSpy).toHaveBeenCalledTimes(1); // only the critical paged
+    });
+  });
+
+  describe('read-only refusal (#95)', () => {
+    it('drops a ReadOnlyError at every severity: no firehose, no Slack, no console error', async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      vi.mocked(logEvent).mockClear();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      for (const severity of ['warning', 'error', 'critical'] as const) {
+        reportError({
+          surface: 'photo-store',
+          message: 'save failed',
+          severity,
+          error: new ReadOnlyError('photos'),
+        });
+      }
+
+      expect(vi.mocked(logEvent)).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('still reports any other error', async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      vi.mocked(logEvent).mockClear();
+      reportError({ surface: 'photo-store', message: 'save failed', error: new Error('boom') });
+      expect(vi.mocked(logEvent)).toHaveBeenCalledTimes(1);
     });
   });
 });

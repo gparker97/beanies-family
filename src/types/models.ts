@@ -2245,6 +2245,31 @@ export interface Category {
 export type CreateFamilyMemberInput = Omit<FamilyMember, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateFamilyMemberInput = Partial<Omit<FamilyMember, 'id' | 'createdAt' | 'updatedAt'>>;
 
+/**
+ * #95: the member fields that are auth and sign-in bookkeeping, not family data, and so the
+ * ONLY fields `familyStore.updateMemberCredentials` accepts (the one member write that passes
+ * the read-only gate). The type IS the allowlist, checked at compile time: a name, colour or
+ * alias cannot be passed. Auth must keep working in a read-only family.
+ *   - the sign-in stamp and its soak markers: `lastLoginAt`, `lineageEpoch`, `appVersion`;
+ *   - credentials: `passwordHash`, `requiresPassword`, `pinHash`, `pinVersion`;
+ *   - identity binding on the sign-in path: `googleAccountEmail`;
+ *   - device bookkeeping: `podTooLargeSeenAt`.
+ */
+export type MemberSystemPatch = Partial<
+  Pick<
+    FamilyMember,
+    | 'lastLoginAt'
+    | 'lineageEpoch'
+    | 'appVersion'
+    | 'passwordHash'
+    | 'requiresPassword'
+    | 'pinHash'
+    | 'pinVersion'
+    | 'googleAccountEmail'
+    | 'podTooLargeSeenAt'
+  >
+>;
+
 export type CreateAccountInput = Omit<Account, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateAccountInput = Partial<Omit<Account, 'id' | 'createdAt' | 'updatedAt'>>;
 

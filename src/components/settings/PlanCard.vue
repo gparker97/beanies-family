@@ -9,13 +9,12 @@
  * purchase verb (Apple 3.1.3(f), Google Play payments policy); the read-only copy is greg's
  * final wording. That is why the cohort line (a price statement) is web-only too.
  *
- * WEB: "See plans" in beta, trial and read-only, except a STALE read-only (`showSeePlans`).
- * The plan page arrives in Phase 5 under the route name below, so until it exists the button is
- * not rendered at all rather than pointing somewhere useless. "Manage plan" / "Receipts" on the active card are Phase 5 as well (they
+ * WEB: "See plans" in beta, trial and read-only, except a STALE read-only; the rule
+ * (`showSeePlans`, including "only once the Phase 5 Plan route exists") lives in `useReadOnlyCopy`,
+ * shared with the read-only band. "Manage plan" / "Receipts" on the active card are Phase 5 as well (they
  * need the billing Lambda's portal session) and are deliberately absent here.
  */
 import { computed } from 'vue';
-import { useRouter } from 'vue-router';
 import { TRIAL_DAYS } from '@beanies/brand/pricing';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -24,20 +23,19 @@ import { useEntitlementStore } from '@/stores/entitlementStore';
 import { isNative } from '@/services/sync/capabilities';
 import { formatDate } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { OFFLINE_GRACE_DAYS } from '@/constants/entitlement';
+import { useReadOnlyCopy } from '@/composables/useReadOnlyCopy';
+import { useAllowanceLine } from '@/composables/useAllowanceLine';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
-/** Phase 5 registers `/settings/plan` under this route name; keep the two in step. */
-const PLAN_ROUTE_NAME = 'Plan';
-
-const router = useRouter();
 const { t } = useTranslation();
 const entitlementStore = useEntitlementStore();
+// Shared with ReadOnlyBanner, so the card and the band can never explain it differently.
+const { paragraphs: readOnlyParagraphs, showSeePlans, seePlans } = useReadOnlyCopy();
+// "N of M magic beans left" (#95 Phase 4): trial and active, managed tier only, fetched once.
+const { line: allowanceLine } = useAllowanceLine();
 
-// Neither can change while the card is mounted: the platform is fixed, and routes are
-// registered at startup.
+// Fixed for the app's lifetime.
 const native = isNative();
-const canSeePlans = !native && router.hasRoute(PLAN_ROUTE_NAME);
 
 type PillTone = 'accent' | 'success';
 
@@ -112,36 +110,12 @@ const copy = computed<{ lead: string | null; body: string | null; extra: string[
   }
 
   if (s === 'read_only') {
-    if (entitlementStore.isStale) {
-      return {
-        lead: null,
-        body: fillTemplate(t('readOnly.stale'), { days: OFFLINE_GRACE_DAYS }),
-        extra,
-      };
-    }
-    const lapsed = entitlementStore.reason === 'lapsed';
-    let body: string;
-    if (lapsed) body = t('readOnly.lapsed');
-    else body = native ? t('readOnly.native.trialEnded') : t('readOnly.web.trialEnded');
-    if (native) extra.push(t('readOnly.native.plansElsewhere'));
-    return { lead: null, body, extra };
+    const [body = null, ...rest] = readOnlyParagraphs.value;
+    return { lead: null, body, extra: rest };
   }
 
   return { lead: null, body: t('plan.unknown'), extra };
 });
-
-// Never while stale: that family may well be paying and only offline, so offering checkout
-// would invite a second subscription. Reconnecting is the fix, and the copy says so.
-const showSeePlans = computed(
-  () =>
-    canSeePlans &&
-    !entitlementStore.isStale &&
-    ['beta', 'trial', 'read_only'].includes(entitlementStore.state ?? '')
-);
-
-function seePlans(): void {
-  void router.push({ name: PLAN_ROUTE_NAME });
-}
 </script>
 
 <template>
@@ -197,6 +171,13 @@ function seePlans(): void {
       class="text-secondary-400 dark:text-ink-soft mt-2 text-sm leading-relaxed"
     >
       {{ line }}
+    </p>
+    <p
+      v-if="allowanceLine"
+      data-testid="plan-allowance"
+      class="text-secondary-400 dark:text-ink-soft mt-2 text-sm leading-relaxed"
+    >
+      {{ allowanceLine }}
     </p>
 
     <BaseButton v-if="showSeePlans" class="mt-4" data-testid="plan-see-plans" @click="seePlans">
