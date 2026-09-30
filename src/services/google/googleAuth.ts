@@ -2853,14 +2853,12 @@ export async function completeRedirectAuth(): Promise<string | null> {
   if (!clientId) throw new Error('Google Client ID not configured');
 
   // Two arms (there is no third):
-  //  - LEGACY web (pre-bounce-fix, one release) OR NATIVE hand-off — a stash
-  //    with a `codeVerifier` is present → exchange WITH the verifier (PKCE).
-  //  - NEW web — no stash → exchange WITHOUT a verifier (the confidential proxy
+  //  - NATIVE hand-off — the native OAuth return leaves a stash with a
+  //    `codeVerifier` → exchange WITH the verifier (PKCE). Web never writes this
+  //    stash any more: the one-release legacy web transport was removed on
+  //    2026-09-30 (docs/plans/2026-06-20-ios-oauth-bounce-state-param.md).
+  //  - WEB — no stash → exchange WITHOUT a verifier (the confidential proxy
   //    secures the code via client_secret).
-  // LEGACY (remove after 2026-09-30): the `stateJson`/`codeVerifier` arm exists
-  // only to complete in-flight redirects started by the pre-bounce-fix build.
-  // The NATIVE hand-off ALSO uses this stash, so removing it must keep the
-  // native arm — see redirectState tripwire test.
   let codeVerifier: string | undefined;
   if (stateJson) {
     try {

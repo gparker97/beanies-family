@@ -11,7 +11,7 @@
 import { onMounted } from 'vue';
 import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 import { CALENDAR_REDIRECT_CODE_KEY } from '@/services/calendar/calendarAuth';
-import { decodeRedirectState, isSameOriginReturnPath } from '@/services/google/redirectState';
+import { decodeRedirectState } from '@/services/google/redirectState';
 import { stashPickerSelection } from '@/services/google/pickerRedirect';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
@@ -98,39 +98,13 @@ onMounted(() => {
     // Couldn't forward the code — fall through to the reported "lost" surface.
   }
 
-  // LEGACY (remove after 2026-09-30): completes in-flight redirects started by
-  // the pre-bounce-fix build, which wrote `beanies_redirect_auth` before the
-  // redirect. The getItem can throw on blocked storage — guarded.
-  let legacyState: string | null = null;
-  try {
-    legacyState = sessionStorage.getItem('beanies_redirect_auth');
-  } catch (e) {
-    console.warn('[OAuthCallback] legacy state read failed', e);
-  }
-  if (legacyState && code) {
-    try {
-      sessionStorage.setItem(REDIRECT_AUTH_CODE_KEY, code);
-      const state = JSON.parse(legacyState);
-      // ⚠️ THE SAME ORIGIN CHECK AS THE MODERN TRANSPORT. This branch navigated to a stored
-      // `returnPath` with no guard at all, so the open-redirect fix applied to
-      // `decodeRedirectState` covered one of three doors. sessionStorage is app-written, so
-      // this is a structural gap rather than a live exploit — but it is the branch a future
-      // change is most likely to widen, and the whole point of extracting the predicate was
-      // that no sink should have its own answer.
-      window.location.href = isSameOriginReturnPath(state?.returnPath) ? state.returnPath : '/';
-    } catch {
-      window.location.href = '/';
-    }
-    return;
-  }
-
-  // GENUINELY LOST: a code in hand we can't forward (no valid `state`, no legacy
-  // stash, or the code stash threw). A hard onboarding block — report it.
+  // GENUINELY LOST: a code in hand we can't forward (no valid `state`, or the code
+  // stash threw). A hard onboarding block — report it.
   if (code) {
     reportError({
       surface: 'oauth.redirectStateLost',
       message:
-        'OAuth redirect returned with a code but no usable routing state (malformed/absent `state` param and no legacy stash, or storage write failed)',
+        'OAuth redirect returned with a code but no usable routing state (malformed/absent `state` param, or storage write failed)',
       // Critical: a code-in-hand-but-routing-lost HARD-BLOCKS onboarding — it
       // must page Slack. The device's `web_storage` context distinguishes a
       // genuine storage fault from this (now-rare) malformed-callback case.
@@ -142,12 +116,6 @@ onMounted(() => {
 
   // Error or genuinely unexpected state (no code).
   if (error) {
-    try {
-      sessionStorage.removeItem('beanies_redirect_auth');
-    } catch {
-      // sessionStorage unavailable — nothing to clean up.
-    }
-
     // ⚠️ RETURN THEM WHERE THEY CAME FROM, and this is a real bug fix rather than tidying.
     //
     // Sending an `?error=` (overwhelmingly `access_denied` — the user declined consent) to `/`
