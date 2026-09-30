@@ -8,6 +8,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-09-30
+
+_Released in 0.26 (web, Android production, iOS App Store)._
+
+### Added
+
+- The Meal Planner can now make one shopping list for the whole week. Each recipe is listed once with its ingredients as written, and a **Cook ×N** marker says how many times it gets cooked that week (from who's eating and the recipe's servings); its lines end in (×N) so the list says how many lots to buy.
+- Lines that are the same in two recipes are put together in "In More Than One Meal". **✨ Find Duplicates** (free, it doesn't use your magic beans) also puts together the same item written differently, and Split (with Undo) takes a merged line apart.
+- A meal's ingredients now show in the edit-meal drawer, ready to add to a shopping list without going to the cookbook.
+- The recipe page's Shopping List is now a checklist: untick what you have, edit a line, add your own, and add to a new list or one of your lists.
+
+### Changed
+
+- A recipe's Servings is now a number ("Serves 4") with a − / + stepper.
+- Who's eating starts with everyone picked, with a one-tap Clear / Everyone.
+- Long list items now wrap instead of being cut off, including while editing, and Enter saves an edited line.
+- The magic beans box now suggests "Remind me to walk the dog tomorrow at 10am…" and has a hint explaining what you can paste.
+
+### Fixed
+
+- Hint bubbles no longer open behind side panels.
+
+### Removed
+
+- An old sign-in redirect fallback, kept for one release after the June fix, is gone.
+
 ## 2026-09-29
 
 _Released in 0.25 (web; Android production and iOS in store review)._

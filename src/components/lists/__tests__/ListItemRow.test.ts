@@ -59,7 +59,7 @@ describe('ListItemRow', () => {
     it('populates the draft from the item when editing begins', async () => {
       const w = mountRow({ editing: false });
       await w.setProps({ editing: true });
-      expect((w.get('input').element as HTMLInputElement).value).toBe('goggles');
+      expect((w.get('textarea').element as HTMLTextAreaElement).value).toBe('goggles');
     });
 
     it('focuses the input so the rename can be typed immediately', async () => {
@@ -68,49 +68,79 @@ describe('ListItemRow', () => {
       const w = mountRow({ editing: false, attachTo: document.body });
       await w.setProps({ editing: true });
       await nextTick();
-      expect(document.activeElement).toBe(w.get('input').element);
+      expect(document.activeElement).toBe(w.get('textarea').element);
       w.unmount();
+    });
+
+    it('a soft keyboard Return (insertLineBreak) saves, and never reaches the text', async () => {
+      const w = mountRow({ editing: true });
+      await w.get('textarea').setValue('swim cap');
+      const ev = new InputEvent('beforeinput', { inputType: 'insertLineBreak', cancelable: true });
+      w.get('textarea').element.dispatchEvent(ev);
+      expect(ev.defaultPrevented).toBe(true);
+      expect(w.emitted('edit-save')).toEqual([['swim cap']]);
+    });
+
+    it('a paste mid-text lands at the caret as one line', async () => {
+      const w = mountRow({ editing: false });
+      await w.setProps({ editing: true });
+      const ta = w.get('textarea').element as HTMLTextAreaElement;
+      ta.setSelectionRange(3, 3); // "gog|gles"
+      const ev = new Event('paste', { cancelable: true, bubbles: true });
+      Object.defineProperty(ev, 'clipboardData', { value: { getData: () => 'X\nY' } });
+      ta.dispatchEvent(ev);
+      await nextTick();
+      expect(ev.defaultPrevented).toBe(true);
+      expect(ta.value).toBe('gogX Ygles');
+      expect(ta.selectionStart).toBe(6);
+      await w.get('textarea').trigger('keydown.enter');
+      expect(w.emitted('edit-save')).toEqual([['gogX Ygles']]);
+    });
+
+    it('asks the soft keyboard for a "done" key', () => {
+      const w = mountRow({ editing: true });
+      expect(w.get('textarea').attributes('enterkeyhint')).toBe('done');
     });
 
     it('saves on Enter', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('swim cap');
-      await w.get('input').trigger('keyup.enter');
+      await w.get('textarea').setValue('swim cap');
+      await w.get('textarea').trigger('keydown.enter');
       expect(w.emitted('edit-save')).toEqual([['swim cap']]);
     });
 
     it('saves on Enter EVEN WHEN BLANK, so clearing the field reverts and never deletes', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('');
-      await w.get('input').trigger('keyup.enter');
+      await w.get('textarea').setValue('');
+      await w.get('textarea').trigger('keydown.enter');
       expect(w.emitted('edit-save')).toEqual([['']]);
     });
 
     it('saves on blur only when the draft actually changed', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').trigger('blur');
+      await w.get('textarea').trigger('blur');
       expect(w.emitted('edit-save')).toBeUndefined();
     });
 
     it('saves on blur when dirty', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('towel');
-      await w.get('input').trigger('blur');
+      await w.get('textarea').setValue('towel');
+      await w.get('textarea').trigger('blur');
       expect(w.emitted('edit-save')).toEqual([['towel']]);
     });
 
     it('does not save a draft that is only whitespace on blur', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('   ');
-      await w.get('input').trigger('blur');
+      await w.get('textarea').setValue('   ');
+      await w.get('textarea').trigger('blur');
       expect(w.emitted('edit-save')).toBeUndefined();
     });
 
     it('cancels on Esc and suppresses the blur that follows', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('towel');
+      await w.get('textarea').setValue('towel');
       pressEscape();
-      await w.get('input').trigger('blur');
+      await w.get('textarea').trigger('blur');
       expect(w.emitted('edit-cancel')).toHaveLength(1);
       expect(w.emitted('edit-save')).toBeUndefined();
     });
@@ -121,8 +151,8 @@ describe('ListItemRow', () => {
     it('commits once, not twice, when Enter is followed by the unmount backstop', async () => {
       const onEditSave = vi.fn();
       const w = mountRow({ editing: true, onEditSave });
-      await w.get('input').setValue('towel');
-      await w.get('input').trigger('keyup.enter');
+      await w.get('textarea').setValue('towel');
+      await w.get('textarea').trigger('keydown.enter');
       w.unmount();
       expect(onEditSave).toHaveBeenCalledTimes(1);
       expect(onEditSave).toHaveBeenCalledWith('towel');
@@ -131,7 +161,7 @@ describe('ListItemRow', () => {
     it('commits a dirty draft on unmount, so closing mid-edit never loses text', async () => {
       const onEditSave = vi.fn();
       const w = mountRow({ editing: true, onEditSave });
-      await w.get('input').setValue('kickboard');
+      await w.get('textarea').setValue('kickboard');
       w.unmount();
       expect(onEditSave).toHaveBeenCalledTimes(1);
       expect(onEditSave).toHaveBeenCalledWith('kickboard');
@@ -147,7 +177,7 @@ describe('ListItemRow', () => {
     it('does not commit on unmount after Esc', async () => {
       const onEditSave = vi.fn();
       const w = mountRow({ editing: true, onEditSave });
-      await w.get('input').setValue('towel');
+      await w.get('textarea').setValue('towel');
       pressEscape();
       w.unmount();
       expect(onEditSave).not.toHaveBeenCalled();
@@ -155,20 +185,60 @@ describe('ListItemRow', () => {
 
     it('commits a dirty draft when the parent ends the edit', async () => {
       const w = mountRow({ editing: true });
-      await w.get('input').setValue('shampoo');
+      await w.get('textarea').setValue('shampoo');
       await w.setProps({ editing: false });
       expect(w.emitted('edit-save')).toEqual([['shampoo']]);
     });
   });
 
+  describe('a long item (#116: merged shopping lines)', () => {
+    const long: FamilyListItem = {
+      id: 'i2',
+      title: 'Ground beef: 500 g ground beef (×3) + 250 g lean ground beef (×2)',
+      completed: false,
+    };
+
+    it('edits in a field that wraps, holding the whole text, and Enter commits it', async () => {
+      const w = mount(ListItemRow, {
+        props: { item: long, editable: true, removable: true, editing: false },
+        attachTo: document.body,
+      });
+      await w.setProps({ editing: true });
+      await nextTick();
+      const field = w.get('[data-testid="list-item-edit"]');
+      // A textarea (it wraps), never a single-line input that scrolls sideways.
+      expect(field.element.tagName).toBe('TEXTAREA');
+      expect(w.find('input').exists()).toBe(false);
+      expect((field.element as HTMLTextAreaElement).value).toBe(long.title);
+      expect(document.activeElement).toBe(field.element);
+
+      await field.setValue(`${long.title} + 1 lb beef`);
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+      field.element.dispatchEvent(enter);
+      // Enter never adds a line: it is blocked and commits instead.
+      expect(enter.defaultPrevented).toBe(true);
+      expect(w.emitted('edit-save')).toEqual([[`${long.title} + 1 lb beef`]]);
+      w.unmount();
+    });
+
+    it('never keeps a line break: a pasted one becomes a space', async () => {
+      const w = mount(ListItemRow, {
+        props: { item: long, editable: true, removable: true, editing: true },
+      });
+      await w.get('textarea').setValue('2 onions\n1 lemon');
+      await w.get('textarea').trigger('blur');
+      expect(w.emitted('edit-save')).toEqual([['2 onions 1 lemon']]);
+    });
+  });
+
   describe('read-only variants render unchanged', () => {
     it('shows no input when not editing', () => {
-      expect(mountRow({ editing: false }).find('input').exists()).toBe(false);
+      expect(mountRow({ editing: false }).find('textarea').exists()).toBe(false);
     });
 
     it('shows no input when the row is not editable at all', async () => {
       const w = mountRow({ editable: false, editing: true });
-      expect(w.find('input').exists()).toBe(false);
+      expect(w.find('textarea').exists()).toBe(false);
     });
 
     it('still toggles', async () => {

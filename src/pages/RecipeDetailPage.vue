@@ -16,7 +16,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { isFlagEnabled } from '@/config/flags';
-import { splitRecipeIngredients } from '@/utils/listSeed';
+import { hasShoppableIngredients } from '@/utils/mealShoppingList';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeTaxonomyBadges from '@/components/pod/RecipeTaxonomyBadges.vue';
 import RecipeListSheet from '@/components/pod/RecipeListSheet.vue';
@@ -33,6 +33,7 @@ import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatServes, servingsOf } from '@/utils/recipeServings';
 import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import { usePermissions } from '@/composables/usePermissions';
 import type { CookLogEntry } from '@/types/models';
@@ -49,6 +50,8 @@ const { canEditActivities } = usePermissions();
 
 const recipeId = computed(() => (route.params.recipeId as string) ?? '');
 const recipe = computed(() => recipesStore.recipes.find((r) => r.id === recipeId.value));
+/** "Serves 4", or '' when the stored text holds no people count (#116). */
+const servesText = computed(() => formatServes(servingsOf(recipe.value), t));
 
 // Screened once here rather than twice in the template. Rejected values render no
 // anchor at all; the URL is not shown as plain text because, unlike a link the user
@@ -70,21 +73,11 @@ const cookLogOpen = ref(false);
 const shoppingListOpen = ref(false);
 
 /**
- * Offer the shopping-list action only when it can actually produce something.
- *
- * Gated on the SPLIT's title count, not `ingredients.length`: a recipe whose every
- * line is "For the sauce:" would otherwise open a sheet that yields zero items —
- * a present-and-failing action.
- *
- * `?? []` is the codebase's own defensive read for this field
- * (`recipeComparable.ts`, `RecipeFormModal`) — Automerge documents are not
- * schema-validated, and this runs on every render, so an `undefined` here would
- * blank the page rather than hide a button.
+ * Offer the shopping-list action only when it can actually produce something
+ * (`hasShoppableIngredients` owns the rule, shared with the meal planner).
  */
 const canMakeShoppingList = computed(
-  () =>
-    isFlagEnabled('familyLists') &&
-    splitRecipeIngredients(recipe.value?.ingredients ?? []).titles.length > 0
+  () => isFlagEnabled('familyLists') && hasShoppableIngredients(recipe.value)
 );
 
 const editingEntry = ref<CookLogEntry | null>(null);
@@ -287,10 +280,10 @@ watch(recipe, (now, before) => {
                 recipe.cookTime
               }}</strong>
             </span>
-            <span v-if="recipe.servings">
+            <span v-if="servesText">
               🍽️
               <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
-                recipe.servings
+                servesText
               }}</strong>
             </span>
             <span v-if="recipe.ingredients?.length">

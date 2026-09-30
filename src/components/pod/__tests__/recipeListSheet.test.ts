@@ -1,21 +1,27 @@
 /**
- * The review sheet (#88). Nothing is created until the user saves — and four ways
+ * The review sheet (#88). Nothing is created until the user saves — and several ways
  * saving can go wrong.
  *
  * The plan's first draft asserted this feature "adds no new failure mode of its
  * own", on the grounds that the mapper is pure and total. The mapper is; the sheet
- * is not. Each test below is one of the modes that claim missed.
+ * is not. Each failure-mode test below is one of the modes that claim missed.
+ *
+ * Since #116 the sheet is the shared checklist + destination + `useShoppingListCommit`
+ * (mounted for real here, with the stores mocked), so these tests exercise the sheet
+ * end to end. The composable's own suite covers every guard in isolation.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 
 const h = vi.hoisted(() => ({
   currentMember: { id: 'm1' } as { id: string } | undefined,
   members: [{ id: 'm1' }, { id: 'm2' }] as Array<{ id: string }>,
   native: true,
   lists: [] as Array<Record<string, unknown>>,
+  destinations: [] as Array<Record<string, unknown>>,
   recipes: [{ id: 'r1' }] as Array<{ id: string }>,
   createList: vi.fn(async (_seed: unknown): Promise<unknown> => ({ id: 'new-list' })),
+  addItems: vi.fn(async (_id: string, _titles: string[]): Promise<unknown> => ({ id: 'l9' })),
   push: vi.fn(),
   toasts: [] as string[],
   toastOptions: [] as Array<Record<string, unknown> | undefined>,
@@ -56,7 +62,11 @@ vi.mock('@/stores/listStore', () => ({
     get lists() {
       return h.lists;
     },
+    get shoppingDestinations() {
+      return h.destinations;
+    },
     createList: h.createList,
+    addItems: h.addItems,
   }),
 }));
 vi.mock('@/stores/recipesStore', () => ({
@@ -122,6 +132,7 @@ beforeEach(() => {
   h.members = [{ id: 'm1' }, { id: 'm2' }];
   h.native = true;
   h.lists = [];
+  h.destinations = [];
   h.recipes = [{ id: 'r1' }];
   h.toasts = [];
   h.toastOptions = [];
@@ -129,12 +140,21 @@ beforeEach(() => {
   h.logged = [];
   h.createList.mockClear();
   h.createList.mockResolvedValue({ id: 'new-list' });
+  h.addItems.mockClear();
+  h.addItems.mockResolvedValue({ id: 'l9' });
   h.push.mockClear();
 });
 
-describe('the prefilled draft', () => {
-  it('seeds the textarea with the non-heading lines, in recipe order', () => {
-    expect(mountSheet().find('textarea').element.value).toBe('2 cups flour\n3 eggs');
+const lineTexts = (w: ReturnType<typeof mountSheet>) =>
+  w.findAll('[data-testid="ingredient-text"]').map((n) => (n.element as HTMLTextAreaElement).value);
+const seedTitles = () =>
+  (h.createList.mock.calls[0]![0] as unknown as { items: Array<{ title: string }> }).items.map(
+    (i) => i.title
+  );
+
+describe('the prefilled checklist', () => {
+  it('lists the non-heading lines, in recipe order, at the recipe’s own amounts', () => {
+    expect(lineTexts(mountSheet())).toEqual(['2 cups flour', '3 eggs']);
   });
 
   it('says how many heading lines were skipped, singular and plural', () => {
@@ -157,23 +177,71 @@ describe('the prefilled draft', () => {
     expect(w.findComponent({ name: 'InferredHint' }).props('text')).toBe('');
   });
 
-  it('creates exactly one list, with the edited items', async () => {
+  it('creates exactly one list, with the edited, ticked and added lines', async () => {
     const w = mountSheet();
-    await w.find('textarea').setValue('Flour\nEggs\nMilk');
+    await w.findAll('[data-testid="ingredient-text"]')[0]!.setValue('3 cups flour');
+    // Untick the eggs: we have some.
+    await w.findAllComponents({ name: 'TickButton' })[1]!.vm.$emit('toggle');
+    await w.find('[data-testid="ingredient-add"]').setValue('Milk');
+    await w.find('[data-testid="ingredient-add"]').trigger('keydown', { key: 'Enter' });
     await save(w);
     expect(h.createList).toHaveBeenCalledOnce();
-    const seed = h.createList.mock.calls[0]![0] as unknown as { items: Array<{ title: string }> };
-    expect(seed.items.map((i) => i.title)).toEqual(['Flour', 'Eggs', 'Milk']);
+    expect(seedTitles()).toEqual(['3 cups flour', 'Milk']);
   });
 
   it('🔴 keeps a line the USER types ending in a colon', async () => {
     // The heading rule runs once, at open. Re-running it on save would silently
     // delete input the user deliberately typed.
     const w = mountSheet();
-    await w.find('textarea').setValue('Marinade:\nSoy sauce');
+    await w.find('[data-testid="ingredient-add"]').setValue('Marinade:');
+    await w.find('[data-testid="ingredient-add"]').trigger('keydown', { key: 'Enter' });
     await save(w);
-    const seed = h.createList.mock.calls[0]![0] as unknown as { items: Array<{ title: string }> };
-    expect(seed.items.map((i) => i.title)).toEqual(['Marinade:', 'Soy sauce']);
+    expect(seedTitles()).toEqual(['2 cups flour', '3 eggs', 'Marinade:']);
+  });
+
+  it('names the list after the recipe when the name is left blank', async () => {
+    const w = mountSheet();
+    await save(w);
+    expect((h.createList.mock.calls[0]![0] as { title: string }).title).toBe(
+      'lists.fromRecipe.listTitle'
+    );
+    expect((h.createList.mock.calls[0]![0] as { linkedRecipeId: string }).linkedRecipeId).toBe(
+      'r1'
+    );
+  });
+});
+
+describe('add to a list the family already has (#116)', () => {
+  const groceries = {
+    id: 'g1',
+    title: 'Weekly Groceries',
+    emoji: '🛒',
+    category: 'out',
+    completed: false,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    items: [],
+  };
+
+  it('appends the ticked lines to the chosen list, and says how many', async () => {
+    h.lists = [groceries];
+    h.destinations = [groceries];
+    h.addItems.mockResolvedValue({ id: 'g1' });
+    const w = mountSheet();
+    await w.find('[data-testid="destination-existing"]').trigger('click');
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
+      'lists.destination.addItems.other'
+    );
+    await save(w);
+    expect(h.createList).not.toHaveBeenCalled();
+    expect(h.addItems).toHaveBeenCalledWith('g1', ['2 cups flour', '3 eggs']);
+    await flushPromises();
+    expect(w.emitted('close')).toHaveLength(1);
+  });
+
+  it('is disabled, and says why, when the family has no list to add to', () => {
+    const w = mountSheet();
+    expect(w.find('[data-testid="destination-existing"]').attributes('disabled')).toBeDefined();
+    expect(w.find('[data-testid="destination-none"]').exists()).toBe(true);
   });
 });
 
@@ -199,7 +267,7 @@ describe('review mode — a list already exists', () => {
     expect(h.push).not.toHaveBeenCalled();
   });
 
-  it('shows the ingredients READ-ONLY — no textarea to type into', () => {
+  it('shows the ingredients READ-ONLY — no checklist to type into', () => {
     h.lists = [existingList()];
     const w = mountSheet();
     expect(w.find('textarea').exists()).toBe(false);
@@ -218,8 +286,8 @@ describe('review mode — a list already exists', () => {
 
   it('🔴 marks the ingredients box read-only, in words and in style', () => {
     // greg: "it looks editable". A read-only box that wears the editable box's
-    // clothes is worse than no box — so it says so, and it drops the white fill,
-    // the 2px border and the focus ring that make the editable one look typeable.
+    // clothes is worse than no box — so it says so, and it drops the white fill
+    // and the 2px border that make an editable one look typeable.
     h.lists = [existingList()];
     const w = mountSheet();
     expect(w.text()).toContain('lists.fromRecipe.readOnly');
@@ -237,7 +305,7 @@ describe('review mode — a list already exists', () => {
       .trigger('click')
       .then(() => {
         expect(w.find('ul[aria-readonly="true"]').exists()).toBe(false);
-        expect(w.find('textarea').exists()).toBe(true);
+        expect(w.find('[data-testid="ingredient-text"]').exists()).toBe(true);
       });
   });
 
@@ -263,9 +331,9 @@ describe('review mode — a list already exists', () => {
     h.lists = [existingList()];
     const w = mountSheet();
     await w.find('[data-testid="recipe-list-start-another"]').trigger('click');
-    expect(w.find('textarea').exists()).toBe(true);
+    expect(w.find('[data-testid="ingredient-text"]').exists()).toBe(true);
     expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
-      'lists.fromRecipe.save'
+      'lists.destination.createList'
     );
     expect(h.push).not.toHaveBeenCalled();
     await save(w);
@@ -275,9 +343,9 @@ describe('review mode — a list already exists', () => {
   it('goes straight to create when no list exists', () => {
     h.lists = [{ id: 'l9', linkedRecipeId: 'other' }];
     const w = mountSheet();
-    expect(w.find('textarea').exists()).toBe(true);
+    expect(w.find('[data-testid="ingredient-text"]').exists()).toBe(true);
     expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
-      'lists.fromRecipe.save'
+      'lists.destination.createList'
     );
   });
 });
@@ -340,11 +408,15 @@ describe('failure modes', () => {
     await save(w);
     expect(h.createList).not.toHaveBeenCalled();
     expect(h.toasts.some((x) => x.startsWith('error:'))).toBe(true);
+    // #116: now reported too, not just toasted, so the race is visible in CloudWatch.
+    expect(h.reported[0]!.context).toMatchObject({ action: 'recipe_missing' });
   });
 
   it('refuses to create an empty list', async () => {
     const w = mountSheet();
-    await w.find('textarea').setValue('   \n  ');
+    // Every line unticked: nothing to write, and Save says so by being unavailable.
+    await w.find('[data-testid="ingredients-toggle-all"]').trigger('click');
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('saveDisabled')).toBe(true);
     await save(w);
     expect(h.createList).not.toHaveBeenCalled();
   });
@@ -451,15 +523,10 @@ describe('who shops and by when', () => {
     );
   });
 
-  it('🔴 refuses when the chosen owner has left the family mid-sheet', async () => {
-    const w = mountSheet();
-    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', 'm2');
-    h.members = [{ id: 'm1' }]; // m2 removed on another device
-    await save(w);
-    expect(h.createList).not.toHaveBeenCalled();
-    expect(h.toasts.some((t) => t.startsWith('error:'))).toBe(true);
-    expect(h.reported[0].context).toMatchObject({ action: 'owner_unresolved' });
-  });
+  // The "owner left the family mid-sheet" race is no longer the sheet's to check:
+  // `listStore.createList` refuses an unresolved owner for every caller, with its own
+  // toast and report (`lists` / `create_unknown_owner`), covered in `listStore.test.ts`
+  // ("refuses to create a list whose owner is not in the family").
 
   it('🔴 resets owner and due date when reopened for another recipe', async () => {
     const w = mountSheet();

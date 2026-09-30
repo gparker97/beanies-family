@@ -22,6 +22,7 @@
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
+import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import LinkList from '@/components/ui/LinkList.vue';
@@ -274,16 +275,11 @@ function restoreEmptyTitle(d: TodoDraft): void {
 }
 
 /**
- * A title is one line. The textarea (it only exists so a long title wraps) blocks a typed
- * Enter, but pasted or dictated text can still carry line breaks: fold them into spaces.
+ * A title is one line. `AutoGrowTextarea` (it only exists so a long title wraps) blocks a
+ * typed Enter, but pasted or dictated text can still carry line breaks: fold them into spaces.
  */
 function cleanTitle(title: string): string {
   return title.replace(/\s*[\r\n]+\s*/g, ' ').trim();
-}
-
-/** Enter never adds a line, except while an IME is composing (Enter commits the text there). */
-function onTitleEnter(e: KeyboardEvent): void {
-  if (!e.isComposing) e.preventDefault();
 }
 
 // ── Activity summary (shared only) ──────────────────────────────────────────
@@ -520,23 +516,17 @@ function logClosed(action: 'dismissed' | 'corrected'): void {
 
             <template v-else>
               <div class="flex items-start gap-2">
-                <!-- The grid mirror grows the textarea to its content, so a long title wraps
-                     instead of being cut off at phone width. -->
-                <div
-                  class="title-grow font-outfit min-w-0 flex-1 text-sm font-semibold"
-                  :data-value="`${d.title} `"
-                >
-                  <textarea
-                    v-model="d.title"
-                    rows="1"
-                    :aria-label="t('magicTodos.titlePlaceholder')"
-                    :placeholder="t('magicTodos.titlePlaceholder')"
-                    class="dark:text-ink dark:border-line-strong resize-none overflow-hidden rounded-md border-b border-dotted border-[rgb(44_62_80/22%)] bg-transparent text-[var(--color-text)] focus:border-transparent focus:ring-2 focus:ring-purple-400 focus:outline-none"
-                    data-testid="magic-todo-title"
-                    @keydown.enter="onTitleEnter"
-                    @blur="restoreEmptyTitle(d)"
-                  />
-                </div>
+                <!-- Grows to its content, so a long title wraps instead of being cut off at
+                     phone width. Enter is blocked inside it (a title is one line). -->
+                <AutoGrowTextarea
+                  v-model="d.title"
+                  wrapper-class="font-outfit min-w-0 flex-1 text-sm font-semibold"
+                  :aria-label="t('magicTodos.titlePlaceholder')"
+                  :placeholder="t('magicTodos.titlePlaceholder')"
+                  class="dark:text-ink dark:border-line-strong rounded-md border-b border-dotted border-[rgb(44_62_80/22%)] bg-transparent text-[var(--color-text)] focus:border-transparent focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                  data-testid="magic-todo-title"
+                  @blur="restoreEmptyTitle(d)"
+                />
                 <button
                   type="button"
                   class="font-outfit dark:bg-surface-hover dark:text-ink-soft flex flex-shrink-0 items-center gap-1 rounded-[10px] bg-[var(--tint-slate-5)] px-2 py-1 text-xs font-semibold text-[var(--color-text-muted)]"
@@ -599,27 +589,6 @@ function logClosed(action: 'dismissed' | 'corrected'): void {
   letter-spacing: 0.08em;
   margin-bottom: 0.5rem;
   text-transform: uppercase;
-}
-
-/* Auto-growing title: the hidden ::after mirror and the textarea share one grid cell, so the
-   cell (and the textarea) is as tall as the wrapped text. */
-.title-grow {
-  display: grid;
-}
-
-.title-grow::after {
-  content: attr(data-value);
-  visibility: hidden;
-  white-space: pre-wrap;
-}
-
-.title-grow > textarea,
-.title-grow::after {
-  border-bottom-width: 1px;
-  font: inherit;
-  grid-area: 1 / 1 / 2 / 2;
-  overflow-wrap: anywhere;
-  padding: 0.125rem 0.25rem;
 }
 
 .review-aside {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
 
 const props = defineProps<{
@@ -10,8 +11,8 @@ const props = defineProps<{
   /** Use light-on-dark styling for dark card backgrounds */
   dark?: boolean;
   /**
-   * Optional pill trigger label (ALREADY translated — pass `t('key')`, this
-   * component never calls `t()`). When set, renders a labeled "How?"-style pill
+   * Optional pill trigger label (ALREADY translated — pass `t('key')`; the only
+   * string this component translates itself is the bare badge's accessible name). When set, renders a labeled "How?"-style pill
    * with the "?" badge at the end, instead of the default bare "?" badge.
    *
    * NOTE: this is the last acceptable prop-based trigger variant. A third
@@ -26,6 +27,8 @@ const props = defineProps<{
    */
   link?: { text: string; href: string };
 }>();
+
+const { t } = useTranslation();
 
 const show = ref(false);
 const el = ref<HTMLElement>();
@@ -96,14 +99,16 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       class="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors"
       :class="
         dark
-          ? 'bg-white/10 text-white/85 hover:bg-white/20'
-          : 'bg-heritage-orange/10 text-heritage-orange hover:bg-heritage-orange/20'
+          ? 'bg-white/10 text-white hover:bg-white/20'
+          : 'bg-heritage-orange/10 text-heritage-orange dark:text-accent-lift hover:bg-heritage-orange/20'
       "
+      :aria-expanded="show"
       @click.stop="toggle"
     >
       {{ triggerLabel }}
       <span
-        class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[0.625rem] leading-none font-bold"
+        aria-hidden="true"
+        class="flex h-4 w-4 items-center justify-center rounded-full text-xs leading-none font-bold"
         :class="dark ? 'bg-white/20' : 'bg-heritage-orange/20'"
         >?</span
       >
@@ -113,26 +118,32 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       v-else
       ref="btn"
       type="button"
-      class="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[0.625rem] leading-none font-bold"
+      class="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-xs leading-none font-bold"
       :class="
         dark
-          ? 'bg-white/15 text-white/60 hover:bg-white/25'
-          : 'dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover bg-gray-200 text-gray-500 hover:bg-gray-300'
+          ? 'bg-white/15 text-white hover:bg-white/25'
+          : 'dark:bg-surface-hover dark:text-ink-soft dark:hover:text-ink hover:text-secondary-500 bg-[var(--tint-slate-10)] text-[var(--color-text-muted)]'
       "
+      :aria-label="t('common.moreInfo')"
+      :aria-expanded="show"
+      data-testid="info-hint-trigger"
       @click.stop="toggle"
     >
-      ?
+      <span aria-hidden="true">?</span>
     </button>
+    <!-- z-[300]: a hint is transient and must sit above EVERY surface it can be opened from,
+         including 'top' (z-[250]) and 'gate' (z-[260]) modals/drawers such as the magic beans
+         sheet. At z-[200] it rendered behind those. -->
     <Teleport to="body">
       <div
         v-if="show"
         ref="popover"
         style="font-family: var(--font-inter)"
-        class="z-[200] w-72 max-w-[calc(100vw-2rem)] rounded-xl p-3 text-xs leading-relaxed font-normal tracking-normal normal-case shadow-lg"
+        class="z-[300] w-72 max-w-[calc(100vw-2rem)] rounded-xl p-3 text-xs leading-relaxed font-normal tracking-normal normal-case shadow-lg"
         :class="
           dark
-            ? 'bg-secondary-600 border border-white/15 text-white/85'
-            : 'dark:border-line-strong dark:bg-surface-overlay dark:text-ink-soft border border-gray-200 bg-white text-gray-600'
+            ? 'bg-secondary-600 border border-white/15 text-white'
+            : 'dark:border-line-strong dark:bg-surface-overlay dark:text-ink-soft text-secondary-500 border border-[var(--tint-slate-10)] bg-white'
         "
         :style="popoverStyle"
         @click.stop
@@ -152,8 +163,10 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         <button
           v-if="link"
           type="button"
-          class="text-heritage-orange mt-2.5 block w-full cursor-pointer border-t pt-2.5 text-left text-xs font-semibold hover:underline"
-          :class="dark ? 'border-white/15' : 'dark:border-line-strong border-gray-200'"
+          class="text-heritage-orange dark:text-accent-lift mt-2.5 block w-full cursor-pointer border-t pt-2.5 text-left text-xs font-semibold hover:underline"
+          :class="
+            dark ? 'border-white/15' : 'dark:border-line-strong border-[var(--tint-slate-10)]'
+          "
           @click.stop="openLink"
         >
           {{ link.text }}

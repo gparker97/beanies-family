@@ -124,4 +124,22 @@ describe('FormFieldGroup validation contract', () => {
     await w.setProps({ error: true });
     expect(w.text()).toContain('This field is required');
   });
+
+  it('renders label-extra BESIDE the label: never faded with it, never part of its name', () => {
+    const w = mount(FormFieldGroup, {
+      props: { label: 'Paste Here' },
+      slots: {
+        default: '<textarea></textarea>',
+        'label-extra': '<button type="button" aria-label="More info">?</button>',
+      },
+      attachTo: document.body,
+    });
+    const label = w.find('label');
+    // The textarea's name is the label's subtree; the hint's "More info" must not be in it.
+    expect(label.find('button').exists()).toBe(false);
+    expect(label.text()).toBe('Paste Here');
+    // Still on the label's row, so it reads as the label's hint.
+    expect(w.find('button').element.parentElement).toBe(label.element.parentElement);
+    expect(w.find('textarea').attributes('aria-labelledby')).toBe(label.attributes('id'));
+  });
 });

@@ -44,7 +44,7 @@ export const ENTITY_DEEP_LINKS: Readonly<Record<DeepLinkType, { path: string; pa
     vacation: { path: '/travel', param: 'vacation' },
     todo: { path: '/todo', param: 'view' },
     // `/lists` opens `?view=<id>` straight into the list drawer — the same param
-    // `useRecipeShoppingLists.openList` pushes, so a tapped reminder and an
+    // `useOpenList().openList` pushes, so a tapped reminder and an
     // in-app "open list" land in exactly the same place.
     list: { path: '/lists', param: 'view' },
     account: { path: '/accounts', param: 'view' },

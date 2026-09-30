@@ -156,6 +156,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiStatementConsentAcknowledgedAt = computed<string | null>(
     () => settings.value.aiStatementConsentAcknowledgedAt ?? null
   );
+  // #116: when the family ticked "don't ask again" on the shopping-list ingredients consent, or null.
+  const aiIngredientsConsentAcknowledgedAt = computed<string | null>(
+    () => settings.value.aiIngredientsConsentAcknowledgedAt ?? null
+  );
   // #34: warn when an activity clashes with a connected calendar's free/busy.
   // Family-scoped (synced); default ON (the freebusy scope is granted upfront).
   const calendarClashNudgeEnabled = computed<boolean>(
@@ -776,6 +780,12 @@ export const useSettingsStore = defineStore('settings', () => {
       settingsRepo.setAiStatementConsentAcknowledgedAt(toISODateString(new Date()))
     );
 
+  // #116: stamp the ingredients consent's own "don't ask again". Same contract.
+  const acknowledgeIngredientsConsent = () =>
+    persistAiSetting('ai.consent.ingredients.label', 'aiIngredientsConsentAcknowledgedAt', () =>
+      settingsRepo.setAiIngredientsConsentAcknowledgedAt(toISODateString(new Date()))
+    );
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -1032,6 +1042,8 @@ export const useSettingsStore = defineStore('settings', () => {
     skipDocumentConsentPrompt,
     aiStatementConsentAcknowledgedAt,
     acknowledgeStatementConsent,
+    aiIngredientsConsentAcknowledgedAt,
+    acknowledgeIngredientsConsent,
     calendarClashNudgeEnabled,
     helpfulHintsEnabled,
     helpfulHintNotifyByType,

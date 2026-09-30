@@ -66,23 +66,28 @@ onUpdated(associateLabel);
 
 <template>
   <div class="space-y-2 rounded-2xl" :data-form-label="label">
-    <label
-      :id="labelId"
-      class="font-outfit flex items-center gap-1.5 text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
-      :class="
-        error
-          ? 'text-primary-500 dark:text-accent-lift opacity-100'
-          : 'dark:text-ink-soft text-[var(--color-text)] opacity-35'
-      "
-    >
-      {{ label }}
-      <span
-        v-if="required"
-        class="text-primary-500 dark:text-accent-lift text-sm font-bold opacity-100"
-        >*</span
+    <!-- `label-extra` (a hint badge, a remove button) sits BESIDE the label, never inside it:
+         inside, it inherited the label's opacity-35 and its own accessible name ("More info")
+         was read as part of the control's name through `aria-labelledby`. -->
+    <div class="flex items-center gap-1.5">
+      <label
+        :id="labelId"
+        class="font-outfit flex items-center gap-1.5 text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
+        :class="
+          error
+            ? 'text-primary-500 dark:text-accent-lift opacity-100'
+            : 'dark:text-ink-soft text-[var(--color-text)] opacity-35'
+        "
       >
+        {{ label }}
+        <span
+          v-if="required"
+          class="text-primary-500 dark:text-accent-lift text-sm font-bold opacity-100"
+          >*</span
+        >
+      </label>
       <slot name="label-extra" />
-    </label>
+    </div>
     <div ref="controlWrap" :class="error ? 'ring-primary-500/40 rounded-2xl ring-2' : ''">
       <slot />
     </div>

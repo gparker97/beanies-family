@@ -14,6 +14,7 @@
  *  for the AI service/provider modules. */
 export type { AiTier } from '@/types/models';
 import type { ShareKind } from '@/types/magicPayload';
+import type { DedupeGroup } from '@/utils/dedupePayload';
 
 /**
  * Concrete inference backends. `tinfoil` is the managed-tier engine (server-held
@@ -90,8 +91,9 @@ export interface ExtractionContext {
 
 /**
  * A single document to extract from. Data-minimization: this is one document, never the
- * family dataset, with the one named exception of {@link ExtractionContext} for the
- * `statement` task (ADR-030, 2026-09-25 update).
+ * family dataset, with two named exceptions (ADR-030): {@link ExtractionContext} for the
+ * `statement` task (2026-09-25 update), and the `dedupe` task, whose text source IS family data:
+ * the ingredient lines of a shopping list being built, and nothing else (2026-09-30 update).
  *
  * NOTE: there is deliberately no `task` field. The task is `run`'s first argument, and
  * carrying it in both places creates two sources of truth that can disagree.
@@ -223,6 +225,8 @@ export interface ExtractionResultByTask {
   share: ShareExtractionResult;
   /** One page (or text chunk) of a bank or card statement (#107). */
   statement: StatementExtractionResult;
+  /** Which lines of a shopping list being built are the same item (#116). Free to the family. */
+  dedupe: DedupeExtractionResult;
 }
 
 /** The extraction tasks the funnel supports (one prompt/schema/parser per task). */
@@ -378,6 +382,20 @@ export interface RecipeExtractionResult extends AttestedResult {
    * the field removes the class of risk rather than defending against it.
    */
   confidence: RecipeFieldConfidence;
+}
+
+/**
+ * Which lines of a shopping list are the SAME purchasable item written differently (#116).
+ * Mirrors `DEDUPE_JSON_SHAPE`.
+ *
+ * The model returns GROUPS OF IDS and a short name, never an amount: the client writes the
+ * merged line from the source lines' own text, so no number is ever invented. The ids are the
+ * opaque ones the client sent (`L1…LN`); the parser checks shape only, and the caller drops any
+ * id it did not send.
+ */
+export interface DedupeExtractionResult extends AttestedResult {
+  /** At most `MODEL_LIST_MAX`. Each has a non-empty name and at least 2 distinct ids. */
+  groups: DedupeGroup[];
 }
 
 /** What kind of line a statement row is. Decides direction defaults and transfer offers. */

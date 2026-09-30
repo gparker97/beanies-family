@@ -5,6 +5,9 @@ import InfoHintBadge from '../InfoHintBadge.vue';
 import { openExternal } from '@/utils/openExternal';
 
 vi.mock('@/utils/openExternal', () => ({ openExternal: vi.fn() }));
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (k: string) => (k === 'common.moreInfo' ? 'More info' : k) }),
+}));
 
 /** Teleport stubbed inline so wrapper.find() reaches the popover content. */
 function factory(props: Record<string, unknown> = {}) {
@@ -27,6 +30,15 @@ describe('InfoHintBadge', () => {
       // The bare badge is the small fixed-size variant.
       expect(btn.classes()).toContain('h-4');
       expect(btn.classes()).toContain('w-4');
+    });
+
+    it('the bare badge has an accessible name and reports whether it is open', async () => {
+      const wrapper = factory({ text: 'A plain hint' });
+      const btn = wrapper.get('button');
+      expect(btn.attributes('aria-label')).toBe('More info');
+      expect(btn.attributes('aria-expanded')).toBe('false');
+      await btn.trigger('click');
+      expect(btn.attributes('aria-expanded')).toBe('true');
     });
 
     it('shows no foot link when no link prop is supplied', async () => {

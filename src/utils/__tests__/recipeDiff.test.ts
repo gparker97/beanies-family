@@ -35,6 +35,7 @@ function prefill(fields: Partial<RecipePrefill['fields']> = {}): RecipePrefill {
     inferredSteps: [],
     inferredTimes: [],
     taxonomyRejected: [],
+    servingsUnparsed: false,
     dishImage: null,
     confidence: { name: 1, ingredients: 1, steps: 1 },
   };
@@ -52,6 +53,30 @@ describe('what it reports as changed', () => {
     expect(d.changed).toBe(false);
     expect(d.rows).toEqual([]);
     expect(d.patch).toEqual({});
+  });
+
+  it('treats "Serves 8" and "8" as the same servings (#116)', () => {
+    // The capture prefill is normalised to the digit string; the stored text is compared the
+    // same way (`recipeComparable`), so an old-format value is not a spurious change.
+    const same = {
+      ingredients: ['225g butter', '4 eggs'],
+      steps: ['Heat the oven.', 'Beat the butter.'],
+    };
+    const d = diffRecipe(recipe(), prefill({ ...same, servings: '8' }));
+    expect(d.changed).toBe(false);
+    expect(d.patch).not.toHaveProperty('servings');
+
+    const changed = diffRecipe(recipe(), prefill({ ...same, servings: '6' }));
+    expect(changed.rows).toEqual([{ field: 'servings', mine: '8', theirs: '6' }]);
+  });
+
+  it('offers a count for an old recipe whose servings text had none (#116)', () => {
+    const same = {
+      ingredients: ['225g butter', '4 eggs'],
+      steps: ['Heat the oven.', 'Beat the butter.'],
+    };
+    const d = diffRecipe(recipe({ servings: '12 muffins' }), prefill({ ...same, servings: '12' }));
+    expect(d.rows).toEqual([{ field: 'servings', mine: undefined, theirs: '12' }]);
   });
 
   it('reports a changed value old-beside-new', () => {

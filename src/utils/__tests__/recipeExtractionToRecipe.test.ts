@@ -187,3 +187,47 @@ describe('inferredTimes (#93)', () => {
     expect(p.inferredTimes).toEqual([]);
   });
 });
+
+describe('servings becomes the digit string of its people count (#116)', () => {
+  it('normalises the AI rung and reports nothing unparsed', () => {
+    const p = recipeExtractionToPrefill(result({ servings: 'Serves 4-6' }))!;
+    expect(p.fields.servings).toBe('4');
+    expect(p.servingsUnparsed).toBe(false);
+  });
+
+  it('drops text with no people count, reports it, and drops its inferred hint', () => {
+    const p = recipeExtractionToPrefill(
+      result({ servings: '12 muffins', inferredTimes: ['prepTime', 'servings'] })
+    )!;
+    expect(p.fields).not.toHaveProperty('servings');
+    expect(p.servingsUnparsed).toBe(true);
+    expect(p.inferredTimes).toEqual(['prepTime']);
+  });
+
+  it('keeps the inferred hint when the inferred servings parsed', () => {
+    const p = recipeExtractionToPrefill(result({ servings: '4', inferredTimes: ['servings'] }))!;
+    expect(p.inferredTimes).toEqual(['servings']);
+  });
+
+  it('does not report an EMPTY servings as unparsed', () => {
+    expect(recipeExtractionToPrefill(result({ servings: '' }))!.servingsUnparsed).toBe(false);
+  });
+
+  it('normalises the JSON-LD rung the same way', () => {
+    const base = {
+      name: 'Loaf',
+      subtitle: '',
+      prepTime: '',
+      cookTime: '',
+      ingredients: ['flour'],
+      steps: ['bake'],
+      imageUrl: '',
+    };
+    const counted = jsonLdToPrefill({ ...base, servings: '8 servings' }, 'https://x.example/r');
+    expect(counted.fields.servings).toBe('8');
+    expect(counted.servingsUnparsed).toBe(false);
+    const loaves = jsonLdToPrefill({ ...base, servings: 'Makes 2 loaves' }, 'https://x.example/r');
+    expect(loaves.fields).not.toHaveProperty('servings');
+    expect(loaves.servingsUnparsed).toBe(true);
+  });
+});

@@ -19,6 +19,16 @@ import {
 } from '../../../../infrastructure/lambda/ai-extract/correctionGrant.mjs';
 // @ts-expect-error — as above.
 import { SEALED_PROTOCOL } from '../../../../infrastructure/lambda/ai-extract/sealedForward.mjs';
+// @ts-expect-error — as above.
+import { FREE_TASK_MAX_BYTES } from '../../../../infrastructure/lambda/ai-extract/meter.mjs';
+
+import { EXTRACTION_TASKS } from '../extractionPrompt';
+import {
+  DEDUPE_MAX_PAYLOAD_BYTES,
+  dedupePayload,
+  dedupePayloadBytes,
+  type DedupeLine,
+} from '@/utils/dedupePayload';
 
 import { sourceHash } from '../providers/managedProvider';
 import { MAGIC_DESTINATION_KINDS } from '@/constants/magicDestinations';
@@ -94,6 +104,79 @@ describe('client / Lambda contract parity', () => {
     expect(clientMatch, 'MANAGED_TEXT_BILL_BOUND must still exist in the client').toBeTruthy();
 
     expect(Number(clientMatch![1].replace(/_/g, ''))).toBe(Number(match![1].replace(/_/g, '')));
+  });
+
+  // ── Free tasks (#116) ─────────────────────────────────────────────────────────────────
+  //
+  // The Lambda makes a read free only when the SIZE it measured is inside the task's bound, so a
+  // client whose worst case outgrows that bound is silently CHARGED for a feature labelled free.
+  // These build the real sealed request, from the real prompt, and measure it the way the
+  // Lambda does.
+
+  it('every free task is a task the client actually has', () => {
+    const free = [...(FREE_TASK_MAX_BYTES as Map<string, number>).keys()];
+    expect(free.length).toBeGreaterThan(0);
+    for (const task of free) expect(Object.keys(EXTRACTION_TASKS)).toContain(task);
+  });
+
+  it('the worst-case dedupe request fits under the free bound, with margin', () => {
+    const bound = (FREE_TASK_MAX_BYTES as Map<string, number>).get('dedupe')!;
+    const enc = (s: string) => new TextEncoder().encode(s).length;
+    // `sealedForward.mjs` meters `Buffer.from(sealed, 'base64').length`: the EHBP ciphertext of
+    // the JSON body `managedProvider` seals. EHBP adds a 4-byte length prefix and a 16-byte AEAD
+    // tag (ehbp `encryptRequestWithContext`). The model id comes from the proxy; 128 bytes is a
+    // generous stand-in for today's `gemma4-31b`.
+    const SEAL_OVERHEAD = 4 + 16;
+    const sealedBytes = (lines: DedupeLine[]) =>
+      enc(
+        JSON.stringify({
+          model: 'm'.repeat(128),
+          messages: EXTRACTION_TASKS.dedupe.buildMessages(
+            { kind: 'text', text: dedupePayload(lines) },
+            '2026-09-30'
+          ),
+          temperature: 0,
+        })
+      ) + SEAL_OVERHEAD;
+
+    /** Add lines of `text` until the next one would cross the client's payload bound. */
+    const fill = (text: string): DedupeLine[] => {
+      const lines: DedupeLine[] = [];
+      for (let i = 1; ; i++) {
+        const next = [...lines, { id: `L${i}`, text }];
+        if (dedupePayloadBytes(next) > DEDUPE_MAX_PAYLOAD_BYTES) return lines;
+        lines.push(next[next.length - 1]!);
+      }
+    };
+
+    // Quotes and backslashes are the worst: escaped once in the payload and AGAIN in the
+    // request body, so they double. CJK is 3 UTF-8 bytes a character. Control characters
+    // become six-byte escapes. Short lines maximise the per-line id overhead.
+    const worst = [
+      '"'.repeat(60),
+      '\\'.repeat(60),
+      '"\\'.repeat(40),
+      '豆腐と鶏むね肉'.repeat(8),
+      '\u0001\u2028'.repeat(20),
+      'x',
+      '2 "heaped" tbsp 醤油 \\ to taste',
+    ];
+    let largest = 0;
+    for (const text of worst) {
+      const lines = fill(text);
+      expect(dedupePayloadBytes(lines)).toBeLessThanOrEqual(DEDUPE_MAX_PAYLOAD_BYTES);
+      largest = Math.max(largest, sealedBytes(lines));
+    }
+
+    // The analytic ceiling the comment in meter.mjs derives: at most twice the payload, plus the
+    // fixed prompt. It must hold for the measured cases, or the derivation is wrong.
+    const fixed = sealedBytes([]);
+    expect(largest).toBeLessThanOrEqual(2 * DEDUPE_MAX_PAYLOAD_BYTES + fixed);
+
+    // At least 15% headroom above the worst case, so modest prompt growth still fits. When this
+    // fails: raise FREE_TASK_MAX_BYTES in meter.mjs and deploy the Lambda BEFORE the client, or
+    // lower DEDUPE_MAX_PAYLOAD_BYTES.
+    expect(largest * 1.15).toBeLessThan(bound);
   });
 
   it('lets a correction name exactly the kinds the app can make (#113)', () => {

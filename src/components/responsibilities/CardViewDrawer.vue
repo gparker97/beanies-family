@@ -45,6 +45,7 @@ import { cardUsesFor } from '@/constants/responsibilityCards';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { SLOT_LABEL_KEYS } from '@/constants/mealSlots';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { uiLocale } from '@/utils/uiLocale';
 import {
   MAIN_PART_KEY,
   cardHistory,
@@ -99,8 +100,10 @@ const owners = computed(() => [
 /** "greg and Sofia" / "格雷格和米娅": the locale's own list, never an English comma. */
 function listNames(names: string[]): string {
   try {
-    const locale = currentLanguage.value === 'zh' ? 'zh-CN' : 'en-US';
-    return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(names);
+    return new Intl.ListFormat(uiLocale(currentLanguage.value), {
+      style: 'long',
+      type: 'conjunction',
+    }).format(names);
   } catch {
     // Intl.ListFormat is missing on very old browsers: a plain list still reads fine.
     return names.join(', ');

@@ -244,6 +244,7 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
           // No model output on this rung, so nothing was offered and nothing was rejected —
           // and nothing was inferred, because nothing was read.
           taxonomyRejected: [],
+          servingsUnparsed: false,
           inferredTimes: [],
           dishImage: null,
           confidence: { name: 1, ingredients: 0, steps: 0 },
@@ -361,6 +362,20 @@ export function useRecipeCapture(options: UseRecipeCaptureOptions) {
         detail: INFERRED_TIME_BUCKETS[new Set(prefill.inferredTimes).size] ?? 'none',
       },
     });
+
+    // The source gave servings text with no people count ("12 muffins", "Makes 2 loaves"), so
+    // the prefill left it blank (#116). This is the parser's miss rate on real sources. It
+    // also means `times_filled`'s `count` above reads LOWER for those captures than it did
+    // before servings became a number — intended: a blank stepper is not a filled field.
+    // The servings text itself is never logged.
+    if (prefill.servingsUnparsed) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'servings unparsed',
+        context: { action: 'servings_unparsed', kind },
+      });
+    }
 
     // The event that matters. Without it a model drifting to "Main Course" or "brunch" is
     // indistinguishable from one that simply declined — both present as "the AI never fills

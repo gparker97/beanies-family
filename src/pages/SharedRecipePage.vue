@@ -24,6 +24,7 @@ import { showToast } from '@/composables/useToast';
 import { decodeRecipeShare, type SharedRecipeFields } from '@/utils/recipeShareLink';
 import { stashKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
 import { getUrlDomain, safeHttpsUrl } from '@/utils/url';
+import { formatServes, servingsOf } from '@/utils/recipeServings';
 
 const route = useRoute();
 const router = useRouter();
@@ -87,9 +88,12 @@ const sourceHref = computed(() => safeHttpsUrl(fields.value?.sourceUrl ?? null))
  */
 const hasPod = computed(() => authStore.isAuthenticated && authStore.podCreated);
 
+/** "Serves 4", or '' when there is no people count (#116). */
+const servesText = computed(() => formatServes(servingsOf(fields.value ?? undefined), t));
+
 /** Prep · Cook · Serves, only the parts that exist. */
 const hasMeta = computed(
-  () => !!(fields.value?.prepTime || fields.value?.cookTime || fields.value?.servings)
+  () => !!(fields.value?.prepTime || fields.value?.cookTime || servesText.value)
 );
 
 /**
@@ -166,10 +170,10 @@ function keep() {
               fields.cookTime
             }}</strong>
           </span>
-          <span v-if="fields.servings">
+          <span v-if="servesText">
             🍽️
             <strong class="font-outfit text-secondary-500 dark:text-ink font-semibold">{{
-              fields.servings
+              servesText
             }}</strong>
           </span>
         </div>

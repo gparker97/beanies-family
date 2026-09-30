@@ -12,6 +12,7 @@
 // row. Escape is owned by that composable via the shared `useEscapeClose`
 // stack, so this file must NOT also bind `@keyup.esc`.
 import { toRef } from 'vue';
+import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useInlineRename } from '@/composables/useInlineRename';
 import type { FamilyListItem } from '@/types/models';
@@ -43,6 +44,16 @@ const { draft, inputRef, onEnter, onEsc, onBlur } = useInlineRename({
   save: (text) => emit('edit-save', text),
   cancel: () => emit('edit-cancel'),
 });
+
+/**
+ * An item is one line. The field only wraps so a long item can be read while it is edited.
+ * `single-line` stops a line break at the source (Enter and a soft keyboard's Return commit, a
+ * paste is folded at the caret); this fold is the last-resort guard for anything else (a
+ * dictated or dropped line break), where the caret may jump but the item still stays one line.
+ */
+function setDraft(value: string): void {
+  draft.value = value.replace(/[\r\n]+/g, ' ');
+}
 </script>
 
 <template>
@@ -73,19 +84,23 @@ const { draft, inputRef, onEnter, onEsc, onBlur } = useInlineRename({
       <span v-if="item.completed" aria-hidden="true">✓</span>
     </button>
 
-    <!-- EDITING: raw <input> (focusable + autofocused via nextTick; matches the
-         static text rhythm so no layout jump) + explicit save/cancel controls.
-         `pointerdown.prevent` on the controls keeps focus on the input so the
-         input's blur-to-save can't fire BEFORE a deliberate ✕ cancel. -->
+    <!-- EDITING: a one-line field that WRAPS (AutoGrowTextarea), so a long item that wraps
+         in the list is readable in full while it is edited too. Autofocused via nextTick,
+         plus explicit save/cancel controls. `pointerdown.prevent` on the controls keeps
+         focus in the field so its blur-to-save can't fire BEFORE a deliberate ✕ cancel. -->
     <template v-if="editable && editing">
-      <input
-        :ref="(el) => (inputRef = el as HTMLInputElement | null)"
-        v-model="draft"
-        type="text"
-        class="min-w-0 flex-1 border-b border-[var(--color-primary-500)] bg-transparent text-base text-[var(--color-text)] outline-none"
+      <AutoGrowTextarea
+        :ref="(el) => (inputRef = el as InstanceType<typeof AutoGrowTextarea> | null)"
+        :model-value="draft"
+        wrapper-class="min-w-0 flex-1 text-base"
+        single-line
+        enterkeyhint="done"
+        class="border-b border-[var(--color-primary-500)] bg-transparent text-[var(--color-text)] outline-none"
         :placeholder="t('lists.detail.itemPlaceholder')"
         :aria-label="t('lists.detail.editItem')"
-        @keyup.enter="onEnter"
+        data-testid="list-item-edit"
+        @update:model-value="setDraft"
+        @enter="onEnter"
         @blur="onBlur"
       />
       <button
@@ -121,7 +136,9 @@ const { draft, inputRef, onEnter, onEsc, onBlur } = useInlineRename({
       :aria-label="t('lists.detail.editItem')"
       @click="$emit('edit-start')"
     >
-      <span class="min-w-0 flex-1 truncate">{{ item.title }}</span>
+      <!-- Wraps, never an ellipsis: a long item ("Ground beef: 500 g ground beef (×3) + …")
+           must be readable in full at the shop. -->
+      <span class="min-w-0 flex-1 wrap-anywhere">{{ item.title }}</span>
       <span
         class="flex-shrink-0 text-xs text-[var(--color-text-muted)] opacity-40 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
         aria-hidden="true"
@@ -132,7 +149,7 @@ const { draft, inputRef, onEnter, onEsc, onBlur } = useInlineRename({
     <!-- READ-ONLY text (default; the LinkedLists embed). -->
     <span
       v-else
-      class="flex-1 text-sm"
+      class="min-w-0 flex-1 text-sm wrap-anywhere"
       :class="
         item.completed ? 'text-[var(--color-text-muted)] line-through' : 'text-[var(--color-text)]'
       "

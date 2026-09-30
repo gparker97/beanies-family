@@ -25,6 +25,14 @@ interface Props {
    * `includePets` is ignored when this prop is set.
    */
   members?: import('@/types/models').FamilyMember[];
+  /**
+   * Multi mode only: a trailing text button at the end of the chip row that picks every
+   * chip ("Everyone") or, once they are all picked, unpicks them ("Clear"). "All" is
+   * measured against THIS picker's own member list. Visual only: what an all-picked or
+   * empty value MEANS is the caller's business. No `aria-pressed`: its label names the
+   * action, like the checklist's tick-all toggle.
+   */
+  allToggle?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
   showShared: false,
   includePets: false,
   members: undefined,
+  allToggle: false,
 });
 
 const emit = defineEmits<{
@@ -74,6 +83,23 @@ function toggle(id: string) {
   } else {
     emit('update:modelValue', id === props.modelValue ? '' : id);
   }
+}
+
+const showAllToggle = computed(
+  () => props.allToggle && props.mode === 'multi' && members.value.length > 0
+);
+const allPicked = computed(() => members.value.every((m) => isSelected(m.id)));
+
+/** Pick every chip, or unpick them all; ids outside this picker's list are kept. */
+function toggleAll() {
+  const current = Array.isArray(props.modelValue) ? props.modelValue : [];
+  const ids = members.value.map((m) => m.id);
+  emit(
+    'update:modelValue',
+    allPicked.value
+      ? current.filter((id) => !ids.includes(id))
+      : [...current, ...ids.filter((id) => !current.includes(id))]
+  );
 }
 
 const avatarSize = computed(() => (props.compact ? 'h-6 w-6 text-xs' : 'h-7 w-7 text-xs'));
@@ -123,6 +149,16 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <span class="font-outfit dark:text-ink text-xs font-semibold text-[var(--color-text)]">
         {{ member.name }}
       </span>
+    </button>
+
+    <button
+      v-if="showAllToggle"
+      type="button"
+      class="font-outfit text-primary-600 dark:text-accent-lift self-center px-1 text-xs font-semibold underline underline-offset-2"
+      data-testid="family-chip-all-toggle"
+      @click="toggleAll"
+    >
+      {{ allPicked ? t('action.clear') : t('common.everyone') }}
     </button>
   </div>
 </template>

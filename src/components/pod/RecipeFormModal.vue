@@ -28,6 +28,8 @@ import { diffPayload } from '@/utils/diffPayload';
 import { recipeComparable } from '@/utils/recipeComparable';
 import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import NumberStepper from '@/components/ui/NumberStepper.vue';
+import { SERVINGS_MAX, servingsOf } from '@/utils/recipeServings';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFormModal } from '@/composables/useFormModal';
@@ -94,7 +96,15 @@ const name = ref('');
 const subtitle = ref('');
 const prepTime = ref('');
 const cookTime = ref('');
-const servings = ref('');
+/**
+ * Servings as a NUMBER of people (#116); `undefined` = not set. Stored as its digit string.
+ *
+ * 🚨 Same four places as the refs below: seeded from `servingsOf` in `onEdit` AND
+ * `applyPrefill`, written by `buildPayload`, and compared by `recipeComparable` (which
+ * normalises the stored text the same way, so an untouched "Serves 4-6" or "12 muffins"
+ * recipe diffs as unchanged and its text is never rewritten by an unrelated edit).
+ */
+const servingsCount = ref<number | undefined>(undefined);
 const ingredientsText = ref('');
 const stepsText = ref('');
 const notes = ref('');
@@ -203,7 +213,7 @@ function applyPrefill(prefill: RecipePrefill | null): void {
   subtitle.value = f?.subtitle ?? '';
   prepTime.value = f?.prepTime ?? '';
   cookTime.value = f?.cookTime ?? '';
-  servings.value = f?.servings ?? '';
+  servingsCount.value = servingsOf(f);
   ingredientsText.value = (f?.ingredients ?? []).join('\n');
   stepsText.value = (f?.steps ?? []).join('\n');
   notes.value = f?.notes ?? '';
@@ -241,7 +251,7 @@ const { isEditing, isSubmitting } = useFormModal(
       subtitle.value = r.subtitle ?? '';
       prepTime.value = r.prepTime ?? '';
       cookTime.value = r.cookTime ?? '';
-      servings.value = r.servings ?? '';
+      servingsCount.value = servingsOf(r);
       ingredientsText.value = (r.ingredients ?? []).join('\n');
       stepsText.value = (r.steps ?? []).join('\n');
       notes.value = r.notes ?? '';
@@ -414,7 +424,8 @@ function buildPayload() {
     subtitle: orUndefined(subtitle.value),
     prepTime: orUndefined(prepTime.value),
     cookTime: orUndefined(cookTime.value),
-    servings: orUndefined(servings.value),
+    // A digit string, NEVER a number: pre-0.26 clients call `.trim()` on it (#116).
+    servings: servingsCount.value != null ? String(servingsCount.value) : undefined,
     sourceUrl: orUndefined(sourceUrl.value),
     ingredients: splitLines(ingredientsText.value),
     steps: splitLines(stepsText.value),
@@ -635,9 +646,9 @@ const LIST_TEXTAREA_CLASS =
           <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
         </FormFieldGroup>
 
-        <!-- ⚠️ These three sit in a 3-column grid on tablet and up, so their inferred hint is
+        <!-- ⚠️ These two sit in a 2-column grid on tablet and up, so their inferred hint is
              ONE SHORT WORD, not a sentence — a sentence balloons the row. -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
             <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
             <InferredHint :text="inferredTimeHint('prepTime')" />
@@ -646,11 +657,27 @@ const LIST_TEXTAREA_CLASS =
             <BaseInput v-model="cookTime" :placeholder="t('recipes.placeholder.cookTime')" />
             <InferredHint :text="inferredTimeHint('cookTime')" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('recipes.field.servings')" optional>
-            <BaseInput v-model="servings" :placeholder="t('recipes.placeholder.servings')" />
-            <InferredHint :text="inferredTimeHint('servings')" />
-          </FormFieldGroup>
         </div>
+
+        <!-- Servings gets its own row (the approved #116 mockup): "[− 4 +] people" never
+             wraps, and it carries a one-line reason the number matters. -->
+        <FormFieldGroup :label="t('recipes.field.servings')" optional>
+          <NumberStepper
+            v-model="servingsCount"
+            :min="1"
+            :max="SERVINGS_MAX"
+            :unit="t('recipes.servingsUnit')"
+            :label="t('recipes.field.servings')"
+            data-testid="recipe-servings"
+          />
+          <InferredHint :text="inferredTimeHint('servings')" />
+          <p
+            class="font-inter dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+            data-testid="recipe-servings-hint"
+          >
+            {{ t('recipes.servingsHint') }}
+          </p>
+        </FormFieldGroup>
 
         <!-- Where this came from, visible and editable — the same affordance activities have.
              It is filled in automatically by the reader, but a hand-typed recipe can carry a

@@ -54,7 +54,10 @@ export function dayIso(now = Date.now()) {
  *
  * @param {object}   args
  * @param {string=}  args.familyId  Raw id. Hashed before it touches a key; never logged.
- * @param {string=}  args.attr      `USAGE_ATTRS.charged` (default) or `.corrected`.
+ * @param {string=}  args.attr      `USAGE_ATTRS.charged` (default), `.corrected`, or `.freeTask`
+ *                                  (#116). Only `charged` is billed: `corrected` and `freeTask`
+ *                                  are recorded for our own cost and never summed into the
+ *                                  billed total an allowance is spent against.
  * @param {number=}  args.now       Epoch ms. Injectable so tests need no clock control.
  * @param {object=}  args.ddb       `{ send, commands }` stub — same seam as `checkLimits`.
  * @returns {Promise<boolean>} true iff a row was written. The grant writer keys off this: an

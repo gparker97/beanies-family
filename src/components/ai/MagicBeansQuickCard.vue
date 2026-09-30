@@ -6,8 +6,10 @@
  * and passes the line under the title.
  *
  * The door owns the sheet, the consent and the ingest; this is only its trigger. The sheet opens
- * at `layer="top"`, so it sits above the drawer this card lives in.
+ * at `layer="top"`, so it sits above the drawer this card lives in. The gradient, sheen and
+ * shadow are `MagicBeansCardButton`'s (shared with the week shopping list's Find Duplicates).
  */
+import MagicBeansCardButton from '@/components/ai/MagicBeansCardButton.vue';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import type { ShareKind } from '@/types/magicPayload';
@@ -25,16 +27,14 @@ const { t } = useTranslation();
 <template>
   <MagicBeansDoor :hint="hint">
     <template #trigger="{ open }">
-      <button
-        type="button"
-        class="magic-shimmer from-primary-500 to-terracotta-400 flex w-full cursor-pointer flex-col gap-1 rounded-2xl bg-gradient-to-br p-3 text-left text-white shadow-[0_8px_18px_-8px_rgba(241,93,34,0.6)]"
-        @click="open"
-      >
-        <span aria-hidden="true" class="text-lg leading-none">✨</span>
-        <span class="font-outfit text-sm font-extrabold">{{ t('ai.magic.perform') }}</span>
-        <!-- Full white, no opacity: this line is read (CIG, no opacity on readable text). -->
-        <span class="relative z-[1] text-xs leading-snug text-white">{{ subtitle }}</span>
-      </button>
+      <MagicBeansCardButton class="p-3" @click="open">
+        <span class="flex flex-col gap-1">
+          <span aria-hidden="true" class="text-lg leading-none">✨</span>
+          <span class="font-outfit text-sm font-extrabold">{{ t('ai.magic.perform') }}</span>
+          <!-- Full white, no opacity: this line is read (CIG, no opacity on readable text). -->
+          <span class="text-xs leading-snug text-white">{{ subtitle }}</span>
+        </span>
+      </MagicBeansCardButton>
     </template>
   </MagicBeansDoor>
 </template>

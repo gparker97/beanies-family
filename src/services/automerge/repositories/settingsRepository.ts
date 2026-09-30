@@ -110,6 +110,12 @@ export async function setAiStatementConsentAcknowledgedAt(date: ISODateString): 
   return saveSettings({ aiStatementConsentAcknowledgedAt: date });
 }
 
+export async function setAiIngredientsConsentAcknowledgedAt(
+  date: ISODateString
+): Promise<Settings> {
+  return saveSettings({ aiIngredientsConsentAcknowledgedAt: date });
+}
+
 export async function setSyncEnabled(enabled: boolean): Promise<Settings> {
   return saveSettings({ syncEnabled: enabled });
 }

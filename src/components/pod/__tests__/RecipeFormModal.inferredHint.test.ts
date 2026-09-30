@@ -38,6 +38,7 @@ function prefill(over: Partial<RecipePrefill> = {}): RecipePrefill {
     inferredSteps: [],
     inferredTimes: [],
     taxonomyRejected: [],
+    servingsUnparsed: false,
     dishImage: null,
     confidence: { name: 1, ingredients: 1, steps: 1 },
     ...over,

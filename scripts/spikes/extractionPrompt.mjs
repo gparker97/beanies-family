@@ -6,7 +6,7 @@
 // extractionPrompt.mjs` (server/managed), keep the two copies drift-pinned by a unit test that asserts
 // PROMPT_VERSION + the schema shape match. Bump PROMPT_VERSION on any change so drift is detectable.
 
-export const PROMPT_VERSION = '2026-09-29.2';
+export const PROMPT_VERSION = '2026-09-30.1';
 
 // The activity-category taxonomy rendered for the model to pick `category` from.
 // HARDCODED and byte-identical across all three prompt copies (drift guard) — the .mjs copies
@@ -621,6 +621,54 @@ export function buildShareExtractionMessages(source, todayIso, opts = {}) {
   ];
 }
 
+/**
+ * The DEDUPE shape (#116): which lines of a shopping list being built from the week's recipes are
+ * the same item. The model returns GROUPS OF IDS and a name, never an amount: the client writes
+ * the merged line from the source lines' own text, so no number is ever invented.
+ */
+export const DEDUPE_JSON_SHAPE = {
+  groups:
+    'array: one object per set of lines that are the SAME purchasable item written differently. Each object has exactly these keys: name, lineIds. Empty array if there are none.',
+  name: 'string: a short plain name for the item (e.g. "ground beef"). No amounts, no units, no punctuation beyond words.',
+  lineIds:
+    'array of strings: the "id" of every line in the group, copied exactly from the input. At least 2.',
+};
+
+/** Top-level keys the dedupe model output must include. */
+export const DEDUPE_REQUIRED_KEYS = ['groups'];
+
+/**
+ * Build the messages for the DEDUPE task (#116).
+ *
+ * The source is text: a JSON array of `{ id, text }` shopping-list lines, the ingredient lines as
+ * written in the family's recipes (the named ADR-030 exception, 2026-09-30). It is fenced as
+ * untrusted by `buildUserMessage` like any other text: a recipe line may have been captured from
+ * a hostile web page. The system prompt is a fixed constant.
+ */
+// `_todayIso` is unused: a shopping list has no dates. Kept for the registry's one signature.
+export function buildDedupeMessages(source, _todayIso) {
+  const system = [
+    'You find duplicate items in ONE shopping list that is being built from several recipes.',
+    'The input is a JSON array of lines. Each line is an object {"id": string, "text": string}, and each text is one ingredient line as written in a recipe.',
+    'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
+    'Group the lines that are the SAME purchasable item written differently, such as "500 g ground beef" and "250g lean ground beef". Different items, or different forms a shopper buys separately (fresh and dried, whole and ground), are not the same item.',
+    'Give each group a short plain item name. No amounts, no units, no punctuation beyond words.',
+    'Use only ids that appear in the input, copied exactly. Never invent an id, and never put one id in two groups.',
+    'Leave out every line that matches no other line: a group always has at least 2 ids. If nothing matches, return an empty "groups" array.',
+    'Never return an amount and never rewrite a line.',
+    'The JSON object must have exactly these keys: ' + DEDUPE_REQUIRED_KEYS.join(', ') + '.',
+    'Field meanings: ' + JSON.stringify(DEDUPE_JSON_SHAPE) + '.',
+  ].join('\n');
+
+  return [
+    { role: 'system', content: system },
+    buildUserMessage(
+      'Find the lines in this shopping list that are the same item, as the specified JSON object.',
+      source
+    ),
+  ];
+}
+
 export const EXTRACTION_TASKS = {
   event: {
     buildMessages: buildExtractionMessages,
@@ -670,5 +718,13 @@ export const EXTRACTION_TASKS = {
     // Images (one rendered statement page per call) AND text (one chunk of a pasted statement
     // or CSV export per call). Same fence and review guarantees as `share` (#107).
     sources: ['images', 'text'],
+  },
+  dedupe: {
+    buildMessages: buildDedupeMessages,
+    requiredKeys: DEDUPE_REQUIRED_KEYS,
+    jsonShape: DEDUPE_JSON_SHAPE,
+    // Text only: the JSON array of a shopping list's ingredient lines (#116). Free to the
+    // family, metered on its own counter by the Lambda under a size bound (`meter.mjs`).
+    sources: ['text'],
   },
 };

@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { __setRateLimitClientForTests } from '../rateLimit.mjs';
 import { USAGE_ATTRS, __setDdbClientForTests } from '../ddb.mjs';
-import { ALARMING_PREFIXES } from '../meter.mjs';
+import { ALARMING_PREFIXES, FREE_TASK_MAX_BYTES } from '../meter.mjs';
 
 const API_KEY = 'test-key';
 const originalLog = console.log;
@@ -621,6 +621,33 @@ describe('ai-extract Lambda handler', () => {
       );
       assert.equal(res.statusCode, 200);
       assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+    });
+
+    it('CHARGES a small dedupe on the legacy plaintext arm: free is sealed-arm only (#116)', async () => {
+      // Every client that calls this arm predates Find Duplicates, so a free dedupe here would
+      // only ever be a tampered caller getting a free plaintext read under the label.
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify({ groups: [] }) });
+      const warn = console.warn;
+      const lines = [];
+      console.warn = (...a) => lines.push(a.map(String).join(' '));
+      try {
+        const res = await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: {
+              task: 'dedupe',
+              text: '[{"id":"L1","text":"1 onion"}]',
+              todayIso: '2026-06-03',
+              familyId: 'fam-handler-01',
+            },
+          })
+        );
+        assert.equal(res.statusCode, 200);
+      } finally {
+        console.warn = warn;
+      }
+      assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+      assert.ok(lines.some((l) => l.includes('free task charged: not the sealed arm')));
     });
 
     it('counts NOTHING on a refusal before the model', async () => {
@@ -1372,6 +1399,34 @@ describe('ai-extract Lambda handler', () => {
         // Finding M: on this arm the bean is spent when the enclave ANSWERED, not when we could
         // read the answer — we cannot read it at all.
         assert.deepEqual(counted(), [USAGE_ATTRS.charged], 'one charged count, and only one');
+      });
+
+      it('counts a small sealed dedupe read on the FREE attribute, never the charged one (#116)', async () => {
+        const res = await handler(
+          makeEvent({ headers: keyHeader, body: sealedBody({ task: 'dedupe' }) })
+        );
+
+        assert.equal(res.statusCode, 200);
+        assert.deepEqual(counted(), [USAGE_ATTRS.freeTask], 'one free count, and only one');
+      });
+
+      it('charges a sealed "dedupe" whose ciphertext is over the free bound (#116)', async () => {
+        // The label is client-supplied on this arm, so only the size THIS Lambda measured can make
+        // a read free. A big body wearing the label is charged, and says so in the logs.
+        const big = Buffer.alloc(FREE_TASK_MAX_BYTES.get('dedupe') + 1, 7).toString('base64');
+        const warn = console.warn;
+        const lines = [];
+        console.warn = (...a) => lines.push(a.map(String).join(' '));
+        try {
+          const res = await handler(
+            makeEvent({ headers: keyHeader, body: sealedBody({ task: 'dedupe', sealed: big }) })
+          );
+          assert.equal(res.statusCode, 200);
+        } finally {
+          console.warn = warn;
+        }
+        assert.deepEqual(counted(), [USAGE_ATTRS.charged]);
+        assert.ok(lines.some((l) => l.includes('free task charged')));
       });
 
       it('counts NOTHING when the enclave does not answer', async () => {

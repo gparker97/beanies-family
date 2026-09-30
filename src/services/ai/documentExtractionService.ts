@@ -11,8 +11,9 @@
 // without having awaited the ADR-030 gate does not compile. It used to be a convention in
 // this comment, and a new entry point duly shipped without the gate. The service never
 // inspects the token — it only demands it. Data-minimization: only the compressed document
-// leaves the device, never the family dataset — with ONE named exception, the `statement`
-// task's merchant memory (`ExtractOptions.context`, ADR-030's 2026-09-25 update, #107).
+// leaves the device, never the family dataset — with TWO named exceptions: the `statement`
+// task's merchant memory (`ExtractOptions.context`, ADR-030's 2026-09-25 update, #107), and the
+// `dedupe` task's shopping-list ingredient lines (ADR-030's 2026-09-30 update, #116).
 
 import {
   compress,
@@ -30,6 +31,7 @@ import { onDeviceProvider } from './providers/onDeviceProvider';
 import {
   ExtractionProviderError,
   type AiTier,
+  type DedupeExtractionResult,
   type DocumentExtractionResult,
   type ExtractionProvider,
   type ExtractionRequest,
@@ -321,6 +323,22 @@ export function extractRecipeFromText(
   opts: ExtractOptions
 ): Promise<DocumentExtractionResult<RecipeExtractionResult>> {
   return runExtraction(text, opts, 'recipe');
+}
+
+/**
+ * Find which lines of a shopping list being built are the same item (#116, ✨ Find Duplicates).
+ *
+ * `text` is `JSON.stringify` of `{ id, text }` lines: the ingredient lines as written, with
+ * opaque ids. That is family data, and it is ADR-030's named exception of 2026-09-30, disclosed
+ * by the `ingredients` consent variant. Fenced as untrusted like any text source (a recipe line
+ * may have come from a hostile page). The Lambda meters it on its own free counter. Always
+ * resolves with a classified outcome.
+ */
+export function findDuplicatesInText(
+  text: string,
+  opts: ExtractOptions
+): Promise<DocumentExtractionResult<DedupeExtractionResult>> {
+  return runExtraction(text, opts, 'dedupe');
 }
 
 /**

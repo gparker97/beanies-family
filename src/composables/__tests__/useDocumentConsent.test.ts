@@ -13,8 +13,10 @@ import { createPinia, setActivePinia } from 'pinia';
 
 const setSkip = vi.fn();
 const acknowledge = vi.fn();
+const acknowledgeIngredients = vi.fn();
 let skipPrompt = false;
 let statementAckAt: string | null = null;
+let ingredientsAckAt: string | null = null;
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     get skipDocumentConsentPrompt() {
@@ -23,8 +25,12 @@ vi.mock('@/stores/settingsStore', () => ({
     get aiStatementConsentAcknowledgedAt() {
       return statementAckAt;
     },
+    get aiIngredientsConsentAcknowledgedAt() {
+      return ingredientsAckAt;
+    },
     setSkipDocumentConsentPrompt: setSkip,
     acknowledgeStatementConsent: acknowledge,
+    acknowledgeIngredientsConsent: acknowledgeIngredients,
   }),
 }));
 
@@ -56,8 +62,10 @@ describe('useDocumentConsent (singleton, #64)', () => {
     setActivePinia(createPinia());
     skipPrompt = false;
     statementAckAt = null;
+    ingredientsAckAt = null;
     setSkip.mockReset().mockResolvedValue(undefined);
     acknowledge.mockReset().mockResolvedValue(undefined);
+    acknowledgeIngredients.mockReset().mockResolvedValue(undefined);
     reportError.mockReset();
     // Settle anything a previous test left open, then let the serialization tail drain.
     resolveConsent(false);
@@ -241,6 +249,120 @@ describe('useDocumentConsent (singleton, #64)', () => {
       const grant = await requestConsent();
       expect(isDeferredStatementConsent(deferConsentForStatement())).toBe(true);
       expect(isDeferredStatementConsent(grant!)).toBe(false);
+    });
+  });
+
+  // ── The shopping-list ingredients variant (#116): NOT a document read, so it has its own
+  // "don't ask again" and never reads or writes the family-wide document skip ──
+  describe('ingredients consent', () => {
+    it('shows the ingredients variant', async () => {
+      const { consentOpen: open, consentRequest } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      expect(open.value).toBe(true);
+      expect(consentRequest.value).toEqual({ kind: 'ingredients' });
+      resolveConsent(true);
+      expect(await pending).not.toBeNull();
+    });
+
+    it('"don\'t ask again" does NOT skip it before the family has acknowledged it', async () => {
+      // Sending recipe ingredient lines is family data the generic prompt promises never to
+      // send, so a family that skips the generic prompt still sees this one once.
+      skipPrompt = true;
+      const { consentOpen: open } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(false);
+      expect(await pending).toBeNull();
+    });
+
+    it('skips it once its own "don\'t ask again" is recorded', async () => {
+      ingredientsAckAt = '2026-09-30T00:00:00.000Z';
+      const { consentOpen: open } = useDocumentConsent();
+      const grant = await requestConsent({ kind: 'ingredients' });
+      expect(grant).not.toBeNull();
+      expect(open.value).toBe(false);
+    });
+
+    it('an acknowledged STATEMENT does not skip the ingredients prompt, nor the reverse', async () => {
+      skipPrompt = true;
+      statementAckAt = '2026-09-25T00:00:00.000Z';
+      const { consentOpen: open } = useDocumentConsent();
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(false);
+      await pending;
+
+      statementAckAt = null;
+      ingredientsAckAt = '2026-09-30T00:00:00.000Z';
+      const statement = requestConsent({ kind: 'transactions', reads: 1 });
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(false);
+      await statement;
+    });
+
+    it('ticking "don\'t ask again" records ONLY its own skip, never the family-wide one', async () => {
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      await onConsentConfirm(true);
+      expect(await pending).not.toBeNull();
+      expect(acknowledgeIngredients).toHaveBeenCalledTimes(1);
+      expect(acknowledge).not.toHaveBeenCalled();
+      // The family never saw the photo/document prompt described, so it must not be skipped.
+      expect(setSkip).not.toHaveBeenCalled();
+    });
+
+    it('confirming without ticking records nothing, so it asks again next time', async () => {
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      await onConsentConfirm(false);
+      expect(await pending).not.toBeNull();
+      expect(acknowledgeIngredients).not.toHaveBeenCalled();
+      expect(setSkip).not.toHaveBeenCalled();
+    });
+
+    it('the generic prompt still shows after the ingredients "don\'t ask again"', async () => {
+      // The state onConsentConfirm(true) leaves behind: only the ingredients stamp.
+      ingredientsAckAt = '2026-09-30T00:00:00.000Z';
+      const { consentOpen: open } = useDocumentConsent();
+      expect(await requestConsent({ kind: 'ingredients' })).not.toBeNull();
+      expect(open.value).toBe(false);
+      const generic = requestConsent();
+      await flush();
+      expect(open.value).toBe(true);
+      resolveConsent(false);
+      expect(await generic).toBeNull();
+    });
+
+    it('does not re-record a skip that already exists', async () => {
+      // Reachable only via a prompt queued before the stamp landed (a skip resolves early).
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      ingredientsAckAt = '2026-09-30T00:00:00.000Z';
+      await onConsentConfirm(true);
+      await pending;
+      expect(acknowledgeIngredients).not.toHaveBeenCalled();
+    });
+
+    it('a generic confirm records no acknowledgement at all', async () => {
+      const pending = requestConsent();
+      await flush();
+      await onConsentConfirm(false);
+      await pending;
+      expect(acknowledgeIngredients).not.toHaveBeenCalled();
+      expect(acknowledge).not.toHaveBeenCalled();
+    });
+
+    it('a failed acknowledgement still resolves the caller with a grant', async () => {
+      acknowledgeIngredients.mockRejectedValueOnce(new Error('disk full'));
+      const pending = requestConsent({ kind: 'ingredients' });
+      await flush();
+      await onConsentConfirm(true);
+      expect(await pending).not.toBeNull();
+      expect(reportError).toHaveBeenCalledTimes(1);
     });
   });
 });
