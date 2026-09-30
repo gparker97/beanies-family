@@ -7,25 +7,27 @@
 <!-- ===========================================================================
      Weekly shopping list from the meal planner (2026-09-29), tracker #116
 
-     APPROVED: direction B "by meal", simplified (greg, 2026-09-29). Directions A
-     (one merged list) and C (two steps) were rejected and removed, and so was all
-     cross-recipe merging (rules and magic beans) and the "already on your list" flag.
-
-     Rules drawn here (greg, 2026-09-29):
-       - the week's list is grouped by recipe; a recipe planned more than once in the
-         week is ONE section
-       - batches per meal = ceil(people eating / recipe servings); the section's
-         multiplier is the SUM over the meals it is served at (Tue 5 + Fri 3 eating,
-         serves 4 -> 2 + 1 = x3)
-       - if either number is missing for a meal, that meal counts as 1 batch (the
-         recipe's own amounts)
-       - ingredient lines with a leading amount are scaled; lines without one are kept
-         as written
-       - Recipe.servings becomes a number; old text converts once to its first number
-         ("Serves 4-6" -> 4); text with no count ("12 muffins") is cleared
-       - destination at review: New List (default) or Add to a List; no duplicate checks
-       - one shared checklist: the week drawer, the edit-meal drawer (scaled for that
-         meal) and the recipe page's Shopping List sheet (#88, recipe amounts)
+     APPROVED: direction B "by meal" (greg, 2026-09-29), revision 3 (greg, 2026-09-30):
+       - ingredients are listed AS WRITTEN; the app never multiplies an amount
+       - each recipe carries a prominent "Cook ×N" marker: N = the batches that week,
+         batches per meal = ceil(people eating / servings), summed over its meals;
+         nobody picked in "who's eating" = everyone in the family; no servings set = 1
+       - every line of a ×N recipe (N > 1) ends in " (×N)", so the flat list says
+         "buy three lots"; ×1 recipes get no suffix
+       - duplicates come back: identical lines across recipes merge automatically (free,
+         no AI); "✨ Find Duplicates" is an explicit magic beans button that asks the AI
+         once for the same item written differently. The AI only GROUPS lines and names
+         the item; the app writes the merged text from the source lines, so no number is
+         ever invented. Merged lines sit in "In More Than One Meal" at the top, each with
+         its recipes and a Split action
+       - "who's eating" shows everyone picked by default (nobody stored = everyone); a
+         one-tap toggle reads Clear, then Everyone once cleared
+       - ✨ Find Duplicates uses the house magic beans style (orange to terracotta, white,
+         ✨, sheen), is free (doesn't use magic beans) and shows only with 2+ recipes and AI
+         available
+       - destination: New List (default) or Add to a List; no check against the list
+       - one shared checklist: the week drawer, the edit-meal drawer and the recipe page
+       - Recipe.servings is a number (stepper); old text is read as its people count
 
      CIG-clamped. Heritage Orange #F15D22, Deep Slate #2C3E50, Sky Silk #AED6F1,
      Cloud White #F8F9FA, shopping green #27AE60.
@@ -327,6 +329,37 @@
   .flabel { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
   .flabel .opt { letter-spacing: 0; text-transform: none; font-weight: 500; margin-left: 4px; }
   .fhint { font-size: 0.75rem; color: var(--ink-faint); margin-top: 6px; }
+  /* ---------- rev 3 ---------- */
+  .cook { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 12px; font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 0.9375rem; background: #1e8449; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cook.one { background: var(--tile); color: var(--ink-soft); font-weight: 600; font-size: 0.8125rem; }
+  .ck-line .sfx { font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--green-ink); margin-left: 4px; white-space: nowrap; }
+  .grp.shared, .dupes { border-radius: 16px; background: var(--silk-tint); padding: 12px 12px 6px; }
+  .dupes-h { display: flex; align-items: center; gap: 8px; padding: 0 4px 6px; font-family: 'Outfit', sans-serif; font-size: 0.9375rem; font-weight: 700; color: var(--ink); }
+  .dupes-h .n { font-weight: 600; font-size: 0.75rem; color: var(--ink-soft); }
+  .srcs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+  .srcs .pill { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; background: var(--panel); color: var(--ink-soft); }
+  :root[data-theme='dark'] .srcs .pill { background: var(--card); }
+  .srcs .by { font-size: 0.75rem; color: var(--accent-ink); font-family: 'Outfit', sans-serif; font-weight: 700; }
+  .srcs .split { font-size: 0.75rem; }
+  /* The house magic beans trigger: Heritage Orange -> Terracotta, white, ✨, the sheen. */
+  .magic-card { position: relative; overflow: hidden; width: 100%; border: 0; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 16px; background: linear-gradient(135deg, #f15d22, #e67e22); color: #fff; box-shadow: 0 6px 18px rgb(241 93 34 / 28%); text-align: left; }
+  .magic-card .lbl { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9375rem; flex: 1; }
+  .magic-card .free { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.75rem; padding: 2px 9px; border-radius: 999px; background: rgb(255 255 255 / 22%); color: #fff; }
+  .magic-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 28%) 50%, transparent 70%); transform: translateX(-120%); animation: sheen 4.4s ease-in-out infinite; pointer-events: none; }
+  .magic-card.busy { cursor: progress; }
+  .magic-card.busy::after { animation-duration: 1.3s; }
+  @keyframes sheen { 0% { transform: translateX(-120%); } 55%, 100% { transform: translateX(120%); } }
+  @media (prefers-reduced-motion: reduce) { .magic-card::after { animation: none; display: none; } }
+  .magic-done { display: inline-flex; align-items: center; gap: 4px; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--accent-ink); }
+  .magic-none { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-radius: 14px; background: var(--tile); font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+  .states { display: flex; flex-direction: column; gap: 10px; width: 360px; max-width: 100%; }
+  .states .cap { font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--page-ink-soft); margin: 6px 0 -4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 5px; border-radius: 999px; border: 2px solid var(--line); background: var(--panel); font-family: 'Outfit', sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+  :root[data-theme='dark'] .chip { background: var(--card); }
+  .chip.on { border-color: var(--accent); color: var(--ink); background: var(--accent-tint); }
+  .chip .face { width: 22px; height: 22px; }
+  .everyone { border: 0; background: none; cursor: pointer; padding: 0; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--accent-ink); letter-spacing: 0; text-transform: none; }
 </style>
 </head>
 <body>
@@ -335,11 +368,11 @@
     <div>
       <h1>🛒 Shopping List from the Meal Planner</h1>
       <p class="lede">
-        Tracker #116, <b>revised after greg's review (direction B, simplified)</b>. The week's
-        list is grouped <b>by recipe</b>. A recipe planned twice is one section. Amounts are
-        scaled by <b>how many are eating each time</b> against the recipe's <b>servings</b>,
-        rounded up to a whole batch per meal, then added up. If either number is missing, the
-        recipe's own amounts are used. No merging across recipes and no duplicate checks.
+        Tracker #116, <b>revision 3</b> (greg, 2026-09-30). Ingredients are listed <b>as
+        written</b>. Each recipe says how many times it gets cooked that week (<b>Cook ×3</b>),
+        from who's eating against its servings, and its lines end in <b>(×3)</b> so the flat
+        list still says to buy three lots. Identical lines merge on their own;
+        <b>✨ Find Duplicates</b> asks magic beans for the same item written differently.
       </p>
     </div>
     <div class="theme-toggle" role="group" aria-label="Theme">
@@ -399,24 +432,47 @@
   <div class="section">
     <h2><span class="tag">2</span>The week's list, by recipe</h2>
     <p class="why">
-      One section per recipe, in the order it's first served. The header says when it's served,
-      how many are eating, and the batch count (<b>×3</b>). Lines with an amount are scaled
-      (the old amount is shown faintly); lines without one ("salt to taste") are kept as
-      written. Each section has its own Untick All, so "we already have everything for the
-      stir-fry" is one tap. Every line can still be edited, and you can add your own.
+      One section per recipe, in the order it's first served, with its lines <b>as written</b>.
+      The green <b>Cook ×3</b> marker says how many batches that week (Tue 5 eating + Fri 3,
+      serves 4: 2 + 1). Nobody picked counts as everyone. Every line of a ×3 recipe ends in
+      <b>(×3)</b>, so the list in the Lists page still says to buy three lots. Lines that are
+      exactly the same in two recipes are merged on their own into <b>In More Than One
+      Meal</b>; <b>✨ Find Duplicates</b> asks magic beans once for the rest.
+    </p>
+    <p class="why">
+      <b>The button follows the house magic beans style</b> (Heritage Orange to Terracotta, white,
+      ✨, the shimmer), shaped like the Quick Start card in the add drawers, at the top of the
+      drawer because it's the one magic action here. One word of copy and a <b>Free</b> tag: it
+      doesn't use your magic beans. It shows only when the week has 2+ recipes and AI is
+      available, the same as the other magic beans buttons.
     </p>
     <div class="frames">
       <div>
-        <p class="frame-label">Phone (390), New List</p>
+        <p class="frame-label">Phone (390), on open: identical lines merged, magic beans not run</p>
         <div class="phone">
           <div class="notch"><span></span></div>
           <div data-drawer="week"></div>
         </div>
       </div>
       <div>
-        <p class="frame-label">Desktop drawer (448), Add to a List picked</p>
+        <p class="frame-label">Desktop drawer (448), after ✨ Find Duplicates</p>
         <div class="desk">
-          <div data-drawer="week" data-dest="existing"></div>
+          <div data-drawer="week" data-ai="1" data-dest="existing"></div>
+        </div>
+      </div>
+      <div>
+        <p class="frame-label">The button's states</p>
+        <div class="states">
+          <p class="cap">Ready</p>
+          <button class="magic-card" type="button"><span aria-hidden="true">✨</span><span class="lbl">Find Duplicates</span><span class="free">Free</span></button>
+          <p class="cap">Running (faster sheen, can't be tapped twice)</p>
+          <button class="magic-card busy" type="button" aria-busy="true"><span aria-hidden="true">✨</span><span class="lbl">Finding duplicates…</span></button>
+          <p class="cap">Done: the card goes, the header says what it found</p>
+          <div class="dupes" style="padding-bottom:12px"><div class="dupes-h">In More Than One Meal <span class="n">5</span><span class="magic-done"><span aria-hidden="true">✨</span>4 found</span></div></div>
+          <p class="cap">Done, nothing new</p>
+          <div class="magic-none"><span aria-hidden="true">✨</span>No other duplicates</div>
+          <p class="cap">Failed: the card stays so it can be tapped again, with the usual error toast</p>
+          <p class="cap">AI off, or only one recipe: no card at all (identical lines still merge)</p>
         </div>
       </div>
     </div>
@@ -424,11 +480,12 @@
 
   <!-- ============================ 3. MEAL DRAWER ============================ -->
   <div class="section">
-    <h2><span class="tag">3</span>Edit meal: this meal's ingredients, scaled</h2>
+    <h2><span class="tag">3</span>Edit meal: this meal's ingredients, and Everyone</h2>
     <p class="why">
-      The early adopter's preferred flow. Opening Tuesday's tacos shows the recipe's ingredients,
-      scaled for the 5 eating that night (serves 4, so ×2), with the same checklist. Changing
-      who's eating in this drawer updates the amounts straight away.
+      Opening Tuesday's tacos shows the recipe's ingredients as written, marked <b>Cook ×2</b>
+      (5 eating, serves 4), with <b>(×2)</b> on each line when it's added. "Who's eating" starts
+      with everyone picked and has a one-tap <b>Clear</b> / <b>Everyone</b> toggle; changing who's
+      eating updates the marker straight away.
     </p>
     <div class="frames">
       <div>
@@ -450,21 +507,33 @@
             </div>
             <div>
               <div class="eyebrow">Ingredients <span class="count">for 5, serves 4</span>
-                <span class="acts"><span class="mult">×2</span></span>
+                <span class="acts"><span class="cook">Cook ×2</span></span>
               </div>
               <div class="ck" data-list="meal"></div>
               <div class="ck-foot">
-                <span class="to">Add to <b>🛒 Weekly Groceries</b> ▾</span>
-                <button class="add" type="button">Add 7</button>
+                <span class="to">Add to <b>🛒 Weekly Groceries</b> ›</span>
+                <button class="add" type="button">Add 6</button>
               </div>
             </div>
             <div class="skel-group"><div class="lbl">Cook</div><div class="skel short"></div></div>
-            <div class="skel-group"><div class="lbl">Who's eating</div><div class="skel"></div></div>
+            <div>
+              <div class="eyebrow">Who's eating <span class="acts"><button class="everyone" type="button" data-everyone>Clear</button></span></div>
+              <div class="chips" data-chips>
+                <span class="chip on"><span class="face">G</span>Greg</span>
+                <span class="chip on"><span class="face" style="background:#9b59b6">S</span>Sofia</span>
+                <span class="chip on"><span class="face" style="background:#3498db">L</span>Leo</span>
+                <span class="chip on"><span class="face" style="background:#27ae60">M</span>Max</span>
+                <span class="chip on"><span class="face" style="background:#e67e22">T</span>Theo</span>
+              </div>
+              <div class="fhint">+ 2 guests</div>
+            </div>
           </div>
         </div>
         <p class="note">
-          <b>"Add to" remembers the last list you used</b> (falls back to New List). Tapping the
-          row opens the same destination picker as the week drawer.
+          <b>Everyone is picked by default</b> (a meal with nobody chosen has always meant
+          everyone; now the chips show it). <b>Clear</b> unpicks them all, handy before picking
+          just two; it then reads <b>Everyone</b> to pick them all again. The same toggle is available anywhere the family picker is
+          used for several people, but it's switched on only here for now.
         </p>
       </div>
     </div>
@@ -548,35 +617,43 @@
   setTheme(qs === 'dark' || qs === 'light' ? qs : sys);
   document.querySelectorAll('[data-set-theme]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.setTheme)));
 
-  // ---------- data: base amounts; `s` = scaled amount, `was` = original ----------
+  // ---------- data: lines exactly as written; `x` = the recipe's weekly batches ----------
   const WEEK = [
-    { em: '🍛', nm: 'Chicken Tikka Masala', served: ['Mon, 4 eating'], why: 'Serves 4', mult: '×1', lines: [
-      { q: '600 g', t: 'chicken thighs' }, { q: '1 cup', t: 'plain yogurt' }, { q: '1', t: 'yellow onion, diced' },
-      { q: '3 cloves', t: 'garlic, minced' }, { q: '1 cup', t: 'basmati rice' }, { t: 'Fresh coriander, to serve' } ] },
-    { em: '🌮', nm: 'Beef Tacos', served: ['Tue, 5 eating', 'Fri, 3 eating'], why: 'Serves 4, so 2 batches on Tue and 1 on Fri', mult: '×3', lines: [
-      { q: '1500 g', was: '500 g', t: 'ground beef' }, { q: '24', was: '8', t: 'taco shells' }, { q: '3', was: '1', t: 'bell peppers' },
-      { q: '1 ½ cups', was: '½ cup', t: 'sour cream' }, { q: '3', was: '1', t: 'limes' }, { t: 'Salt, to taste' } ] },
-    { em: '🥦', nm: 'Veggie Stir-Fry', served: ['Thu'], why: "No one picked for Thursday, so the recipe's amounts", mult: 'as written', plain: true, lines: [
-      { q: '2', t: 'green bell peppers' }, { q: '1 head', t: 'broccoli' }, { q: '3 tbsp', t: 'soy sauce' }, { q: '1 thumb', t: 'fresh ginger' } ] },
-    { em: '🍝', nm: 'Spaghetti Bolognese', served: ['Sat, 8 eating'], why: 'Serves 4, so 2 batches', mult: '×2', lines: [
-      { q: '800 g', was: '400 g', t: 'spaghetti' }, { q: '500 g', was: '250 g', t: 'lean ground beef' }, { q: '2 large', was: '1 large', t: 'yellow onions' },
-      { q: '2 cans', was: '1 can', t: 'chopped tomatoes' }, { t: 'Parmesan, to serve' } ] },
+    { em: '🍛', id: 'tikka', nm: 'Chicken Tikka Masala', served: ['Mon, 4 Eating'], why: 'Serves 4', x: 1, lines: [
+      '600 g chicken thighs', '1 cup plain yogurt', '1 yellow onion, diced', '3 cloves garlic, minced', '1 cup basmati rice', 'Fresh coriander, to serve' ] },
+    { em: '🌮', id: 'tacos', nm: 'Beef Tacos', served: ['Tue, 5 Eating', 'Fri, 3 Eating'], why: 'Serves 4: 2 batches Tue, 1 Fri', x: 3, lines: [
+      '500 g ground beef', '8 taco shells', '1 bell pepper', '½ cup sour cream', '1 lime', 'Salt, to taste' ] },
+    { em: '🥦', id: 'stir', nm: 'Veggie Stir-Fry', served: ['Thu, Everyone (5)'], why: 'Serves 4', x: 2, lines: [
+      '2 green bell peppers', '1 head broccoli', '3 tbsp soy sauce', '2 cloves garlic', '1 cup basmati rice' ] },
+    { em: '🍝', id: 'bolo', nm: 'Spaghetti Bolognese', served: ['Sat, 8 Eating'], why: 'Serves 4', x: 2, lines: [
+      '400 g spaghetti', '250 g lean ground beef', '1 large yellow onion', '1 can chopped tomatoes', 'Parmesan, to serve' ] },
   ];
-  const MEAL = [
-    { q: '1000 g', was: '500 g', t: 'ground beef' }, { q: '16', was: '8', t: 'taco shells' }, { q: '2', was: '1', t: 'bell peppers' },
-    { q: '1 cup', was: '½ cup', t: 'sour cream' }, { q: '2', was: '1', t: 'limes' }, { q: '2 cups', was: '1 cup', t: 'grated cheddar' }, { t: 'Salt, to taste' },
+  const NAME = Object.fromEntries(WEEK.map((r) => [r.id, r.nm]));
+  const X = Object.fromEntries(WEEK.map((r) => [r.id, r.x]));
+  const sfx = (x) => (x > 1 ? ` (×${x})` : '');
+  // Identical text merges with no AI: the batches just add up (×1 + ×2 = ×3).
+  const EXACT = [{ text: '1 cup basmati rice', from: ['tikka', 'stir'] }];
+  // Magic beans only GROUPS lines and names the item; the app writes the text.
+  const AI = [
+    { name: 'Ground beef', from: [['tacos', '500 g ground beef'], ['bolo', '250 g lean ground beef']] },
+    { name: 'Bell peppers', from: [['tacos', '1 bell pepper'], ['stir', '2 green bell peppers']] },
+    { name: 'Yellow onion', from: [['tikka', '1 yellow onion, diced'], ['bolo', '1 large yellow onion']] },
+    { name: 'Garlic', from: [['tikka', '3 cloves garlic, minced'], ['stir', '2 cloves garlic']] },
   ];
+  const MEAL = ['500 g ground beef', '8 taco shells', '1 bell pepper', '½ cup sour cream', '1 lime', 'Salt, to taste'];
   const RECIPE = [
-    { q: '400 g', t: 'spaghetti' }, { q: '250 g', t: 'lean ground beef' }, { q: '1 large', t: 'yellow onion, finely chopped' },
-    { q: '2 cloves', t: 'garlic, crushed' }, { q: '1', t: 'carrot, grated' }, { q: '1 can', t: 'chopped tomatoes' },
-    { q: '2 tbsp', t: 'tomato paste' }, { q: '1 tbsp', t: 'olive oil' }, { t: 'Parmesan, to serve' },
+    '400 g spaghetti', '250 g lean ground beef', '1 large yellow onion, finely chopped', '2 cloves garlic, crushed',
+    '1 carrot, grated', '1 can chopped tomatoes', '2 tbsp tomato paste', '1 tbsp olive oil', 'Parmesan, to serve',
   ];
 
-  function line(it) {
+  function line(text, opts = {}) {
     const el = document.createElement('div');
     el.className = 'ck-line on';
+    const srcs = opts.from
+      ? `<div class="srcs">${opts.from.map((k) => `<span class="pill">${NAME[k]}</span>`).join('')}${opts.ai ? '<span class="by" aria-label="Found by magic beans">✨</span>' : ''}<button class="link split" type="button">Split</button></div>`
+      : '';
     el.innerHTML = `<button class="box" type="button" aria-label="Include">✓</button>
-      <div class="txt"><div class="t1"><span contenteditable="true" spellcheck="false">${it.q ? `<span class="q">${it.q}</span> ` : ''}${it.t}</span>${it.was ? `<span class="was">(${it.was})</span>` : ''}</div></div>`;
+      <div class="txt"><div class="t1"><span contenteditable="true" spellcheck="false">${text}</span>${opts.x ? `<span class="sfx">${sfx(opts.x)}</span>` : ''}</div>${srcs}</div>`;
     return el;
   }
   function addRow() {
@@ -585,8 +662,8 @@
     el.innerHTML = `<span class="plus">+</span><input type="text" placeholder="Add an item" aria-label="Add an item" />`;
     return el;
   }
-  function fill(host, items, add = true) {
-    items.forEach((it) => host.appendChild(line(it)));
+  function fill(host, items, add = true, x = 0) {
+    items.forEach((it) => host.appendChild(line(it, { x })));
     if (add) host.appendChild(addRow());
   }
 
@@ -610,24 +687,44 @@
 
   function drawerWeek(host) {
     const existing = host.dataset.dest === 'existing';
-    const total = WEEK.reduce((n, r) => n + r.lines.length, 0);
+    const ai = host.dataset.ai === '1';
+    const merged = new Set();
+    EXACT.forEach((d) => d.from.forEach((k) => merged.add(k + '|' + d.text)));
+    if (ai) AI.forEach((g) => g.from.forEach(([k, t]) => merged.add(k + '|' + t)));
+    const mergedCount = EXACT.length + (ai ? AI.length : 0);
+    const rest = WEEK.map((r) => ({ ...r, lines: r.lines.filter((t) => !merged.has(r.id + '|' + t)) }));
+    const total = mergedCount + rest.reduce((n, r) => n + r.lines.length, 0);
     host.innerHTML = `<div class="dr-head"><div class="dr-emoji">🛒</div><div><p class="dr-title">Shopping List</p><div class="dr-sub">Week of Sep 28, 4 recipes, 5 meals</div></div><button class="dr-close" type="button" aria-label="Close">✕</button></div>
       <div class="dr-body">
-        ${WEEK.map((r, i) => `<div class="rs">
+        ${ai ? '' : `<button class="magic-card" type="button" data-find><span aria-hidden="true">✨</span><span class="lbl">Find Duplicates</span><span class="free">Free</span></button>`}
+        <div class="dupes">
+          <div class="dupes-h">In More Than One Meal <span class="n">${mergedCount}</span>${ai ? `<span class="magic-done"><span aria-hidden="true">✨</span>${AI.length} found</span>` : ''}<span class="acts" style="margin-left:auto"><button class="link" type="button" data-tickall>Untick All</button></span></div>
+          <div class="ck" data-merged></div>
+        </div>
+        ${rest.map((r, i) => `<div class="rs">
           <div class="rs-h"><div class="em">${r.em}</div>
             <div style="min-width:0"><div class="nm">${r.nm}</div><div class="why">${r.why}</div>
               <div class="served">${r.served.map((s) => `<span class="pill">${s}</span>`).join('')}</div></div>
-            <div class="right"><span class="mult${r.plain ? ' plain' : ''}">${r.mult}</span><button class="link" type="button" data-tickall>Untick All</button></div>
+            <div class="right"><span class="cook${r.x === 1 ? ' one' : ''}">${r.x === 1 ? 'Cook Once' : `Cook ×${r.x}`}</span><button class="link" type="button" data-tickall>Untick All</button></div>
           </div>
           <div class="ck" data-sec="${i}"></div></div>`).join('')}
         <div><div class="eyebrow">Where it goes</div><div class="dest">${destBlock(existing ? 'existing' : 'new')}</div></div>
       </div>
       <div class="dr-foot"><button class="btn quiet" type="button">Cancel</button><button class="btn go" type="button">${existing ? `Add ${total} Items` : 'Create List'}</button></div>`;
-    WEEK.forEach((r, i) => fill(host.querySelector(`[data-sec="${i}"]`), r.lines));
+    const mh = host.querySelector('[data-merged]');
+    EXACT.forEach((d) => {
+      const x = d.from.reduce((n, k) => n + X[k], 0);
+      mh.appendChild(line(d.text, { x, from: d.from }));
+    });
+    if (ai) AI.forEach((g) => {
+      const text = `${g.name}: ` + g.from.map(([k, t]) => t + sfx(X[k])).join(' + ');
+      mh.appendChild(line(text, { from: g.from.map(([k]) => k), ai: true }));
+    });
+    rest.forEach((r, i) => fill(host.querySelector(`[data-sec="${i}"]`), r.lines, true, r.x));
   }
 
   document.querySelectorAll('[data-drawer="week"]').forEach(drawerWeek);
-  fill(document.querySelector('[data-list="meal"]'), MEAL, false);
+  fill(document.querySelector('[data-list="meal"]'), MEAL, false, 2);
   fill(document.querySelector('[data-list="recipe"]'), RECIPE);
   document.querySelector('[data-destblock]').innerHTML = destBlock('new');
 
@@ -643,6 +740,24 @@
       lines.forEach((l) => { l.classList.toggle('on', !allOn); l.querySelector('.box').textContent = allOn ? '' : '✓'; });
       if (ta.classList.contains('all')) { ta.classList.toggle('on', !allOn); ta.querySelector('.box').textContent = allOn ? '' : '✓'; }
       else ta.textContent = allOn ? 'Tick All' : 'Untick All';
+      return;
+    }
+    const f = e.target.closest('[data-find]');
+    if (f) {
+      if (f.classList.contains('busy')) return;
+      f.classList.add('busy');
+      f.querySelector('.lbl').textContent = 'Finding duplicates…';
+      f.querySelector('.free').remove();
+      const host = f.closest('[data-drawer]');
+      setTimeout(() => { host.dataset.ai = '1'; drawerWeek(host); }, 1400);
+      return;
+    }
+    const ev = e.target.closest('[data-everyone]');
+    if (ev) {
+      const chips = [...document.querySelectorAll('[data-chips] .chip')];
+      const all = chips.every((c) => c.classList.contains('on'));
+      chips.forEach((c) => c.classList.toggle('on', !all));
+      ev.textContent = all ? 'Everyone' : 'Clear';
       return;
     }
     const st = e.target.closest('[data-step]');

@@ -3,16 +3,19 @@
 > Date: 2026-09-29
 > Related issues: Notion tracker #116 (no GitHub issue — `do not create github issue`)
 > Plan file: `docs/plans/2026-09-29-meal-planner-shopping-list.md`
-> Mockup: `docs/mockups/meal-shopping-list-2026-09-29.html` (direction B "by meal", simplified; approved by greg 2026-09-29)
+> Mockup: `docs/mockups/meal-shopping-list-2026-09-29.html` (direction B "by meal", **revision 4**; approved by greg 2026-09-30)
+> Revision 3 of this plan (2026-09-30) supersedes the scaling design: ingredients are listed as written,
+> each recipe carries a Cook ×N marker, and duplicates are merged (identical lines automatically, the rest
+> by an explicit, free ✨ Find Duplicates).
 
 > **No GitHub issue created.** This plan was approved for direct implementation (greg pre-approved the
 > pre-plan → plan → build chain and asked for an autonomous run).
 
 ## User Story
 
-As a parent planning the week's dinners, I want to turn the week's recipes into one shopping list sized
-for who is eating, and untick what I already have, so I shop once without copying ingredients recipe by
-recipe.
+As a parent planning the week's dinners, I want to turn the week's recipes into one shopping list that
+says how many times each recipe gets cooked and puts shared items on one line, and untick what I already
+have, so I shop once without copying ingredients recipe by recipe.
 
 ## Context
 
@@ -21,10 +24,11 @@ only be made one recipe at a time, from the recipe page (#88, `RecipeListSheet.v
 textarea). An early adopter asked to pick the week's meals and get one list, and (preferred) to see a
 recipe's ingredients as a checklist straight from the planner, without going to the cookbook.
 
-A first mockup explored merging like ingredients across recipes (rules + magic beans). greg rejected
-that as over-engineered: grouping **by recipe** (direction B) removes the need. Instead, amounts scale by
-**who is eating** vs the recipe's **servings**, and a recipe planned twice is one section scaled for
-both meals. `Recipe.servings` is free text today, so it becomes a number.
+Design history: revision 1 merged like ingredients with rules + magic beans; revision 2 scaled amounts by
+who is eating vs servings. Revision 3 (greg, 2026-09-30) settles on: ingredients **as written**, a
+**Cook ×N** batch count per recipe (who's eating vs servings) with `(×N)` on each line, and duplicates
+merged into one section (identical lines automatically, the rest by an explicit, free ✨ Find Duplicates).
+`Recipe.servings` is free text today, so it becomes a number.
 
 Current state (verified 2026-09-29):
 
@@ -59,88 +63,86 @@ weekDates)` returns the week sorted by date, slot, position. `MealEditModal.vue`
 
 ## Requirements
 
-1. **Meal Planner header button.** "🛒 Shopping List" beside Share / Export as PDF, for the visible week
-   (`weekDates`). Badge = number of **distinct existing recipes** planned that week. Disabled, with a
-   one-line hint under the button row, when the week has no recipe meals with an existing recipe. Hidden
-   when the `familyLists` flag is off (same gate as #88's button).
-2. **Week drawer grouped by recipe.** One section per distinct recipe, ordered by the first meal it is
-   served at. A recipe planned more than once is ONE section. Non-recipe meals (eat out, leftovers, skip,
-   other) and meals whose recipe was deleted are ignored. No merging of ingredients across recipes.
-3. **Scaling.**
-   - People eating at a meal = picked members (`eaterMemberIds.length`) + guests (`guestNames.length`),
-     **but only when at least one member is picked**. No members picked (stored `undefined`, which the
-     model reads as "everyone") = not specified, guests or not (counting guests alone would under-scale).
-   - Batches for a meal = `ceil(eating / servings)` when both are known (servings ≥ 1, eating ≥ 1),
-     else **1** (the recipe's own amounts).
-   - A section's multiplier = the **sum** of its meals' batches (Tue 5 + Fri 3 eating, serves 4 → 2 + 1
-     = ×3).
-   - Each ingredient line with a leading amount is multiplied; lines without one ("Salt, to taste") are
-     kept exactly as written. A multiplier of 1 leaves every line byte-identical. No unit conversion.
-   - Supported amounts: integers, decimals, `1/2`, `1 1/2`, unicode vulgar fractions (`½ ¼ ¾ ⅓ ⅔ ⅛`,
-     also glued as `1½`), a number glued to a unit (`400g`), and ranges (`1-2`, `1–2`, `1 to 2`: both ends
-     scaled). Anything else keeps the line as written — never a wrong number.
-   - Results keep the input's style: fractions in → whole or mixed numbers with unicode fractions
-     (`½ ⅓ ⅔ ¼ ¾ ⅛ ⅜ ⅝ ⅞`, tolerance below 1/24), else up to 2 decimals trimmed; decimals in → decimals
-     out (`0.5 kg` ×3 = `1.5 kg`). A range keeps its separator.
-   - **Never a wrong number** — these are left as written (and tagged "As Written" when the multiplier is
-     above 1): percentages (`2% milk`, `85% lean`), list numbering (`1. 200 g flour`, `1)`), comma numbers
-     (`1,5 kg`, `1,000 g`), a number glued to anything outside a closed unit allowlist (`7UP`, `1st`),
-     dual measures (`500 g (1 lb)`, `400g/14oz`), hyphenated words (`5-spice`), `00 flour`, word amounts
-     (`Two eggs`, `a pinch`). `1 (400 g) can` scales the leading `1` only.
-4. **Section header** shows the recipe emoji/name, "Serves N" (or why it is as written), one pill per
-   meal ("Tue, 5 eating", or "Thu, Not Set" when that meal has no count), the multiplier pill (`×3`), and
-   the checklist's own tick-all toggle. **"As Written"** replaces the pill exactly when `multiplier === 1`
-   and a number was missing (servings unset, or some meal not set). Two unset meals sum to ×2 and show
-   ×2.
-5. **One shared ingredient checklist** (used by all three entry points): every line ticked by default,
-   tick/untick one, tick/untick all, edit any line's text in place (auto-growing), add your own line,
-   headings dropped (with the existing "N headings skipped" hint, never silent). Lines emptied by editing
-   are dropped on save; pasted multi-line text becomes several items. One tick-all toggle per checklist
-   (per section in the week view). Lines are plain editable text; when a line was scaled, the original amount
-   shows faintly after it (e.g. "1500 g ground beef (500 g)"); when the multiplier is above 1 but a
-   line's amount could not be read ("Two eggs", "a pinch"), the line carries a small "As Written" tag so
-   the user knows to adjust it.
-6. **Destination at review** (one shared control): **New List** (default; an editable name, blank falls
-   back to the default title; who shops and by date as #88 today, date empty by default so no reminder is
-   armed) or **Add to a List** (a picker of the family's **one-off, unfiled** lists, shopping-category
-   lists first, newest first; recurring lists are excluded, or the ingredients would become permanent
-   weekly staples). With no such lists, Add to a List is disabled with "No lists yet". Add to a List appends every ticked line; **no duplicate checks**. Save
-   label: "Create List" or "Add N Items".
-7. **Edit-meal drawer.** A recipe meal whose recipe exists and has ingredients shows an **Ingredients**
-   section under the recipe block: the checklist scaled for this meal's live eaters/guests (updates as the
-   picker changes, before Save), the multiplier pill, a one-line destination summary ("Add to 🛒 Weekly
-   Groceries ▾", opens the same destination control) and an "Add N" button that writes immediately (it
-   does not depend on the meal's Save, and it uses the eaters shown even if the meal edit is then
-   cancelled). "Add to" defaults to the **newest one-off unfiled `'out'` list** (so a week list made
-   earlier is the natural target), else New List. After Add, the destination switches to the list just
-   written and the button shows "Added", so a second tap never makes a second list. (No per-device "last used" memory: same result on every device,
-   no local state.)
-8. **Recipe page Shopping List (#88)** keeps its review mode (lists this recipe already made, Open /
-   Start Another), but the create mode's textarea is replaced by the shared checklist (recipe's own
-   amounts, ×1) plus the shared destination control.
-9. **Servings becomes a number.**
-   - The field stays `Recipe.servings?: string` in BOTH the TypeScript type and the doc, normalised to a
-     **digit string** ("4") by every new write, so older clients (≥ 0.21.1, which call `.trim()` on it)
-     can never crash and the compiler rejects a numeric write anywhere, including hand-built
-     `MutationOp`s.
-   - One pure parser `parseServings(raw: unknown): number | undefined`: the integer **next to a people
-     keyword** ("serves N", "serves N-M" → N, "N servings/people/portions/persons", "feeds N"), else a bare
-     number or range ("4", "4-6" → 4). "Makes 2 loaves (16 servings)" → 16; "12 muffins", "Makes 2
-     loaves", "", 0, non-integers, above `SERVINGS_MAX` (99) → undefined.
-   - `servingsOf(recipe)` = `parseServings(recipe.servings)`: the ONLY way code reads servings as a
-     number (scaling, display, the form's initial value).
-   - `normalizeServings(raw): string | undefined` = the digit string of `parseServings(raw)`: applied by
-     the AI / JSON-LD prefill and share-link decode; the form writes `String(n)` from its stepper.
-   - Recipe form: a number stepper ("Serves [− 4 +] people", blank allowed, 1-99) instead of the text
-     input. The InferredHint for servings stays.
-   - Display: "Serves 4" (i18n, `formatServes`) on the recipe page, cookbook card, shared recipe page,
-     share text and the refetch diff. Old clients show the bare "4" (harmless).
-   - A recipe with unparseable old text shows no servings in new clients; the raw text stays in the doc
-     until that recipe is next saved in the new form (then cleared). No bulk backfill: last-writer-wins
-     means old clients would re-write free text anyway, and read-time parsing makes a backfill
-     unnecessary.
-10. **Help Center** updated (see Help Center Coverage).
-11. **Observability** (see Observability Coverage).
+1. **Meal Planner header button.** "🛒 Shopping List" beside Share / Export as PDF, for the week on screen
+   (desktop week, or the week of the phone's day). Badge = number of distinct existing recipes with
+   shoppable ingredients planned that week. Disabled, with a one-line hint (`aria-describedby`), when 0.
+   Hidden when the `familyLists` flag is off.
+2. **Week drawer grouped by recipe.** One section per distinct recipe, ordered by its first meal. A recipe
+   planned more than once is ONE section. Non-recipe meals and meals whose recipe was deleted are ignored.
+3. **Ingredients are listed AS WRITTEN.** The app never multiplies, parses or rewrites an amount. There is
+   no "As Written" tag and no faint original. (Revision 3 drops all scaling.)
+4. **Cook ×N per recipe.** A prominent green marker (`Cook ×3`; a quiet `Cook Once` at 1):
+   - People eating at a meal = members picked + guests. **Nobody picked = everyone in the family**
+     (every `familyStore.humans` entry, children included, pets excluded) + guests. (Revision 3: this replaces
+     "nobody picked = not specified".)
+   - Batches for a meal = `ceil(eating / servings)` when servings is known (≥ 1), else **1**.
+   - N = the sum of batches over the recipe's meals that week (Tue 5 + Fri 3 eating, serves 4 → 2 + 1 = 3).
+   - Section header: recipe name, "Serves N" (or "No servings set, one batch per meal"), one pill per
+     meal ("Tue, 5 Eating", "Thu, Everyone (5)"), the Cook marker, the checklist's own tick-all toggle.
+5. **Line suffix.** When N > 1, **every** line of that recipe carries ` (×N)` (e.g. `8 taco shells (×3)`,
+   `Salt, to taste (×3)`), and the suffix is written into the list item text. N = 1 → no suffix. The
+   suffix is part of the line (so it survives into the flat list); editing a line keeps whatever text the
+   user leaves.
+6. **Duplicates (week drawer only).** One "In More Than One Meal" section at the top of the drawer:
+   - **Identical lines merge automatically, no AI.** Two or more lines from different recipes whose text
+     is identical after trimming, collapsing whitespace and ignoring case merge into ONE line with the
+     batches summed over ALL matching lines, even two from one recipe (`1 cup basmati rice` ×1 + ×2 →
+     `1 cup basmati rice (×3)`); the total is always ≥ 2, so a merged exact line always carries a suffix.
+   - **✨ Find Duplicates** (explicit, one tap) sends the week's remaining lines to magic beans ONCE. The
+     AI only returns GROUPS of line ids that are the same item plus a short item name; it never returns
+     amounts. The app writes the merged text deterministically: `{Name}: {line1}{sfx1} + {line2}{sfx2}`
+     (e.g. `Ground beef: 500 g ground beef (×3) + 250 g lean ground beef (×2)`), so no number is ever
+     invented. Ids the AI returns that do not exist, singleton groups, or a line claimed by two groups are
+     dropped (first claim wins).
+   - Every merged line shows its source recipes (pills), a small ✨ when magic beans made it, and **Split**,
+     which puts the source lines back into their recipe sections. Merged lines are editable and tickable
+     like any other line.
+   - Nothing merges silently: merged lines are always shown before save.
+7. **✨ Find Duplicates presentation** (house magic beans style, mockup rev 4):
+   - Full-width card at the top of the drawer body: Heritage Orange → Terracotta gradient, white text,
+     `aria-hidden` ✨, the shared `.magic-shimmer` sheen (reduced motion honoured by the existing CSS),
+     label "Find Duplicates", a small "Free" tag. No explanatory sentence. Built on the existing
+     `MagicBeansQuickCard` look (reuse or extend it; do not hand-roll a second gradient card).
+   - States: ready; running ("Finding duplicates…", busy sheen, cannot be tapped twice); done (the card
+     goes; the merged section header shows "✨ N found"); done with nothing new (a quiet "✨ No other
+     duplicates" line); failed (card stays, the usual extraction error toast, tap again to retry).
+   - Shown only when the week has 2+ recipes AND magic beans is available by the same gate the other
+     magic beans affordances use (`canReadAny` + AI capability); otherwise no card at all (identical-line
+     merges still happen).
+   - One run per drawer open; reopening the drawer starts fresh.
+8. **Free.** The dedupe task does not count against magic beans usage: the ai-extract meter records it
+   in its own "free" counter (still measurable) instead of the charged counter. Abuse rate limits
+   (family/IP per hour) still apply. BYOK calls never reach the meter anyway.
+9. **Shared ingredient checklist** (all entry points): every line ticked by default, tick/untick one,
+   one tick-all toggle per checklist (per section in the week view), edit any line in place
+   (auto-growing), add your own line, headings dropped with the existing "N headings skipped" hint.
+   Lines emptied by editing are dropped on save; pasted multi-line text becomes several items.
+10. **Destination at review** (unchanged from revision 2): New List (default; editable name, blank falls
+    back to the default title; who shops; by date, empty by default) or Add to a List (one-off, unfiled
+    lists, shopping first, newest first; recurring lists excluded; "No lists yet" when none). No duplicate
+    checks against the chosen list. Save label "Create List" / "Add N Items".
+11. **Edit-meal drawer.** A recipe meal shows its ingredients as written with that meal's Cook ×N
+    (`ceil(eating / servings)` for this meal, live from the drawer's who's-eating state) and the ` (×N)`
+    suffix on each line when N > 1. "Add to …" defaults to the newest one-off unfiled shopping list, else
+    New List; Add writes immediately (independent of the meal's Save); after Add the button reads "Added"
+    and a second tap never makes a second list. No duplicate detection (one recipe).
+12. **Who's eating defaults to everyone.** In the edit-meal drawer the family chips show **all members
+    picked** when the meal has no stored `eaterMemberIds` (which has always meant everyone). A one-tap
+    toggle at the end of the chip row (mockup draws it in the label row; the chip row avoids a new slot in a
+    picker used in 23 files) reads **Clear** (unpick all) and, once cleared, **Everyone** (pick all). The
+    toggle is an optional feature of `FamilyChipPicker` (multi mode), switched on only here (keys
+    `action.clear` / `common.everyone`). Storage is unchanged: all humans picked OR none picked saves
+    `eaterMemberIds: undefined` (everyone); a subset saves the subset. Consequence: "Clear then Save"
+    saves everyone, so a guests-only meal can no longer be expressed (revision 2 treated it as not set).
+13. **Recipe page Shopping List (#88):** the same checklist at the recipe's own lines (no suffix), plus the
+    destination control. Review mode unchanged.
+14. **Servings becomes a number** (as built in revision 2, unchanged): stored as a digit string,
+    `servingsOf` is the only numeric read, number stepper in the recipe form, "Serves N" display.
+15. **Magic beans sheet copy** (greg, 2026-09-30): placeholder "Remind me to walk the dog tomorrow at
+    10am…", and the house hint badge (`InfoHintBadge`, drawn as "?") beside "Paste anything" explaining what can be pasted and that
+    results are reviewed before saving. `InfoHintBadge`'s popover must render above every surface layer
+    (it was at `z-[200]`, under the sheet's `top` layer `z-[250]`).
+16. **Help Center** updated (see Help Center Coverage). 17. **Observability** (see Observability Coverage).
 
 ## Important Notes & Caveats
 
@@ -165,8 +167,14 @@ weekDates)` returns the week sorted by date, slot, position. `MealEditModal.vue`
   `"0"` or `""`, so that stays correct.
 - The share link stays on wire version 1 (bumping it makes old clients refuse the link). The value is
   already a string; decode normalises it.
-- The AI prompt is **not** changed (the drift test would force a Lambda redeploy); conversion happens in
-  the client prefill mappers. No terraform.
+- The existing AI prompts are **not** changed for servings (conversion happens in the client prefill
+  mappers). Revision 3 adds ONE new task (dedupe), so PROMPT_VERSION bumps, all three prompt copies change
+  (drift test), and the ai-extract Lambda is applied via `scripts/infra/` (greg OK'd). New clients always
+  use the sealed arm, which accepts any task label, so a client shipped before the Lambda still works; its
+  dedupe reads are simply counted as charged until the Lambda lands.
+- **The AI never returns amounts.** Dedupe results are groups of existing line ids + a name; the merged
+  text is built from the source lines. A model answer that references unknown ids is ignored, never
+  trusted.
 - `RecipeListSheet.vue` lives in `components/pod/` because `components/lists/` must never import domain
   components. The new shared pieces that take a `Recipe` or meals also live outside `lists/`.
 - `listStore.activeLists` is member-filtered by the global filter; the destination picker must read
@@ -174,28 +182,26 @@ weekDates)` returns the week sorted by date, slot, position. `MealEditModal.vue`
 - Ingredient text is never logged (as #88).
 - `familyLists` flag gates every entry point (as #88's `canMakeShoppingList`).
 - Mobile: the header button row wraps; the drawer is the standard `BeanieFormModal variant="drawer"`.
-- Dark mode: every painted surface has a dark partner; the green multiplier pill uses the success tint
-  with `dark:text-success-lift`; no opacity modifiers on readable text (the faint original amount uses
-  `ink-faint`).
+- Dark mode: every painted surface has a dark partner; the Cook ×N marker uses #1E8449 with white text in
+  both modes (≥ 4.5:1); no opacity modifiers on readable text.
+- **Purple is To-do only (CIG).** The Find Duplicates card uses the house magic beans gradient, never
+  purple.
 
 ## Assumptions
 
 > **Review these before implementation.**
 
-1. "Who's eating" is members picked + guests, only when at least one member is picked. No members picked
-   (stored `eaterMemberIds: undefined`, which the model comments as "everyone") counts as **not
-   specified** → the recipe's own amounts, per greg's "if either number is not specified, go with the
-   default amount". Guests alone never set the count (that would under-scale "everyone + 2 guests").
-2. Picking whole-batch arithmetic per meal then summing is what greg chose ("per meal, then add").
-3. No existing recipe stores a numeric `servings` today (the type is `string` everywhere; no writer emits
-   a number). `parseServings` still accepts a number defensively.
-4. `TickButton.vue` and the `MagicTodoReviewDrawer` auto-grow textarea pattern are still the house
-   primitives.
-5. A shopping list made from the **week** is not linked to any recipe (`FamilyList.linkedRecipeId` is
-   single-valued). Lists made from one recipe (recipe page or meal drawer, New List) keep
-   `linkedRecipeId` as #88 does. Adding to an existing list never changes its link.
-6. The newest unfiled `'out'` list is a good default target for the meal drawer (typically this week's
-   list).
+1. "Everyone" = every `familyStore.humans` entry (children included, pets excluded), plus guests. greg: "when the 'who's
+   eating' number is not specified, assume all family members are eating".
+2. Batches are computed per meal (whole batches) then summed, as greg chose.
+3. No existing recipe stores a numeric `servings` (the type is `string` everywhere).
+4. Identical-line matching (trim, collapse whitespace, case-insensitive) is safe to apply without asking:
+   the lines are literally the same text; the merged line keeps the text and sums the batches.
+5. The ai-extract pipeline carries the text-only `dedupe` task via `runExtraction` (verified in Pass 2);
+   ADR-030 needs a named exception for it (§ G).
+6. A shopping list made from the week is not linked to a recipe; single-recipe lists keep
+   `linkedRecipeId` (#88). Adding to an existing list never changes its link.
+7. The newest one-off unfiled `'out'` list is a good default target for the meal drawer.
 
 ## Approach
 
@@ -232,259 +238,285 @@ intent is reproduced; every token comes from the beanies theme + CIG.
 8. `CookLogFormModal.vue:218` gets its own `cookLog.placeholder.servings` key before the recipe
    placeholder key is retired.
 
-### B. Scaling (pure)
+### B. Lines, batches and duplicates (pure)
 
-`src/utils/ingredientScale.ts` (new, pure, heavily unit-tested):
+Revision 3 **deletes** the scaler (`src/utils/ingredientScale.ts` + test): nothing parses or rewrites an
+ingredient amount.
 
-- `parseLeadingAmount(line)` → `{ amounts: number[] (1, or 2 for a range), start, end } | null`. Built
-  as one small token regex per accepted form, not one combined regex. **A number followed by `-` and a
-  letter is not an amount** ("5-spice powder" must never become "15-spice powder"); nor is "00 flour".
-  The golden table includes these, "2 x 400g", "1 (400 g) can", "½", "1½", "1 1/2", "1-2", "1 to 2",
-  "400g", "0.5 kg", "Two eggs", "a pinch".
-- `formatAmount(n)` → string (Req 3 rules).
-- `scaleIngredientLine(line, factor)` → `{ text, original?: string, unscaled?: true }`. `original` = the
-  amount as written, only when scaled; `unscaled` = factor > 1 but no leading amount could be read (the
-  checklist tags it "As Written" so the user knows to adjust "Two eggs" / "a pinch"). Factor 1 returns
-  the line untouched with no flags.
-- `batchesFor(eating?: number, servings?: number)` → integer ≥ 1.
+`src/utils/mealShoppingList.ts` (line building + the everyone rule):
 
-`src/utils/mealShoppingList.ts` (new, pure):
+- `seedEaterIds(stored, humanIds)` → the ids the edit drawer shows: stored ids that are still current
+  humans, or ALL human ids when none remain (nobody stored = everyone).
+- `eaterIdsToStore(picked, humanIds)` → `undefined` when `picked` is empty or contains every human id,
+  else the picked ids.
+- `eatingCount({ eaterMemberIds, guestNames }, humanIds)` → `{ eating, everyone }`: stored ids that are
+  still current humans (all humans when none) + guests. Uses the SAME filter as `seedEaterIds`, so the
+  week drawer and the edit drawer can never disagree about a removed member.
+- `batchesFor(eating, servings)` → `ceil(eating / servings)` when both ≥ 1, else 1.
+- `withBatchSuffix(text, n)` → `n > 1 ? `${text} (×${n})` : text`. The ONE suffix rule. `(×N)` is
+  notation, not translated copy, so the util stays pure (no `t()`).
+- `ChecklistLine = { id, source?, text, checked, recipeId?, batches, mergedInto?: string, merged?:
+'exact' | 'ai', partIds?: string[], recipeIds?: string[] }` (flat; no recursion). A hand edit is
+  `text !== withBatchSuffix(source, batches)`; user-added lines have no `source`.
+- `buildShoppingLines(recipe, batches)` → `{ lines, headingsSkipped }` via `splitRecipeIngredients`.
+- `rebatchLines(lines, n)` → for the meal panel: lines with a `source` whose text is unedited get
+  `withBatchSuffix(source, n)`; hand-edited / user-added lines and every `checked` are kept.
+- `buildWeekShoppingSections(meals, recipesById, humanIds)` → `{ recipeId, recipeName, servings?, meals:
+{ date, slot, eating, everyone, batches }[], batches, lines, headingsSkipped }[]`, ordered by first meal.
+- `countWeekShoppingRecipes`, `hasShoppableIngredients`, `linesToTitles` (kept; `linesToTitles` skips
+  lines with `mergedInto`).
 
-- `eatingCount({ eaterMemberIds, guestNames })` → `undefined` when no member is picked, else members +
-  guests. Takes the two fields (not a meal) so the meal panel can pass the drawer's live refs.
-- `hasShoppableIngredients(recipe)` (extracted from `RecipeDetailPage.vue:84-88`): used by the recipe
-  page, the meal panel, the header badge and the week sections.
-- `buildShoppingLines(recipe, factor)` → `{ lines: ChecklistLine[], headingsSkipped }` via
-  `splitRecipeIngredients` + `scaleIngredientLine`. Used by all three entry points.
-- `buildWeekShoppingSections(meals, recipesById)` → `ShoppingSection[]`:
-  `{ recipeId, recipeName, servings?, meals: { date, slot, eating?, batches }[], multiplier,
-asWritten, lines, headingsSkipped }`, ordered by first meal; `asWritten = multiplier === 1 && (servings
-undefined || some meal's eating undefined)`. Recipes failing `hasShoppableIngredients` are skipped.
-- `ChecklistLine = { id, source?, text, scaledText, original?, unscaled?, checked }` (`id` local, for
-  keys only; `source` = the ingredient as written, absent on user-added lines; `scaledText` = the last
-  generated text, so a re-scale can tell hand edits apart).
-- `rescaleLines(lines, factor)` → a pure map: for `line.source && line.text === line.scaledText`, compute
-  `r = scaleIngredientLine(line.source, factor)` and assign **explicitly** `text: r.text, scaledText:
-r.text, original: r.original, unscaled: r.unscaled` (so ×2→×1 clears the flags and later rescales keep
-  working); other lines unchanged; `checked` always kept. Test: ×2 → ×1 → ×3.
-- `linesToTitles(lines)` = `lines.filter(l => l.checked).flatMap(l => parseDraftItems(l.text))`
-  (`listSeed.ts:146`): drops emptied lines and splits pasted multi-line text; no new cleaner.
+`src/utils/shoppingMerge.ts` (new, the drawer's state as a pure reducer):
+
+- `WeekShoppingState = { sections, merged: ChecklistLine[] }`.
+- `mergeExactDuplicates(state)`: across DIFFERENT recipes, unedited unmerged lines whose source text is
+  equal after trim / whitespace-collapse / case-fold get ONE merged line (`text = withBatchSuffix(source,
+Σ batches)`, `merged: 'exact'`, `partIds`, `recipeIds`); each part gets `mergedInto`.
+- `dedupeCandidates(state)` → `{ payload: { id, text }[], idMap }`: only unedited, unmerged, generated
+  lines; opaque short ids `1…N`; `text` = the SOURCE (no suffix). Capped at `DEDUPE_MAX_LINES` lines and
+  `DEDUPE_MAX_LINE_CHARS` chars per line (both exported; see § F metering).
+- `applyDuplicateGroups(state, groups, idMap)` → `{ state, applied, dropped }`: a group is applied only if
+  it has ≥ 2 ids that still map to present, unmerged, unedited lines from ≥ 2 recipes (first claim wins);
+  the name is whitespace-collapsed; `text = name + ': ' + parts.map((p) => p.text).join(' + ')` (part
+  texts already carry their suffix); `merged: 'ai'`. Applied against the CURRENT state, so lines edited
+  during the run are simply skipped.
+- `splitMergedLine(state, id)` → removes the merged line and clears `mergedInto` on its parts. Rules:
+  Split discards any edit made to the merged line; parts come back exactly as they were.
+- All table-tested. The drawer holds ONE `state` ref and three one-line handlers.
 
 ### C. Shared UI + orchestration
 
-- `src/components/ui/AutoGrowTextarea.vue` (new, extracted): the `.title-grow` grid-mirror textarea +
-  Enter handling from `MagicTodoReviewDrawer.vue:524-538` (CSS `:606-621`, `onTitleEnter` `:285`), with
-  `inheritAttrs: false` + `v-bind="$attrs"` on the inner textarea so `data-testid` / `aria-label` /
-  `@blur` land where the drawer's tests expect (`MagicTodoReviewDrawer.test.ts:264` uses `setValue`).
-  Enter is blocked, paste is allowed. `cleanTitle` / `restoreEmptyTitle` stay in the drawer.
-  `MagicTodoReviewDrawer` switches to it in the same change (second use → extract now).
-- `src/components/lists/ListChoiceRow.vue` (new, extracted from `RecipeListSheet.vue:335-358`): one
-  `FamilyList` row (emoji, title, `progressFor`, open affordance or `selected` outline). No domain imports,
-  so it is allowed in `lists/`. Used by `RecipeListSheet` review mode and `ShoppingListDestination`.
-- `listStore.shoppingDestinations` (new getter): unfiltered `lists`, one-off (`!isRecurring`) and
-  `!isFiled`, category `'out'` first, then the module-private `byCreatedDesc` (`listStore.ts:65`). The
-  picker reads it; the meal panel's default is its first `'out'` entry.
-- `listStore.addItems(listId, titles)` (new): items from `freshItems(titles)` (`listSeed.ts:23`), one
-  `updateList` with completion re-derived by `deriveCompletion` (`:88-113`, reopens a filed one-off) and
-  the `cycleCelebrated` reset `addItem` does today. It keeps `addItem`'s silent-null contract (a missing
-  list returns null; the repository already reports a concurrent delete at `automergeRepository.ts:199`
-  and `wrapAsync` reports a throw; `useWallJobs.ts:255` reports its own `list_add` failure, so reporting
-  here would double it). `addItem` becomes `addItems(id, [title])`.
-- `utils/listSeed.ts`: `buildRecipeListSeed` → `buildShoppingListSeed({ titles, title, ownerId,
-createdBy, dueDate?, linkedRecipeId? })`; closed key set kept; `linkedRecipeId` only when given.
-- `src/composables/useOpenList.ts` (new): `openList(id)` moved out of `useRecipeShoppingLists`
-  (`:56-58`) and removed from its return; the one importer (`RecipeListSheet.vue:92`), its test (`:117`)
-  and the comment at `entityDeepLink.ts:47` are updated. No re-export shim.
-- `src/components/pod/IngredientChecklist.vue` (new): v-model `ChecklistLine[]`; rows = `TickButton` +
-  `AutoGrowTextarea` (plain text: a textarea cannot bold part of its value, so the mockup's bold amount is
-  dropped rather than faked with an overlay) + the faint `(original)` suffix outside the textarea while
-  the line is unedited + an "As Written" tag when `unscaled`; one built-in
-  tick-all toggle (the `ListDetailModal.vue:270-281,470-479` pattern) rendered in the checklist's own
-  header, which takes an optional `title` slot so the week section header puts its name / pills there
-  and uses the SAME toggle (no second implementation); labels are new keys `ingredients.tickAll` /
-  `ingredients.untickAll` ("Tick All" / "Untick All", as the mockup) because `lists.detail.checkAll`
-  reads differently; "Add an item" row; the "N headings skipped" `InferredHint` (moved from
-  `RecipeListSheet.vue:133-139,399`; `listSeed.ts:117` requires it be shown). No store access.
-- `src/components/pod/ShoppingListDestination.vue` (new): v-model `ShoppingDestination = { mode: 'new';
-title; ownerId; dueDate } | { mode: 'existing'; listId }`. New List fields move here from
-  `RecipeListSheet.vue` (owner `FamilyChipPicker`, `BeanieDatePicker`, due hint). Add to a List =
-  `ListChoiceRow`s over `shoppingDestinations`. One mode only (the meal panel draws its own one-line
-  summary and toggles this control).
-- `src/composables/useShoppingListCommit.ts` (new): `commit({ destination, titles, linkedRecipeId?,
-kind })` → `Promise<FamilyList | null>`. `kind` is telemetry-only; callers pass their own default
-  destination and title, so a new entry point never edits this composable.
-  - Guards (moved from `RecipeListSheet.vue`): double-tap; no current member (`reportError` `action:
-'no_current_member'` + silent toast, as today); recipe gone when `linkedRecipeId` is set (**new**
-    `reportError` `action: 'recipe_missing'` with the existing toast; today `RecipeListSheet.vue:244-247`
-    only toasts). The owner check is NOT repeated:
-    `listStore.createList` already refuses an unresolved owner with its own toast + report
-    (`listStore.ts:430-447`; #88's `owner_unresolved` filter becomes `lists`/`create_unknown_owner`).
-    A filed target list is allowed (it reopens).
-  - Then `createList(buildShoppingListSeed(...))` or `addItems`. On a null from `addItems`, if the list
-    is gone from `listStore.lists` → `reportError({ surface: 'list-from-recipe', action:
-'add_items_list_missing', severity: 'error' })` + toast "That list was deleted" with help text; a null
-    from `createList` is already toasted.
-  - On success: the View toast (as #88, via `useOpenList`) and telemetry.
+Kept from revision 2 (built): `AutoGrowTextarea`, `ListChoiceRow`, `ShoppingListDestination`,
+`useShoppingListCommit`, `useOpenList`, `listStore.addItems` / `shoppingDestinations`,
+`buildShoppingListSeed`. Revision 3 changes:
+
+- `IngredientChecklist`: renders and toggles only lines without `mergedInto`; drop `originalOf` and the
+  As Written tag; add a scoped `#line-extra="{ line }"` slot (the drawer puts recipe pills, the ✨ marker
+  and Split there; no domain props, no split emit).
+- `MultiplierPill.vue` → renamed `CookCountPill.vue` (2 importers): `Cook ×N` (strong #1E8449, white,
+  ≥ 4.5:1 in both modes) or a quiet `Cook Once`; aria "Cook 3 times this week" / "Cook once".
+- `FamilyChipPicker`: optional `allToggle` prop (multi mode) rendering a trailing text button in the chip
+  row: `action.clear` when every chip is picked, else new `common.everyone`. "All" is measured against the
+  picker's own member list. No storage meaning (visual only).
+- `src/components/ai/MagicBeansCardButton.vue` (new, extracted from `MagicBeansQuickCard`'s button): props
+  `label`, `subtitle?`, `busy?`; `#tag` slot; `busy` → `.magic-shimmer-busy`, `aria-busy`, `disabled`.
+  `MagicBeansQuickCard` renders it inside its Door trigger; the drawer uses it directly (it must not
+  open the sheet).
+- `src/composables/useFindDuplicates.ts` (new): `find(payload)` → `{ status: 'done' | 'declined' | 'failed'
+| 'stale', groups? }`; never touches drawer state. Flow (template `useRecipeCapture.processUrl`
+  `:419-470`): `requestConsent()` → `resolveBillableFamilyId` → `isOnline` guard → `findDuplicatesInText`
+  with `useAiCapability().extractOptions({ grant, familyId, signal })`. ONE per-open run token: the
+  `AbortController` of the current open; a result whose controller is not the current one is `stale` and
+  dropped (the `useMintedLink.ts:110` pattern). `runExtraction` returns result objects (never throws), so
+  there is no speculative try/catch.
 
 ### D. Entry points
 
-1. `MealPlannerPage.vue`: header button + badge + disabled hint; mounts `MealWeekShoppingDrawer`.
-2. `src/components/mealplan/MealWeekShoppingDrawer.vue` (new): `BeanieFormModal variant="drawer"`,
-   title "Shopping List", subtitle "Week of {date}, {n} recipes, {m} meals"; sections from
-   `buildWeekShoppingSections` (snapshot at open); each section a card with the header (Req 4) and an
-   `IngredientChecklist`; `ShoppingListDestination` below; save → `commit({ kind: 'week' })`. Default new
-   list title "Shopping for {week start}". No `linkedRecipeId`.
-3. `src/components/mealplan/MealIngredientsPanel.vue` (new): props `recipe`, `eating: number`. Owns the
-   checklist (`buildShoppingLines` then `rescaleLines` when `batchesFor(eating, servingsOf(recipe))`
-   changes), the multiplier pill, a one-line "Add to {list} ▾" summary that toggles
-   `ShoppingListDestination`, and the Add button → `commit({ kind: 'meal', linkedRecipeId })`. Default
-   destination = `shoppingDestinations[0]` else New List. `MealEditModal.vue` gains one element and a
-   computed `eating` (from its live `eaterIds` / `guestNames` refs via `eatingCount`), plus one line in
-   its header comment ("hosts the read-only ingredients panel; the panel owns its own list write"), so
-   the modal keeps owning only MealPlanEntry fields. A test pins that Add is independent of the meal's
-   Save / Cancel. The panel is keyed on `recipe.id + recipe.updatedAt` so the nested Edit Recipe
-   (`MealEditModal.vue:199`) refreshes it, and it renders only when `familyLists` is on and
-   `hasShoppableIngredients(recipe)`. After Add it switches the destination to the list written and shows
-   "Added" until the lines or destination change.
-4. `RecipeListSheet.vue`: create mode = `IngredientChecklist` + `ShoppingListDestination` +
-   `commit({ kind: 'recipe', linkedRecipeId })`; review mode unchanged but rendered with `ListChoiceRow`;
-   header comment updated (the textarea rationale is gone; transient line ids are owned by the checklist
-   by design).
+1. `MealPlannerPage.vue`: header button + badge + hint (built); `countWeekShoppingRecipes` unchanged.
+2. `MealWeekShoppingDrawer.vue`: at open, `state = mergeExactDuplicates(fromSections(buildWeek…))`; the
+   "In More Than One Meal" section (shown when it has lines or after a run); the `MagicBeansCardButton`
+   above it (Req 7 gate + states); Split; save = `commit` over `linesToTitles(merged + sections)`;
+   close aborts the run.
+3. `MealIngredientsPanel.vue`: `buildShoppingLines(recipe, batches)` then `rebatchLines` when this meal's
+   batch count changes; `CookCountPill`; the rest as built.
+4. `MealEditModal.vue`: `eaterIds` seeded with `seedEaterIds`; `FamilyChipPicker` with `allToggle`; save
+   stores `eaterIdsToStore(eaterIds, humanIds)`; `eating` from `eatingCount`.
+5. `RecipeListSheet.vue`: batches 1 (no suffix); `logShoppingSheetOpened` arg `asWritten` → `exactMerges`.
+6. `MagicBeansSheet.vue` placeholder + (i), `InfoHintBadge` `z-[300]` (both done).
 
 ### E. i18n, accessibility
 
-New keys (`en` + `beanie`, Title Case labels, sentence case for sentences):
+New keys (`en` + `beanie`): `mealPlanner.shopping.cook.once` ("Cook Once") / `.cook.times` ("Cook ×{n}")
 
-- `mealPlanner.shopping.*`: button, disabled hint, badge aria ("{n} recipes this week"), drawer title,
-  subtitle with one/other plurals ("Week of {date}, {n} recipe(s), {m} meal(s)"), default list title
-  ("Shopping for {date}"), served pill ("{day}, {n} eating"), not-set pill ("{day}, Not Set"), serves
-  line, multiplier aria ("Scaled {n} times"), As Written + its reason lines.
-- `lists.destination.*`: New List, Add to a List, name label, "Add to {list}", no-lists empty state,
-  list-deleted error + help, save labels "Create List" / "Add {n} Item(s)" (one/other), "Added".
-- `ingredients.*`: tickAll, untickAll, add-line placeholder ("Add an item"), per-line tick aria and edit
-  aria ("Include {item}", "Edit {item}"), asWritten tag.
-- `recipes.servesN`, stepper unit "people", stepper −/+ aria ("Fewer" / "More"),
-  `cookLog.placeholder.servings`.
-- Reworded: `lists.fromRecipe.body` (it describes the textarea). Removed: `lists.fromRecipe.itemsLabel`
-  and any key left unread.
-- No new glyphs: the "▾" in the mockup becomes the existing chevron icon (`▾` is not in the i18n glyph
-  allowlist).
+- aria variants, `mealPlanner.shopping.everyonePill` ("{day}, Everyone ({n})"),
+  `mealPlanner.shopping.noServingsPerMeal` (kept), `mealPlanner.shopping.dupes.title` ("In More Than One
+  Meal"), `.dupes.find` ("Find Duplicates"), `.dupes.free` ("Free"), `.dupes.running` ("Finding
+  duplicates…"), `.dupes.found.one/.other` ("{n} found"), `.dupes.none` ("No other duplicates"),
+  `ingredients.split` ("Split"), `ingredients.byMagic` (aria "Found by magic beans"), `common.everyone`
+  ("Everyone"); reuse `action.clear`. Removed once unread: `ingredients.asWritten`, `ingredients.original`,
+  `mealPlanner.shopping.multiplier*`, `.notSetPill`, `.noEaters`. Errors reuse the extraction error toast
+  keys. A11y: the card is a `<button>` with `aria-busy`; Split is a button "Split {item}"; the Clear /
+  Everyone toggle has no `aria-pressed` (its label names the action, like the tick-all toggle).
 
-Accessibility: `aria-expanded` on the meal panel's destination summary; `aria-pressed` on New List / Add
-to a List; `aria-describedby` from the disabled header button to its hint; the badge carries an
-aria-label; `TickButton` supplies `aria-pressed` per line.
+### F. AI task, consent and free metering
+
+- **Task `dedupe`.** `findDuplicatesInText(text, opts) => runExtraction(text, opts, 'dedupe')` next to
+  `extractRecipeFromText` (`documentExtractionService.ts:206-295,319-324`); covers managed (always
+  sealed; prompt from `EXTRACTION_TASKS`, parse via `EXTRACTION_PARSERS`, `managedProvider.ts:463,563`)
+  and BYOK (`openaiCompatible.ts:149-154`) with no provider change. `types.ts`: `DedupeExtractionResult
+extends AttestedResult { groups: { name: string; lineIds: string[] }[] }` + `dedupe:` in
+  `ExtractionResultByTask`. `extractionPrompt.ts`: `DEDUPE_JSON_SHAPE`, `DEDUPE_REQUIRED_KEYS =
+['groups']`, `buildDedupeMessages` (via `buildUserMessage` so lines are fenced as untrusted text),
+  registry entry `{ buildMessages, requiredKeys, jsonShape, sources: ['text'] }`, `parseDedupeResult` in
+  `EXTRACTION_PARSERS` (shape-only; `asString`/`MODEL_FIELD_MAX`, groups ≤ `MODEL_LIST_MAX`). The same
+  three prompt pieces in `scripts/spikes/extractionPrompt.mjs` and
+  `infrastructure/lambda/ai-extract/extractionPrompt.mjs`; `PROMPT_VERSION` bumped in all three. The
+  drift test already loops every task; the sealed-arm `TASK_RE` already admits `dedupe`.
+- **Consent (ADR-030 applies).** `ExtractOptions.grant` is required; reuse the generic `requestConsent()`
+  (`useDocumentConsent.ts:131`; "don't ask again" honoured). Decline → `info` `find_declined`, the card
+  stays. Add a dated "no new exception" note to ADR-030 (like #113's at `:59`).
+- **Free metering.** In `meter.mjs` one table `FREE_TASK_MAX_BYTES = new Map([['dedupe', N]])` and an
+  early-return `usageAttrFor(read, task)`: correction → `corrected`; task in the table AND
+  `read.srcBytes ≤ N` → new `USAGE_ATTRS.freeTask`; else `charged` (an oversized "dedupe" is charged with
+  a `console.warn`). Table-tested. `N` is derived from the client caps (`DEDUPE_MAX_LINES` ×
+  `DEDUPE_MAX_LINE_CHARS` + prompt + seal overhead, ≈ 16 KB), and a client test asserts the worst-case
+  dedupe payload fits under `N`, so prompt growth can never silently turn it charged. The sealed-arm
+  task label is client-supplied: a tampered client can still get small free reads; the accepted controls
+  are the size bound, the unchanged rate limits and the visible free counter. `lambdaContractParity`
+  asserts the table's tasks ⊆ client task keys. Terraform: Lambda code only
+  (`-target=module.ai_extract`). `pull_ai_usage.mjs` (`:93-112`) sums `freeTask`. Update the "metering
+  label and NOTHING else" comment in `sealedForward.mjs`.
+- **Pricing.** Edit the existing `one-magic-bean` FAQ answer (`web/src/lib/pricing.ts:118-120`): finding
+  duplicates in a shopping list is free.
+
+### G. Privacy, payload and edge rules (Pass 4)
+
+- **ADR-030 exception (new, dated).** Find Duplicates sends stored cookbook ingredient lines, which is
+  family data, and ADR-030 says "never the family dataset" with statements the one named exception
+  (`docs/adr/030…md:57`). Add a dated, named exception for "ingredient lines on a shopping list being
+  built", scoped to the line texts only. `ConsentRequest` gains `{ kind: 'ingredients' }`
+  (`useDocumentConsent.ts:66-69`) whose "what" line reads "Only the ingredient lines on this list: no
+  recipe names, dates or who's eating". "Don't ask again" follows the #107 statement precedent. Update
+  `src/content/help/security.ts` "What we send" (`:884-891`) and the "every read is one bean" paragraph
+  (`:860`, dedupe is free) in the same change.
+- **Payload.** JSON `[{ "id": "L1", "text": "…" }]` (string ids `L1…LN`; a line cannot fake an id).
+  `parseDedupeResult` accepts ids as strings, or whole numbers via `String()` → `"L" + n` normalisation
+  only when they match; `idMap` is a `Map`. Repeated ids inside a group are removed before the ≥ 2 check.
+  Names: whitespace collapsed (incl. U+2028/2029), `\p{Cc}\p{Cf}` stripped (bidi), capped at 60 chars;
+  an empty name drops the group.
+- **Respect the user's choices.** `dedupeCandidates` skips unticked, hand-edited, merged and previously
+  Split lines (Split parts get `split: true`); `applyDuplicateGroups` re-checks ticked / unedited / unmerged
+  against the current state.
+- **Free bound, byte-accurate.** One `DEDUPE_MAX_PAYLOAD_BYTES` measured with `TextEncoder` on the
+  serialized payload (not lines × chars); `dedupeCandidates` stops adding lines at the bound. The
+  Lambda's `FREE_TASK_MAX_BYTES` for `dedupe` is set with margin above the worst case of the REAL built
+  sealed request; `lambdaContractParity.test.ts` reads it from `meter.mjs` (as it reads
+  `MANAGED_TEXT_BILL_BOUND`, `:93`), builds the real messages from worst-case lines (quotes, backslashes,
+  CJK) and asserts they fit. `usageAttrFor` requires `Number.isFinite(read.srcBytes)` (it defaults to
+  `null`, and `null <= N` is true).
+- **Checklist with hidden lines.** `IngredientChecklist` computes `visible` (no `mergedInto`) once and
+  bases the list, `allChecked`, the toggle's `v-if` and `toggleAll` on it; a section with no visible lines
+  collapses to its header with "All in More Than One Meal". New `addable` prop (false for the merged
+  section).
+- **Card button is a shell.** `MagicBeansCardButton` = gradient, sheen, shadow, `busy`, and a default slot
+  wrapped in `relative z-[1]`; each card lays out its own content (quick card column, dupes card row). While
+  busy: `aria-disabled` + click guard (not `disabled`, keeps focus). "✨ N found" / "No other duplicates"
+  announced in an `aria-live="polite"` region; focus moves to the merged section header when the card
+  goes. Re-screenshot the To-do, Activity and Transaction drawers' quick cards (light + dark) after the
+  extraction.
+- **Gate + flow.** Card shown when `canReadAny && useAiCapability().isConfigured` and 2+ recipes. The Free
+  tag shows only on the managed tier (BYOK users pay their provider). Order: `isOnline` +
+  `resolveBillableFamilyId` BEFORE `requestConsent` (an offline tap never prompts). Close aborts the run
+  AND clears the current controller, so the aborted result is `stale`, not an error toast.
+- **i18n fixes.** Cook pill aria "Cook 3 times" / "Cook once" (no "this week"; it is used in the meal
+  drawer too). Remove `mealPlanner.shopping.noServings` (it describes scaling); the meal panel uses
+  `noServingsPerMeal`. The `(×N)` suffix lives in the editable text (the mockup draws a styled span; as
+  with the dropped bold, a textarea cannot style part of its value).
+- **Dark mode partners** for: the merged-section background, source pills, the ✨ marker and "N found"
+  (`dark:text-accent-lift`), Split, the "No other duplicates" tile, the quiet Cook Once pill.
+- **`InfoHintBadge` fixes** (being touched anyway): the trigger button gets an accessible name
+  (`common.moreInfo`-style key) and `aria-expanded`; `text-white/85` / `/60` opacity text → ink tokens;
+  its 10px text → `text-xs`.
+- **Help:** add "everyone is picked by default; Clear to pick just some" and "a merged line's (×N) is the
+  total across its recipes".
+- **Tests added to the Testing Plan:** `parseDedupeResult` (numeric ids, caps, names), the payload-size
+  parity test, `MagicBeansCardButton`, `CookCountPill`, `IngredientChecklist` hidden lines + `addable`,
+  `rebatchLines`, `useFindDuplicates` declined / stale / offline-before-consent, consent variant copy.
 
 ## Files Affected
 
-- New: `src/components/mealplan/MealIngredientsPanel.vue`, `src/utils/recipeServings.ts`, `src/utils/ingredientScale.ts`, `src/utils/mealShoppingList.ts`,
-  `src/components/ui/NumberStepper.vue`, `src/components/ui/AutoGrowTextarea.vue`,
-  `src/components/lists/ListChoiceRow.vue`, `src/components/pod/IngredientChecklist.vue`,
-  `src/components/pod/ShoppingListDestination.vue`, `src/components/mealplan/MealWeekShoppingDrawer.vue`,
-  `src/composables/useShoppingListCommit.ts`, `src/composables/useOpenList.ts`; a test file for each.
-- Modified: `src/types/models.ts` (doc comment only), `src/utils/recipeExtractionToRecipe.ts`,
-  `src/composables/useRecipeCapture.ts`, `src/utils/recipeShareLink.ts`, `src/utils/recipeShareText.ts`,
-  `src/utils/recipeComparable.ts`, `src/components/pod/RecipeFormModal.vue`, `src/utils/entityDeepLink.ts`
-  (comment),
-  `src/components/pod/RecipeRefetchModal.vue`, `src/components/pod/CookLogFormModal.vue`, `src/pages/RecipeDetailPage.vue`,
-  `src/pages/FamilyCookbookPage.vue`, `src/pages/SharedRecipePage.vue`, `src/pages/MealPlannerPage.vue`,
-  `src/components/mealplan/MealEditModal.vue`, `src/components/pod/RecipeListSheet.vue`,
-  `src/components/ai/MagicTodoReviewDrawer.vue` (AutoGrowTextarea),
-  `src/composables/useRecipeShoppingLists.ts`, `src/utils/listSeed.ts`, `src/stores/listStore.ts`,
-  `src/services/translation/uiStrings.ts`, `src/content/help/the-pod.ts`, `src/content/help/features.ts`,
-  and the existing tests listed in the Testing Plan (incl. `MagicTodoReviewDrawer.test.ts`,
-  `useRecipeShoppingLists.test.ts`, `recipeListSheet.test.ts` (the `owner_unresolved` case becomes
-  `lists`/`create_unknown_owner`), `listStore.test.ts` `addItem` cases, `RecipeFormModal` tests).
-- Mockup: `docs/mockups/meal-shopping-list-2026-09-29.html` (committed `0d0b1f6c`).
+- Already built in revision 2 (kept): see the Outcome below and `git status`.
+- **Removed:** `src/utils/ingredientScale.ts`, `src/utils/__tests__/ingredientScale.test.ts`.
+- **New:** `src/utils/shoppingMerge.ts` (+ test), `src/composables/useFindDuplicates.ts` (+ test),
+  `src/components/ai/MagicBeansCardButton.vue` (+ test).
+- **Renamed:** `src/components/mealplan/MultiplierPill.vue` → `CookCountPill.vue`.
+- **Modified:** `src/utils/mealShoppingList.ts` (+ test), `src/components/pod/IngredientChecklist.vue`,
+  `MealWeekShoppingDrawer.vue`, `MealIngredientsPanel.vue`, `MealEditModal.vue`,
+  `src/components/ui/FamilyChipPicker.vue`, `src/components/ai/MagicBeansQuickCard.vue`,
+  `src/components/pod/RecipeListSheet.vue`, `src/composables/useShoppingListCommit.ts`,
+  `src/services/ai/types.ts`, `src/services/ai/extractionPrompt.ts`,
+  `src/services/ai/documentExtractionService.ts`, `scripts/spikes/extractionPrompt.mjs`,
+  `infrastructure/lambda/ai-extract/{extractionPrompt,meter,ddb,sealedForward}.mjs` + their tests,
+  `src/services/ai/__tests__/lambdaContractParity.test.ts`, `docs/adr/030-private-ai-tiered-architecture.md`
+  (dated named exception), `src/composables/useDocumentConsent.ts` (`ingredients` variant),
+  `src/content/help/security.ts`,
+  `.claude/skills/beanies-metrics/scripts/pull_ai_usage.mjs`, `src/services/translation/uiStrings.ts`,
+  `src/content/help/features.ts`, `src/content/help/the-pod.ts`, `web/src/lib/pricing.ts`, the browser
+  harness `scripts/design-screenshots/meal-shopping-list-capture.ts`, and component tests that asserted
+  the removed pill / As Written behaviour.
+- Done in this revision already: `src/components/ai/MagicBeansSheet.vue`, `src/components/ui/InfoHintBadge.vue`
+  (z-index; its a11y/opacity fixes are in § G).
+- Mockup: `docs/mockups/meal-shopping-list-2026-09-29.html` (revision 4).
 
 ## Help Center Coverage
 
-- **Action**: update existing — **Category**: `features` — `src/content/help/the-pod.ts` section
-  `shopping-list`. **Title**: keep. **Scope**: the checklist (untick what you have, edit, add), choosing
-  New List or adding to one of your lists, and that it lives on the recipe page. **Notes**: no duplicate
-  check when adding to a list.
-- **Action**: update existing — **Category**: `features` — `features.ts` `planning-your-familys-meals`:
-  new section "Make a Shopping List for the Week" (one section per recipe; amounts sized by who's eating
-  vs the recipe's servings, rounded up to whole batches per meal and added up; missing numbers use the
-  recipe's amounts; lines with no amount stay as written) and a line on seeing ingredients in the meal
-  drawer. **Notes**: set a recipe's Servings to get sizing.
-- The cookbook article that mentions servings (`the-pod.ts:527`) says "Serves" is a number now.
+- **Update** `features.ts` `planning-your-familys-meals` → "Make a Shopping List for the Week": one section
+  per recipe with the ingredients as written; **Cook ×N** says how many batches that week (who's eating vs
+  the recipe's servings, whole batches per meal, added up; nobody picked means everyone); lines of a ×N
+  recipe end in (×N) so the list says how many lots to buy; identical lines are merged into "In More Than
+  One Meal"; **✨ Find Duplicates** (free, doesn't use your magic beans) merges the same item written
+  differently, and Split undoes a merge; the meal drawer shows a meal's ingredients; set a recipe's
+  Servings to get batch counts.
+- **Update** `the-pod.ts` `shopping-list` (recipe page): as built, minus any scaling wording.
+- **Pricing** (`web/src/lib/pricing.ts` FAQ): one line that finding duplicates in a shopping list is free.
 
 ## Observability Coverage
 
-- **Surface `list-from-recipe`** (kept, so #88's CloudWatch filter continues), emitted by the three
-  openers and `useShoppingListCommit`:
-  - `info` `action: 'sheet_opened'`, `kind: 'recipe'|'meal'|'week'`, `count` = sections (1 for
-    recipe/meal), `ingredient_count` = lines offered, `inferred_count` = sections with `asWritten` (the
-    same definition as the UI), so how often servings / who's eating are unset is measurable.
-  - `info` `action: 'list_created'` / `'items_added'`, `kind`, `count` = headings skipped (unchanged
-    meaning, so #88's metric keeps its definition), `ingredient_count` = lines written, `stage:
-'new'|'existing'`, `detail` = sections as a fixed bucket (`'one' | 'two' | 'three' | 'many'`). Success path, so creation rates and the new/existing split
-    are measurable.
-  - Guard failures: `reportError` `severity: 'error'`, `action: 'no_current_member' | 'recipe_missing' |
-'add_items_list_missing'` (the toast is shown to the user).
-- **Surface `lists`**: unknown owner stays `lists` /
-  `create_unknown_owner` (existing, from `createList`). Store write failures are already reported and
-  toasted by `createList` / `updateList` (`wrapAsync`).
-- **Recipe capture** (`useRecipeCapture`, its existing `SURFACE`): when the prefill mapper reports
-  `servingsUnparsed` (non-empty incoming servings text, no people count), emit one `info` event
-  `action: 'servings_unparsed'`, `kind` (the capture kind already in scope). Mirrors the
-  `taxonomyRejected` event that follows `times_filled` (`useRecipeCapture.ts:338-370`), so the parser's
-  miss-rate on real captures is a CloudWatch filter. The existing `times_filled` `count` will read lower
-  for "12 muffins"-style captures; that is intended and noted in the code comment. The `servingsOf`
-  accessor is pure and silent by design (unit-tested; logging on every read would flood the firehose).
-- No new context keys (`action`, `kind`, `count`, `ingredient_count`, `stage`, `inferred_count`,
-  `detail` all exist in `ALLOWED_CONTEXT_KEYS`, `diagnosticContext.ts`) → no store-declaration change.
-- Ingredient text and servings text are never logged.
+- **`list-from-recipe`** (kept): `sheet_opened` (week + recipe only; the passive meal panel emits none),
+  `list_created` / `items_added` with `kind`, `count` = headings skipped, `ingredient_count`, `stage`,
+  `detail` = sections bucket; plus `inferred_count` on `sheet_opened` = exact merges made at open.
+  Guard failures as built (`no_current_member`, `recipe_missing`, `add_items_list_missing`).
+- **`meal-shopping-dupes`** (new surface): `info` `action: 'find_started'` (`count` = lines sent),
+  `'find_done'` (`count` = groups applied, `inferred_count` = groups dropped by validation),
+  `'find_declined'` (consent declined), `'split'` (`kind: 'exact'|'ai'`); on failure `logEvent` error
+  `action: 'find_failed'` with `error_code`, then `reportExtractionFailure(code, error)` (whose toast
+  already reports; no second `reportError`). A stale result (drawer closed or reopened) is dropped
+  without an event. Success path logged, so a hit rate and failure rate are
+  measurable. Never the ingredient text.
+- **ai-extract Lambda:** the `freeTask` counter makes dedupe volume visible in the usage table
+  (`pull_ai_usage.mjs` is edited to sum it); an oversized "dedupe" logs a `console.warn` and is charged. The Lambda's existing structured logs cover
+  failures; the task name is already a logged field.
+- No new client context keys (all allowlisted: `action`, `kind`, `count`, `inferred_count`, `stage`,
+  `detail`, `ingredient_count`).
 
 ## Acceptance Criteria
 
-- [ ] A week with Tikka (Mon, 4 eating, serves 4), Tacos (Tue 5 + Fri 3 eating, serves 4) and a Thu
-      stir-fry with nobody picked shows three sections: ×1, ×3, and "As Written".
-- [ ] `1/2 cup sour cream` ×3 reads `1 ½ cup sour cream` (text after the amount unchanged); `0.5 kg` ×3
-      reads `1.5 kg`; "Salt, to taste" unchanged; ×1 lines byte-identical; `2% milk`, `1,000 g`, `500 g
-    (1 lb)` are left as written with the tag.
-- [ ] Unticked lines are not added; edited text is what gets written; added lines are included.
-- [ ] New List creates one `'out'` one-off list with the ticked lines and the typed name; Add to a List
-      appends them to the chosen one-off list (reopening it if it was completed); no duplicate prompt; a
-      second tap on the meal panel's Add does not create a second list.
-- [ ] The edit-meal drawer shows Tuesday's tacos at ×2 and updates when who's eating changes (hand edits
-      kept); Add writes immediately and independently of the meal's Save; the destination defaults to
-      the newest open shopping list.
-- [ ] The recipe page's Shopping List uses the same checklist at ×1; review mode unchanged.
-- [ ] Recipe form Servings is a number stepper; a recipe stored as "Serves 4-6" reads 4; "12 muffins"
-      reads blank; saving writes the digit string "4" to the doc (never a number).
-- [ ] "5-spice powder" ×3 is unchanged; "Two eggs" ×2 carries the As Written tag.
-- [ ] An old client (0.21.1 code path) editing a recipe saved by the new client does not crash (stored
-      value is a string).
-- [ ] Share link round-trips servings; an old-format "Serves 8" link decodes to the digit string "8".
-- [ ] Editing an old "12 muffins" recipe's name only does not change its servings text.
-- [ ] Recurring lists are not offered in Add to a List; a meal with only guests picked is "Not Set".
-- [ ] Header button hidden with `familyLists` off; disabled with the hint when the week has no recipe
-      meals.
-- [ ] Light + dark, desktop + phone widths match the mockup's intent with CIG tokens.
-- [ ] Help Center article(s) listed in **Help Center Coverage** added/updated and verified to match the
-      shipped behavior
-- [ ] Diagnostic logging in **Observability Coverage** implemented and verified (events fire with the
-      stated `surface`/`context`; failure modes are triageable from CloudWatch without a local repro; any
-      new context key is allowlisted + declared)
+- [ ] A week with Tikka (Mon, 4 picked, serves 4), Tacos (Tue 3 picked + 2 guests, Fri 3 picked; serves 4)
+      and a Thu stir-fry with nobody picked (family of 5, serves 4) shows Tikka **Cook Once**, Tacos
+      **Cook ×3**, Stir-fry **Cook ×2** ("Thu, Everyone (5)"); lines exactly as written, Tacos lines end
+      in (×3), Tikka lines have no suffix.
+- [ ] `1 cup basmati rice` in Tikka (×1) and Stir-fry (×2) is merged at open into `1 cup basmati rice
+(×3)` in "In More Than One Meal", with both recipe pills; Split puts it back.
+- [ ] ✨ Find Duplicates (only with 2+ recipes and AI available) runs once, shows the running state, then
+      merges e.g. `Ground beef: 500 g ground beef (×3) + 250 g lean ground beef (×2)` with a ✨; a failed
+      run leaves the card for a retry with the error toast; nothing merges without being shown.
+- [ ] The dedupe call is recorded in the free counter, not the charged one (Lambda test).
+- [ ] Unticked lines are not added; edited text is what gets written; the suffix travels into the list.
+- [ ] Edit-meal drawer: Tuesday's tacos Cook ×2 with (×2) suffixes; who's eating shows everyone picked
+      for a meal with no stored eaters; Clear unpicks all and the link then reads Everyone; saving with
+      all picked stores no `eaterMemberIds`.
+- [ ] Recipe page Shopping List: the recipe's lines, no suffix.
+- [ ] The magic beans sheet shows the new placeholder and a hint badge whose popover sits above the sheet.
+- [ ] Servings behaviour from revision 2 unchanged (stepper, digit string, old text parsed).
+- [ ] Light + dark, desktop + phone match mockup revision 4 with CIG tokens.
+- [ ] Help Center + pricing line updated.
+- [ ] Observability events fire as stated.
 
 ## Testing Plan
 
-1. Unit: `recipeServings.test.ts` (table of inputs), `ingredientScale.test.ts` (fractions, unicode,
-   glued units, ranges, decimals, no amount, factor 1 identity, formatting tolerance),
-   `mealShoppingList.test.ts` (dedupe, ordering, sum of batches, missing numbers, deleted recipe,
-   non-recipe meals), `listSeed.test.ts` (generalised seed), `listStore` `addItems` (completion
-   re-derived), `useShoppingListCommit.test.ts` (each guard, both destinations, telemetry),
-   `recipeServings` (parse / normalise / format), the form payload's servings is a string, share link and
-   prefill conversions, `recipeDiff` treats "Serves 4" and "4" as equal.
-2. Component: `IngredientChecklist` (tick, tick all, edit, add, empty dropped), `ShoppingListDestination`
-   (both modes), `RecipeListSheet` tests migrated from textarea to checklist, `MealIngredientsPanel`
-   (live scaling, edits kept, independent of meal Save), `MealWeekShoppingDrawer` (sections + save label).
-3. `npm run validate` green.
-4. Browser (Playwright harness under `scripts/design-screenshots/`, not `e2e/specs/`): seed a family
-   with the acceptance-criteria week, open the drawer on desktop + 390px, light + dark, create a list and
-   add to a list, open the meal drawer, change eaters, open a recipe's Shopping List, edit servings in the
-   form; screenshots reviewed.
+1. Unit: `mealShoppingList.test.ts` (seed/store/eatingCount everyone rule, batches, suffix, `rebatchLines`) and `shoppingMerge.test.ts` (exact merge across
+   recipes only, AI group validation incl. bad ids / singletons / double claims, split, suffix sums);
+   `useFindDuplicates.test.ts` (success, malformed JSON, provider error → toast + report, telemetry);
+   the prompt drift / contract-parity tests with the new task; Lambda `meter` test for the free counter
+   (`npm run test:lambda`); `FamilyChipPicker` allToggle; `IngredientChecklist` merged-line pills + Split;
+   `MealEditModal` everyone-by-default display + save mapping; existing tests updated for the removed
+   scaler.
+2. `npm run validate` + `npm run test:lambda` green.
+3. Terraform: `scripts/infra/tf-plan.sh -target=module.ai_extract`; apply only the ai-extract Lambda code
+   change.
+4. Browser harness updated for revision 3 (as-written lines, Cook markers, exact merge, Find Duplicates
+   with the AI call mocked at the network/provider boundary, Split, everyone default + toggle, magic beans
+   sheet (i) above the sheet); desktop + 390px, light + dark; screenshots reviewed.
 
 ## Review Passes
 
@@ -492,7 +524,11 @@ aria-label; `TickButton` supplies `aria-pressed` per line.
   code audits (servings end-to-end; lists/meal planner surfaces).
 - **Pass 2 (DRY + error handling)**: `encode` option on the generic repository (all write paths, servings only when present); `addItems` reports a missing list; recipe-gone guard kept, duplicate owner guard dropped; extracted `AutoGrowTextarea`, `ListChoiceRow`, `useOpenList`, `NumberStepper`, `shoppingDestinations` getter; headings hint kept; `rescaleLines` keeps hand edits; `formatServes` + `SERVINGS_MAX` single sources; capture logs `servingsUnparsed` via the `taxonomyRejected` pattern.
 - **Pass 3 (Sustainability)**: servings stays `string` in type and doc behind one `servingsOf` accessor (drops the repository codec; the compiler now protects old clients); meal feature moved into `MealIngredientsPanel`; `source` on lines makes `rescaleLines` a pure map; plain-text textarea (no fake bold); `kind` telemetry-only, destination single-mode; last-list memory dropped for newest open shopping list; hyphen/`00` guards in the golden table; no re-export shim; whole-array write caveat documented.
-- **Pass 4 (Fresh-eyes sweep)**: fixed `rescaleLines` (explicit fields, ×2→×1→×3 test); recurring lists excluded; guests-only = not set; servings parsed next to the people keyword; wrong-number guard table (%, numbering, commas, glued-unit allowlist, dual measures) and style-preserving formatting; precise As Written rule; baseline normalised in `recipeComparable` (untouched saves never rewrite servings), prefill seeding in both form paths; `addItems` keeps the silent-null contract (report moved to the composable); editable list name, empty due date; panel keyed on recipe update, gated, Added state; `hasShoppableIngredients` extracted; #88 `count` meaning kept; full i18n + a11y list; contradictions removed.
+- **Rev 3 Pass 4 (Fresh eyes)**: named ADR-030 exception + `ingredients` consent variant + security help; string ids + name sanitising; dedupe respects unticked/split lines; byte-accurate free bound + `isFinite` guard; checklist `visible`/`addable`; card button as a shell with live-region announce; gate/flow order; toggle in chip row, no `aria-pressed`; dark partners; InfoHintBadge a11y; stale scaling text removed.
+- **Rev 3 Pass 3 (Sustainability)**: folded § F into §§ B-F (no contradictory text); merged lines hidden in place (`mergedInto`, flat `partIds`) instead of moved; drawer state as a pure reducer in `shoppingMerge.ts` with `dedupeCandidates`; one run token (AbortController) per open; the everyone rule in three helpers sharing one filter; one free-task table with a size bound derived from client caps + test; `FamilyChipPicker` toggle in the chip row (no new slot).
+- **Rev 3 Pass 2 (DRY + errors)**: pinned the AI entry point (`runExtraction(...,'dedupe')`), consent via `requestConsent`, free metering bounded by Lambda-measured `srcBytes` (sealed-arm label is unverifiable), `MagicBeansCardButton` extraction, `FamilyChipPicker` `allToggle` + `#label`, everyone = humans (not pets), simplified line model (`parts`, no `scaledText`), full dead-code list, abort/stale-result handling, no double reporting.
+- **Revision 3 (2026-09-30)**: greg dropped scaling (ingredients as written), added Cook ×N + (×N) suffixes, duplicates back (exact merge + explicit free ✨ Find Duplicates, AI groups only), everyone-by-default who's eating with Clear/Everyone, magic beans sheet copy + (i). Passes 2-4 re-run on this revision (below).
+- **Pass 4 (Fresh-eyes sweep, revision 2)**: fixed `rescaleLines` (explicit fields, ×2→×1→×3 test); recurring lists excluded; guests-only = not set; servings parsed next to the people keyword; wrong-number guard table (%, numbering, commas, glued-unit allowlist, dual measures) and style-preserving formatting; precise As Written rule; baseline normalised in `recipeComparable` (untouched saves never rewrite servings), prefill seeding in both form paths; `addItems` keeps the silent-null contract (report moved to the composable); editable list name, empty due date; panel keyed on recipe update, gated, Added state; `hasShoppableIngredients` extracted; #88 `count` meaning kept; full i18n + a11y list; contradictions removed.
 
 ## Prompt Log
 
@@ -539,4 +575,51 @@ needed."
 Servings: number field, convert old (first number; "12 muffins" cleared). Multiplier: per meal, then add.
 No-amount lines: keep as written. Existing-list duplicates: no flag.
 
+### Follow-up 5 (2026-09-30)
+
+"1) drop the requirement to multiply the quantity numbers. Go back to only listing the recipe as written, and don't add the 'as written' tag 2) add the tag indicating HOW MANY TIMES that recipe would be cooked that week as a clear and prominent marker ... when the 'who's eating' number is not specified, assume all family members are eating. 3) ... just add a multiplier at the end of each line in the shopping list - i.e. 3 russet potatoes (x3). 4) Let's add BACK the requirement to identify duplicates ... one section at the top identifies duplicates ... one basic run with AI i think it enough ... the user can then review and fix the list." (Agreed with refinements: AI groups only, app writes merged text; exact duplicates merge without AI; layout back to direction B's shared section.)
+
+### Follow-up 6 (2026-09-30)
+
+"for who's eating, can you add a small affordance to select/unselect everyone with one tap/click ... rather than having it run automatically ... should we instead have an 'magic beans' type button ... so the AI call becomes explicit"
+
+### Follow-up 7 (2026-09-30)
+
+"1) For who's eating let's just have everyone selected by default, the affordance would read 'clear' initially, and change to everyone again if cleared 2) The purple design ... should we deviate from the CIG ... invoke /frontend-design 3) too much explanation in the find duplicates box ... should we make this free?" (Resolved: house magic beans style, one label + Free tag, free via a separate counter.)
+
+### Follow-up 8 (2026-09-30)
+
+"yes go ahead, make it free and rebuild with /beanies-build-auto" + the magic beans sheet copy change ("remind me to walk my dog tomorrow at 10am", an (i) explaining what can be pasted) + "there seems to be an issue with the info hint badge, it is showing up behind the sidebar. pls check the z-index".
+
 </details>
+
+## Outcome (revision 2 build, superseded in part by revision 3)
+
+> Built 2026-09-29/30 via `/beanies-build-auto`. Not committed (code), not deployed.
+
+- **Built as planned**, with these changes made during the build:
+  - **Scaler is an allowlist (one-number rule).** Round 1 and round 2 of `/code-review high` kept finding
+    lines scaled to a wrong number ("1-1/2 cups", "1 lb 4 oz", "1 cup plus 2 tablespoons", "8 ounces (225 g)",
+    "1 3/2 cups"). Hand-added reject rules were not converging, so `ingredientScale.ts` now scales a line
+    only when its leading amount is the ONLY number in it; any second number leaves the line as written
+    with the As Written tag. Trade-off: "1 (400 g) can" and "2 x 400g" are no longer scaled.
+  - **Servings parser counts only unambiguous headcounts** ("Serves 2 adults and 2 children" is unknown;
+    "Per serving: 350 kcal. Serves 4" is 4; "Serves 4 as a main" is 4).
+  - **"As Written" tag** only on lines that look like they hold an amount the scaler could not read (a
+    digit or a number word); "Salt, to taste" is untagged.
+  - **Faint original shows the unit** ("(500 g)").
+  - **Meal panel keyed on the recipe id** (a sync no longer resets it); rebuilds only when ingredients
+    change; no `sheet_opened` from the passive panel; the Added snapshot is taken before the write.
+  - **Phone:** the header button follows the week of the day on screen.
+  - **Locale:** new `src/utils/uiLocale.ts` shared by the planner, the week drawer, Who Owns What and the
+    card drawer. English dates read "Sep 28".
+  - **Contrast:** light-mode green button/badge darkened to #1E8449; the meal drawer's `.mp-label`
+    (pre-existing) got a dark partner and a 12px size.
+- **Verification:** `npm run validate` green (10290 tests). Browser harness
+  `scripts/design-screenshots/meal-shopping-list-capture.ts` walks every acceptance criterion (desktop +
+  390px, light + dark) and passes.
+- **Review:** round 1 (10 findings, all substantiated and fixed) + browser walk (8 defects, 6 fixed; toast
+  overlap and two copy nits left). Round 2 scoped to the fixes (8 findings, all fixed, 5 of them by the
+  structural scaler change). No third round (ceiling without greg).
+- **Not done:** native iOS/Android check; `public/translations/zh.json` still carries removed keys (the
+  translation bot regenerates it); `MealWeekBoard.vue:66` keeps an English-only weekday (pre-existing).
