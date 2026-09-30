@@ -45,8 +45,9 @@ function itemAllowed(item: QuickAddItem): boolean {
   // the sheet layers only its caller-supplied action filter on top.
   if (!itemAllowedForMember(item)) return false;
   const filter = allowedActions.value;
-  if (filter && !filter.includes(item.action)) return false;
-  return true;
+  if (filter) return filter.includes(item.action);
+  // Unfiltered (the main FAB menu): tiles marked `onlyWhenFiltered` stay out.
+  return !item.onlyWhenFiltered;
 }
 
 const allowedByGroup = computed<Record<QuickAddGroup, readonly QuickAddItem[]>>(() => ({
@@ -427,6 +428,19 @@ html.dark .everyday-subhint {
 
 html.dark .everyday-label {
   color: rgb(241 242 244);
+}
+
+/* Dark partner for the tile itself: it stayed `white` in dark while its label went light,
+   so the label read light-on-white. */
+html.dark .everyday-item {
+  background: var(--color-surface-raised);
+  border-color: rgb(255 139 94 / 22%);
+  box-shadow: 0 2px 6px -2px rgb(0 0 0 / 35%);
+}
+
+html.dark .everyday-item:hover {
+  background: var(--color-surface-hover);
+  border-color: rgb(255 139 94 / 45%);
 }
 
 /* --- Secondary groups --- */

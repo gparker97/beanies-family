@@ -55,10 +55,16 @@ interface QuickAddItemShape {
   readonly requiredPermission: QuickAddPermission;
   /** Hide this item unless the named dev feature flag is enabled. */
   readonly requiresFlag?: DevFlag;
+  /**
+   * Keep the action valid (pages and in-page buttons still dispatch it) but leave the tile
+   * OUT of the main FAB menu: it shows only when a caller opens the sheet with a filter that
+   * names this action (e.g. the Family Scrapbook's sheet).
+   */
+  readonly onlyWhenFiltered?: true;
 }
 
 export const QUICK_ADD_ITEMS = [
-  // — Everyday (jar-pop) —
+  // — Everyday (jar-pop): keep to 6 tiles, two rows —
   {
     id: 'activity',
     group: 'everyday',
@@ -84,7 +90,7 @@ export const QUICK_ADD_ITEMS = [
   {
     id: 'list',
     group: 'everyday',
-    order: 7,
+    order: 6,
     emoji: '\u{1F9FE}', // 🧾
     labelKey: 'quickAdd.list.label',
     hintKey: 'quickAdd.list.hint',
@@ -129,8 +135,8 @@ export const QUICK_ADD_ITEMS = [
   },
   {
     id: 'saying',
-    group: 'everyday',
-    order: 6,
+    group: 'family',
+    order: 2,
     emoji: '\u{1F4AC}', // 💬
     labelKey: 'quickAdd.saying.label',
     hintKey: 'quickAdd.saying.hint',
@@ -156,7 +162,7 @@ export const QUICK_ADD_ITEMS = [
   {
     id: 'note',
     group: 'family',
-    order: 2,
+    order: 5,
     emoji: '\u{1F4DD}', // 📝
     labelKey: 'quickAdd.note.label',
     hintKey: 'quickAdd.note.hint',
@@ -164,6 +170,9 @@ export const QUICK_ADD_ITEMS = [
     action: 'add-note',
     contextKey: 'memberId',
     requiredPermission: 'activities',
+    // Out of the main menu (greg, 2026-09-30: Everyday and Family stay at 6 and 4 tiles).
+    // Still offered by the Family Scrapbook's filtered sheet and the member hero's button.
+    onlyWhenFiltered: true,
   },
   {
     id: 'recipe',
@@ -313,6 +322,7 @@ export interface QuickAddItem {
   readonly contextKey?: QuickAddContextKey;
   readonly requiredPermission: QuickAddPermission;
   readonly requiresFlag?: DevFlag;
+  readonly onlyWhenFiltered?: true;
 }
 
 /**

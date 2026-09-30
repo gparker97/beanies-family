@@ -21,6 +21,7 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 
 ### Changed
 
+- The quick-add menu's Everyday beans are now six tiles in two rows; Saying moves to Family. In dark mode the Everyday tiles are readable again.
 - A recipe's Servings is now a number ("Serves 4") with a − / + stepper.
 - Who's eating starts with everyone picked, with a one-tap Clear / Everyone.
 - Long list items now wrap instead of being cut off, including while editing, and Enter saves an edited line.
@@ -34,7 +35,7 @@ _Released in 0.26 (web, Android production, iOS App Store)._
 ### Removed
 
 - An old sign-in redirect fallback, kept for one release after the June fix, is gone.
-- The Trip idea tile is gone from the quick-add menu (it could not find your trips). Trip ideas are still added from a trip's page.
+- The Trip idea tile is gone from the quick-add menu (it could not find your trips). Trip ideas are still added from a trip's page. Note also moves out of the menu (still offered from the Family Scrapbook).
 
 ## 2026-09-29
 
