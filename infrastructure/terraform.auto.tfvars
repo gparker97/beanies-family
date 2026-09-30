@@ -13,3 +13,11 @@ site_verification_txt_records = [
   "hosted-email-verify=8uetlptp",
   "v=spf1 include:spf.migadu.com -all",
 ]
+
+# Pricing and entitlement (#95). Committed here rather than exported as TF_VAR_* because both
+# have safe defaults: an env-only value would silently revert on an apply from a shell that
+# lacks it (see .beanies-tf.env.example). Launch is a one-line reviewed change to this file.
+#   v1_launch_at:    "" = no launch-based trial clock (families read beta unless subscribed or overridden). At launch, an ISO instant, e.g. "2027-01-15T00:00:00Z".
+#   billing_enforce: false = dry-run (compute, report, never block). Flip after the soak.
+v1_launch_at    = ""
+billing_enforce = false

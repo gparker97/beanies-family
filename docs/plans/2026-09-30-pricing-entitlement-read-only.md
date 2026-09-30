@@ -296,3 +296,14 @@ Feature gate: YES — build the feature behind a dev feature flag registered in 
 > AI day: "Keep UTC, show local reset time". AI floor after read-only: "I'm fine with (1) and i assume the UI would block the user anyway from submitting an AI request, so just to confirm the only exposure would be sending an API call manually to the lambda with the client token?" Recurring while read-only: "Pause and catch up".
 
 </details>
+
+## Outcome (build log)
+
+### 2026-09-30, Phase 1 built (server entitlement, dry-run)
+
+- **Rule order corrected** (plan defect found in implementation): subscribed → `trialEndsAt` override → no-launch `beta` → launch-based trial. As written, the override was inert before launch and a paying family read `beta`, which defeated the pre-launch soak and the Phase 5 sandbox test. `entitlement.mjs` and both test files carry the new order.
+- **Deliberate deviation, recorded here so the next session does not misread Phase 1 as containing them**: the billing Lambda, its log group, the four `/billing/*` routes and the `stripe_*` / `ai_allowance_enforce` variables are NOT in Phase 1. `modules/billing` holds only the DynamoDB table (header comment says so). They ship with Phase 5, which is the first phase with Lambda code to deploy. This run was scoped to Phases 1-4 (greg, 2026-09-30).
+- **`v1_launch_at` and `billing_enforce` live in `terraform.auto.tfvars`, not `TF_VAR_` env lines**: they are non-secret with safe defaults, and an env-sourced variable with a default is the silent-revert case the env example documents (an apply from an unsourced shell would put every family back to beta or switch enforcement off); `*.auto.tfvars` also takes precedence over `TF_VAR_`, so the two cannot coexist safely.
+- Table name is `beanies-family-billing-<env>` (repo `${app_name}-` convention), not `beanies-billing-<env>`.
+- The `lambdaContractParity` import of `entitlement.mjs` ships with Phase 2 (client type), not Phase 1.
+- Applied to prod: billing table, two GetItem policies, registry Lambda redeploy (two-file zip + env), ai-extract env. Live GET returns `entitlement.state === 'beta'`; `entitlement_computed` confirmed in CloudWatch.

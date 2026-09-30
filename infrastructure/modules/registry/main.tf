@@ -87,6 +87,25 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
   })
 }
 
+# Read-only on the billing table (#95): the GET arm joins the family's billing row to compute
+# `entitlement`. GetItem only, and a separate policy so the registry's own read/write grant above
+# stays exactly what it was. The registry never writes billing state; the billing Lambda (Phase 5)
+# and scripts/billing-cohort.mjs do. Losing this grant does not break the GET: it degrades to
+# `entitlement: null` and logs `[registry] entitlement_unavailable`.
+resource "aws_iam_role_policy" "lambda_billing_read" {
+  name = "billing-read"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:GetItem"]
+      Resource = [var.billing_table_arn]
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "lambda_logs" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -94,10 +113,25 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 
 # ── Lambda Function ──────────────────────────────────────────────────────────
 
+# Two named `source` blocks rather than `source_dir` (#95). The directory also holds the vitest
+# files, the README and the generated zip itself, none of which belong in the function, and
+# `archive_file` accepts exactly ONE of source_file / source_dir / source {} (they conflict).
+# A new module the handler imports must be added here too, or the Lambda fails at cold start
+# with ERR_MODULE_NOT_FOUND on every request.
 data "archive_file" "lambda" {
   type        = "zip"
-  source_file = "${path.module}/../../lambda/registry/index.mjs"
   output_path = "${path.module}/../../lambda/registry/lambda.zip"
+
+  source {
+    content  = file("${path.module}/../../lambda/registry/index.mjs")
+    filename = "index.mjs"
+  }
+
+  # The trial and lapse rules (computeEntitlement), imported by index.mjs.
+  source {
+    content  = file("${path.module}/../../lambda/registry/entitlement.mjs")
+    filename = "entitlement.mjs"
+  }
 }
 
 # ── CloudWatch Log Group ─────────────────────────────────────────────────────
@@ -136,6 +170,16 @@ resource "aws_lambda_function" "registry" {
       DEV_ORIGINS      = join(",", var.dev_origins)
       REGISTRY_API_KEY = var.api_key
       CORS_ORIGIN      = join(",", var.cors_origins)
+      # Entitlement (#95). ONE billing table whatever the request Origin: billing rows exist
+      # only in prod (the billing Lambda is prod-only and checkout refuses dev origins), so a
+      # dev family reads no row and computes trial/beta, which is correct. See index.mjs.
+      BILLING_TABLE_NAME = var.billing_table_name
+      # Empty = the launch-based 90-day clock has not started (beta for families with no
+      # subscription and no trialEndsAt override; those two count before launch). Set once, at
+      # launch, per the pricing runbook.
+      V1_LAUNCH_AT = var.v1_launch_at
+      # Dry-run switch. "false" computes and reports the state but the client takes no action.
+      BILLING_ENFORCE = var.billing_enforce ? "true" : "false"
     }
   }
 

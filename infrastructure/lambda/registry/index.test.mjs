@@ -1,5 +1,5 @@
 /* global process */
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
 // --- Mock the DynamoDB client (keep util-dynamodb's marshall/unmarshall real) ---
@@ -25,8 +25,20 @@ vi.mock('@aws-sdk/client-dynamodb', () => {
 
 const API_KEY = 'test-key';
 const FAMILY_ID = '11111111-2222-4333-8444-555555555555';
+const BILLING_TABLE = 'billing-prod';
 
 let handler;
+
+/**
+ * Every live-row GET logs the `entitlement_computed` soak line (with no billing env it still
+ * computes `beta` and logs). Silence it for the whole file; the entitlement block asserts on it
+ * through this spy, which is fresh per test.
+ */
+let logSpy;
+beforeEach(() => {
+  logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+});
+afterEach(() => logSpy.mockRestore());
 
 beforeAll(async () => {
   process.env.TABLE_NAME = 'registry-prod';
@@ -513,14 +525,25 @@ async function del(existing = null, queryStringParameters = undefined) {
   return { res, item: putCall ? unmarshall(putCall[0].input.Item) : null };
 }
 
-/** Drive a GET through the handler. */
-async function get(existing = null) {
+/**
+ * Drive a GET through the handler. `existing` is the registry row; `billing` is the billing-table
+ * row (#95), dispatched on `TableName` so the two reads can differ. Pass an Error as `billing` to
+ * make the billing read throw.
+ */
+async function get(
+  existing = null,
+  { billing = null, origin = 'https://app.beanies.family' } = {}
+) {
   sendMock.mockReset();
-  sendMock.mockImplementation(() =>
-    Promise.resolve({ Item: existing ? marshall(existing) : undefined })
-  );
+  sendMock.mockImplementation((command) => {
+    if (command.input.TableName === BILLING_TABLE) {
+      if (billing instanceof Error) return Promise.reject(billing);
+      return Promise.resolve({ Item: billing ? marshall(billing) : undefined });
+    }
+    return Promise.resolve({ Item: existing ? marshall(existing) : undefined });
+  });
   const res = await handler({
-    headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+    headers: { 'x-api-key': API_KEY, origin },
     pathParameters: { familyId: FAMILY_ID },
     requestContext: { http: { method: 'GET' } },
   });
@@ -758,13 +781,14 @@ describe('registry DELETE — the ladder measures, it does not enforce', () => {
   const OWNED = { createdAt: '2025-03-01T00:00:00.000Z', ownerMemberId: M_A };
   let warn;
 
+  // A fresh spy per test, restored after it: each assertion reads only its own test's warns
+  // (the "is silent" case would otherwise see earlier tests' calls), and no spy outlives this
+  // block to silence, or be restored by, anything else in the file.
   beforeEach(() => {
-    // `spyOn` on an already-spied method hands back the SAME spy, so without the
-    // clear the call history accumulates across tests in this block and the
-    // "is silent" assertion reads three earlier tests' warns as its own.
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    warn.mockClear();
   });
+
+  afterEach(() => warn.mockRestore());
 
   it('warns when the caller sends no writer id, and deletes anyway', async () => {
     const { res, item } = await del(OWNED);
@@ -1146,5 +1170,305 @@ describe('registry PUT — an empty string never latches a write-once identity',
       { ownerEmail: 'owner@example.com' }
     );
     expect(item.ownerEmail).toBe('owner@example.com');
+  });
+});
+
+describe('registry GET: entitlement (#95)', () => {
+  const ROW = {
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    createdAt: '2026-10-01T00:00:00.000Z',
+    ownerEmail: 'owner@example.com',
+  };
+  const LAUNCH = '2026-11-01T00:00:00.000Z';
+  const DAY = 24 * 60 * 60 * 1000;
+
+  let errorSpy;
+  let warnSpy;
+
+  beforeEach(() => {
+    delete process.env.V1_LAUNCH_AT;
+    delete process.env.BILLING_ENFORCE;
+    // Scoped to this block so the GET tests above make no billing read. (They still compute
+    // `beta` and log the soak line; the file-level `console.log` spy silences that.)
+    process.env.BILLING_TABLE_NAME = BILLING_TABLE;
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+    delete process.env.V1_LAUNCH_AT;
+    delete process.env.BILLING_ENFORCE;
+    delete process.env.BILLING_TABLE_NAME;
+  });
+
+  /** The structured `entitlement_computed` lines logged by the last call, parsed. */
+  function computedLines() {
+    return logSpy.mock.calls
+      .map((c) => c[0])
+      .filter((l) => typeof l === 'string' && l.includes('entitlement_computed'))
+      .map((l) => JSON.parse(l));
+  }
+
+  function billingReads() {
+    return getCommands().filter((c) => c.input.TableName === BILLING_TABLE);
+  }
+
+  it('joins the billing row: an active subscription is `active` with its plan', async () => {
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    const { res, body } = await get(ROW, {
+      billing: {
+        familyId: FAMILY_ID,
+        status: 'active',
+        plan: 'full',
+        cohort: 'pre_v1',
+        stripeSubscriptionId: 'sub_1',
+        currentPeriodEnd: '2027-10-01T00:00:00.000Z',
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(body.fileId).toBe('FILE-1');
+    expect(body.entitlement).toMatchObject({
+      state: 'active',
+      reason: 'subscribed',
+      plan: 'full',
+      cohort: 'pre_v1',
+      currentPeriodEnd: '2027-10-01T00:00:00.000Z',
+      enforced: false,
+    });
+  });
+
+  it('a subscribed family is `active` even before launch', async () => {
+    const { body } = await get(ROW, { billing: { status: 'active', plan: 'basic' } });
+    expect(body.entitlement).toMatchObject({
+      state: 'active',
+      reason: 'subscribed',
+      plan: 'basic',
+      trialEndsAt: null,
+    });
+    expect(computedLines()[0]).toMatchObject({ state: 'active', launch_set: false });
+  });
+
+  it('a trialEndsAt override runs the trial clock before launch (the prod soak)', async () => {
+    const { body } = await get(ROW, { billing: { trialEndsAt: '2020-01-01T00:00:00.000Z' } });
+    expect(body.entitlement).toMatchObject({
+      state: 'read_only',
+      reason: 'trial_ended',
+      trialEndsAt: '2020-01-01T00:00:00.000Z',
+    });
+  });
+
+  it('reads the billing row by familyId, strongly consistent', async () => {
+    await get(ROW);
+    const [read] = billingReads();
+    expect(unmarshall(read.input.Key)).toEqual({ familyId: FAMILY_ID });
+    expect(read.input.ConsistentRead).toBe(true);
+  });
+
+  it('never returns the billing row raw (no customer id, no token hash)', async () => {
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    const { res } = await get(ROW, {
+      billing: {
+        status: 'active',
+        plan: 'basic',
+        stripeCustomerId: 'cus_SECRET',
+        stripeSubscriptionId: 'sub_SECRET',
+        planTokenHash: 'deadbeef',
+      },
+    });
+    expect(res.body).not.toContain('cus_SECRET');
+    expect(res.body).not.toContain('sub_SECRET');
+    expect(res.body).not.toContain('deadbeef');
+  });
+
+  it('no billing row and no launch: `beta`, plan null', async () => {
+    const { res, body } = await get(ROW);
+    expect(res.statusCode).toBe(200);
+    expect(body.entitlement).toMatchObject({
+      state: 'beta',
+      reason: 'no_launch',
+      plan: null,
+      trialEndsAt: null,
+    });
+  });
+
+  it('no billing row after launch: `trial` from launch + 90 days, plan null', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-12-01T00:00:00.000Z'));
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    const { body } = await get(ROW);
+    expect(body.entitlement).toMatchObject({ state: 'trial', reason: 'in_trial', plan: null });
+    // createdAt precedes launch, so every beta family gets a fresh 90 days from launch.
+    expect(body.entitlement.trialEndsAt).toBe(
+      new Date(Date.parse(LAUNCH) + 90 * DAY).toISOString()
+    );
+  });
+
+  it('a lapsed subscription past the trial is `read_only` / `lapsed`', async () => {
+    process.env.V1_LAUNCH_AT = '2025-01-01T00:00:00.000Z';
+    const { body } = await get(
+      { ...ROW, createdAt: '2025-01-01T00:00:00.000Z' },
+      { billing: { status: 'canceled', plan: 'basic', stripeSubscriptionId: 'sub_1' } }
+    );
+    expect(body.entitlement).toMatchObject({ state: 'read_only', reason: 'lapsed', plan: null });
+  });
+
+  it('a billing read failure still answers 200 with the row and `entitlement: null`', async () => {
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    const { res, body } = await get(ROW, { billing: new Error('ProvisionedThroughputExceeded') });
+    // The pointer lookup that recovery-from-registry depends on must survive a billing blip.
+    expect(res.statusCode).toBe(200);
+    expect(body.fileId).toBe('FILE-1');
+    expect(body.entitlement).toBeNull();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[registry] entitlement_unavailable'),
+      expect.any(Error)
+    );
+    expect(errorSpy.mock.calls[0][0]).toContain('dynamodb:GetItem');
+    expect(computedLines()).toHaveLength(0);
+  });
+
+  it('reflects BILLING_ENFORCE in `enforced`, and only the exact string "true" enforces', async () => {
+    process.env.BILLING_ENFORCE = 'true';
+    expect((await get(ROW)).body.entitlement.enforced).toBe(true);
+    process.env.BILLING_ENFORCE = 'false';
+    expect((await get(ROW)).body.entitlement.enforced).toBe(false);
+    process.env.BILLING_ENFORCE = '1';
+    expect((await get(ROW)).body.entitlement.enforced).toBe(false);
+    delete process.env.BILLING_ENFORCE;
+    expect((await get(ROW)).body.entitlement.enforced).toBe(false);
+  });
+
+  it('reads the ONE billing table even for a dev-origin request', async () => {
+    await get(ROW, { origin: 'http://localhost:5173' });
+    const tables = getCommands().map((c) => c.input.TableName);
+    expect(tables).toEqual(['registry-dev', BILLING_TABLE]);
+  });
+
+  it('logs one structured `entitlement_computed` line per GET, hashed id only', async () => {
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    process.env.BILLING_ENFORCE = 'true';
+    await get(ROW);
+    const lines = computedLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toEqual({
+      msg: 'entitlement_computed',
+      family_id_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      state: 'trial',
+      reason: 'in_trial',
+      enforced: true,
+      launch_set: true,
+    });
+    const everything = JSON.stringify([logSpy.mock.calls, warnSpy.mock.calls]);
+    expect(everything).not.toContain(FAMILY_ID);
+  });
+
+  it('does not use or log the billing read for a tombstoned row', async () => {
+    const { res, body } = await get(
+      { ...ROW, deletedAt: '2026-09-09T00:00:00.000Z' },
+      { billing: { status: 'active', plan: 'full' } }
+    );
+    expect(res.statusCode).toBe(404);
+    expect(body).not.toHaveProperty('entitlement');
+    expect(computedLines()).toHaveLength(0);
+  });
+
+  it('discards a failed billing read on a 404 without logging it', async () => {
+    const { res } = await get(null, { billing: new Error('boom') });
+    expect(res.statusCode).toBe(404);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(computedLines()).toHaveLength(0);
+  });
+
+  it('issues the billing read alongside the registry read, not after it', async () => {
+    // Both GetItems are sent before either resolves: hold the registry read open and check.
+    let releaseRegistry;
+    sendMock.mockReset();
+    sendMock.mockImplementation((command) => {
+      if (command.input.TableName === BILLING_TABLE) return Promise.resolve({ Item: undefined });
+      return new Promise((resolve) => {
+        releaseRegistry = () => resolve({ Item: marshall(ROW) });
+      });
+    });
+    const pending = handler({
+      headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+      pathParameters: { familyId: FAMILY_ID },
+      requestContext: { http: { method: 'GET' } },
+    });
+    await Promise.resolve();
+    expect(billingReads()).toHaveLength(1);
+    releaseRegistry();
+    expect((await pending).statusCode).toBe(200);
+  });
+
+  it('a registry read failure is still a 500, whatever the billing read did', async () => {
+    sendMock.mockReset();
+    sendMock.mockImplementation((command) =>
+      command.input.TableName === BILLING_TABLE
+        ? Promise.resolve({ Item: undefined })
+        : Promise.reject(new Error('registry down'))
+    );
+    const res = await handler({
+      headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+      pathParameters: { familyId: FAMILY_ID },
+      requestContext: { http: { method: 'GET' } },
+    });
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('unset BILLING_TABLE_NAME before launch is a supported config: `beta`, no read, no error', async () => {
+    delete process.env.BILLING_TABLE_NAME;
+    const { body } = await get(ROW);
+    expect(body.entitlement.state).toBe('beta');
+    expect(billingReads()).toHaveLength(0);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('unset BILLING_TABLE_NAME after launch refuses to guess: `entitlement: null` + error', async () => {
+    delete process.env.BILLING_TABLE_NAME;
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    const { res, body } = await get(ROW);
+    expect(res.statusCode).toBe(200);
+    expect(body.entitlement).toBeNull();
+    expect(errorSpy.mock.calls[0][0]).toContain('entitlement_unavailable');
+  });
+
+  it('an unparseable V1_LAUNCH_AT computes `beta` and says so', async () => {
+    process.env.V1_LAUNCH_AT = 'next tuesday';
+    const { body } = await get(ROW);
+    expect(body.entitlement.state).toBe('beta');
+    expect(computedLines()[0].launch_set).toBe(false);
+    expect(errorSpy.mock.calls[0][0]).toContain('entitlement_launch_invalid');
+  });
+
+  it('a subscribed family with a garbage createdAt does not warn (createdAt was never used)', async () => {
+    process.env.V1_LAUNCH_AT = '2025-01-01T00:00:00.000Z';
+    const { body } = await get(
+      { ...ROW, createdAt: 'garbage' },
+      { billing: { status: 'active', plan: 'full' } }
+    );
+    expect(body.entitlement.state).toBe('active');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('an overridden trial with a garbage createdAt does not warn', async () => {
+    process.env.V1_LAUNCH_AT = '2025-01-01T00:00:00.000Z';
+    const { body } = await get(
+      { ...ROW, createdAt: 'garbage' },
+      { billing: { trialEndsAt: '2999-01-01T00:00:00.000Z' } }
+    );
+    expect(body.entitlement.state).toBe('trial');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a row with no usable createdAt gets a full trial and a warning', async () => {
+    process.env.V1_LAUNCH_AT = '2025-01-01T00:00:00.000Z';
+    const { body } = await get({ ...ROW, createdAt: 'garbage' });
+    expect(body.entitlement.state).toBe('trial');
+    expect(warnSpy.mock.calls[0][0]).toContain('entitlement_created_at_invalid');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(FAMILY_ID);
   });
 });

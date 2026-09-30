@@ -86,6 +86,17 @@ module "web" {
   }
 }
 
+# ── billing: plan state for pricing and read-only (#95) ──────────────────────
+# Phase 1: the billing table only; the billing Lambda and its /billing/* routes arrive in
+# Phase 5. The registry reads it (GET computes `entitlement`); ai-extract will read it for the
+# allowance tier. Neither ever writes it.
+module "billing" {
+  source = "./modules/billing"
+
+  app_name    = var.app_name
+  environment = var.environment
+}
+
 module "registry" {
   source = "./modules/registry"
 
@@ -94,6 +105,11 @@ module "registry" {
   domain_name    = "api.${var.domain_name}"
   hosted_zone_id = var.hosted_zone_id
   api_key        = var.registry_api_key
+
+  billing_table_name = module.billing.table_name
+  billing_table_arn  = module.billing.table_arn
+  v1_launch_at       = var.v1_launch_at
+  billing_enforce    = var.billing_enforce
 
   providers = {
     aws           = aws
@@ -170,6 +186,9 @@ module "ai_extract" {
   # ships with it. A production problem here is this line, not a rollback: unset, the Lambda
   # neither issues nor consumes grants and corrections simply cost a bean.
   correction_grants_enabled = true
+  # Plan tier for the magic-beans allowance (#95, read from Phase 4).
+  billing_table_name = module.billing.table_name
+  billing_table_arn  = module.billing.table_arn
 }
 
 

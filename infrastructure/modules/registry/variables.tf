@@ -51,3 +51,27 @@ variable "log_retention_days" {
   type        = number
   default     = 90
 }
+
+# ── Entitlement (#95) ────────────────────────────────────────────────────────
+
+variable "billing_table_name" {
+  description = "Billing DynamoDB table (from the billing module). The GET arm reads it to compute `entitlement`; always the prod table, whatever the request Origin."
+  type        = string
+}
+
+variable "billing_table_arn" {
+  description = "Billing DynamoDB table ARN, for the Lambda's dynamodb:GetItem grant."
+  type        = string
+}
+
+variable "v1_launch_at" {
+  description = "V1 launch instant (ISO-8601, e.g. 2027-01-15T00:00:00Z). Empty means the launch-based trial clock has not started: families with no subscription and no trialEndsAt override are beta (subscriptions and overrides count before launch). Once set, those families' trials end max(createdAt, this) + 90 days."
+  type        = string
+  default     = ""
+}
+
+variable "billing_enforce" {
+  description = "When false (dry-run), entitlement is computed and reported with enforced=false and no client acts on it. Flip only per the pricing launch runbook."
+  type        = bool
+  default     = false
+}

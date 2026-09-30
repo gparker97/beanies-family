@@ -89,3 +89,22 @@ variable "youtube_api_key" {
   default     = ""
   sensitive   = true
 }
+
+# ── Pricing and entitlement (#95) ────────────────────────────────────────────
+# Both are launch CONFIG, not secrets, so they are set in terraform.auto.tfvars (committed), not
+# via TF_VAR_*. Both have safe defaults, which is exactly the silent-revert shape described in
+# .beanies-tf.env.example: set only in one shell's env, an apply from any other shell would
+# quietly stop the launch trial clock (or switch enforcement off) and succeed. A committed
+# value cannot be forgotten, and *.auto.tfvars outranks TF_VAR_* anyway.
+
+variable "v1_launch_at" {
+  description = "V1 launch instant, ISO-8601 (e.g. 2027-01-15T00:00:00Z). Empty means the launch-based 90-day trial clock has not started: a family with no subscription and no trialEndsAt override is `beta`. A subscription (`active`) and a per-family trialEndsAt override count before launch too. Once set, each remaining family's trial ends at max(registry createdAt, this) + 90 days. Set in terraform.auto.tfvars at launch, per docs/runbooks/pricing-launch.md (Phase 6)."
+  type        = string
+  default     = ""
+}
+
+variable "billing_enforce" {
+  description = "Read-only enforcement switch. false = dry-run: the registry computes and returns entitlement with enforced=false, clients log would_block and take no action. true = a read_only family cannot write. Set in terraform.auto.tfvars; flip only after the soak, per the pricing launch runbook."
+  type        = bool
+  default     = false
+}

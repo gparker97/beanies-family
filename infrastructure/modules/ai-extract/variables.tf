@@ -104,3 +104,16 @@ variable "correction_grants_enabled" {
   type        = bool
   default     = false
 }
+
+# ── Billing (#95) ────────────────────────────────────────────────────────────
+# From the billing module. Read by the Phase 4 allowance check (plan tier); unused until then.
+
+variable "billing_table_name" {
+  description = "Billing DynamoDB table name (from the billing module), exposed as BILLING_TABLE_NAME."
+  type        = string
+}
+
+variable "billing_table_arn" {
+  description = "Billing DynamoDB table ARN, for the Lambda's dynamodb:GetItem grant."
+  type        = string
+}

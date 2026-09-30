@@ -155,6 +155,24 @@ resource "aws_iam_role_policy" "rate_table" {
   })
 }
 
+# Read-only on the billing table (#95), for the magic-beans allowance tier. Wired in Phase 1 with
+# the table so Phase 4 (allowance.mjs) is a code change only; until then nothing in this Lambda
+# reads BILLING_TABLE_NAME and the grant is unused. GetItem only: the allowance reads one row
+# (status, plan, planTokenHash) and never writes billing state.
+resource "aws_iam_role_policy" "billing_read" {
+  name = "${var.app_name}-ai-extract-billing-read-${var.environment}"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:GetItem"]
+      Resource = [var.billing_table_arn]
+    }]
+  })
+}
+
 # ── Lambda Function ──────────────────────────────────────────────────────────
 # source_dir (not source_file) so the zip includes BOTH index.mjs and the
 # drift-pinned extractionPrompt.mjs. output_path lives in the module dir so the
@@ -201,6 +219,9 @@ resource "aws_lambda_function" "ai_extract" {
       # silently - so the Lambda half ships dormant ahead of the client that uses it, and a
       # production problem is a terraform variable rather than a rollback.
       CORRECTION_GRANTS = var.correction_grants_enabled ? "1" : ""
+      # The billing table (#95). Not read yet: Phase 4's allowance check reads the family's plan
+      # tier from it. Wired now so that phase needs no terraform change.
+      BILLING_TABLE_NAME = var.billing_table_name
     }
   }
 
