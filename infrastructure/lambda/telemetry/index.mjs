@@ -230,6 +230,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'recur_interval',
   'recur_end',
   'recur_reason',
+  // Plans and read-only (#95): closed enums and a boolean. Mirror of src/utils/diagnosticContext.ts.
+  'entitlement_state',
+  'plan',
+  'dry_run',
 ]);
 
 function getHeaders(event) {

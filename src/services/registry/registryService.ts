@@ -106,6 +106,42 @@ export type RegistryLookup =
   | { status: 'unavailable'; error?: unknown };
 
 /**
+ * One observer of every successful registry GET (#95). `entitlementStore`
+ * installs it so the entitlement block rides the lookups `syncStore` already
+ * makes (four call sites, all funnelled through `lookupFamilyResult`) without
+ * `syncStore` knowing entitlement exists. The same inversion as
+ * `setLocalChangeHandler` in `docClient.ts`: this module imports no store.
+ */
+type RegistryEntryObserver = (entry: RegistryEntry) => void;
+let registryEntryObserver: RegistryEntryObserver | null = null;
+
+/** Install (or clear, with `null`) the observer of every `found` lookup. */
+export function setRegistryEntryObserver(fn: RegistryEntryObserver | null): void {
+  registryEntryObserver = fn;
+}
+
+/**
+ * Hand a found entry to the observer. An observer that throws must never turn
+ * a successful lookup into a failed one: the canonical-pod check and
+ * recovery-from-registry depend on this answer, entitlement does not.
+ */
+function notifyObserver(entry: RegistryEntry): void {
+  if (!registryEntryObserver) return;
+  try {
+    registryEntryObserver(entry);
+  } catch (err) {
+    console.warn('[registry] entry observer threw; the lookup result is unaffected', err);
+    logEvent({
+      level: 'warn',
+      surface: 'registry',
+      message: 'registry entry observer threw',
+      context: { action: 'observer_failed' },
+      error: err,
+    });
+  }
+}
+
+/**
  * Look up a family's file location by familyId, distinguishing absent from
  * unavailable.
  *
@@ -128,7 +164,9 @@ export async function lookupFamilyResult(familyId: string): Promise<RegistryLook
       });
       return { status: 'unavailable' };
     }
-    return { status: 'found', entry: (await res.json()) as RegistryEntry };
+    const entry = (await res.json()) as RegistryEntry;
+    notifyObserver(entry);
+    return { status: 'found', entry };
   } catch (err) {
     // Previously a bare console.warn — registry outages were invisible in the
     // firehose, so nobody could tell a dead registry from a quiet one.

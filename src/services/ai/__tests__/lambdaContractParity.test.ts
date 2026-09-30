@@ -21,6 +21,14 @@ import {
 import { SEALED_PROTOCOL } from '../../../../infrastructure/lambda/ai-extract/sealedForward.mjs';
 // @ts-expect-error — as above.
 import { FREE_TASK_MAX_BYTES } from '../../../../infrastructure/lambda/ai-extract/meter.mjs';
+import {
+  ENTITLEMENT_STATES as SERVER_ENTITLEMENT_STATES,
+  ENTITLEMENT_REASONS as SERVER_ENTITLEMENT_REASONS,
+  TRIAL_DAYS as SERVER_TRIAL_DAYS,
+  // @ts-expect-error: as above.
+} from '../../../../infrastructure/lambda/registry/entitlement.mjs';
+import { TRIAL_DAYS } from '@beanies/brand/pricing';
+import { ENTITLEMENT_REASONS, ENTITLEMENT_STATES } from '@/types/models';
 
 import { EXTRACTION_TASKS } from '../extractionPrompt';
 import {
@@ -183,5 +191,25 @@ describe('client / Lambda contract parity', () => {
     // A kind the app offers but `SHARE_KINDS` lacks would 400 every correction to it; a kind
     // the Lambda accepts but the app lacks is a hint channel nothing uses.
     expect([...SHARE_KINDS]).toEqual(MAGIC_DESTINATION_KINDS);
+  });
+
+  it('names the same entitlement states as the registry (#95)', () => {
+    // A state the server can send that the client does not know renders as "no plan" at best;
+    // one the client knows that the server never sends is a branch nobody can reach.
+    expect(Object.values(SERVER_ENTITLEMENT_STATES).sort()).toEqual([...ENTITLEMENT_STATES].sort());
+  });
+
+  it('names the same entitlement reasons as the registry (#95)', () => {
+    // The Settings card picks its read-only sentence by reason (`lapsed` vs trial ended): a
+    // reason the client does not know would silently get the wrong sentence.
+    expect(Object.values(SERVER_ENTITLEMENT_REASONS).sort()).toEqual(
+      [...ENTITLEMENT_REASONS].sort()
+    );
+  });
+
+  it('sells the same trial length the registry enforces (#95)', () => {
+    // The pricing page and the Settings meter say `TRIAL_DAYS`; the registry's clock is the one
+    // that ends the trial. They must be one number.
+    expect(SERVER_TRIAL_DAYS).toBe(TRIAL_DAYS);
   });
 });

@@ -248,6 +248,10 @@ describe('uiStrings', () => {
       // A single to-do with nobody to credit it to (the Add To-do sidebar, the quick-add bar,
       // the Nook widget): "bean" must never stand in for the to-do or the family member.
       'todo.error.',
+      // Plans and read-only (#95): money and the family's data are at stake. "bean" must never
+      // stand in for the plan, the family data or the device here.
+      'plan.',
+      'readOnly.',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

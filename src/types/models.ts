@@ -2156,6 +2156,14 @@ export interface Settings {
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   /** #109 Who Owns What: family check-in rhythm in weeks; 0 = off (default 4 via getDefaultSettings). Family-scoped. The last check-in is derived from the check-in records, never stored here. */
   responsibilityCheckInWeeks?: 0 | 2 | 4 | 8;
+  /**
+   * #95: the family's plan token, a bearer secret the billing Lambda hands out once on the
+   * first paid claim (Phase 5). It gates the Customer Portal and the `full` AI allowance and
+   * is NOT the family (encryption) key. Kept in the encrypted doc so every member's device
+   * has it. Deliberately NO default in `getDefaultSettings`: absent means "never claimed, or
+   * lost", and `entitlementStore` logs `plan_token_missing` when a paid family lacks it.
+   */
+  planToken?: string;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -2294,7 +2302,56 @@ export interface RegistryEntry {
   // every row created before 2026-08-24, which reads as UNKNOWN — exclude those
   // from platform breakdowns rather than assuming web.
   signupPlatform?: 'web' | 'ios' | 'android' | null;
+  /**
+   * #95: what the family is entitled to, computed server-side on every GET by
+   * `infrastructure/lambda/registry/entitlement.mjs` (never stored in the row). `null` when the
+   * registry could not read the billing table; absent from a Lambda older than #95. The client
+   * keeps its cached answer in both cases (`entitlementStore`).
+   */
+  entitlement?: Entitlement | null;
   updatedAt: ISODateString;
+}
+
+/**
+ * #95: the four entitlement states, in the vocabulary of `ENTITLEMENT_STATES` in
+ * `infrastructure/lambda/registry/entitlement.mjs` (asserted equal by
+ * `lambdaContractParity.test.ts`). `beta` is "no launch date yet": every surface treats it as a
+ * trial with no end.
+ */
+export const ENTITLEMENT_STATES = ['beta', 'trial', 'active', 'read_only'] as const;
+export type EntitlementState = (typeof ENTITLEMENT_STATES)[number];
+
+/** Why the server chose the state: one reason per rule in `entitlement.mjs` (parity-tested). */
+export const ENTITLEMENT_REASONS = [
+  'no_launch',
+  'in_trial',
+  'subscribed',
+  'trial_ended',
+  'lapsed',
+] as const;
+export type EntitlementReason = (typeof ENTITLEMENT_REASONS)[number];
+
+/** The paid plans. `null` on an Entitlement means "not subscribed". */
+export type PlanId = 'basic' | 'full';
+
+/** Grandfathering cohort, written by `scripts/billing-cohort.mjs`. */
+export type PlanCohort = 'pre_v1' | 'first_ten';
+
+/**
+ * The registry's answer to "what may this family do?" (#95). Dates are ISO strings. The client
+ * never computes the trial clock from these; it only applies the 14-day offline rule and the
+ * "trial ended while offline" rule to a cached copy (`entitlementStore`).
+ */
+export interface Entitlement {
+  state: EntitlementState;
+  reason: EntitlementReason;
+  plan: PlanId | null;
+  cohort: PlanCohort | null;
+  trialEndsAt: ISODateString | null;
+  currentPeriodEnd: ISODateString | null;
+  /** BILLING_ENFORCE on the server. False = dry-run: display the state, never act on it. */
+  enforced: boolean;
+  serverTime: ISODateString;
 }
 
 /**

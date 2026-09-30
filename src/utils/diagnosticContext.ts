@@ -342,6 +342,19 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // declared in docs/runbooks/native-store-submission.md — a key in one and not the others
   // is dropped after leaving the device, silently.
   'count',
+  // Plans and read-only (#95, surfaces 'entitlement' / 'read-only-gate' / 'billing-ui').
+  // All closed enums or a boolean, never an id, a price or a token: `entitlement_state`
+  // (beta|trial|active|read_only), `plan` (basic|full, or null), `dry_run` (true when the
+  // client would NOT act on a read-only answer). Outcomes ride `action`, sources `kind`,
+  // the stale flag and refusal classes `detail`. MIRRORED in the telemetry Lambda + its
+  // pinned test. Declared in Phase 2: the data-collection table in
+  // docs/runbooks/native-store-submission.md and web/src/pages/privacy.astro are updated;
+  // PrivacyInfo.xcprivacy declares categories only (Other Diagnostic Data already covers
+  // these) and needs nothing; the store Data-Safety / App-Privacy answers are re-checked
+  // against the runbook table at the next store submission, as the runbook directs.
+  'entitlement_state',
+  'plan',
+  'dry_run',
 ]);
 
 export const MAX_STRING_LEN = 200;

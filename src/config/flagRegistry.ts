@@ -88,6 +88,16 @@ export const FLAG_REGISTRY = [
     description:
       "The week-first meal board under The Treehouse (page, nav, nook 'today's meals', and briefing cook assignments). Cookbook is separate.",
   },
+  {
+    // #95. Gates every pricing SURFACE (the Settings plan card now; the read-only band, the
+    // plan page and the write gate's refusal later). It does NOT gate the entitlement store:
+    // that is instantiated in App.vue for everyone, so the dry-run soak (`would_block`) runs
+    // in prod before this ships. Enforcement additionally needs the server's `enforced`.
+    id: 'pricing',
+    label: 'Plans & read-only',
+    description:
+      'Settings plan card (trial, active, read-only) and, when the server enforces it, read-only mode after the trial.',
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */
