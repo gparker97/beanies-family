@@ -155,10 +155,8 @@ resource "aws_iam_role_policy" "rate_table" {
   })
 }
 
-# Read-only on the billing table (#95), for the magic-beans allowance tier. Wired in Phase 1 with
-# the table so Phase 4 (allowance.mjs) is a code change only; until then nothing in this Lambda
-# reads BILLING_TABLE_NAME and the grant is unused. GetItem only: the allowance reads one row
-# (status, plan, planTokenHash) and never writes billing state.
+# Read-only on the billing table (#95), for the magic-beans allowance tier (allowance.mjs). GetItem
+# only: the allowance reads one row (status, plan, planTokenHash) and never writes billing state.
 resource "aws_iam_role_policy" "billing_read" {
   name = "${var.app_name}-ai-extract-billing-read-${var.environment}"
   role = aws_iam_role.lambda.id
@@ -169,6 +167,24 @@ resource "aws_iam_role_policy" "billing_read" {
       Effect   = "Allow"
       Action   = ["dynamodb:GetItem"]
       Resource = [var.billing_table_arn]
+    }]
+  })
+}
+
+# Read-only on the USAGE table (#95), for the allowance pre-check: GetItem for today's counter
+# (per-day tiers) and Query for the month's day items (basic). A separate policy from `rate_table`
+# above, whose comment records that the limiter and the meter never read a counter back; the
+# allowance is the first reader, and keeping the two grants apart keeps each comment true.
+resource "aws_iam_role_policy" "usage_read" {
+  name = "${var.app_name}-ai-extract-usage-read-${var.environment}"
+  role = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dynamodb:GetItem", "dynamodb:Query"]
+      Resource = [aws_dynamodb_table.usage.arn]
     }]
   })
 }
@@ -219,9 +235,13 @@ resource "aws_lambda_function" "ai_extract" {
       # silently - so the Lambda half ships dormant ahead of the client that uses it, and a
       # production problem is a terraform variable rather than a rollback.
       CORRECTION_GRANTS = var.correction_grants_enabled ? "1" : ""
-      # The billing table (#95). Not read yet: Phase 4's allowance check reads the family's plan
-      # tier from it. Wired now so that phase needs no terraform change.
+      # The billing table (#95): the allowance check reads the family's plan tier from it.
+      # Unset (with USAGE_TABLE) is the same supported no-op as above: every read is allowed.
       BILLING_TABLE_NAME = var.billing_table_name
+      # Magic-beans allowance enforcement (#95). Exactly "true" refuses over-allowance reads with a
+      # 402; anything else is dry-run (compute, log allowance_would_deny, allow). Flip only per
+      # the pricing launch runbook, after V1_LAUNCH_AT and BILLING_ENFORCE.
+      AI_ALLOWANCE_ENFORCE = var.ai_allowance_enforce ? "true" : "false"
     }
   }
 
@@ -302,6 +322,49 @@ resource "aws_cloudwatch_metric_alarm" "rate_store_unavailable" {
 
   tags = {
     Name        = "${var.app_name}-ai-extract-rate-store-unavailable"
+    Environment = var.environment
+  }
+}
+
+# The magic-beans allowance (#95) FAILS OPEN when it cannot read the billing or usage table, for
+# the same reason the limiter does: a DynamoDB blip must not take down every managed read. That
+# is only safe if somebody finds out, so the fail-open line gets a filter and an alarm too.
+
+resource "aws_cloudwatch_log_metric_filter" "allowance_store_unavailable" {
+  name           = "${var.app_name}-ai-extract-allowance-store-unavailable-${var.environment}"
+  log_group_name = aws_cloudwatch_log_group.ai_extract.name
+  # ⚠️ The exact `ALLOWANCE_STORE_ERROR_PREFIX` from allowance.mjs. `meter.test.mjs` asserts it
+  # appears here, so a drifted prefix fails CI rather than silently stopping the alarm.
+  pattern = "\"[ai-extract] allowance_store_error\""
+
+  metric_transformation {
+    name          = "AllowanceStoreUnavailable"
+    namespace     = "${var.app_name}/ai-extract"
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "allowance_store_unavailable" {
+  count = var.alerts_topic_arn == "" ? 0 : 1
+
+  alarm_name        = "${var.app_name}-ai-extract-allowance-store-unavailable-${var.environment}"
+  alarm_description = "The magic-beans allowance could not read DynamoDB and allowed managed reads through unchecked (or told a client usage is unavailable). Check BILLING_TABLE_NAME and USAGE_TABLE, the ${var.billing_table_name} and ${aws_dynamodb_table.usage.name} tables, and the Lambda's dynamodb:GetItem (billing, usage) and dynamodb:Query (usage) permissions."
+
+  namespace           = aws_cloudwatch_log_metric_filter.allowance_store_unavailable.metric_transformation[0].namespace
+  metric_name         = aws_cloudwatch_log_metric_filter.allowance_store_unavailable.metric_transformation[0].name
+  statistic           = "Sum"
+  period              = 300
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [var.alerts_topic_arn]
+  ok_actions    = [var.alerts_topic_arn]
+
+  tags = {
+    Name        = "${var.app_name}-ai-extract-allowance-store-unavailable"
     Environment = var.environment
   }
 }

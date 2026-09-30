@@ -1554,6 +1554,18 @@ async function runStatementBranch(
     reportExtractionFailure(outcome.errorCode);
     return null;
   }
+  // A statement stopped part way by the magic-beans allowance (#95) is never a silent partial
+  // import: the pages already read go on to review (they were paid for), and the quota prompt
+  // says why the rest were not read and when more beans arrive.
+  if (outcome.read.units.some((u) => u.errorCode === 'allowance_exceeded')) {
+    logEvent({
+      level: 'info',
+      surface: env.surface,
+      message: 'statement read stopped by the magic-beans allowance',
+      context: { action: 'failed', error_code: 'allowance_exceeded', kind: 'transactions' },
+    });
+    reportExtractionFailure('allowance_exceeded');
+  }
   const { result } = outcome.read;
   if (!result.isStatement || result.lines.length === 0) return { kind: 'none' };
 

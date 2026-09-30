@@ -15,6 +15,7 @@ import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
  *   • the `task !== 'share'` fence      — a grant is only meaningful on `share`
  *   • rate limiting, UNCONDITIONALLY    — see the fence note below
  *   • `openRead` / `closeRead`          — the meter, keyed on the envelope's `familyId`
+ *   • the magic-beans allowance (#95)    : charged reads only, after `openRead`, before the model
  *
  * WHAT IT CANNOT DO, permanently:
  *   • validate the source (mime, page count, text length). The client owns those now.
@@ -38,7 +39,8 @@ import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
  */
 
 import { checkLimits } from './rateLimit.mjs';
-import { closeRead, openRead, validateCorrectionToken } from './meter.mjs';
+import { chargesABean, closeRead, openRead, validateCorrectionToken } from './meter.mjs';
+import { allowanceRefusalBody, checkAllowance } from './allowance.mjs';
 import { UPSTREAM_ERROR_TEXT, callUpstream } from './upstream.mjs';
 
 /** The wire discriminator. Anything else is refused with a code the client can act on. */
@@ -300,6 +302,7 @@ export async function sealedForward(envelope, event, respond) {
     ehbp,
     sealed,
     contentType,
+    planToken,
   } = envelope || {};
 
   // ── Shape. Each refusal is BEFORE any billable work and costs the family nothing. ──────────
@@ -435,6 +438,17 @@ export async function sealedForward(envelope, event, respond) {
   // of those is something the family did. See the set's own comment.
   if (correction && HARD_REFUSAL_REASONS.has(read.reason)) {
     return respond(409, { error: 'Correction refused', code: 'correction_refused' }, event);
+  }
+
+  // The magic-beans allowance (#95): after the meter has decided whether this read is free, before
+  // the model. Same placement and reasons as the legacy arm; see `chargesABean` in meter.mjs. A
+  // free correction or an in-bound free task (✨ Find Duplicates) is never refused here.
+  if (chargesABean(read, task)) {
+    const allowance = await checkAllowance({
+      familyId: family,
+      planToken: typeof planToken === 'string' ? planToken : undefined,
+    });
+    if (!allowance.allowed) return respond(402, allowanceRefusalBody(allowance), event);
   }
 
   const result = await callUpstream({

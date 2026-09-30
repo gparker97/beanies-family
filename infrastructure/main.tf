@@ -186,9 +186,10 @@ module "ai_extract" {
   # ships with it. A production problem here is this line, not a rollback: unset, the Lambda
   # neither issues nor consumes grants and corrections simply cost a bean.
   correction_grants_enabled = true
-  # Plan tier for the magic-beans allowance (#95, read from Phase 4).
-  billing_table_name = module.billing.table_name
-  billing_table_arn  = module.billing.table_arn
+  # Plan tier for the magic-beans allowance (#95), and whether over-allowance reads are refused.
+  billing_table_name   = module.billing.table_name
+  billing_table_arn    = module.billing.table_arn
+  ai_allowance_enforce = var.ai_allowance_enforce
 }
 
 

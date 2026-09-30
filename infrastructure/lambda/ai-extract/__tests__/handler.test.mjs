@@ -1942,4 +1942,277 @@ describe('ai-extract Lambda handler', () => {
       assert.match(line, /task=event$/, 'resolved, not "invalid"');
     });
   });
+
+  describe('magic-beans allowance (#95), wired in both arms', () => {
+    // ⚠️ Every other block runs without BILLING_TABLE_NAME, so the allowance is a silent no-op
+    // there. This block wires it, then asserts the refusal on each arm, the image path, the free
+    // task exemption, dry-run, and the usage read.
+    const SEALED = Buffer.from('pretend-ciphertext').toString('base64');
+    const sealedBody = (over = {}) => ({
+      protocol: 'ehbp-1',
+      familyId: 'fam-allow-01',
+      task: 'share',
+      srcHash: 'b'.repeat(64),
+      sealed: SEALED,
+      ...over,
+    });
+    function sealedUpstream() {
+      const all = { 'ehbp-response-nonce': 'n', 'content-type': 'application/octet-stream' };
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get: (k) => all[String(k).toLowerCase()] ?? null,
+          entries: () => Object.entries(all),
+        },
+        arrayBuffer: async () => new TextEncoder().encode('sealed-reply').buffer,
+      };
+    }
+
+    /** Both tables behind one stub: UpdateItem (limiter, meter), GetItem, Query. */
+    function allowanceDdb({ dayCount = 0, billing = null } = {}) {
+      const sent = [];
+      const cls = (kind) =>
+        class {
+          constructor(input) {
+            this.kind = kind;
+            this.input = input;
+          }
+        };
+      return {
+        sent,
+        ddb: {
+          commands: {
+            UpdateItemCommand: cls('update'),
+            GetItemCommand: cls('get'),
+            QueryCommand: cls('query'),
+          },
+          send: async (cmd) => {
+            sent.push({ kind: cmd.kind, input: cmd.input });
+            if (cmd.kind === 'get' && cmd.input.TableName === 'beanies-billing-test') {
+              if (!billing) return {};
+              return {
+                Item: Object.fromEntries(Object.entries(billing).map(([k, v]) => [k, { S: v }])),
+              };
+            }
+            if (cmd.kind === 'get') {
+              return dayCount ? { Item: { n: { N: String(dayCount) } } } : {};
+            }
+            if (cmd.kind === 'query') return { Items: [] };
+            return {};
+          },
+        },
+      };
+    }
+
+    let stubbed;
+    let upstreamCalls;
+    const useStub = (opts) => {
+      stubbed = allowanceDdb(opts);
+      __setDdbClientForTests(stubbed.ddb);
+    };
+
+    beforeEach(() => {
+      process.env.USAGE_TABLE = 'beanies-ai-usage-test';
+      process.env.BILLING_TABLE_NAME = 'beanies-billing-test';
+      process.env.AI_ALLOWANCE_ENFORCE = 'true';
+      upstreamCalls = 0;
+      useStub({ dayCount: 1 }); // the trial floor (1/day), already spent
+    });
+
+    afterEach(() => {
+      delete process.env.USAGE_TABLE;
+      delete process.env.BILLING_TABLE_NAME;
+      delete process.env.AI_ALLOWANCE_ENFORCE;
+      __setDdbClientForTests(null);
+    });
+
+    it('sealed arm: over the allowance is a 402 with the numbers, and the model is never called', async () => {
+      globalThis.fetch = async () => {
+        upstreamCalls += 1;
+        return sealedUpstream();
+      };
+      const res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: sealedBody() }))
+      );
+      assert.equal(res.statusCode, 402);
+      assert.equal(res.parsedBody.code, 'allowance_exceeded');
+      assert.equal(res.parsedBody.used, 1);
+      assert.equal(res.parsedBody.limit, 1);
+      assert.equal(res.parsedBody.period, 'day');
+      assert.match(res.parsedBody.resetsAt, /T00:00:00\.000Z$/);
+      assert.equal(res.headers['Access-Control-Allow-Origin'], 'https://beanies.family');
+      assert.equal(upstreamCalls, 0, 'a refused read must not reach the billable enclave');
+      assert.equal(
+        stubbed.sent.filter(
+          (c) => c.kind === 'update' && c.input.TableName === 'beanies-ai-usage-test'
+        ).length,
+        0,
+        'and must not be counted'
+      );
+    });
+
+    it('sealed arm: a full-plan family with its token passes where the trial floor would not', async () => {
+      const token = 'the-family-plan-token';
+      useStub({
+        dayCount: 1,
+        billing: {
+          status: 'active',
+          plan: 'full',
+          planTokenHash: createHash('sha256').update(token).digest('hex'),
+        },
+      });
+      globalThis.fetch = async () => sealedUpstream();
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: sealedBody({ planToken: token }) })
+      );
+      assert.equal(res.statusCode, 200);
+    });
+
+    it('sealed arm: an in-bound free task (Find Duplicates) is never refused, it spends no bean', async () => {
+      globalThis.fetch = async () => sealedUpstream();
+      const res = await handler(
+        makeEvent({ headers: keyHeader, body: sealedBody({ task: 'dedupe' }) })
+      );
+      assert.equal(res.statusCode, 200);
+      assert.ok(
+        stubbed.sent.every((c) => c.input.TableName !== 'beanies-billing-test'),
+        'a free read does not even consult the allowance'
+      );
+    });
+
+    it('legacy arm: an IMAGE read is checked too (outside the hasText gate)', async () => {
+      globalThis.fetch = async () => {
+        upstreamCalls += 1;
+        return fakeUpstream();
+      };
+      const res = parseResponse(
+        await handler(
+          makeEvent({ headers: keyHeader, body: { ...goodBody, familyId: 'fam-allow-02' } })
+        )
+      );
+      assert.equal(res.statusCode, 402);
+      assert.equal(res.parsedBody.code, 'allowance_exceeded');
+      assert.equal(upstreamCalls, 0);
+    });
+
+    it('legacy arm: a text read is refused the same way', async () => {
+      globalThis.fetch = async () => fakeUpstream({ content: JSON.stringify({ kind: 'none' }) });
+      const res = await handler(
+        makeEvent({
+          headers: keyHeader,
+          body: { task: 'share', text: 'fair on sat', todayIso: '2026-06-03', familyId: 'f-3' },
+        })
+      );
+      assert.equal(res.statusCode, 402);
+    });
+
+    it('dry-run: over the allowance still reads, and logs allowance_would_deny', async () => {
+      process.env.AI_ALLOWANCE_ENFORCE = 'false';
+      const lines = [];
+      console.log = (...a) => lines.push(a.map(String).join(' '));
+      globalThis.fetch = async () => sealedUpstream();
+      const res = await handler(makeEvent({ headers: keyHeader, body: sealedBody() }));
+      assert.equal(res.statusCode, 200);
+      assert.ok(lines.some((l) => l.includes('"msg":"allowance_would_deny"')));
+      assert.ok(lines.some((l) => l.includes('"msg":"allowance_checked"')));
+    });
+
+    it('the `allowance` protocol returns usage and never refuses', async () => {
+      useStub({ dayCount: 7 });
+      const res = parseResponse(
+        await handler(
+          makeEvent({
+            headers: keyHeader,
+            body: { protocol: 'allowance', familyId: 'fam-allow-01' },
+          })
+        )
+      );
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(
+        { used: res.parsedBody.used, limit: res.parsedBody.limit, tier: res.parsedBody.tier },
+        { used: 7, limit: 1, tier: 'trial' }
+      );
+      assert.equal(res.parsedBody.period, 'day');
+      assert.ok(res.parsedBody.resetsAt);
+    });
+
+    it('the `allowance` protocol classifies a missing family and an unconfigured store', async () => {
+      let res = parseResponse(
+        await handler(makeEvent({ headers: keyHeader, body: { protocol: 'allowance' } }))
+      );
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.parsedBody.code, 'bad_family');
+      delete process.env.BILLING_TABLE_NAME;
+      res = parseResponse(
+        await handler(
+          makeEvent({ headers: keyHeader, body: { protocol: 'allowance', familyId: 'f' } })
+        )
+      );
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.parsedBody.code, 'allowance_unavailable');
+    });
+
+    it('the `allowance` protocol goes through the rate limiter before any DynamoDB read', async () => {
+      process.env.RATE_TABLE = 'beanies-ai-rate-test';
+      const sent = [];
+      __setDdbClientForTests({
+        commands: {
+          UpdateItemCommand: class {
+            constructor(input) {
+              this.kind = 'update';
+              this.input = input;
+            }
+          },
+          GetItemCommand: class {
+            constructor(input) {
+              this.kind = 'get';
+              this.input = input;
+            }
+          },
+          QueryCommand: class {
+            constructor(input) {
+              this.kind = 'query';
+              this.input = input;
+            }
+          },
+        },
+        send: async (cmd) => {
+          sent.push(cmd);
+          if (cmd.kind === 'update') {
+            const err = new Error('conditional request failed');
+            err.name = 'ConditionalCheckFailedException';
+            throw err;
+          }
+          return {};
+        },
+      });
+      try {
+        const res = parseResponse(
+          await handler(
+            makeEvent({
+              headers: keyHeader,
+              body: { protocol: 'allowance', familyId: 'fam-allow-01' },
+            })
+          )
+        );
+        assert.equal(res.statusCode, 429);
+        assert.equal(res.parsedBody.code, 'rate_limited');
+        assert.equal(
+          sent.filter((c) => c.kind !== 'update').length,
+          0,
+          'a throttled usage read must not touch the billing or usage table'
+        );
+      } finally {
+        delete process.env.RATE_TABLE;
+      }
+    });
+
+    it('the `allowance` protocol still needs the api key', async () => {
+      const res = await handler(
+        makeEvent({ body: { protocol: 'allowance', familyId: 'fam-allow-01' } })
+      );
+      assert.equal(res.statusCode, 401);
+    });
+  });
 });

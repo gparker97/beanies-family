@@ -108,3 +108,9 @@ variable "billing_enforce" {
   type        = bool
   default     = false
 }
+
+variable "ai_allowance_enforce" {
+  description = "Magic-beans allowance enforcement in the ai-extract Lambda (AI_ALLOWANCE_ENFORCE). false = dry-run: each managed read is checked against the family's allowance and allowance_would_deny is logged, nothing is refused. true = over-allowance reads get a 402. Set in terraform.auto.tfvars; flip last, after v1_launch_at and billing_enforce, per the pricing launch runbook."
+  type        = bool
+  default     = false
+}

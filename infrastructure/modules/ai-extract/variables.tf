@@ -106,7 +106,7 @@ variable "correction_grants_enabled" {
 }
 
 # ── Billing (#95) ────────────────────────────────────────────────────────────
-# From the billing module. Read by the Phase 4 allowance check (plan tier); unused until then.
+# From the billing module. Read by the allowance check (allowance.mjs) for the plan tier.
 
 variable "billing_table_name" {
   description = "Billing DynamoDB table name (from the billing module), exposed as BILLING_TABLE_NAME."
@@ -116,4 +116,10 @@ variable "billing_table_name" {
 variable "billing_table_arn" {
   description = "Billing DynamoDB table ARN, for the Lambda's dynamodb:GetItem grant."
   type        = string
+}
+
+variable "ai_allowance_enforce" {
+  description = "Magic-beans allowance enforcement. false = dry-run: every managed read is checked and allowance_would_deny is logged, nothing is refused. true = reads over the family's allowance get a 402. Flip only per the pricing launch runbook."
+  type        = bool
+  default     = false
 }

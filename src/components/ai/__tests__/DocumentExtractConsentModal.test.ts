@@ -19,7 +19,11 @@ vi.mock('@/composables/useTranslation', () => ({
 }));
 
 vi.mock('@/composables/useAiCapability', () => ({
-  useAiCapability: () => ({ tier: { value: 'managed' } }),
+  useAiCapability: () => ({
+    tier: { value: 'managed' },
+    // #95: the read-only refusal runs first in requestConsent; a writable family passes.
+    refuseManagedReadIfReadOnly: () => false,
+  }),
 }));
 
 const setSkip = vi.fn().mockResolvedValue(undefined);
