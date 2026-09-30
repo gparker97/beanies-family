@@ -5,6 +5,9 @@
  * become a god-form. "Mark cooked" (recipe meals only) delegates to the existing
  * CookLogFormModal; the meal flips to cooked ONLY when a new cook-log actually
  * persisted (guards against a lost log with a wrong "cooked" state).
+ *
+ * Hosts the read-only ingredients panel (#116, `MealIngredientsPanel`); the panel owns
+ * its own list write, so this form still saves only MealPlanEntry fields.
  */
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -14,12 +17,21 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
+import MealIngredientsPanel from '@/components/mealplan/MealIngredientsPanel.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useCardDefaultHint } from '@/composables/useCardDefaultHint';
 import { confirm } from '@/composables/useConfirm';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { isFlagEnabled } from '@/config/flags';
+import { useFamilyStore } from '@/stores/familyStore';
+import {
+  eaterIdsToStore,
+  eatingCount,
+  hasShoppableIngredients,
+  seedEaterIds,
+} from '@/utils/mealShoppingList';
 import type { MealPlanEntry, MealKind, UpdateMealPlanInput } from '@/types/models';
 
 const props = defineProps<{ open: boolean; meal: MealPlanEntry | null }>();
@@ -28,6 +40,10 @@ const emit = defineEmits<{ close: [] }>();
 const { t } = useTranslation();
 const mealPlanStore = useMealPlanStore();
 const recipesStore = useRecipesStore();
+const familyStore = useFamilyStore();
+
+/** Every human member: who "everyone" means (pets never eat from the recipe). */
+const humanIds = computed(() => familyStore.humans.map((m) => m.id));
 
 // Local edit state (reset from `meal` on open).
 const kind = ref<MealKind>('recipe');
@@ -43,6 +59,21 @@ const recipe = computed(() =>
   props.meal?.recipeId ? recipesStore.recipes.find((r) => r.id === props.meal!.recipeId) : undefined
 );
 const isRecipe = computed(() => kind.value === 'recipe');
+
+// Ingredients (#116): Cook ×N for the LIVE picker, before Save. Same gate as the recipe
+// page's Shopping List (#88): the familyLists flag, and something to shop for.
+const showIngredients = computed(
+  () =>
+    isRecipe.value &&
+    !!recipe.value &&
+    isFlagEnabled('familyLists') &&
+    hasShoppableIngredients(recipe.value)
+);
+const eating = computed(
+  () =>
+    eatingCount({ eaterMemberIds: eaterIds.value, guestNames: guestNames.value }, humanIds.value)
+      .eating
+);
 
 // Who Owns What (#109): derived, nothing stored. Shows while the chosen cook is the
 // single holder of the slot's card ("Sofia holds Cooking Dinner in Who Owns What.").
@@ -69,7 +100,8 @@ watch(
     kind.value = m.kind;
     label.value = m.label ?? '';
     cookId.value = m.cookMemberId ?? '';
-    eaterIds.value = [...(m.eaterMemberIds ?? [])];
+    // No stored eaters has always meant everyone, so the chips SHOW everyone picked.
+    eaterIds.value = seedEaterIds(m.eaterMemberIds, humanIds.value);
     guestNames.value = [...(m.guestNames ?? [])];
     guestDraft.value = '';
     note.value = m.note ?? '';
@@ -97,7 +129,8 @@ async function save(): Promise<void> {
     recipeId: kind.value === 'recipe' ? props.meal.recipeId : undefined,
     label: label.value.trim() || undefined,
     cookMemberId: cookId.value || undefined,
-    eaterMemberIds: eaterIds.value.length ? eaterIds.value : undefined,
+    // Everyone (all picked) or nobody (cleared) both save as "everyone": no stored ids.
+    eaterMemberIds: eaterIdsToStore(eaterIds.value, humanIds.value),
     guestNames: guestNames.value.length ? guestNames.value : undefined,
     note: note.value.trim() || undefined,
     serveTime: serveTime.value || undefined,
@@ -210,6 +243,16 @@ async function onCookLogClosed(): Promise<void> {
             {{ t('mealPlanner.editor.editRecipe') }}
           </button>
         </div>
+        <!-- Keyed on the recipe ONLY: any update to it (an edit here, a sync from another
+             device) must not remount the panel and drop unticks, edits or "Added". The
+             panel rebuilds its lines itself when the ingredients actually change. -->
+        <MealIngredientsPanel
+          v-if="showIngredients && recipe"
+          :key="recipe.id"
+          class="mt-4"
+          :recipe="recipe"
+          :eating="eating"
+        />
       </div>
       <div v-else>
         <div class="mp-label">{{ t('mealPlanner.editor.plan') }}</div>
@@ -239,7 +282,7 @@ async function onCookLogClosed(): Promise<void> {
       <!-- Who's eating + guests -->
       <div>
         <div class="mp-label">{{ t('mealPlanner.editor.eaters') }}</div>
-        <FamilyChipPicker v-model="eaterIds" mode="multi" />
+        <FamilyChipPicker v-model="eaterIds" mode="multi" all-toggle />
         <div class="mt-2 flex flex-wrap items-center gap-1.5">
           <span
             v-for="(g, i) in guestNames"
@@ -332,13 +375,17 @@ async function onCookLogClosed(): Promise<void> {
 
 <style scoped>
 .mp-label {
-  color: rgb(44 62 80 / 42%);
+  color: var(--color-text-muted);
   font-family: Outfit, sans-serif;
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.07em;
   margin-bottom: 0.375rem;
   text-transform: uppercase;
+}
+
+html.dark .mp-label {
+  color: var(--color-ink-faint);
 }
 
 .mp-input {

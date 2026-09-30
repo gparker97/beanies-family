@@ -356,9 +356,9 @@ extends AttestedResult { groups: { name: string; lineIds: string[] }[] }` + `ded
   (`useDocumentConsent.ts:131`; "don't ask again" honoured). Decline → `info` `find_declined`, the card
   stays. Add a dated "no new exception" note to ADR-030 (like #113's at `:59`).
 - **Free metering.** In `meter.mjs` one table `FREE_TASK_MAX_BYTES = new Map([['dedupe', N]])` and an
-  early-return `usageAttrFor(read, task)`: correction → `corrected`; task in the table AND
-  `read.srcBytes ≤ N` → new `USAGE_ATTRS.freeTask`; else `charged` (an oversized "dedupe" is charged with
-  a `console.warn`). Table-tested. `N` is derived from the client caps (`DEDUPE_MAX_LINES` ×
+  early-return `usageAttrFor(read, task)`: correction → `corrected`; task in the table AND the SEALED arm
+  AND `read.srcBytes ≤ N` → new `USAGE_ATTRS.freeTask`; else `charged` (an oversized or legacy-arm "dedupe"
+  is charged with a `console.warn`; no legacy-arm client has Find Duplicates). Table-tested. `N` is derived from the client caps (`DEDUPE_MAX_LINES` ×
   `DEDUPE_MAX_LINE_CHARS` + prompt + seal overhead, ≈ 16 KB), and a client test asserts the worst-case
   dedupe payload fits under `N`, so prompt growth can never silently turn it charged. The sealed-arm
   task label is client-supplied: a tampered client can still get small free reads; the accepted controls
@@ -623,3 +623,23 @@ No-amount lines: keep as written. Existing-list duplicates: no flag.
   structural scaler change). No third round (ceiling without greg).
 - **Not done:** native iOS/Android check; `public/translations/zh.json` still carries removed keys (the
   translation bot regenerates it); `MealWeekBoard.vue:66` keeps an English-only weekday (pre-existing).
+
+## Outcome (revision 3 build, 2026-09-30)
+
+- **Built** revision 3 as planned: ingredients as written, Cook ×N + `(×N)` line suffixes, "In More Than One
+  Meal" (identical lines merged automatically; explicit free ✨ Find Duplicates via the new `dedupe` AI
+  task; AI groups only, the app writes merged text), Split + Undo toast, everyone-by-default who's eating
+  with Clear / Everyone, long lines wrap everywhere (list rows edit in a single-line auto-growing textarea,
+  Enter commits), magic beans sheet copy + hint badge (now above every layer, not faded).
+- **Privacy/metering:** dated ADR-030 exception + `ingredients` consent variant (its own "don't ask again",
+  never the family-wide document skip); `dedupe` is free only on the sealed arm within a byte bound pinned
+  by a parity test (`freeTask` counter). Lambda applied twice via `scripts/infra/` (code-hash only).
+- **Removed:** the revision 2 scaler (`ingredientScale.ts`), As Written tag, faint originals.
+- **Verification:** `npm run validate` green (10206 tests), `test:lambda` 333/333, browser harness walk
+  green (desktop + 390px, light + dark), screenshots reviewed.
+- **Review:** round 1 (10 findings, all fixed incl. a legacy-arm free-read hole), round 2 scoped to the
+  fixes (9 findings, all fixed). Round-2 fixes were NOT re-reviewed (two-round ceiling).
+- **Follow-ups:** a CloudWatch metric filter + alarm for `FREE_TASK_CHARGED_PREFIX` (then add it to
+  `ALARMING_PREFIXES`); a Settings control to reset the ingredients "don't ask again"; the meal drawer's
+  guest-name input / chip dark styling (pre-existing).
+- **Separate change:** expired legacy redirect-transport tripwire removed (`6abeea05`).

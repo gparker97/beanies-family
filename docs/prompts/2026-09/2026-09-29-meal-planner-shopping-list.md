@@ -19,3 +19,4 @@ tags: [meal-planner, shopping-list, recipes, servings, lists, checklist]
 ## Outcome
 
 - Pre-planned (Notion #116 written back, In Progress), mockup direction B approved then simplified per greg (by recipe, scaled by who's eating vs servings, no merging/AI), planned with 4 passes (`docs/plans/2026-09-29-meal-planner-shopping-list.md`), built, browser-verified, reviewed twice at `high`. See the plan's Outcome. Not committed, not deployed.
+- **2026-09-30** Revision 3 (see the plan's prompt log for greg's verbatim follow-ups 5-8): as written, Cook ×N + (×N), duplicates (exact + free ✨ Find Duplicates), everyone by default, magic beans sheet copy + hint badge z-index; greg's testing asks (running indicator, long lines wrap, undo after Split, Enter saves an edited line) folded in; built, reviewed twice, deployed as 0.26 (no spotlight).

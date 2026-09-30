@@ -10,7 +10,6 @@ import { computed, effectScope } from 'vue';
 
 const h = vi.hoisted(() => ({
   lists: [] as Array<Record<string, unknown>>,
-  push: vi.fn(),
 }));
 
 vi.mock('@/stores/listStore', () => ({
@@ -20,7 +19,6 @@ vi.mock('@/stores/listStore', () => ({
     },
   }),
 }));
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: h.push }) }));
 
 import { useRecipeShoppingLists } from '../useRecipeShoppingLists';
 
@@ -46,7 +44,6 @@ function setup(recipeId: string | undefined = 'r1') {
 beforeEach(() => {
   while (scopes.length) scopes.pop()!.stop();
   h.lists = [];
-  h.push.mockClear();
 });
 
 describe('which lists belong to this recipe', () => {
@@ -108,12 +105,5 @@ describe('the list worth offering to open', () => {
 
   it('is null when the recipe has no lists at all', () => {
     expect(setup().activeList.value).toBeNull();
-  });
-});
-
-describe('opening a list', () => {
-  it('navigates to the lists page rather than mounting the drawer here', () => {
-    setup().openList('l9');
-    expect(h.push).toHaveBeenCalledWith({ name: 'Lists', query: { view: 'l9' } });
   });
 });

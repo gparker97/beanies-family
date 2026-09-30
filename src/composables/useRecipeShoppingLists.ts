@@ -7,12 +7,11 @@
  * list already exists. An inline `filter` in each would be two places to change
  * when the link field or the ordering rule moves.
  *
- * Read-only and navigation-only. Creating a list stays in `RecipeListSheet` —
- * this composable deliberately owns no write, so neither caller becomes a second
- * lists client.
+ * Read-only. Creating a list stays in `RecipeListSheet` — this composable
+ * deliberately owns no write, so neither caller becomes a second lists client.
+ * Navigating to a list is `useOpenList`, shared with surfaces that have no recipe.
  */
 import { computed, type ComputedRef, type Ref } from 'vue';
-import { useRouter } from 'vue-router';
 import { useListStore } from '@/stores/listStore';
 import type { FamilyList } from '@/types/models';
 
@@ -20,7 +19,6 @@ export function useRecipeShoppingLists(
   recipeId: Ref<string | undefined> | ComputedRef<string | undefined>
 ) {
   const listStore = useListStore();
-  const router = useRouter();
 
   /** Every list built from this recipe, NEWEST FIRST — a family's latest shop is the one they mean. */
   const lists = computed<FamilyList[]>(() => {
@@ -44,18 +42,5 @@ export function useRecipeShoppingLists(
     () => lists.value.find((l) => !l.completed) ?? null
   );
 
-  /**
-   * Go to a list.
-   *
-   * NAVIGATES rather than mounting a second copy of the ~700-line list drawer:
-   * `BeanieListsPage` already opens `?view=<id>` immediately and strips the query
-   * on close, and the route's own `requiresFlag: 'familyLists'` is a second, free
-   * flag check. A family tapping "open my shopping list" is going shopping — the
-   * Lists page is the destination, not a detour.
-   */
-  function openList(id: string): void {
-    void router.push({ name: 'Lists', query: { view: id } });
-  }
-
-  return { lists, activeList, openList };
+  return { lists, activeList };
 }

@@ -29,7 +29,8 @@
  * (`RecipeFormModal`), neither of which can host a per-page mount.
  *
  * The `remember` checkbox is OPTIONAL — confirming proceeds either way; ticking it persists
- * the family-scoped consent-skip so future extractions don't prompt.
+ * the skip its line describes: the family-scoped document skip, or a non-document variant's
+ * own (the ingredients prompt, #116), so it never skips a prompt the family has not seen.
  */
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -38,7 +39,8 @@ import { openExternal } from '@/utils/openExternal';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
 import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { useAiCapability } from '@/composables/useAiCapability';
-import { useDocumentConsent } from '@/composables/useDocumentConsent';
+import { useDocumentConsent, type ConsentRequest } from '@/composables/useDocumentConsent';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
 
 // The privacy article lives on the marketing site (deployed via deploy-web.yml). LIVE as of
@@ -52,10 +54,63 @@ const { t } = useTranslation();
 const { consentOpen, consentRequest, resolveConsent, onConsentConfirm } = useDocumentConsent();
 
 /**
- * The bank-statement variant (#107). It discloses what the generic prompt never had to: the
- * family's past merchant names and categories travel with the pages, and the read costs one bean
- * per page. Everything else (tier line, footnote, remember) is shared.
+ * The copy each prompt shows, per variant. ONE table keyed like `useDocumentConsent`'s
+ * `ACKNOWLEDGEMENTS`, so a new variant without its own copy is a compile error rather than a
+ * prompt that borrows the generic "read this photo, document or selected text" wording for
+ * something it is not.
+ *
+ *  - `transactions` (#107): the family's past merchant names and categories travel with the
+ *    pages, and the read costs one bean per page (its extra "what it costs" row is below).
+ *  - `ingredients` (#116, ✨ Find Duplicates): the lines on a shopping list, which is family data
+ *    (so the generic "never any of your family's data" would be false). A free list tidy, so
+ *    neither "attached to this item" nor "gimme those beans!" applies.
  */
+interface ConsentCopy {
+  title: UIStringKey;
+  icon: string;
+  intro: UIStringKey;
+  what: UIStringKey;
+  after: UIStringKey;
+  confirm: UIStringKey;
+  /** The "don't ask again" line: it must describe the skip `onConsentConfirm` records. */
+  remember: UIStringKey;
+}
+const GENERIC_COPY: ConsentCopy = {
+  title: 'ai.consent.title',
+  icon: '✨',
+  intro: 'ai.consent.intro',
+  what: 'ai.consent.whatValue',
+  after: 'ai.consent.afterValue',
+  confirm: 'ai.consent.confirm',
+  remember: 'ai.consent.remember',
+};
+const VARIANT_COPY: Record<ConsentRequest['kind'], ConsentCopy> = {
+  transactions: {
+    title: 'ai.consent.statement.title',
+    icon: '🏦',
+    intro: 'ai.consent.statement.intro',
+    what: 'ai.consent.statement.whatValue',
+    after: 'ai.consent.statement.afterValue',
+    confirm: 'ai.consent.statement.confirm',
+    // A statement IS a document the family chose, so the family-wide line is true of it.
+    remember: 'ai.consent.remember',
+  },
+  ingredients: {
+    title: 'ai.consent.title',
+    icon: '✨',
+    intro: 'ai.consent.ingredients.intro',
+    what: 'ai.consent.ingredients.whatValue',
+    after: 'ai.consent.ingredients.afterValue',
+    confirm: 'ai.consent.ingredients.confirm',
+    // Its own skip, never the family-wide document one (see useDocumentConsent).
+    remember: 'ai.consent.ingredients.remember',
+  },
+};
+const copy = computed(() =>
+  consentRequest.value ? VARIANT_COPY[consentRequest.value.kind] : GENERIC_COPY
+);
+
+/** The bank-statement request, for its per-page cost row; null for every other prompt. */
 const statement = computed(() =>
   consentRequest.value?.kind === 'transactions' ? consentRequest.value : null
 );
@@ -75,46 +130,36 @@ watch(consentOpen, (isOpen) => {
 // LoginBackground): case-insensitive, and if the phrase isn't present in a
 // translation it degrades to the whole sentence as `lead` with no link.
 const introParts = computed(() =>
-  splitAroundAccent(
-    t(statement.value ? 'ai.consent.statement.intro' : 'ai.consent.intro'),
-    t('ai.consent.introLink')
-  )
+  splitAroundAccent(t(copy.value.intro), t('ai.consent.introLink'))
 );
 
 const items = computed(() => {
-  const where = {
-    icon: '🔒',
-    label: t('ai.consent.whereLabel'),
-    value: tier.value === 'byok' ? t('ai.consent.whereByok') : t('ai.consent.whereManaged'),
-  };
+  const c = copy.value;
   const request = statement.value;
-  if (!request) {
-    return [
-      { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.whatValue') },
-      where,
-      { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t('ai.consent.afterValue') },
-    ];
-  }
   return [
-    { icon: '📄', label: t('ai.consent.whatLabel'), value: t('ai.consent.statement.whatValue') },
-    where,
+    { icon: '📄', label: t('ai.consent.whatLabel'), value: t(c.what) },
     {
-      icon: '🫘',
-      label: t('ai.consent.statement.readsLabel'),
-      value: fillTemplate(
-        t(
-          request.reads === 1
-            ? 'ai.consent.statement.reads.one'
-            : 'ai.consent.statement.reads.other'
-        ),
-        { count: String(request.reads) }
-      ),
+      icon: '🔒',
+      label: t('ai.consent.whereLabel'),
+      value: tier.value === 'byok' ? t('ai.consent.whereByok') : t('ai.consent.whereManaged'),
     },
-    {
-      icon: '🗑️',
-      label: t('ai.consent.afterLabel'),
-      value: t('ai.consent.statement.afterValue'),
-    },
+    ...(request
+      ? [
+          {
+            icon: '🫘',
+            label: t('ai.consent.statement.readsLabel'),
+            value: fillTemplate(
+              t(
+                request.reads === 1
+                  ? 'ai.consent.statement.reads.one'
+                  : 'ai.consent.statement.reads.other'
+              ),
+              { count: String(request.reads) }
+            ),
+          },
+        ]
+      : []),
+    { icon: '🗑️', label: t('ai.consent.afterLabel'), value: t(c.after) },
   ];
 });
 
@@ -129,10 +174,10 @@ function onConfirm(): void {
     layer="gate"
     size="narrow"
     :open="consentOpen"
-    :title="t(statement ? 'ai.consent.statement.title' : 'ai.consent.title')"
-    :icon="statement ? '🏦' : '✨'"
+    :title="t(copy.title)"
+    :icon="copy.icon"
     icon-bg="var(--tint-orange-8)"
-    :save-label="t(statement ? 'ai.consent.statement.confirm' : 'ai.consent.confirm')"
+    :save-label="t(copy.confirm)"
     @close="resolveConsent(false)"
     @save="onConfirm"
   >
@@ -149,7 +194,7 @@ function onConfirm(): void {
       ><button
         v-if="introParts.accent && PRIVACY_ARTICLE_LIVE"
         type="button"
-        class="font-semibold underline underline-offset-2 hover:text-[#F15D22]"
+        class="dark:hover:text-accent-lift font-semibold underline underline-offset-2 hover:text-[#F15D22]"
         @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
       >
         {{ introParts.accent }}</button
@@ -182,7 +227,7 @@ function onConfirm(): void {
     <button
       v-if="PRIVACY_ARTICLE_LIVE"
       type="button"
-      class="font-outfit inline-flex items-center gap-1 text-sm font-semibold text-[#F15D22] underline underline-offset-2 hover:text-[#D14D1A]"
+      class="font-outfit dark:text-accent-lift dark:hover:text-ink inline-flex items-center gap-1 text-sm font-semibold text-[#F15D22] underline underline-offset-2 hover:text-[#D14D1A]"
       @click.stop.prevent="openExternal(PRIVACY_ARTICLE_URL)"
     >
       {{ t('ai.consent.learnMore') }}
@@ -214,7 +259,7 @@ function onConfirm(): void {
         </svg>
       </span>
       <span class="font-inter dark:text-ink text-sm text-[var(--color-text)]">
-        {{ t('ai.consent.remember') }}
+        {{ t(copy.remember) }}
       </span>
     </label>
   </BeanieFormModal>

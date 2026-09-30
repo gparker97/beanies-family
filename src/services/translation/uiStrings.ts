@@ -97,6 +97,10 @@ const STRING_DEFS = {
   'common.saving': { en: 'Saving...', beanie: 'counting beans...' },
   'common.shared': { en: 'Shared', beanie: 'everyone' },
   'common.all': { en: 'All', beanie: 'all' },
+  // Pick every member at once (the family picker's Clear / Everyone toggle).
+  'common.everyone': { en: 'Everyone', beanie: 'everyone' },
+  // The accessible name of the "?" hint badge.
+  'common.moreInfo': { en: 'More info', beanie: 'more info' },
   'common.none': { en: 'None', beanie: 'none' },
   'common.whatsThis': { en: "What's this?", beanie: "what's this?" },
   'common.family': { en: 'Family', beanie: 'the pod' },
@@ -891,6 +895,16 @@ const STRING_DEFS = {
   'recipes.field.prepTime': { en: 'Prep time', beanie: 'prep time' },
   'recipes.field.cookTime': { en: 'Cook time', beanie: 'cook time' },
   'recipes.field.servings': { en: 'Servings', beanie: 'servings' },
+  // Servings is a number of people (#116). "Serves [− 4 +] people" in the form; "Serves 4" on display.
+  'recipes.servesN': { en: 'Serves {n}', beanie: 'serves {n}' },
+  'recipes.servingsUnit': { en: 'people', beanie: 'people' },
+  'recipes.servingsHint': {
+    en: 'Used to size shopping lists for the people eating.',
+    beanie: 'used to size shopping lists for the people eating.',
+  },
+  // Generic −/+ labels for NumberStepper (screen readers only).
+  'common.stepper.fewer': { en: 'Fewer', beanie: 'fewer' },
+  'common.stepper.more': { en: 'More', beanie: 'more' },
   'recipes.field.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
   'recipes.field.steps': { en: 'Preparation steps', beanie: 'preparation steps' },
   'recipes.field.notes': { en: 'Family notes', beanie: 'family notes' },
@@ -917,7 +931,6 @@ const STRING_DEFS = {
   },
   'recipes.placeholder.prepTime': { en: 'e.g. 4h', beanie: 'e.g. 4h' },
   'recipes.placeholder.cookTime': { en: 'e.g. 45 min', beanie: 'e.g. 45 min' },
-  'recipes.placeholder.servings': { en: 'e.g. serves 6', beanie: 'e.g. serves 6' },
   'recipes.placeholder.ingredients': {
     en: 'One per line — 500g ground beef\\n3 carrots\\n…',
     beanie: 'one per line — 500g ground beef\\n3 carrots\\n…',
@@ -975,6 +988,7 @@ const STRING_DEFS = {
   'cookLog.field.wentWell': { en: 'What went well', beanie: 'what went well' },
   'cookLog.field.toImprove': { en: 'What to try next time', beanie: 'what to try next time' },
   'cookLog.field.photo': { en: 'Dish photo', beanie: 'dish photo' },
+  'cookLog.placeholder.servings': { en: 'e.g. serves 6', beanie: 'e.g. serves 6' },
   'cookLog.placeholder.wentWell': {
     en: 'e.g. nailed the sauce reduction',
     beanie: 'e.g. nailed the sauce reduction',
@@ -1369,6 +1383,71 @@ const STRING_DEFS = {
   'mealPlanner.share.title': { en: 'Meal plan', beanie: 'meal plan' },
   'mealPlanner.export.share': { en: 'Share', beanie: 'share' },
   'mealPlanner.export.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
+  // The week's shopping list (#116). One section per recipe, ingredients as written, with a
+  // Cook ×N count from who's eating vs the recipe's servings. Ordinary product copy, so
+  // beanie values stay playful-lowercase.
+  'mealPlanner.shopping.button': { en: 'Shopping List', beanie: 'shopping list' },
+  'mealPlanner.shopping.disabledHint': {
+    en: 'Plan a recipe this week to build a shopping list.',
+    beanie: 'plan a recipe this week to build a shopping list.',
+  },
+  'mealPlanner.shopping.badge.one': { en: '1 recipe this week', beanie: '1 recipe this week' },
+  'mealPlanner.shopping.badge.other': {
+    en: '{n} recipes this week',
+    beanie: '{n} recipes this week',
+  },
+  'mealPlanner.shopping.title': { en: 'Shopping List', beanie: 'shopping list' },
+  // "Week of 28 Sep, 4 recipes, 5 meals": {recipes} and {meals} are the plural keys below.
+  'mealPlanner.shopping.subtitle': {
+    en: 'Week of {date}, {recipes}, {meals}',
+    beanie: 'week of {date}, {recipes}, {meals}',
+  },
+  'mealPlanner.shopping.recipes.one': { en: '1 recipe', beanie: '1 recipe' },
+  'mealPlanner.shopping.recipes.other': { en: '{n} recipes', beanie: '{n} recipes' },
+  'mealPlanner.shopping.meals.one': { en: '1 meal', beanie: '1 meal' },
+  'mealPlanner.shopping.meals.other': { en: '{n} meals', beanie: '{n} meals' },
+  'mealPlanner.shopping.listTitle': { en: 'Shopping for {date}', beanie: 'shopping for {date}' },
+  // One pill per meal a recipe is served at: "Tue, 5 Eating" / "Thu, Everyone (5)" (nobody
+  // picked = the whole family).
+  'mealPlanner.shopping.eatingPill': { en: '{day}, {n} Eating', beanie: '{day}, {n} eating' },
+  'mealPlanner.shopping.everyonePill': {
+    en: '{day}, Everyone ({n})',
+    beanie: '{day}, everyone ({n})',
+  },
+  // How many times the recipe gets cooked. The glyph lives in the string so a locale can
+  // move it; the aria variants are what a screen reader hears.
+  'mealPlanner.shopping.cook.once': { en: 'Cook Once', beanie: 'cook once' },
+  'mealPlanner.shopping.cook.onceAria': { en: 'Cook once', beanie: 'cook once' },
+  'mealPlanner.shopping.cook.times': { en: 'Cook ×{n}', beanie: 'cook ×{n}' },
+  'mealPlanner.shopping.cook.timesAria': { en: 'Cook {n} times', beanie: 'cook {n} times' },
+  // Servings unset: one batch for each meal.
+  'mealPlanner.shopping.noServingsPerMeal': {
+    en: 'No servings set, so one batch per meal.',
+    beanie: 'no servings set, so one batch per meal.',
+  },
+  // Duplicates across the week's recipes: identical lines merge on their own; ✨ Find
+  // Duplicates asks magic beans (free) for the same item written differently.
+  'mealPlanner.shopping.dupes.title': {
+    en: 'In More Than One Meal',
+    beanie: 'in more than one meal',
+  },
+  'mealPlanner.shopping.dupes.find': { en: 'Find Duplicates', beanie: 'find duplicates' },
+  'mealPlanner.shopping.dupes.free': { en: 'Free', beanie: 'free' },
+  // The card's wait text (swept by the magic shimmer while the read is in flight).
+  'mealPlanner.shopping.dupes.running': {
+    en: 'Finding duplicates…',
+    beanie: 'counting beans…',
+  },
+  'mealPlanner.shopping.dupes.found.one': { en: '1 found', beanie: '1 found' },
+  'mealPlanner.shopping.dupes.found.other': { en: '{n} found', beanie: '{n} found' },
+  'mealPlanner.shopping.dupes.none': { en: 'No other duplicates', beanie: 'no other duplicates' },
+  // The toast after Split (its action is `action.undo`). {n} is always 2 or more.
+  'mealPlanner.shopping.dupes.splitDone': {
+    en: 'Split into {n} lines',
+    beanie: 'split into {n} lines',
+  },
+  'mealPlanner.shopping.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
+  'mealPlanner.shopping.forEating': { en: 'For {n}, serves {s}', beanie: 'for {n}, serves {s}' },
   'mealPlanner.export.building': { en: 'Preparing…', beanie: 'preparing…' },
   // The exported sheet's own copy (rendered into the picture/PDF).
   'mealPlanner.export.heading': { en: "This Week's Meals", beanie: "this week's meals" },
@@ -4421,15 +4500,9 @@ const STRING_DEFS = {
   // automatically, so its beanie value keeps the real noun ("member").
   'lists.fromRecipe.title': { en: 'Make a shopping list', beanie: 'make a shopping list' },
   'lists.fromRecipe.body': {
-    en: 'Check the list over before it is created — edit anything, or add what you already need.',
-    beanie:
-      'check the list over before it is created — edit anything, or add what you already need.',
+    en: 'Untick what you already have, edit any line, or add your own.',
+    beanie: 'untick what you already have, edit any line, or add your own.',
   },
-  'lists.fromRecipe.itemsLabel': {
-    en: 'Shopping items, one per line',
-    beanie: 'shopping items, one per line',
-  },
-  'lists.fromRecipe.save': { en: 'Create List', beanie: 'create list' },
   'lists.fromRecipe.listTitle': { en: 'Shopping for {recipe}', beanie: 'shopping for {recipe}' },
   'lists.fromRecipe.created': { en: 'Shopping list ready!', beanie: 'shopping list ready!' },
   'lists.fromRecipe.view': { en: 'View', beanie: 'view' },
@@ -4481,17 +4554,6 @@ const STRING_DEFS = {
     beanie: 'a reminder will be sent to {name} on the due date.',
   },
   'lists.fromRecipe.someone': { en: 'Whoever owns it', beanie: 'whoever owns it' },
-  // An owner removed on another device while this sheet was open. Important
-  // surface: keeps the real noun ("family member") in beanie mode.
-  'lists.fromRecipe.ownerGoneError': {
-    en: 'That family member is no longer in your pod',
-    beanie: 'that family member is no longer in your pod',
-  },
-  'lists.fromRecipe.ownerGoneHelp': {
-    en: 'They were removed while this was open. Pick someone else to shop, then create the list.',
-    beanie:
-      'they were removed while this was open. pick someone else to shop, then create the list.',
-  },
   'recipes.detail.openShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
   'recipes.detail.newShoppingList': {
     en: 'Start another shopping list',
@@ -4506,10 +4568,6 @@ const STRING_DEFS = {
   'lists.fromRecipe.headingsSkipped.other': {
     en: '{count} heading lines from the recipe were left out. Add them back if you want them.',
     beanie: '{count} heading lines from the recipe were left out. add them back if you want them.',
-  },
-  'lists.fromRecipe.existing': {
-    en: 'You already made a list for this recipe:',
-    beanie: 'you already made a list for this recipe:',
   },
   'lists.fromRecipe.noMemberError': {
     en: "We couldn't tell who you are",
@@ -4528,6 +4586,48 @@ const STRING_DEFS = {
     beanie: 'someone in your family removed it while this was open, so no list was created.',
   },
   'recipes.detail.makeShoppingList': { en: 'Shopping List', beanie: 'shopping list' },
+  // Where a shopping checklist goes (#116): a New List, or Add to a List the family has.
+  'lists.destination.heading': { en: 'Where It Goes', beanie: 'where it goes' },
+  'lists.destination.newList': { en: 'New List', beanie: 'new list' },
+  'lists.destination.addToList': { en: 'Add to a List', beanie: 'add to a list' },
+  'lists.destination.nameLabel': { en: 'List Name', beanie: 'list name' },
+  'lists.destination.noLists': { en: 'No lists yet', beanie: 'no lists yet' },
+  'lists.destination.createList': { en: 'Create List', beanie: 'create list' },
+  'lists.destination.addItems.one': { en: 'Add 1 Item', beanie: 'add 1 item' },
+  'lists.destination.addItems.other': { en: 'Add {n} Items', beanie: 'add {n} items' },
+  // The meal drawer's one-line summary and its short button.
+  'lists.destination.addTo': { en: 'Add to {list}', beanie: 'add to {list}' },
+  'lists.destination.addToNew': { en: 'Add to a New List', beanie: 'add to a new list' },
+  'lists.destination.addShort': { en: 'Add {n}', beanie: 'add {n}' },
+  'lists.destination.added': { en: 'Added', beanie: 'added' },
+  'lists.destination.itemsAdded': { en: 'Added to your list!', beanie: 'added to your list!' },
+  // A list deleted on another device before the ingredients were added. Important
+  // surface: keeps the real nouns, and says nothing was added.
+  'lists.destination.listGoneError': {
+    en: 'That list was deleted',
+    beanie: 'that list was deleted',
+  },
+  'lists.destination.listGoneHelp': {
+    en: 'Someone in your family removed it while this was open, so nothing was added. Pick another list or make a new one.',
+    beanie:
+      'someone in your family removed it while this was open, so nothing was added. pick another list or make a new one.',
+  },
+  // The shared ingredient checklist (#116).
+  'ingredients.tickAll': { en: 'Tick All', beanie: 'tick all' },
+  'ingredients.untickAll': { en: 'Untick All', beanie: 'untick all' },
+  'ingredients.addPlaceholder': { en: 'Add an item', beanie: 'add an item' },
+  'ingredients.include': { en: 'Include {item}', beanie: 'include {item}' },
+  'ingredients.edit': { en: 'Edit {item}', beanie: 'edit {item}' },
+  // A recipe section whose every line was merged into "In More Than One Meal".
+  'ingredients.allMerged': {
+    en: 'All in More Than One Meal',
+    beanie: 'all in more than one meal',
+  },
+  // A merged line: put its parts back into their recipes. The aria names the line.
+  'ingredients.split': { en: 'Split', beanie: 'split' },
+  'ingredients.splitAria': { en: 'Split {item}', beanie: 'split {item}' },
+  // The ✨ on a line magic beans merged (the glyph is decorative; this is its name).
+  'ingredients.byMagic': { en: 'Found by magic beans', beanie: 'found by magic beans' },
   'resumeSetup.driveConsentDenied': {
     en: 'Google needs permission to access your family file. Please reconnect Google Drive and allow file access when prompted.',
     beanie:
@@ -10965,8 +11065,14 @@ const STRING_DEFS = {
   'ai.capture.action': { en: 'Read it', beanie: 'read it' },
   'ai.capture.label': { en: 'Paste anything', beanie: 'paste anything' },
   'ai.capture.placeholder': {
-    en: 'Paste a message, an email, or a link…',
-    beanie: 'paste a message, an email, or a link…',
+    en: 'Remind me to walk the dog tomorrow at 10am…',
+    beanie: 'remind me to walk the dog tomorrow at 10am…',
+  },
+  // The (i) beside "Paste anything": what the box accepts, and that nothing saves unseen.
+  'ai.capture.labelHint': {
+    en: "Paste a text message, an email, an activity, a to-do, a reminder for yourself, a recipe link, or anything else you want to keep, and we'll work out what it is. You always review it before anything is saved.",
+    beanie:
+      "paste a text message, an email, an activity, a to-do, a reminder for yourself, a recipe link, or anything else you want to keep, and we'll work out what it is. you always review it before anything is saved.",
   },
   // The Caveat tagline under the title. A TAGLINE, not help text — by the time this sheet is
   // open the family has already tapped Magic beans, so it is the feature's voice rather than an
@@ -11156,6 +11262,37 @@ const STRING_DEFS = {
       'nothing is saved until you confirm the list. the statement itself is not kept, by the ai service or by beanies.',
   },
   'ai.consent.statement.confirm': { en: 'Read My Statement', beanie: 'read my statement' },
+  // #116 ✨ Find Duplicates: the one consent line that changes. Consent is an important
+  // surface, so the beanie value keeps every real noun.
+  'ai.consent.ingredients.whatValue': {
+    en: "Only the ingredient lines on this list: no recipe names, dates or who's eating.",
+    beanie: "only the ingredient lines on this list: no recipe names, dates or who's eating.",
+  },
+  // The rest of the variant's copy: a free list tidy, not a document read, so the generic
+  // intro ("read this photo, document or selected text"), "attached to this item" and
+  // "gimme those beans!" are all wrong for it. Keep "secure, private" (`introLink`) verbatim
+  // in the intro so the privacy link still renders.
+  'ai.consent.ingredients.intro': {
+    en: 'Magic beans will look at the ingredient lines on this list with secure, private AI and spot the ones that are the same item.',
+    beanie:
+      'magic beans will look at the ingredient lines on this list with secure, private ai and spot the ones that are the same item.',
+  },
+  'ai.consent.ingredients.afterValue': {
+    en: 'Nothing is kept by the AI service. The merged lines only change this list.',
+    beanie: 'nothing is kept by the ai service. the merged lines only change this list.',
+  },
+  'ai.consent.ingredients.confirm': { en: 'Find Duplicates', beanie: 'find duplicates' },
+  // Its own "don't ask again": a list is not a document, so it never reuses the generic
+  // "process the documents I choose" line (and never sets that family-wide skip).
+  'ai.consent.ingredients.remember': {
+    en: "Don't ask again before finding duplicates in a shopping list.",
+    beanie: "don't ask again before finding duplicates in a shopping list.",
+  },
+  // Names the setting in the "couldn't save" toast if the one-time acknowledgement fails.
+  'ai.consent.ingredients.label': {
+    en: 'Shopping List Ingredients Consent',
+    beanie: 'shopping list ingredients consent',
+  },
   'statementImport.title': { en: 'Your Statement, Read', beanie: 'your statement, read' },
   'statementImport.lines.one': { en: '{count} line', beanie: '{count} line' },
   'statementImport.lines.other': { en: '{count} lines', beanie: '{count} lines' },

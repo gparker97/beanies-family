@@ -699,7 +699,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Keep the recipes that get passed down — the story behind them, the photos, and a log of every time someone makes them.',
     icon: '🍜',
     readTime: 6,
-    updatedDate: '2026-09-27',
+    updatedDate: '2026-09-29',
     sections: [
       {
         type: 'heading',
@@ -746,7 +746,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
         items: [
           'Tap <strong>Add a recipe</strong>',
           'Give it a <strong>Recipe name</strong> (e.g. <em>“Grandma’s Bolognese”</em>) and, if you like, a <strong>Subtitle</strong> for the story behind it (<em>“passed down from Mary, ~1972”</em>)',
-          'Add the <strong>Prep time</strong>, <strong>Cook time</strong> and <strong>Servings</strong>',
+          'Add the <strong>Prep time</strong>, <strong>Cook time</strong> and <strong>Servings</strong> (the number of people it feeds; use − and + or type it)',
           'List the <strong>Ingredients</strong> — one per line — and the <strong>Preparation steps</strong>, also one step per line',
           'Add any <strong>Family notes</strong> (the little things — <em>“Neil asks for this every Sunday”</em>) and <strong>Photos</strong>',
           'Tap <strong>Save</strong>',
@@ -807,33 +807,38 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Once you have picked what you are cooking, tap <strong>Shopping List</strong> on the recipe. beanies fills a new list with that recipe’s ingredients so you do not have to type them out again.',
+          'Once you have picked what you are cooking, tap <strong>Shopping List</strong> on the recipe. beanies turns the recipe’s ingredients into a checklist, so you do not have to type them out again.',
       },
       {
         type: 'steps',
         content: '',
         items: [
           'Open the recipe and tap <strong>Shopping List</strong>.',
-          'Check the list over. Every ingredient is on its own line — edit any of them, delete what you already have in the cupboard, or add anything else you need while you are there.',
-          'Tap <strong>Create List</strong>. Your new list appears in Beanie Lists, ready to tick off as you shop — tap <strong>View</strong> on the message to go straight there.',
+          'Every ingredient starts ticked. Untick anything you already have in the cupboard (or use <strong>Untick All</strong> and tick just what you need), tap any line to change it, and type anything else you need into <strong>Add an item</strong>.',
+          'Choose where it goes. <strong>New List</strong> makes a fresh shopping list: give it a name if you like, pick who is shopping, and add a due date if you want a reminder. <strong>Add to a List</strong> adds the ticked lines to one of your open lists instead, such as the week’s groceries.',
+          'Tap <strong>Create List</strong> (or <strong>Add</strong> when adding to a list). Tap <strong>View</strong> on the message to go straight to it.',
           'Shopping with someone else? Open the list and use <strong>Tick all</strong> to finish it in one go, or <strong>Clear all ticks</strong> to start it over.',
         ],
       },
       {
         type: 'callout',
-        title: 'Nothing is created until you say so',
+        title: 'Nothing is written until you say so',
         icon: '✏️',
         content:
-          'Closing the window without tapping Create List leaves everything exactly as it was — no list is made.',
+          'Closing the window without tapping Create List (or Add) leaves everything exactly as it was. No list is made and nothing is added.',
       },
       {
         type: 'list',
         content: '',
         items: [
-          '<strong>Heading lines are left out.</strong> Recipes often group ingredients under headings like “For the sauce:”. Those are not things you buy, so beanies leaves them out and tells you how many it skipped — add them back if you want them.',
-          '<strong>The recipe remembers.</strong> Tap <strong>Shopping List</strong> again later and beanies shows you the one you already made, with how far through it you are — open it to carry on, or start another. You stay in the cookbook either way until you choose to go.',
-          '<strong>You can make more than one.</strong> Cooking the same thing next month? Start another list whenever you like — beanies tells you which ones already exist rather than quietly piling up duplicates.',
+          '<strong>Only unticked lines are left out.</strong> Whatever is ticked is what goes on the list, exactly as it reads on screen, including anything you changed or added.',
+          '<strong>Heading lines are left out.</strong> Recipes often group ingredients under headings like “For the sauce:”. Those are not things you buy, so beanies leaves them out and tells you how many it skipped. Add them back if you want them.',
+          '<strong>Adding to a list does not check for doubles.</strong> If the list already has milk and the recipe needs milk, it will be on there twice. Untick what the list already covers.',
+          '<strong>Add before you go.</strong> If someone is ticking the same list at the shop while you add to it, one of the two changes can be lost. Add your ingredients before the shop starts.',
+          '<strong>Only open, one-off lists are offered.</strong> Recurring lists (like a weekly staples list) are left out, so a recipe’s ingredients never become permanent items.',
+          '<strong>The recipe remembers.</strong> Tap <strong>Shopping List</strong> again later and beanies shows you the lists you already made from it, with how far through each one you are. Open one to carry on, or start another. You stay in the cookbook until you choose to go.',
           '<strong>Your list is yours.</strong> Deleting the recipe later does not delete the list. It stays exactly as you left it.',
+          '<strong>Planning the week?</strong> The Meal Planner can make one shopping list for every recipe in the week, with how many times each one gets cooked. See <strong>Planning your family’s meals</strong>.',
         ],
       },
       {

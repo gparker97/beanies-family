@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildCopySeeds,
-  buildRecipeListSeed,
+  buildShoppingListSeed,
   freshItems,
   parseDraftItems,
   splitRecipeIngredients,
@@ -229,10 +229,10 @@ describe('parseDraftItems — draft → items', () => {
   });
 });
 
-describe('buildRecipeListSeed', () => {
-  const seed = (over: Partial<Parameters<typeof buildRecipeListSeed>[0]> = {}) =>
-    buildRecipeListSeed({
-      recipeId: 'r1',
+describe('buildShoppingListSeed', () => {
+  const seed = (over: Partial<Parameters<typeof buildShoppingListSeed>[0]> = {}) =>
+    buildShoppingListSeed({
+      linkedRecipeId: 'r1',
       titles: ['Flour', 'Eggs'],
       title: 'Shopping for Pancakes',
       ownerId: 'm1',
@@ -262,6 +262,25 @@ describe('buildRecipeListSeed', () => {
     expect(s.linkedActivityId).toBeUndefined();
     expect(s.activityDate).toBeUndefined();
     expect(s.linkedVacationId).toBeUndefined();
+  });
+
+  it('🔴 a week list (no recipe given) carries NO link key at all', () => {
+    // `linkedRecipeId` is single-valued; a list made from several recipes must not
+    // claim one of them. Absent, not `undefined`, so the closed-key set holds.
+    const s = seed({ linkedRecipeId: undefined });
+    expect(Object.keys(s)).not.toContain('linkedRecipeId');
+    expect(Object.keys(s).sort()).toEqual(
+      [
+        'category',
+        'completed',
+        'createdBy',
+        'emoji',
+        'items',
+        'lifecycle',
+        'ownerId',
+        'title',
+      ].sort()
+    );
   });
 
   it('🔴 OMITS cycleCelebrated entirely rather than setting it false', () => {

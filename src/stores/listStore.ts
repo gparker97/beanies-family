@@ -22,7 +22,6 @@ import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { showToast } from '@/composables/useToast';
-import { generateUUID } from '@/utils/id';
 import { trackFeature } from '@/services/analytics/plausible';
 import type {
   FamilyList,
@@ -186,6 +185,22 @@ export const useListStore = defineStore('lists', () => {
    */
   const dueListsCount = computed(
     () => lists.value.filter((l) => !isFiled(l) && isDueSoon(l, today.value)).length
+  );
+
+  /**
+   * Where a shopping list's ingredients may be ADDED (#116): the family's one-off,
+   * unfiled lists, shopping ('out') first, then newest first.
+   *
+   * Deliberately UNFILTERED (`lists`, not `filteredLists`): the global member filter
+   * must never hide the family's grocery list from the picker. Recurring lists are
+   * excluded, or a week's ingredients would become permanent weekly staples.
+   */
+  const shoppingDestinations = computed(() =>
+    lists.value
+      .filter((l) => !isRecurring(l) && !isFiled(l))
+      .sort(
+        (a, b) => Number(b.category === 'out') - Number(a.category === 'out') || byCreatedDesc(a, b)
+      )
   );
 
   /** Active lists grouped by category (insertion order = active sort order). */
@@ -839,10 +854,27 @@ export const useListStore = defineStore('lists', () => {
    * correction and keeps the once-per-cycle guard).
    */
   async function addItem(listId: string, title: string): Promise<FamilyList | null> {
+    return addItems(listId, [title]);
+  }
+
+  /**
+   * Append several open items in ONE write (#116, a recipe's ingredients). Same
+   * re-open rules as `addItem`, which delegates here, so the two can never drift.
+   *
+   * ⚠️ Silent-null contract, same as `addItem`: a missing list returns `null` and
+   * reports nothing. The repository already reports a concurrent delete and
+   * `wrapAsync` (inside `updateList`) reports a throw, while each caller knows
+   * what the null MEANS to its user (`useWallJobs` reports `list_add`, the
+   * shopping-list commit reports `add_items_list_missing`), so reporting here too
+   * would double every page.
+   *
+   * ⚠️ A whole-array write: the worker has no splice op, so this races a partner
+   * ticking the same list (last writer wins on `items`), exactly as `addItem` does.
+   */
+  async function addItems(listId: string, titles: string[]): Promise<FamilyList | null> {
     const list = lists.value.find((l) => l.id === listId);
     if (!list) return null;
-    const item: FamilyListItem = { id: generateUUID(), title, completed: false };
-    const items = [...list.items, item];
+    const items = [...list.items, ...freshItems(titles)];
     const { patch } = deriveCompletion(list, items);
     if (isRecurring(list) && list.cycleCelebrated) patch.cycleCelebrated = false;
     return updateList(listId, { items, ...patch });
@@ -1194,6 +1226,7 @@ export const useListStore = defineStore('lists', () => {
     dueSoonLists,
     dueListsCount,
     listsByCategory,
+    shoppingDestinations,
     // Actions
     loadLists,
     createList,
@@ -1205,6 +1238,7 @@ export const useListStore = defineStore('lists', () => {
     discardIfUntouched,
     toggleItem,
     addItem,
+    addItems,
     removeItem,
     restoreItem,
     renameList,

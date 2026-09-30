@@ -11,9 +11,11 @@
 
 import { isRealYmd, isWallClockTime } from '@/utils/date';
 import { safeHttpsUrl } from '@/utils/url';
+import { sanitizeDedupeName } from '@/utils/dedupePayload';
 import { SHARE_COMPANIONS } from '@/constants/magicDestinations';
 import { logEvent } from '@/services/telemetry';
 import type {
+  DedupeExtractionResult,
   ExtractionContext,
   ExtractionResult,
   ExtractionSource,
@@ -36,7 +38,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-09-29.2';
+export const PROMPT_VERSION = '2026-09-30.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -1168,6 +1170,57 @@ function requireNested(obj: Record<string, unknown>, key: string): unknown {
 }
 
 /**
+ * The DEDUPE shape (#116): which lines of a shopping list being built from the week's recipes are
+ * the same item. The model returns GROUPS OF IDS and a name, never an amount: the client writes
+ * the merged line from the source lines' own text, so no number is ever invented.
+ */
+export const DEDUPE_JSON_SHAPE = {
+  groups:
+    'array: one object per set of lines that are the SAME purchasable item written differently. Each object has exactly these keys: name, lineIds. Empty array if there are none.',
+  name: 'string: a short plain name for the item (e.g. "ground beef"). No amounts, no units, no punctuation beyond words.',
+  lineIds:
+    'array of strings: the "id" of every line in the group, copied exactly from the input. At least 2.',
+};
+
+/** Top-level keys the dedupe model output must include. */
+export const DEDUPE_REQUIRED_KEYS = ['groups'] as const;
+
+/**
+ * Build the messages for the DEDUPE task (#116).
+ *
+ * The source is text: a JSON array of `{ id, text }` shopping-list lines, the ingredient lines as
+ * written in the family's recipes (the named ADR-030 exception, 2026-09-30). It is fenced as
+ * untrusted by `buildUserMessage` like any other text: a recipe line may have been captured from
+ * a hostile web page. The system prompt is a fixed constant.
+ */
+export function buildDedupeMessages(
+  source: ExtractionSource,
+  // Unused: a shopping list has no dates. Kept for the registry's one signature.
+  _todayIso: string
+): ChatMessage[] {
+  const system = [
+    'You find duplicate items in ONE shopping list that is being built from several recipes.',
+    'The input is a JSON array of lines. Each line is an object {"id": string, "text": string}, and each text is one ingredient line as written in a recipe.',
+    'Return ONLY a single JSON object — no prose, no markdown, no code fences.',
+    'Group the lines that are the SAME purchasable item written differently, such as "500 g ground beef" and "250g lean ground beef". Different items, or different forms a shopper buys separately (fresh and dried, whole and ground), are not the same item.',
+    'Give each group a short plain item name. No amounts, no units, no punctuation beyond words.',
+    'Use only ids that appear in the input, copied exactly. Never invent an id, and never put one id in two groups.',
+    'Leave out every line that matches no other line: a group always has at least 2 ids. If nothing matches, return an empty "groups" array.',
+    'Never return an amount and never rewrite a line.',
+    'The JSON object must have exactly these keys: ' + DEDUPE_REQUIRED_KEYS.join(', ') + '.',
+    'Field meanings: ' + JSON.stringify(DEDUPE_JSON_SHAPE) + '.',
+  ].join('\n');
+
+  return [
+    { role: 'system', content: system },
+    buildUserMessage(
+      'Find the lines in this shopping list that are the same item, as the specified JSON object.',
+      source
+    ),
+  ];
+}
+
+/**
  * ONE signature for every task's builder.
  *
  * `opts.kindHint` reaches only `share` and `opts.context` only `statement`; the others take the
@@ -1237,6 +1290,14 @@ export const EXTRACTION_TASKS: Record<ExtractionTask, ExtractionTaskEntry> = {
     // or CSV export per call). Same fence and review guarantees as `share` (#107).
     sources: ['images', 'text'],
   },
+  dedupe: {
+    buildMessages: buildDedupeMessages,
+    requiredKeys: DEDUPE_REQUIRED_KEYS,
+    jsonShape: DEDUPE_JSON_SHAPE,
+    // Text only: the JSON array of a shopping list's ingredient lines (#116). Free to the
+    // family, metered on its own counter by the Lambda under a size bound (`meter.mjs`).
+    sources: ['text'],
+  },
 };
 
 /**
@@ -1250,6 +1311,7 @@ export const EXTRACTION_PARSERS = {
   recipe: parseRecipeExtractionResult,
   share: parseShareExtractionResult,
   statement: parseStatementExtractionResult,
+  dedupe: parseDedupeResult,
 } as const;
 
 // ── Statement parser (#107, client-only like the others) ──────────────────────────────────
@@ -1582,4 +1644,59 @@ export function parseTravelExtractionResult(raw: unknown): TravelExtractionResul
     tripTypeHint: asString(obj.tripTypeHint, MODEL_FIELD_MAX),
     segments,
   };
+}
+
+// ── Dedupe parser (#116, client-only like the others) ─────────────────────────────────────
+
+/**
+ * A model-supplied item name, made safe to show: the shared {@link sanitizeDedupeName} (the same
+ * rule the list reducer applies), after the usual string coercion. `''` when nothing is left.
+ */
+function asDedupeName(v: unknown): string {
+  return sanitizeDedupeName(asString(v, MODEL_FIELD_MAX));
+}
+
+/** A line id as sent (`"L3"`), or a whole number a model answered instead, as its string. */
+function asDedupeId(v: unknown): string {
+  if (typeof v === 'number') return Number.isInteger(v) && v >= 0 ? String(v) : '';
+  return asString(v, MODEL_FIELD_MAX);
+}
+
+/**
+ * Validate + coerce a parsed dedupe model object into a {@link DedupeExtractionResult} (#116).
+ *
+ * SHAPE ONLY. Whether an id is one the client actually sent, and whether a line is claimed twice
+ * across groups, are decided by the caller against the list it holds; this parser has no list.
+ * What it does guarantee: every group has a non-empty, sanitised name and at least 2 DISTINCT ids
+ * (repeats inside a group are dropped before that check), and at most `MODEL_LIST_MAX` groups and
+ * ids per group are kept, walked with the bounded collect the other parsers use.
+ * Throws (wrapped as `malformed_output`) only when `groups` is missing altogether.
+ */
+export function parseDedupeResult(raw: unknown): DedupeExtractionResult {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('Dedupe output is not a JSON object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const missing = DEDUPE_REQUIRED_KEYS.filter((k) => !(k in obj));
+  if (missing.length) {
+    throw new Error(`Dedupe output missing keys: ${missing.join(', ')}`);
+  }
+
+  const groups: DedupeExtractionResult['groups'] = [];
+  for (const entry of Array.isArray(obj.groups) ? obj.groups : []) {
+    if (groups.length >= MODEL_LIST_MAX) break;
+    if (typeof entry !== 'object' || entry === null) continue;
+    const group = entry as Record<string, unknown>;
+    const name = asDedupeName(group.name);
+    if (!name) continue;
+    const ids = new Set<string>();
+    for (const rawId of Array.isArray(group.lineIds) ? group.lineIds : []) {
+      if (ids.size >= MODEL_LIST_MAX) break;
+      const id = asDedupeId(rawId);
+      if (id) ids.add(id);
+    }
+    if (ids.size < 2) continue;
+    groups.push({ name, lineIds: [...ids] });
+  }
+  return { groups };
 }

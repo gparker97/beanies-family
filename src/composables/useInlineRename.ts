@@ -53,7 +53,8 @@ export interface InlineRenameOptions {
 
 export function useInlineRename(opts: InlineRenameOptions) {
   const draft = ref('');
-  const inputRef = ref<HTMLInputElement | null>(null);
+  /** The edit field: an `<input>`, or anything focusable like `AutoGrowTextarea`'s instance. */
+  const inputRef = ref<{ focus(): void } | null>(null);
   /** A terminal action already ran this session. Guards the backstops. */
   const resolved = ref(false);
 

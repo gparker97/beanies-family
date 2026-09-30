@@ -319,7 +319,7 @@ function handleDelete() {
       <template #label-extra>
         <button
           type="button"
-          class="hover:text-primary-500 ml-1 text-sm leading-none text-[var(--color-text-muted)] transition-colors"
+          class="hover:text-primary-500 dark:hover:text-accent-lift ml-1 text-sm leading-none text-[var(--color-text-muted)] transition-colors"
           :aria-label="t('accounts.jointOwnerRemove')"
           :title="t('accounts.jointOwnerRemove')"
           @click="collapseCoOwners"

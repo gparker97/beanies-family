@@ -77,6 +77,7 @@ async function main() {
   const perFamily = new Map();
   let charged = 0;
   let corrected = 0;
+  let freeTask = 0;
   let unattributed = 0;
   // ⚠️ The DENOMINATOR must be window-filtered too. `unattributed` is counted only for rows
   // inside the window, so dividing by `counters.length` — every row the scan returned, up to
@@ -92,8 +93,10 @@ async function main() {
     inWindow += 1;
     const n = Number(row[USAGE_ATTRS.charged] ?? 0);
     const c = Number(row[USAGE_ATTRS.corrected] ?? 0);
+    const f = Number(row[USAGE_ATTRS.freeTask] ?? 0);
     charged += n;
     corrected += c;
+    freeTask += f;
 
     const familyHash = String(row.pk).slice(2);
     const known = byHash.get(familyHash);
@@ -105,10 +108,12 @@ async function main() {
       name: known?.familyName ?? null,
       charged: 0,
       corrected: 0,
+      freeTask: 0,
       days: 0,
     };
     acc.charged += n;
     acc.corrected += c;
+    acc.freeTask += f;
     acc.days += 1;
     perFamily.set(key, acc);
   }
@@ -140,8 +145,10 @@ async function main() {
         windowDays: days,
         // `charged` is what an allowance is spent against. `corrected` is OUR cost — a free
         // re-read after we inferred the wrong kind — and must never be summed into an
-        // entitlement calculation. Labelled here so the dashboard cannot get it wrong.
-        totals: { charged, corrected, unattributedRows: unattributed },
+        // entitlement calculation. `freeTask` is reads of a task we give away (#116, Find
+        // Duplicates), also our cost and never the family's. Labelled here so the dashboard
+        // cannot get it wrong.
+        totals: { charged, corrected, freeTask, unattributedRows: unattributed },
         families: [...perFamily.values()].sort((a, b) => b.charged - a.charged),
       },
       null,

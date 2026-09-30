@@ -272,3 +272,72 @@ describe('deliverRecipe compensates the start event for BOTH orchestrated doors'
     expect(startEvents()).toHaveLength(0);
   });
 });
+
+// ─── servings_unparsed (#116) ────────────────────────────────────────────────
+//
+// Servings text with no people count ("12 muffins") leaves the form's stepper blank. This
+// event is the parser's miss rate on real sources; it must fire for that case only, and must
+// never carry the text itself.
+
+describe('deliverRecipe logs servings the parser could not use', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    withActiveFamily();
+    vi.clearAllMocks();
+  });
+
+  function deliverWithServings(servings: string) {
+    const onRecipeReady = vi.fn();
+    const capture = useRecipeCapture({ onRecipeReady });
+    capture.deliverRecipe(
+      {
+        via: 'extraction',
+        data: {
+          isRecipe: true,
+          name: 'Muffins',
+          subtitle: '',
+          prepTime: '',
+          cookTime: '',
+          servings,
+          ingredients: [{ text: '2 cups flour', inferred: false }],
+          steps: [],
+          notes: '',
+          course: '',
+          mealSlots: [],
+          inferredTimes: [],
+          confidence: { name: 1, ingredients: 1, steps: 1 },
+        },
+      } as never,
+      { sourceFile: null } as never
+    );
+    return onRecipeReady;
+  }
+
+  const unparsedEvents = () =>
+    (logEvent as unknown as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) => c[0]?.context?.action === 'servings_unparsed'
+    );
+
+  it('logs once when the text has no people count, without the text', () => {
+    const ready = deliverWithServings('12 muffins');
+    expect(unparsedEvents()).toHaveLength(1);
+    expect(unparsedEvents()[0][0]).toMatchObject({
+      level: 'info',
+      surface: 'recipe-extract',
+      context: { action: 'servings_unparsed', kind: 'document' },
+    });
+    expect(JSON.stringify(unparsedEvents()[0][0])).not.toContain('muffins');
+    expect(ready.mock.calls[0][0].prefill.fields.servings).toBeUndefined();
+  });
+
+  it('does not log when the text has a count', () => {
+    const ready = deliverWithServings('Serves 4-6');
+    expect(unparsedEvents()).toHaveLength(0);
+    expect(ready.mock.calls[0][0].prefill.fields.servings).toBe('4');
+  });
+
+  it('does not log when there was no servings text at all', () => {
+    deliverWithServings('');
+    expect(unparsedEvents()).toHaveLength(0);
+  });
+});

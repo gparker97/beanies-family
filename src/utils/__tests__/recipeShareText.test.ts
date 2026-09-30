@@ -15,6 +15,7 @@ const t = ((key: string) => {
   if (key === 'recipeShare.text.prep') return 'Prep {value}';
   if (key === 'recipeShare.text.cook') return 'Cook {value}';
   if (key === 'recipeShare.text.andMore') return '… and {count} more';
+  if (key === 'recipes.servesN') return 'Serves {n}';
   return key;
 }) as unknown as (key: UIStringKey) => string;
 
@@ -48,6 +49,21 @@ describe('buildRecipeShareText', () => {
     expect(text).toContain('Prep 20 mins');
     expect(text).toContain(LINK);
     expect(rung).toBe('none');
+  });
+
+  it('shows servings as "Serves N", parsed from old text too (#116)', () => {
+    expect(
+      buildRecipeShareText({ fields: fields({ servings: '4' }), link: LINK, t }).text
+    ).toContain('Prep 20 mins · Cook 45 mins · Serves 4');
+    // Pre-0.26 text is parsed, not echoed; text with no people count is left out.
+    expect(buildRecipeShareText({ fields: fields(), link: LINK, t }).text).toContain('· Serves 8');
+    const muffins = buildRecipeShareText({
+      fields: fields({ servings: '12 muffins' }),
+      link: LINK,
+      t,
+    });
+    expect(muffins.text).not.toContain('muffins');
+    expect(muffins.text).toContain('Prep 20 mins · Cook 45 mins');
   });
 
   it('KEEPS THE LINK for a realistic 12-ingredient recipe', () => {

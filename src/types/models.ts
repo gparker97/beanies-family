@@ -1914,6 +1914,12 @@ export interface Recipe {
    * it to an href raw.
    */
   sourceUrl?: string;
+  /**
+   * How many people the recipe serves (#116): a digit string ("4") written by the app since
+   * 0.26; older free text ("Serves 4-6", "12 muffins") is parsed by `servingsOf`. Read it
+   * ONLY through `servingsOf` / `formatServes` (`@/utils/recipeServings`), never raw. Never
+   * store a number: pre-0.26 clients call `.trim()` on it and would crash on every edit.
+   */
   servings?: string;
   ingredients: string[];
   steps: string[];
@@ -2129,6 +2135,7 @@ export interface Settings {
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   aiStatementConsentAcknowledgedAt?: ISODateString; // #107: when the family first confirmed the bank-statement consent (its merchant-list disclosure is new, so a family that skips the generic prompt still sees it once). Family-scoped.
+  aiIngredientsConsentAcknowledgedAt?: ISODateString; // #116: when the family ticked "don't ask again" on the shopping-list ingredients consent. Its own skip: the family-wide document skip neither covers nor is set by it (a list is not a document). Family-scoped.
   calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.

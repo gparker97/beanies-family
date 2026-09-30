@@ -24,12 +24,20 @@ vi.mock('@/composables/useAiCapability', () => ({
 
 const setSkip = vi.fn().mockResolvedValue(undefined);
 let skipPrompt = false;
+let ingredientsAckAt: string | null = null;
+const acknowledgeIngredients = vi.fn(async () => {
+  ingredientsAckAt = '2026-09-30T00:00:00.000Z';
+});
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
     get skipDocumentConsentPrompt() {
       return skipPrompt;
     },
+    get aiIngredientsConsentAcknowledgedAt() {
+      return ingredientsAckAt;
+    },
     setSkipDocumentConsentPrompt: setSkip,
+    acknowledgeIngredientsConsent: acknowledgeIngredients,
   }),
 }));
 
@@ -56,7 +64,9 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
   beforeEach(async () => {
     setActivePinia(createPinia());
     skipPrompt = false;
+    ingredientsAckAt = null;
     setSkip.mockClear();
+    acknowledgeIngredients.mockClear();
     // Settle anything a previous test left pending so state cannot leak between cases, then
     // let the serialization tail drain (a request now waits for any prompt ahead of it).
     resolveConsent(false);
@@ -129,5 +139,54 @@ describe('DocumentExtractConsentModal (#133, singleton form #64)', () => {
 
     expect(wrapper.text()).toContain('ai.consent.remember');
     expect(wrapper.text()).not.toContain('ai.consent.privacyLink');
+  });
+
+  it('the ingredients variant says only the list lines are sent (#116)', async () => {
+    const wrapper = mountModal();
+    void requestConsent({ kind: 'ingredients' });
+    await flush();
+    await wrapper.vm.$nextTick();
+
+    // The generic line promises "never any of your family's data", which Find Duplicates is not.
+    expect(wrapper.text()).toContain('ai.consent.ingredients.whatValue');
+    expect(wrapper.text()).not.toContain('ai.consent.whatValue');
+    // A free list tidy, not a document read: its own intro, after line and button.
+    expect(wrapper.text()).toContain('ai.consent.ingredients.intro');
+    expect(wrapper.text()).not.toContain('ai.consent.intro');
+    expect(wrapper.text()).toContain('ai.consent.ingredients.afterValue');
+    expect(wrapper.text()).not.toContain('ai.consent.afterValue');
+    const modal = wrapper.findComponent({ name: 'BeanieFormModal' });
+    expect(modal.props('saveLabel')).toBe('ai.consent.ingredients.confirm');
+    expect(modal.props('title')).toBe('ai.consent.title');
+    resolveConsent(false);
+  });
+
+  it('the ingredients "don\'t ask again" has its own line and never skips the generic prompt (#116)', async () => {
+    const wrapper = mountModal();
+    const pending = requestConsent({ kind: 'ingredients' });
+    await flush();
+    await wrapper.vm.$nextTick();
+
+    // "process the documents I choose" is not what this prompt is about.
+    expect(wrapper.text()).toContain('ai.consent.ingredients.remember');
+    expect(wrapper.text()).not.toContain('ai.consent.remember');
+
+    await wrapper.find('input[type="checkbox"]').setValue(true);
+    await wrapper.find('button.t-save').trigger('click');
+    expect(await pending).not.toBeNull();
+    expect(acknowledgeIngredients).toHaveBeenCalledTimes(1);
+    expect(setSkip).not.toHaveBeenCalled();
+
+    // The generic photo/document prompt still asks, with its own line.
+    const generic = requestConsent();
+    await flush();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.text()).toContain('ai.consent.remember');
+    await wrapper.find('button.t-close').trigger('click');
+    expect(await generic).toBeNull();
+
+    // And the ingredients prompt itself is now skipped.
+    expect(await requestConsent({ kind: 'ingredients' })).not.toBeNull();
+    expect(wrapper.text()).not.toContain('ai.consent.ingredients.intro');
   });
 });

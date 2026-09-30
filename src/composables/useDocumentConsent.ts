@@ -61,13 +61,13 @@ export function isDeferredStatementConsent(
 }
 
 /**
- * What a prompt is about, when it is not the generic one. Only the statement read has a
- * variant: it discloses the merchant list and states the read count (#107).
+ * What a prompt is about, when it is not the generic one. Each variant discloses something the
+ * generic prompt never did:
+ *   - `transactions` (#107): the family's merchant list travels with the pages; states the read count.
+ *   - `ingredients` (#116): ✨ Find Duplicates sends the ingredient lines on a shopping list being
+ *     built, which is family data (ADR-030's 2026-09-30 exception), and nothing else.
  */
-export interface ConsentRequest {
-  kind: 'transactions';
-  reads: number;
-}
+export type ConsentRequest = { kind: 'transactions'; reads: number } | { kind: 'ingredients' };
 
 /** Whether the consent modal is showing. Read by the single global modal mount. */
 export const consentOpen = ref(false);
@@ -115,17 +115,55 @@ const WAIT_TIMEOUT_MS = 60_000;
  * `useSettingsStore()` is called HERE rather than at module scope on purpose: Pinia is not
  * active at import time, so a module-scope call would throw at app boot for every importer.
  */
+type SettingsStore = ReturnType<typeof useSettingsStore>;
+
+/**
+ * Per variant: its own acknowledgement, and whether it is a DOCUMENT read. ONE table, so the
+ * skip rule and the confirm handler below cannot disagree about a variant, and a new variant
+ * without an entry is a compile error rather than a prompt "don't ask again" skips before the
+ * family ever saw what it discloses.
+ *
+ *  - A document read (`transactions`, #107) is covered by the family-wide "process the
+ *    documents I choose" skip, whose checkbox it shows, but only once the family has confirmed
+ *    its extra disclosure (the merchant list): `at` is "confirmed once", recorded on any confirm.
+ *  - A non-document variant (`ingredients`, #116) is NOT a document the family chose, so the
+ *    family-wide skip neither covers it nor may be set from it: its checkbox has its own copy,
+ *    and `at` is "the family ticked don't ask again on THIS prompt", recorded only then. Ticking
+ *    it must never skip the generic photo/document prompt the family has not seen.
+ */
+const ACKNOWLEDGEMENTS: Record<
+  ConsentRequest['kind'],
+  {
+    at: (s: SettingsStore) => string | null;
+    record: (s: SettingsStore) => Promise<void>;
+    documentRead: boolean;
+  }
+> = {
+  transactions: {
+    at: (s) => s.aiStatementConsentAcknowledgedAt,
+    record: (s) => s.acknowledgeStatementConsent(),
+    documentRead: true,
+  },
+  ingredients: {
+    at: (s) => s.aiIngredientsConsentAcknowledgedAt,
+    record: (s) => s.acknowledgeIngredientsConsent(),
+    documentRead: false,
+  },
+};
+
 /**
  * THE one rule for whether a prompt may be skipped. "Don't ask again" covers the prompt the
- * family actually saw. The statement prompt discloses something the generic one never did (the
- * merchant list), so a family that skips the generic prompt still sees the statement one ONCE;
- * after they confirm it, their skip applies to it too.
+ * family actually saw. A document-read variant discloses something the generic one never did
+ * (the merchant list), so a family that skips the generic prompt still sees it ONCE; after they
+ * confirm it, their skip applies to it too. A non-document variant is skipped only by its own
+ * "don't ask again".
  */
 function shouldSkipPrompt(request?: ConsentRequest): boolean {
   const settings = useSettingsStore();
+  const variant = request ? ACKNOWLEDGEMENTS[request.kind] : null;
+  if (variant && !variant.documentRead) return Boolean(variant.at(settings));
   if (!settings.skipDocumentConsentPrompt) return false;
-  if (request?.kind === 'transactions') return Boolean(settings.aiStatementConsentAcknowledgedAt);
-  return true;
+  return variant ? Boolean(variant.at(settings)) : true;
 }
 
 export function requestConsent(request?: ConsentRequest): Promise<ConsentGrant | null> {
@@ -158,20 +196,23 @@ export function resolveConsent(granted: boolean): void {
 
 /**
  * Confirm handler for the consent modal. Proceeds for this document regardless; if the user
- * ticked "remember", persist the family-scoped skip — but a persist failure must never strand
+ * ticked "remember", persist the skip the prompt's checkbox described (the family-scoped
+ * document skip, or a non-document variant's own) — but a persist failure must never strand
  * the caller, so consent resolves in `finally`.
  */
 export async function onConsentConfirm(remember: boolean): Promise<void> {
   try {
     const settings = useSettingsStore();
-    // The statement disclosure is acknowledged once per family, so a later "don't ask again"
+    // A variant's disclosure is acknowledged once per family, so a later "don't ask again"
     // family is not shown it forever. Written first: it is the one that changes what is asked.
-    if (
-      consentRequest.value?.kind === 'transactions' &&
-      !settings.aiStatementConsentAcknowledgedAt
-    ) {
-      await settings.acknowledgeStatementConsent();
+    const request = consentRequest.value;
+    const ack = request ? ACKNOWLEDGEMENTS[request.kind] : null;
+    if (ack && !ack.documentRead) {
+      // Its own "don't ask again", never the family-wide document skip (see ACKNOWLEDGEMENTS).
+      if (remember && !ack.at(settings)) await ack.record(settings);
+      return;
     }
+    if (ack && !ack.at(settings)) await ack.record(settings);
     if (remember) await settings.setSkipDocumentConsentPrompt(true);
   } catch (e) {
     reportError({

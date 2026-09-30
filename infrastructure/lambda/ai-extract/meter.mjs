@@ -136,6 +136,76 @@ export async function openRead({
 }
 
 /**
+ * Tasks the family is never charged for, each with the largest SOURCE (`read.srcBytes`) that is
+ * still free. A read of one of these tasks is counted on `USAGE_ATTRS.freeTask`, not `charged`.
+ *
+ * ⚠️ WHY A SIZE BOUND. On the sealed arm `task` is a client-supplied label this Lambda cannot
+ * verify: the body is ciphertext. So "dedupe" alone cannot make a read free, or anyone holding the
+ * bundle's api key could label a 1 MB statement read "dedupe". The bound is the part a caller
+ * cannot lie about: `srcBytes` is what THIS Lambda measured. A tampered client can still get
+ * SMALL free reads; the accepted controls are this bound, the unchanged per-family and per-IP rate
+ * limits (which count free reads too), and the visible `f` counter in `pull_ai_usage.mjs`.
+ *
+ * `dedupe` (#116, ✨ Find Duplicates) — the client caps the serialized line payload at
+ * `DEDUPE_MAX_PAYLOAD_BYTES` = 8,000 UTF-8 bytes (`src/composables/useFindDuplicates.ts`). The
+ * sealed request the Lambda measures is `JSON.stringify({ model, messages, temperature })` of
+ * the real dedupe prompt, plus EHBP's 4-byte length prefix and 16-byte AEAD tag. Worst case:
+ *   · the payload is re-escaped inside the request JSON, and a payload made of `"` and `\` doubles
+ *     (each becomes `\"` / `\\`), so at most 2 × 8,000 = 16,000 bytes;
+ *   · the fixed prompt and request wrapper (system text, JSON shape, fence, instruction,
+ *     `temperature`) measured 2,000 bytes on 2026-09-30 (PROMPT_VERSION 2026-09-30.1);
+ *   · the model id, assumed ≤ 128 bytes (today's `gemma4-31b` is 10), and the seal's 20 bytes.
+ * 16,000 + 2,000 + 128 + 20 ≈ 18,150 bytes worst case (typical weeks are 4-8 KB sealed), so
+ * 24,576 (24 KiB) leaves ~6.4 KB, about a third, for prompt growth.
+ *
+ * ⚠️ SEALED ARM ONLY. The legacy plaintext arm is charged for every task, `dedupe` included: every
+ * client that still calls it predates the sealed arm and so predates ✨ Find Duplicates, so no real
+ * dedupe read ever arrives there. A free legacy `dedupe` would only ever serve a tampered caller,
+ * and on that arm the bound would be 24 KB of PLAINTEXT sent to the model for nothing.
+ * `lambdaContractParity.test.ts` builds the REAL messages from worst-case lines and asserts they
+ * fit under this number with margin, so prompt growth fails CI rather than quietly charging.
+ */
+export const FREE_TASK_MAX_BYTES = new Map([['dedupe', 24_576]]);
+
+/**
+ * The line a charged free task logs (see `usageAttrFor`). Exported so the tests assert the string
+ * the Lambda actually emits.
+ *
+ * ⚠️ NOT in `ALARMING_PREFIXES` yet, on purpose: that map is only prefixes with a CloudWatch
+ * metric filter in `modules/ai-extract/main.tf` (and `meter.test.mjs` fails otherwise), and no
+ * existing filter means this. Borrowing one would page with the wrong runbook (e.g. "usage-count
+ * write failed" sends the on-call to DynamoDB permissions). To alarm on it, add a filter +
+ * alarm for this exact prefix to main.tf, then add it to `ALARMING_PREFIXES`.
+ */
+export const FREE_TASK_CHARGED_PREFIX = '[ai-extract] free task charged';
+
+/**
+ * Which usage attribute a read is counted on. An early-return ladder, most specific first:
+ *   1. a correction the grant paid for → `corrected` (our cost, whatever the task);
+ *   2. a free task on the SEALED arm within its measured size bound → `freeTask`;
+ *   3. everything else → `charged`, including a free task on the legacy arm or OVER its bound,
+ *      which warns: it is either a client that outgrew the bound (raise it, with the parity
+ *      test) or someone borrowing the label.
+ *
+ * ⚠️ `Number.isFinite`, not a bare `<=`: `srcBytes` defaults to `null`, and `null <= N` is true in
+ * JavaScript, so an unmeasured read would otherwise be free.
+ */
+export function usageAttrFor(read, task) {
+  if (read?.free) return USAGE_ATTRS.corrected;
+  const bound = FREE_TASK_MAX_BYTES.get(task);
+  if (bound === undefined) return USAGE_ATTRS.charged;
+  if (read?.arm !== 'sealed') {
+    console.warn(`${FREE_TASK_CHARGED_PREFIX}: not the sealed arm task=${task} arm=${read?.arm}`);
+    return USAGE_ATTRS.charged;
+  }
+  if (Number.isFinite(read.srcBytes) && read.srcBytes <= bound) return USAGE_ATTRS.freeTask;
+  console.warn(
+    `${FREE_TASK_CHARGED_PREFIX}: over its size bound task=${task} bytes=${read.srcBytes} bound=${bound}`
+  );
+  return USAGE_ATTRS.charged;
+}
+
+/**
  * Count the read, then issue a correction grant if one is warranted.
  *
  * Awaited before the 200 returns. Lambda freezes the execution environment the moment the
@@ -163,15 +233,9 @@ export async function openRead({
  * @returns {{ token: string }|undefined} spread into the 200 body as `correction`.
  */
 export async function closeRead(read, { familyId, task, now = Date.now(), ddb } = {}) {
-  // A free correction still gets RECORDED, on its own attribute. `n` is what an allowance is
-  // spent against; `c` is our cost, not the family's. An entitlement layer that summed the row
-  // would bill families for our miscategorisations, which is the opposite of the promise.
-  const counted = await countUsage({
-    familyId,
-    attr: read?.free ? USAGE_ATTRS.corrected : USAGE_ATTRS.charged,
-    now,
-    ddb,
-  });
+  // A free read still gets RECORDED, on its own attribute. `n` is what an allowance is spent
+  // against; `c` and `f` are our cost, not the family's. See `usageAttrFor`.
+  const counted = await countUsage({ familyId, attr: usageAttrFor(read, task), now, ddb });
 
   return issueGrant({
     familyId,

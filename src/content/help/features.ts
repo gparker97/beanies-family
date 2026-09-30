@@ -79,8 +79,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       "Plan the week from your cookbook — who's cooking what, when — and share it so nobody has to ask what's for dinner.",
     icon: '\u{1F372}',
-    readTime: 3,
-    updatedDate: '2026-08-19',
+    readTime: 5,
+    updatedDate: '2026-09-30',
     sections: [
       {
         type: 'paragraph',
@@ -141,6 +141,41 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'infoBox',
         content:
           "Copying a week <strong>replaces</strong> whatever was already planned in the target week — beanies warns you first. Anything you'd already marked cooked keeps its history. The picture and PDF are made <strong>on your device</strong> — nothing about your plan is uploaded to make them, and they always show the whole week (not a single day).",
+      },
+      {
+        type: 'heading',
+        content: 'Make a Shopping List for the Week',
+        level: 2,
+        id: 'shopping-list',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap <strong>🛒 Shopping List</strong> at the top of the Meal Planner to turn the week you are looking at into one shopping list. The number on the button is how many recipes it will use. With no recipes planned that week, the button is grayed out.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>One section per recipe, as written.</strong> A recipe planned twice in the week is one section. Every ingredient is listed exactly as the recipe has it: beanies never changes an amount. Eating out, leftovers and skipped meals are left out.',
+          '<strong>Cook ×N says how many batches.</strong> beanies compares how many people are eating at each meal (the family members picked, plus guests) with the number the recipe serves, rounds up to whole batches for each meal, and adds those up. Tacos for 5 on Tuesday and 3 on Friday, from a recipe that serves 4, is 2 batches plus 1: <strong>Cook ×3</strong>. A recipe with no servings set counts as one batch per meal.',
+          '<strong>Nobody picked means everyone.</strong> If no one is picked under Who’s eating, the whole family is counted (plus any guests), and the meal shows as “Everyone”.',
+          '<strong>Lines end in (×N).</strong> Every line of a ×3 recipe ends in “(×3)”, like “8 taco shells (×3)”, so the list still says to buy three lots once it is on the Lists page. A recipe cooked once has no suffix.',
+          '<strong>In More Than One Meal.</strong> A line that is exactly the same in two recipes (say “1 cup basmati rice”) is put on one line at the top, with the recipes it came from. Its (×N) is the total across those recipes.',
+          '<strong>✨ Find Duplicates.</strong> One tap asks magic beans to find the same item written differently, like “500 g ground beef” and “250 g lean ground beef”, and puts them on one line with both amounts. It is free and does not use your magic beans. Only the ingredient lines are sent, and it only groups your lines: it never makes up an amount.',
+          '<strong>Split undoes a merge.</strong> Tap <strong>Split</strong> under a merged line to put its lines back in their recipes.',
+          '<strong>Review before it is written.</strong> Untick what you already have (each section has its own <strong>Untick All</strong>), change any line, add your own, then choose <strong>New List</strong> or <strong>Add to a List</strong>. Adding to a list does not check for doubles, so add before you go shopping.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can also see a single meal’s ingredients without leaving the planner: open the meal and they are listed under the recipe with that meal’s Cook ×N. Who’s eating starts with everyone picked; tap <strong>Clear</strong> to pick just some people (it then reads <strong>Everyone</strong> to pick them all again), and the count updates straight away. Tap <strong>Add</strong> to put the ingredients on a shopping list; that happens straight away, whether or not you then save the meal.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Want batch counts for your family? Open the recipe, tap edit, and set <strong>Servings</strong> to the number of people it feeds. Without it, each meal counts as one batch.',
       },
     ],
   },

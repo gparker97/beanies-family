@@ -56,6 +56,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import AiSourceButtons from '@/components/ai/AiSourceButtons.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { MAGIC_DESTINATIONS, magicTileCols } from '@/constants/magicDestinations';
@@ -197,6 +198,9 @@ function handleSave(): void {
     </template>
 
     <FormFieldGroup :label="t('ai.capture.label')">
+      <template #label-extra>
+        <InfoHintBadge :text="t('ai.capture.labelHint')" />
+      </template>
       <div ref="fieldWrap">
         <!-- A TEXTAREA, not an input: a pasted class-group message is several lines, and a
              single-line field that scrolls sideways makes it impossible to check what you
