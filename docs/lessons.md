@@ -2213,3 +2213,24 @@ before committing anything derived from a real document, run a mechanical check:
 source's text and grep the staged files for every card fragment, amount and all-caps merchant
 line in it. A header comment saying "synthetic" is not evidence. Plans may describe a document's
 FORMAT (columns, suffixes, page counts); never its values, account product names or periods.
+
+---
+
+## A magic beans button was drawn purple, and scaling free-text amounts never converged
+
+**2026-09-30** -- two corrections in the #116 shopping-list work.
+
+1. The first ✨ Find Duplicates mockup used a purple gradient. greg asked whether that
+   deviated from the CIG: it did. Purple is the CIG's To-do accent only; every magic beans
+   (AI) affordance uses the Heritage Orange -> Terracotta gradient, white text, an
+   `aria-hidden` ✨ and the shared `.magic-shimmer` sheen (`MagicBeansQuickCard`,
+   `MagicReaderPill`, now `MagicBeansCardButton`).
+2. Revision 2 multiplied ingredient amounts parsed out of free text. Two review rounds kept
+   finding lines scaled to a wrong number ("1-1/2 cups", "1 lb 4 oz", "1 cup plus 2 tbsp",
+   "8 ounces (225 g)"); each patch added a reject rule for the next pattern. greg dropped
+   scaling: ingredients stay as written with a Cook ×N count and a (×N) suffix.
+
+**Rule:** before styling any AI trigger, reuse the house magic beans component or its shell;
+never pick a colour for "AI". Never parse and rewrite amounts in user-written text: when a
+number must reach the user, show a multiplier next to the text as written. If a parser needs a
+growing blocklist to avoid wrong answers, stop and flip to an allowlist or drop the feature.
