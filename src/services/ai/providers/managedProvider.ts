@@ -40,6 +40,7 @@
 import { EXTRACTION_PARSERS, EXTRACTION_TASKS } from '../extractionPrompt';
 import {
   ExtractionProviderError,
+  type AllowanceUsage,
   type ExtractionProvider,
   type ExtractionRequest,
   type ExtractionResultByTask,
@@ -60,7 +61,8 @@ function isServerVerdict(err: unknown): boolean {
     err instanceof ExtractionProviderError &&
     (err.code === 'correction_refused' ||
       err.code === 'correction_disagreed' ||
-      err.code === 'rate_limited')
+      err.code === 'rate_limited' ||
+      err.code === 'allowance_exceeded')
   );
 }
 import { buildSignal, parseChatCompletion } from './openaiCompatible';
@@ -78,6 +80,8 @@ const PROXY_API_KEY = import.meta.env.VITE_AI_EXTRACT_API_KEY;
 const SEALED_PROTOCOL = 'ehbp-1';
 /** Asks the proxy which model to name inside the sealed body. Same route, no new endpoint. */
 const SEALED_CONFIG_PROTOCOL = 'ehbp-config';
+/** Asks the proxy how many magic beans are left (#95). Same route; `ALLOWANCE_PROTOCOL` server-side. */
+const ALLOWANCE_PROTOCOL = 'allowance';
 
 /**
  * The model id, from the proxy, memoised for the session.
@@ -246,11 +250,39 @@ async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<Sea
     // The proxy returns { error, code } on failure so we can distinguish a transient upstream
     // outage (retry) from a hard failure. Read the body defensively — fall back to status-based
     // mapping if it's absent/unreadable so we never mis-handle a failure.
-    let code: string | undefined;
+    let errorBody: (Partial<AllowanceUsage> & { code?: string }) | undefined;
     try {
-      code = ((await res.json()) as { code?: string })?.code;
+      errorBody = (await res.json()) as typeof errorBody;
     } catch {
       /* no/unreadable error body — use the HTTP status below */
+    }
+    const code = errorBody?.code;
+    if (code === 'allowance_exceeded' || res.status === 402) {
+      // The family's magic beans for the period are spent (#95). An expected, intentional
+      // refusal like `rate_limited`: nothing reached the model and nothing was charged. The
+      // numbers ride on the error AND are remembered for the quota prompt, because the service
+      // layer flattens errors to `{ errorCode, error }` before any toast sees them.
+      const allowance = parseAllowance(errorBody);
+      lastAllowanceRefusal = allowance;
+      console.warn(
+        '[ai-extract] the proxy refused this read: the family has used its magic-beans ' +
+          'allowance for the period. Intentional (#95), not an outage. Reading with your own AI ' +
+          'key (Settings, AI & Privacy) is unlimited.'
+      );
+      throw new ExtractionProviderError(
+        'allowance_exceeded',
+        `Managed proxy: magic-beans allowance reached (HTTP ${res.status})`,
+        undefined,
+        allowance ? { allowance } : undefined
+      );
+    }
+    if (code === 'allowance_unavailable') {
+      // The usage read could not be answered (store unconfigured, or a blip the Lambda has
+      // already logged and alarmed). Before the 503 rung below, which would call it "busy".
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed proxy could not report magic-beans usage right now'
+      );
     }
     if (code === 'upstream_unavailable' || res.status === 503) {
       throw new ExtractionProviderError(
@@ -432,6 +464,82 @@ async function postToProxy(envelope: unknown, signal?: AbortSignal): Promise<Sea
   }
 }
 
+/**
+ * The numbers off a 402 body or a usage read, or null when they are not all there. Validated
+ * rather than cast: a malformed body must not render "NaN of undefined" in the quota prompt.
+ */
+function parseAllowance(body: unknown): AllowanceUsage | null {
+  const b = body as Partial<AllowanceUsage> | undefined;
+  if (
+    !b ||
+    typeof b.used !== 'number' ||
+    typeof b.limit !== 'number' ||
+    (b.period !== 'day' && b.period !== 'month') ||
+    typeof b.resetsAt !== 'string' ||
+    Number.isNaN(Date.parse(b.resetsAt))
+  ) {
+    return null;
+  }
+  const tier = b.tier === 'trial' || b.tier === 'basic' || b.tier === 'full' ? b.tier : undefined;
+  return {
+    used: b.used,
+    limit: b.limit,
+    period: b.period,
+    resetsAt: b.resetsAt,
+    ...(tier ? { tier } : {}),
+  };
+}
+
+/**
+ * The most recent allowance refusal this device received, for the quota prompt (#95).
+ *
+ * WHY A MODULE VALUE AND NOT ONLY THE ERROR. The error carries it too, but every reader funnels
+ * through `documentExtractionService`, which flattens a failure to `{ errorCode, error }`, and
+ * seven call sites then hand only the code to `useExtractionErrorToast`. Threading the numbers
+ * through all of them would widen a result type nothing else reads. The toast takes the value
+ * the same tick the refusal lands, and `takeAllowanceRefusal` clears it so a stale one can never
+ * describe a later refusal.
+ */
+let lastAllowanceRefusal: AllowanceUsage | null = null;
+
+/** Read and clear the last allowance refusal. Null when the 402 carried no usable numbers. */
+export function takeAllowanceRefusal(): AllowanceUsage | null {
+  const value = lastAllowanceRefusal;
+  lastAllowanceRefusal = null;
+  return value;
+}
+
+/**
+ * How many magic beans the family has left (#95): `protocol: 'allowance'` on the same proxy route
+ * and key as every read. A READ: it never spends a bean and the server never refuses it.
+ *
+ * Throws a typed `ExtractionProviderError` on any failure (never silent): `not_available` when the
+ * proxy is unset or cannot answer, `malformed_output` when the answer is not the usage shape, and
+ * the transport codes `postToProxy` already classifies. The caller decides what to show.
+ */
+export async function fetchAllowance(args: {
+  familyId: string;
+  planToken?: string;
+  signal?: AbortSignal;
+}): Promise<AllowanceUsage> {
+  const body = await postToProxy(
+    {
+      protocol: ALLOWANCE_PROTOCOL,
+      familyId: args.familyId,
+      ...(args.planToken ? { planToken: args.planToken } : {}),
+    },
+    args.signal
+  );
+  const usage = parseAllowance(body);
+  if (!usage) {
+    throw new ExtractionProviderError(
+      'malformed_output',
+      'Managed proxy returned an unreadable magic-beans usage answer'
+    );
+  }
+  return usage;
+}
+
 export const managedProvider: ExtractionProvider = {
   id: 'tinfoil',
   async run<T extends ExtractionTask>(
@@ -491,6 +599,9 @@ export const managedProvider: ExtractionProvider = {
           task,
           srcHash: await sourceHash(request),
           ...(request.familyId ? { familyId: request.familyId } : {}),
+          // The paid `full` allowance needs it (#95). Plaintext metadata by necessity: the proxy
+          // must read it to pick the allowance, and it says nothing about the document.
+          ...(request.planToken ? { planToken: request.planToken } : {}),
           // TOKEN ONLY. `to` is deliberately absent from the wire: `consumeGrant` no longer
           // conditions on the kind, and the closed-set check on `to` existed only because it
           // reached the model's instruction server-side, which it cannot do now. Sending it would

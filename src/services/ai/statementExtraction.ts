@@ -55,6 +55,9 @@ export const STATEMENT_CHUNK_MAX_LINES = 60;
  */
 const TERMINAL_CODES = new Set<ExtractionErrorCode>([
   'rate_limited',
+  // The family's magic beans are spent (#95): every later page would 402 the same way. The
+  // pages already read are kept (they were paid for); the caller shows the quota prompt.
+  'allowance_exceeded',
   'not_available',
   'attestation_failed',
   'offline',

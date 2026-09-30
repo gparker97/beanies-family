@@ -2348,6 +2348,35 @@ describe('the statement branch (#107)', () => {
     );
   });
 
+  it('a statement stopped by the magic-beans allowance shows the quota prompt and keeps the paid pages (#95)', async () => {
+    readStatement.mockResolvedValueOnce({
+      ok: true,
+      read: {
+        ...READ_OK.read,
+        units: [
+          { unit: 0, status: 'read' },
+          { unit: 1, status: 'failed', errorCode: 'allowance_exceeded' },
+        ],
+      },
+    });
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(reportExtractionFailure).toHaveBeenCalledWith('allowance_exceeded');
+    expect(dispatchSharePayload).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'transactions' })
+    );
+  });
+
+  it('a complete statement read shows no quota prompt', async () => {
+    await ingestInAppSource(
+      { kind: 'paste', text: STATEMENT_TEXT, hint: 'transactions' },
+      DEFERRED as never
+    );
+    expect(reportExtractionFailure).not.toHaveBeenCalled();
+  });
+
   it('every unit failing is reported once through the shared mapping', async () => {
     readStatement.mockResolvedValueOnce({ ok: false, errorCode: 'provider_error' });
     await ingestInAppSource(

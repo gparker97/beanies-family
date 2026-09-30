@@ -89,6 +89,12 @@ export interface ExtractOptions {
    */
   familyId: string;
   /**
+   * The family's plan token (#95), from the doc's settings when present. The managed proxy uses
+   * it to grant the paid `full` allowance; every other tier ignores it. An option, like
+   * `familyId`, because this module is store-free.
+   */
+  planToken?: string;
+  /**
    * Set on a correction re-read, or on a first read the person pre-labelled from the
    * magic-beans sheet (#108, `reason: 'stated'`). `to` is what makes the read targeted;
    * `token` is the managed-tier grant that makes a CORRECTION free, and is absent on BYOK and
@@ -274,6 +280,7 @@ async function runWithSource<T extends ExtractionTask>(
     todayIso: opts.todayIso,
     signal: opts.signal,
     familyId: opts.familyId,
+    ...(opts.planToken ? { planToken: opts.planToken } : {}),
     ...(opts.correction ? { correction: opts.correction } : {}),
     ...(opts.context ? { context: opts.context } : {}),
   };

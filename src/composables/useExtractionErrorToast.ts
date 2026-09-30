@@ -13,6 +13,10 @@ import { useAiCapability } from './useAiCapability';
 import { storeToRefs } from 'pinia';
 import { useTranslationStore } from '@/stores/translationStore';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { allowanceResetParts } from '@/utils/allowanceReset';
+import { takeAllowanceRefusal } from '@/services/ai/providers/managedProvider';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { AI_SETTINGS_OPEN } from '@/constants/settingsDeepLinks';
 import type { ExtractionErrorCode } from '@/services/ai/types';
 
 const ERROR_SURFACE = 'ai-extract';
@@ -73,6 +77,52 @@ export function useExtractionErrorToast() {
     const useDetail = detail && isEnglish.value ? detail : undefined;
     showToast('error', t('ai.error.title'), useDetail ? `${base} ${useDetail}` : base, {
       surface: ERROR_SURFACE,
+    });
+  }
+
+  /**
+   * The quota prompt (#95): the family's magic beans for the period are spent. What is left (none,
+   * of how many), when more arrive in LOCAL time, and the unlimited route (their own AI key) with
+   * a button straight to the AI settings. Info, never an error surface: the proxy refused on
+   * purpose, the same treatment `rate_limited` gets.
+   */
+  function allowancePrompt(): void {
+    const refusal = takeAllowanceRefusal();
+    const reset = refusal ? allowanceResetParts(refusal.resetsAt) : null;
+    let message: string;
+    if (refusal && reset) {
+      message = fillTemplate(
+        t(refusal.period === 'month' ? 'ai.allowance.month' : 'ai.allowance.day'),
+        { limit: refusal.limit, time: reset.time, date: reset.date }
+      );
+    } else {
+      message = t('ai.allowance.generic');
+    }
+    showToast('info', t('ai.allowance.title'), message, {
+      actionLabel: t('ai.allowance.action'),
+      // The router is imported on the tap, not at module load: this mapper is used by stores and
+      // composables whose import graph should not pull in every route.
+      actionFn: async () => {
+        const { default: router } = await import('@/router');
+        await router.push({ path: '/settings', query: { open: AI_SETTINGS_OPEN } });
+      },
+      // Long enough to read two sentences and reach the button.
+      durationMs: 10_000,
+    });
+    // The rate of this line against `allowance_checked` server-side is how often a family meets
+    // the wall. `plan` keeps its declared enum (basic | full | null: the plan PAID for), so the
+    // allowance tier (trial | basic | full) rides on `kind`; `count` is what the proxy said was used.
+    const allowanceTier = refusal?.tier ?? null;
+    logEvent({
+      level: 'info',
+      surface: 'ai-allowance',
+      message: 'quota prompt shown',
+      context: {
+        action: 'quota_prompt_shown',
+        kind: allowanceTier ?? 'unknown',
+        plan: allowanceTier === 'trial' ? null : allowanceTier,
+        count: refusal?.used,
+      },
     });
   }
 
@@ -164,6 +214,9 @@ export function useExtractionErrorToast() {
         // expected, intentional refusal must never page #beanies-errors. Same treatment
         // `fetch_blocked` and `upstream_busy` already get.
         showToast('info', t('ai.error.rateLimited.title'), t('ai.error.rateLimited.message'));
+        return;
+      case 'allowance_exceeded':
+        allowancePrompt();
         return;
       case 'no_content':
         // The fetch worked; the page/video just had nothing readable in it.

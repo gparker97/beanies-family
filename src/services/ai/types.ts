@@ -149,6 +149,12 @@ export interface ExtractionRequest {
    * must start passing it, or image extractions will silently count against the IP limit only.
    */
   familyId?: string;
+  /**
+   * The family's plan token (#95), when the doc holds one. Proves the caller is the paying
+   * family, which is what unlocks the `full` magic-beans allowance on the managed proxy. A bearer
+   * secret, not identity; ignored by BYOK and on-device. Absent ⇒ trial or basic allowance.
+   */
+  planToken?: string;
   /** The `statement` task's merchant memory (#107). Ignored by every other task. */
   context?: ExtractionContext;
 }
@@ -518,10 +524,30 @@ export type ExtractionErrorCode =
   | 'correction_refused' // the free re-read's grant was missing, spent, or for another
   // document. The proxy REFUSES rather than quietly running a charged, unhinted re-read that
   // would return the same wrong answer — so nothing was read and nothing was charged.
-  | 'rate_limited'; // OUR proxy refused: too many extractions from this family or IP in the
-// window (#83). An expected, intentional refusal — the system working as designed — so it
-// must NEVER reach an error surface. `useExtractionErrorToast` gives it an info toast, the
-// same treatment `fetch_blocked` and `upstream_busy` already get.
+  | 'rate_limited' // OUR proxy refused: too many extractions from this family or IP in the
+  // window (#83). An expected, intentional refusal — the system working as designed — so it
+  // must NEVER reach an error surface. `useExtractionErrorToast` gives it an info toast, the
+  // same treatment `fetch_blocked` and `upstream_busy` already get.
+  | 'allowance_exceeded'; // the family's magic-beans allowance for the period is spent (#95),
+// a 402 from our proxy. Expected and intentional like `rate_limited`: an info toast (the quota
+// prompt) and never an error surface. Nothing was read and nothing was charged.
+
+/** Which allowance a family's managed reads are counted against (#95; `allowance.mjs`). */
+export type AllowanceTier = 'trial' | 'basic' | 'full';
+
+/**
+ * What the proxy says about a family's magic beans (#95): the 402 body, and the `allowance`
+ * protocol's usage read. `resetsAt` is a UTC instant (the usage day and month are UTC); every
+ * surface renders it in LOCAL time.
+ */
+export interface AllowanceUsage {
+  used: number;
+  limit: number;
+  period: 'day' | 'month';
+  resetsAt: string;
+  /** Present on the usage read; on a 402 when the proxy sent it. */
+  tier?: AllowanceTier;
+}
 
 /**
  * Result of the extraction funnel. Per-service `{ success, … }` shape — matching
@@ -583,10 +609,18 @@ export interface ExtractionProvider {
 export class ExtractionProviderError extends Error {
   readonly code: ExtractionErrorCode;
   readonly cause?: unknown;
-  constructor(code: ExtractionErrorCode, message: string, cause?: unknown) {
+  /** The proxy's numbers on an `allowance_exceeded` refusal (#95). Absent on every other code. */
+  readonly allowance?: AllowanceUsage;
+  constructor(
+    code: ExtractionErrorCode,
+    message: string,
+    cause?: unknown,
+    details?: { allowance?: AllowanceUsage }
+  ) {
     super(message);
     this.name = 'ExtractionProviderError';
     this.code = code;
     this.cause = cause;
+    if (details?.allowance) this.allowance = details.allowance;
   }
 }

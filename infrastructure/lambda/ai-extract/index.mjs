@@ -27,7 +27,19 @@
  */
 
 import { EXTRACTION_TASKS } from './extractionPrompt.mjs';
-import { closeRead, openRead, sourceFingerprint, validateCorrection } from './meter.mjs';
+import {
+  chargesABean,
+  closeRead,
+  openRead,
+  sourceFingerprint,
+  validateCorrection,
+} from './meter.mjs';
+import {
+  ALLOWANCE_PROTOCOL,
+  allowanceRefusalBody,
+  checkAllowance,
+  readAllowance,
+} from './allowance.mjs';
 import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
 import { checkLimits } from './rateLimit.mjs';
 import {
@@ -173,6 +185,36 @@ export async function handler(event) {
   if (parsed?.protocol === SEALED_CONFIG_PROTOCOL) {
     return response(200, { model: TINFOIL_MODEL }, event);
   }
+  // The magic-beans usage read (#95), on this same route for the same reason as the config ask
+  // above: no new API Gateway path, no terraform. A READ: it never refuses a family anything, it
+  // tells the client "N of M left". `readAllowance` never throws.
+  if (parsed?.protocol === ALLOWANCE_PROTOCOL) {
+    // Through the family and IP buckets FIRST, like every other body shape that reaches
+    // DynamoDB: the x-api-key ships in the bundle, and without this anyone holding it could drive
+    // unbounded billing and usage reads (and, with a hostile id, the store-error alarm).
+    const limits = await checkLimits({
+      familyId: typeof parsed.familyId === 'string' ? parsed.familyId : undefined,
+      ip: event?.requestContext?.http?.sourceIp,
+    });
+    if (!limits.allowed) {
+      return response(
+        429,
+        {
+          error: 'Too many requests',
+          code: 'rate_limited',
+          retryAfterSeconds: limits.retryAfterSeconds,
+        },
+        event
+      );
+    }
+    const read = await readAllowance({ familyId: parsed.familyId, planToken: parsed.planToken });
+    if (read.ok) return response(200, read.usage, event);
+    // `bad_family` rides the client's `bad_*` prefix rung (a client-construction bug, reported);
+    // `allowance_unavailable` is ours (unconfigured, or a store failure already logged + alarmed).
+    return read.reason === 'no_family'
+      ? response(400, { error: 'Expected a family id', code: 'bad_family' }, event)
+      : response(503, { error: 'Usage unavailable', code: 'allowance_unavailable' }, event);
+  }
   if (parsed?.protocol === SEALED_PROTOCOL) {
     // AWAITED inside the handler's own try/catch below would be ideal, but the legacy arm owns
     // that try. So the sealed arm gets its own here: without it a throw rejects the handler
@@ -207,6 +249,7 @@ export async function handler(event) {
     task: rawTask,
     familyId,
     correction,
+    planToken,
   } = parsed || {};
   // Task selects the prompt + required-keys. Default to 'event' so older clients (which
   // send no task) keep the original #133 behavior byte-for-byte. Reject an unknown task.
@@ -424,6 +467,30 @@ export async function handler(event) {
   //                        on the identical failure, because a blip must not lock a family out.
   if (correction && HARD_REFUSAL_REASONS.has(read.reason)) {
     return response(409, { error: 'Correction refused', code: 'correction_refused' }, event);
+  }
+
+  // ── Magic-beans allowance (#95) ─────────────────────────────────────────────────────────
+  //
+  // UNCONDITIONAL on source kind, unlike the `hasText` limiter above: an image read spends a bean
+  // exactly like a text one, so it must be checked like one.
+  //
+  // AFTER `openRead`, not beside `checkLimits`, and only for a read that will be CHARGED: a free
+  // correction spends no bean and must never be refused for being over the allowance, and whether
+  // a correction is free is only known once its grant has been evaluated. A charged read consumed
+  // nothing in `openRead`, so refusing it here costs the family nothing. See `chargesABean`.
+  //
+  // ⚠️ This refusal sits below the retirement counter above, like the 409 just before it. That
+  // is honest for the counter: an un-updated store build hitting its allowance is still an
+  // un-updated store build extracting, which is exactly what ADR-030 step 3 waits to read zero.
+  //
+  // `checkAllowance` never throws and fails open internally, so this is one `if`.
+  if (chargesABean(read, task)) {
+    const allowance = await checkAllowance({
+      familyId: typeof familyId === 'string' ? familyId : undefined,
+      planToken: typeof planToken === 'string' ? planToken : undefined,
+    });
+    // Through `response()` so the CORS headers are present, like the 429.
+    if (!allowance.allowed) return response(402, allowanceRefusalBody(allowance), event);
   }
 
   try {

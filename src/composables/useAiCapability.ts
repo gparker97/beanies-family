@@ -5,6 +5,10 @@
 
 import { computed } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useEntitlementStore } from '@/stores/entitlementStore';
+import { useToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { assertNever } from '@/utils/assertNever';
 import { apiKeyForProvider } from '@/utils/aiApiKeys';
 import type { ByokConfig } from '@/services/ai/providers/byokProvider';
@@ -55,6 +59,36 @@ export function useAiCapability() {
    * go to the managed tier). Task-specific extras (`correction`, `context`) are spread by the
    * caller on top.
    */
+  /** The family's plan token (#95), from the shared doc's settings. Null when never claimed. */
+  const planToken = computed<string | null>(() => settingsStore.settings.planToken ?? null);
+
+  /**
+   * May a MANAGED read be sent at all (#95)? False only while the family is read-only for real
+   * (`isReadOnly`: flag on, server enforcing, state read-only). A read whose result cannot be
+   * saved is a wasted bean, and the server would still grant the 1-a-day floor, so the UI is
+   * what refuses. BYOK and on-device never reach our proxy and are not gated by this.
+   */
+  const canRequestManagedRead = computed(() => !useEntitlementStore().isReadOnly);
+
+  /**
+   * THE refusal, for every door that is about to send a document to the managed tier. Returns
+   * true (and shows the read-only toast) when the read must not be sent; false otherwise,
+   * including on BYOK and on-device, which are unaffected. Called BEFORE consent, so nothing
+   * leaves the device and nobody is asked to agree to a read that will not happen.
+   */
+  function refuseManagedReadIfReadOnly(): boolean {
+    if (tier.value !== 'managed' || canRequestManagedRead.value) return false;
+    const { t } = useTranslation();
+    useToast().showToast('info', t('readOnly.toast.title'), t('readOnly.toast.message'));
+    logEvent({
+      level: 'info',
+      surface: 'ai-allowance',
+      message: 'managed read refused while read-only',
+      context: { action: 'read_only_refused' },
+    });
+    return true;
+  }
+
   function extractOptions(args: {
     grant: ConsentGrant;
     familyId: string;
@@ -67,10 +101,20 @@ export function useAiCapability() {
       byok: byokConfig.value ?? undefined,
       grant: args.grant,
       familyId: args.familyId,
+      // The paid `full` allowance needs it (#95); absent on every family that has not paid.
+      ...(planToken.value ? { planToken: planToken.value } : {}),
       ...(args.signal ? { signal: args.signal } : {}),
       ...(args.context ? { context: args.context } : {}),
     };
   }
 
-  return { tier, byokConfig, isConfigured, extractOptions };
+  return {
+    tier,
+    byokConfig,
+    isConfigured,
+    planToken,
+    canRequestManagedRead,
+    refuseManagedReadIfReadOnly,
+    extractOptions,
+  };
 }

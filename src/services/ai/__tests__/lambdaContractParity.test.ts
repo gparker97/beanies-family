@@ -24,10 +24,16 @@ import { FREE_TASK_MAX_BYTES } from '../../../../infrastructure/lambda/ai-extrac
 import {
   ENTITLEMENT_STATES as SERVER_ENTITLEMENT_STATES,
   ENTITLEMENT_REASONS as SERVER_ENTITLEMENT_REASONS,
+  SUBSCRIBED_STATUSES as ENTITLEMENT_SUBSCRIBED_STATUSES,
   TRIAL_DAYS as SERVER_TRIAL_DAYS,
   // @ts-expect-error: as above.
 } from '../../../../infrastructure/lambda/registry/entitlement.mjs';
-import { TRIAL_DAYS } from '@beanies/brand/pricing';
+import {
+  PLAN_ALLOWANCE,
+  SUBSCRIBED_STATUSES as ALLOWANCE_SUBSCRIBED_STATUSES,
+  // @ts-expect-error: as above.
+} from '../../../../infrastructure/lambda/ai-extract/allowance.mjs';
+import { MAGIC_BEANS, TRIAL_DAYS } from '@beanies/brand/pricing';
 import { ENTITLEMENT_REASONS, ENTITLEMENT_STATES } from '@/types/models';
 
 import { EXTRACTION_TASKS } from '../extractionPrompt';
@@ -211,5 +217,23 @@ describe('client / Lambda contract parity', () => {
     // The pricing page and the Settings meter say `TRIAL_DAYS`; the registry's clock is the one
     // that ends the trial. They must be one number.
     expect(SERVER_TRIAL_DAYS).toBe(TRIAL_DAYS);
+  });
+
+  it('enforces the same magic-beans allowances the pricing page sells (#95)', () => {
+    // `MAGIC_BEANS` is what /pricing and the app promise; `PLAN_ALLOWANCE` is what the ai-extract
+    // Lambda refuses at. A drift is a family refused below what it paid for, or given more.
+    expect(PLAN_ALLOWANCE).toEqual({
+      trial: { perDay: MAGIC_BEANS.trialPerDay },
+      basic: { perMonth: MAGIC_BEANS.basicPerMonth },
+      full: { perDay: MAGIC_BEANS.fullPerDay },
+    });
+  });
+
+  it('counts the same Stripe statuses as paying in the registry and in ai-extract (#95)', () => {
+    // Two Lambdas, two zips, one rule. If they drift, a `past_due` family could read `active` in
+    // the app while ai-extract drops it to the trial floor, or the reverse.
+    expect([...(ALLOWANCE_SUBSCRIBED_STATUSES as Set<string>)].sort()).toEqual(
+      [...(ENTITLEMENT_SUBSCRIBED_STATUSES as Set<string>)].sort()
+    );
   });
 });
