@@ -31,12 +31,21 @@ const ALLOWED_CONTEXT_KEYS: readonly QuickAddContextKey[] = [
 ];
 
 describe('QUICK_ADD_ITEMS — invariants', () => {
-  it('has exactly 19 items (4 groups: 7 everyday + 4 family + 4 money + 4 care)', () => {
+  it('has exactly 19 items (4 groups: 6 everyday + 5 family + 4 money + 4 care)', () => {
     expect(QUICK_ADD_ITEMS).toHaveLength(19);
-    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday')).toHaveLength(7);
-    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'family')).toHaveLength(4);
+    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday')).toHaveLength(6);
+    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'family')).toHaveLength(5);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'money')).toHaveLength(4);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'care')).toHaveLength(4);
+  });
+
+  it('the main FAB menu shows at most 6 Everyday tiles (two rows) and 4 Family tiles', () => {
+    const inMainMenu = (g: string) =>
+      QUICK_ADD_ITEMS.filter(
+        (i) => i.group === g && !('onlyWhenFiltered' in i && i.onlyWhenFiltered)
+      );
+    expect(inMainMenu('everyday').length).toBeLessThanOrEqual(6);
+    expect(inMainMenu('family')).toHaveLength(4);
   });
 
   it('has unique item ids', () => {
