@@ -83,9 +83,8 @@ const copy = computed<PickerCopy>(() => {
         emptyKey: 'quickAdd.picker.medication.empty',
       };
     case 'vacationId':
-      // Reserved for symmetry — trip-idea has a dedicated empty-state
-      // toast on TravelPlansPage, so this branch isn't exercised
-      // today. Kept compile-safe via assertNever.
+      // No quick-add item uses `vacationId` today (the Trip idea tile was
+      // removed 2026-09-30); kept compile-safe via assertNever.
       return {
         titleKey: 'quickAdd.picker.vacation.title',
         emptyKey: 'quickAdd.picker.vacation.empty',
@@ -148,7 +147,7 @@ const tiles = computed<PickerTile[]>(() => {
         };
       });
     case 'vacationId':
-      return []; // unused today; trip-idea has its own empty-state toast
+      return []; // no quick-add item uses vacationId today
     default:
       return assertNever(contextKey.value, 'QuickAddPicker.tiles');
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
@@ -559,37 +559,7 @@ function startWizard() {
   showVacationWizard.value = true;
 }
 
-// Quick-add FAB handlers.
-//
-// - `add-trip` opens the vacation wizard fresh.
-// - `add-trip-idea` requires a parent trip. If the user arrived with a
-//   `vacationId` (on a trip detail route) we select that one and focus
-//   the inline quick-idea input. Without context, we pick the first
-//   trip if any exist, or fire an info toast with a "Create trip"
-//   action so the user isn't left guessing why nothing happened.
-function handleAddTripIdea(vacationId: string | undefined): void {
-  const vacations = vacationStore.vacations;
-  if (vacations.length === 0) {
-    showToast('info', t('quickAdd.tripIdea.noTripsTitle'), t('quickAdd.tripIdea.noTripsMessage'), {
-      actionLabel: t('quickAdd.tripIdea.addTripAction'),
-      actionFn: () => {
-        startWizard();
-      },
-    });
-    return;
-  }
-
-  const targetId =
-    vacationId && vacations.some((v) => v.id === vacationId) ? vacationId : vacations[0].id;
-  selectedVacationId.value = targetId;
-
-  // Wait for the ideas panel to render (route/state change may re-mount
-  // it), then focus the quick-add input so the user can type immediately.
-  void nextTick().then(() => {
-    scrollToIdeas();
-    ideasPanelRef.value?.focusQuickAdd();
-  });
-}
+// Quick-add FAB handler: `add-trip` opens the vacation wizard fresh.
 
 /**
  * ONE permission gate for every mutation on this surface.
@@ -611,14 +581,11 @@ function requireEdit(): boolean {
   return false;
 }
 
-useQuickAddIntent((action, { vacationId }) => {
+useQuickAddIntent((action) => {
   if (!canEditActivities.value) return;
   switch (action) {
     case 'add-trip':
       startWizard();
-      break;
-    case 'add-trip-idea':
-      handleAddTripIdea(vacationId);
       break;
     default:
       break;
