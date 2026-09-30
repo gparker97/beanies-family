@@ -1,10 +1,15 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getById as projGetById } from '../projection';
 import { createAutomergeRepository } from '../automergeRepository';
 import { installInlineBackend } from '../worker/__tests__/inlineHarness';
+import { setWriteGate, ReadOnlyError } from '../worker/docClient';
 import type { FamilyMember } from '@/types/models';
+
+// The read-only gate's side channels (#95); nothing else in this file reaches them.
+vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 // Test with familyMembers collection using a transform
 function applyDefaults(member: FamilyMember): FamilyMember {
@@ -141,6 +146,33 @@ describe('createAutomergeRepository', () => {
     it('returns undefined for non-existent ID', async () => {
       const result = await repo.update('non-existent', { name: 'Nope' });
       expect(result).toBeUndefined();
+    });
+
+    it('threads opts.system to mutate: a system write passes a read-only family, an edit does not (#95)', async () => {
+      const created = await repo.create({
+        name: 'Erin',
+        email: 'erin@example.com',
+        gender: 'female',
+        ageGroup: 'adult',
+        role: 'member',
+        color: '#ABC',
+        requiresPassword: false,
+      });
+      setWriteGate(() => ({ block: true, wouldBlock: false }));
+      try {
+        await expect(repo.update(created.id, { name: 'Refused' })).rejects.toBeInstanceOf(
+          ReadOnlyError
+        );
+        const stamped = await repo.update(
+          created.id,
+          { lastLoginAt: '2026-09-30' },
+          { system: true }
+        );
+        expect(stamped!.lastLoginAt).toBe('2026-09-30');
+        expect(stamped!.name).toBe('Erin');
+      } finally {
+        setWriteGate(null);
+      }
     });
 
     it('deletes fields explicitly set to undefined', async () => {

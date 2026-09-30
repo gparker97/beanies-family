@@ -168,7 +168,7 @@ export function usePodCompaction() {
     const family = useFamilyStore();
     for (const m of family.members.filter((x) => x.podTooLargeSeenAt)) {
       try {
-        await family.updateMember(m.id, { podTooLargeSeenAt: undefined });
+        await family.updateMemberCredentials(m.id, { podTooLargeSeenAt: undefined });
       } catch {
         // Best effort: the compaction already succeeded, and a stale mark only
         // costs a note that is bounded by its own recency window anyway.

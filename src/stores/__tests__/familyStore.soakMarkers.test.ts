@@ -46,7 +46,7 @@ describe('familyStore.updateMember — soak markers', () => {
 
   it('stamps the lineage epoch when a login is recorded', async () => {
     const store = seed();
-    await store.updateMember('m1', { lastLoginAt: '2026-09-06' });
+    await store.updateMemberCredentials('m1', { lastLoginAt: '2026-09-06' });
     expect(patchOf().lineageEpoch).toBe(REQUIRED_EPOCH);
     expect(patchOf().appVersion).toBe(APP_VERSION);
   });
@@ -64,15 +64,65 @@ describe('familyStore.updateMember — soak markers', () => {
     // An identical write still emits an Automerge change, and this feature
     // exists to stop the history growing for no reason.
     const store = seed({ lineageEpoch: REQUIRED_EPOCH, appVersion: APP_VERSION });
-    await store.updateMember('m1', { lastLoginAt: '2026-09-06' });
+    await store.updateMemberCredentials('m1', { lastLoginAt: '2026-09-06' });
     expect(patchOf().lineageEpoch).toBeUndefined();
     expect(patchOf().appVersion).toBeUndefined();
   });
 
   it('still carries the caller own fields through', async () => {
     const store = seed();
-    await store.updateMember('m1', { lastLoginAt: '2026-09-06', name: 'Greg P' });
-    expect(patchOf().name).toBe('Greg P');
+    await store.updateMemberCredentials('m1', { lastLoginAt: '2026-09-06', pinVersion: 2 });
+    expect(patchOf().pinVersion).toBe(2);
     expect(patchOf().lastLoginAt).toBe('2026-09-06');
+  });
+});
+
+describe('member writes and the read-only gate (#95)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const call = () => vi.mocked(familyRepo.updateFamilyMember).mock.calls[0];
+
+  it('updateMemberCredentials always sends the write as system: the sign-in stamp', async () => {
+    const store = seed();
+    await store.updateMemberCredentials('m1', { lastLoginAt: '2026-09-30' });
+    expect(call()?.[2]).toEqual({ system: true });
+  });
+
+  it('updateMemberCredentials passes a PIN change', async () => {
+    const store = seed();
+    await store.updateMemberCredentials('m1', { pinHash: 'salt:hash', pinVersion: 2 });
+    expect(call()?.[2]).toEqual({ system: true });
+  });
+
+  it('updateMemberCredentials passes a password rotation', async () => {
+    const store = seed();
+    await store.updateMemberCredentials('m1', {
+      passwordHash: 'salt:hash',
+      requiresPassword: false,
+    });
+    expect(call()?.[2]).toEqual({ system: true });
+  });
+
+  it('updateMember never sends system, even for a credential key', async () => {
+    const store = seed();
+    await store.updateMember('m1', { pinHash: 'salt:hash', pinVersion: 2 });
+    expect(call()).toHaveLength(2);
+    expect(call()?.[2]).toBeUndefined();
+  });
+
+  it('updateMember leaves a name edit gated', async () => {
+    const store = seed();
+    await store.updateMember('m1', { name: 'Gregory' });
+    expect(call()).toHaveLength(2);
+  });
+
+  it('updateMember with an empty patch is a no-op: nothing reaches the gate', async () => {
+    const store = seed();
+    const result = await store.updateMember('m1', {});
+    expect(familyRepo.updateFamilyMember).not.toHaveBeenCalled();
+    expect(result?.id).toBe('m1');
   });
 });

@@ -46,6 +46,7 @@ import { selectActivitiesToBackfill } from '@/utils/activityReminderBackfill';
 import { DEFAULT_ACTIVITY_LEAD } from '@/utils/reminderSchedule';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
+import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { trackFeature, withAppInitiatedWrites } from '@/services/analytics/plausible';
 import type {
@@ -970,6 +971,9 @@ export const useActivityStore = defineStore('activities', () => {
     if (settingsStore.activityReminderBackfilledAt) return;
     if (activities.value.length === 0) return;
     if (!opts.canEdit) return;
+    //  • #95: a read-only family skips it, exactly like a member without permission, and it
+    //    runs on the next writable boot. The write is never attempted, so never refused.
+    if (skipWhileReadOnly('activity-reminder-backfill')) return;
 
     try {
       const candidates = selectActivitiesToBackfill(activities.value);

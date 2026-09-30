@@ -36,6 +36,7 @@ import {
   normalizeMessage,
 } from '@/utils/diagnosticContext';
 import { logEvent } from '@/services/telemetry';
+import { ReadOnlyError } from '@/services/automerge/worker/writeGate';
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -67,6 +68,10 @@ export interface ErrorReportInput {
  * surface is intentionally synchronous.
  */
 export function reportError(input: ErrorReportInput): void {
+  // #95: an expected refusal, not a failure. The write gate has already logged it as
+  // `read-only-gate blocked` (and shown its info toast); reporting it again at error severity
+  // from every store's own catch would be noise. No firehose event, no console error.
+  if (input.error instanceof ReadOnlyError) return;
   if (reentryGuard) {
     console.warn('[errorReporter] re-entry blocked', input.surface);
     return;

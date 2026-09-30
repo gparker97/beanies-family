@@ -79,9 +79,9 @@ vi.mock('@/composables/usePodExport', () => ({
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({ activeFamilyId: 'fam-1' }),
 }));
-const updateMember = vi.fn(async () => null);
+const updateMemberCredentials = vi.fn(async () => null);
 vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: () => ({ members: hooks.members, updateMember }),
+  useFamilyStore: () => ({ members: hooks.members, updateMemberCredentials }),
 }));
 vi.mock('@/services/sync/syncService', () => ({
   flushPendingSave: vi.fn(async () => {}),
@@ -479,7 +479,7 @@ describe('after a successful compaction', () => {
     await usePodCompaction().compact();
 
     expect(docClient.compactDoc).toHaveBeenCalled();
-    expect(updateMember).toHaveBeenCalledWith('m2', { podTooLargeSeenAt: undefined });
+    expect(updateMemberCredentials).toHaveBeenCalledWith('m2', { podTooLargeSeenAt: undefined });
   });
 
   it('does not touch a member who never reported one', async () => {
@@ -487,7 +487,7 @@ describe('after a successful compaction', () => {
 
     await usePodCompaction().compact();
 
-    expect(updateMember).not.toHaveBeenCalled();
+    expect(updateMemberCredentials).not.toHaveBeenCalled();
   });
 });
 

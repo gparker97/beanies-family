@@ -106,6 +106,11 @@ describe('familyStore — normalizeRoles', () => {
     await store.loadMembers();
 
     expect(mutate).toHaveBeenCalledOnce();
+    // #95: the roster heal runs on load, so it must pass the read-only write gate.
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ op: 'batch' }), {
+      quiet: true,
+      system: true,
+    });
     // The mocked second getAllFamilyMembers returns the demoted state.
     expect(store.owner?.id).toBe('owner-old');
   });
