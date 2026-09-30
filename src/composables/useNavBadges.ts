@@ -23,6 +23,7 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useListStore } from '@/stores/listStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { isFlagEnabled } from '@/config/flags';
 import { bookingProgress } from '@/utils/vacation';
 import {
@@ -70,6 +71,7 @@ export function useNavBadges() {
   const budgetStore = useBudgetStore();
   const vacationStore = useVacationStore();
   const listStore = useListStore();
+  const responsibilityStore = useResponsibilityStore();
 
   const badges = computed<Record<KnownBadgeKey, NavBadge>>(() => ({
     overdueTodos: {
@@ -92,6 +94,17 @@ export function useNavBadges() {
     dueLists: {
       kind: 'count',
       count: isFlagEnabled('familyLists') ? listStore.dueListsCount : 0,
+    },
+    // Who Owns What cards kept but not (fully) owned yet: `waiting` includes a split
+    // card with an unowned part (the Overview's "Waiting for a Holder"; NOT `remaining`,
+    // which adds unsorted cards: those are optional to sort and must not raise a nag). Only for someone who can
+    // deal (`canDeal`, the store's own write gate: an adult), like the "cards with
+    // nobody" briefing row it replaces (docs/plans/2026-09-30-who-owns-what-briefing-trim.md):
+    // for anyone else the count, and the Planning-tab dot it raises, is a nag they
+    // cannot act on.
+    stillToDeal: {
+      kind: 'count',
+      count: responsibilityStore.canDeal ? responsibilityStore.stats.waiting : 0,
     },
   }));
 

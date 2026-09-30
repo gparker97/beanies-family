@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 _Released in 0.26 on the web. 0.26.1 (web, Android production, iOS App Store) carries all of it plus the quick-add, phone header, deal card and PDF font changes, and replaced 0.26 in store review._
 
+_Entries marked (unreleased) are on `main` and follow in the next release._
+
 ### Added
 
 - The Meal Planner can now make one shopping list for the whole week. Each recipe is listed once with its ingredients as written, and a **Cook ×N** marker says how many times it gets cooked that week (from who's eating and the recipe's servings); its lines end in (×N) so the list says how many lots to buy.
@@ -21,6 +23,7 @@ _Released in 0.26 on the web. 0.26.1 (web, Android production, iOS App Store) ca
 
 ### Changed
 
+- (unreleased) The daily briefing no longer shows a standing "Your cards in Who Owns What" row or a "cards with nobody" row. Instead, grown-ups see an orange number on **Who Owns What** in the menu counting cards still waiting for a holder, like the over-budget and unbooked-travel counts. "Card moved" notes now clear after a week (tick to dismiss any time).
 - On phones, the Meal Planner and Who Owns What headers now fit on one row: Share is a round icon, and Export as PDF stays on bigger screens (Share makes the same PDF).
 - Who Owns What's deal view puts the card center stage on phones: a bigger card, a single progress bar, "n of total" on the card's category chip, and swipe left or right to move between cards.
 - The quick-add menu's Everyday beans are now six tiles in two rows; Saying moves to Family. In dark mode the Everyday tiles are readable again.
@@ -31,6 +34,7 @@ _Released in 0.26 on the web. 0.26.1 (web, Android production, iOS App Store) ca
 
 ### Fixed
 
+- (unreleased) On phones, the orange dot that marks a menu tab needing attention (overdue to-dos, over budget, unbooked travel) now actually shows.
 - Hint bubbles no longer open behind side panels.
 - PDF exports from the live app use the app's own fonts again, so the header no longer falls back to a system font and overlaps.
 - In dark mode, the meal drawer's guest-name and note fields and the Meal Planner's week arrows are readable again.

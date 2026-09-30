@@ -13,6 +13,7 @@
  *      active; informational dots do NOT escalate
  *   7. Corrupt deadline on a goal → logged + excluded (no silent drop)
  *   8. badgeFor(path) resolves via the nav registry
+ *   9. Who Owns What count = kept cards not fully held (`waiting`), adults only
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -54,7 +55,9 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useListStore } from '@/stores/listStore';
-import type { TodoItem, Goal, FamilyVacation, FamilyList } from '@/types/models';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import type { TodoItem, Goal, FamilyVacation, FamilyList, FamilyMember } from '@/types/models';
 
 // Pin "today" to a deterministic date so the time-window assertions are
 // stable. The vacation tests assume today = 2026-05-16.
@@ -143,6 +146,7 @@ describe('useNavBadges', () => {
     expect(badges.value.overdueGoals).toEqual({ kind: 'count', count: 0 });
     expect(badges.value.unbookedTravel).toEqual({ kind: 'count', count: 0 });
     expect(badges.value.dueLists).toEqual({ kind: 'count', count: 0 });
+    expect(badges.value.stillToDeal).toEqual({ kind: 'count', count: 0 });
     expect(categoryAttention.value).toEqual({
       nook: false,
       planning: false,
@@ -351,6 +355,50 @@ describe('useNavBadges', () => {
       expect.stringMatching(/\[safeDate\] could not parse "not-a-date" in goal g-bad\.deadline/)
     );
     warnSpy.mockRestore();
+  });
+
+  it('stillToDeal: counts kept cards nobody (fully) holds, for adults only', () => {
+    const member = (id: string, ageGroup: 'adult' | 'child') =>
+      ({
+        id,
+        name: id,
+        role: 'member',
+        ageGroup,
+        email: `${id}@t.test`,
+        color: '#000',
+      }) as FamilyMember;
+    const familyStore = useFamilyStore();
+    familyStore.members.push(member('mum', 'adult'), member('kid', 'child'));
+    const kept = (id: string, parts: { key: string; holderId?: string }[]) => ({
+      id,
+      status: 'kept',
+      splitMode: parts.length > 1 ? 'label' : 'single',
+      parts,
+      createdAt: '2026-05-01T10:00:00.000Z',
+      updatedAt: '2026-05-01T10:00:00.000Z',
+    });
+    useResponsibilityStore().states = [
+      kept('laundry', [{ key: 'main', holderId: 'mum' }]), // held: not counted
+      kept('dishes', [{ key: 'main' }]), // nobody: counted
+      kept('floors', [
+        { key: 'mon', holderId: 'mum' },
+        { key: 'tue' }, // one part unowned: still to deal
+      ]),
+      { ...kept('breakfast', [{ key: 'main' }]), status: 'skipped' }, // skipped: not counted
+    ];
+    const { badges, badgeFor, categoryAttention } = useNavBadges();
+
+    // Signed out / not picked yet: nothing to act on.
+    expect(badges.value.stillToDeal).toEqual({ kind: 'count', count: 0 });
+
+    familyStore.setCurrentMember('mum');
+    expect(badges.value.stillToDeal).toEqual({ kind: 'count', count: 2 });
+    expect(badgeFor('/who-owns-what')).toEqual({ kind: 'count', count: 2 });
+    expect(categoryAttention.value.planning).toBe(true);
+
+    familyStore.setCurrentMember('kid');
+    expect(badges.value.stillToDeal).toEqual({ kind: 'count', count: 0 });
+    expect(categoryAttention.value.planning).toBe(false);
   });
 
   it('badgeFor(path) resolves via the nav registry', () => {

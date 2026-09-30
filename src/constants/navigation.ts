@@ -166,6 +166,7 @@ export const NAV_ITEMS: NavItemDef[] = [
     emoji: '🙋',
     section: 'treehouse',
     mobileCategory: 'planning',
+    badgeKey: 'stillToDeal',
   },
   // The Piggy Bank
   {
@@ -314,6 +315,7 @@ export const KNOWN_BADGE_KEYS = [
   'overdueGoals',
   'unbookedTravel',
   'dueLists',
+  'stillToDeal',
 ] as const;
 export type KnownBadgeKey = (typeof KNOWN_BADGE_KEYS)[number];
 const KNOWN_BADGE_KEY_SET: ReadonlySet<string> = new Set(KNOWN_BADGE_KEYS);

@@ -338,7 +338,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The briefing brings together <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, <strong>helpful hints</strong> beanies added ahead of an upcoming event, your <strong>Who Owns What</strong> cards, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
+          'The briefing brings together <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, <strong>helpful hints</strong> beanies added ahead of an upcoming event, changes to your <strong>Who Owns What</strong> cards, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
       },
       {
         type: 'heading',
@@ -439,22 +439,20 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'If your family has dealt the <a href="/help/features/who-owns-what">Who Owns What</a> deck, a few quiet rows keep it fresh. They sit after your other items for the day, just before any helpful hints, and tapping one opens Who Owns What.',
+          'If your family has dealt the <a href="/help/features/who-owns-what">Who Owns What</a> deck, a couple of quiet rows keep it fresh. They sit after your other items for the day, just before any helpful hints, and tapping one opens Who Owns What. Cards your family kept but nobody holds yet don\u2019t appear here: for grown-ups, an orange number on <strong>Who Owns What</strong> in the menu counts them, the same way the menu flags an overspent budget or a trip that still needs booking.',
       },
       {
         type: 'list',
         content: '',
         items: [
-          '<strong>Your cards</strong> \u{1F64B}: When you hold at least one card, a row reminds you which ones: up to three card names, plus how many you hold. It is only ever about your own cards.',
-          '<strong>A card moved</strong> \u{1F64B}: When someone else re-deals a card to you or away from you, you see a note like <em>"Laundry moved to Sofia on Mon, 21 Sep."</em> or <em>"You now hold Laundry, from Sofia."</em> for up to two weeks. Tick it to dismiss it; it stays dismissed on all your devices. You never get a note for a change you made yourself.',
-          '<strong>Cards with nobody</strong> \u{1FAE5}: For grown-ups, a row names the first few cards still waiting for a holder. Tap it to go straight to dealing.',
+          '<strong>A card moved</strong> \u{1F64B}: When someone else re-deals a card to you or away from you, you see a note like <em>"Laundry moved to Sofia on Mon, 21 Sep."</em> or <em>"You now hold Laundry, from Sofia."</em> for a week. Tick it to dismiss it any time; it stays dismissed on all your devices. You never get a note for a change you made yourself.',
           '<strong>Family check-in due</strong> \u{1F5D3}\uFE0F: For grown-ups, a reminder appears from the day a check-in is due until your family finishes it. Tick it to be reminded again in a week. It never appears when check-ins are turned off. See <a href="/help/features/family-check-in">how the family check-in works</a>.',
         ],
       },
       {
         type: 'infoBox',
         content:
-          'The briefing never compares people or says who holds more cards. It only talks about your own cards and the jobs that still need someone.',
+          'The briefing never compares people or says who holds more cards. It only talks about changes to your own cards and your family\u2019s check-in.',
         title: 'Never a comparison',
         icon: '\u{1F91D}',
       },
