@@ -51,6 +51,8 @@ If yes, the plan **must** include a `## Help Center Coverage` section (see forma
 
 **Observability coverage assessment (ALWAYS — every plan).** While drafting, work out the diagnostic logging the change must emit so its failure modes are triageable from CloudWatch without a local repro, and capture it in the mandatory `## Observability Coverage` section (see format below). This is per the "Observability & Diagnostic Logging" convention in `CLAUDE.md` and applies to **every** plan — feature, fix, or refactor. Unlike Help Center Coverage it is never omitted (a refactor states what signal it preserves, or why none is needed). Route events through `logEvent`/`reportError`/`perfTiming`; reserve `severity: 'critical'` (Slack page) for "user action failed / data at risk"; put queryable data in structured `context`; and if a new context key ships, flag the `ALLOWED_CONTEXT_KEYS` + store-declaration update.
 
+**Dark mode coverage assessment (every plan that touches UI).** If the plan adds or changes anything a user sees (a component, page, modal, drawer, card, pill, icon, copy colour, or a scoped style), it must include a `## Dark Mode Coverage` section (see format below). Read `docs/brand/beanies-cig-v2.html` slides 8-9 and `.claude/skills/beanies-theme/SKILL.md` § Dark mode first; the CIG wins where they differ. For each surface the change paints, state its dark treatment: which surface step it sits on (`surface-ground` → `surface-raised` → `surface-overlay` → `surface-hover`, or `surface-paper`), which ink its text uses (`ink` / `ink-soft` / `ink-faint`), the `-lift` partner for every accent used as text or a meaningful icon, and the dark partner for every painted background, **including inline `style` backgrounds and `<style scoped>` rules** (both outrank a `dark:` utility, so they need an explicit `html.dark` rule; never `:global(.dark)`). Also list any **existing** surface the change sits on or next to whose dark treatment is already broken, and whether the plan fixes it or records it. Mockups must be checked in dark as well as light. Omit the section entirely for work with no visual change.
+
 **Mockup-driven drafting (only when an approved mockup informs this work).** When Phase 1 surfaced a mockup (a `Mockup:` line or a `docs/mockups/…` file), Pass 1 must translate that design faithfully into a CIG-compliant plan rather than re-inventing the UI. Read the mockup file, then draft under this instruction (the canonical mockup→plan directive — edit it here if it needs to change):
 
 > This plan implements an approved mockup. Read the mockup file in full before drafting. Strive for simplicity and elegance in both the plan and the implementation, and follow all DRY conventions. Reproduce the mockup's design intent faithfully — its layout, visual hierarchy, spacing rhythm, component structure, tone, and the specific interactions it demonstrates — so the shipped UI is recognizably the same design. At the same time, every concrete style token (colors, typography and font sizes, radii, shadows, spacing, modal/component patterns) MUST come from the beanies theme + CIG (`.claude/skills/beanies-theme/SKILL.md`), not from whatever aesthetic the mockup's generator happened to choose. Where the mockup and the beanies UI theme / CIG disagree, the CIG ALWAYS wins — translate the mockup's intent into CIG-compliant equivalents rather than copying its raw values. Map each region of the mockup to existing components, composables, and utilities first (DRY) before proposing anything new. Call out any place where faithfully reproducing the mockup would violate the CIG, accessibility, i18n, or the rem-based text rule, and resolve it in favour of the rule. Ask any clarifying questions before drafting; once everything is clear, prepare the plan.
@@ -203,6 +205,18 @@ For each affected article:
 
 The article work is written following `.claude/skills/beanies-help-docs/SKILL.md` and lands **in the same change** as the feature — not as a follow-up. Treat it as a first-class acceptance criterion.
 
+## Dark Mode Coverage
+
+> Include this section for any plan that changes UI (per Phase 2's assessment). Omit it entirely (do not write "N/A") when there is no visual change.
+
+For each surface the change paints (new or modified):
+
+- **Surface**: component / element, and the surface step it sits on in dark (`surface-ground` / `surface-raised` / `surface-overlay` / `surface-hover` / `surface-paper`)
+- **Text**: the ink it resolves to in dark (`ink` / `ink-soft` / `ink-faint`), never the raw grey ramp, never an opacity modifier on readable text
+- **Accents**: each accent used as text or a meaningful icon and its `dark:text-*-lift` partner
+- **Backgrounds**: the dark partner for every painted background, naming any inline `style` or `<style scoped>` rule and its explicit `html.dark` counterpart
+- **Adjacent defects**: existing dark-mode breakage on the same screen, and whether this plan fixes it or records it as a follow-up
+
 ## Observability Coverage
 
 > **MANDATORY for every plan** (per the "Observability & Diagnostic Logging" convention in `CLAUDE.md`). Observability is a first-class deliverable — never a follow-up. Unlike Help Center Coverage, this section is never omitted: even a pure refactor states what diagnostic signal it preserves or why none is needed.
@@ -221,6 +235,7 @@ State, concretely, the diagnostic logging this work emits so any failure can be 
 - [ ] ...
 - [ ] Help Center article(s) listed in **Help Center Coverage** added/updated and verified to match the shipped behavior (omit this row if the section was omitted)
 - [ ] Diagnostic logging in **Observability Coverage** implemented and verified (events fire with the stated `surface`/`context`; failure modes are triageable from CloudWatch without a local repro; any new context key is allowlisted + declared)
+- [ ] Every surface in **Dark Mode Coverage** checked in dark (desktop + phone) and matches its stated treatment; no unreadable text, missing `-lift`, or background without a dark partner (omit this row if the section was omitted)
 
 ## Testing Plan
 
@@ -350,6 +365,7 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 - **Mockups inform Pass 1; the CIG always wins; stay Notion-agnostic.** When an approved mockup is present (via a `Mockup:` line or a `docs/mockups/…` path in the prompt), read it and draft to it using the _Mockup-driven drafting_ directive in Phase 2.1 — faithfully reproducing its design intent but sourcing every concrete style token from `.claude/skills/beanies-theme/SKILL.md` + the CIG (the CIG wins on any conflict). The mockup reaches this skill ONLY through the prompt + the repo file — never read the Notion tracker for it (writing `mockup file url` back is `beanies-pre-plan`'s job). If invoked standalone where a mockup is expected but absent, generate one first via `/frontend-design:frontend-design` (CIG-clamped), get approval, commit only the approved file, then draft.
 - **ALWAYS assess Help Center coverage.** If the work introduces a distinct user-facing feature (or meaningfully changes behavior an existing article documents), include the `## Help Center Coverage` section in the plan AND treat the article as part of the same change — not a follow-up. Skip the section entirely for bug fixes, refactors, polish, and similar work.
 - **ALWAYS include Observability Coverage.** Every plan carries the `## Observability Coverage` section (per the `CLAUDE.md` convention) — feature, fix, or refactor, never omitted. State the diagnostic events emitted (`logEvent`/`reportError`/`perfTiming`, kebab-case `surface`, structured `context`), how they make each failure mode triageable from CloudWatch without a local repro, the success-path signal for future alerting, and any `ALLOWED_CONTEXT_KEYS` + store-declaration update a new context key requires. The logging lands in the same change — an acceptance criterion, not a follow-up.
+- **ALWAYS include Dark Mode Coverage for UI work.** Any plan that changes what a user sees carries the `## Dark Mode Coverage` section: every surface's dark surface step, ink, `-lift` partners and background partners (inline and scoped styles included), plus any adjacent existing breakage, fixed or recorded. The CIG (slides 8-9) is the authority. Dark mode lands in the same change as light, as an acceptance criterion, never as a follow-up.
 - **ALWAYS create 2-way links** between the plan file and the GitHub issue (if one was created).
 - **ALWAYS add labels** to GitHub issues per the project conventions (when one is created).
 - Plans are saved to `docs/plans/YYYY-MM-DD-<short-slug>.md` — this is a permanent historical record.

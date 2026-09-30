@@ -187,6 +187,26 @@ What to cover:
 - **Phone width (~400px)** for anything with layout. Most of this project's UI defects are mobile ones.
 - **Screenshots of anything visual**, and actually look at them. A screenshot you did not open proves nothing.
 
+#### Dark-mode sweep (mandatory for any change that touches UI)
+
+A light-mode pass proves nothing about dark: most of this project's dark defects are a painted background
+with no dark partner or an accent with no `-lift`, and both look fine in light. So for every UI change, run
+this as its own step, **fix what it finds before Phase 5**, and do not hand dark mode to the review:
+
+1. **List the surfaces.** Every surface the change paints (from the plan's `## Dark Mode Coverage` section
+   when it has one), plus the host surface it sits in (the drawer, modal, page or card around it).
+2. **Screenshot each one in dark, at desktop and phone width**, in every state the change adds (empty,
+   filled, busy, error, selected), and open every image.
+3. **Probe contrast** on those screens (text vs its actual background; the harness pattern in
+   `references/browser-verification.md`). Readable text must clear WCAG AA (4.5:1, or 3:1 for large text).
+4. **Grep the diff** for the known traps: a bare accent (`text-[#F15D22]`, `text-primary-500`) with no
+   `dark:text-*-lift`; the raw grey ramp or an opacity modifier on readable text; an inline `style`
+   background or a `<style scoped>` rule with no `html.dark` partner; `:global(.dark)` in a scoped block.
+5. **Fix, re-screenshot, look again.** Semantic tokens only (CIG slides 8-9 + the theme skill).
+6. **Adjacent defects.** Existing dark breakage on the SAME screen the user will look at gets fixed in
+   this change when it is cheap and local (a missing partner on a field in the drawer you built into);
+   anything broader (an app-wide colour, a brand asset) goes in the Phase 8 report as a named follow-up.
+
 When something genuinely cannot be driven programmatically — a real Google OAuth consent screen, a native
 iOS/Android build, a second physical device, a push notification on a lock screen, a paid flow — do not fake
 it and do not skip it silently. It goes on the manual-test list in Phase 8. That list is a deliverable, not
@@ -305,6 +325,9 @@ Close with a report greg can act on in under a minute:
 **Verified in a browser**
 - <step walked> — <result>  (light/dark, desktop/phone as relevant)
 
+**Dark mode:** <surfaces checked in dark (desktop + phone) | "no UI change"> — <defects found and fixed,
+including adjacent ones> — <adjacent defects recorded, not fixed, and why>
+
 **Review:** <N> findings, <N> fixed, <N> deliberately not fixed
 - <finding not fixed> — <why, and where it is recorded>
 
@@ -354,6 +377,9 @@ that overstates what was verified is worse than no report, because it retires th
 - **Always run terraform through `scripts/infra/`.** A `terraform plan` from a shell that did not source
   `~/.beanies-tf.env` produces a confident, wrong plan rather than an error. The scripts exist so that cannot
   happen; do not hand-roll the commands.
+- **Dark mode is tested and fixed in Phase 4, not left to review.** Any UI change runs the dark-mode sweep
+  (every painted surface and its host, dark at desktop + phone, contrast probed, traps grepped) and fixes
+  what it finds before Phase 5; the report says what was checked and fixed.
 - **A screenshot you did not look at is not evidence.** Nor is a test you did not run. Say what you actually
   verified and how, and let the rest go on the manual list.
 - **Review at `high`. Escalate only when greg says so.** `xhigh` and `max` are his to ask for by name; a
