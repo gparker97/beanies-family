@@ -62,8 +62,10 @@ The table schema is implicit — the Lambda writes whatever fields are in the PU
 cd infrastructure/lambda/registry
 # Bundle index.mjs + node_modules dependencies (the AWS SDK v3 packages)
 # If your Lambda runtime includes the SDK by default (Node.js 18+ usually does
-# for client-dynamodb), you can skip node_modules and just zip index.mjs.
-zip -j lambda.zip index.mjs
+# for client-dynamodb), you can skip node_modules and just zip the two modules.
+# entitlement.mjs is imported by index.mjs; leaving it out fails every request
+# with ERR_MODULE_NOT_FOUND.
+zip -j lambda.zip index.mjs entitlement.mjs
 ```
 
 If you need to bundle deps:
@@ -71,7 +73,7 @@ If you need to bundle deps:
 ```bash
 npm init -y
 npm install @aws-sdk/client-dynamodb @aws-sdk/util-dynamodb
-zip -r lambda.zip index.mjs node_modules
+zip -r lambda.zip index.mjs entitlement.mjs node_modules
 ```
 
 ### 3. Create the Lambda function
@@ -86,7 +88,8 @@ zip -r lambda.zip index.mjs node_modules
   - `CORS_ORIGIN` — comma-separated SPA origins (e.g. `https://family.example.com,http://localhost:5173`)
   - `DEV_TABLE_NAME` (optional) — separate dev table for `localhost` origins
   - `DEV_ORIGINS` (optional) — comma-separated dev origins; defaults to `http://localhost:5173,http://localhost:4173`
-- **IAM permissions:** the Lambda's execution role needs `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:DeleteItem` on your table's ARN.
+  - `BILLING_TABLE_NAME`, `V1_LAUNCH_AT`, `BILLING_ENFORCE`: the hosted service's plan state. **The Terraform path requires the billing table**: `modules/registry` takes `billing_table_name`/`billing_table_arn` and always grants `dynamodb:GetItem` on it, so wire `module "billing"` (see `infrastructure/main.tf`). Only this hand-zipped self-host path may leave `BILLING_TABLE_NAME` unset, and then only while `V1_LAUNCH_AT` is also unset: every GET returns `entitlement.state: 'beta'` and nothing is ever read-only. (Setting `V1_LAUNCH_AT` without a billing table makes the GET return `entitlement: null`. A subscription or a `trialEndsAt` override in the billing table counts even before `V1_LAUNCH_AT` is set; only the launch-based 90-day clock waits for it.)
+- **IAM permissions:** the Lambda's execution role needs `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:DeleteItem` on your table's ARN, plus `dynamodb:GetItem` on the billing table's ARN when `BILLING_TABLE_NAME` is set.
 
 Upload `lambda.zip`.
 

@@ -1,6 +1,8 @@
 /* global process */
+import { createHash } from 'node:crypto';
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { computeEntitlement, isValidInstant } from './entitlement.mjs';
 
 const client = new DynamoDBClient({});
 const PROD_TABLE = process.env.TABLE_NAME;
@@ -56,6 +58,137 @@ const SIGNUP_PLATFORMS = new Set(['web', 'ios', 'android']);
 
 const validPlatform = (v) => (SIGNUP_PLATFORMS.has(v) ? v : null);
 
+/**
+ * sha256 hex of a family id, for log lines. Deliberately the SAME function as
+ * `ai-extract/ddb.mjs` `hash()`, so an `entitlement_computed` line joins against the usage table
+ * and the metrics skill without a second derivation. (It cannot be imported: every Lambda here is
+ * its own zip.)
+ */
+function familyIdHash(familyId) {
+  return createHash('sha256').update(String(familyId)).digest('hex');
+}
+
+/**
+ * The GET arm's billing read (#95), issued CONCURRENTLY with the registry read so the pointer
+ * lookup pays no extra round trip. It NEVER rejects: the result is `{ configured, billing }` or
+ * `{ configured, error }`, and `entitlementFor` decides what to log only once the registry row is
+ * known to be live. On a 404 or a tombstone the result is simply discarded, unlogged.
+ *
+ * ITS OWN TRY/CATCH, AND THAT IS THE POINT. The handler's outer try turns any throw into a 500,
+ * and the GET is the pointer lookup that recovery-from-registry depends on. A blip on a table
+ * that only decides plan state must not take the family's file location down with it, so a
+ * billing read failure degrades to `entitlement: null` and the row still goes back with a 200.
+ *
+ * ONE BILLING TABLE, WHATEVER THE ORIGIN. The registry picks its own table by Origin
+ * (`tableForOrigin`), and that split is deliberately NOT extended here. Billing rows are written
+ * only by the prod billing Lambda (a Stripe webhook carries no Origin, and checkout refuses
+ * DEV_ORIGINS), so a localhost family simply has no billing row and computes `trial`/`beta`,
+ * which is the right answer for a dev family.
+ *
+ * Env is read at CALL time, not module load, so one test process can exercise launch set/unset
+ * and enforce on/off without module-cache games (the `countUsage.mjs` convention).
+ */
+async function readBilling(familyId) {
+  const billingTable = process.env.BILLING_TABLE_NAME;
+  if (!billingTable) return { configured: false, billing: null };
+  try {
+    const { Item } = await client.send(
+      new GetItemCommand({
+        TableName: billingTable,
+        Key: marshall({ familyId }),
+        // Strongly consistent, for the same reason as the registry read: the client refreshes
+        // straight after a checkout claim, and an eventually-consistent miss would show a
+        // family that has just paid its trial (or read-only) state.
+        ConsistentRead: true,
+      })
+    );
+    return { configured: true, billing: Item ? unmarshall(Item) : null };
+  } catch (error) {
+    return { configured: true, error };
+  }
+}
+
+/**
+ * The GET arm's entitlement block (#95): apply `computeEntitlement` to the live registry row and
+ * the billing read, log the outcome. Returns null when the answer cannot be computed; NEVER
+ * throws.
+ */
+function entitlementFor(familyId, row, billingRead) {
+  const launchAt = process.env.V1_LAUNCH_AT || '';
+  const enforce = process.env.BILLING_ENFORCE === 'true';
+  const launchSet = isValidInstant(launchAt);
+
+  if (launchAt && !launchSet) {
+    // Not fatal: an unparseable launch date computes `beta` for everyone, the pre-launch state.
+    // But it is a launch that silently did not happen, so say so on every GET until fixed.
+    console.error(
+      '[registry] entitlement_launch_invalid: V1_LAUNCH_AT does not parse as an ISO-8601 date, ' +
+        'so the launch-based trial clock never starts (subscriptions and overrides still count). Fix var.v1_launch_at and re-apply modules/registry.'
+    );
+  }
+
+  if (billingRead.error) {
+    console.error(
+      '[registry] entitlement_unavailable: check BILLING_TABLE_NAME and dynamodb:GetItem on the billing table',
+      billingRead.error
+    );
+    return null;
+  }
+  if (!billingRead.configured && launchSet) {
+    // Unset table with no launch is a supported configuration (self-hosters, and every
+    // environment before #95 ships): a self-host has no billing rows, so `beta` is exact there.
+    // (A subscription or a trial override would count before launch too, but neither can exist
+    // without the table that holds it.) Unset table AFTER launch is not supported: a paying
+    // family would read as trial or read-only. Refuse to guess.
+    console.error(
+      '[registry] entitlement_unavailable: BILLING_TABLE_NAME is unset while V1_LAUNCH_AT is set. ' +
+        'Wire billing_table_name into modules/registry and re-apply.'
+    );
+    return null;
+  }
+
+  const entitlement = computeEntitlement({
+    createdAt: row.createdAt,
+    billing: billingRead.billing,
+    launchAt,
+    now: Date.now(),
+    enforce,
+  });
+
+  // Warn only when createdAt actually decided the answer: a trial-clock outcome with no per-family
+  // override. A subscribed family, a beta family and an overridden trial never read it.
+  const createdAtUsed =
+    (entitlement.reason === 'in_trial' || entitlement.reason === 'trial_ended') &&
+    !isValidInstant(billingRead.billing?.trialEndsAt);
+  if (createdAtUsed && !isValidInstant(row.createdAt)) {
+    // `computeEntitlement` treated the missing createdAt as now (a full trial, the generous
+    // failure). Every PUT stamps `createdAt` and tombstones keep it, so this means a row that
+    // was edited by hand: fix the row, or pin the trial with
+    // `scripts/billing-cohort.mjs --trial-ends-at`.
+    console.warn(
+      '[registry] entitlement_created_at_invalid: trial computed from now. Fix createdAt on the ' +
+        'registry row or set an override with scripts/billing-cohort.mjs --trial-ends-at',
+      familyIdHash(familyId)
+    );
+  }
+
+  // The soak signal: one JSON line per answered GET, success path included, so the rate of each
+  // state is measurable before anything is enforced. Hash only; the raw id never goes here.
+  // eslint-disable-next-line no-console -- structured success-path soak line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'entitlement_computed',
+      family_id_hash: familyIdHash(familyId),
+      state: entitlement.state,
+      reason: entitlement.reason,
+      enforced: entitlement.enforced,
+      launch_set: launchSet,
+    })
+  );
+
+  return entitlement;
+}
+
 export async function handler(event) {
   // API key check
   const key = event.headers?.['x-api-key'];
@@ -73,23 +206,31 @@ export async function handler(event) {
 
   try {
     if (method === 'GET') {
-      const { Item } = await client.send(
-        new GetItemCommand({
-          TableName: tableName,
-          Key: marshall({ familyId }),
-          // Strongly consistent. An eventually-consistent read can miss a row
-          // written moments ago, and a client told "absent" for a family that
-          // does exist takes a recovery path it had no business taking.
-          ConsistentRead: true,
-        })
-      );
+      // The billing read (#95) runs alongside, never after: `readBilling` cannot reject, so a
+      // registry failure still reaches the outer catch exactly as before.
+      const [{ Item }, billingRead] = await Promise.all([
+        client.send(
+          new GetItemCommand({
+            TableName: tableName,
+            Key: marshall({ familyId }),
+            // Strongly consistent. An eventually-consistent read can miss a row
+            // written moments ago, and a client told "absent" for a family that
+            // does exist takes a recovery path it had no business taking.
+            ConsistentRead: true,
+          })
+        ),
+        readBilling(familyId),
+      ]);
       if (!Item) return response(404, { error: 'Family not found' }, event);
       const row = unmarshall(Item);
       // A tombstoned row is GONE as far as every client is concerned. Its
       // identity attributes survive so a later PUT can restore them (see the
       // DELETE arm); that is bookkeeping, not a live family.
       if (row.deletedAt) return response(404, { error: 'Family not found' }, event);
-      return response(200, row, event);
+      // Additive: every existing reader ignores the extra key, and `entitlement: null` means
+      // "could not be computed this time", which the client answers by keeping its cache.
+      const entitlement = entitlementFor(familyId, row, billingRead);
+      return response(200, { ...row, entitlement }, event);
     }
 
     if (method === 'PUT') {
