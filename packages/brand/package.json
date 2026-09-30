@@ -7,12 +7,14 @@
   "exports": {
     "./theme.css": "./theme.css",
     "./nav": "./nav.ts",
+    "./pricing": "./pricing.ts",
     "./schema": "./schema.ts",
     "./assets/*": "./assets/*"
   },
   "files": [
     "theme.css",
     "nav.ts",
+    "pricing.ts",
     "schema.ts",
     "assets",
     "fonts"

@@ -96,6 +96,7 @@ import { hasPersistedSession } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -169,6 +170,10 @@ const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
+// #95: instantiated here, for everyone and whatever the `pricing` flag says, so the registry
+// observer and the hourly poll install in prod. A lazy first use from a flagged component would
+// mean no dry-run soak at all. Nothing reads it in this file.
+useEntitlementStore();
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();

@@ -20,9 +20,11 @@ vi.mock('@/services/telemetry', () => ({ logEvent }));
 vi.mock('@/config/features', () => ({ features: { registry: true } }));
 
 import {
+  lookupFamilyResult,
   removeFamily,
   registerFamily,
   registerFamilyOrThrow,
+  setRegistryEntryObserver,
   type RegistryWritePayload,
 } from '../registryService';
 
@@ -230,5 +232,59 @@ describe('registry DELETE — the writer id rides the query string', () => {
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ context: { action: 'delete' } })
     );
+  });
+});
+
+describe('registry GET: the entry observer (#95)', () => {
+  // `entitlementStore` learns the family's plan from lookups other callers make. The seam must
+  // see every successful one and must never be able to break one.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setRegistryEntryObserver(null);
+  });
+
+  const entry = { familyId: FAMILY, provider: 'google_drive', updatedAt: '2026-09-30' };
+
+  it('hands every found entry to the observer', async () => {
+    global.fetch = okFetch(entry);
+    const seen = vi.fn();
+    setRegistryEntryObserver(seen);
+
+    const r = await lookupFamilyResult(FAMILY);
+
+    expect(r).toEqual({ status: 'found', entry });
+    expect(seen).toHaveBeenCalledWith(entry);
+  });
+
+  it('does not call the observer for an absent or unavailable family', async () => {
+    const seen = vi.fn();
+    setRegistryEntryObserver(seen);
+
+    global.fetch = failFetch(404);
+    expect(await lookupFamilyResult(FAMILY)).toEqual({ status: 'absent' });
+    global.fetch = failFetch(503);
+    expect((await lookupFamilyResult(FAMILY)).status).toBe('unavailable');
+
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('a throwing observer never turns a found lookup into a failure, and is logged', async () => {
+    global.fetch = okFetch(entry);
+    setRegistryEntryObserver(() => {
+      throw new Error('observer bug');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const r = await lookupFamilyResult(FAMILY);
+
+    expect(r).toEqual({ status: 'found', entry });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'registry',
+        context: { action: 'observer_failed' },
+      })
+    );
+    warn.mockRestore();
   });
 });

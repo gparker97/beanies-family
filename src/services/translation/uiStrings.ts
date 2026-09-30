@@ -7605,6 +7605,80 @@ const STRING_DEFS = {
     beanie:
       'leaving the wall asks for your PIN, so you need one before you start. set it up in account.',
   },
+  // ── Plans and read-only (#95) ─────────────────────────────────────────────
+  // Money and the family's data are at stake, so `plan.` and `readOnly.` are important
+  // surfaces (uiStrings.test.ts): beanie values keep the real nouns and only drop case.
+  // NATIVE copy carries no link, URL, price or purchase verb (Apple 3.1.3(f), Google Play).
+  // `readOnly.native.*` is greg's final wording, verbatim, hyphen included.
+  'plan.title': { en: 'Your Plan', beanie: 'your plan' },
+  'plan.pill.beta': { en: 'Beta', beanie: 'beta' },
+  'plan.pill.trial': { en: 'Trial', beanie: 'trial' },
+  'plan.pill.active': { en: 'Active', beanie: 'active' },
+  'plan.pill.readOnly': { en: 'Read-only', beanie: 'read-only' },
+  'plan.beta.body': {
+    en: "You're on the beta, so everything is free for now.",
+    beanie: "you're on the beta, so everything is free for now.",
+  },
+  'plan.trial.meterLabel': { en: 'Trial progress', beanie: 'trial progress' },
+  'plan.trial.day': { en: 'Day {day} of {total}.', beanie: 'day {day} of {total}.' },
+  'plan.trial.endsNative': {
+    en: 'Everything is included until {date}, then beanies.family goes read-only until a plan is chosen.',
+    beanie:
+      'everything is included until {date}, then beanies.family goes read-only until a plan is chosen.',
+  },
+  'plan.trial.endsWeb': {
+    en: 'Everything is included until {date}. Start a plan now and billing begins today; wait and nothing is charged until day {day}.',
+    beanie:
+      'everything is included until {date}. start a plan now and billing begins today; wait and nothing is charged until day {day}.',
+  },
+  'plan.name.basic': { en: 'beanies basic', beanie: 'beanies basic' },
+  'plan.name.full': { en: 'beanies + magic beans', beanie: 'beanies + magic beans' },
+  'plan.active.renews': { en: 'Renews {date}.', beanie: 'renews {date}.' },
+  'plan.cohort.preV1': {
+    en: 'Half price for life, for joining before v1.',
+    beanie: 'half price for life, for joining before v1.',
+  },
+  'plan.cohort.firstTen': {
+    en: 'One of the first ten families: your founding price is yours for life.',
+    beanie: 'one of the first ten families: your founding price is yours for life.',
+  },
+  'plan.unknown': {
+    en: 'Your plan details will show here once this device has checked in with beanies.family.',
+    beanie: 'your plan details will show here once this device has checked in with beanies.family.',
+  },
+  'plan.action.seePlans': { en: 'See Plans', beanie: 'see plans' },
+  'readOnly.native.trialEnded': {
+    en: 'Your trial has ended, so beanies.family is now read-only. Everything is still yours and export always works.',
+    beanie:
+      'your trial has ended, so beanies.family is now read-only. everything is still yours and export always works.',
+  },
+  'readOnly.native.plansElsewhere': {
+    en: "Plans can't be chosen here - they can be managed from the beanies.family website.",
+    beanie: "plans can't be chosen here - they can be managed from the beanies.family website.",
+  },
+  'readOnly.web.trialEnded': {
+    en: 'Your trial has ended, so nothing new can be added until you pick a plan. Everything is still yours and export always works.',
+    beanie:
+      'your trial has ended, so nothing new can be added until you pick a plan. everything is still yours and export always works.',
+  },
+  'readOnly.lapsed': {
+    en: 'Your plan has ended, so beanies.family is now read-only. Everything is still yours and export always works.',
+    beanie:
+      'your plan has ended, so beanies.family is now read-only. everything is still yours and export always works.',
+  },
+  // `{days}` is OFFLINE_GRACE_DAYS (src/constants/entitlement.ts), the number the rule enforces.
+  'readOnly.stale': {
+    en: "This device hasn't been able to confirm your plan for {days} days, so beanies.family is read-only until it is back online. Everything is still yours and export always works.",
+    beanie:
+      "this device hasn't been able to confirm your plan for {days} days, so beanies.family is read-only until it is back online. everything is still yours and export always works.",
+  },
+  // Phase 3's write-gate toast: reason-neutral, because it fires for trial end, lapse and stale.
+  'readOnly.toast.title': { en: 'Read-only for now', beanie: 'read-only for now' },
+  'readOnly.toast.message': {
+    en: "beanies.family is read-only right now, so this change wasn't saved. Everything is still yours.",
+    beanie:
+      "beanies.family is read-only right now, so this change wasn't saved. everything is still yours.",
+  },
   'celebration.listComplete': {
     en: 'Whole list done! The beanies are cheering!',
     beanie: 'whole list done! the beanies are going wild!',

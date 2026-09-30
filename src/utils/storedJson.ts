@@ -4,8 +4,8 @@
  * next (defaults, reset, overwrite) and any firehose event, because only the
  * caller knows whether a lost write matters.
  *
- * Shared by `perMemberStore` (install/community nudges, bean tips) and
- * `useSidebarAccordion`.
+ * Shared by `perMemberStore` (install/community nudges, bean tips),
+ * `useSidebarAccordion` and the entitlement cache (#95).
  */
 
 export type StoredJsonRead =
@@ -47,6 +47,21 @@ export function writeStoredJson(key: string, value: unknown, label: string): Sto
     return { ok: true };
   } catch (error) {
     console.warn(`[${label}] localStorage write failed for "${key}"`, error);
+    return { ok: false, error };
+  }
+}
+
+/**
+ * Remove a stored value. Same contract as the write: never throws; a refused removal (storage
+ * disabled, a hardened browser) warns with the key and returns the caught error so the caller's
+ * firehose event can carry it. Removing a key that is not there is `{ ok: true }`.
+ */
+export function removeStoredJson(key: string, label: string): StoredJsonWrite {
+  try {
+    localStorage.removeItem(key);
+    return { ok: true };
+  } catch (error) {
+    console.warn(`[${label}] localStorage remove failed for "${key}"`, error);
     return { ok: false, error };
   }
 }
