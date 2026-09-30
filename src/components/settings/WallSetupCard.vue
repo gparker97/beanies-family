@@ -106,18 +106,22 @@ watch(canEnterWall, (ready) => {
         <span>{{ t(key) }}</span>
       </li>
     </ul>
-    <button
-      type="button"
-      data-testid="wall-setup-help"
-      class="text-primary-500 dark:text-accent-lift mt-3 text-sm font-semibold hover:underline"
-      @click="openSetupHelp"
-    >
-      {{ t('wall.setup.help.link') }}
-    </button>
-
-    <BaseButton class="mt-4" @click="start">
-      {{ canEnterWall ? t('wall.setup.start') : t('wall.setup.setPinAndStart') }}
-    </BaseButton>
+    <!-- One row: the primary action, then the quiet help link. `flex-wrap` stacks them on a
+         phone; without the wrapper the inline link and the inline-flex button sat on one line
+         with no gap and the link's text ran into the button. -->
+    <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-3">
+      <BaseButton @click="start">
+        {{ canEnterWall ? t('wall.setup.start') : t('wall.setup.setPinAndStart') }}
+      </BaseButton>
+      <button
+        type="button"
+        data-testid="wall-setup-help"
+        class="text-primary-500 dark:text-accent-lift text-sm font-semibold hover:underline"
+        @click="openSetupHelp"
+      >
+        {{ t('wall.setup.help.link') }}
+      </button>
+    </div>
 
     <BeanieFormModal
       :open="pinModalOpen"
