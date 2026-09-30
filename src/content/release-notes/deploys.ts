@@ -17,6 +17,49 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.09.30',
+    date: '2026-09-30',
+    month: '30 september 2026',
+    summary: {
+      en: 'The Meal Planner can now make one shopping list for the whole week.',
+      beanie: 'the meal planner can now make one shopping list for the whole week.',
+    },
+    features: [
+      {
+        icon: '\u{1F6D2}',
+        title: { en: 'A shopping list for the week', beanie: 'a shopping list for the week' },
+        description: {
+          en: 'One list for the week, one section per recipe, with a Cook \u00D7N marker so you know how many lots to buy. Things you need for more than one meal go on one line, and \u2728 Find Duplicates (free) catches the ones written differently.',
+          beanie:
+            'one list for the week, one section per recipe, with a cook \u00D7n marker so you know how many lots to buy. things you need for more than one meal go on one line, and \u2728 find duplicates (free) catches the ones written differently.',
+        },
+        tryItRoute: '/meal-planner',
+      },
+      {
+        icon: '\u{1F37D}\uFE0F',
+        title: { en: 'Ingredients in the meal drawer', beanie: 'ingredients in the meal drawer' },
+        description: {
+          en: 'Open a planned meal to see its ingredients and add them to a shopping list, without going to the cookbook.',
+          beanie:
+            'open a planned meal to see its ingredients and add them to a shopping list, without going to the cookbook.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.29',
     date: '2026-09-29',
     month: '29 september 2026',
