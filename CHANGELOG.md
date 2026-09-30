@@ -10,7 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-09-30
 
-_Released in 0.26 (web, Android production, iOS App Store); the quick-add, phone header, deal card and PDF font changes follow in 0.26.1._
+_Released in 0.26 on the web. 0.26.1 (web, Android production, iOS App Store) carries all of it plus the quick-add, phone header, deal card and PDF font changes, and replaced 0.26 in store review._
 
 ### Added
 
