@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Phone Toolbars and Deal Hero</title>
+<!-- ===========================================================================
+     Phone-width toolbars + the Who Owns What deal card as hero (2026-09-30)
+
+     Proposed (greg's brief, frontend-design review, CIG-clamped):
+       Who Owns What, Deal view, phone (< 768px):
+         - the decorative tagline row ("Who's holding what this week? 🙋") is dropped
+         - ONE toolbar row: [Overview | Deal | Deck] + ＋ add + share icon + ⋯ overflow
+         - Export as PDF hidden (on phones it only ends in the same share sheet)
+         - progress: ONE bar with "81 cards to go"; the "card 1 of 20" line moves ONTO
+           the card's own category chip ("Home & Household · 1 of 20")
+         - the card grows from 12.25rem (196px) to 18rem (288px); arrows shrink and
+           overlap the pile's edges; swipe left/right steps the pile (try it below)
+         - "Keep this card, or skip it?" dropped on phones; Keep / Skip taller
+       Meal Planner, phone:
+         - Export as PDF hidden; Share becomes a round icon; Copy + Shopping List + Share
+           fit one row
+     Desktop / tablet (>= 768px): unchanged (both buttons, full labels, tagline).
+
+     CIG: Heritage Orange #F15D22 -> Terracotta #E67E22 gradient for Share (as today),
+     Deep Slate #2C3E50 ink, Cloud White ground; dark: surface-ground #151E27,
+     surface-raised #1E2A36, surface-overlay #26343F, ink #F2F5F7, ink-soft #C3CED6,
+     ink-faint #9AA9B4, line #4A5B69, accent-lift #FF8B5E. Outfit + Inter, rem sizes.
+     =========================================================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --page: #eef1f4; --page-ink: #2c3e50; --page-soft: #4d5d6c; --page-line: rgb(44 62 80 / 12%);
+    --ground: #f8f9fa; --panel: #fff; --card: #fff; --ink: #2c3e50; --ink-soft: #506b7a; --ink-faint: #64748b;
+    --line: rgb(44 62 80 / 10%); --tile: rgb(44 62 80 / 6%); --accent: #f15d22; --accent-ink: #d14d1a;
+    --accent-tint: rgb(241 93 34 / 10%); --silk: rgb(174 214 241 / 30%); --silk-ink: #2c6a93;
+    --track: rgb(44 62 80 / 10%); --slab: #fdebd9; --pick: rgb(241 93 34 / 8%); --frame: rgb(44 62 80 / 14%);
+    --focus: #aed6f1;
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --page: #101820; --page-ink: #f2f5f7; --page-soft: #c3ced6; --page-line: rgb(255 255 255 / 10%);
+    --ground: #151e27; --panel: #1e2a36; --card: #26343f; --ink: #f2f5f7; --ink-soft: #c3ced6; --ink-faint: #9aa9b4;
+    --line: #4a5b69; --tile: #26343f; --accent: #f15d22; --accent-ink: #ff8b5e; --accent-tint: #2f3e4b;
+    --silk: rgb(174 214 241 / 14%); --silk-ink: #aed6f1; --track: #2f3e4b; --slab: #3a2e27; --pick: #2f3e4b; --frame: #4a5b69;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--page-ink); font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 16px 80px; }
+  .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; align-items: flex-start; }
+  h1 { font-family: Outfit, sans-serif; font-size: 1.5rem; font-weight: 800; margin: 0 0 6px; }
+  .lede { font-size: 0.875rem; line-height: 1.6; color: var(--page-soft); max-width: 72ch; margin: 0; }
+  .lede b { color: var(--page-ink); }
+  .tt { display: inline-flex; padding: 3px; border-radius: 14px; background: var(--page-line); gap: 2px; }
+  .tt button { border: 0; background: transparent; padding: 6px 12px; border-radius: 11px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; color: var(--page-soft); }
+  .tt button[aria-pressed='true'] { background: var(--panel); color: var(--page-ink); }
+  .section { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--page-line); }
+  .section h2 { font-family: Outfit, sans-serif; font-size: 1.25rem; font-weight: 700; margin: 0 0 6px; }
+  .section p.why { font-size: 0.875rem; line-height: 1.6; color: var(--page-soft); max-width: 72ch; margin: 0; }
+  .frames { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 18px; align-items: flex-start; }
+  .label { font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 700; color: var(--page-soft); margin: 0 0 8px; }
+  .label.new { color: var(--accent-ink); }
+
+  /* phone */
+  .phone { width: 390px; max-width: 100%; height: 740px; border-radius: 36px; border: 1px solid var(--frame); background: var(--ground); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgb(0 0 0 / 12%); }
+  .appbar { height: 56px; flex: none; display: flex; align-items: center; justify-content: center; font-family: Outfit, sans-serif; font-weight: 700; font-size: 1rem; color: var(--ink); border-bottom: 1px solid var(--line); background: var(--panel); position: relative; }
+  .appbar .hb { position: absolute; left: 14px; width: 32px; height: 32px; border-radius: 10px; background: var(--tile); }
+  .body { flex: 1; overflow: hidden; padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; }
+  .navbar { height: 56px; flex: none; border-top: 1px solid var(--line); background: var(--panel); display: flex; justify-content: space-around; align-items: center; font-family: Outfit, sans-serif; font-size: 0.6875rem; color: var(--ink-faint); }
+  .navbar span { display: grid; place-items: center; gap: 2px; }
+
+  /* toolbar pieces */
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row.rw { flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .tagline { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.125rem; color: var(--ink); }
+  .seg { display: inline-flex; padding: 3px; border-radius: 14px; background: var(--tile); gap: 2px; flex: none; }
+  .seg span { padding: 7px 14px; border-radius: 11px; font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); }
+  .seg.tight span { padding: 7px 11px; }
+  .seg span.on { background: var(--accent); color: #fff; }
+  .ib { width: 38px; height: 38px; flex: none; border-radius: 999px; display: grid; place-items: center; border: 0; background: var(--tile); color: var(--ink); font-weight: 700; cursor: pointer; }
+  .ib.share { background: linear-gradient(135deg, #f15d22, #e67e22); color: #fff; box-shadow: 0 3px 10px rgb(241 93 34 / 30%); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 16px; background: var(--tile); color: var(--ink); font-family: Outfit, sans-serif; font-size: 0.8125rem; font-weight: 600; border: 0; white-space: nowrap; }
+  .pill.grad { background: linear-gradient(90deg, #f15d22, #e67e22); color: #fff; }
+  .pill.shop { background: rgb(39 174 96 / 12%); color: #1e8449; }
+  :root[data-theme='dark'] .pill.shop { background: rgb(95 208 138 / 14%); color: #5fd08a; }
+  .pill .n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #1e8449; color: #fff; font-size: 0.6875rem; font-weight: 700; }
+  .svg { width: 16px; height: 16px; }
+
+  /* progress */
+  .prog { display: grid; gap: 6px; }
+  .prog .t { font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); }
+  .bar { height: 8px; border-radius: 999px; background: var(--track); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 12%; background: linear-gradient(90deg, #f15d22, #e67e22); border-radius: 999px; }
+  .pos { text-align: center; font-family: Outfit, sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--ink-soft); }
+
+  /* pile */
+  .stage { position: relative; display: flex; align-items: center; justify-content: center; touch-action: pan-y; user-select: none; }
+  .pile { position: relative; aspect-ratio: 5 / 7; }
+  .pile.cur { width: 196px; }
+  .pile.big { width: 288px; }
+  .back { position: absolute; inset: 0; border-radius: 18px; background: linear-gradient(135deg, #f15d22, #e67e22); }
+  .back.b1 { transform: rotate(4deg) translate(6px, 4px); opacity: 0.85; }
+  .back.b2 { transform: rotate(-4deg) translate(-6px, 4px); opacity: 0.7; }
+  .card { position: absolute; inset: 0; border-radius: 18px; background: var(--card); border: 1px solid var(--line); box-shadow: 0 10px 26px rgb(44 62 80 / 18%); overflow: hidden; display: flex; flex-direction: column; transform: rotate(-1.5deg); transition: transform 0.28s ease; }
+  .card .slab { flex: 0 0 44%; background: var(--slab); display: grid; place-items: center; font-size: 3.2rem; }
+  .pile.big .card .slab { font-size: 4.6rem; }
+  .card .txt { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .card h3 { margin: 0; font-family: Outfit, sans-serif; font-weight: 700; font-size: 1rem; color: var(--ink); }
+  .pile.big .card h3 { font-size: 1.25rem; }
+  .card p { margin: 0; font-size: 0.8125rem; line-height: 1.45; color: var(--ink-soft); }
+  .pile.big .card p { font-size: 0.9375rem; }
+  .chip { margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 700; }
+  .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .chip .of { color: var(--ink-soft); font-weight: 600; }
+  .arrow { width: 40px; height: 40px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center; color: var(--ink); font-size: 1.1rem; flex: none; }
+  .stage.cur { gap: 10px; }
+  .stage.big .arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 12px; z-index: 2; box-shadow: 0 2px 8px rgb(44 62 80 / 16%); }
+  .stage.big .arrow.l { left: -4px; }
+  .stage.big .arrow.r { right: -4px; }
+  .q { text-align: center; font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.0625rem; color: var(--ink); }
+  .kk { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kk button { border: 1.5px solid var(--line); background: var(--panel); border-radius: 16px; padding: 12px; font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.9375rem; color: var(--ink); }
+  .kk.big button { padding: 15px 12px; font-size: 1rem; }
+  .kk button.keep { border-color: var(--accent); background: var(--pick); color: var(--accent-ink); }
+  .swipehint { text-align: center; font-size: 0.75rem; color: var(--ink-faint); margin-top: -4px; }
+  .note { font-size: 0.8125rem; line-height: 1.55; color: var(--page-soft); max-width: 360px; margin: 10px 0 0; }
+  .note b { color: var(--page-ink); }
+  .mp-title { font-family: Outfit, sans-serif; font-weight: 700; font-size: 1.5rem; color: var(--ink); margin: 0; }
+  .mp-sub { font-family: Outfit, sans-serif; color: var(--accent-ink); font-size: 1rem; font-style: italic; }
+  .skel { border-radius: 16px; border: 2px dashed var(--line); height: 58px; }
+  .daynav { display: flex; align-items: center; gap: 8px; font-family: Outfit, sans-serif; font-weight: 700; color: var(--ink); font-size: 1rem; }
+  .daynav .arrow { width: 34px; height: 34px; }
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Phone toolbars and the deal card as hero</h1>
+      <p class="lede">Current vs proposed at phone width. <b>Export as PDF is hidden below 768px</b> on both pages (on a phone it only ends in the same share sheet as Share, or downloads a file); tablets and desktops keep both. On Who Owns What the <b>card becomes the hero</b>: one toolbar row, one progress bar, "1 of 20" moves onto the card's chip, the card grows from 196px to 288px, and <b>swipe</b> steps the pile (drag the proposed card).</p>
+    </div>
+    <div class="tt" role="group" aria-label="Theme"><button type="button" data-set-theme="light">Light</button><button type="button" data-set-theme="dark">Dark</button></div>
+  </div>
+
+  <div class="section">
+    <h2>1. Who Owns What, Deal view</h2>
+    <p class="why">The proposed view gains about a row and a half of height, and all of it goes to the card: art 4.6rem instead of 3.2rem, title 1.25rem, the description fully readable. Keep / Skip stay one thumb-reach under it.</p>
+    <div class="frames">
+      <div>
+        <p class="label">Current (after a card is kept: Share + Export wrap onto the view row)</p>
+        <div class="phone">
+          <div class="appbar"><span class="hb"></span>Who Owns What</div>
+          <div class="body">
+            <div class="row"><span class="tagline grow">Who's holding what this week? 🙋</span><button class="ib" type="button">＋</button><button class="ib" type="button">⋯</button></div>
+            <div class="row rw">
+              <span class="seg"><span>Overview</span><span class="on">Deal</span><span>Deck</span></span>
+              <span class="pill grad"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Share the Deck</span>
+              <span class="pill"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Export as PDF</span>
+            </div>
+            <div class="prog"><span class="t">81 cards to go</span><div class="bar"><i></i></div></div>
+            <div class="pos">Home &amp; Household · card 1 of 20</div>
+            <div class="stage cur">
+              <span class="arrow">‹</span>
+              <div class="pile cur"><span class="back b1"></span><span class="back b2"></span>
+                <div class="card"><div class="slab">🍳</div><div class="txt"><h3>Cooking Dinner</h3><p>Everyone fed by seven, most nights</p><span class="chip"><span class="dot"></span>Home &amp; Household</span></div></div>
+              </div>
+              <span class="arrow">›</span>
+            </div>
+            <div class="q">Keep this card, or skip it?</div>
+            <div class="kk"><button type="button" class="keep">✓ Keep</button><button type="button">⏭ Skip</button></div>
+          </div>
+          <div class="navbar"><span>🏡<br />Nook</span><span>🌳<br />Planning</span><span>📅<br />Calendar</span><span>🐷<br />Money</span><span>🫘<br />Pod</span></div>
+        </div>
+      </div>
+      <div>
+        <p class="label new">Proposed</p>
+        <div class="phone">
+          <div class="appbar"><span class="hb"></span>Who Owns What</div>
+          <div class="body">
+            <div class="row">
+              <span class="seg tight"><span>Overview</span><span class="on">Deal</span><span>Deck</span></span>
+              <span class="grow"></span>
+              <button class="ib" type="button" aria-label="Add a card">＋</button>
+              <button class="ib share" type="button" aria-label="Share the Deck"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button>
+              <button class="ib" type="button" aria-label="More">⋯</button>
+            </div>
+            <div class="prog"><span class="t">81 cards to go</span><div class="bar"><i></i></div></div>
+            <div class="stage big" id="swipeStage">
+              <button class="arrow l" type="button" aria-label="Previous card" data-step="-1">‹</button>
+              <div class="pile big"><span class="back b1"></span><span class="back b2"></span>
+                <div class="card" id="swipeCard"><div class="slab" id="swArt">🍳</div><div class="txt"><h3 id="swTitle">Cooking Dinner</h3><p id="swDesc">Everyone fed by seven, most nights</p><span class="chip"><span class="dot"></span>Home &amp; Household <span class="of" id="swOf">· 1 of 20</span></span></div></div>
+              </div>
+              <button class="arrow r" type="button" aria-label="Next card" data-step="1">›</button>
+            </div>
+            <div class="swipehint">Swipe to see the next card</div>
+            <div class="kk big"><button type="button" class="keep">✓ Keep</button><button type="button">⏭ Skip</button></div>
+          </div>
+          <div class="navbar"><span>🏡<br />Nook</span><span>🌳<br />Planning</span><span>📅<br />Calendar</span><span>🐷<br />Money</span><span>🫘<br />Pod</span></div>
+        </div>
+        <p class="note"><b>Swipe</b> uses the same shared gesture helper as the Card Details drawer (touch only, vertical scroll untouched). The arrows stay for discoverability and keyboard/mouse users. The <b>share icon</b> shows only once something is kept, as today. The "swipe" hint shows until the first swipe, then never again on that device.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>2. Meal Planner header</h2>
+    <p class="why">Export as PDF is hidden on phones, and Share becomes the same round gradient icon, so the three actions fit one row and the week starts a row higher.</p>
+    <div class="frames">
+      <div>
+        <p class="label">Current</p>
+        <div class="phone" style="height: 480px">
+          <div class="appbar"><span class="hb"></span>Meal Planner</div>
+          <div class="body">
+            <div><p class="mp-title">🍲 Meal Planner</p><span class="mp-sub">what's cooking this week? 🌱</span></div>
+            <div class="row rw"><span class="pill">⧉ Copy last week</span><span class="pill shop">🛒 Shopping List <span class="n">3</span></span>
+              <span class="pill grad"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>Share</span>
+              <span class="pill"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>Export as PDF</span></div>
+            <div class="daynav"><span class="arrow">‹</span><span class="arrow">›</span>Wednesday, 30 Sep</div>
+            <div class="skel"></div><div class="skel"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="label new">Proposed</p>
+        <div class="phone" style="height: 480px">
+          <div class="appbar"><span class="hb"></span>Meal Planner</div>
+          <div class="body">
+            <div><p class="mp-title">🍲 Meal Planner</p><span class="mp-sub">what's cooking this week? 🌱</span></div>
+            <div class="row"><span class="pill">⧉ Copy last week</span><span class="pill shop">🛒 Shopping List <span class="n">3</span></span><span class="grow"></span>
+              <button class="ib share" type="button" aria-label="Share"><svg class="svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg></button></div>
+            <div class="daynav"><span class="arrow">‹</span><span class="arrow">›</span>Wednesday, 30 Sep</div>
+            <div class="skel"></div><div class="skel"></div><div class="skel"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const root = document.documentElement;
+  const qs = new URLSearchParams(location.search).get('theme');
+  function setTheme(t) { root.dataset.theme = t; document.querySelectorAll('[data-set-theme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.setTheme === t))); }
+  setTheme(qs === 'dark' || qs === 'light' ? qs : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.querySelectorAll('[data-set-theme]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.setTheme)));
+
+  const CARDS = [
+    ['🍳', 'Cooking Dinner', 'Everyone fed by seven, most nights'],
+    ['🧺', 'Laundry', 'Washed, dried, folded, and back in drawers'],
+    ['🗑️', 'Trash & Recycling', 'Out on the curb before pickup day'],
+    ['🛒', 'Groceries', 'The fridge has what the week needs'],
+  ];
+  let i = 0;
+  const card = document.getElementById('swipeCard');
+  function show(dir) {
+    i = (i + dir + CARDS.length) % CARDS.length;
+    const [a, t, d] = CARDS[i];
+    document.getElementById('swArt').textContent = a;
+    document.getElementById('swTitle').textContent = t;
+    document.getElementById('swDesc').textContent = d;
+    document.getElementById('swOf').textContent = `· ${i + 1} of 20`;
+    card.style.transform = 'rotate(-1.5deg)';
+  }
+  document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => show(Number(b.dataset.step))));
+  const stage = document.getElementById('swipeStage');
+  let x0 = null;
+  stage.addEventListener('pointerdown', (e) => { if (e.target.closest('button')) return; x0 = e.clientX; stage.setPointerCapture(e.pointerId); });
+  stage.addEventListener('pointermove', (e) => { if (x0 === null) return; const dx = e.clientX - x0; card.style.transition = 'none'; card.style.transform = `translateX(${dx}px) rotate(${-1.5 + dx / 30}deg)`; });
+  stage.addEventListener('pointerup', (e) => { if (x0 === null) return; const dx = e.clientX - x0; x0 = null; card.style.transition = ''; if (Math.abs(dx) > 60) show(dx < 0 ? 1 : -1); else card.style.transform = 'rotate(-1.5deg)'; });
+</script>
+</body>
+</html>
