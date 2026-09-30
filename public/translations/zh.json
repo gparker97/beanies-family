@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-29",
-    "translationCount": 5621
+    "lastUpdated": "2026-09-30",
+    "translationCount": 5672
   },
   "translations": {
     "app.name": {
@@ -10201,11 +10201,6 @@
       "hash": "e690qs",
       "lastUpdated": "2026-04-19"
     },
-    "recipes.placeholder.servings": {
-      "translation": "例如： 6人份",
-      "hash": "9vevfu",
-      "lastUpdated": "2026-04-19"
-    },
     "recipes.placeholder.ingredients": {
       "translation": "每行一项，例如 500 克牛肉末\\n3 根胡萝卜\\n……",
       "hash": "s95iib",
@@ -11634,31 +11629,6 @@
     "quickAdd.recipe.hint": {
       "translation": "成分·步骤",
       "hash": "ty5zvk",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.tripIdea.label": {
-      "translation": "行程创意",
-      "hash": "plagaa",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.tripIdea.hint": {
-      "translation": "收藏目的地",
-      "hash": "shibm4",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.tripIdea.noTripsTitle": {
-      "translation": "请先添加行程",
-      "hash": "ozwp7x",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.tripIdea.noTripsMessage": {
-      "translation": "行程创意体现在行程中--创建一个创意，然后再回来。",
-      "hash": "1tizfk",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.tripIdea.addTripAction": {
-      "translation": "新增行程",
-      "hash": "kbxbj0",
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.account.label": {
@@ -19841,16 +19811,6 @@
       "hash": "ifjbmn",
       "lastUpdated": "2026-08-19"
     },
-    "mealPlanner.export.exportPdf": {
-      "translation": "导出为 PDF",
-      "hash": "nrwtrk",
-      "lastUpdated": "2026-08-19"
-    },
-    "mealPlanner.export.building": {
-      "translation": "正在准备…",
-      "hash": "bncl36",
-      "lastUpdated": "2026-08-19"
-    },
     "mealPlanner.export.failed": {
       "translation": "无法创建文件",
       "hash": "utcu21",
@@ -21792,9 +21752,9 @@
       "lastUpdated": "2026-09-03"
     },
     "ai.capture.placeholder": {
-      "translation": "粘贴消息、电子邮件或链接……",
-      "hash": "u9e6jg",
-      "lastUpdated": "2026-09-03"
+      "translation": "提醒我明天上午10点遛狗……",
+      "hash": "qtbud3",
+      "lastUpdated": "2026-09-30"
     },
     "wall.tooNarrow.title": {
       "translation": "这块屏幕对墙壁来说太小了",
@@ -23467,19 +23427,9 @@
       "lastUpdated": "2026-09-13"
     },
     "lists.fromRecipe.body": {
-      "translation": "在创建列表之前检查列表—编辑任何内容，或添加您已经需要的内容。",
-      "hash": "bgjnd4",
-      "lastUpdated": "2026-09-13"
-    },
-    "lists.fromRecipe.itemsLabel": {
-      "translation": "购物商品，每行一件",
-      "hash": "7tblf1",
-      "lastUpdated": "2026-09-13"
-    },
-    "lists.fromRecipe.save": {
-      "translation": "创建清单",
-      "hash": "ifsmrm",
-      "lastUpdated": "2026-09-13"
+      "translation": "取消勾选您已有的内容、编辑任何行或添加您自己的行。",
+      "hash": "k9zkc4",
+      "lastUpdated": "2026-09-30"
     },
     "lists.fromRecipe.listTitle": {
       "translation": "{recipe}购物",
@@ -23541,11 +23491,6 @@
       "hash": "6xvoen",
       "lastUpdated": "2026-09-13"
     },
-    "lists.fromRecipe.existing": {
-      "translation": "您已经为此配方创建了一个列表：",
-      "hash": "spohlq",
-      "lastUpdated": "2026-09-13"
-    },
     "lists.fromRecipe.noMemberError": {
       "translation": "我们无法分辨您的身份",
       "hash": "lgxmyy",
@@ -23599,16 +23544,6 @@
     "lists.fromRecipe.someone": {
       "translation": "无论谁拥有它",
       "hash": "xxas4m",
-      "lastUpdated": "2026-09-13"
-    },
-    "lists.fromRecipe.ownerGoneError": {
-      "translation": "该家庭成员已不在您的Pod中",
-      "hash": "3c9260",
-      "lastUpdated": "2026-09-13"
-    },
-    "lists.fromRecipe.ownerGoneHelp": {
-      "translation": "该成员在此打开时已被移除。请另选一位购物的人，然后创建清单。",
-      "hash": "st47oq",
       "lastUpdated": "2026-09-13"
     },
     "lists.error.unknownOwner": {
@@ -24604,7 +24539,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -25029,12 +24964,12 @@
     "statementImport.row.tick": {
       "translation": "Add {name}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "statementImport.row.edit": {
       "translation": "Edit {name}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "statementImport.row.already": {
       "translation": "已添加{date}",
@@ -25526,11 +25461,6 @@
       "hash": "zert5l",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.menu.export": {
-      "translation": "导出为 PDF",
-      "hash": "nrwtrk",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.menu.rhythm": {
       "translation": "入住节奏",
       "hash": "b2hgto",
@@ -26009,7 +25939,7 @@
     "whoOwnsWhat.card.since": {
       "translation": "Since {date}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "whoOwnsWhat.card.sinceBefore": {
       "translation": "自{date}起，在{name}之前",
@@ -26034,7 +25964,7 @@
     "whoOwnsWhat.card.open": {
       "translation": "Open {card}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "whoOwnsWhat.byBean.count.one": {
       "translation": "1张卡",
@@ -26389,7 +26319,7 @@
     "whoOwnsWhat.pile.groupAction": {
       "translation": "Skip {count}",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "whoOwnsWhat.pile.empty": {
       "translation": "这里没有什么可交易的了。",
@@ -26691,11 +26621,6 @@
       "hash": "5gzl9j",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.export.building": {
-      "translation": "正在准备…",
-      "hash": "bncl36",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.export.heading": {
       "translation": "谁拥有什么",
       "hash": "cib92j",
@@ -26751,21 +26676,6 @@
       "hash": "lm6nyp",
       "lastUpdated": "2026-09-27"
     },
-    "whoOwnsWhat.briefing.mine": {
-      "translation": "您在“谁拥有什么”中的卡片",
-      "hash": "z0iuxw",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.briefing.mineCount.one": {
-      "translation": "您的1张卡",
-      "hash": "ithxrg",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.briefing.mineCount.other": {
-      "translation": "您的{count}张卡片",
-      "hash": "artyjl",
-      "lastUpdated": "2026-09-27"
-    },
     "whoOwnsWhat.briefing.movedAway": {
       "translation": "{card}已于{date}移至{name}。",
       "hash": "m2dcp4",
@@ -26774,16 +26684,6 @@
     "whoOwnsWhat.briefing.movedToYou": {
       "translation": "您现在持有来自{name}的{card}。",
       "hash": "lnycsd",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.briefing.nobody.one": {
-      "translation": "{names}还没有人。",
-      "hash": "hdy52l",
-      "lastUpdated": "2026-09-27"
-    },
-    "whoOwnsWhat.briefing.nobody.other": {
-      "translation": "{count}张卡片还没有人： {names}。",
-      "hash": "fl4usz",
       "lastUpdated": "2026-09-27"
     },
     "whoOwnsWhat.briefing.checkIn": {
@@ -28059,7 +27959,7 @@
     "whoOwnsWhat.checkinDrawer.noIssues": {
       "translation": "No Issues",
       "hash": "",
-      "lastUpdated": "2026-09-29"
+      "lastUpdated": "2026-09-30"
     },
     "whoOwnsWhat.checkinDrawer.talked": {
       "translation": "我们已经讨论过了",
@@ -28110,6 +28010,361 @@
       "translation": "（续）",
       "hash": "p2aafo",
       "lastUpdated": "2026-09-29"
+    },
+    "common.everyone": {
+      "translation": "所有人",
+      "hash": "5qdaq3",
+      "lastUpdated": "2026-09-30"
+    },
+    "common.moreInfo": {
+      "translation": "更多信息",
+      "hash": "8v645j",
+      "lastUpdated": "2026-09-30"
+    },
+    "recipes.servesN": {
+      "translation": "可供{n}人食用",
+      "hash": "2rdy32",
+      "lastUpdated": "2026-09-30"
+    },
+    "recipes.servingsUnit": {
+      "translation": "用户",
+      "hash": "gehwmp",
+      "lastUpdated": "2026-09-30"
+    },
+    "recipes.servingsHint": {
+      "translation": "用于为吃饭的人调整购物清单的大小。",
+      "hash": "qeyva9",
+      "lastUpdated": "2026-09-30"
+    },
+    "common.stepper.fewer": {
+      "translation": "稀少",
+      "hash": "14clyd",
+      "lastUpdated": "2026-09-30"
+    },
+    "common.stepper.more": {
+      "translation": "更多",
+      "hash": "1fj3p",
+      "lastUpdated": "2026-09-30"
+    },
+    "cookLog.placeholder.servings": {
+      "translation": "例如： 6人份",
+      "hash": "9vevfu",
+      "lastUpdated": "2026-09-30"
+    },
+    "sheetExport.exportPdf": {
+      "translation": "导出为 PDF",
+      "hash": "nrwtrk",
+      "lastUpdated": "2026-09-30"
+    },
+    "sheetExport.building": {
+      "translation": "正在准备…",
+      "hash": "bncl36",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.button": {
+      "translation": "购物单",
+      "hash": "f12je2",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.disabledHint": {
+      "translation": "计划本周的食谱，以建立购物清单。",
+      "hash": "u3hll4",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.badge.one": {
+      "translation": "本周1份食谱",
+      "hash": "k3pv03",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.badge.other": {
+      "translation": "本周{n}个食谱",
+      "hash": "whbp23",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.title": {
+      "translation": "购物单",
+      "hash": "f12je2",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.subtitle": {
+      "translation": "{date}周， {recipes} ， {meals}",
+      "hash": "m8tqhy",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.recipes.one": {
+      "translation": "1个配方",
+      "hash": "jqqezh",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.recipes.other": {
+      "translation": "{n}个食谱",
+      "hash": "9us4y7",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.meals.one": {
+      "translation": "1餐",
+      "hash": "nqsn6a",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.meals.other": {
+      "translation": "{n}份餐点",
+      "hash": "47e2h2",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.listTitle": {
+      "translation": "{date}购物",
+      "hash": "msgnr1",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.eatingPill": {
+      "translation": "{day} ， {n}吃",
+      "hash": "2e5r8w",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.everyonePill": {
+      "translation": "{day} ，所有人({n})",
+      "hash": "s8k002",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.cook.once": {
+      "translation": "烹饪一次",
+      "hash": "z9vu7b",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.cook.onceAria": {
+      "translation": "烹饪一次",
+      "hash": "z9bemf",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.cook.times": {
+      "translation": "厨师× {n}",
+      "hash": "z7gq2d",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.cook.timesAria": {
+      "translation": "烹饪{n}次",
+      "hash": "tzvrew",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.noServingsPerMeal": {
+      "translation": "没有设置份量，因此每餐一批。",
+      "hash": "9ob3ds",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.title": {
+      "translation": "不止一餐",
+      "hash": "bp8blg",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.find": {
+      "translation": "查找重复收件人",
+      "hash": "w1g80f",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.free": {
+      "translation": "免费",
+      "hash": "1b43w",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.running": {
+      "translation": "正在查找重复项…",
+      "hash": "oini93",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.found.one": {
+      "translation": "%1 被找到。",
+      "hash": "pnvnbn",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.found.other": {
+      "translation": "找到{n}个",
+      "hash": "4b1tw4",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.none": {
+      "translation": "无其他重复项",
+      "hash": "4zigqf",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.dupes.splitDone": {
+      "translation": "Split into {n} lines",
+      "hash": "",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.ingredients": {
+      "translation": "食材",
+      "hash": "77hsv2",
+      "lastUpdated": "2026-09-30"
+    },
+    "mealPlanner.shopping.forEating": {
+      "translation": "对于{n} ，提供{s}",
+      "hash": "fmo6y8",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.heading": {
+      "translation": "它去向何方",
+      "hash": "3yiq6q",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.newList": {
+      "translation": "新清单",
+      "hash": "mv5y72",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addToList": {
+      "translation": "添加到列表",
+      "hash": "hh18jh",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.nameLabel": {
+      "translation": "列表名称",
+      "hash": "bx0a8d",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.noLists": {
+      "translation": "无列表",
+      "hash": "b85gta",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.createList": {
+      "translation": "建立名單",
+      "hash": "ifsmrm",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addItems.one": {
+      "translation": "添加1个项目",
+      "hash": "x6ybsx",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addItems.other": {
+      "translation": "添加{n}个项目",
+      "hash": "dw3b1n",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addTo": {
+      "translation": "Add to {list}",
+      "hash": "",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addToNew": {
+      "translation": "添加到新列表",
+      "hash": "q641b7",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.addShort": {
+      "translation": "Add {n}",
+      "hash": "",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.added": {
+      "translation": "加入物",
+      "hash": "11klwg",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.itemsAdded": {
+      "translation": "已添加到您的心愿单",
+      "hash": "80cdid",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.listGoneError": {
+      "translation": "该列表已删除",
+      "hash": "vcm2cn",
+      "lastUpdated": "2026-09-30"
+    },
+    "lists.destination.listGoneHelp": {
+      "translation": "您的家人在开放时将其删除，因此没有添加任何内容。选择另一个心愿单或创建一个新心愿单。",
+      "hash": "188y7f",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.tickAll": {
+      "translation": "全部勾选",
+      "hash": "x2oyvy",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.untickAll": {
+      "translation": "取消所有选中",
+      "hash": "j6mlvb",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.addPlaceholder": {
+      "translation": "+ 新增项目",
+      "hash": "5yfc6x",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.include": {
+      "translation": "包括{item}",
+      "hash": "mbv5mh",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.edit": {
+      "translation": "Edit {item}",
+      "hash": "",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.allMerged": {
+      "translation": "一顿不止一餐的多样化体验",
+      "hash": "spxwr1",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.split": {
+      "translation": "分列",
+      "hash": "1boqgq",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.splitAria": {
+      "translation": "Split {item}",
+      "hash": "",
+      "lastUpdated": "2026-09-30"
+    },
+    "ingredients.byMagic": {
+      "translation": "被魔豆发现",
+      "hash": "ue9uit",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.capture.labelHint": {
+      "translation": "粘贴短信、电子邮件、活动、待办事项、提醒、食谱链接或其他任何您想保留的内容，我们会帮您确定具体内容。您始终会在保存任何内容之前查看它。",
+      "hash": "pzm2dl",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.whatValue": {
+      "translation": "仅此列表中的食材行：没有食谱名称、日期或谁在吃。",
+      "hash": "5xs17h",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.intro": {
+      "translation": "魔豆将使用安全、私密的人工智能查看此列表中的配料线，并发现相同的配料线。",
+      "hash": "cdv7qe",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.afterValue": {
+      "translation": "AI服务不保留任何内容。合并的行只会更改此列表。",
+      "hash": "raelq0",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.confirm": {
+      "translation": "查找重复收件人",
+      "hash": "w1g80f",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.remember": {
+      "translation": "在购物清单中找到重复项之前，请勿再次询问。",
+      "hash": "35jhvf",
+      "lastUpdated": "2026-09-30"
+    },
+    "ai.consent.ingredients.label": {
+      "translation": "购物清单成分同意书",
+      "hash": "fvwb2",
+      "lastUpdated": "2026-09-30"
+    },
+    "whoOwnsWhat.pile.positionChip": {
+      "translation": "{category} · {n}/{total}",
+      "hash": "9rnjsq",
+      "lastUpdated": "2026-09-30"
+    },
+    "whoOwnsWhat.pile.swipeHint": {
+      "translation": "滑动以查看下一张卡片",
+      "hash": "84fcvy",
+      "lastUpdated": "2026-09-30"
     }
   }
 }
