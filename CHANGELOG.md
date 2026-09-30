@@ -15,6 +15,7 @@ _Unreleased on `main`. Nothing in this section is visible to users yet._
 ### Fixed
 
 - (unreleased) On Settings, the Beanie Wall card's "How to set your device up" link no longer runs into the Start button.
+- (unreleased) Help Center: the magic link article now says links last 15 minutes and that a new link does not cancel an earlier one (it still described the retired 7-day link).
 
 ### Changed
 
