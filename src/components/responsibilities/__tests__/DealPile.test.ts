@@ -146,6 +146,9 @@ const PickerStub = defineComponent({
 });
 
 import DealPile from '../DealPile.vue';
+import DealPileStage from '../DealPileStage.vue';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
+import { swipe } from '@/test/pointerSwipe';
 import { resetDealActionsForTest } from '../useDealActions';
 
 let wrapper: VueWrapper | null = null;
@@ -172,6 +175,7 @@ function lastUndo(): () => Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   resetDealActionsForTest();
   toast.toasts.value = [];
   let toastId = 0;
@@ -436,6 +440,17 @@ describe('DealPile: stepping and revisiting', () => {
     expect(w.find('[data-testid="deal-pile-prev"]').attributes('disabled')).toBeDefined();
   });
 
+  it('an unknown category reads Other on the position line, as on the chip (one source)', async () => {
+    store.resolved = [
+      { ...makeCard('laundry', 'held', 'sofia'), category: 'from-a-newer-client' as never },
+      makeCard('dishes'),
+    ];
+    const w = mountPile({ scope: 'unsorted' });
+    await click(w, 'deal-list-kept-laundry');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(w.find('[data-testid="deal-pile-position"]').text()).toBe('lists.category.other');
+  });
+
   it('Bring back from the Skipped list runs the pile revisit: on the card, logged, undo', async () => {
     store.resolved = [makeCard('laundry', 'skipped'), makeCard('dishes')];
     const w = mountPile();
@@ -597,5 +612,111 @@ describe('DealPile: keyboard shortcuts', () => {
     await flushPromises();
     expect(store.deal).toHaveBeenCalledWith('laundry', 'main', 'greg');
     toggle.remove();
+  });
+});
+
+describe('DealPile: phones (swipe, hint, count on the chip)', () => {
+  // A touch screen: the swipe hint only exists where the stage's (touch-only) swipe does.
+  const realMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes('hover: none'),
+      media: q,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  const stageEl = (w: VueWrapper) => w.findComponent(DealPileStage).element as HTMLElement;
+  const swipeLeft = (w: VueWrapper) => swipe(stageEl(w), { x: 200, y: 100 }, { x: 60, y: 100 });
+  const swipeRight = (w: VueWrapper) => swipe(stageEl(w), { x: 60, y: 100 }, { x: 200, y: 100 });
+
+  it('a touch swipe steps the pile, logged apart from the arrows', async () => {
+    const w = mountPile();
+    swipeLeft(w);
+    await flushPromises();
+    expect(has(w, 'deal-pile-card-dishes')).toBe(true);
+    swipeRight(w);
+    await flushPromises();
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    await click(w, 'deal-pile-next');
+    expect(logged('pile_step')).toEqual([
+      { detail: 'swipe_next' },
+      { detail: 'swipe_prev' },
+      { detail: 'next' },
+    ]);
+  });
+
+  it('the hint shows until the first step that moves the pile, then stays gone on this device', async () => {
+    const w = mountPile();
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(true);
+    // A swipe past the start moves nothing and leaves it up.
+    swipeRight(w);
+    await flushPromises();
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT)).toBeNull();
+
+    swipeLeft(w);
+    await flushPromises();
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT)).toBe('seen');
+    w.unmount();
+
+    expect(has(mountPile(), 'deal-pile-swipe-hint')).toBe(false);
+  });
+
+  it('an arrow or a key step counts too (arrow-only users lose the hint)', async () => {
+    const w = mountPile();
+    await click(w, 'deal-pile-next');
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT)).toBe('seen');
+    w.unmount();
+
+    localStorage.removeItem(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT);
+    const k = mountPile();
+    expect(has(k, 'deal-pile-swipe-hint')).toBe(true);
+    press('ArrowRight');
+    await flushPromises();
+    expect(has(k, 'deal-pile-swipe-hint')).toBe(false);
+  });
+
+  it('an action never shows or hides the hint (stable while the pile has 2+ cards)', async () => {
+    const w = mountPile();
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(true);
+    await click(w, 'deal-pile-skip');
+    await flushPromises();
+    expect(has(w, 'deal-pile-swipe-hint')).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEYS.WHO_OWNS_WHAT_SWIPE_HINT)).toBeNull();
+  });
+
+  it('no hint when there is nowhere to swipe', () => {
+    store.resolved = [makeCard('laundry')];
+    expect(has(mountPile(), 'deal-pile-swipe-hint')).toBe(false);
+  });
+
+  it('the chip carries the count while the card is counted, never on a visited card', async () => {
+    store.resolved = [makeCard('laundry', 'held', 'sofia'), makeCard('dishes')];
+    const w = mountPile();
+    expect(has(w, 'deal-pile-position-chip')).toBe(true);
+    await click(w, 'deal-list-kept-laundry');
+    expect(has(w, 'deal-pile-card-laundry')).toBe(true);
+    expect(has(w, 'deal-pile-position-chip')).toBe(false);
+  });
+
+  it('the position line and the question stay in the DOM, hidden below md', () => {
+    const w = mountPile();
+    expect(w.find('[data-testid="deal-pile-position"]').classes()).toEqual(
+      expect.arrayContaining(['hidden', 'md:block'])
+    );
+    expect(w.find('[data-testid="deal-pile-question"]').classes()).toEqual(
+      expect.arrayContaining(['hidden', 'md:block'])
+    );
   });
 });

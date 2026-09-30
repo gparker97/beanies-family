@@ -20,4 +20,7 @@ export const STORAGE_KEYS = {
   WHO_OWNS_WHAT_VIEW: 'beanies:whoOwnsWhatView',
   /** Who Owns What (#109): the Deal view at md+, card by card (`pile`) or the board. */
   WHO_OWNS_WHAT_DEAL_MODE: 'beanies:whoOwnsWhatDealMode',
+  /** Who Owns What: the deal pile's phone swipe hint, `show` until the first swipe, then
+   *  `seen`. Device-local; not read by the `index.html` bootstrap. */
+  WHO_OWNS_WHAT_SWIPE_HINT: 'beanies:whoOwnsWhatSwipeHint',
 } as const;

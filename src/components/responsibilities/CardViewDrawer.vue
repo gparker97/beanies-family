@@ -23,7 +23,7 @@
  * says so and closes, rather than rendering an empty shell. A delete from this drawer's
  * own tile is not a surprise: it has its own success toast, so the notice is skipped.
  */
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
@@ -37,7 +37,6 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatNookDate } from '@/utils/date';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts';
-import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
@@ -213,15 +212,6 @@ useKeyboardShortcuts(
   }
 );
 
-const handEl = ref<HTMLElement | null>(null);
-useHorizontalSwipe(handEl, {
-  onSwipeLeft: () => go(1, 'swipe'),
-  onSwipeRight: () => go(-1, 'swipe'),
-  enabled: computed(() => !!step.value),
-  // A mouse drag on a desktop selects text; only touch / pen swipe.
-  ignoreMouse: true,
-});
-
 /** "beanies uses this card for": one line per default target; hint targets collapse to one. */
 const uses = computed(() => {
   if (!card.value || card.value.isCustom) return [];
@@ -281,7 +271,8 @@ const { onDelete } = useCardDrawerEnd({
       >
         {{ position }}
       </p>
-      <div ref="handEl" class="hand pt-2 pb-4">
+      <!-- The stage owns the swipe (touch / pen), emitting step(dir, 'arrow' | 'swipe'). -->
+      <div class="pt-2 pb-4">
         <DealPileStage
           :card="card"
           size="hand"
@@ -289,7 +280,7 @@ const { onDelete } = useCardDrawerEnd({
           :arrows="!!step"
           :can-prev="!!step?.prevId"
           :can-next="!!step?.nextId"
-          @step="go($event, 'arrow')"
+          @step="go"
         >
           <div
             class="dark:border-line mt-1 flex min-w-0 items-center gap-2 border-t border-dashed border-[var(--color-border)] pt-2"
@@ -381,11 +372,6 @@ const { onDelete } = useCardDrawerEnd({
 </template>
 
 <style scoped>
-/* Swipe target: vertical scroll stays with the drawer, horizontal is ours. */
-.hand {
-  touch-action: pan-y;
-}
-
 .fan {
   height: 1.5rem;
   left: 0.25rem;

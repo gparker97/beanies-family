@@ -19,4 +19,13 @@ describe('useListCategoryLabel', () => {
     // @ts-expect-error — exercising the defensive fallback path
     expect(categoryLabel('bogus')).toBe('bogus');
   });
+
+  it('categoryLabelOrOther: known ids translate; missing or unknown ids read "Other"', () => {
+    const { categoryLabelOrOther } = useListCategoryLabel();
+    expect(categoryLabelOrOther('home')).toBe('t:lists.category.home');
+    expect(categoryLabelOrOther('from-a-newer-client')).toBe('t:lists.category.other');
+    expect(categoryLabelOrOther(null)).toBe('t:lists.category.other');
+    expect(categoryLabelOrOther(undefined)).toBe('t:lists.category.other');
+    expect(categoryLabelOrOther('')).toBe('t:lists.category.other');
+  });
 });

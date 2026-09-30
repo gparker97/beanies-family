@@ -73,8 +73,8 @@ function button(wrapper: VueWrapper, labelKey: string) {
 /** Busy flag cleared: both buttons show their idle label, enabled; the sheet is unmounted. */
 function expectIdle(wrapper: VueWrapper) {
   expect(button(wrapper, 'mealPlanner.export.share').attributes('disabled')).toBeUndefined();
-  expect(button(wrapper, 'mealPlanner.export.exportPdf').attributes('disabled')).toBeUndefined();
-  expect(wrapper.text()).not.toContain('mealPlanner.export.building');
+  expect(button(wrapper, 'sheetExport.exportPdf').attributes('disabled')).toBeUndefined();
+  expect(wrapper.text()).not.toContain('sheetExport.building');
   expect(wrapper.find('.export-host').exists()).toBe(false);
 }
 
@@ -138,7 +138,7 @@ describe('MealPlannerPage export — failure contract', () => {
     pngBlobToPdf.mockRejectedValue(new sheetExport.ExportError('pdf', new Error('x')));
     pngBlobsToPdf.mockRejectedValue(new sheetExport.ExportError('pdf', new Error('x')));
     const wrapper = factory();
-    await button(wrapper, 'mealPlanner.export.exportPdf').trigger('click');
+    await button(wrapper, 'sheetExport.exportPdf').trigger('click');
     await flushPromises();
 
     expectOneFailureToast('pdf', 'pdf');
@@ -149,7 +149,7 @@ describe('MealPlannerPage export — failure contract', () => {
   it('deliver failure (a plain Error): one toast at stage deliver, busy flag cleared', async () => {
     vi.mocked(deliverFile).mockRejectedValue(new Error('share blew up'));
     const wrapper = factory();
-    await button(wrapper, 'mealPlanner.export.exportPdf').trigger('click');
+    await button(wrapper, 'sheetExport.exportPdf').trigger('click');
     await flushPromises();
 
     expectOneFailureToast('pdf', 'deliver');

@@ -52,7 +52,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const { bringBack } = useDealActions();
 
 const skipped = computed(() => props.cards.filter((c) => c.status === 'skipped'));
@@ -103,8 +103,8 @@ const shelves = computed<Shelf[]>(() =>
   groupByCategory(visible.value).map(({ category, cards }) => {
     const def = category ? getListCategory(category) : undefined;
     return category && def
-      ? { key: category, title: categoryLabel(category), emoji: def.emoji, cards }
-      : { key: OTHER_SHELF, title: t('lists.category.other'), emoji: '📁', cards };
+      ? { key: category, title: categoryLabelOrOther(category), emoji: def.emoji, cards }
+      : { key: OTHER_SHELF, title: categoryLabelOrOther(null), emoji: '📁', cards };
   })
 );
 

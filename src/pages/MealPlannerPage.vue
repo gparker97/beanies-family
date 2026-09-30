@@ -15,7 +15,6 @@ import MealEditModal from '@/components/mealplan/MealEditModal.vue';
 import MealPickerSheet from '@/components/mealplan/MealPickerSheet.vue';
 import MealWeekShoppingDrawer from '@/components/mealplan/MealWeekShoppingDrawer.vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
@@ -26,6 +25,7 @@ import { confirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import ExportSheet from '@/components/export/ExportSheet.vue';
+import SheetExportActions from '@/components/export/SheetExportActions.vue';
 import MealPlanExportBody from '@/components/export/MealPlanExportBody.vue';
 import ExportPeopleLegend from '@/components/export/ExportPeopleLegend.vue';
 import { useSheetExportRunner } from '@/composables/useSheetExportRunner';
@@ -255,7 +255,6 @@ const sheetComp = ref<{ $el: HTMLElement } | null>(null);
 const {
   exportMounting,
   exportingFormat,
-  exporting,
   run: runExport,
 } = useSheetExportRunner({
   surface: 'plan-export',
@@ -292,25 +291,27 @@ const {
           <button
             v-if="isCurrentWeek"
             type="button"
-            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
+            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-3 py-2.5 text-sm font-semibold md:px-4"
             @click="copyLastWeek"
           >
-            ⧉ {{ t('mealPlanner.copyLastWeek') }}
+            <span class="hidden md:inline" aria-hidden="true">⧉ </span
+            >{{ t('mealPlanner.copyLastWeek') }}
           </button>
           <button
             v-else
             type="button"
-            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold"
+            class="font-outfit text-secondary-500 dark:text-ink rounded-2xl bg-[var(--tint-slate-5)] px-3 py-2.5 text-sm font-semibold md:px-4"
             @click="copyViewedToCurrent"
           >
-            ⧉ {{ t('mealPlanner.copyHere') }}
+            <span class="hidden md:inline" aria-hidden="true">⧉ </span
+            >{{ t('mealPlanner.copyHere') }}
           </button>
           <!-- The week's shopping list. Disabled (never hidden) with no recipe meals, so
              the feature stays discoverable, with the reason right under the row. -->
           <button
             v-if="canMakeShoppingList"
             type="button"
-            class="font-outfit dark:text-success-lift dark:disabled:bg-surface-overlay dark:disabled:text-ink-faint inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-success-10)] px-4 py-2.5 text-sm font-semibold text-[#1e8449] disabled:cursor-not-allowed disabled:bg-[var(--tint-slate-5)] disabled:text-[var(--color-text-muted)]"
+            class="font-outfit dark:text-success-lift dark:disabled:bg-surface-overlay dark:disabled:text-ink-faint inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-success-10)] px-3 py-2.5 text-sm font-semibold text-[#1e8449] disabled:cursor-not-allowed disabled:bg-[var(--tint-slate-5)] disabled:text-[var(--color-text-muted)] md:px-4"
             :disabled="shoppingRecipeCount === 0"
             :aria-describedby="shoppingRecipeCount === 0 ? 'mp-shopping-hint' : undefined"
             data-testid="meal-shopping-button"
@@ -327,33 +328,14 @@ const {
             >
           </button>
           <!-- Two conventional actions: social Share (image → OS share sheet) and
-             Export as PDF (downloads the week). Both always cover the week. -->
-          <button
-            type="button"
-            class="from-primary-500 to-terracotta-400 font-outfit inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            :disabled="exporting"
-            @click="runExport('image')"
-          >
-            <BeanieIcon v-if="exportingFormat !== 'image'" name="share" size="sm" />
-            {{
-              exportingFormat === 'image'
-                ? t('mealPlanner.export.building')
-                : t('mealPlanner.export.share')
-            }}
-          </button>
-          <button
-            type="button"
-            class="font-outfit text-secondary-500 dark:text-ink inline-flex items-center gap-1.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
-            :disabled="exporting"
-            @click="runExport('pdf')"
-          >
-            <BeanieIcon v-if="exportingFormat !== 'pdf'" name="download" size="sm" />
-            {{
-              exportingFormat === 'pdf'
-                ? t('mealPlanner.export.building')
-                : t('mealPlanner.export.exportPdf')
-            }}
-          </button>
+             Export as PDF (downloads the week), both covering the week. Phones get the
+             Share icon only (SheetExportActions); with the pills' tighter phone padding and
+             no ⧉ glyph, Copy, Shopping List (with its badge) and Share fit one row at 390px. -->
+          <SheetExportActions
+            :exporting-format="exportingFormat"
+            :share-label="t('mealPlanner.export.share')"
+            @run="runExport"
+          />
         </div>
         <p
           v-if="canMakeShoppingList && shoppingRecipeCount === 0"

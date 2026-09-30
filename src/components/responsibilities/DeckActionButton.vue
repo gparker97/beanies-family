@@ -4,11 +4,12 @@
  * board's tap picker and the check-in drawer so they stay one look. Sits on a raised or
  * overlay surface in both modes.
  *
- * `variant="choice"` is the deal pile's Keep / Skip / revisit buttons (round 7): larger, and
- * every choice looks equally unselected until it is hovered (pointer devices only, so a tap
- * can't leave it lit), focused from the keyboard, or its shortcut is pressed (the one-shot
- * `key-press` animation in `style.css`, which paints the `--press-*` tokens from `style.css` so it can
- * never stick, and is killed under reduced motion).
+ * `variant="choice"` is the deal pile's Keep / Skip / revisit buttons (round 7): larger (and
+ * taller again on a phone), and every choice looks equally unselected until it is hovered
+ * (pointer devices only, so a tap can't leave it lit), focused from the keyboard, or its
+ * shortcut is pressed (the one-shot `key-press` animation in `style.css`, which paints the
+ * `--press-*` tokens from `style.css` so it can never stick, and is killed under reduced
+ * motion).
  */
 withDefaults(defineProps<{ disabled?: boolean; variant?: 'default' | 'choice' }>(), {
   disabled: false,
@@ -77,6 +78,15 @@ html.dark .deck-action:hover:not(:disabled) {
   transition:
     background-color 150ms ease,
     border-color 150ms ease;
+}
+
+/* Phones: the pile's card is the hero and Keep / Skip sit one thumb-reach under it, so
+   they get taller. The banner's revisit choices follow, so the two stay one look. */
+@media (width < 48rem) {
+  .deck-action.is-choice {
+    font-size: 1rem;
+    padding: 0.9375rem 0.75rem;
+  }
 }
 
 .deck-action.is-choice:focus-visible {
