@@ -103,6 +103,9 @@ import { confirm } from '@/composables/useConfirm';
 import CardEditDrawer from '../CardEditDrawer.vue';
 import CardSplitEditor from '../CardSplitEditor.vue';
 import CardViewDrawer from '../CardViewDrawer.vue';
+import DealPileStage from '../DealPileStage.vue';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { swipe } from '@/test/pointerSwipe';
 import WhoOwnsWhatPage from '@/pages/WhoOwnsWhatPage.vue';
 
 const FormModalStub = defineComponent({
@@ -429,6 +432,30 @@ describe('CardViewDrawer', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
     // Still on laundry (the parent owns the id): → steps again, ← is at the start.
     expect(w.emitted('navigate')).toEqual([['custom-swim'], ['custom-swim']]);
+  });
+
+  it('a touch swipe on the card in hand steps (the stage owns it); a mouse drag does not', () => {
+    const w = mount(CardViewDrawer, {
+      props: {
+        open: true,
+        cardId: 'laundry',
+        sequence: { label: 'Home', ids: ['laundry', 'custom-swim'] },
+      },
+      global: { stubs },
+      attachTo: document.body,
+    });
+    const stage = w.findComponent(DealPileStage).element as HTMLElement;
+    swipe(stage, { x: 200, y: 100 }, { x: 60, y: 100 }, 'mouse');
+    expect(w.emitted('navigate')).toBeUndefined();
+    // At the start: a swipe right has nowhere to go.
+    swipe(stage, { x: 60, y: 100 }, { x: 200, y: 100 });
+    expect(w.emitted('navigate')).toBeUndefined();
+    swipe(stage, { x: 200, y: 100 }, { x: 60, y: 100 });
+    expect(w.emitted('navigate')).toEqual([['custom-swim']]);
+    expect(
+      vi.mocked(logEvent).mock.calls.filter((c) => c[0].message === 'card_view_navigate')
+    ).toEqual([[expect.objectContaining({ context: { detail: 'swipe' } })]]);
+    w.unmount();
   });
 
   it('reaching the end hands focus to the other arrow instead of dropping it', async () => {

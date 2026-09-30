@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, h, ref, type Ref } from 'vue';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { useHorizontalSwipe, type UseHorizontalSwipeOptions } from '../useHorizontalSwipe';
+import { pointer, swipe } from '@/test/pointerSwipe';
 
 interface SwipeHarness {
   wrapper: VueWrapper;
@@ -41,40 +42,6 @@ function makeHarness(opts: Partial<UseHorizontalSwipeOptions> = {}): SwipeHarnes
   const wrapper = mount(Comp, { attachTo: document.body });
   const el = wrapper.element as HTMLElement;
   return { wrapper, el, onSwipeLeft, onSwipeRight, onProgress };
-}
-
-function pointer(
-  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
-  el: HTMLElement,
-  init: { x: number; y: number; pointerType?: string; pointerId?: number; button?: number }
-) {
-  // jsdom doesn't have PointerEvent — fall back to a CustomEvent-shaped Event
-  // that carries the fields our handler reads (clientX, clientY, pointerId,
-  // pointerType, button). dispatchEvent + a custom prototype is reliable.
-  const e = new Event(type, { bubbles: true, cancelable: true }) as Event & {
-    clientX: number;
-    clientY: number;
-    pointerId: number;
-    pointerType: string;
-    button: number;
-  };
-  e.clientX = init.x;
-  e.clientY = init.y;
-  e.pointerId = init.pointerId ?? 1;
-  e.pointerType = init.pointerType ?? 'touch';
-  e.button = init.button ?? 0;
-  el.dispatchEvent(e);
-}
-
-function swipe(el: HTMLElement, from: { x: number; y: number }, to: { x: number; y: number }) {
-  pointer('pointerdown', el, from);
-  // Two intermediate moves so axis-lock has at least one decision point.
-  pointer('pointermove', el, {
-    x: from.x + (to.x - from.x) / 2,
-    y: from.y + (to.y - from.y) / 2,
-  });
-  pointer('pointermove', el, to);
-  pointer('pointerup', el, to);
 }
 
 describe('useHorizontalSwipe', () => {

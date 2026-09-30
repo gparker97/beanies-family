@@ -124,7 +124,11 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
         </div>
         <div
           class="font-outfit text-sm font-bold"
-          :class="day.isToday ? 'text-[#F15D22]' : 'text-secondary-500 dark:text-ink'"
+          :class="
+            day.isToday
+              ? 'dark:text-accent-lift text-[#F15D22]'
+              : 'text-secondary-500 dark:text-ink'
+          "
         >
           {{ WEEKDAY_FMT.format(day.date) }}
         </div>
@@ -133,7 +137,7 @@ const lastDayStr = computed(() => props.weekDays.at(-1)?.dateStr ?? '');
         </div>
         <div
           v-if="day.isToday"
-          class="font-outfit mt-0.5 inline-block rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-xs font-bold text-[#F15D22]"
+          class="font-outfit dark:text-accent-lift mt-0.5 inline-block rounded-full bg-[var(--tint-orange-15)] px-2 py-0.5 text-xs font-bold text-[#F15D22]"
         >
           {{ t('mealPlanner.today') }}
         </div>

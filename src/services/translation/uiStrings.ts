@@ -1382,7 +1382,9 @@ const STRING_DEFS = {
   },
   'mealPlanner.share.title': { en: 'Meal plan', beanie: 'meal plan' },
   'mealPlanner.export.share': { en: 'Share', beanie: 'share' },
-  'mealPlanner.export.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
+  // The fridge sheet's shared page actions (SheetExportActions: Meal Planner, Who Owns What).
+  'sheetExport.exportPdf': { en: 'Export as PDF', beanie: 'export as pdf' },
+  'sheetExport.building': { en: 'Preparing…', beanie: 'preparing…' },
   // The week's shopping list (#116). One section per recipe, ingredients as written, with a
   // Cook ×N count from who's eating vs the recipe's servings. Ordinary product copy, so
   // beanie values stay playful-lowercase.
@@ -1448,7 +1450,6 @@ const STRING_DEFS = {
   },
   'mealPlanner.shopping.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
   'mealPlanner.shopping.forEating': { en: 'For {n}, serves {s}', beanie: 'for {n}, serves {s}' },
-  'mealPlanner.export.building': { en: 'Preparing…', beanie: 'preparing…' },
   // The exported sheet's own copy (rendered into the picture/PDF).
   'mealPlanner.export.heading': { en: "This Week's Meals", beanie: "this week's meals" },
   'mealPlanner.export.accent': { en: "what's cooking? 🌱", beanie: "what's cooking? 🌱" },
@@ -12880,7 +12881,6 @@ const STRING_DEFS = {
   'whoOwnsWhat.view.deal': { en: 'Deal', beanie: 'deal' },
   'whoOwnsWhat.view.deck': { en: 'Deck', beanie: 'deck' },
   'whoOwnsWhat.menu.share': { en: 'Share the Deck', beanie: 'share the deck' },
-  'whoOwnsWhat.menu.export': { en: 'Export as PDF', beanie: 'export as pdf' },
   'whoOwnsWhat.menu.rhythm': { en: 'Check-in Rhythm', beanie: 'check-in rhythm' },
   'whoOwnsWhat.menu.skipped': { en: 'See Skipped Cards', beanie: 'see skipped cards' },
   'whoOwnsWhat.menu.restore': { en: 'Restore Default Cards', beanie: 'restore default cards' },
@@ -13340,6 +13340,15 @@ const STRING_DEFS = {
     en: '{category} · card {n} of {total}',
     beanie: '{category} · card {n} of {total}',
   },
+  // Phones: the count rides on the card's own category chip instead of the position line.
+  'whoOwnsWhat.pile.positionChip': {
+    en: '{category} · {n} of {total}',
+    beanie: '{category} · {n} of {total}',
+  },
+  'whoOwnsWhat.pile.swipeHint': {
+    en: 'Swipe to see the next card',
+    beanie: 'swipe to see the next card',
+  },
   'whoOwnsWhat.pile.prev': { en: 'Previous Card', beanie: 'previous card' },
   'whoOwnsWhat.pile.next': { en: 'Next Card', beanie: 'next card' },
   'whoOwnsWhat.pile.withSince': {
@@ -13513,7 +13522,6 @@ const STRING_DEFS = {
   },
 
   // Who Owns What: the fridge sheet (#109). Rendered into the picture / PDF.
-  'whoOwnsWhat.export.building': { en: 'Preparing…', beanie: 'preparing…' },
   'whoOwnsWhat.export.heading': { en: 'Who Owns What', beanie: 'who owns what' },
   'whoOwnsWhat.export.accent': {
     en: 'every job has a name on it ✨',

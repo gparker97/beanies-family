@@ -64,7 +64,7 @@ const SKIPPED_STACK = 6;
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const { cardName, cardDone, partCaption, memberCardsLabel } = useResponsibilityCardLabel();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 const { pulse } = useAttentionPulse();
@@ -110,7 +110,7 @@ const railEmpty = computed(() =>
 );
 
 function groupTitle(category: ResolvedCard['category'] | null): string {
-  return category ? categoryLabel(category) : t('lists.category.other');
+  return categoryLabelOrOther(category);
 }
 
 // ── Tap-to-deal ──────────────────────────────────────────────────────────────

@@ -4,23 +4,41 @@
  * backs with the live card on top) and the forward arrow. Presentational: `DealPile` owns
  * the cursor and the flights, and reads `cardEl` (exposed) as the flight's source.
  *
- * The card is about 300px wide at md+ and 196px on a phone; the arrows are 48px / 40px
- * squircles with translated aria-labels.
+ * On the pile the card is the page's hero, up to 18.75rem wide. Its geometry lives in two
+ * custom properties on `.stage` (see the style block), so the pile's width, the art band's
+ * share and the phone arrows' height cannot drift apart. Widths come from the stage's own
+ * box, never the viewport, so Large reading mode never scrolls sideways. The arrows are
+ * 2.5rem / 3rem squircles with translated aria-labels; below 48rem they overlap the pile's
+ * edges in flow, and a disabled one stays opaque with a muted icon (they are also disabled
+ * while busy, so hiding them would flicker).
  *
- * Also the Card Details drawer's "card in hand" (`size="hand"`, `testid="card-view"`): 15rem
- * at md+, and the card grows with its content instead of clipping it (a long custom done
- * line, a split card's holder lines in the default slot, under the category chip). The pile
- * passes nothing new: fixed 5:7, `deal-pile-*` test ids, arrows on.
+ * The stage also owns the **swipe** (touch and pen only, `useHorizontalSwipe` on the stable
+ * root, since only the card is keyed): left steps forward, right steps back, whenever the
+ * arrows are on and exactly when the matching arrow could (`canPrev` / `canNext`). It emits
+ * `step(dir, via)` so a host can tell swipes from arrows in its telemetry.
+ *
+ * With `count` set (the pile, while the card is counted), the category chip reads
+ * "{category} · n of total" below 48rem, where the pile hides its position line.
+ *
+ * Also the Card Details drawer's "card in hand" (`size="hand"`, `testid="card-view"`):
+ * 12.25rem on a phone and 15rem at md+, and the card grows with its content instead of
+ * clipping it (a long custom done line, a split card's holder lines in the default slot,
+ * under the category chip). Swipe works there the same way.
  */
 import { computed, nextTick, useTemplateRef, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useHorizontalSwipe } from '@/composables/useHorizontalSwipe';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { categoryTint, getListCategory } from '@/constants/listCategories';
+import { categoryTint } from '@/constants/listCategories';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
 import CardBack from '@/components/responsibilities/CardBack.vue';
+
+/** How a step was asked for: an arrow (click or tap) or a swipe on the stage. */
+export type StageStepVia = 'arrow' | 'swipe';
 
 const props = withDefaults(
   defineProps<{
@@ -34,26 +52,48 @@ const props = withDefaults(
     /** Test id prefix: `${testid}-card-<id>`, `${testid}-prev` / `-next`, `${testid}-name`. */
     testid?: string;
     arrows?: boolean;
+    /** The card's place in the pile, shown on the chip below 48rem; null when not counted. */
+    count?: { n: number; total: number } | null;
   }>(),
-  { leaving: false, size: 'pile', testid: 'deal-pile', arrows: true }
+  { leaving: false, size: 'pile', testid: 'deal-pile', arrows: true, count: null }
 );
-const emit = defineEmits<{ step: [dir: -1 | 1] }>();
+
+const emit = defineEmits<{ step: [dir: -1 | 1, via: StageStepVia] }>();
 
 const { t } = useTranslation();
-const { categoryLabel } = useListCategoryLabel();
+const { categoryLabelOrOther } = useListCategoryLabel();
 const { cardName, cardDone } = useResponsibilityCardLabel();
 
 const tint = computed(() => categoryTint(props.card.category));
 const isHand = computed(() => props.size === 'hand');
-/** A category from a newer client reads "Other", never its raw id. */
-const categoryText = computed(() =>
-  getListCategory(props.card.category)
-    ? categoryLabel(props.card.category)
-    : t('lists.category.other')
-);
+const categoryText = computed(() => categoryLabelOrOther(props.card.category));
 
 const cardEl = useTemplateRef<HTMLElement>('cardEl');
 defineExpose({ cardEl });
+
+const chipCount = computed(() =>
+  props.count
+    ? fillTemplate(t('whoOwnsWhat.pile.positionChip'), {
+        category: categoryText.value,
+        n: props.count.n,
+        total: props.count.total,
+      })
+    : ''
+);
+
+// Swipe on the stable root (the card is keyed per card). Touch and pen only: a mouse drag
+// on a desktop selects text. The same guards as the arrows.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useHorizontalSwipe(rootEl, {
+  onSwipeLeft: () => {
+    if (props.canNext) emit('step', 1, 'swipe');
+  },
+  onSwipeRight: () => {
+    if (props.canPrev) emit('step', -1, 'swipe');
+  },
+  enabled: computed(() => props.arrows),
+  ignoreMouse: true,
+});
 
 // Stepping to an end disables the arrow just pressed; a disabled button drops focus to the
 // page (out of a drawer, for a screen reader and the next Tab). Hand it to the other arrow,
@@ -91,7 +131,7 @@ keepFocus(
 </script>
 
 <template>
-  <div class="flex items-center justify-center gap-2.5 md:gap-7">
+  <div ref="rootEl" class="stage flex items-center justify-center" :class="`is-${size}`">
     <button
       v-if="arrows"
       ref="prevEl"
@@ -101,11 +141,11 @@ keepFocus(
       :aria-label="t('whoOwnsWhat.pile.prev')"
       aria-keyshortcuts="ArrowLeft"
       :data-testid="`${testid}-prev`"
-      @click="emit('step', -1)"
+      @click="emit('step', -1, 'arrow')"
     >
       <BeanieIcon name="chevron-left" size="md" />
     </button>
-    <div class="pile relative shrink-0" :class="{ 'is-hand': isHand }">
+    <div class="pile relative shrink-0">
       <CardBack class="back back-2" />
       <CardBack class="back back-1" />
       <article
@@ -120,9 +160,9 @@ keepFocus(
         <div class="slab relative grid place-items-center overflow-hidden">
           <CardArt
             :card="card"
-            :img-class="isHand ? 'h-24 w-24 md:h-28 md:w-28' : 'h-24 w-24 md:h-36 md:w-36'"
-            class="text-6xl leading-none"
-            :class="{ 'md:text-7xl': !isHand }"
+            :img-class="isHand ? 'h-24 w-24 md:h-28 md:w-28' : 'pile-art'"
+            class="leading-none"
+            :class="isHand ? 'text-6xl' : 'text-7xl'"
           />
           <span
             class="pointer-events-none absolute -right-1.5 -bottom-3.5 text-6xl leading-none opacity-[0.07] md:text-7xl"
@@ -130,10 +170,10 @@ keepFocus(
             >{{ card.emoji }}</span
           >
         </div>
-        <div class="flex flex-1 flex-col gap-1 p-3" :class="{ 'md:gap-1.5 md:p-4': !isHand }">
+        <div class="flex flex-1 flex-col" :class="isHand ? 'gap-1 p-3' : 'gap-1.5 p-4'">
           <p
-            class="font-outfit dark:text-ink text-lg leading-tight font-semibold text-[var(--color-text)]"
-            :class="{ 'md:text-xl': !isHand }"
+            class="font-outfit dark:text-ink leading-tight font-semibold text-[var(--color-text)]"
+            :class="isHand ? 'text-lg' : 'text-xl'"
             :data-testid="`${testid}-name`"
           >
             {{ cardName(card) }}
@@ -147,7 +187,14 @@ keepFocus(
           <span
             class="cat-chip font-outfit dark:text-ink-soft mt-auto inline-flex items-center gap-1.5 self-start rounded-full px-2 py-0.5 text-xs font-semibold text-[var(--color-text)]"
           >
-            <i class="h-2 w-2 rounded-full" :style="{ background: tint }" />{{ categoryText }}
+            <i class="h-2 w-2 shrink-0 rounded-full" :style="{ background: tint }" />
+            <template v-if="count">
+              <span class="md:hidden" :data-testid="`${testid}-position-chip`">{{
+                chipCount
+              }}</span>
+              <span class="hidden md:inline">{{ categoryText }}</span>
+            </template>
+            <template v-else>{{ categoryText }}</template>
           </span>
           <slot />
         </div>
@@ -162,7 +209,7 @@ keepFocus(
       :aria-label="t('whoOwnsWhat.pile.next')"
       aria-keyshortcuts="ArrowRight"
       :data-testid="`${testid}-next`"
-      @click="emit('step', 1)"
+      @click="emit('step', 1, 'arrow')"
     >
       <BeanieIcon name="chevron-right" size="md" />
     </button>
@@ -170,14 +217,45 @@ keepFocus(
 </template>
 
 <style scoped>
-.pile {
-  aspect-ratio: 5 / 7;
-  width: 12.25rem;
+/* The pile's geometry, in one place:
+   --pile-w  the pile's width. `100%` is substituted where it is used: the pile's width and
+             the phone arrows' margin-top both resolve it against the stage's width, so they
+             agree at every width. Phones: the pile leaves 1.25rem each side for half an
+             overlapping arrow. md+: two 3rem arrows and two 1.75rem gaps (9.5rem) beside it.
+   --slab    the art band's share of the card's height.
+   The hand (the Card Details drawer) sets its own sizes below.
+   Swipe target: vertical scroll and pinch-zoom stay with the browser, horizontal is ours. */
+.stage {
+  --pile-w: min(18.75rem, 100% - 2.5rem);
+  --slab: 0.42;
+
+  gap: 0.625rem;
+  touch-action: pan-y pinch-zoom;
+  width: 100%;
 }
 
-@media (width >= 48rem) {
-  .pile {
-    width: 18.75rem;
+/* A size container, so the pile's art can size from the pile itself (`cqi`): a `100%` in
+   `--pile-w` would resolve against the art's own box there. */
+.pile {
+  aspect-ratio: 5 / 7;
+  container-type: inline-size;
+  width: var(--pile-w);
+}
+
+/* About half the pile's width (9rem at full size), always under the art band's height
+   (1.4 x --slab = 0.588 of the pile's width), so the art never clips at any width or
+   text size. The hand keeps its own fixed art sizes. */
+.pile-art {
+  height: 9rem;
+  width: 9rem;
+}
+
+/* WKWebView before iOS 16 has no container units (the app still targets iOS 15), so the
+   plain 9rem above is the fallback and the pile-relative size applies where supported. */
+@supports (width: 1cqi) {
+  .pile-art {
+    height: min(9rem, 48cqi);
+    width: min(9rem, 48cqi);
   }
 }
 
@@ -194,6 +272,12 @@ keepFocus(
 }
 
 @media (width >= 48rem) {
+  .stage {
+    --pile-w: min(18.75rem, 100% - 9.5rem);
+
+    gap: 1.75rem;
+  }
+
   .arrow {
     border-radius: 1rem;
     height: 3rem;
@@ -223,6 +307,34 @@ html.dark .arrow {
 
   html.dark .arrow:hover:not(:disabled) {
     background: var(--color-surface-hover);
+  }
+}
+
+/* Phones, the pile only: the arrows overlap the pile's edges in flow (half on the card,
+   half in the 1.25rem the pile's width leaves each side), above the card. A disabled one
+   stays opaque over the card with a muted icon. `--card-shadow` carries its own dark value and `line-strong` reads in both
+   carry their own dark values. */
+@media (width < 48rem) {
+  .is-pile {
+    gap: 0;
+  }
+
+  /* Centred on the card's art band (the card is 7/5 as tall as wide, the band its top
+     --slab), so an arrow never sits on the title or description. */
+  .is-pile .arrow {
+    align-self: flex-start;
+    box-shadow: var(--card-shadow);
+    margin-inline: -1.25rem;
+    margin-top: calc(var(--pile-w) * 1.4 * var(--slab) / 2 - 1.25rem);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* `line-strong` has one value that reads on both the white and the dark arrow (checked
+     in both modes), so this one rule serves both. */
+  .is-pile .arrow:disabled {
+    color: var(--color-line-strong);
+    opacity: 1;
   }
 }
 
@@ -265,7 +377,7 @@ html.dark .arrow {
 
 .slab {
   background: color-mix(in srgb, var(--cat) 12%, transparent);
-  flex: 0 0 42%;
+  flex: 0 0 calc(var(--slab) * 100%);
 }
 
 html.dark .slab {
@@ -283,24 +395,25 @@ html.dark .cat-chip {
 /* The card in hand grows with its content: a grid item in flow at least 5:7 tall, with a
    fixed-height slab (a percentage of a content-sized card would hug the art or push the
    text under the clip). */
-.pile.is-hand {
+.is-hand .pile {
   aspect-ratio: auto;
   display: grid;
   min-height: 17.15rem;
+  width: 12.25rem;
 }
 
-.pile.is-hand .slab {
+.is-hand .pile .slab {
   flex: none;
   height: 7.2rem;
 }
 
 @media (width >= 48rem) {
-  .pile.is-hand {
+  .is-hand .pile {
     min-height: 21rem;
     width: 15rem;
   }
 
-  .pile.is-hand .slab {
+  .is-hand .pile .slab {
     height: 8.8rem;
   }
 }
