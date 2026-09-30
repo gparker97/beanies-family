@@ -15,6 +15,7 @@ import { HELPFUL_HINT_TYPES } from '@/utils/helpfulHints';
 import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
 import {
   buildCardBriefingRows,
+  MOVED_NOTE_DAYS,
   cardHistory,
   checkInCardIds,
   invalidCheckIns,
@@ -662,15 +663,14 @@ describe('buildCardBriefingRows', () => {
     } satisfies CardBriefingInput;
   }
 
-  it('shows the viewer their cards and adults the cards with nobody', () => {
-    const rows = buildCardBriefingRows(input());
-    expect(rows).toEqual([
-      { kind: 'mine', cardIds: ['laundry'] },
-      { kind: 'nobody', cardIds: ['dishes'], count: 1 },
-    ]);
+  it('has no standing rows: holding a card or a card with nobody adds nothing', () => {
+    // greg holds laundry and dishes is kept with nobody. The old "your cards" row was
+    // never actionable, and cards with nobody are counted by the nav badge instead
+    // (useNavBadges `stillToDeal`), so a quiet deck means a quiet briefing.
+    expect(buildCardBriefingRows(input())).toEqual([]);
   });
 
-  it('never shows nobody or check-in rows to a child', () => {
+  it('never shows check-in rows to a child', () => {
     const rows = buildCardBriefingRows(
       input({ viewerId: 'leo', viewerIsAdult: false, rhythmWeeks: 2 })
     );
@@ -733,6 +733,18 @@ describe('buildCardBriefingRows', () => {
       '22',
       '21',
     ]);
+  });
+
+  it('keeps a moved note for 7 calendar days, gone a week after the move', () => {
+    expect(MOVED_NOTE_DAYS).toBe(7);
+    const redeal = (ymd: string) =>
+      move({ cardId: 'laundry', fromId: 'sofia', toId: 'greg', byId: 'sofia', at: noon(ymd) });
+    const lastDay = redeal('2026-09-20'); // TODAY minus 6: the 7th calendar day
+    const expired = redeal('2026-09-19'); // TODAY minus 7: a week on, gone
+    const shown = (m: ResponsibilityMove) =>
+      buildCardBriefingRows(input({}, [m])).some((r) => r.kind === 'moved');
+    expect(shown(lastDay)).toBe(true);
+    expect(shown(expired)).toBe(false);
   });
 
   it('shows the check-in row from the due date, snoozable for 7 days', () => {

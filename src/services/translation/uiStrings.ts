@@ -13559,15 +13559,6 @@ const STRING_DEFS = {
   },
 
   // Who Owns What: Nook briefing rows (#109). Never a count about anyone but the viewer.
-  'whoOwnsWhat.briefing.mine': {
-    en: 'Your cards in Who Owns What',
-    beanie: 'your cards in who owns what',
-  },
-  'whoOwnsWhat.briefing.mineCount.one': { en: 'your 1 card', beanie: 'your 1 card' },
-  'whoOwnsWhat.briefing.mineCount.other': {
-    en: 'your {count} cards',
-    beanie: 'your {count} cards',
-  },
   'whoOwnsWhat.briefing.movedAway': {
     en: '{card} moved to {name} on {date}.',
     beanie: '{card} moved to {name} on {date}. one less on your pile.',
@@ -13575,14 +13566,6 @@ const STRING_DEFS = {
   'whoOwnsWhat.briefing.movedToYou': {
     en: 'You now hold {card}, from {name}.',
     beanie: 'you now hold {card}, from {name}.',
-  },
-  'whoOwnsWhat.briefing.nobody.one': {
-    en: '{names} has nobody yet.',
-    beanie: '{names} has nobody yet.',
-  },
-  'whoOwnsWhat.briefing.nobody.other': {
-    en: '{count} cards have nobody yet: {names}.',
-    beanie: '{count} cards have nobody yet: {names}.',
   },
   'whoOwnsWhat.briefing.checkIn': {
     en: 'Your family check-in is due',

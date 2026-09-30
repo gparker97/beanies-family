@@ -1166,7 +1166,18 @@ describe('useCriticalItems', () => {
     }
     const cardRows = () => useCriticalItems().criticalItems.value.filter((i) => i.type === 'card');
 
-    it("shows the viewer's cards, a moved note, cards with nobody and a due check-in", () => {
+    /** A re-deal of laundry from parent-2 to parent-1, made by parent-2: a moved note for both. */
+    const REDEAL = {
+      id: 'laundry:main:2026-03-09T10:00:00.000Z',
+      cardId: 'laundry',
+      partKey: 'main',
+      fromId: 'parent-2',
+      toId: 'parent-1',
+      byId: 'parent-2',
+      at: '2026-03-09T10:00:00.000Z',
+    };
+
+    it('shows a moved note and a due check-in, with no "your cards" or "cards with nobody" rows', () => {
       familyStore.setCurrentMember('parent-1');
       seedDeck(
         [
@@ -1174,28 +1185,18 @@ describe('useCriticalItems', () => {
           kept('dishes', 'parent-1'),
           kept('floors'),
         ],
-        [
-          FIRST_DEAL,
-          {
-            id: 'laundry:main:2026-03-09T10:00:00.000Z',
-            cardId: 'laundry',
-            partKey: 'main',
-            fromId: 'parent-2',
-            toId: 'parent-1',
-            byId: 'parent-2',
-            at: '2026-03-09T10:00:00.000Z',
-          },
-        ]
+        [FIRST_DEAL, REDEAL]
       );
       const rows = cardRows();
-      expect(rows.map((r) => r.icon)).toEqual(['🙋', '🙋', '🫥', '🗓️']);
-      const [mine, moved, nobody, checkIn] = rows;
-      expect(mine!.route).toBe('/who-owns-what');
+      // parent-1 holds two cards and "floors" has nobody: neither adds a row any more
+      // (the nav badge `stillToDeal` counts cards with nobody instead).
+      expect(rows.map((r) => r.icon)).toEqual(['🙋', '🗓️']);
+      expect(rows.map((r) => r.id)).not.toContain('card-mine');
+      expect(rows.map((r) => r.id)).not.toContain('card-nobody');
+      const [moved, checkIn] = rows;
       expect(moved!.completable).toBe(true);
       expect(moved!.dismissKey).toBe('card-move:laundry:main:2026-03-09T10:00:00.000Z');
       expect(moved!.route).toEqual({ path: '/who-owns-what', query: { card: 'laundry' } });
-      expect(nobody!.route).toEqual({ path: '/who-owns-what', query: { view: 'deal' } });
-      expect(nobody!.completable).toBe(false);
       expect(checkIn!.dismissKey).toMatch(/^card-checkin:/);
     });
 
@@ -1229,7 +1230,7 @@ describe('useCriticalItems', () => {
 
     it('orders card rows above the helpful-hint block', () => {
       familyStore.setCurrentMember('parent-1');
-      seedDeck([kept('dishes', 'parent-1')]);
+      seedDeck([kept('laundry', 'parent-1', '2026-01-01T10:00:00.000Z')], [FIRST_DEAL, REDEAL]);
       todoStore.todos.push(
         makeTodo({
           id: 'hint-1',
@@ -1243,17 +1244,18 @@ describe('useCriticalItems', () => {
         })
       );
       const ids = useCriticalItems().criticalItems.value.map((i) => i.id);
-      expect(ids.indexOf('card-mine')).toBeGreaterThanOrEqual(0);
-      expect(ids.indexOf('card-mine')).toBeLessThan(ids.indexOf('hint-1'));
+      const movedId = `card-move:${REDEAL.id}`;
+      expect(ids.indexOf(movedId)).toBeGreaterThanOrEqual(0);
+      expect(ids.indexOf(movedId)).toBeLessThan(ids.indexOf('hint-1'));
     });
 
-    it('shows cards with nobody and the check-in to adults only', () => {
+    it('shows the check-in to adults only (a child holding cards gets no card rows)', () => {
       familyStore.setCurrentMember('child-1');
       seedDeck(
         [kept('laundry', 'child-1', '2026-01-01T10:00:00.000Z'), kept('floors')],
         [FIRST_DEAL]
       );
-      expect(cardRows().map((r) => r.id)).toEqual(['card-mine']);
+      expect(cardRows()).toEqual([]);
     });
 
     it('hides a dismissed moved note and a snoozed check-in', () => {

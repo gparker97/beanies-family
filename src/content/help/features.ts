@@ -2503,7 +2503,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'When a card changes hands, both the person who held it and the person who now holds it get a short note in their daily briefing.',
+          'When a card changes hands, both the person who held it and the person who now holds it get a short note in their daily briefing for a week. While any kept card is still waiting for a holder (or a split card has a part nobody holds yet), grown-ups see an orange number next to <strong>Who Owns What</strong> in the menu: it counts the cards under <strong>Waiting for a Holder</strong> on the Overview.',
       },
       {
         type: 'heading',
@@ -2647,7 +2647,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Learn exactly how <a href="/help/features/family-check-in">the family check-in</a> works, see how your cards show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
+          'Learn exactly how <a href="/help/features/family-check-in">the family check-in</a> works, see how card changes show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
       },
     ],
   },

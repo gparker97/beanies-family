@@ -11,7 +11,7 @@ import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
-import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/responsibilityDeck';
 import { useTranslation } from '@/composables/useTranslation';
@@ -443,7 +443,7 @@ export function useCriticalItems() {
       rhythmWeeks: responsibilityStore.rhythmWeeks,
       readState: notificationsStore.readState,
       viewerId: memberId,
-      viewerIsAdult: isAdultMember(currentMember),
+      viewerIsAdult: responsibilityStore.canDeal, // same gate as the nav badge + deck writes
       today: todayStr.value,
     });
     for (const row of cardRows) items.push(cardItem(row));
@@ -512,36 +512,10 @@ export function useCriticalItems() {
     return items;
   });
 
-  function namesOf(cardIds: readonly string[]): string {
-    return cardIds
-      .map((id) => responsibilityStore.cardById(id))
-      .filter((c) => !!c)
-      .map((c) => cardName(c))
-      .join(', ');
-  }
-
   /** One card row → one briefing item. No deck logic here, only copy and routing. */
   function cardItem(row: CardBriefingRow): CriticalItem {
     const base = { type: 'card' as const, time: '' };
     switch (row.kind) {
-      case 'mine': {
-        const count = row.cardIds.length;
-        const countLabel = buildMessage(
-          count === 1
-            ? 'whoOwnsWhat.briefing.mineCount.one'
-            : 'whoOwnsWhat.briefing.mineCount.other',
-          { count: String(count) }
-        );
-        return {
-          ...base,
-          id: 'card-mine',
-          message: t('whoOwnsWhat.briefing.mine'),
-          caption: `${namesOf(row.cardIds.slice(0, 3))} · ${countLabel}`,
-          icon: '🙋',
-          completable: false,
-          route: WHO_OWNS_WHAT_PATH,
-        };
-      }
       case 'moved': {
         const card = responsibilityStore.cardById(row.cardId);
         const otherId = row.role === 'to' ? row.move.fromId : row.move.toId;
@@ -560,20 +534,6 @@ export function useCriticalItems() {
           route: { path: WHO_OWNS_WHAT_PATH, query: { card: row.cardId } },
         };
       }
-      case 'nobody':
-        return {
-          ...base,
-          id: 'card-nobody',
-          message: buildMessage(
-            row.count === 1
-              ? 'whoOwnsWhat.briefing.nobody.one'
-              : 'whoOwnsWhat.briefing.nobody.other',
-            { count: String(row.count), names: namesOf(row.cardIds) }
-          ),
-          icon: '🫥',
-          completable: false,
-          route: { path: WHO_OWNS_WHAT_PATH, query: { view: 'deal' } },
-        };
       case 'checkin':
         return {
           ...base,
