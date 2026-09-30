@@ -83,3 +83,50 @@ beanies-branded plan page in the signed-in web app + Stripe Embedded Checkout fo
 
 - hosted Customer Portal for cancel/manage. Stripe never handles the trial (server clock; subscribe
   during trial bills immediately). Recorded in memory `project_pricing_single_gateway.md`.
+
+## Prompt 7 — 2026-09-30 ~11:30 UTC
+
+> Ok agreed. Make all changes as needed to the issue tracker in notion and run /beanies-pre-plan #95
+
+## Prompt 8 — 2026-09-30 ~11:50 UTC
+
+> As an aside i'm setting up the stripe account now and it is asking about managed payments,
+> which should i choose? [Stripe's "Let us handle it" (Managed Payments, +3.5%) vs "Pick what
+> you need"]
+
+## Prompt 9 — 2026-09-30 ~12:20 UTC
+
+> ok the mockup looks ok for now. we can focus on functionality for now and tweak the design
+> later. note that all pricing functionality in the UI should be behind a feature gate (or
+> operate as dry-run - i.e. capture metrics/data for soak-in testing in prod but not take any
+> action) until we release v1. [Native read-only copy replaced with greg's two-paragraph
+> wording.] In addition, i'm setting up stripe now, and stripe has helpfully provided the
+> below prompt to set up the mcp and plugins - should we also set this up now or make it part
+> of the plan? [Stripe's plugin + MCP + stripe_implementation_planner prompt]
+
+## Prompts 10-12 — 2026-09-30 ~12:40-13:30 UTC
+
+> [Stripe plugin install failed twice from claude-plugins-official ("index.lock: File exists"
+> on the git-subdir checkout; the pinned stripe/ai commit exists, so the fault is the
+> installer's subdir path). Worked around by adding stripe/ai as its own marketplace:
+> `claude plugin marketplace add stripe/ai` + `claude plugin install stripe@stripe` (0.11.4).
+> Reloaded, authenticated the bundled mcp.stripe.com server.]
+> ok have authenticated now
+
+Outcome: ran `stripe_implementation_planner` on the NJL Solutions sandbox; accepted shape is
+embedded checkout on web, flat rate, pay up front, Customer Portal, Smart Retries, Stripe Tax
+threshold monitoring (free, no collection). Doc links + guide id recorded on Notion #95
+References. Nothing in it contradicts the pre-plan; it added the threshold-monitoring tip.
+
+## Prompts 13-14 — 2026-09-30 ~14:00-16:30 UTC
+
+> ok go ahead and run /beanies-plan - do not implement yet
+> [Post-pass clarifications: keep the UTC AI day with local reset display; accept the 1/day server
+> floor for read-only families, with the UI refusing to send; recurring pauses and catches up.]
+
+## Outcome
+
+`/beanies-plan` ran the four passes (Pass 1 draft; Pass 2 DRY + errors; Pass 3 sustainability;
+Pass 4 fresh eyes) with three Explore agents up front and a fresh Plan subagent per pass. Plan
+approved and saved to `docs/plans/2026-09-30-pricing-entitlement-read-only.md`; URL written back
+to Notion #95. Not implemented.
