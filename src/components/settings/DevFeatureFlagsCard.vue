@@ -11,6 +11,7 @@
 import { ref } from 'vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 import { listFlags } from '@/config/flags';
 import { setProdFlag } from '@/services/featureFlags/devFlagWriter';
 import { useToast } from '@/composables/useToast';
@@ -21,6 +22,10 @@ const { showToast } = useToast();
 // Local, mutable copy of committed (prod) state for optimistic UI.
 const rows = ref(listFlags());
 const showReload = ref(false);
+
+// Collapsed by default (greg, 2026-10-01): the list outgrew the page. Same disclosure shape
+// as the Beanie Lab row above it, so Settings has one way of folding a section away.
+const expanded = ref(false);
 
 async function onToggle(flag: DevFlag, value: boolean): Promise<void> {
   const row = rows.value.find((r) => r.id === flag);
@@ -51,37 +56,72 @@ function reload(): void {
 </script>
 
 <template>
-  <section>
-    <h2
-      class="font-outfit dark:text-ink-faint mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase"
+  <section
+    class="overflow-hidden rounded-[var(--sq)] border transition-colors duration-300"
+    :class="
+      expanded
+        ? 'dark:border-line dark:bg-surface-raised border-solid border-[var(--tint-slate-10)] bg-white shadow-[0_2px_12px_rgba(44,62,80,0.04)]'
+        : 'dark:border-line-strong border-dashed border-[var(--deep-slate)]/15'
+    "
+  >
+    <!-- Disclosure header: always visible, quiet when collapsed -->
+    <button
+      type="button"
+      class="flex w-full items-center gap-2.5 px-4 py-3.5 text-left transition-colors"
+      :class="
+        expanded
+          ? 'dark:text-ink text-[var(--deep-slate)]'
+          : 'dark:text-ink-soft text-[var(--deep-slate)]/60'
+      "
+      :aria-expanded="expanded"
+      aria-controls="dev-flags-body"
+      data-testid="dev-flags-toggle"
+      @click="expanded = !expanded"
     >
-      🚩 Feature Flags · dev only
-    </h2>
-    <div
-      class="dark:bg-surface-raised rounded-[var(--sq)] bg-white px-6 py-2 shadow-[0_2px_12px_rgba(44,62,80,0.04)]"
-    >
-      <p class="dark:text-ink-soft py-3 text-xs leading-snug text-[var(--deep-slate)]/60">
-        These toggles control <strong>production</strong> availability. Toggling rewrites the
-        committed config (<code>featureFlags.committed.ts</code>) — commit + deploy to apply for all
-        users. In development every flag is always on regardless of these switches. Changes apply
-        after reload.
-      </p>
-      <SettingToggleRow
-        v-for="(row, i) in rows"
-        :key="row.id"
-        :model-value="row.committed"
-        :title="row.label"
-        :hint="row.description"
-        :divider="i < rows.length - 1 || showReload"
-        :testid="`flag-${row.id}`"
-        @update:model-value="(v: boolean) => onToggle(row.id, v)"
-      />
-      <div v-if="showReload" class="flex items-center justify-between py-3.5">
-        <p class="dark:text-ink-soft text-xs text-[var(--deep-slate)]/60">
-          Saved. Reload to apply the change in this session.
+      <span aria-hidden="true">🚩</span>
+      <span class="font-outfit flex-1 text-sm font-semibold">Feature flags · dev only</span>
+      <span class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/45"
+        >{{ rows.length }} flags</span
+      >
+      <span class="chev text-xs opacity-60" :class="{ 'chev-open': expanded }">&#x25BC;</span>
+    </button>
+
+    <!-- Collapsible body -->
+    <SmoothHeight :revision="expanded">
+      <div v-show="expanded" id="dev-flags-body" class="px-6 pb-2">
+        <p class="dark:text-ink-soft py-3 text-xs leading-snug text-[var(--deep-slate)]/60">
+          These toggles control <strong>production</strong> availability. Toggling rewrites the
+          committed config (<code>featureFlags.committed.ts</code>): commit + deploy to apply for
+          all users. In development every flag is always on regardless of these switches. Changes
+          apply after reload.
         </p>
-        <BaseButton variant="primary" size="sm" @click="reload">Reload to apply</BaseButton>
+        <SettingToggleRow
+          v-for="(row, i) in rows"
+          :key="row.id"
+          :model-value="row.committed"
+          :title="row.label"
+          :hint="row.description"
+          :divider="i < rows.length - 1 || showReload"
+          :testid="`flag-${row.id}`"
+          @update:model-value="(v: boolean) => onToggle(row.id, v)"
+        />
+        <div v-if="showReload" class="flex items-center justify-between py-3.5">
+          <p class="dark:text-ink-soft text-xs text-[var(--deep-slate)]/60">
+            Saved. Reload to apply the change in this session.
+          </p>
+          <BaseButton variant="primary" size="sm" @click="reload">Reload to apply</BaseButton>
+        </div>
       </div>
-    </div>
+    </SmoothHeight>
   </section>
 </template>
+
+<style scoped>
+.chev {
+  transition: transform 0.28s ease;
+}
+
+.chev-open {
+  transform: rotate(180deg);
+}
+</style>
