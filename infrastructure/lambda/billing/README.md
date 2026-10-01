@@ -24,7 +24,7 @@ While prod holds the sandbox key (`sk_test_`), the deployed Lambda lets a dev or
 Prod holds exactly one Stripe key pair. Once that is live, sandbox testing happens here, with the deployed code unchanged:
 
 ```bash
-source ~/.beanies-tf.env                                   # sandbox sk_test_ + AWS profile
+source ~/.beanies-tf.env                                   # the SANDBOX pair by name + AWS profile
 # once: a sandbox billing table, so sandbox subscriptions never land in live families' rows
 aws dynamodb create-table --table-name beanies-family-billing-sandbox \
   --attribute-definitions AttributeName=familyId,AttributeType=S \
@@ -34,4 +34,4 @@ stripe listen --forward-to localhost:8787/billing/webhook   # prints a whsec_; e
 VITE_BILLING_BASE_URL=http://localhost:8787 npm run dev     # the Plan page now talks to the harness
 ```
 
-`local.mjs` wraps `handler` in a synthetic HTTP API v2 event, reads the sandbox billing table you name (it refuses a `-prod` table) and the DEV registry (where localhost families register), read-only, with your AWS profile, and, because it always runs with the sandbox key, is never refused for a localhost origin. It is never packaged (the archive excludes it). `stripe trigger customer.subscription.updated --add subscription:metadata.familyId=<uuid>` exercises the webhook path.
+`local.mjs` wraps `handler` in a synthetic HTTP API v2 event, reads the sandbox billing table you name (it refuses a `-prod` table) and the DEV registry (where localhost families register), read-only, with your AWS profile, and, because it reads the sandbox pair by name (and refuses a live key outright), is never refused for a localhost origin. It is never packaged (the archive excludes it). `stripe trigger customer.subscription.updated --add subscription:metadata.familyId=<uuid>` exercises the webhook path.
