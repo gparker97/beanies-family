@@ -34,7 +34,8 @@ vi.mock('@automerge/automerge', async (importOriginal) => {
 const { generateFamilyKey, encryptPayload } = await import('@/services/crypto/familyKeyService');
 const { bufferToBase64 } = await import('@/utils/encoding');
 const ap = await import('../applyAndProject');
-const { buildRebaseOps: buildRebaseOpsRaw } = await import('../docOps');
+const { buildRebaseOps: buildRebaseOpsRaw, applyMutation: applyMutationOp } =
+  await import('../docOps');
 // The composer is typed on `FamilyDocument`; these fixtures are deliberately a
 // minimal subset, so the cast is at the boundary rather than inside the tests.
 const buildRebaseOps = buildRebaseOpsRaw as unknown as (
@@ -157,6 +158,39 @@ describe('the peer keeps its offline work', () => {
     };
     expect(out.settings.theme).toBe('dark'); // the peer's change
     expect(out.settings.baseCurrency).toBe('EUR'); // the compactor's, NOT reverted
+  });
+
+  it('emits patchSettings (never setSettings), and carries a peer-removed rate (#117)', () => {
+    // ⚠️ Sent WITHOUT a `base`, so the worker takes the target as the base and applies the
+    // composer's three-way value exactly. An additive (base-less-means-nothing-known) write
+    // would silently keep the rate the peer removed.
+    const gbp = { from: 'USD', to: 'GBP', rate: 0.8 };
+    const eur = { from: 'USD', to: 'EUR', rate: 0.9 };
+    let shared = base();
+    shared = Automerge.change(shared, (d) => {
+      (d.settings as Record<string, unknown>).exchangeRates = [gbp, eur];
+    });
+    const baselineHeads = Automerge.getHeads(shared);
+    let peer = Automerge.load<Doc>(Automerge.save(shared));
+    peer = Automerge.change(peer, (d) => {
+      (d.settings as { exchangeRates: unknown[] }).exchangeRates.splice(1, 1);
+    });
+    const target = compact(shared);
+
+    const built = buildRebaseOps(peer, baselineHeads, target);
+
+    expect(built?.op).toEqual({
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { exchangeRates: [gbp] }, deleteKeys: [] },
+    });
+    const applied = applyMutationOp(
+      target as unknown as Parameters<typeof applyMutationOp>[0],
+      built!.op as Parameters<typeof applyMutationOp>[1]
+    ).doc;
+    expect((applied.settings as unknown as { exchangeRates: unknown[] }).exchangeRates).toEqual([
+      gbp,
+    ]);
   });
 
   it('takes the compacted lineage, not the peer own', async () => {
@@ -538,7 +572,7 @@ describe('the guards that only show up in the edge cases', () => {
     expect(built).not.toBeNull();
     expect(built!.count).toBeGreaterThan(0);
     // Both the todo and the settings survived the absent-singleton path.
-    expect(JSON.stringify(built)).toContain('setSettings');
+    expect(JSON.stringify(built)).toContain('patchSettings');
   });
 });
 
@@ -727,8 +761,8 @@ describe('the conflict count means what it says', () => {
 describe('the composer cannot corrupt the lineage it lands on', () => {
   it('never emits an op that writes podLineage', async () => {
     // ⚠️ Structural: `MutationOp`'s `collection` is typed `CollectionName`,
-    // which excludes the singletons, and the only op that writes one is
-    // `named:setSettings`. Worth a test anyway — an op stamping the OLD lineage
+    // which excludes the singletons, and the only op it emits that writes one is
+    // `named:patchSettings`, which writes `settings` and nothing else. Worth a test anyway — an op stamping the OLD lineage
     // onto the NEW document is self-inflicted corruption with no external cause.
     const shared = base();
     const baselineHeads = Automerge.getHeads(shared);

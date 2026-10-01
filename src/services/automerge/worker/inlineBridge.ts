@@ -13,7 +13,7 @@
  * worker uses, so an async merge can't interleave with a following mutate.
  */
 import { configure, dispatch, postingSink } from './applyAndProject';
-import type { ProjectionDelta, WorkerSignal } from './protocol';
+import type { DispatchReply, WorkerSignal } from './protocol';
 
 let signalHandler: ((sig: WorkerSignal) => void) | null = null;
 
@@ -38,14 +38,11 @@ function ensureConfigured(): void {
 let tail: Promise<unknown> = Promise.resolve();
 
 /** The inline executor `docClient.setInlineExecutor` consumes. */
-export function inlineExecutor(
-  method: string,
-  args: unknown
-): Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }> {
+export function inlineExecutor(method: string, args: unknown): Promise<DispatchReply> {
   ensureConfigured();
   const run = tail.then(() => dispatch(method, args));
   tail = run.catch(() => undefined); // keep the chain alive even if a call rejects
-  return run as Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }>;
+  return run;
 }
 
 /** Test-only: reset the one-time configure guard + the serialization chain. */

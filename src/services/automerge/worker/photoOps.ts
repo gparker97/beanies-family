@@ -23,6 +23,8 @@ import type {
 } from '@/types/models';
 import type { NamedOpHandler } from './docOps';
 import type { ProjectionDelta } from './protocol';
+// Pure (no Automerge import), so this file stays free of Automerge for `photoStore`.
+import { appendUnique } from './reconcile';
 
 /** JSON round-trip to a plain, structured-clone-safe object (no Automerge dep). */
 function toPlain<T>(value: T): T {
@@ -49,6 +51,17 @@ export class PhotoCollectHookError extends Error {
   }
 }
 
+/**
+ * Every photo attach is an APPEND, never a rebuild (#117). Rebuilding `photoIds` assigned a
+ * brand-new array, so two devices attaching concurrently kept only one device's array, and
+ * `gcOrphans` then deleted the other photo outright (orphans have no grace period). A push
+ * onto the existing list merges. Deduped: photo ids are minted per upload, so the same id
+ * reaching the same host twice is only ever a retry or a refresh write, and must be a no-op.
+ */
+function attachTo(host: object, photoId: UUID): void {
+  appendUnique(host as Record<string, unknown>, 'photoIds', photoId);
+}
+
 /** The standard flat shape: `doc[collection][entityId].photoIds`. */
 export function flatHooks(collection: string): PhotoCollectionHooks {
   type FlatEntities = Record<string, { photoIds?: UUID[] }>;
@@ -57,7 +70,7 @@ export function flatHooks(collection: string): PhotoCollectionHooks {
       const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
       const entity = entities?.[entityId];
       if (!entity) return;
-      entity.photoIds = [...(entity.photoIds ?? []), photoId];
+      attachTo(entity, photoId);
     },
     *collect(doc) {
       const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
@@ -70,9 +83,24 @@ export function flatHooks(collection: string): PhotoCollectionHooks {
 }
 
 const photoCollections = new Map<string, PhotoCollectionHooks>();
+/** The registered collections that use the standard flat shape. Filled by the SAME call that
+ * fills the registry, so the registry stays the one list. */
+const flatPhotoHosts = new Set<string>();
 
 export function registerPhotoCollection(name: string, hooks?: PhotoCollectionHooks): void {
   photoCollections.set(name, hooks ?? flatHooks(name));
+  if (hooks) flatPhotoHosts.delete(name);
+  else flatPhotoHosts.add(name);
+}
+
+/**
+ * Is `name` a registered flat photo host (`entity.photoIds`)? Such hosts are created with
+ * `photoIds: []` (#117), so a later first attach is a list insert that merges, rather than the
+ * creation of the key, which two devices would race on. Vacations (nested segments) and the
+ * avatar (a scalar) are not flat hosts.
+ */
+export function isFlatPhotoHost(name: string): boolean {
+  return flatPhotoHosts.has(name);
 }
 
 // ─── Vacation (nested booking segments) + avatar (scalar) hooks ──────────────
@@ -113,7 +141,7 @@ export const vacationPhotoHooks: PhotoCollectionHooks = {
     for (const arr of vacationSegmentArrays(vac)) {
       const seg = arr.find((s) => s.id === segmentId);
       if (seg) {
-        seg.photoIds = [...(seg.photoIds ?? []), photoId];
+        attachTo(seg, photoId);
         return;
       }
     }

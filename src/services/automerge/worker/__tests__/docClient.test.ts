@@ -150,6 +150,56 @@ describe('docClient', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it('logs reconciler notes from the mutate response: warn for a fallback, info for a heal (#117)', async () => {
+    useWorker((req) =>
+      req.method === 'mutate'
+        ? {
+            cid: req.cid,
+            ok: true,
+            result: {},
+            changed: true,
+            notes: [
+              { action: 'next_duplicate_keys', kind: 'lists.items', count: 2 },
+              { action: 'healed_duplicate_keys', kind: 'vacations.ideas', count: 1 },
+            ],
+          }
+        : null
+    );
+    await mutate({ op: 'patch', collection: 'lists', id: 'L', patch: { items: [] } });
+    const events = vi
+      .mocked(logEvent)
+      .mock.calls.map(([e]) => e)
+      .filter((e) => e.surface === 'crdt-reconcile');
+    expect(events).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        message: 'reconcile fallback',
+        context: { action: 'next_duplicate_keys', kind: 'lists.items', count: 2 },
+      }),
+      expect.objectContaining({
+        level: 'info',
+        context: { action: 'healed_duplicate_keys', kind: 'vacations.ideas', count: 1 },
+      }),
+    ]);
+  });
+
+  it('carries reconciler notes on the inline path too (#117)', async () => {
+    setInlineExecutor(async () => ({
+      result: {},
+      changed: true,
+      notes: [{ action: 'reconcile_verify_failed', kind: 'settings.exchangeRates', count: 1 }],
+    }));
+    forceInlineMode();
+    await mutate({ op: 'named', name: 'patchSettings', args: { patch: {} } });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'crdt-reconcile',
+        context: { action: 'reconcile_verify_failed', kind: 'settings.exchangeRates', count: 1 },
+      })
+    );
+  });
+
   it('fireAndForgetMutate catches a rejected mutate and reports it — no unhandled rejection (F8)', async () => {
     useWorker((req) =>
       req.method === 'mutate'

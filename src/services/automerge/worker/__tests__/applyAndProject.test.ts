@@ -507,6 +507,47 @@ describe('worker/applyAndProject', () => {
     expect(real.changed).toBe(true);
   });
 
+  it('a patch whose values all match reports changed:false, for entities and settings (#117)', () => {
+    setKey(key);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', name: 'Joint' } });
+    mutate({ op: 'named', name: 'patchSettings', args: { patch: { theme: 'dark' } } });
+    // The repositories always stamp `updatedAt`; it must not count as a change on its own.
+    const entity = mutate({
+      op: 'patch',
+      collection: 'accounts',
+      id: 'a',
+      patch: { name: 'Joint' },
+      base: { name: 'Joint' },
+      updatedAt: '2026-10-01',
+      onMissing: 'skip',
+    });
+    expect(entity.changed).toBe(false);
+    expect(entity.notes).toBeUndefined(); // nothing to report rides no field at all
+    const settings = mutate({
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { theme: 'dark' }, updatedAt: '2026-10-01' },
+    });
+    expect(settings.changed).toBe(false);
+  });
+
+  it('mutate carries reconciler notes on the response (#117)', () => {
+    setKey(key);
+    initDoc();
+    const items = [{ id: 'i1', text: 'milk' }];
+    mutate({ op: 'set', collection: 'lists', id: 'L', entity: { id: 'L', items } });
+    const res = mutate({
+      op: 'patch',
+      collection: 'lists',
+      id: 'L',
+      patch: { items: [...items, { id: 'i2', text: 'eggs' }, { id: 'i2', text: 'eggs' }] },
+      base: { items },
+    });
+    expect(res.changed).toBe(true);
+    expect(res.notes).toEqual([{ action: 'next_duplicate_keys', kind: 'lists.items', count: 1 }]);
+  });
+
   it('openCache opens the DB WITHOUT loading a cached doc — create keeps the fresh owner doc (F1)', async () => {
     // A stale cache row exists for this family (a prior/interrupted create attempt).
     const staleBin = saveDoc(
