@@ -15,6 +15,7 @@ _Unreleased on `main`. Nothing in this section is visible to users yet._
 ### Added
 
 - (unreleased) Help Center: "Plans, your trial, and what read-only means".
+- (unreleased) Blog: "passwords are so two-thousand and late" is staged for Friday 2 Oct, with greg's hero illustration, the long-and-short summary and a cleaned-up recovery-kit screenshot.
 
 ### Fixed
 
