@@ -123,6 +123,15 @@ export interface MergeOutcome {
    * branches on it. `user-file` adopts only; every other context throws.
    */
   rebaseUnavailable?: true;
+  /**
+   * Root keys (`COLLECTION_NAMES` + `settings`) holding more than one concurrent value after
+   * this operation, and how many of those it introduced (#117, plan F; `countRootConflicts`).
+   * A root conflict hides the losing map's entities and persists forever, so only `added > 0`
+   * is news: it raises the terminus to `warn`, and on a merge it is also when the worker
+   * pushed a full projection instead of deltas. Present on every action the worker returns;
+   * optional so the deliberately looser views (`MergeTerminusOutcome`) can omit it.
+   */
+  rootConflicts?: { total: number; added: number };
 }
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─

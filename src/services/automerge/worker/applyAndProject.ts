@@ -51,6 +51,9 @@ import {
   registerNamedOp,
   payloadFailure,
   nextLineage,
+  rootConflictSnapshot,
+  rootConflictsSince,
+  type RootConflictSnapshot,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import * as cache from './cache';
@@ -1101,6 +1104,12 @@ export async function mergeRemoteEnvelope(
   if (!currentDoc && !toldToInstallWholesale) {
     throw new LocalDocUnreadableError('worker-holds-no-document');
   }
+  // #117 plan F: the root conflicts THIS family's document already carries, read before anything
+  // below can consume the handle, so every outcome can say how many the operation ADDED. A
+  // wholesale install starts from nothing of this family's (the resident doc may be another
+  // family's), so every conflict it brings is new to this device.
+  const conflictsBefore: RootConflictSnapshot =
+    currentDoc && !toldToInstallWholesale ? rootConflictSnapshot(currentDoc) : new Map();
   // Seeded from the instruction; the lineage verdict may set it below (an
   // `adopt` or a completed `rebase` both install).
   let installWholesale = toldToInstallWholesale;
@@ -1156,6 +1165,7 @@ export async function mergeRemoteEnvelope(
         dirty: true,
         changed: false,
         remoteHeads: headsOf(remote),
+        rootConflicts: rootConflictsSince(conflictsBefore, currentDoc),
       };
     }
     // ⚠️ THE REBASE COMPOSES AND APPLIES BEFORE IT INSTALLS. ONE ASSIGNMENT.
@@ -1213,6 +1223,8 @@ export async function mergeRemoteEnvelope(
           remoteHeads: driveHeads,
           replayed: rebased.replayed,
           conflicts: rebased.conflicts,
+          // Already a full projection above, so this is reporting only.
+          rootConflicts: rootConflictsSince(conflictsBefore, doc),
         };
       }
       // ⚠️ WHERE THE FALLBACK GOES DEPENDS ON WHO ASKED. For an ordinary poll
@@ -1305,6 +1317,8 @@ export async function mergeRemoteEnvelope(
       dirty: !headsEqual(remoteHeads, heads),
       changed: true,
       remoteHeads,
+      // Already a full projection above, so this is reporting only.
+      rootConflicts: rootConflictsSince(conflictsBefore, doc),
       // Only ever true on the `user-file` fallback: this adopt is standing in
       // for a rebase that could not run, and the soak needs to see that.
       ...(rebaseUnavailable ? { rebaseUnavailable: true as const } : {}),
@@ -1325,11 +1339,19 @@ export async function mergeRemoteEnvelope(
   currentDoc = merged.doc;
   schedulePersist();
   scheduleSnapshotPersist();
-  // projectionDeltasBetween is pure and derives fully (or null) BEFORE pushDeltas
+  const rootConflicts = rootConflictsSince(conflictsBefore, currentDoc);
+  // ⚠️ A NEW ROOT CONFLICT FORCES THE FULL PROJECTION (#117, plan F). When a merge changes
+  // which map wins at a collection key, the diff is `put [collection]` (a root-level patch,
+  // which `projectionDeltasBetween` skips) plus the winner's entities, and NOTHING for the
+  // losing map's entities. Deltas would leave those as phantoms in the projection until a
+  // reload. Rare (a mixed-fleet migration race), so the full rebuild costs nothing in practice.
+  //
+  // Otherwise: projectionDeltasBetween is pure and derives fully (or null) BEFORE pushDeltas
   // streams anything → a derivation failure can never leave a half-updated
   // projection. `?? buildFullProjection` is NULLISH: an empty (but valid) delta
   // set streams nothing rather than triggering a spurious full rebuild.
-  const deltas = projectionDeltasBetween(currentDoc, localHeads, merged.heads);
+  const deltas =
+    rootConflicts.added > 0 ? null : projectionDeltasBetween(currentDoc, localHeads, merged.heads);
   pushDeltas(deltas ?? buildFullProjection(currentDoc));
   // Reuses the same `headsEqual` the persist path uses, against the localHeads
   // captured before the merge — so `changed` means precisely "our doc moved".
@@ -1339,6 +1361,7 @@ export async function mergeRemoteEnvelope(
     dirty: merged.dirty,
     changed: !headsEqual(localHeads, merged.heads),
     remoteHeads,
+    rootConflicts,
   };
 }
 

@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import { setDocActor, resetDocActor, docInitOpts } from '../docActor';
 import { loadDoc, saveDoc, applyMutation, migrateDoc } from '../docOps';
 
@@ -25,20 +25,28 @@ const setBalance = (doc: Automerge.Doc<FamilyDocument>, id: string, balance: num
 const actorCount = (doc: Automerge.Doc<FamilyDocument>) =>
   new Set(Automerge.getAllChanges(doc).map((c) => Automerge.decodeChange(c).actor)).size;
 
+/**
+ * The fixed actors of the committed migration changes (#117, plan F): `migrateDoc` creates each
+ * absent collection with its stored change, one actor per collection. A CONSTANT, not growth:
+ * every device applies the same changes, so they never add a lane after the first migrate.
+ */
+const MIGRATION_ACTORS = COLLECTION_NAMES.length;
+
 beforeEach(() => resetDocActor());
 
 describe('a pinned actor across repeated load cycles', () => {
   it('keeps ONE lane where the default mints one per load', () => {
     // The unpinned control first, so the assertion below is a comparison rather
-    // than a claim. FOUR actors, not three: `init` mints one for the migrate
-    // change, then each of the three loads mints another. That is the growth —
-    // one lane per SESSION, on a document whose data never changed shape.
+    // than a claim. THREE session lanes on top of the constant migration actors:
+    // each of the three loads mints another. That is the growth — one lane per
+    // SESSION, on a document whose data never changed shape. (Before #117 the
+    // migrate was an ordinary change, so `init`'s own actor made it four.)
     let unpinned = migrateDoc(Automerge.init<FamilyDocument>());
     for (let i = 0; i < 3; i++) {
       unpinned = loadDoc(saveDoc(unpinned));
       unpinned = setBalance(unpinned, `a${i}`, i);
     }
-    expect(actorCount(unpinned)).toBe(4);
+    expect(actorCount(unpinned)).toBe(MIGRATION_ACTORS + 3);
 
     setDocActor(ACTOR);
     let pinned = migrateDoc(Automerge.init<FamilyDocument>(docInitOpts()));
@@ -46,7 +54,7 @@ describe('a pinned actor across repeated load cycles', () => {
       pinned = loadDoc(saveDoc(pinned));
       pinned = setBalance(pinned, `a${i}`, i);
     }
-    expect(actorCount(pinned)).toBe(1);
+    expect(actorCount(pinned)).toBe(MIGRATION_ACTORS + 1);
   });
 
   it('produces a SMALLER document for the same data', () => {

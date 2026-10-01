@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument, CollectionName } from '@/types/automerge';
+import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
 import {
   migrateDoc,
   loadDoc,
@@ -17,7 +17,11 @@ import {
   unframeChanges,
   registerNamedOp,
   __resetNamedOpsForTesting,
+  countRootConflicts,
+  rootConflictSnapshot,
+  rootConflictsSince,
 } from '../docOps';
+import { MIGRATION_CHANGES } from '../migrationChanges';
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { apply, converge, fork, seeded } from './twoDevices';
 
@@ -1159,5 +1163,143 @@ describe('docOps — merge-safe writes (#117)', () => {
       patchOp('goals', 'G', { manualContributions: [{ id, amount: 10 }] }, {});
     const { a: merged } = converge(apply(a, add('c1')), apply(b, add('c2')));
     expect(read(merged, 'goals', 'G').manualContributions).toHaveLength(1);
+  });
+});
+
+describe('docOps — deterministic collection creation (#117, plan F)', () => {
+  /**
+   * A pod written before `missing` shipped: every other collection exists, created by an
+   * ordinary random-actor change, exactly as today's pods were.
+   */
+  const oldPod = (...missing: CollectionName[]): Doc =>
+    Automerge.change(Automerge.init<FamilyDocument>(), (d) => {
+      for (const name of COLLECTION_NAMES) {
+        if (!missing.includes(name)) (d as unknown as AnyRec)[name] = {};
+      }
+    });
+  const todo = (id: string): MutationOp => setOp('todos', { id, title: id });
+  const lastChange = (doc: Doc) => Automerge.decodeChange(Automerge.getLastLocalChange(doc)!);
+
+  it('every device creates an absent collection as the SAME object (the stored change)', () => {
+    const one = migrateDoc(Automerge.init<FamilyDocument>());
+    const two = migrateDoc(Automerge.init<FamilyDocument>());
+    expect(Automerge.getActorId(one)).not.toBe(Automerge.getActorId(two));
+    for (const name of COLLECTION_NAMES) {
+      expect(Automerge.getObjectId(one[name])).toBe(Automerge.getObjectId(two[name]));
+    }
+  });
+
+  it('a doc with nothing missing comes back as the same handle with heads unchanged', () => {
+    const doc = seeded([todo('t1')]);
+    const heads = getHeads(doc);
+    expect(migrateDoc(doc)).toBe(doc);
+    expect(getHeads(doc)).toEqual(heads);
+  });
+
+  it('two devices migrating an old pod both write into ONE merged collection, no root conflict', () => {
+    const { a, b } = fork(oldPod('todos'));
+    // Divergent histories before the migration, as on two real devices.
+    const a1 = apply(migrateDoc(apply(a, setOp('accounts', { id: 'acct-a' }))), todo('e1'));
+    const b1 = apply(migrateDoc(apply(b, setOp('accounts', { id: 'acct-b' }))), todo('e2'));
+    const { a: merged } = converge(a1, b1);
+    expect(Object.keys(merged.todos).sort()).toEqual(['e1', 'e2']);
+    expect(countRootConflicts(merged)).toBe(0);
+  });
+
+  it('a `null` collection migrates via an ordinary change and is usable', () => {
+    const withNull = Automerge.change(oldPod(), (d) => {
+      (d as unknown as AnyRec).todos = null;
+    });
+    const migrated = migrateDoc(withNull);
+    expect(migrated.todos).toEqual({});
+    // An ordinary local change, not the stored one (which would leave the key `null`, probe c).
+    expect(lastChange(migrated).actor).toBe(Automerge.getActorId(migrated));
+    expect(lastChange(migrated).message).toBe('migrate: add missing collections');
+    expect(read(apply(migrated, todo('t1')), 'todos', 't1')).toEqual({ id: 't1', title: 't1' });
+    expect(countRootConflicts(migrated)).toBe(0);
+  });
+
+  it('mixes absent and null in one migrate: stored change for absent, ordinary for null', () => {
+    const doc = Automerge.change(oldPod('lists'), (d) => {
+      (d as unknown as AnyRec).todos = null;
+    });
+    const migrated = migrateDoc(doc);
+    expect(migrated.lists).toEqual({});
+    expect(migrated.todos).toEqual({});
+    const listsActor = Automerge.getObjectId(migrated.lists)!.split('@')[1];
+    expect(listsActor).toBe(
+      Automerge.decodeChange(Uint8Array.from(Buffer.from(MIGRATION_CHANGES.lists, 'base64'))).actor
+    );
+    expect(Automerge.getObjectId(migrated.todos)!.split('@')[1]).toBe(
+      Automerge.getActorId(migrated)
+    );
+  });
+
+  it('a corrupt stored change throws loudly (a build defect), never skipped', () => {
+    const table = MIGRATION_CHANGES as Record<CollectionName, string>;
+    const saved = table.todos;
+    try {
+      table.todos = 'AAAA';
+      expect(() => migrateDoc(oldPod('todos'))).toThrow(/stored migration change for "todos"/);
+      // Decodable, but for the wrong collection: also a build defect.
+      table.todos = table.lists;
+      expect(() => migrateDoc(oldPod('todos'))).toThrow(/wrong shape/);
+    } finally {
+      table.todos = saved;
+    }
+  });
+
+  it("mixed fleet: a pre-#117 device's `{}` beats the stored change; the conflict is counted and only a full projection is phantom-free", () => {
+    const { a, b } = fork(oldPod('todos'));
+    // A is on the new build: the stored change. B is on the old build: a random-actor `{}`.
+    const a1 = apply(migrateDoc(a), todo('e1'));
+    const b1 = apply(
+      Automerge.change(b, (d) => {
+        (d as unknown as AnyRec).todos = {};
+      }),
+      todo('e2')
+    );
+    const aHeads = getHeads(a1);
+    const before = rootConflictSnapshot(a1);
+    const { a: merged } = converge(a1, b1);
+
+    expect(countRootConflicts(merged)).toBe(1);
+    expect(rootConflictsSince(before, merged)).toEqual({ total: 1, added: 1 });
+    // B's assignment sits behind the old pod's ops, so it wins on op counter; A's map is hidden.
+    expect(Object.keys(merged.todos)).toEqual(['e2']);
+    const todosBulk = buildFullProjection(merged).find(
+      (d): d is Extract<ProjectionDelta, { kind: 'bulk' }> =>
+        d.kind === 'bulk' && d.collection === 'todos'
+    );
+    expect(todosBulk?.entities.map(([id]) => id)).toEqual(['e2']);
+
+    // WHY the full projection: the delta from A's heads upserts the winner's entity and emits
+    // NOTHING for A's own `e1`, which would stay in A's projection as a phantom.
+    const deltas = projectionDeltasBetween(merged, aHeads, getHeads(merged)) ?? [];
+    expect(deltas.some((d) => d.kind === 'remove' && d.id === 'e1')).toBe(false);
+
+    // A conflict that merely persists is not news on the next merge.
+    expect(rootConflictsSince(rootConflictSnapshot(merged), merged)).toEqual({
+      total: 1,
+      added: 0,
+    });
+  });
+
+  it('a third concurrent value at an already-conflicted key counts as added', () => {
+    const origin = oldPod('todos');
+    const devices = [0, 1, 2].map(() => Automerge.clone(origin));
+    const [x, y, z] = devices.map((d, i) =>
+      apply(
+        Automerge.change(d, (doc) => {
+          (doc as unknown as AnyRec).todos = {};
+        }),
+        todo(`e${i}`)
+      )
+    );
+    const xy = mergeDocs(x!, y!).doc;
+    const before = rootConflictSnapshot(xy);
+    expect(before.get('todos')).toBe(2);
+    const xyz = mergeDocs(xy, z!).doc;
+    expect(rootConflictsSince(before, xyz)).toEqual({ total: 1, added: 1 });
   });
 });
