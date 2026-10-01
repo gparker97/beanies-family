@@ -1,5 +1,5 @@
 ---
-title: 'passwords are so two thousand and late'
+title: 'passwords are so two-thousand and late'
 slug: passwords-are-so-two-thousand-and-late
 date: 2026-10-02
 category: use-case
