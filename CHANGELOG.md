@@ -10,27 +10,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-01
 
-_Unreleased on `main`. Nothing in this section is visible to users yet._
+_Released in 0.90.0: web live, Android production (in Google review), iOS submitted to the App Store with auto-release. The blog entry is staged content (draft) and is not live._
 
 ### Added
 
-- (unreleased) Help Center: "Plans, your trial, and what read-only means".
+- Help Center: "Plans, your trial, and what read-only means".
 - (unreleased) Blog: "passwords are so two-thousand and late" is staged for Friday 2 Oct, with greg's hero illustration, the long-and-short summary and a cleaned-up recovery-kit screenshot.
 
 ### Fixed
 
-- (unreleased) Edits made on two devices between syncs now both survive the merge: ticks and additions on a shared list, photos attached to the same recipe, votes on a holiday idea, drop-off and pick-up ticks, goal contributions, loan details, and exchange rates or API keys added on different devices. Saving a form now writes only the fields you changed, so an unrelated save on one device no longer undoes an edit made on another.
-- (unreleased) On Settings, the Beanie Wall card's "How to set your device up" link no longer runs into the Start button.
-- (unreleased) Help Center: the magic link article now says links last 15 minutes and that a new link does not cancel an earlier one (it still described the retired 7-day link).
+- Edits made on two devices between syncs now both survive the merge: ticks and additions on a shared list, photos attached to the same recipe, votes on a holiday idea, drop-off and pick-up ticks, goal contributions, loan details, and exchange rates or API keys added on different devices. Saving a form now writes only the fields you changed, so an unrelated save on one device no longer undoes an edit made on another.
+- On Settings, the Beanie Wall card's "How to set your device up" link no longer runs into the Start button.
+- Help Center: the magic link article now says links last 15 minutes and that a new link does not cancel an earlier one (it still described the retired 7-day link).
 
 ### Changed
 
-- (unreleased, behind a flag, dry-run) Groundwork for plans: the app can now learn its plan and trial state from beanies.family, show it in Settings, go read-only with a calm band when a trial ends, and meter magic beans. None of it acts until v1; today every family reads as beta.
-- (unreleased) Settings now has a **Your beanies Plan** card. Every family is on the free beta today, and the card says so; nothing is charged and nothing changes until v1.
-- (unreleased) Fixed a long-standing bug where a setting with no default (such as the new plan token) could be silently erased on app start by the exchange-rate refresh.
-- (unreleased) Your beanies Plan now sits at the top of Settings, shows magic beans as a meter, and links to a Plan Details page (also from the profile menu); the Plan page has a way back to Settings.
-- (unreleased) A cancelled plan now says so, with the date everything stays included until and a **Restart Plan** button; a failed renewal says **Payment Issue** with **Update Card**. The magic-beans line no longer shows the wrong allowance right after a page refresh.
-- (unreleased, web, live keys only) Settings → Your beanies Plan → See Plans opens a Plan page on the web where a family can pick beanies basic or beanies + magic beans, in USD or SGD, yearly or monthly, and pay inside the page with Stripe; an active plan shows Manage Plan and Receipts (Stripe's portal). Nothing is offered in the iPhone or Android apps.
+- (behind a flag, dry-run) Groundwork for plans: the app can now learn its plan and trial state from beanies.family, show it in Settings, go read-only with a calm band when a trial ends, and meter magic beans. None of it acts until v1; today every family reads as beta.
+- Settings now has a **Your beanies Plan** card. Every family is on the free beta today, and the card says so; nothing is charged and nothing changes until v1.
+- Fixed a long-standing bug where a setting with no default (such as the new plan token) could be silently erased on app start by the exchange-rate refresh.
+- Your beanies Plan now sits at the top of Settings, shows magic beans as a meter, and links to a Plan Details page (also from the profile menu); the Plan page has a way back to Settings.
+- A cancelled plan now says so, with the date everything stays included until and a **Restart Plan** button; a failed renewal says **Payment Issue** with **Update Card**. The magic-beans line no longer shows the wrong allowance right after a page refresh.
+- (web, live keys only) Settings → Your beanies Plan → See Plans opens a Plan page on the web where a family can pick beanies basic or beanies + magic beans, in USD or SGD, yearly or monthly, and pay inside the page with Stripe; an active plan shows Manage Plan and Receipts (Stripe's portal). Nothing is offered in the iPhone or Android apps.
 
 ---
 
