@@ -19,6 +19,9 @@ import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
 import { useToday } from '@/composables/useToday';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
+/** `missing` = vacation or segment not found (toast shown); `failed` = save errored (toast shown by wrapAsync). */
+export type SegmentWriteResult = 'saved' | 'missing' | 'failed';
+
 import type {
   FamilyVacation,
   VacationTravelSegment,
@@ -434,13 +437,10 @@ export const useVacationStore = defineStore('vacations', () => {
     vacationId: string,
     segmentId: string,
     patch: Record<string, unknown>
-  ): Promise<boolean> {
+  ): Promise<SegmentWriteResult> {
     const vacation = vacations.value.find((v) => v.id === vacationId);
-    if (!vacation) {
-      console.warn(`[vacation] updateSegment: no vacation "${vacationId}"`);
-      return false;
-    }
-    if (Object.keys(patch).length === 0) return true; // nothing changed — a save is a no-op
+    if (!vacation) return segmentMissing('update_missing', 'vacation');
+    if (Object.keys(patch).length === 0) return 'saved'; // nothing changed — a save is a no-op
 
     const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
     for (const key of keys) {
@@ -451,23 +451,15 @@ export const useVacationStore = defineStore('vacations', () => {
       const saved = await updateVacation(vacationId, {
         [key]: nextArr,
       } as UpdateFamilyVacationInput);
-      return saved !== null;
+      return saved !== null ? 'saved' : 'failed';
     }
-    // The segment is gone — deleted on another device while this drawer was open. Not an
-    // error the user caused, but they must not be told it saved.
-    logEvent({
-      level: 'warn',
-      surface: 'vacation-segment',
-      message: 'segment not found',
-      context: { action: 'update_missing' },
-    });
-    return false;
+    return segmentMissing('update_missing', 'segment');
   }
 
   /** Remove one booking segment by id, from whichever bucket holds it. */
-  async function deleteSegment(vacationId: string, segmentId: string): Promise<boolean> {
+  async function deleteSegment(vacationId: string, segmentId: string): Promise<SegmentWriteResult> {
     const vacation = vacations.value.find((v) => v.id === vacationId);
-    if (!vacation) return false;
+    if (!vacation) return segmentMissing('delete_missing', 'vacation');
     const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
     for (const key of keys) {
       const arr = (vacation[key] ?? []) as Array<{ id: string }>;
@@ -476,15 +468,35 @@ export const useVacationStore = defineStore('vacations', () => {
       const saved = await updateVacation(vacationId, {
         [key]: nextArr,
       } as UpdateFamilyVacationInput);
-      return saved !== null;
+      return saved !== null ? 'saved' : 'failed';
     }
+    return segmentMissing('delete_missing', 'segment');
+  }
+
+  /**
+   * The vacation or segment is gone, typically deleted on another device while a drawer was
+   * open. Not an error the user caused, but they must not be told it saved. The STORE owns
+   * the toast so no caller can forget it. (A `'failed'` save needs none: `updateVacation`'s
+   * `wrapAsync` already showed the error toast.)
+   */
+  function segmentMissing(
+    action: 'update_missing' | 'delete_missing',
+    kind: 'vacation' | 'segment'
+  ): 'missing' {
     logEvent({
       level: 'warn',
       surface: 'vacation-segment',
       message: 'segment not found',
-      context: { action: 'delete_missing' },
+      context: { action, kind },
     });
-    return false;
+    notifySegmentGone();
+    return 'missing';
+  }
+
+  /** Tell the user the booking they were editing no longer exists. */
+  function notifySegmentGone() {
+    const t = useTranslationStore().t;
+    showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
   }
 
   /**
@@ -573,6 +585,7 @@ export const useVacationStore = defineStore('vacations', () => {
     saveExtractedTrip,
     updateSegment,
     deleteSegment,
+    notifySegmentGone,
     updateSegmentPhotoIds,
     addExtractedSegments,
     resetState,

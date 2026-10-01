@@ -11,7 +11,6 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
 import { useTranslation } from '@/composables/useTranslation';
-import { useToast } from '@/composables/useToast';
 import { useFormModal } from '@/composables/useFormModal';
 import {
   useBookingValidation,
@@ -37,7 +36,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
-const { showToast } = useToast();
 const vacationStore = useVacationStore();
 
 // Form fields
@@ -233,14 +231,11 @@ async function handleSave() {
       // Addressed BY ID and merged onto the CURRENT segment (`updateSegment`): a CRDT merge that
       // shifts the array can no longer aim this save at a different booking, and fields the user
       // did not touch are never rewritten. See TravelSegmentEditModal for the full reasoning.
-      const saved = await vacationStore.updateSegment(
+      await vacationStore.updateSegment(
         props.vacationId,
         targetId,
         formDiff.changes(buildPayload())
       );
-      if (!saved) {
-        showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
-      }
       emit('close');
     } finally {
       isSubmitting.value = false;

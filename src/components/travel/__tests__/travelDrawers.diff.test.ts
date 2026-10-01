@@ -61,7 +61,7 @@ function setup() {
   setActivePinia(createPinia());
   const store = useVacationStore();
   store.vacations = [structuredClone(vacation)] as never;
-  const updateSegment = vi.fn().mockResolvedValue(true);
+  const updateSegment = vi.fn().mockResolvedValue('saved');
   store.updateSegment = updateSegment;
   return { store, updateSegment };
 }

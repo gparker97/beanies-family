@@ -62,7 +62,9 @@ export interface RecipeDiff {
  * A user who hand-edited a recipe must never lose that work to a worse reading of the page.
  */
 function isEmptyish(value: unknown): boolean {
-  if (value === undefined) return true;
+  // `null` empties too: `diffPayload` passes a raw null through as a WRITE, so a null prefill
+  // field would otherwise wipe a hand-edited value.
+  if (value === undefined || value === null) return true;
   // Whitespace counts. `asString` now trims at the parser, so this is belt-and-braces on a
   // path where getting it wrong blanks a field — and it holds for any future producer that
   // does not trim.
@@ -71,7 +73,7 @@ function isEmptyish(value: unknown): boolean {
 }
 
 function hasContent(value: unknown): boolean {
-  return !isEmptyish(value) && value !== null;
+  return !isEmptyish(value);
 }
 
 /**
