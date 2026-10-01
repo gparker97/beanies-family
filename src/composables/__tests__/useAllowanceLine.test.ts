@@ -31,9 +31,9 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
     t: (k: string) =>
       k === 'plan.allowance.day'
-        ? 'day {left}/{limit} {time}'
+        ? 'day {left}/{limit} {date} {time}'
         : k === 'plan.allowance.month'
-          ? 'month {left}/{limit} {date}'
+          ? 'month {left}/{limit} {date} {time}'
           : k,
   }),
 }));
@@ -77,7 +77,9 @@ describe('useAllowanceLine', () => {
     expect(h.fetchAllowance).toHaveBeenCalledTimes(1);
     expect(h.fetchAllowance).toHaveBeenCalledWith({ familyId: 'fam-1' });
     // The shared formatter's local rendering of the UTC reset (allowanceReset.ts).
-    expect(line.value).toBe(`day 1/1 ${allowanceResetParts(RESETS)!.time}`);
+    expect(line.value).toBe(
+      `day 1/1 ${allowanceResetParts(RESETS)!.date} ${allowanceResetParts(RESETS)!.time}`
+    );
     expect(line.value).toMatch(/(am|pm)$/);
   });
 
@@ -100,7 +102,9 @@ describe('useAllowanceLine', () => {
     h.fetchAllowance.mockResolvedValue({ used: 1, limit: 1, period: 'month', resetsAt: RESETS });
     const { line } = useAllowanceLine();
     await flushPromises();
-    expect(line.value).toBe(`month 0/1 ${allowanceResetParts(RESETS)!.date}`);
+    expect(line.value).toBe(
+      `month 0/1 ${allowanceResetParts(RESETS)!.date} ${allowanceResetParts(RESETS)!.time}`
+    );
   });
 
   it('never shows a negative count when a race overran the allowance by one', async () => {
@@ -192,7 +196,9 @@ describe('useAllowanceLine', () => {
     await flushPromises();
     expect(h.fetchAllowance).toHaveBeenCalledTimes(2);
     expect(h.fetchAllowance).toHaveBeenLastCalledWith({ familyId: 'fam-2' });
-    expect(line.value).toBe(`day 0/1 ${allowanceResetParts(RESETS)!.time}`);
+    expect(line.value).toBe(
+      `day 0/1 ${allowanceResetParts(RESETS)!.date} ${allowanceResetParts(RESETS)!.time}`
+    );
   });
 
   it('an answer for a family the user has already left is discarded', async () => {
@@ -204,7 +210,9 @@ describe('useAllowanceLine', () => {
     await flushPromises();
     resolveOld({ used: 1, limit: 1, period: 'day', resetsAt: RESETS });
     await flushPromises();
-    expect(line.value).toBe(`day 10/10 ${allowanceResetParts(RESETS)!.time}`);
+    expect(line.value).toBe(
+      `day 10/10 ${allowanceResetParts(RESETS)!.date} ${allowanceResetParts(RESETS)!.time}`
+    );
   });
 
   it('a failed read is "unavailable" plus a logged warning, never a throw', async () => {
