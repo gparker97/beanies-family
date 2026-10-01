@@ -17,8 +17,8 @@
  *
  * It wraps `handler` in a synthetic API Gateway HTTP API v2 event, so what runs is the same
  * routing, auth and Stripe code as prod. Env mapping (all overridable):
- *   STRIPE_SECRET_KEY      <- TF_VAR_stripe_secret_key
- *   STRIPE_WEBHOOK_SECRET  <- the `whsec_` that `stripe listen` prints (pass it explicitly)
+ *   STRIPE_SECRET_KEY      <- BEANIES_STRIPE_SANDBOX_SECRET_KEY (never the TF_VAR_, which may be live)
+ *   STRIPE_WEBHOOK_SECRET  <- BEANIES_STRIPE_SANDBOX_WEBHOOK_SECRET, or the `whsec_` `stripe listen` prints
  *   STRIPE_PRE_V1_COUPON   <- TF_VAR_stripe_pre_v1_coupon (default PRE_V1_50)
  *   BILLING_API_KEY        <- TF_VAR_registry_api_key (the dev client sends the registry key)
  *   BILLING_TABLE_NAME     <- REQUIRED, and never the prod table (see README: a sandbox table)
@@ -71,7 +71,9 @@ function readBody(req) {
 }
 
 export function applyLocalEnv(env = process.env) {
-  env.STRIPE_SECRET_KEY ||= env.TF_VAR_stripe_secret_key || '';
+  // The SANDBOX pair by name (never the TF_VAR_ lines, which hold whatever prod runs on).
+  env.STRIPE_SECRET_KEY ||= env.BEANIES_STRIPE_SANDBOX_SECRET_KEY || '';
+  env.STRIPE_WEBHOOK_SECRET ||= env.BEANIES_STRIPE_SANDBOX_WEBHOOK_SECRET || '';
   env.STRIPE_PRE_V1_COUPON ||= env.TF_VAR_stripe_pre_v1_coupon || 'PRE_V1_50';
   env.BILLING_API_KEY ||= env.TF_VAR_registry_api_key || '';
   // NEVER the prod billing table by default: after the live-key flip, a sandbox claim or a
@@ -122,6 +124,12 @@ if (invokedDirectly) {
   if (missing.length) {
     console.error(
       `[billing-local] missing ${missing.join(', ')}. Run: source ~/.beanies-tf.env, then BILLING_TABLE_NAME=beanies-family-billing-sandbox npm run billing:local (see infrastructure/lambda/billing/README.md).`
+    );
+    process.exit(1);
+  }
+  if (/^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY)) {
+    console.error(
+      '[billing-local] refusing to run on a LIVE Stripe key: the harness is for the sandbox only.'
     );
     process.exit(1);
   }

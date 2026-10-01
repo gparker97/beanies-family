@@ -51,10 +51,17 @@ describe('local harness', () => {
 
   it('maps the TF env names', () => {
     const env = applyLocalEnv({
-      TF_VAR_stripe_secret_key: 'sk_test_1',
+      BEANIES_STRIPE_SANDBOX_SECRET_KEY: 'sk_test_1',
+      BEANIES_STRIPE_SANDBOX_WEBHOOK_SECRET: 'whsec_1',
+      TF_VAR_stripe_secret_key: 'sk_live_prod',
       TF_VAR_registry_api_key: 'k',
     });
-    assert.equal(env.STRIPE_SECRET_KEY, 'sk_test_1');
+    assert.equal(
+      env.STRIPE_SECRET_KEY,
+      'sk_test_1',
+      'the sandbox pair, never the TF_VAR_ (prod) key'
+    );
+    assert.equal(env.STRIPE_WEBHOOK_SECRET, 'whsec_1');
     assert.equal(env.BILLING_API_KEY, 'k');
     assert.equal(env.STRIPE_PRE_V1_COUPON, 'PRE_V1_50');
     assert.equal(env.BILLING_TABLE_NAME, '', 'never the prod billing table by default');
