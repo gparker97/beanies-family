@@ -736,6 +736,40 @@ export const useListStore = defineStore('lists', () => {
    * never filed. Un-checking an item on a filed one-off un-files it.
    */
   /**
+   * Celebrate a list completing, with an Undo that is safe against edits made in the meantime.
+   *
+   * The Undo re-reads the CURRENT list and clears completion only on the items THIS gesture
+   * changed, then un-completes the list. It never writes back a pre-gesture snapshot: during
+   * the 6-second toast a family can add a row or tick another one (or another device can), and
+   * a whole-array restore would erase it. Same rule as `restoreItem`.
+   */
+  function celebrateWithUndo(
+    listId: string,
+    changedItemIds: string[],
+    wasRecurring: boolean
+  ): void {
+    const changed = new Set(changedItemIds);
+    celebrate('list-complete', {
+      onUndo: () => {
+        const current = lists.value.find((l) => l.id === listId);
+        if (!current) return;
+        const items = current.items.map((it) =>
+          changed.has(it.id)
+            ? { ...it, completed: false, completedBy: undefined, completedAt: undefined }
+            : it
+        );
+        void updateList(listId, {
+          items,
+          completed: false,
+          completedBy: undefined,
+          completedAt: undefined,
+          ...(wasRecurring ? { cycleCelebrated: false } : {}),
+        });
+      },
+    });
+  }
+
+  /**
    * Tick or untick EVERY item in one write (#88 follow-up).
    *
    * Deliberately routed through the same `deriveCompletion` that `toggleItem`,
@@ -788,19 +822,10 @@ export const useListStore = defineStore('lists', () => {
     const { patch: completion, shouldCelebrate } = deriveCompletion(list, items, byMemberId);
     const updated = await updateList(listId, { items, ...completion });
     if (updated && shouldCelebrate) {
-      const originalItems = list.items;
-      const wasRecurring = isRecurring(list);
-      celebrate('list-complete', {
-        onUndo: () => {
-          void updateList(listId, {
-            items: originalItems,
-            completed: false,
-            completedBy: undefined,
-            completedAt: undefined,
-            ...(wasRecurring ? { cycleCelebrated: false } : {}),
-          });
-        },
-      });
+      const changedItemIds = list.items
+        .filter((it) => it.completed !== completed)
+        .map((it) => it.id);
+      celebrateWithUndo(listId, changedItemIds, isRecurring(list));
     }
     return updated;
   }
@@ -829,19 +854,7 @@ export const useListStore = defineStore('lists', () => {
     const { patch: completion, shouldCelebrate } = deriveCompletion(list, items, byMemberId);
     const updated = await updateList(listId, { items, ...completion });
     if (updated && shouldCelebrate) {
-      const originalItems = list.items;
-      const wasRecurring = isRecurring(list);
-      celebrate('list-complete', {
-        onUndo: () => {
-          void updateList(listId, {
-            items: originalItems,
-            completed: false,
-            completedBy: undefined,
-            completedAt: undefined,
-            ...(wasRecurring ? { cycleCelebrated: false } : {}),
-          });
-        },
-      });
+      celebrateWithUndo(listId, [itemId], isRecurring(list));
     }
     return updated;
   }

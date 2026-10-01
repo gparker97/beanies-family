@@ -1750,8 +1750,34 @@ export const useActivityStore = defineStore('activities', () => {
     { immediate: true }
   );
 
+  /**
+   * Tick or un-tick a drop-off / pick-up duty for ONE occurrence. Owns the toggle that the
+   * Nook and the activity view modal each hand-rolled. Un-ticking removes EVERY completion for
+   * that date (a concurrent double-tick leaves two entries sharing a date key; removing one
+   * would leave the other and the un-tick would silently do nothing); ticking appends one.
+   */
+  async function toggleDutyCompletion(
+    activityId: string,
+    duty: 'dropoff' | 'pickup',
+    occurrenceDate: string,
+    memberId: string
+  ): Promise<FamilyActivity | null> {
+    const activity = activities.value.find((a) => a.id === activityId);
+    if (!activity || !occurrenceDate) return null;
+    const field = duty === 'dropoff' ? 'dropoffCompletions' : 'pickupCompletions';
+    const current = activity[field] ?? [];
+    const next: DutyCompletion[] = current.some((c) => c.date === occurrenceDate)
+      ? current.filter((c) => c.date !== occurrenceDate)
+      : [
+          ...current,
+          { date: occurrenceDate, completedBy: memberId, completedAt: new Date().toISOString() },
+        ];
+    return updateActivity(activityId, { [field]: next });
+  }
+
   return {
     repeatStartFor,
+    toggleDutyCompletion,
     monthEvents,
     eventsInRange,
     backfillReminderMinutes,

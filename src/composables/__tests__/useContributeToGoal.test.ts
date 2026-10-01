@@ -57,24 +57,34 @@ describe('useContributeToGoal.contribute', () => {
     goalsState.updateGoal.mockReset();
   });
 
+  /** Mimic the store: record the caller-minted contribution id on the returned goal. */
+  function echoMintedId(currentAmount: number, amount: number, followedBy: string[] = []) {
+    goalsState.updateGoal.mockImplementation(async (_id, _input, options) => {
+      const minted = (options as { contribution: { id: string } }).contribution.id;
+      return goal({
+        currentAmount,
+        manualContributions: [
+          { id: minted, amount, at: '...', updatedBy: 'member-1' },
+          ...followedBy.map((id) => ({ id, amount: 5, at: '...', updatedBy: 'member-2' })),
+        ],
+      });
+    });
+  }
+
   it('positive amount → appends contribution + fires success toast with undo action', async () => {
-    goalsState.updateGoal.mockResolvedValue(
-      goal({
-        currentAmount: 600,
-        manualContributions: [{ id: 'c-new', amount: 100, at: '...', updatedBy: 'member-1' }],
-      })
-    );
+    echoMintedId(600, 100);
 
     const { contribute } = useContributeToGoal();
     const result = await contribute('g-1', { amount: 100 });
 
     expect(result.success).toBe(true);
-    expect(result.contributionId).toBe('c-new');
+    const minted = goalsState.updateGoal.mock.calls[0]![2] as { contribution: { id: string } };
+    expect(result.contributionId).toBe(minted.contribution.id);
     expect(result.appliedDelta).toBe(100);
     expect(goalsState.updateGoal).toHaveBeenCalledWith(
       'g-1',
       expect.objectContaining({ currentAmount: 600 }),
-      { contribution: { author: 'member-1', note: undefined } }
+      { contribution: { id: expect.any(String), author: 'member-1', note: undefined } }
     );
     // Toast with action button
     expect(showToastMock).toHaveBeenCalledWith(
@@ -85,6 +95,39 @@ describe('useContributeToGoal.contribute', () => {
         actionLabel: 'goalContribute.undoLabel',
         actionFn: expect.any(Function),
         durationMs: 6000,
+      })
+    );
+  });
+
+  it("Undo targets the minted id even when another device's entry follows it", async () => {
+    echoMintedId(600, 100, ['c-other-device']);
+    const { contribute } = useContributeToGoal();
+    const result = await contribute('g-1', { amount: 100 });
+    const minted = (goalsState.updateGoal.mock.calls[0]![2] as { contribution: { id: string } })
+      .contribution.id;
+    expect(result.contributionId).toBe(minted);
+    expect(result.contributionId).not.toBe('c-other-device');
+
+    // Fire the toast's Undo against a live goal holding both entries.
+    goalsState.goals = [
+      goal({
+        currentAmount: 605,
+        manualContributions: [
+          { id: minted, amount: 100, at: '...', updatedBy: 'member-1' },
+          { id: 'c-other-device', amount: 5, at: '...', updatedBy: 'member-2' },
+        ],
+      }),
+    ];
+    goalsState.updateGoal.mockReset().mockResolvedValue(goal());
+    const toastOpts = showToastMock.mock.calls.find(
+      (c) => c[1] === 'goalContribute.successToast'
+    )![3];
+    await toastOpts.actionFn();
+    expect(goalsState.updateGoal).toHaveBeenCalledWith(
+      'g-1',
+      expect.objectContaining({
+        currentAmount: 505,
+        manualContributions: [expect.objectContaining({ id: 'c-other-device' })],
       })
     );
   });
@@ -128,7 +171,7 @@ describe('useContributeToGoal.contribute', () => {
     const { contribute } = useContributeToGoal();
     await contribute('g-1', { amount: 100, note: "mom's birthday money" });
     expect(goalsState.updateGoal).toHaveBeenCalledWith('g-1', expect.any(Object), {
-      contribution: { author: 'member-1', note: "mom's birthday money" },
+      contribution: { id: expect.any(String), author: 'member-1', note: "mom's birthday money" },
     });
   });
 
@@ -194,7 +237,7 @@ describe('useContributeToGoal.saveWithContribution', () => {
     expect(goalsState.updateGoal).toHaveBeenCalledWith(
       'g-1',
       expect.objectContaining({ currentAmount: 800 }),
-      { contribution: { author: 'member-1', note: undefined } }
+      { contribution: { id: expect.any(String), author: 'member-1', note: undefined } }
     );
     // No undo toast for the edit flow
     const undoCalls = showToastMock.mock.calls.filter(

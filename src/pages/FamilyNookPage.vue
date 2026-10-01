@@ -39,7 +39,6 @@ import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import type {
   FamilyActivity,
-  DutyCompletion,
   MealPlanEntry,
   Transaction,
   CreateFamilyActivityInput,
@@ -114,27 +113,14 @@ const {
 
 // ── Duty completion toggle ──────────────────────────────────────────────────
 async function handleDutyComplete(id: string, dutyType: string, occurrenceDate: string) {
-  const activity = activityStore.activities.find((a) => a.id === id);
-  if (!activity || !occurrenceDate) return;
   const memberId = familyStore.currentMemberId;
-  if (!memberId) return;
-  const now = new Date().toISOString();
-  const updates: Record<string, DutyCompletion[]> = {};
+  if (!memberId || !occurrenceDate) return;
   if (dutyType.includes('dropoff')) {
-    const completions = [...(activity.dropoffCompletions ?? [])];
-    const idx = completions.findIndex((c) => c.date === occurrenceDate);
-    if (idx >= 0) completions.splice(idx, 1);
-    else completions.push({ date: occurrenceDate, completedBy: memberId, completedAt: now });
-    updates.dropoffCompletions = completions;
+    await activityStore.toggleDutyCompletion(id, 'dropoff', occurrenceDate, memberId);
   }
   if (dutyType.includes('pickup')) {
-    const completions = [...(activity.pickupCompletions ?? [])];
-    const idx = completions.findIndex((c) => c.date === occurrenceDate);
-    if (idx >= 0) completions.splice(idx, 1);
-    else completions.push({ date: occurrenceDate, completedBy: memberId, completedAt: now });
-    updates.pickupCompletions = completions;
+    await activityStore.toggleDutyCompletion(id, 'pickup', occurrenceDate, memberId);
   }
-  await activityStore.updateActivity(id, updates);
 }
 
 // ── Todo completion toggle (from critical items) ────────────────────────────
