@@ -24,14 +24,13 @@ import type { ResultEnvelope, SharePayload } from '@/types/magicPayload';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import { useRecipeCapture } from '@/composables/useRecipeCapture';
 import type { DishImagePrefill } from '@/types/magicPayload';
-import { diffPayload } from '@/utils/diffPayload';
-import { recipeComparable } from '@/utils/recipeComparable';
 import type { RecipeTimeField } from '@/constants/recipeTimeFields';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import NumberStepper from '@/components/ui/NumberStepper.vue';
 import { SERVINGS_MAX, servingsOf } from '@/utils/recipeServings';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
 import { useTranslation } from '@/composables/useTranslation';
@@ -100,9 +99,9 @@ const cookTime = ref('');
  * Servings as a NUMBER of people (#116); `undefined` = not set. Stored as its digit string.
  *
  * 🚨 Same four places as the refs below: seeded from `servingsOf` in `onEdit` AND
- * `applyPrefill`, written by `buildPayload`, and compared by `recipeComparable` (which
- * normalises the stored text the same way, so an untouched "Serves 4-6" or "12 muffins"
- * recipe diffs as unchanged and its text is never rewritten by an unrelated edit).
+ * `applyPrefill`, and written by `buildPayload`. The edit baseline is `buildPayload()` taken
+ * after `onEdit`, so an untouched "Serves 4-6" or "12 muffins" recipe diffs as unchanged and
+ * its text is never rewritten by an unrelated edit.
  */
 const servingsCount = ref<number | undefined>(undefined);
 const ingredientsText = ref('');
@@ -113,11 +112,10 @@ const sourceUrl = ref('');
 /**
  * Course, meals and tags (#87).
  *
- * 🚨 THESE MUST BE SEEDED AND SAVED IN ALL FOUR PLACES — `onEdit`, `applyPrefill`,
- * `recipeComparable` and `buildPayload`. Miss `onEdit` and the failure is catastrophic and
- * silent: opening a saved recipe leaves these blank, `buildPayload` sends ''/[],
- * `recipeComparable` reports the STORED values, `diffPayload` sees a real change and writes the
- * clear — so fixing a typo in the title would erase that recipe's tags, course and meals.
+ * 🚨 THESE MUST BE SEEDED AND SAVED IN ALL THREE PLACES — `onEdit`, `applyPrefill` and
+ * `buildPayload`. Miss `onEdit` and the failure is catastrophic and silent: opening a saved
+ * recipe leaves these blank, and the snapshot is taken after `onEdit`, so a field `onEdit`
+ * missed is blank in the baseline too and diffs as unchanged (the stored value survives).
  */
 const course = ref<RecipeCourse | ''>('');
 const mealSlots = ref<MealSlot[]>([]);
@@ -242,7 +240,7 @@ function applyPrefill(prefill: RecipePrefill | null): void {
   // `tags` deliberately untouched on a merge — see above.
 }
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<Recipe, RecipePayload>(
   () => props.recipe,
   () => props.open,
   {
@@ -274,6 +272,8 @@ const { isEditing, isSubmitting } = useFormModal(
       correctionEnv.value = props.prefillEnv;
       applyPrefill(props.prefill);
     },
+    // Snapshot-at-open: an edit sends only what the user changed (see `buildPayload`).
+    snapshot: { build: buildPayload, name: 'RecipeFormModal' },
   }
 );
 
@@ -410,14 +410,9 @@ function splitLines(s: string): string[] {
  * precisely the failure class `docs/plans/2026-08-15-recurring-occurrence-edit-data-loss.md`
  * was written about, in a CRDT where the other device's edit is otherwise safe.
  *
- * `diffPayload` is the fix that already exists for it (ActivityModal and
- * ActivityViewEditModal both use it): it emits `undefined` ONLY for a field that had a value
+ * `formDiff` (a snapshot-at-open `diffPayload`) is the fix for it: it emits `undefined` ONLY for a field that had a value
  * and now does not, and omits everything untouched.
  */
-function orUndefined(v: string): string | undefined {
-  return v.trim() || undefined;
-}
-
 function buildPayload() {
   return {
     name: name.value.trim(),
@@ -436,11 +431,10 @@ function buildPayload() {
     course: course.value === '' ? undefined : course.value,
     mealSlots: sortSlots(mealSlots.value),
     tags: [...tags.value],
-    // photoIds stays conditional: an empty array is a MEANINGFUL value here (the user
-    // removed every photo), not an absent one, and PhotoAttachments owns that state.
-    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
+    // No `photoIds`: `usePhotoEntityBinding` is the only writer of photo ids.
   };
 }
+type RecipePayload = ReturnType<typeof buildPayload>;
 
 /**
  * Eager-create + photo-binding wiring.
@@ -451,22 +445,15 @@ function buildPayload() {
  */
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
-const eager = useEagerEntityCreate<Recipe, ReturnType<typeof buildPayload>>({
+const eager = useEagerEntityCreate<Recipe, RecipePayload>({
   resolveExistingId: () => props.recipe?.id ?? null,
   firstMissingField: () => (v.missing.value.has('name') ? 'name' : null),
   buildPayload,
   create: (payload) => recipesStore.createRecipe(payload),
-  // Send only what CHANGED. The baseline is read from the store rather than from
-  // `props.recipe`, so it is correct on the eager-create path too — there the entity was
-  // created by this very form and props.recipe is null, yet a second save must still diff
-  // against what is actually stored. See `recipeComparable` for why this matters.
-  update: (id, payload) => {
-    const stored = recipesStore.recipes.find((r) => r.id === id);
-    return recipesStore.updateRecipe(
-      id,
-      stored ? diffPayload(recipeComparable(stored), payload) : payload
-    );
-  },
+  // Send only what CHANGED: `formDiff` diffs against the snapshot taken when the form opened
+  // (re-taken after an eager create, which is the path a store-side baseline used to cover).
+  update: (id, payload) => recipesStore.updateRecipe(id, payload),
+  formDiff,
 });
 
 const binding = usePhotoEntityBinding({

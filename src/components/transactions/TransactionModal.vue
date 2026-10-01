@@ -160,7 +160,60 @@ const isAmountLocked = computed(() => {
 /** Offer a statement import at the top of a NEW transaction (#107): finance-gated like the reader. */
 const { canReadStatement } = useMagicReader();
 
-const { isEditing, isSubmitting } = useFormModal(
+// The one-time transaction / transfer payload. Every field is emitted so an edit can diff against
+// the open-time snapshot (`formDiff`); recurring items save through their own path. Pure: no
+// clock, no generated ids.
+function buildPayload() {
+  // Preserved on edit (#107): a statement import reconciles rows, and editing one here must not
+  // silently un-reconcile it. New rows start unreconciled.
+  const isReconciled = props.transaction?.isReconciled ?? false;
+  if (isTransfer.value) {
+    // A one-time move between two accounts (no category / goal / loan / recurrence). The store
+    // is the authority for the converted `toAmount`.
+    return {
+      accountId: accountId.value,
+      toAccountId: toAccountId.value,
+      type: 'transfer' as const,
+      amount: amount.value!,
+      currency: currency.value,
+      category: '',
+      date: date.value,
+      description: description.value.trim(),
+      isReconciled,
+    };
+  }
+  return {
+    accountId: accountId.value,
+    ...(activityId.value ? { activityId: activityId.value } : {}),
+    ...(loanId.value ? { loanId: loanId.value } : {}),
+    goalId: goalId.value || undefined,
+    goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
+    goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
+    type: effectiveType.value,
+    amount: amount.value!,
+    currency: currency.value,
+    category: category.value,
+    date: date.value,
+    description: description.value.trim(),
+    isReconciled,
+  };
+}
+type TransactionPayload = ReturnType<typeof buildPayload>;
+
+/**
+ * An edit sends only what changed. The computed allocation (`goalAllocApplied`) is cleared on
+ * every non-empty edit so the store's reverse-and-reapply cycle starts fresh, as it always has.
+ */
+function editChanges(payload: TransactionPayload): UpdateTransactionInput {
+  const changes: Record<string, unknown> = { ...formDiff.changes(payload) };
+  if (Object.keys(changes).length > 0) changes.goalAllocApplied = undefined;
+  return changes as UpdateTransactionInput;
+}
+
+const { isEditing, isSubmitting, formDiff } = useFormModal<
+  Transaction | RecurringItem,
+  TransactionPayload
+>(
   () => props.transaction ?? props.recurringItem ?? null,
   () => props.open,
   {
@@ -272,6 +325,7 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       linkPromptDismissed.value = false;
     },
+    snapshot: { build: buildPayload, name: 'TransactionModal' },
   }
 );
 
@@ -528,21 +582,9 @@ function handleSave() {
     // Transfer: a one-time move between two accounts (no category / goal / loan /
     // recurrence). The store is the authority for the converted `toAmount`.
     if (isTransfer.value) {
-      const data = {
-        accountId: accountId.value,
-        toAccountId: toAccountId.value,
-        type: 'transfer' as const,
-        amount: amount.value!,
-        currency: currency.value,
-        category: '',
-        date: date.value,
-        description: description.value.trim(),
-        // Preserve on edit (#107): a statement import reconciles rows, and editing one here
-        // must not silently un-reconcile it. New rows start unreconciled.
-        isReconciled: props.transaction?.isReconciled ?? false,
-      };
+      const data = buildPayload();
       if (isEditing.value && props.transaction) {
-        emit('save', { id: props.transaction.id, data: data as UpdateTransactionInput });
+        emit('save', { id: props.transaction.id, data: editChanges(data) });
       } else {
         emit('save', data as CreateTransactionInput);
       }
@@ -610,28 +652,10 @@ function handleSave() {
     }
 
     // One-time transaction (create or edit)
-    const data = {
-      accountId: accountId.value,
-      ...(activityId.value ? { activityId: activityId.value } : {}),
-      ...(loanId.value ? { loanId: loanId.value } : {}),
-      goalId: goalId.value || undefined,
-      goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
-      goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
-      // Clear computed allocation so the store's reversal + reapply cycle
-      // starts fresh when goal fields change or goal is unlinked.
-      goalAllocApplied: undefined,
-      type: effectiveType.value,
-      amount: amount.value!,
-      currency: currency.value,
-      category: category.value,
-      date: date.value,
-      description: description.value.trim(),
-      // Preserved on edit, as above (#107).
-      isReconciled: props.transaction?.isReconciled ?? false,
-    };
+    const data = buildPayload();
 
     if (isEditing.value && props.transaction) {
-      emit('save', { id: props.transaction.id, data: data as UpdateTransactionInput });
+      emit('save', { id: props.transaction.id, data: editChanges(data) });
     } else {
       emit('save', data as CreateTransactionInput);
     }

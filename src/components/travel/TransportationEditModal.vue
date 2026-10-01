@@ -68,7 +68,39 @@ const tripAssigneeIds = computed(
   () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
 );
 
-const { isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot (`formDiff`); the
+// drawer then saves only what changed, addressed by id. Pure function of form state.
+function buildPayload() {
+  return {
+    title: autoTitle.value,
+    status: status.value,
+    bookingReference: bookingReference.value,
+    pickupDate: pickupDate.value,
+    pickupTime: pickupTime.value,
+    returnDate: returnDate.value,
+    returnTime: returnTime.value,
+    agencyName: agencyName.value,
+    agencyAddress: agencyAddress.value,
+    operator: operator.value,
+    route: route.value,
+    departureStation: departureStation.value,
+    arrivalStation: arrivalStation.value,
+    departureDate: departureDate.value,
+    departureTime: departureTime.value,
+    link: link.value || undefined,
+    notes: notes.value,
+    // undefined = "everyone on this trip", re-resolved whenever the roster changes.
+    // Materializing it here froze the list, so a family member added later was excluded
+    // from every previously-saved segment forever.
+    travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
+  };
+}
+type VacationTransportationPayload = ReturnType<typeof buildPayload>;
+
+const { isSubmitting, formDiff } = useFormModal<
+  VacationTransportation,
+  VacationTransportationPayload
+>(
   () => props.transportation,
   () => props.open,
   {
@@ -110,6 +142,7 @@ const { isSubmitting } = useFormModal(
       notes.value = '';
       travellerIds.value = [...tripAssigneeIds.value];
     },
+    snapshot: { build: buildPayload, name: 'TransportationEditModal' },
   }
 );
 
@@ -192,48 +225,22 @@ function onPhotoIds(ids: string[]): void {
 }
 
 async function handleSave() {
-  if (!props.vacationId || props.transportationIndex < 0) return;
+  const targetId = props.transportation?.id;
+  if (!props.vacationId || !targetId) return;
   await validation.attemptSave(async () => {
     isSubmitting.value = true;
     try {
-      const vacation = vacationStore.getVacationById(props.vacationId);
-      if (!vacation) return;
-      const transportation = [...vacation.transportation];
-      // Resolve BY ID, not by the index captured at open — a CRDT merge that shifts this
-      // array re-points the index at a different booking and this save overwrites the wrong
-      // one. See TravelSegmentEditModal for the full reasoning.
-      const targetId = props.transportation?.id;
-      const idx = targetId ? transportation.findIndex((x) => x.id === targetId) : -1;
-      if (idx < 0) {
+      // Addressed BY ID and merged onto the CURRENT segment (`updateSegment`): a CRDT merge that
+      // shifts the array can no longer aim this save at a different booking, and fields the user
+      // did not touch are never rewritten. See TravelSegmentEditModal for the full reasoning.
+      const saved = await vacationStore.updateSegment(
+        props.vacationId,
+        targetId,
+        formDiff.changes(buildPayload())
+      );
+      if (!saved) {
         showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
-        emit('close');
-        return;
       }
-      transportation[idx] = {
-        ...transportation[idx]!,
-        title: autoTitle.value,
-        status: status.value,
-        bookingReference: bookingReference.value,
-        pickupDate: pickupDate.value,
-        pickupTime: pickupTime.value,
-        returnDate: returnDate.value,
-        returnTime: returnTime.value,
-        agencyName: agencyName.value,
-        agencyAddress: agencyAddress.value,
-        operator: operator.value,
-        route: route.value,
-        departureStation: departureStation.value,
-        arrivalStation: arrivalStation.value,
-        departureDate: departureDate.value,
-        departureTime: departureTime.value,
-        link: link.value || undefined,
-        notes: notes.value,
-        // undefined = "everyone on this trip", re-resolved whenever the roster changes.
-        // Materializing it here froze the list, so a family member added later was excluded
-        // from every previously-saved segment forever.
-        travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
-      };
-      await vacationStore.updateVacation(props.vacationId, { transportation });
       emit('close');
     } finally {
       isSubmitting.value = false;

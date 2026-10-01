@@ -192,4 +192,54 @@ describe('useEagerEntityCreate', () => {
     await api.ensureId();
     expect(create).toHaveBeenCalledTimes(2);
   });
+
+  describe('formDiff', () => {
+    function withDiff() {
+      const formDiff = {
+        changes: vi.fn((p: FakePayload) => ({ title: p.title + '!' })),
+        rebaseline: vi.fn(),
+      };
+      const create = vi.fn(async () => ({ id: 'eager-id', title: 'X' }));
+      const update = vi.fn(async (id: string) => ({ id, title: 'X' }));
+      const api = effectScope().run(() =>
+        useEagerEntityCreate<FakeEntity, FakePayload>({
+          resolveExistingId: () => null,
+          firstMissingField: () => null,
+          buildPayload: () => ({ title: 'X' }),
+          create,
+          update,
+          formDiff,
+        })
+      )!;
+      return { api, create, update, formDiff };
+    }
+
+    it('rebaselines on the created payload after an eager create', async () => {
+      const { api, formDiff } = withDiff();
+      await api.ensureId();
+      expect(formDiff.rebaseline).toHaveBeenCalledWith({ title: 'X' });
+    });
+
+    it('commit sends the diff, not the full payload, once an entity exists', async () => {
+      const { api, update } = withDiff();
+      await api.ensureId();
+      await api.commit();
+      expect(update).toHaveBeenCalledWith('eager-id', { title: 'X!' });
+    });
+
+    it('an empty diff still calls update', async () => {
+      const { api, update, formDiff } = withDiff();
+      formDiff.changes.mockReturnValue({} as never);
+      await api.ensureId();
+      await api.commit();
+      expect(update).toHaveBeenCalledWith('eager-id', {});
+    });
+
+    it('commit on a never-created entity creates with the full payload', async () => {
+      const { api, create, formDiff } = withDiff();
+      await api.commit();
+      expect(create).toHaveBeenCalledWith({ title: 'X' });
+      expect(formDiff.changes).not.toHaveBeenCalled();
+    });
+  });
 });
