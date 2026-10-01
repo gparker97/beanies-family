@@ -2,6 +2,8 @@ import type { CollectionName, CollectionEntity } from '@/types/automerge';
 import { list, getById as projectionGetById } from './projection';
 import { mutate, type RequestOpts } from './worker/docClient';
 import type { MutationOp } from './worker/protocol';
+// Pure (no Automerge import): the photo-host registry, so this stays the one list.
+import { isFlatPhotoHost } from './worker/photoOps';
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 import { reportError } from '@/utils/errorReporter';
@@ -26,6 +28,64 @@ export function stripUndefined<T extends object>(obj: T): T {
  */
 export function toPlain<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
+}
+
+/** The `patch` variant of `MutationOp`. */
+export type PatchMutationOp = Extract<MutationOp, { op: 'patch' }>;
+
+/**
+ * The values `source` holds for `keys`, as a plain (structured-clone-safe) copy: the `base` a
+ * write sends (#117, ADR-039). A key `source` lacks stays ABSENT from the result rather than
+ * `undefined`, because a key missing from a supplied base means "nothing known", which the
+ * worker treats as additive (it inserts and overwrites, never deletes). A missing `source`
+ * (an entity not yet in the projection, settings in the boot window) is therefore `{}`, the
+ * all-additive base, never a base that could delete something it has not seen.
+ */
+export function pickBase(
+  source: object | null | undefined,
+  keys: readonly string[]
+): Record<string, unknown> {
+  const record = (source ?? {}) as Record<string, unknown>;
+  const picked: Record<string, unknown> = {};
+  for (const key of keys) {
+    if (record[key] !== undefined) picked[key] = record[key];
+  }
+  return toPlain(picked);
+}
+
+/**
+ * Build a `patch` op that carries its own `base` (#117, ADR-039): the projection's value of
+ * every patched key, read at call time. The worker then reconciles three-way and writes only
+ * what the caller changed, so a peer's edit merged in meanwhile (or an earlier queued write)
+ * is kept instead of reverted, and arrays are edited per item rather than replaced.
+ *
+ * The base is RAW: no repository read `transform` is applied. A transform can derive values
+ * (`familyMemberRepository.applyDefaults` derives the permission flags from `ageGroup`), and a
+ * derived value in the base would make an explicit write of that same value look unchanged
+ * and drop it. Only the keys of `patch` are picked, so main never inspects the shape.
+ *
+ * `patch` must already be plain and undefined-free (`splitPatch`); clears travel in
+ * `deleteKeys`, outside the reconciler. `current` is the projection entity when the caller has
+ * just read it (the factory `update`'s existence check), to avoid a second read.
+ */
+export function patchOp(
+  collection: CollectionName,
+  id: string,
+  patch: Record<string, unknown>,
+  opts: Pick<PatchMutationOp, 'deleteKeys' | 'updatedAt' | 'onMissing'> & {
+    current?: object;
+  } = {}
+): PatchMutationOp {
+  const { current, ...rest } = opts;
+  const source = current ?? projectionGetById(collection, id);
+  return {
+    op: 'patch',
+    collection,
+    id,
+    patch,
+    base: pickBase(source, Object.keys(patch)),
+    ...rest,
+  };
 }
 
 /**
@@ -83,11 +143,19 @@ export function createAutomergeRepository<
     return transform(entity);
   }
 
-  /** The stored shape of a new entity: input + id + both timestamps, plain and undefined-free. */
+  /**
+   * The stored shape of a new entity: input + id + both timestamps, plain and undefined-free.
+   * A flat photo host is born with `photoIds: []` (#117), so its first attach is a list insert
+   * that merges, not the creation of the key, which two devices would race on (one device's
+   * photo id lost, then the photo itself collected by the next GC).
+   */
   function stampNew(id: string, input: CreateInput, now: string): Entity {
+    const raw = input as Record<string, unknown>;
+    const seedPhotoIds = raw.photoIds === undefined && isFlatPhotoHost(collectionName);
     return toPlain(
       stripUndefined({
-        ...(input as Record<string, unknown>),
+        ...raw,
+        ...(seedPhotoIds ? { photoIds: [] } : undefined),
         id,
         createdAt: now,
         updatedAt: now,
@@ -147,15 +215,14 @@ export function createAutomergeRepository<
     if (!ids.length) return [];
     const now = toISODateString(new Date());
     const { patch: cleanPatch, deleteKeys } = splitPatch(patch);
-    const ops: MutationOp[] = ids.map((id) => ({
-      op: 'patch',
-      collection: collectionName,
-      id,
-      patch: cleanPatch,
-      deleteKeys,
-      updatedAt: now,
-      onMissing: options.onMissing,
-    }));
+    // One op per id, each with that entity's own base (see `patchOp`).
+    const ops: MutationOp[] = ids.map((id) =>
+      patchOp(collectionName, id, cleanPatch, {
+        deleteKeys,
+        updatedAt: now,
+        onMissing: options.onMissing,
+      })
+    );
     await mutate({ op: 'batch', ops });
     return ids
       .map((id) => projectionGetById(collectionName, id) as Entity | undefined)
@@ -181,8 +248,9 @@ export function createAutomergeRepository<
     opts?: Pick<RequestOpts, 'system'>
   ): Promise<Entity | undefined> {
     // Existence check up front (fast path). Returning undefined preserves the
-    // repository contract.
-    if (!projectionGetById(collectionName, id)) return undefined;
+    // repository contract. The same read is the write's base (`patchOp`).
+    const current = projectionGetById(collectionName, id);
+    if (!current) return undefined;
 
     const now = toISODateString(new Date());
     const { patch: cleanInput, deleteKeys: keysToDelete } = splitPatch(input);
@@ -193,15 +261,12 @@ export function createAutomergeRepository<
     // (the old graceful contract) but leave a warning breadcrumb so a genuine
     // worker/projection divergence is diagnosable (never a silent success).
     const result = await mutate<Entity | undefined>(
-      {
-        op: 'patch',
-        collection: collectionName,
-        id,
-        patch: cleanInput,
+      patchOp(collectionName, id, cleanInput, {
         deleteKeys: keysToDelete,
         updatedAt: now,
         onMissing: 'skip',
-      },
+        current,
+      }),
       opts?.system ? { system: true } : undefined
     );
     if (!result) {
