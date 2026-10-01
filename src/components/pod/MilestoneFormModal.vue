@@ -190,6 +190,11 @@ watch(occurredOn, () => {
   if (dateError.value) dateError.value = null;
 });
 
+/**
+ * The `useFormModal` snapshot builder: a PURE function of form state. Create-time defaults
+ * (today's date, the 'custom' category/title) live in `withCreateDefaults`, so a snapshot taken
+ * at open and one taken at save can never differ because the clock or locale moved.
+ */
 function buildPayload() {
   // selectedMemberId is `undefined` when the user hasn't picked yet —
   // `canSave` blocks save in that case, so this code path is only
@@ -197,14 +202,9 @@ function buildPayload() {
   const memberId = selectedMemberId.value ?? null;
   return {
     memberId,
-    // Empty category means the user opened the form, attached a photo
-    // (eager-create path), and didn't pick a category. Default to
-    // 'custom' so the milestone is well-formed; the user can edit later.
-    category: (category.value || 'custom') as MilestoneCategory,
-    // Same fallback for title — only reachable via the eager-create
-    // path with an unfilled title.
-    title: title.value.trim() || t('milestone.cat.custom'),
-    occurredOn: occurredOn.value || toDateInputValue(new Date()),
+    category: category.value as MilestoneCategory,
+    title: title.value.trim(),
+    occurredOn: occurredOn.value,
     // Emitted even when blank so an edit can clear it; the snapshot diff keeps an untouched
     // blank out of the write. No `photoIds`: the binding is the only writer of photo ids.
     description: orUndefined(description.value),
@@ -225,11 +225,26 @@ type MilestonePayload = ReturnType<typeof buildPayload>;
  * photo itself is GC'd after 24h via the photoStore tombstone sweep;
  * the bare entity remains until explicitly deleted.
  */
+/**
+ * Create-only fallbacks. An empty category/title means the user opened the form, attached a
+ * photo (eager-create path) and didn't fill them in; default to 'custom' so the milestone is
+ * well-formed (they can edit later). Never applied to an update, so an untouched blank stays
+ * out of the diff.
+ */
+function withCreateDefaults(payload: MilestonePayload): MilestonePayload {
+  return {
+    ...payload,
+    category: payload.category || 'custom',
+    title: payload.title || t('milestone.cat.custom'),
+    occurredOn: payload.occurredOn || toDateInputValue(new Date()),
+  };
+}
+
 const eager = useEagerEntityCreate<Milestone, MilestonePayload>({
   resolveExistingId: () => props.milestone?.id ?? null,
   firstMissingField: () => (selectedMemberId.value === undefined ? 'member' : null),
   buildPayload,
-  create: (payload) => milestonesStore.createMilestone(payload),
+  create: (payload) => milestonesStore.createMilestone(withCreateDefaults(payload)),
   update: (id, payload) => milestonesStore.updateMilestone(id, payload),
   formDiff,
 });

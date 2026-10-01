@@ -36,8 +36,22 @@ describe('diffPayload', () => {
       expect(out.note).toBeUndefined();
     });
 
-    it('normalises null to undefined — null would persist as a literal null', () => {
-      const out = diffPayload({ note: 'hi' } as { note?: string | null }, { note: null });
+    it('writes null as null when a value is set to null (null is a meaningful value)', () => {
+      const out = diffPayload({ memberId: 'm1' } as { memberId?: string | null }, {
+        memberId: null,
+      });
+      expect('memberId' in out).toBe(true);
+      expect(out.memberId).toBeNull();
+    });
+
+    it('treats null -> null as unchanged', () => {
+      expect(
+        diffPayload({ memberId: null } as { memberId?: string | null }, { memberId: null })
+      ).toEqual({});
+    });
+
+    it("emits undefined (delete) for 'x' -> ''", () => {
+      const out = diffPayload({ note: 'x' }, { note: '' });
       expect('note' in out).toBe(true);
       expect(out.note).toBeUndefined();
     });

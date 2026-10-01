@@ -18,6 +18,7 @@ import { toISODateString, extractDatePart } from '@/utils/date';
 import { mergeExtractedIntoVacation } from '@/utils/segmentMerge';
 import { useToday } from '@/composables/useToday';
 import { trackFeature } from '@/services/analytics/plausible';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type {
   FamilyVacation,
   VacationTravelSegment,
@@ -454,7 +455,12 @@ export const useVacationStore = defineStore('vacations', () => {
     }
     // The segment is gone — deleted on another device while this drawer was open. Not an
     // error the user caused, but they must not be told it saved.
-    console.warn(`[vacation] updateSegment: no segment "${segmentId}" in "${vacationId}"`);
+    logEvent({
+      level: 'warn',
+      surface: 'vacation-segment',
+      message: 'segment not found',
+      context: { action: 'update_missing' },
+    });
     return false;
   }
 
@@ -472,6 +478,12 @@ export const useVacationStore = defineStore('vacations', () => {
       } as UpdateFamilyVacationInput);
       return saved !== null;
     }
+    logEvent({
+      level: 'warn',
+      surface: 'vacation-segment',
+      message: 'segment not found',
+      context: { action: 'delete_missing' },
+    });
     return false;
   }
 

@@ -270,6 +270,16 @@ describe('FamilyMemberModal', () => {
     expect(await saveEmitted(w)).toEqual({ email: 'alex@new.example.com' });
   });
 
+  it('adult -> pet replaces a real email with a freshly minted temp address', async () => {
+    const real = { ...adult, email: 'alex@example.com' };
+    const w = await mountOpen(FamilyMemberModal, { member: real });
+    (w.vm as Vm).beanRole = 'pet';
+    const data = await saveEmitted(w);
+    expect(data).toMatchObject({ isPet: true });
+    expect(String(data.email)).toMatch(/^\d+@temp\.beanies\.family$/);
+    expect(data.email).not.toBe('alex@example.com');
+  });
+
   it('create mints a temp email and starts the member as role member', async () => {
     const w = await mountOpen(FamilyMemberModal, {});
     (w.vm as Vm).name = 'Sam';

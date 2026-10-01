@@ -15,10 +15,16 @@
  *  - absent from `next`                → omitted (field left untouched)
  *  - present and equal to original     → omitted
  *  - present and different             → included
- *  - present as `''` / `null` / `undefined`, with a value in `original`
+ *  - `''` / `null` / `undefined` all count as "absent" for the unchanged check
+ *    (so '' → null is no change)
+ *  - a change to raw `''` / `undefined`, with a value in `original`
  *                                      → included as `undefined` so the key is
- *                                        DELETED. `null` would otherwise be
- *                                        persisted as a literal null.
+ *                                        DELETED.
+ *  - a change to raw `null`            → included as `null`, a real write. `null` is
+ *                                        a meaningful value for some fields (e.g.
+ *                                        `memberId: null` = family-wide) that readers
+ *                                        test with `=== null`; deleting the key would
+ *                                        make the item vanish from them.
  *  - arrays compared BY VALUE, element-wise (daysOfWeek, assigneeIds, photoIds); elements
  *    use the same equality, so an array of equal objects reads as unchanged
  *
@@ -36,8 +42,8 @@
  * library. Pinned by an out-of-contract test.
  */
 
-/** Normalise the "no value" spellings to a single one so `'' → undefined` and
- *  `null → undefined` register as clears rather than as changes to a new value. */
+/** Normalise the "no value" spellings to a single one for COMPARISON ONLY, so `''`, `null` and
+ *  `undefined` read as the same "absent" state. The emitted value keeps `null` (see header). */
 function normalize(value: unknown): unknown {
   return value === '' || value === null ? undefined : value;
 }
@@ -57,11 +63,12 @@ export function diffPayload<T extends object>(original: T, next: Partial<T>): Pa
   const out: Record<string, unknown> = {};
   const before = original as Record<string, unknown>;
   for (const key of Object.keys(next)) {
-    const nextValue = normalize((next as Record<string, unknown>)[key]);
+    const raw = (next as Record<string, unknown>)[key];
+    const nextValue = normalize(raw);
     const prevValue = normalize(before[key]);
     if (isEqual(nextValue, prevValue)) continue;
-    // Assign (never omit) so a clear is a present-but-undefined key.
-    out[key] = nextValue;
+    // Assign (never omit) so a clear is a present-but-undefined key; a raw null is written as null.
+    out[key] = raw === null ? null : nextValue;
   }
   return out as Partial<T>;
 }
