@@ -34,12 +34,15 @@ function viteVars(file: string): Set<string> {
  * Vars a lane may legitimately omit, each with the reason. An entry here is a
  * decision on the record — not a place to silence a genuine gap.
  */
+const STRIPE_WEB_ONLY =
+  'Stripe Embedded Checkout mounts only on the web Plan page (#95); native carries no purchase ' +
+  'path at all (Apple 3.1.3(f), Google Play), so the publishable key must NOT ship in a native bundle.';
+
 const EXEMPT: Record<string, Record<string, string>> = {
-  // Empty as of #71: the native lanes now carry VITE_PLAUSIBLE_DOMAIN, so the
-  // one standing exemption is retired. The MECHANISM stays — the next lane that
-  // legitimately omits a var records the reason here rather than silently
-  // diverging. An empty map means "every lane carries every var", which is the
-  // state we want CI to enforce.
+  // The MECHANISM: a lane that legitimately omits a var records the reason here rather than
+  // silently diverging. Before #95 this map was empty (every lane carried every var).
+  'mobile-android-release.yml': { VITE_STRIPE_PUBLISHABLE_KEY: STRIPE_WEB_ONLY },
+  'mobile-ios-release.yml': { VITE_STRIPE_PUBLISHABLE_KEY: STRIPE_WEB_ONLY },
 };
 
 describe('CI client-env parity', () => {

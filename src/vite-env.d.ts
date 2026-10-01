@@ -31,6 +31,10 @@ interface ImportMetaEnv {
   readonly VITE_AI_EXTRACT_API_KEY: string | undefined;
   readonly VITE_CONTENT_FETCH_URL?: string;
   readonly VITE_CONTENT_FETCH_API_KEY?: string;
+  /** Stripe publishable key (#95). Public by design; unset means the Plan page shows "checkout couldn't load". Web deploy only. */
+  readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
+  /** Optional override for the billing routes' base URL, read only by billingApi.ts: point it at the local harness (`npm run billing:local`, http://localhost:8787). Defaults to VITE_REGISTRY_API_URL. */
+  readonly VITE_BILLING_BASE_URL?: string;
   /** Set automatically by Vite at build time (CI). Not user-configurable. */
   readonly VITE_BUILD_SHA: string | undefined;
   /** ISO build timestamp, set by Vite at build time. Not user-configurable. */

@@ -1185,7 +1185,7 @@ const SYSTEM_COLLECTIONS: ReadonlySet<CollectionName> = new Set<CollectionName>(
 
 /** Named ops that always pass. `setSettings` is every settings write: theme, language, text
  * size, and the device sync bookkeeping that still lives in the shared doc. */
-const SYSTEM_NAMED_OPS: ReadonlySet<string> = new Set(['setSettings']);
+const SYSTEM_NAMED_OPS: ReadonlySet<string> = new Set(['setSettings', 'patchSettings']);
 
 /** Kinds already logged as `would_block` this session (one event per kind, not per write). */
 const wouldBlockLogged = new Set<string>();

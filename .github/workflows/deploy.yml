@@ -180,6 +180,10 @@ jobs:
           # debug build silently loses the ability to capture a recipe from a link.
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
+          # Stripe publishable key (#95): public by design, but a per-mode value (pk_test_ now,
+          # pk_live_ at launch) so it lives beside the other per-environment keys as a secret.
+          # WEB ONLY: native never mounts checkout (workflowEnvParity.test.ts records the exemption).
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           # Plausible site script ID for app.beanies.family (the Vue PWA).
           # `src/services/analytics/plausible.ts` is gated on this var so a
           # vanilla self-host stays fully offline by default — only the

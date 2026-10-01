@@ -11,8 +11,8 @@
  *
  * WEB: "See plans" in beta, trial and read-only, except a STALE read-only; the rule
  * (`showSeePlans`, including "only once the Phase 5 Plan route exists") lives in `useReadOnlyCopy`,
- * shared with the read-only band. "Manage plan" / "Receipts" on the active card are Phase 5 as well (they
- * need the billing Lambda's portal session) and are deliberately absent here.
+ * shared with the read-only band. "Manage plan" / "Receipts" on the active card open the Stripe
+ * Customer Portal through `usePlanPortal` (Phase 5), shared with the Plan page's active card.
  */
 import { computed } from 'vue';
 import { TRIAL_DAYS } from '@beanies/brand/pricing';
@@ -24,15 +24,21 @@ import { isNative } from '@/services/sync/capabilities';
 import { formatDate } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { useReadOnlyCopy } from '@/composables/useReadOnlyCopy';
-import { useAllowanceLine } from '@/composables/useAllowanceLine';
+import AllowanceMeter from '@/components/billing/AllowanceMeter.vue';
+import { isPlanPageReachable } from '@/services/billing/pricingGate';
+import PlanPortalActions from '@/components/billing/PlanPortalActions.vue';
+import { usePlanSummary } from '@/composables/usePlanSummary';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const { t } = useTranslation();
 const entitlementStore = useEntitlementStore();
 // Shared with ReadOnlyBanner, so the card and the band can never explain it differently.
 const { paragraphs: readOnlyParagraphs, showSeePlans, seePlans } = useReadOnlyCopy();
-// "N of M magic beans left" (#95 Phase 4): trial and active, managed tier only, fetched once.
-const { line: allowanceLine } = useAllowanceLine();
+// Web, active: "Plan Details" opens the Plan page (the cancelled / payment-issue detail, the
+// token field, the meter). Same reachability rule as "See plans" and the router guard.
+const showDetails = computed(() => entitlementStore.state === 'active' && isPlanPageReachable());
+// The active plan in words (renewing / ending / payment issue), shared with the Plan page.
+const planSummary = usePlanSummary();
 
 // Fixed for the app's lifetime.
 const native = isNative();
@@ -46,7 +52,7 @@ const pill = computed<{ key: UIStringKey; tone: PillTone } | null>(() => {
     case 'trial':
       return { key: 'plan.pill.trial', tone: 'accent' };
     case 'active':
-      return { key: 'plan.pill.active', tone: 'success' };
+      return planSummary.pill.value;
     case 'read_only':
       return { key: 'plan.pill.readOnly', tone: 'accent' };
     default:
@@ -94,19 +100,8 @@ const copy = computed<{ lead: string | null; body: string | null; extra: string[
   }
 
   if (s === 'active') {
-    const name =
-      entitlementStore.plan === 'full'
-        ? t('plan.name.full')
-        : entitlementStore.plan === 'basic'
-          ? t('plan.name.basic')
-          : null;
-    const renews = entitlementStore.currentPeriodEnd
-      ? fillTemplate(t('plan.active.renews'), {
-          date: formatDate(entitlementStore.currentPeriodEnd),
-        })
-      : null;
     if (cohortLine.value) extra.push(cohortLine.value);
-    return { lead: name, body: renews, extra };
+    return { lead: planSummary.name.value, body: planSummary.body.value, extra };
   }
 
   if (s === 'read_only') {
@@ -172,16 +167,16 @@ const copy = computed<{ lead: string | null; body: string | null; extra: string[
     >
       {{ line }}
     </p>
-    <p
-      v-if="allowanceLine"
-      data-testid="plan-allowance"
-      class="text-secondary-400 dark:text-ink-soft mt-2 text-sm leading-relaxed"
-    >
-      {{ allowanceLine }}
-    </p>
+    <AllowanceMeter />
 
     <BaseButton v-if="showSeePlans" class="mt-4" data-testid="plan-see-plans" @click="seePlans">
       {{ t('plan.action.seePlans') }}
     </BaseButton>
+    <!-- "Manage Plan" / "Receipts" (#95 Phase 5): shared with the Plan page. -->
+    <PlanPortalActions>
+      <BaseButton v-if="showDetails" variant="ghost" data-testid="plan-details" @click="seePlans">
+        {{ t('plan.action.details') }}
+      </BaseButton>
+    </PlanPortalActions>
   </BaseCard>
 </template>

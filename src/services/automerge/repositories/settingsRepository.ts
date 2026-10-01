@@ -44,42 +44,52 @@ export function getDefaultSettings(): Settings {
   };
 }
 
-export async function getSettings(): Promise<Settings> {
-  const current = projectionGetSettings();
-  if (!current) return getDefaultSettings();
-  // Backfill any optional fields added after this doc was written, so downstream readers can
-  // trust that a field with a default in getDefaultSettings() is present — no per-field
-  // `?? default` coalescing required at every call site.
+/**
+ * Backfill any optional fields added after a doc was written, so downstream readers can trust
+ * that a field with a default in getDefaultSettings() is present, and apply the #133 migration:
+ * a doc written before `aiTier` existed but with a configured BYOK provider+key was effectively
+ * on the BYOK tier. ONE place, used by the read AND by what a write returns, so a save can
+ * never hand the store an object the read would have corrected.
+ */
+function withDefaults(current: Partial<Settings>): Settings {
   const merged: Settings = { ...getDefaultSettings(), ...current };
-  // #133 migration: a doc written before `aiTier` existed but with a configured BYOK
-  // provider+key was effectively on the BYOK tier. Preserve that rather than letting the
-  // backfill default it to 'managed' (which would silently ignore the user's own key).
   if (current.aiTier === undefined && apiKeyForProvider(merged.aiProvider, merged.aiApiKeys)) {
     merged.aiTier = 'byok';
   }
   return merged;
 }
 
+export async function getSettings(): Promise<Settings> {
+  const current = projectionGetSettings();
+  if (!current) return getDefaultSettings();
+  return withDefaults(current);
+}
+
+/**
+ * Write some settings fields. The merge happens IN THE WORKER (`patchSettings`), against the
+ * authoritative document, never against the main-thread projection: in the window between the
+ * worker loading the document and the projection hydrating, `getSettings()` returns the
+ * defaults, and a merge-then-replace from that read wiped every field with no default (the
+ * plan token, 2026-10-01). Only the fields passed here change; `updatedAt` is stamped unless
+ * `preserveTimestamp` (sync bookkeeping that must not churn it).
+ *
+ * The returned object is the document's settings after the write, backfilled with defaults
+ * like `getSettings()`.
+ */
 export async function saveSettings(
   settings: Partial<Settings>,
   options?: { preserveTimestamp?: boolean }
 ): Promise<Settings> {
-  // Deep-clone both existing AND incoming settings to strip Automerge proxy
-  // wrappers — spreading a proxy only shallow-copies, leaving nested arrays/objects
-  // as proxy references which Automerge rejects with
-  // "Cannot create a reference to an existing document object".
-  const existing = structuredClone(await getSettings());
-  const incoming = structuredClone(settings) as Partial<Settings>;
-
-  const updated: Settings = {
-    ...existing,
-    ...incoming,
-    id: SETTINGS_ID,
-    updatedAt: options?.preserveTimestamp ? existing.updatedAt : toISODateString(new Date()),
-  };
-
-  await mutate({ op: 'named', name: 'setSettings', args: { settings: updated } });
-  return updated;
+  const patch = structuredClone(settings) as Partial<Settings>;
+  patch.id = SETTINGS_ID;
+  if (!options?.preserveTimestamp) patch.updatedAt = toISODateString(new Date());
+  else delete patch.updatedAt;
+  const written = await mutate<Partial<Settings> | null>({
+    op: 'named',
+    name: 'patchSettings',
+    args: { patch },
+  });
+  return withDefaults(written ?? {});
 }
 
 export async function setBaseCurrency(currency: CurrencyCode): Promise<Settings> {

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * Admin writes to the billing table (#95): cohorts, trial overrides and plan-token reissue.
+ * Admin writes to the billing table (#95): cohorts and trial overrides.
  *
  * The billing row has three writers with DISJOINT attributes: the billing Lambda's webhook
  * (subscription fields), its claim route (token hash, claim time, Stripe ids) and this script
- * (`cohort`, `trialEndsAt`, `planTokenHash` + `tokenClaimedAt` on reissue). Every write here is
+ * (`cohort`, `trialEndsAt`). Every write here is
  * an UpdateItem that SETs only this script's own attributes, never a PutItem: a PutItem would
  * erase the subscription the webhook wrote, and the next registry GET would compute a paying
  * family as trial or read-only. See docs/plans/2026-09-30-pricing-entitlement-read-only.md.
@@ -22,11 +22,6 @@
  *       family's trial clock even while V1_LAUNCH_AT is unset. The ISO instant must carry an
  *       explicit offset (`Z` or `+08:00`); a zone-less time would be read in the operator's
  *       local zone and write the wrong instant to prod.
- *   node scripts/billing-cohort.mjs --reissue-token <familyId> [--apply]
- *       Mint a fresh plan token (32 random bytes, base64url), print it ONCE, store only its
- *       sha256 hex as planTokenHash and stamp tokenClaimedAt. The manual recovery path when a
- *       family's settings.planToken was lost (the `plan_token_missing` warning). Printing the
- *       token is the only copy that ever exists; nothing can recover it later.
  *
  * Requires AWS creds in env (same profile as terraform apply: `source ~/.beanies-tf.env`).
  *
@@ -35,7 +30,6 @@
  *   billing:  beanies-family-billing-prod   (must exist: apply modules/billing first)
  */
 
-import { createHash, randomBytes } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 // The one parse rule for billing-row dates: whatever the registry's `computeEntitlement` accepts
 // as `trialEndsAt` is what this script may write. (The script runs from the repo checkout.)
@@ -101,33 +95,6 @@ export function trialEndsAtUpdate(familyId, iso) {
 }
 
 /**
- * sha256 hex of the token string. The Phase 5 claim and portal routes and the Phase 4 allowance
- * check must hash the same way, or a reissued token never matches.
- */
-export function hashPlanToken(token) {
-  return createHash('sha256').update(token, 'utf8').digest('hex');
-}
-
-/** A fresh plan token: 32 random bytes, base64url. */
-export function mintPlanToken() {
-  return randomBytes(32).toString('base64url');
-}
-
-/** planTokenHash + tokenClaimedAt. Only the hash is stored; the token itself never is. */
-export function reissueTokenUpdate(familyId, token, now = new Date()) {
-  return {
-    TableName: BILLING_TABLE,
-    Key: { familyId },
-    UpdateExpression: 'SET #planTokenHash = :hash, #tokenClaimedAt = :claimedAt',
-    ExpressionAttributeNames: {
-      '#planTokenHash': 'planTokenHash',
-      '#tokenClaimedAt': 'tokenClaimedAt',
-    },
-    ExpressionAttributeValues: { ':hash': hashPlanToken(token), ':claimedAt': now.toISOString() },
-  };
-}
-
-/**
  * Which live registry families the snapshot writes. Mirrors the write's
  * `attribute_not_exists(#cohort)` condition EXACTLY: a family qualifies only when its billing row
  * is missing or has no `cohort` attribute at all. A DynamoDB NULL attribute (`cohort: null` after
@@ -153,8 +120,7 @@ const USAGE = `Usage:
   node scripts/billing-cohort.mjs --snapshot-pre-v1 [--apply]
   node scripts/billing-cohort.mjs --first-ten <familyId> [--apply]
   node scripts/billing-cohort.mjs --trial-ends-at <familyId> <iso-with-offset> [--apply]
-      e.g. 2027-01-15T00:00:00Z; counts before launch too (runs this family's trial clock)
-  node scripts/billing-cohort.mjs --reissue-token <familyId> [--apply]`;
+      e.g. 2027-01-15T00:00:00Z; counts before launch too (runs this family's trial clock)`;
 
 /** Parse argv into one command, or throw with the reason and the usage text. */
 export function parseArgs(argv) {
@@ -188,9 +154,6 @@ export function parseArgs(argv) {
       }
       return { mode: 'trial-ends-at', familyId: requireFamilyId(params[0]), iso, apply };
     }
-    case '--reissue-token':
-      if (params.length !== 1) fail('--reissue-token takes exactly one familyId.');
-      return { mode: 'reissue-token', familyId: requireFamilyId(params[0]), apply };
     default:
       return fail(flag ? `Unknown flag "${flag}".` : 'No command given.');
   }
@@ -326,24 +289,11 @@ async function singleFamily(sdk, cmd) {
       `Change:  trialEndsAt ${before?.trialEndsAt ?? '(computed)'} -> ${input.ExpressionAttributeValues[':trialEndsAt']}`
     );
   } else {
-    console.log(
-      `Change:  planTokenHash + tokenClaimedAt replaced; the family's current token (if any) stops working`
-    );
+    console.log();
   }
 
   if (!cmd.apply) {
     console.log(`\nDry-run complete. Re-run with --apply to write.`);
-    return;
-  }
-
-  if (cmd.mode === 'reissue-token') {
-    // Minted only on --apply, so a dry-run never prints a token that was never stored.
-    const token = mintPlanToken();
-    await sendUpdate(sdk, reissueTokenUpdate(cmd.familyId, token));
-    console.log(`\nPlan token (shown ONCE, only its hash is stored):\n\n  ${token}\n`);
-    console.log(
-      "Deliver it into the family's settings.planToken per docs/runbooks/pricing-launch.md."
-    );
     return;
   }
 

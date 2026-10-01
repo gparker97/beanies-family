@@ -711,6 +711,17 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /**
+   * Store the family's plan token (#95 Phase 5): handed out once by the billing claim after a
+   * paid checkout (the claim is the ONLY writer; there is no paste or reissue). A named
+   * settings write, so the read-only gate lets it through (a just-paid read-only family must
+   * be able to land it). THROWS on failure: the caller (the Plan page) must tell the user the
+   * token was not saved, because the only other copy is the one on their screen.
+   */
+  async function setPlanToken(planToken: string): Promise<void> {
+    settings.value = await settingsRepo.saveSettings({ planToken });
+  }
+
   async function setOnboardingCompleted(completed: boolean): Promise<void> {
     try {
       settings.value = await settingsRepo.saveSettings({ onboardingCompleted: completed });
@@ -1083,6 +1094,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setTravelReminderLead,
     setPreferredCurrencies,
     setOnboardingCompleted,
+    setPlanToken,
     markRecoveryKitConfirmed,
     setWeekStartDay,
     setCountry,

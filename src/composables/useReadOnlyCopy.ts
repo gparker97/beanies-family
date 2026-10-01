@@ -25,6 +25,7 @@ import { useEntitlementStore } from '@/stores/entitlementStore';
 import { isNative } from '@/services/sync/capabilities';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { OFFLINE_GRACE_DAYS, PLAN_ROUTE_NAME } from '@/constants/entitlement';
+import { isPlanPageReachable } from '@/services/billing/pricingGate';
 
 export function useReadOnlyCopy() {
   const { t } = useTranslation();
@@ -32,7 +33,9 @@ export function useReadOnlyCopy() {
   const router = useRouter();
   // Neither changes for the app's lifetime: the platform is fixed, routes register at startup.
   const native = isNative();
-  const planRouteExists = router.hasRoute(PLAN_ROUTE_NAME);
+  // Whether the Plan page is REACHABLE here (cloud web build with Stripe, flag on, not native)
+  // is the router guard's own predicate, so "See plans" can never lead to a bounce.
+  const planRouteExists = router.hasRoute(PLAN_ROUTE_NAME) && isPlanPageReachable();
 
   /** The read-only explanation, one string per paragraph. Meaningful only in `read_only`. */
   const paragraphs = computed<string[]>(() => {
@@ -48,7 +51,6 @@ export function useReadOnlyCopy() {
   /** Whether to offer "See plans"; see the header. */
   const showSeePlans = computed(
     () =>
-      !native &&
       planRouteExists &&
       !entitlementStore.isStale &&
       ['beta', 'trial', 'read_only'].includes(entitlementStore.state ?? '')
