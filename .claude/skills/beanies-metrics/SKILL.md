@@ -6,8 +6,8 @@ description: >-
   nurture and who we lost, retention/time-to-quiet, most-used features and
   pages, and marketing-site traffic sources, channels, referrers and funnel.
   Reads the DynamoDB family registry (live), the CloudWatch telemetry firehose,
-  and Plausible Analytics, then renders a terminal report AND a branded HTML
-  dashboard. Use this WHENEVER greg asks how the app or site is doing, how many
+  Plausible Analytics, and the OpenAI Ads API (paid campaigns), then renders a
+  terminal report AND a branded HTML dashboard. Use this WHENEVER greg asks how the app or site is doing, how many
   families/users/sign-ups there are, who the most engaged or heaviest users are,
   who's churned or gone quiet, retention or engagement numbers, growth or
   sign-up trends, what features or pages are most used, where traffic or
@@ -57,13 +57,24 @@ schemas, identifiers, and caveats before interpreting anything.
    attached. Needs a service-account key at
    `~/.config/beanies/gsc-service-account.json` (or env `GSC_ACCESS_TOKEN`); the
    script exits 3 and the panel self-hides when absent.
-5. **Ad spend ledger** (optional, manual) — `~/.config/beanies/ad-spend.json`. There is
-   no ads-platform API, so spend / impressions / clicks per ad are typed in from Ads
-   Manager; Plausible adds visitors + CTA clicks per ad via `utm_content`. First
-   campaign: the ChatGPT Ads Singapore pilot (`utm_source=chatgpt`,
-   `utm_campaign=sg-pilot-oct26`, from 2026-10-02). Absent → the paid panel hides
-   with a note. Schema + example: `references/data-sources.md` §5 and
-   `assets/ad-spend.example.json`.
+5. **Ad platforms** (optional) — two halves, joined by `utm_content`:
+   - **OpenAI Ads API** (`pull_openai_ads.mjs`) — the live source for the ad roster
+     (name, headline, status, review status), spend / impressions / clicks per ad per
+     day, a per-country split, and lifetime spend for credit progress. Needs
+     `OPENAI_ADS_API_KEY` from `~/.openai.env` (`set -a; . ~/.openai.env; set +a`);
+     absent → exits 3 and the panel falls back to the ledger alone. **Never print or
+     commit the key.** Spend is in whole units of the **account currency (SGD)**, not
+     micros — see `references/data-sources.md` §5.
+   - **Manual ledger** `~/.config/beanies/ad-spend.json` — now only needs
+     `pods_manual` (the create-pod Slack attributions the platform cannot know) plus
+     the campaign's `credit_usd` / `credit_deadline`. Its `ads` and `daily` are
+     optional overrides / fallback: a slug the API knows is API-only (ledger rows for
+     it are ignored and counted as superseded); a ledger-only slug keeps its rows.
+   - Plausible adds visitors + CTA clicks per ad via `utm_content`. First campaign:
+     the ChatGPT Ads pilot (`utm_source=chatgpt`, `utm_campaign=sg-pilot-oct26`, live
+     from 2026-10-01). Neither source present → the paid panel hides with a note.
+     Schema + example: `references/data-sources.md` §5 and
+     `assets/ad-spend.example.json`.
 
 ## Workflow
 
@@ -96,8 +107,14 @@ node $SKILL/query_plausible.mjs both 30d > "$OUT/plausible.json" || echo "PLAUSI
 # 3b. Google search terms (optional — exits 3 without credentials).
 node $SKILL/query_search_console.mjs 30 > "$OUT/search_console.json" || echo "SEARCH CONSOLE SKIPPED"
 
-# 4. Consolidate + reconcile registry<->CloudWatch, join the (optional) ad-spend
-#    ledger at ~/.config/beanies/ad-spend.json, and render the dashboard HTML
+# 3c. OpenAI Ads (optional — exits 3 without the key). Load the key from
+#     ~/.openai.env first; never echo it. 30 = days, ending today in the ad
+#     account's timezone (Asia/Singapore).
+set -a; . ~/.openai.env; set +a
+node $SKILL/pull_openai_ads.mjs 30 > "$OUT/openai_ads.json" || echo "OPENAI ADS SKIPPED"
+
+# 4. Consolidate + reconcile registry<->CloudWatch, join the (optional) ads API
+#    dump + ad-spend ledger at ~/.config/beanies/ad-spend.json, and render the dashboard HTML
 #    from assets/dashboard-template.html. Writes $OUT/dashboard_data.json (the
 #    figures for the terminal report) and $OUT/beanies-metrics.html (the artifact).
 node $SKILL/build_dashboard.mjs "$OUT"
@@ -107,7 +124,8 @@ Then interpret `dashboard_data.json` for the terminal report and publish the
 HTML. Don't dump raw JSON at greg — lead with what changed and what it means.
 The filenames above are exact — `build_dashboard.mjs` expects `registry.json`,
 `cw_activity.json`, `cw_activity7.json`, `cw_surface.json`, `cw_lastseen.json`,
-`cw_daily.json`, and (optionally) `plausible.json` + `search_console.json` in `$OUT`.
+`cw_daily.json`, and (optionally) `plausible.json` + `search_console.json` +
+`openai_ads.json` in `$OUT`.
 
 ### Cross-source reconciliation (do this — it's where the insight is)
 - Registry `lastLoginAt` is date-only and login-only; CloudWatch `last-seen` fires on
@@ -196,11 +214,31 @@ signal, not every field.
      clicks; call `opportunities` (high impressions, CTR <2%, position ≤20) the
      cheapest SEO win. Never call any term "converting" without saying it is
      **inferred via the landing page** — GSC has no conversion signal.
-9b. **Paid campaigns** (`paid` — skip with a one-line note when `null`, i.e. no
-    ledger). Per campaign: spend, impressions, clicks, CTR, CPC (ledger, window-scoped);
-    tagged visitors + CTA clicks (Plausible by `utm_content`); pods and **CPA**. Then the
-    per-ad table and the `winner` (lowest CPA with ≥1 pod, else highest CTA-click rate).
-    Credit progress (`credit.spent` of `credit.amount`, `daysLeft`).
+9b. **Paid campaigns** (`paid` — skip with a one-line note when `null`, i.e. neither
+    an ads-API dump nor a ledger). Per campaign: spend, impressions, clicks, CTR, CPC
+    (window-scoped); tagged visitors + CTA clicks (Plausible by `utm_content`); pods and
+    **CPA**. Then the per-ad table (with `status`, `reviewStatus`, `title` and a
+    per-`countries` split from the API) and the `winner` (lowest CPA with ≥1 pod, else
+    highest CTA-click rate). Credit progress (`credit.spent` of `credit.amount`,
+    `daysLeft`, `daysElapsed`).
+    - **Always name the spend source** (`spendSource`, per campaign and overall):
+      `openai-ads-api` = live platform insights; `ledger` = hand-typed from Ads
+      Manager; `none` = no rows yet. Precedence is per ad slug — API wins where it
+      knows the slug, the ledger fills only slugs the API does not have, and
+      `ledgerSuperseded` counts the ledger rows that were ignored. `pods_manual` is
+      ledger-only whatever the spend source.
+    - **Currency**: when the API feeds a campaign, figures are in the ad account's
+      currency (**SGD** for this account). `currencyMismatch` is set when the ledger's
+      `currency` / `credit_usd` disagree — say so rather than mixing them silently.
+    - **Tweaks** (`tweaks[]`, each names the `rule` that fired; only emitted when the
+      precondition holds, never padded): (a) ≥300 impressions and CTR below half the
+      campaign median → *consider pausing*; (b) the best CTR and ≥2× the median → *shift
+      budget here* (a and b need ≥2 ads with impressions); (c) ad clicks but zero
+      Plausible visitors for that `utm_content` in the window → *tagging or landing
+      problem*; (d) lifetime spend ÷ days elapsed × days left < credit remaining (and
+      spend > 0) → *under-pacing, raise daily budget to X* with X = remaining ÷ days
+      left; (e) status active but review not approved → *blocked in review*. Relay them
+      verbatim in the terminal report — they are the actions.
     - **Always name the attribution source** (`totals.podsSource`): `manual` means pods
       were recorded by greg from the create-pod Slack message (`pods_manual`), because
       nothing carries UTMs into the app yet; `plausible-app-utm` means the app-side
@@ -210,13 +248,17 @@ signal, not every field.
       there is no revenue to divide by; say so if the word "ROI" comes up. `cpa` is
       `null` (render "—") when pods = 0 — never report $0.
     - Tagged `visitors` is `null` until the first tagged visit lands (the tile says "no
-      tagged visits yet"); ad `clicks` (ledger) vs `visitors` (Plausible) will differ —
-      ad-blockers, bots, and bounce-before-load all sit in that gap.
-    - Call out `undeclaredLedger` / `undeclaredPlausible` (ad slugs in one source but not
-      the ledger's `ads` list) as tagging mistakes to fix today.
-    - **Keeping the ledger current is greg's daily job**: one `daily` row per ad per day
-      from Ads Manager, plus a `pods_manual` row per attributed Slack create-pod message.
-      Remind him if the newest `daily.date` is older than yesterday.
+      tagged visits yet"); ad `clicks` (platform) vs `visitors` (Plausible) will differ —
+      ad-blockers, bots, and bounce-before-load all sit in that gap. If clicks exist and
+      visitors stay null, rule (c) fires: check Plausible's `utm_source` rows — on
+      2026-10-01 the 4 ChatGPT clicks arrived as `utm_source=chatgpt.com` with campaign
+      and content `(not set)`, i.e. the ad's `query_string_template` was not applied.
+    - Call out `undeclaredLedger` / `undeclaredPlausible` / `untaggedApiAds` (ad slugs in
+      one source but not the roster, or platform ads with no UTM at all) as tagging
+      mistakes to fix today.
+    - **greg's daily job is now just the pods**: a `pods_manual` row per attributed
+      Slack create-pod message. Spend comes from the API; `daily` rows are only needed
+      for a platform without an API (or to patch a slug the API lacks).
 10. **App usage (Plausible app)** — goals/conversions (signups, logins,
     member_joined, discord clicks…), feature_used breakdown, login-method mix.
 11. **Founder callouts** — 3–5 bullets: the one number that moved most, the biggest
@@ -274,8 +316,9 @@ dashboard" option (its own `/beanies-plan`, with a threat model), not to bolt it
   count with NO member data — always report **total users with its coverage %**
   (families quiet since the field shipped report none, so the total is a floor;
   never backfill unknowns as 1).
-- **Never** print or commit the Plausible token, AWS credentials, beanpod contents, or
-  the real ad-spend ledger (only `assets/ad-spend.example.json` lives in the repo).
+- **Never** print or commit the Plausible token, `OPENAI_ADS_API_KEY`, AWS credentials,
+  beanpod contents, or the real ad-spend ledger (only `assets/ad-spend.example.json`
+  lives in the repo).
 - Save raw JSON to the scratchpad, not the repo.
 - If AWS creds fail (registry/CloudWatch error), say so plainly and report whatever
   sources did succeed rather than aborting the whole run.

@@ -289,19 +289,88 @@ reported separately as `queryLevelTotals`. Never present the query total as site
 
 ---
 
-## 5. Ad spend ledger (manual — paid campaigns)
+## 5. Ad platforms (paid campaigns): OpenAI Ads API + manual ledger
 
-- **Why it exists:** there is **no ads-platform API** for the channels we buy on (first:
-  ChatGPT Ads, Singapore pilot from 2026-10-02). Spend, impressions and clicks per ad
-  come from Ads Manager and are typed in by hand. Plausible supplies the other half of
-  the picture (visitors + CTA clicks per ad) because every ad is tagged
-  `utm_source=<platform>&utm_medium=cpc&utm_campaign=<campaign>&utm_content=<angle>-<ad-slug>`
-  and `utm_content` is the join key.
-- **File:** `~/.config/beanies/ad-spend.json` (gitignored location, never committed).
-  **Optional** — absent means the paid-campaigns panel hides itself with a note; a
-  malformed file is reported as `paidLedgerError` in `dashboard_data.json` and in the
+Two halves, joined on the ad slug `utm_content`. Every ad is tagged
+`utm_source=<platform>&utm_medium=cpc&utm_campaign=<campaign>&utm_content=<angle>-<ad-slug>`;
+Plausible supplies visitors + CTA clicks per slug, the platform supplies spend.
+
+### 5a. OpenAI Ads API (live — `scripts/pull_openai_ads.mjs`)
+
+- **Auth:** `OPENAI_ADS_API_KEY` in `~/.openai.env` (`set -a; . ~/.openai.env; set +a`).
+  Never printed, never committed. Missing → exit 3, the pipeline degrades to the ledger.
+- **Base:** `https://api.ads.openai.com/v1`, `Authorization: Bearer`. All GET. List
+  responses are `{object:'list', data[], has_more, first_id, last_id}` with
+  `?limit=&after=<last_id>` pagination (insights page at 20 rows by default, `limit=100`
+  honoured — the collector walks `after` on every list).
+- **Endpoints used (verified 2026-10-01):** `/ad_accounts` (currency, timezone),
+  `/campaigns` (status, `budget.daily_spend_limit_micros`, targeting countries,
+  `start_time`), `/ad_groups`, `/ads` (status, `review_status`, `creative.title/body`,
+  `landing_page_configuration.query_string_template` — the UTMs are parsed from it),
+  and `/ad_account/insights` with `aggregation_level=ad|campaign`,
+  `time_granularity=daily` (per-day rows) or `none` (one lifetime aggregate; `total`,
+  `weekly`, `all` are rejected), `fields[]=metadata.readable_time, ad.id, ad.name,
+  ad.impressions, ad.clicks, ad.spend, ad.ctr, ad.cpc` (also `campaign.id`,
+  `ad_group.id` on ad rows — the only ad→campaign link, `/ads` carries none),
+  `time_ranges[]={"type":"date_range","since","until"}`, `includes[]=zero_impression_items`
+  (so unserved ads still appear), and `segments[]=country` (per-country split; keys
+  change to `ad_spend` / `ad_clicks` / `country_name`, and `zero_impression_items` is
+  refused with a segment, so that call omits it).
+- **⚠️ Units (inferred, verified):** insights `spend` and `cpc` are **whole units of the
+  account currency — SGD for this account —** not micros: day one read `spend 14.69`,
+  `clicks 4`, `cpc 3.67` and 4 × 3.67 = 14.68, while the campaign budget is
+  `25,000,000` micros for a S$25/day cap. So budgets are micros (the collector divides
+  by 1e6 into `dailyBudget`), insights are units, and `ctr` is a fraction (0.0061 =
+  4/653) that the collector converts to percent. Recorded on every dump as `spendUnit`.
+  The ledger's `credit_usd` was written before the platform reported SGD — the build
+  step sets `currencyMismatch` when the ledger's `currency` differs from the account's.
+- **Window:** `[DAYS]` (default 30) ending *today in the account timezone*
+  (Asia/Singapore). Lifetime is a second `time_granularity=none` call from the earliest
+  campaign `start_time` to today.
+- **Output `openai_ads.json`:**
+
+```jsonc
+{
+  "generatedAt": "...", "window": { "since", "until", "days", "timezone" },
+  "account": { "id", "name", "status", "currency": "SGD", "timezone", "reviewStatus" },
+  "spendUnit": { "unit": "currency-units", "currency": "SGD", "note": "..." },
+  "campaigns": [{ "id", "name", "status", "objective", "biddingType", "dailyBudget", "countries": ["US","SG","GB","AU"], "startDate", "endDate", "createdAt" }],
+  "adGroups": [{ "id", "name", "status", "contextHints": [], "biddingStrategy" }],
+  "ads": [{ "id", "name", "status", "reviewStatus", "title", "body", "targetUrl", "queryStringTemplate",
+            "utmSource", "utmMedium", "utmCampaign", "utmContent",   // null when untagged
+            "campaignId", "adGroupId", "lifetime": { "spend", "clicks", "impressions" }, "createdAt" }],
+  "dailyByAd":       [{ "date", "adId", "adName", "impressions", "clicks", "spend", "ctr", "cpc" }],
+  "dailyByCampaign": [{ "date", "campaignId", "campaignName", "impressions", "clicks", "spend", "ctr", "cpc" }],
+  "byCountry":       [{ "date", "adId", "country": "SG", "impressions", "clicks", "spend" }],   // soft
+  "lifetime": { "since", "until", "spend", "clicks", "impressions", "byCampaign": [...], "source": "insights-lifetime | window-sum-fallback" },
+  "_degraded": [{ "name", "reason" }]
+}
+```
+
+### 5b. Manual ledger (`~/.config/beanies/ad-spend.json`)
+
+- **Why it still exists:** the platform cannot know which Slack create-pod message was an
+  ad (`pods_manual`), nor the promo credit and its deadline. With the API live, the
+  ledger **only needs** `platform` / `utm_source` / `utm_campaign` / `currency` /
+  `credit_usd` / `credit_deadline` / `pods_manual`. `ads` and `daily` are **optional
+  overrides / fallback** (see precedence below) — keep them for a platform with no API.
+- **File:** gitignored location, never committed. **Optional** — with neither the
+  ledger nor `openai_ads.json` the paid panel hides itself with a note; a malformed
+  ledger is reported as `paidLedgerError` in `dashboard_data.json` and in the
   dashboard's "missing this run" banner, never a crash. Example to copy:
   `assets/ad-spend.example.json`.
+- **Precedence (per ad slug, per campaign):**
+  - `spendSource: 'openai-ads-api'` when any API ad carries the campaign's
+    `utm_campaign`. The roster is the API's tagged ads (name, `title`, `status`,
+    `reviewStatus`, per-`countries` split); the ledger `ads` entry only lends `angle`
+    (the API has no such field — else it is derived from the "angle - name" prefix).
+    Ledger `daily` rows for an API-known slug are **ignored** and counted in
+    `ledgerSuperseded`; ledger-only slugs keep their rows and roster entries.
+  - `spendSource: 'ledger'` when the API has nothing for the campaign — identical to the
+    pre-API behaviour. `'none'` when neither has rows.
+  - An API campaign the ledger does not declare is synthesised from the ads' UTMs
+    (`synthesizedFromApi: true`, no credit, no pods).
+  - `pods_manual` / `podsSource` are unaffected by the spend source.
 - **Schema:**
 
 ```jsonc
@@ -332,9 +401,13 @@ reported separately as `queryLevelTotals`. Never present the query total as site
 }
 ```
 
-- **Window scoping:** `daily` and `pods_manual` rows are filtered to the dashboard's
-  date range (`dateRange.start..end`, inclusive, by the row's `date`). `credit` progress
-  is **lifetime** — the credit is a budget, not a window figure.
+- **Window scoping:** `daily` (API or ledger) and `pods_manual` rows are filtered to the
+  dashboard's date range (`dateRange.start..end`, inclusive, by the row's `date`).
+  `credit` progress is **lifetime** — the credit is a budget, not a window figure — from
+  the API's un-windowed insights call when available (`credit.source:
+  'insights-lifetime'`), else the sum of every row held (`'row-sum'`, only right while
+  the window covers the campaign). `credit.daysElapsed` counts from the API campaign
+  `startDate` (else the ledger `started`, else the first served day).
 - **`pods_manual` is the interim attribution.** Until the UTM carry-through ships, a pod
   created by someone who came via an ad can only be attributed by greg reading the
   create-pod Slack message (and, ideally, asking). Record it here with the ad's
@@ -349,15 +422,28 @@ reported separately as `queryLevelTotals`. Never present the query total as site
   **CTA rate** (CTA clickers ÷ tagged visitors), signups (app UTM, when present), pods,
   **CPA = spend ÷ pods** (`null` when pods = 0 — never a divide-by-zero, never "$0").
   `winner` = lowest CPA among ads with ≥1 pod, else highest CTA-click rate, else null.
-  `undeclaredLedger` / `undeclaredPlausible` list ad slugs seen in one source but not
-  the `ads` list — tagging mistakes, surfaced rather than dropped.
+  `undeclaredLedger` / `undeclaredPlausible` / `untaggedApiAds` list ad slugs seen in one
+  source but not the roster (or platform ads with no UTM at all) — tagging mistakes,
+  surfaced rather than dropped.
+- **Tweaks** (`campaign.tweaks[]`, each `{ rule, action, utmContent, name, detail }`;
+  computed in `build_dashboard.mjs`, rendered under the per-ad table; a rule is emitted
+  only when its precondition holds — never padded):
+  - **(a)** an ad with ≥300 impressions and CTR < ½ the campaign median CTR (median over
+    ads with impressions; needs ≥2 such ads) → `consider pausing`
+  - **(b)** the ad with the best CTR when it is ≥2× that median → `shift budget here`
+  - **(c)** an ad with clicks but no Plausible visitor for its `utm_content` in the same
+    window (Plausible present) → `tagging or landing problem`
+  - **(d)** credit pace: lifetime spend ÷ days elapsed × days left < credit remaining,
+    with spend > 0 and days left > 0 → `under-pacing, raise daily budget to X`, X =
+    remaining ÷ days left (the API's current daily cap is quoted in `detail`)
+  - **(e)** an ad with `status: active` but `reviewStatus` ≠ `approved` → `blocked in review`
 - **What CPA means here:** cost per **new family (pod)**. It is **not** a revenue ROI —
   no paid plan exists yet, so there is no revenue to earn back. Read CPA against the
   value of an early-adopter family, not against a sale.
-- **Keeping it current:** daily, from Ads Manager, one `daily` row per ad per day; add a
-  `pods_manual` row the moment a create-pod Slack message can be tied to the campaign.
-  Stale ledgers under-report spend and overstate nothing — but CPA is only as fresh as
-  the last row.
+- **Keeping it current:** add a `pods_manual` row the moment a create-pod Slack message
+  can be tied to the campaign — that is the whole daily job now. `daily` rows are only
+  for a platform without an API; a stale ledger there under-reports spend and overstates
+  nothing, but CPA is only as fresh as the last row.
 
 ---
 
@@ -369,7 +455,8 @@ reported separately as `queryLevelTotals`. Never present the query total as site
 - **HTML dashboard artifact** is hosted (private, but hosted): **mask emails**
   (`jo****@gmail.com`, via `pull_registry.mjs` `ownerMasked`) and prefer family name +
   country + masked owner. Never publish full customer email lists to an artifact.
-- **Never** print or commit the Plausible token, AWS keys, or `.beanpod` contents.
+- **Never** print or commit the Plausible token, `OPENAI_ADS_API_KEY`, AWS keys, or
+  `.beanpod` contents.
 - The ad-spend ledger holds no customer data, but `pods_manual.note` may — keep notes
   to "heard via chatgpt", never a name or email. Never commit the real ledger.
 - Raw JSON dumps go to the session scratchpad, never into the repo.

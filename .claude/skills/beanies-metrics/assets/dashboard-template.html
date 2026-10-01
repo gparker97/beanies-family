@@ -191,6 +191,11 @@
   .attr b{color:var(--ink)}
   .angle{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--rail);color:var(--ink-soft);margin-right:6px}
   td.paused{color:var(--ink-faint)}
+  .tweaks{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+  .tweaks li{font-size:12.5px;color:var(--ink-soft);display:flex;gap:9px;align-items:baseline;line-height:1.45}
+  .tweaks li b{color:var(--ink)}
+  .tweaks .rule{flex:none;font-family:ui-monospace,monospace;font-size:10.5px;color:var(--ink-faint);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+  .cty{font-size:10.5px;color:var(--ink-faint);font-weight:500}
   .note{font-size:11.5px;color:var(--ink-faint);margin-top:12px;line-height:1.5}
   .missing{font-size:12.5px;color:var(--warn);background:rgba(224,138,30,.09);
     border:1px solid rgba(224,138,30,.3);border-radius:10px;padding:11px 13px;line-height:1.5}
@@ -395,7 +400,7 @@ const monthEntries=Object.entries(D.growth);
 const latestMonth=monthEntries[monthEntries.length-1]||[null,0];
 const weekEntries=Object.entries(D.growthWeek);
 const lastWeekNew=(weekEntries[weekEntries.length-1]||[null,0])[1];
-const srcNames=[D.paid?'ad ledger':null,D.plausibleAvailable?'plausible':null,D.searchConsoleAvailable?'search console':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
+const srcNames=[D.paid?.apiAvailable?'openai ads':null,D.paid?.ledgerPresent?'ad ledger':null,D.plausibleAvailable?'plausible':null,D.searchConsoleAvailable?'search console':null,D.cwAvailable?'cloudwatch':null,'registry'].filter(Boolean).reverse();
 const C=D.conversion;
 
 // meta + lede
@@ -495,10 +500,13 @@ if(D.paid&&D.paid.campaigns.length){
     'manual':['manual','<b>manual</b> — pods recorded by hand from the create-pod slack message; app-side utm attribution is empty until the carry-through ships'],
     'none':['','<b>none</b> — no signups carry a utm yet and nothing has been recorded by hand']}[P.attribution];
   $('paidPanel').style.display='';
-  $('paidcap').innerHTML=`${P.campaigns.length===1?`<b>${esc(P.campaigns[0].platform)}</b> · <code>${esc(P.campaigns[0].utmCampaign)}</code>`:`<b>${P.campaigns.length}</b> campaigns`} · spend, impressions and clicks typed in from ads manager (<code>${esc(P.ledgerPath)}</code>); visitors and cta clicks from plausible by <code>utm_content</code>; window = past ${rng.days} days. <b>cpa = spend per new family</b>, not revenue.`;
+  const spendSrcText={'openai-ads-api':`spend, impressions and clicks <b>live from the openai ads api</b>${P.apiAccount?` (${esc(P.apiAccount.currency||'')}, ${esc(P.apiAccount.timezone||'')})`:''}`,
+    'ledger':`spend, impressions and clicks <b>typed in from ads manager</b> (<code>${esc(P.ledgerPath)}</code>)`,
+    'none':'no spend source yet — neither the ads api nor the ledger has rows'}[P.spendSource];
+  $('paidcap').innerHTML=`${P.campaigns.length===1?`<b>${esc(P.campaigns[0].platform)}</b> · <code>${esc(P.campaigns[0].utmCampaign)}</code>`:`<b>${P.campaigns.length}</b> campaigns`} · ${spendSrcText}; visitors and cta clicks from plausible by <code>utm_content</code>; pods from the ledger's <code>pods_manual</code> until utms reach the app; window = past ${rng.days} days. <b>cpa = spend per new family</b>, not revenue.`;
   $('paidKpis').innerHTML=[
-    {n:money(P.totals.spend,cur),l:'spend',s:'ledger · this window',c:'flat'},
-    {n:num(P.totals.clicks),l:'ad clicks',s:'ledger',c:'flat'},
+    {n:money(P.totals.spend,cur),l:'spend',s:(P.spendSource==='openai-ads-api'?'ads api':'ledger')+' · this window',c:'flat'},
+    {n:num(P.totals.clicks),l:'ad clicks',s:P.spendSource==='openai-ads-api'?'ads api':'ledger',c:'flat'},
     {n:num(P.totals.visitors),l:'site visitors',s:!P.plausibleAvailable?'no plausible token':P.totals.visitors==null?'no tagged visits yet':'plausible · tagged',c:'flat'},
     {n:num(P.totals.pods),l:'pods created',s:P.attribution==='plausible-app-utm'?'plausible app utm':P.attribution==='manual'?'manual · from slack':'none attributed',c:'flat'},
     {n:money(P.totals.cpa,cur),l:'cpa',s:P.totals.cpa==null?'no pods yet':'spend ÷ pods',c:'flat',accent:true},
@@ -508,7 +516,7 @@ if(D.paid&&D.paid.campaigns.length){
     const credit=c.credit?`<div class="credit"><span><b>${money(c.credit.spent,c.currency)}</b> of ${money(c.credit.amount,c.currency)} credit</span><div class="track"><div class="fill ${c.credit.pct>=85?'hot':''}" style="width:${Math.max(1,c.credit.pct)}%"></div></div><span>${c.credit.pct}%${c.credit.daysLeft!=null?` · <b>${c.credit.daysLeft}</b> day${c.credit.daysLeft===1?'':'s'} left`:''}</span></div>`:'';
     const win=c.winner?`<div class="note" style="margin-top:8px"><span class="pill good">winner</span> &nbsp;<b style="color:var(--ink)">${esc(c.winner.name)}</b> — ${c.winner.by==='cpa'?`lowest cpa at <b style="color:var(--ink)">${money(c.winner.value,c.currency)}</b> per pod`:`highest cta-click rate at <b style="color:var(--ink)">${c.winner.value}%</b> of its visitors (no ad has a pod yet)`}</div>`:`<div class="note">no winner yet — no ad has a pod or a cta click.</div>`;
     const rows=c.ads.map(a=>`<tr>
-      <td class="name ${a.status==='paused'?'paused':''}"><span class="angle">${esc(a.angle||'—')}</span>${esc(a.name)}${a.status==='paused'?' <span class="pill neu">paused</span>':''}<br><code style="font-size:10.5px;color:var(--ink-faint)">${esc(a.utmContent)}</code></td>
+      <td class="name ${a.status==='paused'?'paused':''}"><span class="angle">${esc(a.angle||'—')}</span>${esc(a.name)}${a.status&&a.status!=='active'?` <span class="pill neu">${esc(a.status)}</span>`:''}${a.reviewStatus&&a.reviewStatus!=='approved'?` <span class="pill warn">${esc(a.reviewStatus)}</span>`:''}${a.title&&a.title!==a.name?`<br><span style="color:var(--ink-soft);font-weight:500">${esc(a.title)}</span>`:''}<br><code style="font-size:10.5px;color:var(--ink-faint)">${esc(a.utmContent)}</code>${a.countries&&a.countries.length?` <span class="cty">· ${a.countries.map(k=>`${esc(k.country)} ${num(k.impressions)}/${num(k.clicks)}`).join(', ')}</span>`:''}</td>
       <td class="num">${money(a.spend,c.currency)}</td><td class="num">${num(a.impressions)}</td><td class="num">${num(a.clicks)}</td>
       <td class="num">${pc(a.ctr)}</td><td class="num">${money(a.cpc,c.currency)}</td>
       <td class="num">${num(a.visitors)}</td><td class="num">${a.ctaClicks==null?'—':num(a.ctaClicks)+(a.ctaRate!=null?` <span style="color:var(--ink-faint);font-weight:500">(${a.ctaRate}%)</span>`:'')}</td>
@@ -518,13 +526,24 @@ if(D.paid&&D.paid.campaigns.length){
     if(c.undeclaredLedger.length)extras.push(`ledger spend on undeclared ads: ${c.undeclaredLedger.map(esc).join(', ')}`);
     if(c.undeclaredPlausible.length)extras.push(`plausible saw tagged content not in the ledger: ${c.undeclaredPlausible.map(esc).join(', ')}`);
     if(P.ctaFilteredByUtmSource===false)extras.push('plausible refused the utm_source filter on cta queries — untagged rows were dropped in the build step');
+    if(c.ledgerSuperseded)extras.push(`<b>${c.ledgerSuperseded}</b> ledger daily row${c.ledgerSuperseded===1?'':'s'} ignored — the ads api is the source for those ads`);
+    if(c.untaggedApiAds&&c.untaggedApiAds.length)extras.push(`platform ads with no utm tag (not in the table): ${c.untaggedApiAds.map(esc).join(', ')}`);
+    if(c.currencyMismatch)extras.push(`<b>currency</b>: the ads account bills in ${esc(c.currencyMismatch.platform)} but the ledger credit is declared in ${esc(c.currencyMismatch.ledger)} — credit progress mixes the two until the ledger is corrected`);
+    if(c.api&&c.api.status&&c.api.status!=='active')extras.push(`platform campaign status: <b>${esc(c.api.status)}</b>`);
+    const spendAttr={'openai-ads-api':['live',`<b>openai ads api</b> — ${c.api?`campaign “${esc(c.api.name)}” (${esc(c.api.status)}${c.api.dailyBudget!=null?`, ${money(c.api.dailyBudget,c.currency)}/day cap`:''}${c.api.countries&&c.api.countries.length?`, ${c.api.countries.map(esc).join(' ')}`:''})`:'per-ad daily insights'}`],
+      'ledger':['manual','<b>manual ledger</b> — typed in from ads manager; no platform api data for this campaign'],
+      'none':['','<b>none</b> — no spend rows from the api or the ledger']}[c.spendSource];
+    const ruleName={a:'low ctr',b:'best ctr',c:'no visitors',d:'credit pace',e:'review'};
+    const tweaks=(c.tweaks&&c.tweaks.length)?`<ul class="tweaks">${c.tweaks.map(t=>`<li><span class="rule">rule ${esc(t.rule)} · ${esc(ruleName[t.rule]||'')}</span><span><b>${esc(t.action.replace(/ (\d+(\.\d+)?)$/,(m,v)=>' '+money(Number(v),c.currency)))}</b>${t.name?` — ${esc(t.name)}`:''}<span style="color:var(--ink-faint)"> · ${esc(t.detail)}</span></span></li>`).join('')}</ul>`:'';
     return `<div style="margin-top:8px">
       ${P.campaigns.length>1?`<h3>${esc(c.platform)} · <code>${esc(c.utmCampaign)}</code></h3>`:''}
       ${credit}
       <div class="tscroll" style="margin-top:12px"><table style="min-width:760px"><thead><tr><th>ad</th><th style="text-align:right">spend</th><th style="text-align:right">impr.</th><th style="text-align:right">clicks</th><th style="text-align:right">ctr</th><th style="text-align:right">cpc</th><th style="text-align:right">visitors</th><th style="text-align:right">cta clicks</th><th style="text-align:right">pods</th><th style="text-align:right">cpa</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="10" class="cap">no ads declared in the ledger.</td></tr>'}</tbody></table></div>
       ${win}
-      <div class="attr"><i class="${attrLabel[0]}"></i><span>attribution: ${attrLabel[1]}</span></div>
+      ${tweaks}
+      <div class="attr"><i class="${spendAttr[0]}"></i><span>spend source: ${spendAttr[1]}</span></div>
+      <div class="attr" style="margin-top:6px"><i class="${attrLabel[0]}"></i><span>pod attribution: ${attrLabel[1]}</span></div>
       ${extras.length?`<div class="note">${extras.join(' · ')}</div>`:''}
       ${c.notes?`<div class="note">${esc(c.notes)}</div>`:''}
     </div>`;
@@ -733,5 +752,5 @@ if(D.lost.length){
 $('callouts').innerHTML=co.map(c=>`<div class="callout ${c.c}"><h3>${c.h}</h3><p>${c.p}</p></div>`).join('');
 
 // footer
-$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing)${D.searchConsoleAvailable?' · Google Search Console':''}${D.paid?' · manual ad-spend ledger':''}. &nbsp; <b>Caveats:</b> members-per-family comes from a bare roster COUNT each family reports to the registry (no names) — families quiet since 2026-08-29 report none, so total users is a floor at the stated coverage. Registry <code>lastLoginAt</code> is date-only and login-only, so “active” here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family, so <b>overall conversion is a cross-site ratio, not a tracked per-visitor funnel</b>. Search Console reports clicks, never conversions — any “converting term” reading is inferred via the landing page. “Internal” marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
+$('foot').innerHTML=`<b>Sources:</b> DynamoDB family registry (live) · CloudWatch telemetry firehose (90-day retention) · Plausible Analytics (app + marketing)${D.searchConsoleAvailable?' · Google Search Console':''}${D.paid?.apiAvailable?' · OpenAI Ads API':''}${D.paid?.ledgerPresent?' · manual ad-spend ledger':''}. &nbsp; <b>Caveats:</b> members-per-family comes from a bare roster COUNT each family reports to the registry (no names) — families quiet since 2026-08-29 report none, so total users is a floor at the stated coverage. Registry <code>lastLoginAt</code> is date-only and login-only, so “active” here is reconciled against CloudWatch activity (any event). <code>beanpodSizeKb</code> is client-reported and approximate. Plausible is aggregate and cannot be joined per family, so <b>overall conversion is a cross-site ratio, not a tracked per-visitor funnel</b>. Search Console reports clicks, never conversions — any “converting term” reading is inferred via the landing page. “Internal” marks the founder's own daily-driver pod. Generated ${new Date(D.generatedAt).toLocaleString('en-GB')}.`;
 </script>

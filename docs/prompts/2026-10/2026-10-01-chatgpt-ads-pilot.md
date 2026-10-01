@@ -51,3 +51,24 @@ issue, just the tracker row".
   dark), and the terminal-report section. Verified with a full pipeline run and Playwright screenshots.
   Real ledger seeded with the eight ads and the one untagged 2026-10-01 pod; `daily` is empty until
   greg fills it from Ads Manager.
+
+**2026-10-01 (evening)** — "I saw that there is an API option for the open AI ads portal. i've created
+an API key ... can you use this key to see if you can access my openai ads portal" / "yes please
+update the metrics skill to use the api key to pull the relevant data ... propose updates/tweaks as
+required to boost performance" / "are you also able to make the updates you noticed above?" / "also
+add australia to the targeting" / "ok un-pause the campaign now" / "retrieve the actual copy i wrote
+in the chatgpt ads and update notion where it differed ... use that to learn and refine my style".
+
+### Outcome (API + live campaign)
+
+- OpenAI Ads API verified with the key in `~/.openai.env` (read + write). Account bills in **SGD**.
+- Via the API: ad-group context hints rewritten as 14 whole phrases (the UI had split them on
+  commas), Australia added to targeting (US/SG/GB/AU), campaign activated ~20:30 SGT.
+- `beanies-metrics`: new `scripts/pull_openai_ads.mjs` collector (campaigns, ad groups, ads with
+  parsed UTM, daily insights per ad/campaign, country split, lifetime for credit); `build_dashboard`
+  is API-first with the ledger as fallback/override and `pods_manual` only; panel shows spend
+  source, per-ad status/review/title/country; rule-based "tweaks" (pause / shift budget / tagging
+  problem / under-pacing / blocked in review) with guards so pre-tagging clicks and a cap already
+  above target do not fire.
+- Notion pilot page updated with greg's live copy next to the proposals, the style rules learned
+  from the diff, status callout, AU, SGD. Memory: `feedback_ad_copy_style`, `project_chatgpt_ads_pilot`.

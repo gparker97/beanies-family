@@ -3,8 +3,8 @@
  * beanies-metrics: consolidate collected JSON into the dashboard.
  *
  * Reads the raw source dumps from a directory (produced by pull_registry.mjs,
- * cw_cache.mjs, query_plausible.mjs) plus the optional manual ad-spend ledger
- * at ~/.config/beanies/ad-spend.json, does the registry<->CloudWatch
+ * cw_cache.mjs, query_plausible.mjs, pull_openai_ads.mjs) plus the optional
+ * manual ad-spend ledger at ~/.config/beanies/ad-spend.json, does the registry<->CloudWatch
  * reconciliation (the key insight: registry lastLoginAt is date-only/login-only
  * and undercounts, so true "active" comes from CloudWatch last-seen), then:
  *   - writes `dashboard_data.json` (the consolidated, artifact-safe figures), and
@@ -70,6 +70,7 @@ const surf = load('cw_surface.json', true);
 const daily = load('cw_daily.json', true);
 const pl = load('plausible.json', true);
 const gsc = load('search_console.json', true);
+const ads_api = load('openai_ads.json', true); // pull_openai_ads.mjs; optional, see the paid block
 
 const NOW = new Date(reg.generatedAt).getTime() / 1000;
 const DAY = 86400;
@@ -537,13 +538,19 @@ if (gsc) {
   };
 }
 
-// ── Paid campaigns (manual spend ledger x Plausible UTM) ────────────────────
-// There is no ads-platform API, so spend / impressions / clicks per ad are typed
-// into ~/.config/beanies/ad-spend.json by hand (schema: references/data-sources.md
-// §5). Plausible contributes visitors + CTA clicks per `utm_content` on the
+// ── Paid campaigns (OpenAI Ads API ⊕ manual ledger ⊕ Plausible UTM) ─────────
+// Spend / impressions / clicks per ad per day come from the ads platform when
+// `openai_ads.json` is present (pull_openai_ads.mjs), and from the hand-typed
+// ledger at ~/.config/beanies/ad-spend.json otherwise. Precedence is per ad
+// slug (`utm_content`): a slug the API knows is API-only — its ledger `daily`
+// rows are ignored, never summed on top — while a ledger-only slug keeps its
+// ledger rows as a fallback. With no API file the ledger behaves exactly as it
+// always did. `pods_manual` is ledger-only in every case: the platform cannot
+// know which Slack create-pod message was an ad. Every figure says which source
+// it came from (`spendSource`, `podsSource`).
+//
+// Plausible contributes visitors + CTA clicks per `utm_content` on the
 // marketing site, and — once UTMs carry through to the app — signups per ad.
-// Until then `pods` falls back to the ledger's `pods_manual` rows, and every
-// figure says which source it came from (`podsSource`).
 //
 // CPA here = spend ÷ new families (pods). It is NOT a revenue ROI — no paid
 // plan exists yet, so there is no revenue to divide by.
@@ -561,21 +568,75 @@ let paidLedgerError = null;
       paidLedgerError = `ad-spend.json unreadable: ${String(err?.message || err).slice(0, 160)}`;
     }
   }
-  const campaignsIn = Array.isArray(ledger?.campaigns) ? ledger.campaigns : [];
+  const inWindowDate = (d) => typeof d === 'string' && d >= dateRange.start && d <= dateRange.end;
+  const r1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
+  const r2 = (n) => (n == null ? null : Math.round(n * 100) / 100);
+  const ratio = (a, b) => (b ? a / b : null); // never divide by zero
+  const notSet = (v) => !v || v === '(not set)';
+  const sumBy = (rows, k) => rows.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+
+  // ── API index: everything keyed by the ad slug the ledger and Plausible use.
+  const apiAdsAll = Array.isArray(ads_api?.ads) ? ads_api.ads : [];
+  const apiAdById = new Map(apiAdsAll.map((a) => [a.id, a]));
+  const apiTagged = apiAdsAll.filter((a) => a.utmContent && a.utmCampaign);
+  const apiUntagged = apiAdsAll.filter((a) => !(a.utmContent && a.utmCampaign));
+  // Daily platform rows re-keyed to {date, utm_content, spend, impressions, clicks}
+  // so the per-ad arithmetic below is identical whichever source fed it.
+  const apiDaily = (ads_api?.dailyByAd || [])
+    .map((d) => ({ ...d, utm_content: apiAdById.get(d.adId)?.utmContent ?? null, utm_campaign: apiAdById.get(d.adId)?.utmCampaign ?? null }))
+    .filter((d) => d.utm_content);
+  const apiCountry = (ads_api?.byCountry || [])
+    .filter((d) => inWindowDate(d.date))
+    .map((d) => ({ ...d, utm_content: apiAdById.get(d.adId)?.utmContent ?? null }))
+    .filter((d) => d.utm_content);
+  const apiCampaignById = new Map((ads_api?.campaigns || []).map((c) => [c.id, c]));
+  const apiLifetimeByCampaign = new Map((ads_api?.lifetime?.byCampaign || []).map((l) => [l.campaignId, l]));
+  const apiCurrency = ads_api?.account?.currency || null;
+
+  // Ledger campaigns first; then any API campaign (by utm_campaign) the ledger
+  // does not declare, so the panel still renders from the platform alone.
+  const campaignsIn = Array.isArray(ledger?.campaigns) ? [...ledger.campaigns] : [];
+  for (const a of apiTagged) {
+    if (!campaignsIn.some((c) => c.utm_campaign === a.utmCampaign)) {
+      campaignsIn.push({
+        platform: a.utmSource || 'openai ads',
+        utm_source: a.utmSource,
+        utm_campaign: a.utmCampaign,
+        currency: apiCurrency || 'USD',
+        ads: [],
+        daily: [],
+        pods_manual: [],
+        _synthesizedFromApi: true,
+      });
+    }
+  }
+
   if (campaignsIn.length) {
-    const inWindowDate = (d) => typeof d === 'string' && d >= dateRange.start && d <= dateRange.end;
-    const r1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
-    const r2 = (n) => (n == null ? null : Math.round(n * 100) / 100);
-    const ratio = (a, b) => (b ? a / b : null); // never divide by zero
-    const notSet = (v) => !v || v === '(not set)';
     const mktPaid = pl?.marketing?.paid || null;
     const appPaid = pl?.app?.paid || null;
 
     const campaigns = campaignsIn.map((c) => {
-      const ads = Array.isArray(c.ads) ? c.ads : [];
-      const dailyAll = Array.isArray(c.daily) ? c.daily : [];
-      const daily = dailyAll.filter((d) => inWindowDate(d.date));
+      const ledgerAds = Array.isArray(c.ads) ? c.ads : [];
+      const ledgerDailyAll = Array.isArray(c.daily) ? c.daily : [];
       const podsManual = (Array.isArray(c.pods_manual) ? c.pods_manual : []).filter((p) => inWindowDate(p.date));
+
+      // Platform ads for THIS campaign, by slug. API wins per slug.
+      const sameUtm = (a) => a.utmCampaign === c.utm_campaign && (!c.utm_source || !a.utmSource || a.utmSource === c.utm_source);
+      const apiAdsHere = apiTagged.filter(sameUtm);
+      const apiBySlug = new Map(apiAdsHere.map((a) => [a.utmContent, a]));
+      const apiSlugs = new Set(apiBySlug.keys());
+      const apiCampaignIds = [...new Set(apiAdsHere.map((a) => a.campaignId).filter(Boolean))];
+      const apiCampaign = apiCampaignIds.length === 1 ? apiCampaignById.get(apiCampaignIds[0]) || null : null;
+      const spendSource = apiAdsHere.length ? 'openai-ads-api' : ledgerDailyAll.length ? 'ledger' : 'none';
+
+      // Merged daily rows: API rows for API-known slugs, ledger rows only for
+      // slugs the API does not know. Ledger rows on an API slug are counted as
+      // superseded and surfaced, never silently summed.
+      const apiDailyHere = apiDaily.filter((d) => d.utm_campaign === c.utm_campaign);
+      const ledgerSuperseded = ledgerDailyAll.filter((d) => apiSlugs.has(d.utm_content)).length;
+      const ledgerFallbackAll = ledgerDailyAll.filter((d) => !apiSlugs.has(d.utm_content));
+      const dailyAll = [...apiDailyHere, ...ledgerFallbackAll];
+      const daily = dailyAll.filter((d) => inWindowDate(d.date));
 
       // Plausible rows for THIS campaign, keyed by utm_content.
       const sameCampaign = (r) =>
@@ -609,11 +670,44 @@ let paidLedgerError = null;
       // hand-recorded pods, else nothing.
       const podsSource = campaignSignups > 0 ? 'plausible-app-utm' : podsManual.length ? 'manual' : 'none';
 
-      const adRows = ads.map((ad) => {
+      // The ad roster: platform ads first (API fields), then ledger-only ads.
+      // The ledger `ads` entry is an optional overlay — its `angle` (the API has
+      // no such field) and `name` fill gaps, they never override API truth.
+      const ledgerBySlug = new Map(ledgerAds.map((a) => [a.utm_content, a]));
+      const roster = [
+        ...apiAdsHere.map((a) => {
+          const l = ledgerBySlug.get(a.utmContent) || {};
+          return {
+            utm_content: a.utmContent,
+            name: a.name || l.name || a.utmContent,
+            title: a.title || l.name || null,
+            // "funny - dinner" -> "funny" when the ledger does not say.
+            angle: l.angle || (a.name && a.name.includes(' - ') ? a.name.split(' - ')[0].trim() : null),
+            status: a.status || l.status || null,
+            reviewStatus: a.reviewStatus || null,
+            adId: a.id,
+            rowSource: 'openai-ads-api',
+          };
+        }),
+        ...ledgerAds
+          .filter((a) => !apiSlugs.has(a.utm_content))
+          .map((a) => ({
+            utm_content: a.utm_content,
+            name: a.name || a.utm_content,
+            title: null,
+            angle: a.angle || null,
+            status: a.status || null,
+            reviewStatus: null,
+            adId: null,
+            rowSource: ledgerFallbackAll.some((d) => d.utm_content === a.utm_content) ? 'ledger' : 'none',
+          })),
+      ];
+
+      const adRows = roster.map((ad) => {
         const mine = daily.filter((d) => d.utm_content === ad.utm_content);
-        const spend = mine.reduce((n, d) => n + (Number(d.spend) || 0), 0);
-        const impressions = mine.reduce((n, d) => n + (Number(d.impressions) || 0), 0);
-        const clicks = mine.reduce((n, d) => n + (Number(d.clicks) || 0), 0);
+        const spend = sumBy(mine, 'spend');
+        const impressions = sumBy(mine, 'impressions');
+        const clicks = sumBy(mine, 'clicks');
         const t = trafficByContent.get(ad.utm_content) || null;
         const visitors = t ? t.visitors : null;
         const ctaClicks = ctaByContent.has(ad.utm_content) ? ctaByContent.get(ad.utm_content) : (t ? 0 : null);
@@ -624,12 +718,29 @@ let paidLedgerError = null;
             : podsSource === 'manual'
               ? podsManual.filter((p) => p.utm_content === ad.utm_content).length
               : 0;
+        // Per-country split (API only, window-scoped). Empty when the segment
+        // query degraded or the ad has not served yet.
+        const countryAgg = new Map();
+        for (const d of apiCountry.filter((d) => d.utm_content === ad.utm_content)) {
+          const o = countryAgg.get(d.country) || { country: d.country, impressions: 0, clicks: 0, spend: 0 };
+          o.impressions += d.impressions || 0;
+          o.clicks += d.clicks || 0;
+          o.spend += d.spend || 0;
+          countryAgg.set(d.country, o);
+        }
+        const countries = [...countryAgg.values()]
+          .map((o) => ({ ...o, spend: r2(o.spend) }))
+          .sort((a, b) => b.impressions - a.impressions);
         return {
           utmContent: ad.utm_content,
-          name: ad.name || ad.utm_content,
-          angle: ad.angle || null,
-          status: ad.status || null,
-          daysActive: new Set(mine.map((d) => d.date)).size,
+          name: ad.name,
+          title: ad.title,
+          angle: ad.angle,
+          status: ad.status,
+          reviewStatus: ad.reviewStatus,
+          adId: ad.adId,
+          spendSource: ad.rowSource,
+          daysActive: new Set(mine.filter((d) => d.impressions || d.spend).map((d) => d.date)).size,
           spend: r2(spend),
           impressions,
           clicks,
@@ -644,6 +755,7 @@ let paidLedgerError = null;
           pods,
           podsSource,
           cpa: pods > 0 && spend > 0 ? r2(spend / pods) : null,
+          countries,
         };
       });
 
@@ -660,15 +772,28 @@ let paidLedgerError = null;
         podsSource === 'plausible-app-utm' ? campaignSignups : podsSource === 'manual' ? podsManual.length : 0;
       const ctaClicks = hasTraffic ? ctaCampaign : null;
 
-      // Spend the ledger says this ad slug drew but no `ads` entry declares, and
-      // Plausible contents nobody declared — both are tagging mistakes worth a
-      // line, not silent drops.
-      const declared = new Set(ads.map((a) => a.utm_content));
+      // Spend on a slug no roster entry declares (ledger fallback rows only —
+      // every API row has a roster entry by construction), Plausible contents
+      // nobody declared, and platform ads with no utm tag at all — all tagging
+      // mistakes worth a line, not silent drops.
+      const declared = new Set(roster.map((a) => a.utm_content));
       const undeclaredLedger = [...new Set(daily.map((d) => d.utm_content).filter((k) => k && !declared.has(k)))];
       const undeclaredPlausible = [...trafficByContent.keys()].filter((k) => !notSet(k) && !declared.has(k));
+      const untaggedApiAds = apiCampaign ? apiUntagged.filter((a) => a.campaignId === apiCampaign.id).map((a) => a.name) : [];
 
-      // Credit progress is LIFETIME (the credit is a budget, not a window).
-      const lifetimeSpend = dailyAll.reduce((n, d) => n + (Number(d.spend) || 0), 0);
+      // Credit progress is LIFETIME (the credit is a budget, not a window). From
+      // the platform's un-windowed insights call when it answered; else the sum
+      // of every row we hold (right only while the window covers the campaign).
+      const apiLifetime = apiCampaignIds.map((id) => apiLifetimeByCampaign.get(id)).filter(Boolean);
+      const lifetimeSpend =
+        apiLifetime.length ? sumBy(apiLifetime, 'spend') + sumBy(ledgerFallbackAll, 'spend') : sumBy(dailyAll, 'spend');
+      const lifetimeSource = apiLifetime.length ? ads_api?.lifetime?.source || 'insights-lifetime' : 'row-sum';
+      const startDate = apiCampaign?.startDate || c.started || null;
+      const firstServed = dailyAll.filter((d) => d.impressions || d.spend).map((d) => d.date).sort()[0] || null;
+      const elapsedFrom = startDate || firstServed;
+      const daysElapsed = elapsedFrom
+        ? Math.max(1, Math.floor((new Date(dateRange.end + 'T00:00:00Z').getTime() - new Date(elapsedFrom + 'T00:00:00Z').getTime()) / (DAY * 1000)) + 1)
+        : null;
       const credit = c.credit_usd
         ? {
             amount: c.credit_usd,
@@ -678,6 +803,8 @@ let paidLedgerError = null;
             daysLeft: c.credit_deadline
               ? Math.max(0, Math.ceil((new Date(c.credit_deadline + 'T23:59:59Z').getTime() / 1000 - NOW) / DAY))
               : null,
+            daysElapsed,
+            source: lifetimeSource,
           }
         : null;
 
@@ -695,13 +822,74 @@ let paidLedgerError = null;
         }
       }
 
+      const currency = spendSource === 'openai-ads-api' && apiCurrency ? apiCurrency : c.currency || 'USD';
+      // The ledger's `credit_usd` and `currency` were written before the platform
+      // reported its own currency; flag a mismatch rather than silently mixing.
+      const currencyMismatch = spendSource === 'openai-ads-api' && apiCurrency && c.currency && c.currency !== apiCurrency ? { ledger: c.currency, platform: apiCurrency } : null;
+
+      // ── Tweaks: explicit, named rules; only emitted when the precondition holds.
+      const tweaks = [];
+      const served = adRows.filter((a) => a.impressions > 0 && a.ctr != null);
+      const median = (xs) => {
+        const s = [...xs].sort((a, b) => a - b);
+        return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null;
+      };
+      const medianCtr = served.length >= 2 ? median(served.map((a) => a.ctr)) : null;
+      if (medianCtr != null && medianCtr > 0) {
+        // (a) ≥300 impressions and CTR below half the campaign median.
+        for (const a of served.filter((a) => a.impressions >= 300 && a.ctr < medianCtr / 2)) {
+          tweaks.push({ rule: 'a', action: 'consider pausing', utmContent: a.utmContent, name: a.name, detail: `ctr ${a.ctr}% vs campaign median ${r2(medianCtr)}% on ${a.impressions} impressions` });
+        }
+        // (b) the best CTR, and at least twice the median.
+        const best = [...served].sort((a, b) => b.ctr - a.ctr)[0];
+        if (best && best.ctr >= 2 * medianCtr) {
+          tweaks.push({ rule: 'b', action: 'shift budget here', utmContent: best.utmContent, name: best.name, detail: `best ctr ${best.ctr}% ≥ 2× campaign median ${r2(medianCtr)}%` });
+        }
+      }
+      // (c) clicks on the platform but no tagged visitor in Plausible over the same window.
+      if (pl) {
+        for (const a of adRows.filter((a) => a.clicks >= 10 && !(a.visitors > 0))) {
+          tweaks.push({ rule: 'c', action: 'tagging or landing problem', utmContent: a.utmContent, name: a.name, detail: `${a.clicks} ad click${a.clicks === 1 ? '' : 's'} but plausible saw no visitor with utm_content=${a.utmContent}` });
+        }
+      }
+      // (d) credit pace: current daily pace × days left would not spend what is
+      // left. Needs some spend first — zero spend is "not started", not pacing.
+      if (credit && credit.daysLeft > 0 && daysElapsed && lifetimeSpend > 0) {
+        const remaining = credit.amount - lifetimeSpend;
+        const pace = lifetimeSpend / daysElapsed;
+        const projected = pace * credit.daysLeft;
+        const target = r2(remaining / credit.daysLeft);
+        // Only worth saying when the suggested cap is above the one already set.
+        const capTooLow = apiCampaign?.dailyBudget == null || target > apiCampaign.dailyBudget;
+        if (remaining > 0 && projected < remaining && capTooLow) {
+          tweaks.push({
+            rule: 'd',
+            action: `under-pacing, raise daily budget to ${target}`,
+            utmContent: null,
+            name: null,
+            value: target,
+            detail: `${r2(pace)}/day over ${daysElapsed} day${daysElapsed === 1 ? '' : 's'} × ${credit.daysLeft} left = ${r2(projected)}, but ${r2(remaining)} of credit remains${apiCampaign?.dailyBudget != null ? ` (daily cap now ${apiCampaign.dailyBudget})` : ''}`,
+          });
+        }
+      }
+      // (e) active but not approved.
+      for (const a of adRows.filter((a) => a.status === 'active' && a.reviewStatus && a.reviewStatus !== 'approved')) {
+        tweaks.push({ rule: 'e', action: 'blocked in review', utmContent: a.utmContent, name: a.name, detail: `review_status=${a.reviewStatus}` });
+      }
+
       return {
         platform: c.platform,
         utmSource: c.utm_source,
         utmCampaign: c.utm_campaign,
-        currency: c.currency || 'USD',
+        currency,
+        currencyMismatch,
         notes: c.notes || null,
-        started: c.started || null,
+        started: startDate,
+        spendSource,
+        api: apiCampaign
+          ? { id: apiCampaign.id, name: apiCampaign.name, status: apiCampaign.status, dailyBudget: apiCampaign.dailyBudget, countries: apiCampaign.countries, objective: apiCampaign.objective }
+          : null,
+        synthesizedFromApi: !!c._synthesizedFromApi,
         totals: {
           spend: r2(spend),
           impressions,
@@ -719,10 +907,13 @@ let paidLedgerError = null;
           cpa: pods > 0 && spend > 0 ? r2(spend / pods) : null,
         },
         credit,
-        ads: adRows.sort((a, b) => b.spend - a.spend),
+        ads: adRows.sort((a, b) => b.spend - a.spend || b.impressions - a.impressions),
         winner,
+        tweaks,
         undeclaredLedger,
         undeclaredPlausible,
+        untaggedApiAds,
+        ledgerSuperseded,
       };
     });
 
@@ -732,9 +923,19 @@ let paidLedgerError = null;
     const totalPods = sumT('pods');
     paid = {
       ledgerPath: '~/.config/beanies/ad-spend.json',
+      ledgerPresent: !!ledger,
+      apiAvailable: !!ads_api,
+      apiAccount: ads_api?.account ? { name: ads_api.account.name, currency: ads_api.account.currency, timezone: ads_api.account.timezone, status: ads_api.account.status } : null,
+      apiWindow: ads_api?.window || null,
+      spendUnit: ads_api?.spendUnit || null,
       plausibleAvailable: !!pl,
-      // Overall attribution source, for the one-line note. Mixed campaigns are
-      // possible in principle; the per-campaign `podsSource` is the exact answer.
+      // Overall sources, for the one-line notes. Mixed campaigns are possible
+      // in principle; the per-campaign fields are the exact answer.
+      spendSource: campaigns.some((c) => c.spendSource === 'openai-ads-api')
+        ? 'openai-ads-api'
+        : campaigns.some((c) => c.spendSource === 'ledger')
+          ? 'ledger'
+          : 'none',
       attribution: campaigns.some((c) => c.totals.podsSource === 'plausible-app-utm')
         ? 'plausible-app-utm'
         : campaigns.some((c) => c.totals.podsSource === 'manual')
@@ -799,9 +1000,9 @@ const data = {
   // file so it is never a silent drop.
   paid,
   paidLedgerError,
-  // Which optional Plausible queries degraded this run, so the page can say so
-  // rather than rendering a silently-empty panel.
-  degraded: pl?._degraded || [],
+  // Which optional Plausible / ads-API queries degraded this run, so the page
+  // can say so rather than rendering a silently-empty panel.
+  degraded: [...(pl?._degraded || []), ...(ads_api?._degraded || [])],
   activeReal30,
   activeReal7,
   engagedPctReal: reg.counts.realFamilies ? Math.round((activeReal30 / reg.counts.realFamilies) * 100) : 0,
