@@ -16,6 +16,8 @@ tags: [automerge, crdt, merge, data-loss, worker]
 
 **15:50** — (plan approved via ExitPlanMode) "implement with /beanies-build-auto"
 
+**20:05** — "once the reviews are done and all fixes are done, pls perform testing yourself to the extent possible you can test and validate these new data related changes, as it is hard to test these issues in real life as it's hard to generate the conditions that these fixes are aiming to fix i think. is it possible to test these yourself, and then let me know anything i can do myself to ensure the testing did not revert anything or cause new bugs or side effects"
+
 ## Outcome
 
-_In progress._
+Phase 1 built, reviewed twice and verified the same day: nine commits `328599a3`..`6988ce63` on `main`, not deployed. Full record in the plan's Outcome section (`docs/plans/2026-10-01-crdt-merge-safe-writes.md`). Phase 2 (Automerge Counters) is still to plan.
