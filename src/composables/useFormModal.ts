@@ -8,7 +8,8 @@ import { logEvent } from '@/services/telemetry/logEvent';
  */
 export interface FormDiff<P> {
   /** Full payload when there is no baseline (create); otherwise only the changed fields. A
-   *  cleared field is present as `undefined` (see `diffPayload`). */
+   *  cleared text field is `undefined` (a delete); an explicit `null` is a write of null (see
+   *  `diffPayload`). */
   changes(payload: P): Partial<P>;
   /** Replace the baseline, e.g. right after an eager create so the next save diffs against it. */
   rebaseline(payload: P): void;

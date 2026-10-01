@@ -54,7 +54,10 @@ async function mountModal(existing?: Milestone | null) {
           props: ['saveDisabled', 'isSubmitting', 'showDelete', 'title', 'open'],
           template: '<div data-testid="modal"><slot /></div>',
         },
-        PhotoAttachments: { template: '<div data-testid="photos" />' },
+        PhotoAttachments: {
+          template: '<div data-testid="photos" />',
+          methods: { openPicker() {} },
+        },
         // BeanieDatePicker renders custom chrome; stub as a plain date
         // input so DOM-level selectors in the tests find it.
         BeanieDatePicker: {
@@ -125,24 +128,48 @@ describe('MilestoneFormModal', () => {
     expect(dateInput.value).toBe('2024-06-15');
   });
 
-  it('an edit saved later does not diff occurredOn when the date was untouched', async () => {
-    const m: Milestone = {
-      id: 'm-2',
-      memberId: MEMBER_ID,
-      category: 'graduation',
-      title: 'Graduation',
-      occurredOn: '2024-06-15',
-      createdAt: '2024-06-15T00:00:00.000Z',
-      updatedAt: '2024-06-15T00:00:00.000Z',
-    };
-    const { wrapper, store } = await mountModal(m);
-    await wrapper.find('input[type="text"]').setValue('Graduation Day');
-    await nextTick();
-    wrapper.findComponent(BeanieFormModal).vm.$emit('save');
-    await vi.waitFor(() => expect(store.updateMilestone).toHaveBeenCalled());
-    const patch = vi.mocked(store.updateMilestone).mock.calls[0]![1] as Record<string, unknown>;
-    expect(patch.title).toBe('Graduation Day');
-    expect('occurredOn' in patch).toBe(false);
+  it('eager create writes the defaults back to the form and a later save never diffs occurredOn across midnight', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 5, 10, 23, 59, 0));
+      const { wrapper, store } = await mountModal(null);
+      const created = { id: 'eager-1', memberId: MEMBER_ID };
+      store.createMilestone = vi.fn().mockResolvedValue(created);
+      // The user blanks the date and attaches a photo first: eager create with defaults.
+      await wrapper.find('input[type="date"]').setValue('');
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('milestone.addPhotos'))!
+        .trigger('click');
+      await vi.waitFor(() => expect(store.createMilestone).toHaveBeenCalled());
+      await nextTick();
+      const createdPayload = vi.mocked(store.createMilestone).mock.calls[0]![0] as Record<
+        string,
+        unknown
+      >;
+      expect(createdPayload.occurredOn).toBe('2026-06-10');
+      expect(createdPayload.category).toBe('custom');
+      // The form now shows what was stored.
+      expect((wrapper.find('input[type="date"]').element as HTMLInputElement).value).toBe(
+        '2026-06-10'
+      );
+      expect((wrapper.find('input[type="text"]').element as HTMLInputElement).value).toBe(
+        'milestone.cat.custom'
+      );
+
+      // Midnight passes, then the user edits only the title and saves.
+      vi.setSystemTime(new Date(2026, 5, 11, 0, 1, 0));
+      await wrapper.find('input[type="text"]').setValue('First swim');
+      await nextTick();
+      wrapper.findComponent(BeanieFormModal).vm.$emit('save');
+      await vi.waitFor(() => expect(store.updateMilestone).toHaveBeenCalled());
+      const patch = vi.mocked(store.updateMilestone).mock.calls[0]![1] as Record<string, unknown>;
+      expect(patch.title).toBe('First swim');
+      expect('occurredOn' in patch).toBe(false);
+      expect('category' in patch).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('preserves user-typed title across category changes (no overwrite)', async () => {

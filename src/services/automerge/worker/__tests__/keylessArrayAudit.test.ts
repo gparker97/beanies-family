@@ -125,7 +125,47 @@ function seedData(): Record<string, Json> {
   return JSON.parse(JSON.stringify(merged));
 }
 
-function findings(): Finding[] {
+/** Collections the audit walks, with data (fixture or SUPPLEMENT). Keep in step with the header. */
+const AUDITED_COLLECTIONS: readonly string[] = [
+  'accounts',
+  'activities',
+  'assets',
+  'budgets',
+  'familyMembers',
+  'goals',
+  'listCycles',
+  'lists',
+  'medications',
+  'milestones',
+  'recurringItems',
+  'responsibilityCards',
+  'sayings',
+  'todos',
+  'transactions',
+  'vacations',
+];
+/** Collections with NO seed data, so NOT audited (the header's list, minus the supplemented). */
+const UNAUDITED_COLLECTIONS: readonly string[] = [
+  'photos',
+  'favorites',
+  'memberNotes',
+  'allergies',
+  'medicationLogs',
+  'recipes',
+  'cookLogs',
+  'mealPlans',
+  'emergencyContacts',
+  'notificationReads',
+  'calendarConnections',
+  'calendarEventLinks',
+  'driveConnections',
+  'overlapAcknowledgments',
+  'removedMembers',
+  'responsibilityMoves',
+  'responsibilityCheckIns',
+];
+
+function findings(walked?: Set<string>): Finding[] {
   const data = seedData();
   const out: Finding[] = [];
   for (const name of [...COLLECTION_NAMES, 'settings']) {
@@ -135,6 +175,7 @@ function findings(): Finding[] {
       continue;
     }
     if (!Array.isArray(col)) continue; // fixture shape: arrays of entities
+    walked?.add(name);
     for (const entity of col) {
       const id = isMap(entity) && typeof entity.id === 'string' ? entity.id : '?';
       collect(entity, name, `${name}.${id}`, name, out);
@@ -147,6 +188,16 @@ describe('keyless array-of-objects audit', () => {
   it('walks a non-trivial seed (guards against a silently empty audit)', () => {
     const f = findings();
     expect(f.length).toBeGreaterThan(5);
+  });
+
+  it('walks exactly AUDITED_COLLECTIONS, and AUDITED + UNAUDITED covers every collection', () => {
+    const walked = new Set<string>();
+    findings(walked);
+    expect([...walked].sort()).toEqual([...AUDITED_COLLECTIONS].sort());
+    // A new collection must be placed in exactly one list, so skipping it is a decision.
+    expect([...AUDITED_COLLECTIONS, ...UNAUDITED_COLLECTIONS].sort()).toEqual(
+      [...COLLECTION_NAMES].sort()
+    );
   });
 
   it('every array-of-objects field has an id, a KEY_FIELDS entry, or a value-identity allowlist line', () => {

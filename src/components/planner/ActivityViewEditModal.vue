@@ -838,9 +838,9 @@ async function confirmReschedule() {
   if (!activity.value || !rescheduleDate.value) return;
 
   // These four fields map 1:1 onto the entity, so a payload-vs-entity diff is
-  // safe here. Using `diffPayload` also normalises cleared fields to `undefined`
-  // — the hand-rolled deltas this replaces wrote `null`, which Automerge
-  // persists as a literal null rather than deleting the key.
+  // safe here. With `diffPayload`, a cleared text field is `undefined` (a delete) while
+  // an explicit `null` is a write of null; the hand-rolled deltas this replaces wrote
+  // `null`, which Automerge persists as a literal null rather than deleting the key.
   // The base date is the OCCURRENCE being rescheduled, not the entity's `date`
   // (which for a recurring master is the series START). Using the entity's date
   // meant that moving an occurrence ONTO the series start produced an equal

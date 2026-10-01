@@ -271,7 +271,20 @@ watch(
   }
 );
 
+/**
+ * Write the create-time defaults BACK into the form before an eager create, so the form
+ * equals the stored entity and the diff baseline (taken from the payload that was created)
+ * matches it. Title is set before category so the category watcher's pre-fill is a no-op.
+ */
+function applyCreateDefaultsToForm(): void {
+  const d = withCreateDefaults(buildPayload());
+  title.value = d.title;
+  category.value = d.category;
+  occurredOn.value = d.occurredOn;
+}
+
 async function handleAddFirstPhoto(): Promise<void> {
+  if (!eager.entityId.value && selectedMemberId.value !== undefined) applyCreateDefaultsToForm();
   const id = await eager.ensureId();
   if (!id) return;
   await nextTick();
