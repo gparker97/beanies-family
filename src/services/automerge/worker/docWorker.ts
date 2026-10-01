@@ -35,8 +35,9 @@ self.onmessage = (e: MessageEvent) => {
   if (typeof req?.cid !== 'number') return;
   tail = tail.then(async () => {
     try {
-      const { result, delta, changed } = await dispatch(req.method, req.args);
-      post({ cid: req.cid, ok: true, result, delta, changed } as RpcResponse);
+      // The whole reply, spread: a field added to `DispatchReply` (`notes`, #117) reaches
+      // main without this loop having to learn about it.
+      post({ cid: req.cid, ok: true, ...(await dispatch(req.method, req.args)) });
     } catch (err) {
       post({ cid: req.cid, ok: false, error: serializeError(err) });
     }

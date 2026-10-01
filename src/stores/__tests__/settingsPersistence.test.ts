@@ -2,7 +2,7 @@
  * Tests for settings persistence across save/read cycles.
  *
  * ADR-032: the doc lives in the worker; settings are written via
- * saveSettings → mutate({op:'named', name:'setSettings'}) and read back from the
+ * saveSettings → mutate({op:'named', name:'patchSettings'}) and read back from the
  * projection. This drives the REAL inline backend on the main thread (no Worker).
  *
  * The Automerge binary serialize round-trip (saveDoc → loadDoc) and the encrypted

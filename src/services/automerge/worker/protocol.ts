@@ -25,6 +25,7 @@ import type { CacheInitStage, CacheInitLoss } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 import type { PodLineage } from '@/types/models';
+import type { ReconcileNote } from './reconcile';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -134,7 +135,19 @@ export type MutationOp =
       id: string;
       patch: Record<string, unknown>;
       deleteKeys?: string[];
+      /** Stamped onto the entity ONLY when the patch actually wrote something (#117), so an
+       *  all-unchanged patch leaves the heads untouched and reports `changed: false`. */
       updatedAt?: string;
+      /**
+       * The snapshot `patch` was derived from (#117, ADR-039): for each patched key, the value
+       * the caller read before building the new one. The worker reconciles three-way, writing
+       * only the caller's own changes (`patch` vs `base`) and leaving anything the document
+       * changed meanwhile (a merged peer edit, a queued write) alone. A key absent from a
+       * supplied `base` is additive: it inserts and overwrites, never deletes. Omitted
+       * entirely, the document itself is the base (the target becomes `patch` in place).
+       * Never widens what a write touches: only the keys of `patch` are walked.
+       */
+      base?: Record<string, unknown>;
       /** Behavior when `collection[id]` is absent (default `'throw'`):
        *  - `'throw'`  — reject (a real entity should exist; a genuine bug).
        *  - `'create'` — init `collection[id] = {}` then apply (the two-level
@@ -162,6 +175,25 @@ export type MutationOp =
   /** Named handlers whose domain logic lives in the worker (e.g. photo attach). */
   | { op: 'named'; name: string; args: Record<string, unknown> };
 
+/**
+ * The args of the `patchSettings` named op: a per-key, three-way merge into the settings
+ * singleton (#95, #117). A `type`, not an `interface`, so it is assignable to the named op's
+ * `Record<string, unknown>` args.
+ */
+export type PatchSettingsArgs = {
+  /** The fields to write. Reconciled per key against `base` (arrays per item). */
+  patch: Record<string, unknown>;
+  /** Fields to clear. Each counts as a write only when the field exists. */
+  deleteKeys?: string[];
+  /** Seeds a document that has no settings object yet; ignored once one exists. */
+  defaults?: Record<string, unknown>;
+  /** The snapshot `patch` was derived from (see the `patch` op's `base`). Omitted: the
+   *  document's own settings are the base. */
+  base?: Record<string, unknown>;
+  /** Stamped onto the settings ONLY when the op wrote something. */
+  updatedAt?: string;
+};
+
 // ─── Envelope ────────────────────────────────────────────────────────────────
 
 /** A request from main → worker. `method` names the handler; `args` is its input. */
@@ -183,7 +215,17 @@ export interface RpcOk {
    * `docClient.mutate` then skips the Drive-save trigger. Absent ⇒ treated as
    * changed (the safe default for every non-mutate response). */
   changed?: boolean;
+  /** `mutate` only: what the reconciler found worth reporting (#117). The worker cannot
+   * telemeter, so its findings ride the response and `docClient.mutate` logs them. Absent
+   * when there is nothing to report. */
+  notes?: ReconcileNote[];
 }
+
+/** What one dispatched RPC hands back before the envelope wraps it: `RpcOk` minus the
+ * correlation fields. ONE declaration shared by `dispatch`, the worker loop, the inline
+ * bridge and `docClient`'s executor type, so a new response field cannot be carried on one
+ * path and dropped on another. */
+export type DispatchReply = Omit<RpcOk, 'cid' | 'ok'>;
 
 export interface RpcErr {
   cid: number;
