@@ -652,13 +652,8 @@ async function saveInlineField(item: TimelineItem, field: string, value: string)
     item.kind === 'travel' && TRAVEL_DATE_FIELDS.has(field)
       ? { [field]: value, sortDate: value }
       : { [field]: value };
-  const saved = await vacationStore.updateSegment(selectedVacation.value.id, item.id, patch);
-  if (!saved) notifySegmentGone();
-}
-
-/** The segment was deleted elsewhere (or the save failed): never tell the user it saved. */
-function notifySegmentGone() {
-  showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
+  // The store toasts when the segment is gone; nothing more to do here.
+  await vacationStore.updateSegment(selectedVacation.value.id, item.id, patch);
 }
 
 function openEditModal(item: TimelineItem) {
@@ -670,8 +665,7 @@ function openEditModal(item: TimelineItem) {
 async function deleteTimelineItem(item: TimelineItem) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
-  const deleted = await vacationStore.deleteSegment(selectedVacation.value.id, item.id);
-  if (!deleted) notifySegmentGone();
+  await vacationStore.deleteSegment(selectedVacation.value.id, item.id);
 }
 
 function closeEditModal() {

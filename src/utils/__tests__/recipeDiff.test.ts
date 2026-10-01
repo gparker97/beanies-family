@@ -239,3 +239,20 @@ describe('whitespace is empty, and must never overwrite content', () => {
     expect(d.changed).toBe(false);
   });
 });
+
+describe('an explicit null is empty too', () => {
+  it('does not let a null prefill field wipe a hand-edited value', () => {
+    // `diffPayload` passes a raw null through as a write of null, so the never-clear rule
+    // must treat it as emptying exactly like `undefined`.
+    const d = diffRecipe(
+      recipe(),
+      prefill({
+        prepTime: null,
+        ingredients: ['225g butter', '4 eggs'],
+        steps: ['Heat the oven.', 'Beat the butter.'],
+      } as unknown as Partial<RecipePrefill['fields']>)
+    );
+    expect(d.patch).not.toHaveProperty('prepTime');
+    expect(d.changed).toBe(false);
+  });
+});

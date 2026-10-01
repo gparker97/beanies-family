@@ -510,29 +510,62 @@ describe('vacationStore', () => {
   // ── Missing segments ──
 
   describe('missing segment', () => {
-    it('updateSegment logs to the firehose and returns false', async () => {
+    it('updateSegment logs to the firehose, toasts, and returns missing', async () => {
       const store = useVacationStore();
       store.vacations.push(makeVacation());
-      expect(await store.updateSegment('vac-1', 'gone', { notes: 'x' })).toBe(false);
+      expect(await store.updateSegment('vac-1', 'gone', { notes: 'x' })).toBe('missing');
       expect(logEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           level: 'warn',
           surface: 'vacation-segment',
-          context: { action: 'update_missing' },
+          context: { action: 'update_missing', kind: 'segment' },
         })
       );
     });
 
-    it('deleteSegment logs to the firehose and returns false', async () => {
+    it('deleteSegment logs to the firehose, toasts, and returns missing', async () => {
       const store = useVacationStore();
       store.vacations.push(makeVacation());
-      expect(await store.deleteSegment('vac-1', 'gone')).toBe(false);
+      expect(await store.deleteSegment('vac-1', 'gone')).toBe('missing');
       expect(logEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           surface: 'vacation-segment',
-          context: { action: 'delete_missing' },
+          context: { action: 'delete_missing', kind: 'segment' },
         })
       );
+    });
+  });
+
+  describe('segment result + gone toast ownership', () => {
+    it('a missing vacation logs, toasts once, and returns missing', async () => {
+      const store = useVacationStore();
+      vi.mocked(showToast).mockClear();
+      expect(await store.updateSegment('nope', 's', { notes: 'x' })).toBe('missing');
+      expect(await store.deleteSegment('nope', 's')).toBe('missing');
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { action: 'update_missing', kind: 'vacation' } })
+      );
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { action: 'delete_missing', kind: 'vacation' } })
+      );
+      expect(showToast).toHaveBeenCalledTimes(2);
+    });
+
+    it('a failed save returns failed and does NOT show the gone toast', async () => {
+      const store = useVacationStore();
+      store.vacations.push(
+        makeVacation({
+          travelSegments: [{ id: 's-a', type: 'flight', title: 'A' }],
+        } as never)
+      );
+      vi.mocked(vacationRepo.updateVacation).mockRejectedValue(new Error('boom'));
+      vi.mocked(showToast).mockClear();
+      expect(await store.updateSegment('vac-1', 's-a', { title: 'B' })).toBe('failed');
+      expect(await store.deleteSegment('vac-1', 's-a')).toBe('failed');
+      const goneCalls = vi
+        .mocked(showToast)
+        .mock.calls.filter((c) => String(c[1]).includes('segmentGone') || c[0] === 'info');
+      expect(goneCalls).toHaveLength(0);
     });
   });
 
@@ -1064,7 +1097,7 @@ describe('vacationStore', () => {
       }));
       vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
 
-      expect(await store.updateSegment('vac-1', 's-b', { title: 'Renamed' })).toBe(true);
+      expect(await store.updateSegment('vac-1', 's-b', { title: 'Renamed' })).toBe('saved');
 
       const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
         string,
@@ -1102,14 +1135,14 @@ describe('vacationStore', () => {
     it('refuses to write when the segment is gone, rather than writing elsewhere', async () => {
       const store = useVacationStore();
       store.vacations.push(tripWithThree());
-      expect(await store.updateSegment('vac-1', 's-deleted', { title: 'X' })).toBe(false);
+      expect(await store.updateSegment('vac-1', 's-deleted', { title: 'X' })).toBe('missing');
       expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
     });
 
     it('an empty patch is a no-op, not a full rewrite', async () => {
       const store = useVacationStore();
       store.vacations.push(tripWithThree());
-      expect(await store.updateSegment('vac-1', 's-b', {})).toBe(true);
+      expect(await store.updateSegment('vac-1', 's-b', {})).toBe('saved');
       expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
     });
 
@@ -1158,7 +1191,7 @@ describe('vacationStore', () => {
       }));
       vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
 
-      expect(await store.deleteSegment('vac-1', 's-b')).toBe(true);
+      expect(await store.deleteSegment('vac-1', 's-b')).toBe('saved');
       const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
         string,
         unknown
