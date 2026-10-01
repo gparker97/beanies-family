@@ -2918,6 +2918,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
+          'Switching plans takes effect straight away. Moving up (basic to beanies + magic beans) charges the difference today, with the unused part of your old plan taken off; moving down credits the unused part against your next bill. The confirmation screen shows what is due today and what each renewal will cost from then on. If you have already cancelled and want a different plan, choose <strong>Renew</strong> in the portal first, then <strong>Update plan</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
           'If a payment fails, Stripe emails you and retries for a while before the plan ends. During those retries everything stays included; the card says <strong>Payment Issue</strong> and offers <strong>Update Card</strong>.',
       },
       {
