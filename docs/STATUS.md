@@ -2494,7 +2494,7 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 > 3. **Watch CloudWatch after deploy:** `crdt-reconcile` (warn = caller bug or verify fallback; info `healed_duplicate_keys` is expected), `form-diff` warn ("edit without baseline"), merge-terminus `root_conflicts`/`added`, `vacation-segment`. All should be zero warns before the pricing live flip.
 > 4. **#117 Phase 2:** `/beanies-plan` for the Automerge Counter deltas (balance, currentAmount, loan outstandingBalance) per the plan's Phase 2 design; needs the update floor raised before enabling.
 > 5. **Follow-ups (not scheduled):** the rebase composer counts `updatedAt` collisions as `conflicts` (pre-existing telemetry overcount, found by the chaos diagnostic); `base` serialisation cost on long lists (measure first); the keyless-array audit covers 16 of 33 collections (demo fixture gap); ActivityModal onto `useFormModal`; re-export the test family to `/tmp/gp-test-family.beanpod` so the chaos diagnostic can run on real data.
-> **Validated 2026-10-01 (session 4 close).** Nothing dropped: this session touched only blog content, marketing tooling and the metrics skill, so every pricing/#117 entry below is untouched and still owned by the other machine's session.
+>    **Validated 2026-10-01 (session 4 close).** Nothing dropped: this session touched only blog content, marketing tooling and the metrics skill, so every pricing/#117 entry below is untouched and still owned by the other machine's session.
 >
 > **⭐ NEXT SESSION (2026-10-01 session 4 close — blog + ads):**
 >
