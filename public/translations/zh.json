@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-09-30",
-    "translationCount": 5672
+    "lastUpdated": "2026-10-01",
+    "translationCount": 5764
   },
   "translations": {
     "app.name": {
@@ -24539,7 +24539,7 @@
     "recovery.kitCreatedOn": {
       "translation": "Created {date}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "recovery.kitInvalidatedBy": {
       "translation": "已由{name}在{date}失效",
@@ -24964,12 +24964,12 @@
     "statementImport.row.tick": {
       "translation": "Add {name}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "statementImport.row.edit": {
       "translation": "Edit {name}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "statementImport.row.already": {
       "translation": "已添加{date}",
@@ -25939,7 +25939,7 @@
     "whoOwnsWhat.card.since": {
       "translation": "Since {date}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "whoOwnsWhat.card.sinceBefore": {
       "translation": "自{date}起，在{name}之前",
@@ -25964,7 +25964,7 @@
     "whoOwnsWhat.card.open": {
       "translation": "Open {card}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "whoOwnsWhat.byBean.count.one": {
       "translation": "1张卡",
@@ -26319,7 +26319,7 @@
     "whoOwnsWhat.pile.groupAction": {
       "translation": "Skip {count}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "whoOwnsWhat.pile.empty": {
       "translation": "这里没有什么可交易的了。",
@@ -27959,7 +27959,7 @@
     "whoOwnsWhat.checkinDrawer.noIssues": {
       "translation": "No Issues",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "whoOwnsWhat.checkinDrawer.talked": {
       "translation": "我们已经讨论过了",
@@ -28189,7 +28189,7 @@
     "mealPlanner.shopping.dupes.splitDone": {
       "translation": "Split into {n} lines",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "mealPlanner.shopping.ingredients": {
       "translation": "食材",
@@ -28244,7 +28244,7 @@
     "lists.destination.addTo": {
       "translation": "Add to {list}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "lists.destination.addToNew": {
       "translation": "添加到新列表",
@@ -28254,7 +28254,7 @@
     "lists.destination.addShort": {
       "translation": "Add {n}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "lists.destination.added": {
       "translation": "加入物",
@@ -28299,7 +28299,7 @@
     "ingredients.edit": {
       "translation": "Edit {item}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "ingredients.allMerged": {
       "translation": "一顿不止一餐的多样化体验",
@@ -28314,7 +28314,7 @@
     "ingredients.splitAria": {
       "translation": "Split {item}",
       "hash": "",
-      "lastUpdated": "2026-09-30"
+      "lastUpdated": "2026-10-01"
     },
     "ingredients.byMagic": {
       "translation": "被魔豆发现",
@@ -28365,6 +28365,466 @@
       "translation": "滑动以查看下一张卡片",
       "hash": "84fcvy",
       "lastUpdated": "2026-09-30"
+    },
+    "plan.title": {
+      "translation": "您的Beanies计划",
+      "hash": "xzb2y9",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.beta": {
+      "translation": "测试版",
+      "hash": "18avk",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.trial": {
+      "translation": "试用",
+      "hash": "1c9qly",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.active": {
+      "translation": "Active",
+      "hash": "wchdly",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.readOnly": {
+      "translation": "只读",
+      "hash": "dyman7",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.beta.body": {
+      "translation": "您正处于测试阶段，因此目前一切都是免费的。",
+      "hash": "8codkr",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.trial.meterLabel": {
+      "translation": "正在审判",
+      "hash": "i6c653",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.trial.day": {
+      "translation": "第{day}天，共{total}天。",
+      "hash": "4f5dh7",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.trial.endsNative": {
+      "translation": "所有内容都包含在{date}之前，然后beanies.family将变为只读，直到选择了套餐。",
+      "hash": "r0rp78",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.trial.endsWeb": {
+      "translation": "在{date}前，所有费用均已包含在内。立即开始套餐，从今天开始计费；等待，直到第{day}天才会收取任何费用。",
+      "hash": "v0yfh2",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.name.basic": {
+      "translation": "beanies basic",
+      "hash": "y4xjbf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.name.full": {
+      "translation": "豆子+魔豆",
+      "hash": "f68jj6",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.renews": {
+      "translation": "{date}续订。",
+      "hash": "hzwdds",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.ending": {
+      "translation": "结尾",
+      "hash": "yefdqf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.pill.paymentIssue": {
+      "translation": "支付问题",
+      "hash": "c2v2tb",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.ends": {
+      "translation": "已取消。在{date}之前，所有内容都将包含在内，然后beanies.family将变为只读。",
+      "hash": "hw0uxn",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.pastDue": {
+      "translation": "您上次的付款未成功。更新您的卡片以保留所有内容； Stripe将继续尝试一段时间。",
+      "hash": "1fw68i",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.restart": {
+      "translation": "重启计划",
+      "hash": "c96equ",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.updateCard": {
+      "translation": "更新卡号",
+      "hash": "h42scn",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.preV1": {
+      "translation": "终身半价，在v1之前加入。",
+      "hash": "d7susk",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.firstTen": {
+      "translation": "前十个家庭之一：你的创始价格是你的终身。",
+      "hash": "ox8588",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.unknown": {
+      "translation": "此设备与beanies.family签入后，您的计划详细信息将显示在此处。",
+      "hash": "5on2jz",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.action.seePlans": {
+      "translation": "查看套餐",
+      "hash": "b47q59",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.trial": {
+      "translation": "{total}天试用期的第{day}天。在您选择套餐之前，我们不会向您收取任何费用。",
+      "hash": "3mgpcy",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.beta": {
+      "translation": "您正处于测试阶段，因此目前一切都是免费的。选择一个支持beanies.family的方案；即日起开始计费。",
+      "hash": "eh37ec",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.readOnly": {
+      "translation": "您的试用期已结束。选择一个套餐，继续为您的家庭成员提供服务。",
+      "hash": "6x4zlt",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.active": {
+      "translation": "大功告成！您的套餐详情如下。非常感谢您成为豆豆支持者！你将在今生和来世获得奖励。",
+      "hash": "o5l9ha",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.ending": {
+      "translation": "您已取消预订；所有费用将包含在内，直至{date}。请在下方随时改变主意。",
+      "hash": "dkdkq9",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.subtitle.pastDue": {
+      "translation": "您的套餐仍处于有效状态，但上次付款未成功。",
+      "hash": "oq0gf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.page.loading": {
+      "translation": "数着豆子……",
+      "hash": "wg3bo8",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.currency.label": {
+      "translation": "货币",
+      "hash": "al2er5",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.select.aria": {
+      "translation": "选择计划",
+      "hash": "88i2r3",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.page.preV1.lead": {
+      "translation": "您的Pod在v1之前加入，因此",
+      "hash": "uj8zxf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.page.preV1.bold": {
+      "translation": "每个套餐都是半价，永远。",
+      "hash": "1e7mat",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.page.firstTen.lead": {
+      "translation": "你是前十大家族之一，所以",
+      "hash": "pr7yih",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.page.firstTen.bold": {
+      "translation": "每月{price} ，永久。",
+      "hash": "jgzg5n",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cohort.page.noCode": {
+      "translation": "无代码，无事可做。",
+      "hash": "u5yggh",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.basic.for": {
+      "translation": "适用于全家人的整个应用程序。魔豆每月一次。",
+      "hash": "6mha3k",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.full.for": {
+      "translation": "BASIC中的所有内容，加上beanies ，都会为您阅读文书工作。",
+      "hash": "lbth4q",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.per.year": {
+      "translation": "年",
+      "hash": "ojxw10",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.per.month": {
+      "translation": "一个月",
+      "hash": "jzn5dt",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.basic1": {
+      "translation": "每项功能、每位会员、每台设备",
+      "hash": "wacxmb",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.basic2": {
+      "translation": "每月1粒魔豆",
+      "hash": "lfjqsz",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.basic3": {
+      "translation": "您自己的AI密钥：无限",
+      "hash": "3bf2pf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.full1": {
+      "translation": "每天10粒魔豆",
+      "hash": "x5udqk",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.full2": {
+      "translation": "声明、邀请、食谱、行程",
+      "hash": "aoz6i",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.bullets.full3": {
+      "translation": "可随时从此页面取消",
+      "hash": "otxp0",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cycle.label": {
+      "translation": "计费",
+      "hash": "ppp9p7",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cycle.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.cycle.monthly": {
+      "translation": "Monthly {price}",
+      "hash": "",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.checkout.loading": {
+      "translation": "正在准备退房……",
+      "hash": "su3wjt",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.checkout.retry": {
+      "translation": "再試一次",
+      "hash": "9ysxvf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.stripeJs": {
+      "translation": "无法加载结账。内容拦截器可能正在停止Stripe ；请允许js.stripe.com并重试。",
+      "hash": "uef5lm",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.checkoutUnavailable": {
+      "translation": "目前无法退房。请稍后重试，或通过“设置”向我们发送反馈。",
+      "hash": "jwbqjk",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.notConfigured": {
+      "translation": "此版本的beanies.family上未设置结账。",
+      "hash": "l8lfo5",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.alreadySubscribed": {
+      "translation": "这个家族已经有了计划。刷新页面以查看。",
+      "hash": "67snxo",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.working": {
+      "translation": "正在设置您的计划...",
+      "hash": "lb80r7",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.done.title": {
+      "translation": "活跃的计划",
+      "hash": "mg2tz7",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.done.message": {
+      "translation": "谢谢。从现在开始，一切都包括在内。",
+      "hash": "w2v1in",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.failed.title": {
+      "translation": "已完成付款，但计划未完成设置",
+      "hash": "pfs6bu",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.failed.message": {
+      "translation": "无需支付其他费用。轻触“重试” ，或通过“设置”向我们发送反馈，我们将为您解决问题。",
+      "hash": "rdu8f8",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.retry": {
+      "translation": "再試一次",
+      "hash": "9ysxvf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.dismiss": {
+      "translation": "现在不行",
+      "hash": "8bkhfb",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.permanent.title": {
+      "translation": "该退房无法与此家庭相匹配",
+      "hash": "fiwfo5",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.claim.permanent.message": {
+      "translation": "如果您被收取了费用，请从“设置”中向我们发送反馈，并附上日期，我们将予以纠正。",
+      "hash": "l6e2lj",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.manage": {
+      "translation": "管理套餐",
+      "hash": "qz8a9w",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.receipts": {
+      "translation": "收据",
+      "hash": "cb08md",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.active.finePrint": {
+      "translation": "管理套餐打开Stripe的安全门户，以更改您的银行卡、切换套餐或取消套餐。",
+      "hash": "bi24yf",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.portalUnavailable.title": {
+      "translation": "无法打开计划门户",
+      "hash": "k9qxx8",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.portalUnavailable.message": {
+      "translation": "请稍后重试。",
+      "hash": "6wzxdd",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.error.portalUnavailable.badToken": {
+      "translation": "此设备上的计划有些不合时宜。我们已被告知并将纠正；您无需执行任何操作。",
+      "hash": "d3s47p",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.action.details": {
+      "translation": "计划详细信息",
+      "hash": "fxspcb",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.backToSettings": {
+      "translation": "返回设置",
+      "hash": "xjdqjz",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.allowance.meterLabel": {
+      "translation": "魔豆剩余",
+      "hash": "4e5tpz",
+      "lastUpdated": "2026-10-01"
+    },
+    "header.plan": {
+      "translation": "您的Beanies计划",
+      "hash": "xzb2y9",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.native.trialEnded": {
+      "translation": "您的试用期已结束，因此beanies.family现在是只读的。一切都归您所有，出口始终有效。",
+      "hash": "bm1eq6",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.native.plansElsewhere": {
+      "translation": "无法在此处选择套餐-可以从beanies.family网站进行管理。",
+      "hash": "1jqauq",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.web.trialEnded": {
+      "translation": "您的试用期已结束，因此在您选择套餐之前，无法添加任何新内容。一切都归您所有，出口始终有效。",
+      "hash": "6sjmza",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.lapsed": {
+      "translation": "您的套餐已结束，因此beanies.family现在是只读的。一切都归您所有，出口始终有效。",
+      "hash": "7mxe4f",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.stale": {
+      "translation": "此设备已有{days}天无法确认您的计划，因此beanies.family在重新上线之前是只读的。一切都归您所有，出口始终有效。",
+      "hash": "g8q0ix",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.toast.title": {
+      "translation": "暂时只读",
+      "hash": "m7b0aq",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.toast.message": {
+      "translation": "beanies.family目前为只读，因此未保存此更改。一切都是你的。",
+      "hash": "yvc78k",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.band.title": {
+      "translation": "暂时只读",
+      "hash": "m7b0aq",
+      "lastUpdated": "2026-10-01"
+    },
+    "readOnly.band.export": {
+      "translation": "导出我的数据",
+      "hash": "k4qbma",
+      "lastUpdated": "2026-10-01"
+    },
+    "ai.allowance.title": {
+      "translation": "魔豆用完",
+      "hash": "dimsop",
+      "lastUpdated": "2026-10-01"
+    },
+    "ai.allowance.day": {
+      "translation": "您今天还剩下{limit}个魔法豆中的0个。更多的在{time}到达，用你自己的AI密钥阅读永远是无限的。",
+      "hash": "xw5e6m",
+      "lastUpdated": "2026-10-01"
+    },
+    "ai.allowance.month": {
+      "translation": "本月剩下{limit}个魔法豆中的0个。更多人将于{date} {time}抵达，使用您自己的AI密钥进行阅读始终是无限的。",
+      "hash": "4kwhj2",
+      "lastUpdated": "2026-10-01"
+    },
+    "ai.allowance.generic": {
+      "translation": "你现在已经使用了所有的魔豆。使用您自己的AI密钥阅读始终是无限制的。",
+      "hash": "gqvk9f",
+      "lastUpdated": "2026-10-01"
+    },
+    "ai.allowance.action": {
+      "translation": "AI 设置",
+      "hash": "ooa2wr",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.allowance.day": {
+      "translation": "今天剩下{limit}个魔豆中的{left}个， {time}还有更多。",
+      "hash": "2lx2p0",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.allowance.month": {
+      "translation": "本月剩下{limit}个魔豆中的{left}个， {date}还有更多。",
+      "hash": "oe6ik0",
+      "lastUpdated": "2026-10-01"
+    },
+    "plan.allowance.unavailable": {
+      "translation": "魔豆的使用目前不可用。",
+      "hash": "62oesx",
+      "lastUpdated": "2026-10-01"
     }
   }
 }
