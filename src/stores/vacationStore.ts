@@ -332,11 +332,12 @@ export const useVacationStore = defineStore('vacations', () => {
     const ideas = vacation.ideas.map((idea) => {
       if (idea.id !== ideaId) return idea;
 
-      const existingVoteIndex = idea.votes.findIndex((vote) => vote.memberId === memberId);
-      const updatedVotes =
-        existingVoteIndex >= 0
-          ? idea.votes.filter((_, i) => i !== existingVoteIndex)
-          : [...idea.votes, { memberId, votedAt: toISODateString(new Date()) }];
+      // Remove by KEY, never by index: a concurrent double-vote leaves two entries sharing a
+      // memberId, and dropping just one would leave the vote standing.
+      const hasVoted = idea.votes.some((vote) => vote.memberId === memberId);
+      const updatedVotes = hasVoted
+        ? idea.votes.filter((vote) => vote.memberId !== memberId)
+        : [...idea.votes, { memberId, votedAt: toISODateString(new Date()) }];
 
       return { ...idea, votes: updatedVotes };
     });
@@ -476,32 +477,16 @@ export const useVacationStore = defineStore('vacations', () => {
 
   /**
    * Set the attached document/photo ids on one booking segment (travel,
-   * accommodation, or transportation). Owns the find-by-id + index-merge so
-   * the five UI callers (3 edit drawers + wizard steps) don't each hand-roll
-   * an array spread. Persists via `updateVacation` (which re-syncs trip dates).
+   * accommodation, or transportation). A thin wrapper over `updateSegment`, which
+   * owns the find-by-id + merge, so the five UI callers (3 edit drawers + wizard
+   * steps) don't each hand-roll an array spread.
    */
   async function updateSegmentPhotoIds(
     vacationId: string,
     segmentId: string,
     photoIds: string[]
   ): Promise<void> {
-    const vacation = vacations.value.find((v) => v.id === vacationId);
-    if (!vacation) {
-      console.warn(`[vacation] updateSegmentPhotoIds: no vacation "${vacationId}"`);
-      return;
-    }
-    const keys = ['travelSegments', 'accommodations', 'transportation'] as const;
-    for (const key of keys) {
-      const arr = vacation[key] as Array<{ id: string; photoIds?: string[] }>;
-      const idx = arr.findIndex((s) => s.id === segmentId);
-      if (idx < 0) continue;
-      const nextArr = arr.map((s, i) => (i === idx ? { ...s, photoIds: [...photoIds] } : s));
-      await updateVacation(vacationId, { [key]: nextArr } as UpdateFamilyVacationInput);
-      return;
-    }
-    console.warn(
-      `[vacation] updateSegmentPhotoIds: segment "${segmentId}" not found on vacation "${vacationId}"`
-    );
+    await updateSegment(vacationId, segmentId, { photoIds: [...photoIds] });
   }
 
   /**

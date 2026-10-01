@@ -81,7 +81,7 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 500 },
-      { contribution: { author: 'member-1' } }
+      { contribution: { id: 'c-minted', author: 'member-1' } }
     );
 
     expect(goalRepo.updateGoal).toHaveBeenCalledWith(
@@ -101,13 +101,13 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 700 },
-      { contribution: { author: 'member-1' } }
+      { contribution: { id: 'c-minted', author: 'member-1' } }
     );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;
     expect(call.manualContributions).toHaveLength(1);
     expect(call.manualContributions![0]).toMatchObject({
-      id: 'contrib-test-id',
+      id: 'c-minted',
       amount: 200,
       updatedBy: 'member-1',
     });
@@ -125,7 +125,7 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 450 },
-      { contribution: { author: 'member-1' } }
+      { contribution: { id: 'c-minted', author: 'member-1' } }
     );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;
@@ -143,7 +143,7 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 600 },
-      { contribution: { author: 'member-1', note: "mom's birthday money" } }
+      { contribution: { id: 'c-minted', author: 'member-1', note: "mom's birthday money" } }
     );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;
@@ -158,7 +158,11 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
       ...input,
     }));
 
-    await store.updateGoal('goal-1', { name: 'Renamed' }, { contribution: { author: 'member-1' } });
+    await store.updateGoal(
+      'goal-1',
+      { name: 'Renamed' },
+      { contribution: { id: 'c-minted', author: 'member-1' } }
+    );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;
     expect(call.manualContributions).toBeUndefined();
@@ -181,13 +185,13 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 600 },
-      { contribution: { author: 'member-1' } }
+      { contribution: { id: 'c-minted', author: 'member-1' } }
     );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;
     expect(call.manualContributions).toHaveLength(2);
     expect(call.manualContributions![0]!.id).toBe('prev');
-    expect(call.manualContributions![1]!.id).toBe('contrib-test-id');
+    expect(call.manualContributions![1]!.id).toBe('c-minted');
   });
 
   it('auto-complete still fires when currentAmount crosses targetAmount', async () => {
@@ -201,7 +205,7 @@ describe('goalsStore.updateGoal — manual contribution invariant', () => {
     await store.updateGoal(
       'goal-1',
       { currentAmount: 1000 },
-      { contribution: { author: 'member-1' } }
+      { contribution: { id: 'c-minted', author: 'member-1' } }
     );
 
     const call = vi.mocked(goalRepo.updateGoal).mock.calls[0]![1]!;

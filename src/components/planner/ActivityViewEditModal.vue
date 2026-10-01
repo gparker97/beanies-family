@@ -130,19 +130,7 @@ async function toggleDuty(duty: 'dropoff' | 'pickup') {
   if (!activity.value || !props.occurrenceDate) return;
   const memberId = familyStore.currentMemberId;
   if (!memberId) return;
-  const field = duty === 'dropoff' ? 'dropoffCompletions' : 'pickupCompletions';
-  const completions = [...(activity.value[field] ?? [])];
-  const idx = completions.findIndex((c) => c.date === props.occurrenceDate);
-  if (idx >= 0) {
-    completions.splice(idx, 1);
-  } else {
-    completions.push({
-      date: props.occurrenceDate,
-      completedBy: memberId,
-      completedAt: new Date().toISOString(),
-    });
-  }
-  await activityStore.updateActivity(activity.value.id, { [field]: completions });
+  await activityStore.toggleDutyCompletion(activity.value.id, duty, props.occurrenceDate, memberId);
 }
 
 // Live-lookup from store so display stays reactive after inline edits

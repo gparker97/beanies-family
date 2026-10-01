@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
-import { generateUUID } from '@/utils/id';
 import { parseIsoDateSafely } from '@/utils/safeDate';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import { mutate } from '@/services/automerge/worker/docClient';
@@ -24,7 +23,7 @@ export interface UpdateGoalOptions {
    * (transactionsStore.applyGoalAllocation, recurringProcessor) omit this,
    * so their writes never create audit entries.
    */
-  contribution?: { author: UUID; note?: string };
+  contribution?: { id: UUID; author: UUID; note?: string };
 }
 
 /**
@@ -35,13 +34,13 @@ export interface UpdateGoalOptions {
 function appendContributionIfChanged(
   existing: Goal,
   input: UpdateGoalInput,
-  contribution: { author: UUID; note?: string }
+  contribution: { id: UUID; author: UUID; note?: string }
 ): UpdateGoalInput {
   if (input.currentAmount === undefined) return input;
   const delta = input.currentAmount - existing.currentAmount;
   if (delta === 0) return input;
   const entry: GoalManualContribution = {
-    id: generateUUID(),
+    id: contribution.id,
     amount: delta,
     at: new Date().toISOString(),
     updatedBy: contribution.author,

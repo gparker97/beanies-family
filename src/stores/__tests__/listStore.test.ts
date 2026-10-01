@@ -272,6 +272,39 @@ describe('listStore', () => {
     expect(store.completedLists.map((l) => l.id)).toEqual(['l']);
   });
 
+  it('celebration Undo clears only the item this gesture ticked and keeps edits made meanwhile', async () => {
+    const store = useListStore();
+    store.lists = [
+      list({
+        id: 'l',
+        items: [item({ id: 'i1', completed: true }), item({ id: 'i2', completed: false })],
+      }),
+    ];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      const next = { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+      store.lists = store.lists.map((x) => (x.id === id ? next : x));
+      return next;
+    });
+
+    await store.toggleItem('l', 'i2', 'm-2');
+    // During the toast: a new row is added elsewhere (add-row, or another device).
+    store.lists = store.lists.map((x) =>
+      x.id === 'l' ? { ...x, items: [...x.items, item({ id: 'i3', completed: false })] } : x
+    );
+
+    const onUndo = vi.mocked(celebrate).mock.calls[0]![1]!.onUndo!;
+    onUndo();
+
+    const patch = vi.mocked(listRepo.updateList).mock.calls[1]![1] as Partial<FamilyList>;
+    expect(patch.completed).toBe(false);
+    const byId = Object.fromEntries((patch.items ?? []).map((i) => [i.id, i]));
+    expect(Object.keys(byId).sort()).toEqual(['i1', 'i2', 'i3']); // the new row survives
+    expect(byId.i2!.completed).toBe(false);
+    expect(byId.i2!.completedBy).toBeUndefined();
+    expect(byId.i1!.completed).toBe(true); // not touched by this gesture
+  });
+
   it('toggleItem on a recurring list celebrates once per cycle and never files it', async () => {
     const store = useListStore();
     const l = list({

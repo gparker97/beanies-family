@@ -533,6 +533,36 @@ describe('vacationStore', () => {
   // ── toggleIdeaVote ──
 
   describe('toggleIdeaVote', () => {
+    it('un-voting removes EVERY vote with that memberId (concurrent duplicate)', async () => {
+      const store = useVacationStore();
+      store.vacations.push(
+        makeVacation({
+          ideas: [
+            {
+              id: 'idea-1',
+              title: 'Snorkeling',
+              votes: [
+                { memberId: 'm-2', votedAt: NOW },
+                { memberId: 'm-3', votedAt: NOW },
+                { memberId: 'm-2', votedAt: NOW },
+              ],
+              createdBy: 'm-1',
+              createdAt: NOW,
+            },
+          ],
+        })
+      );
+      vi.mocked(vacationRepo.updateVacation).mockResolvedValue(makeVacation());
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.toggleIdeaVote('vac-1', 'idea-1', 'm-2');
+
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as {
+        ideas: Array<{ votes: Array<{ memberId: string }> }>;
+      };
+      expect(saved.ideas[0]!.votes.map((v) => v.memberId)).toEqual(['m-3']);
+    });
+
     it('adds vote for new member', async () => {
       const store = useVacationStore();
       const vacation = makeVacation({
@@ -1048,6 +1078,41 @@ describe('vacationStore', () => {
       const store = useVacationStore();
       store.vacations.push(tripWithThree());
       expect(await store.updateSegment('vac-1', 's-b', {})).toBe(true);
+      expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
+    });
+
+    it('updateSegmentPhotoIds delegates to updateSegment, patching only photoIds by id', async () => {
+      const store = useVacationStore();
+      const existing = tripWithThree();
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      await store.updateSegmentPhotoIds('vac-1', 's-b', ['p1', 'p2']);
+
+      const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+        string,
+        unknown
+      >;
+      const segs = saved.travelSegments as Array<{
+        id: string;
+        title: string;
+        photoIds?: string[];
+      }>;
+      expect(segs.find((x) => x.id === 's-b')).toMatchObject({
+        title: 'B',
+        photoIds: ['p1', 'p2'],
+      });
+      expect(segs.find((x) => x.id === 's-a')!.photoIds).toBeUndefined();
+    });
+
+    it('updateSegmentPhotoIds on a missing segment writes nothing', async () => {
+      const store = useVacationStore();
+      store.vacations.push(tripWithThree());
+      await store.updateSegmentPhotoIds('vac-1', 's-gone', ['p1']);
       expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
     });
 
