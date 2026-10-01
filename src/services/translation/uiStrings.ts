@@ -7683,9 +7683,9 @@ const STRING_DEFS = {
       "you're all set - your plan details are below. thanks so much for being a beanie supporter! you will be rewarded in this life and the next.",
   },
   'plan.page.subtitle.ending': {
-    en: "You've cancelled; everything stays included until {date}. Change your mind any time below.",
+    en: "You've cancelled; everything stays included until {date}. Change your mind any time below: Restart Plan renews it, and you can switch plans once it's renewed.",
     beanie:
-      "you've cancelled; everything stays included until {date}. change your mind any time below.",
+      "you've cancelled; everything stays included until {date}. change your mind any time below: restart plan renews it, and you can switch plans once it's renewed.",
   },
   'plan.page.subtitle.pastDue': {
     en: "Your plan is still active, but your last payment didn't go through.",
@@ -7788,8 +7788,9 @@ const STRING_DEFS = {
   'plan.active.manage': { en: 'Manage Plan', beanie: 'manage plan' },
   'plan.active.receipts': { en: 'Receipts', beanie: 'receipts' },
   'plan.active.finePrint': {
-    en: "Manage plan opens Stripe's secure portal to change your card, switch plan or cancel.",
-    beanie: "manage plan opens stripe's secure portal to change your card, switch plan or cancel.",
+    en: "Manage plan opens Stripe's secure portal to change your card, switch plan or cancel. Switching takes effect today: moving up charges the difference, moving down credits your next bill.",
+    beanie:
+      "manage plan opens stripe's secure portal to change your card, switch plan or cancel. switching takes effect today: moving up charges the difference, moving down credits your next bill.",
   },
   'plan.error.portalUnavailable.title': {
     en: "Couldn't open the plan portal",
