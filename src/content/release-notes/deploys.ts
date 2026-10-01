@@ -17,6 +17,65 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.01',
+    date: '2026-10-01',
+    month: '1 october 2026',
+    summary: {
+      en: 'Edits from two devices now both survive the sync, and saving a form only writes what you changed.',
+      beanie:
+        'edits from two devices now both survive the sync, and saving a form only writes what you changed.',
+    },
+    features: [
+      {
+        icon: '\u{1F91D}',
+        title: {
+          en: 'Nothing lost when the pod merges',
+          beanie: 'nothing lost when the pod merges',
+        },
+        description: {
+          en: 'Tick a list on one phone while someone adds to it on another, attach photos to the same recipe, vote on the same holiday idea: after the sync, both sides keep their changes.',
+          beanie:
+            'tick a list on one phone while someone adds to it on another, attach photos to the same recipe, vote on the same holiday idea: after the sync, both sides keep their changes.',
+        },
+      },
+      {
+        icon: '\u270F\uFE0F',
+        title: {
+          en: 'Forms save only what you changed',
+          beanie: 'forms save only what you changed',
+        },
+        description: {
+          en: 'Renaming an account, a goal or a family member no longer rewrites every other field, so an edit made on another device is never undone by an unrelated save.',
+          beanie:
+            'renaming an account, a goal or a family member no longer rewrites every other field, so an edit made on another device is never undone by an unrelated save.',
+        },
+      },
+      {
+        icon: '\u{1F331}',
+        title: { en: 'Your beanies Plan, in Settings', beanie: 'your beanies plan, in settings' },
+        description: {
+          en: 'Settings now shows your plan. Every family is on the free beta today; nothing is charged and nothing changes until v1.',
+          beanie:
+            'settings now shows your plan. every family is on the free beta today; nothing is charged and nothing changes until v1.',
+        },
+        tryItRoute: '/settings',
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.09.30.2',
     date: '2026-09-30',
     month: '30 september 2026',
