@@ -5,13 +5,13 @@
 
 ## What is live today (sandbox, dry-run, flag off)
 
-| Switch                 | Where                                                 | Value now                  |
-| ---------------------- | ----------------------------------------------------- | -------------------------- |
-| Stripe keys            | `~/.beanies-tf.env` + GitHub `STRIPE_PUBLISHABLE_KEY` | `sk_test_` / `pk_test_`    |
-| `v1_launch_at`         | `infrastructure/terraform.auto.tfvars`                | `""` (every family `beta`) |
-| `pricing` flag         | `src/config/featureFlags.committed.ts`                | `false`                    |
-| `billing_enforce`      | `terraform.auto.tfvars`                               | `false` (dry-run)          |
-| `ai_allowance_enforce` | `terraform.auto.tfvars`                               | `false` (dry-run)          |
+| Switch                 | Where                                                                                 | Value now                  |
+| ---------------------- | ------------------------------------------------------------------------------------- | -------------------------- |
+| Stripe keys            | `~/.beanies-tf.env` (`BEANIES_STRIPE_MODE=sandbox`) + GitHub `STRIPE_PUBLISHABLE_KEY` | sandbox pair               |
+| `v1_launch_at`         | `infrastructure/terraform.auto.tfvars`                                                | `""` (every family `beta`) |
+| `pricing` flag         | `src/config/featureFlags.committed.ts`                                                | `false`                    |
+| `billing_enforce`      | `terraform.auto.tfvars`                                                               | `false` (dry-run)          |
+| `ai_allowance_enforce` | `terraform.auto.tfvars`                                                               | `false` (dry-run)          |
 
 **The flag can be ON in prod before launch.** Every family then sees the beta card ("everything is free for now") on web and native, and nothing else: on app.beanies.family the Plan page needs a LIVE publishable key (`features.checkout`), so no family is ever offered Stripe's test-mode checkout while prod holds the sandbox pair, and the read-only gate cannot act while `billing_enforce` is false. Until the flag is committed on, a family only sees any of this with the per-browser override `localStorage beanies:flag:pricing=true`; either way only on a cloud build: `features.pricing` (registry + `VITE_STRIPE_PUBLISHABLE_KEY`) is false on every self-host, so the plan card, the Plan page and the read-only gate are simply absent there.
 
@@ -50,7 +50,7 @@ The webhook secret is a two-apply dance the first time in any mode: apply with `
 
 Each step is its own commit or apply, and each is watched before the next.
 
-1. **Live keys.** In the live Dashboard create the Stripe objects above. Set `TF_VAR_stripe_secret_key=sk_live_...` and the GitHub secret `STRIPE_PUBLISHABLE_KEY=pk_live_...`; create the live webhook endpoint, set `TF_VAR_stripe_webhook_secret`; `tf-plan.sh -target=module.billing` → apply → web deploy. Verify with a real card on a `first_ten` test family ($1), then refund it in the Dashboard. Sandbox testing from here on is `npm run billing:local` + `stripe listen` on the dev machine.
+1. **Live keys.** Paste `sk_live_` and `pk_live_` into `~/.beanies-tf.env` as `BEANIES_STRIPE_LIVE_SECRET_KEY` / `BEANIES_STRIPE_LIVE_PUBLISHABLE_KEY` (the sandbox pair stays beside them). Create the live Stripe objects above with that key (REST, as in the sandbox) including the webhook endpoint, whose `whsec_` goes in as `BEANIES_STRIPE_LIVE_WEBHOOK_SECRET`. Then the ONE flip: `BEANIES_STRIPE_MODE=live`, `tf-plan.sh -target=module.billing` → apply, `gh secret set STRIPE_PUBLISHABLE_KEY --body "$BEANIES_STRIPE_PUBLISHABLE_KEY"`, web deploy. Verify with a real card on a `first_ten` test family ($1), then refund it in the Dashboard. Sandbox testing from here on is `npm run billing:local` + `stripe listen` on the dev machine.
 2. **`v1_launch_at`.** One-line change to `terraform.auto.tfvars` (an ISO instant), `tf-plan.sh -target=module.registry` → apply. Every family's trial clock starts: `trialEndsAt = max(createdAt, v1_launch_at) + 90 d`. Watch `entitlement_computed` in CloudWatch: every state should read `trial`, none `read_only`.
 3. **Cohort snapshot.** `node scripts/billing-cohort.mjs --snapshot-pre-v1` (dry-run, read the list) then `--apply`. Every live family at that instant gets `cohort=pre_v1`; `--first-ten <familyId>` for the ten. A family created after this has no cohort and sees list prices.
 4. **`pricing` flag.** `featureFlags.committed.ts` `pricing: true` → web deploy AND the mobile lanes (native shows the plan card and the band copy; no purchase path). The Plan card, Plan page and See plans are now visible to every family.
