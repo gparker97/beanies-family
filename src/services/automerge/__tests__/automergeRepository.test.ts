@@ -3,9 +3,13 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getById as projGetById } from '../projection';
 import { createAutomergeRepository } from '../automergeRepository';
-import { installInlineBackend } from '../worker/__tests__/inlineHarness';
+import {
+  installInlineBackend,
+  recordMutations,
+  patchOpsIn,
+} from '../worker/__tests__/inlineHarness';
 import { setWriteGate, ReadOnlyError } from '../worker/docClient';
-import type { FamilyMember } from '@/types/models';
+import type { FamilyList, FamilyListItem, FamilyMember } from '@/types/models';
 
 // The read-only gate's side channels (#95); nothing else in this file reaches them.
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
@@ -199,6 +203,77 @@ describe('createAutomergeRepository', () => {
       // Other fields should be untouched
       expect(fetched!.name).toBe('Eve');
       expect(fetched!.email).toBe('eve@example.com');
+    });
+  });
+
+  describe('update base (#117)', () => {
+    const member = {
+      name: 'Hana',
+      email: 'hana@example.com',
+      gender: 'female' as const,
+      ageGroup: 'adult' as const,
+      role: 'member' as const,
+      color: '#ABC',
+      requiresPassword: false,
+    };
+
+    it('sends the RAW stored values of exactly the patched keys as base, never the transformed read', async () => {
+      const created = await repo.create(member);
+      // The read transform derives `requiresPassword: true` (no passwordHash); the stored value is false.
+      expect((await repo.getById(created.id))!.requiresPassword).toBe(true);
+      const sent = recordMutations();
+
+      const updated = await repo.update(created.id, {
+        requiresPassword: true,
+        name: 'Hana P',
+        institution: undefined,
+      } as any);
+
+      const [op] = patchOpsIn(sent);
+      expect(op!.base).toEqual({ requiresPassword: false, name: 'Hana' });
+      expect(op!.deleteKeys).toEqual(['institution']);
+      // With a transformed base the explicit `true` would read as unchanged and be dropped.
+      const stored = projGetById('familyMembers', created.id) as unknown as FamilyMember;
+      expect(stored.requiresPassword).toBe(true);
+      expect(updated!.name).toBe('Hana P');
+    });
+
+    it('leaves a key the entity lacks out of base, so its write is additive', async () => {
+      const created = await repo.create(member);
+      const sent = recordMutations();
+
+      await repo.update(created.id, { lastLoginAt: '2026-10-01' });
+
+      expect(patchOpsIn(sent)[0]!.base).toEqual({});
+    });
+
+    it('two writes built from the same state, the second sent before the first lands, both survive', async () => {
+      const listRepo = createAutomergeRepository<'lists', FamilyList>('lists');
+      const item = (id: string, completed: boolean): FamilyListItem => ({
+        id,
+        title: id,
+        completed,
+      });
+      const list = await listRepo.create({
+        title: 'Shopping',
+        emoji: '🛒',
+        category: 'shopping',
+        ownerId: 'm-1',
+        items: [item('milk', false), item('eggs', false)],
+        lifecycle: 'ongoing',
+      } as any);
+
+      // Two quick ticks, each built from the pre-write items: today the second reverted the first.
+      await Promise.all([
+        listRepo.update(list.id, { items: [item('milk', true), item('eggs', false)] }),
+        listRepo.update(list.id, { items: [item('milk', false), item('eggs', true)] }),
+      ]);
+
+      const stored = projGetById('lists', list.id) as unknown as FamilyList;
+      expect(stored.items.map((i) => [i.id, i.completed])).toEqual([
+        ['milk', true],
+        ['eggs', true],
+      ]);
     });
   });
 
@@ -404,6 +479,26 @@ describe('createAutomergeRepository', () => {
       }
     });
 
+    it('patchMany sends each id its own base', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: { ...input('Sign slip'), activityId: 'act-old' } },
+        { id: 'td-2', input: input('Pay fee') },
+      ]);
+      const sent = recordMutations();
+
+      await todoRepo.patchMany(
+        ['td-1', 'td-2', 'gone'],
+        { activityId: 'act-1' },
+        { onMissing: 'skip' }
+      );
+
+      expect(patchOpsIn(sent).map((op) => [op.id, op.base])).toEqual([
+        ['td-1', { activityId: 'act-old' }],
+        ['td-2', {}],
+        ['gone', {}],
+      ]);
+    });
+
     it('removeMany deletes present ids and ignores a missing one', async () => {
       await todoRepo.createManyWithIds([
         { id: 'td-1', input: input('Sign slip') },
@@ -414,6 +509,56 @@ describe('createAutomergeRepository', () => {
       await expect(todoRepo.removeMany(['td-1', 'gone', 'td-3'])).resolves.toBeUndefined();
 
       expect((await todoRepo.getAll()).map((t) => t.id)).toEqual(['td-2']);
+    });
+  });
+
+  describe('photo hosts are born with photoIds: [] (#117)', () => {
+    const recipeRepo = createAutomergeRepository<'recipes', import('@/types/models').Recipe>(
+      'recipes'
+    );
+    const recipe = { name: 'Soup', ingredients: ['salt'], steps: [] } as any;
+
+    it('create and createManyWithIds seed photoIds on a flat photo host', async () => {
+      const one = await recipeRepo.create(recipe);
+      const [two] = await recipeRepo.createManyWithIds([{ id: 'rc-2', input: recipe }]);
+
+      for (const id of [one.id, two!.id]) {
+        const stored = projGetById('recipes', id) as unknown as Record<string, unknown>;
+        expect(stored.photoIds).toEqual([]);
+      }
+    });
+
+    it('keeps photoIds the input already carries', async () => {
+      const created = await recipeRepo.create({ ...recipe, photoIds: ['ph-1'] });
+      expect(projGetById('recipes', created.id)!.photoIds).toEqual(['ph-1']);
+    });
+
+    it('does not seed photoIds on a collection that is not a flat photo host', async () => {
+      const accountRepo = createAutomergeRepository<'accounts', import('@/types/models').Account>(
+        'accounts'
+      );
+      const account = await accountRepo.create({
+        memberId: 'm-1',
+        name: 'Checking',
+        type: 'checking',
+        currency: 'USD',
+        balance: 0,
+        isActive: true,
+        includeInNetWorth: true,
+      } as any);
+      // familyMembers (avatar hooks) is registered but is not a flat host either.
+      const member = await repo.create({
+        name: 'Ivy',
+        email: 'ivy@example.com',
+        gender: 'female',
+        ageGroup: 'adult',
+        role: 'member',
+        color: '#ABC',
+        requiresPassword: false,
+      });
+
+      expect('photoIds' in (projGetById('accounts', account.id) as object)).toBe(false);
+      expect('photoIds' in (projGetById('familyMembers', member.id) as object)).toBe(false);
     });
   });
 
