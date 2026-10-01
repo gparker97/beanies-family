@@ -640,35 +640,19 @@ const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
 
 /** Inline-edit a single field on a timeline item and save immediately */
 /**
- * AWAITED, and the await is the point.
- *
- * These writes rebuild a whole array from `selectedVacation.value` and then persist it.
- * Fire-and-forget meant a second edit a moment later still read the array from BEFORE the
- * first write landed, so the first edit was silently overwritten — and the UI had already
- * cleared, so it looked saved. Awaiting serialises them against the same snapshot.
+ * AWAITED so a failed save is observed before the inline editor clears. Addressed by segment
+ * id (never array position) through `updateSegment`, so the write is a per-segment patch that
+ * merges onto the current trip instead of rebuilding the whole array from a possibly stale copy.
  */
 async function saveInlineField(item: TimelineItem, field: string, value: string) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
-  const id = selectedVacation.value.id;
-  if (item.kind === 'travel') {
-    const travelSegments = [...selectedVacation.value.travelSegments];
-    const updated = { ...travelSegments[item.arrayIndex]!, [field]: value };
-    // Keep sortDate in sync when a primary date field changes
-    if (TRAVEL_DATE_FIELDS.has(field)) {
-      updated.sortDate = value;
-    }
-    travelSegments[item.arrayIndex] = updated;
-    await vacationStore.updateVacation(id, { travelSegments });
-  } else if (item.kind === 'accommodation') {
-    const accommodations = [...selectedVacation.value.accommodations];
-    accommodations[item.arrayIndex] = { ...accommodations[item.arrayIndex]!, [field]: value };
-    await vacationStore.updateVacation(id, { accommodations });
-  } else if (item.kind === 'transportation') {
-    const transportation = [...selectedVacation.value.transportation];
-    transportation[item.arrayIndex] = { ...transportation[item.arrayIndex]!, [field]: value };
-    await vacationStore.updateVacation(id, { transportation });
-  }
+  // Keep sortDate in sync when a primary date field of a travel segment changes
+  const patch: Record<string, unknown> =
+    item.kind === 'travel' && TRAVEL_DATE_FIELDS.has(field)
+      ? { [field]: value, sortDate: value }
+      : { [field]: value };
+  await vacationStore.updateSegment(selectedVacation.value.id, item.id, patch);
 }
 
 function openEditModal(item: TimelineItem) {
@@ -680,23 +664,7 @@ function openEditModal(item: TimelineItem) {
 async function deleteTimelineItem(item: TimelineItem) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
-  const id = selectedVacation.value.id;
-  if (item.kind === 'travel') {
-    const travelSegments = selectedVacation.value.travelSegments.filter(
-      (_, i) => i !== item.arrayIndex
-    );
-    await vacationStore.updateVacation(id, { travelSegments });
-  } else if (item.kind === 'accommodation') {
-    const accommodations = selectedVacation.value.accommodations.filter(
-      (_, i) => i !== item.arrayIndex
-    );
-    await vacationStore.updateVacation(id, { accommodations });
-  } else if (item.kind === 'transportation') {
-    const transportation = selectedVacation.value.transportation.filter(
-      (_, i) => i !== item.arrayIndex
-    );
-    await vacationStore.updateVacation(id, { transportation });
-  }
+  await vacationStore.deleteSegment(selectedVacation.value.id, item.id);
 }
 
 function closeEditModal() {

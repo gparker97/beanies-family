@@ -228,6 +228,63 @@ describe('activityStore', () => {
     });
   });
 
+  // ── Duty completion toggle ──
+
+  describe('toggleDutyCompletion', () => {
+    it('ticks a duty by appending one completion for the date', async () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity());
+      vi.mocked(activityRepo.updateActivity).mockImplementation(async (_id, patch) =>
+        makeActivity(patch as Partial<FamilyActivity>)
+      );
+
+      await store.toggleDutyCompletion('activity-1', 'dropoff', '2026-03-04', 'member-parent-1');
+
+      const patch = vi.mocked(activityRepo.updateActivity).mock.calls[0]![1] as {
+        dropoffCompletions: Array<{ date: string; completedBy: string; completedAt: string }>;
+      };
+      expect(Object.keys(patch)).toEqual(['dropoffCompletions']);
+      expect(patch.dropoffCompletions).toHaveLength(1);
+      expect(patch.dropoffCompletions[0]).toMatchObject({
+        date: '2026-03-04',
+        completedBy: 'member-parent-1',
+      });
+      expect(typeof patch.dropoffCompletions[0]!.completedAt).toBe('string');
+    });
+
+    it('un-ticks by removing EVERY completion for the date, keeping other dates', async () => {
+      const store = useActivityStore();
+      const at = '2026-03-04T10:00:00.000Z';
+      store.activities.push(
+        makeActivity({
+          pickupCompletions: [
+            { date: '2026-03-04', completedBy: 'member-parent-1', completedAt: at },
+            { date: '2026-03-04', completedBy: 'member-parent-2', completedAt: at },
+            { date: '2026-03-11', completedBy: 'member-parent-1', completedAt: at },
+          ],
+        })
+      );
+      vi.mocked(activityRepo.updateActivity).mockImplementation(async (_id, patch) =>
+        makeActivity(patch as Partial<FamilyActivity>)
+      );
+
+      await store.toggleDutyCompletion('activity-1', 'pickup', '2026-03-04', 'member-parent-1');
+
+      expect(activityRepo.updateActivity).toHaveBeenCalledWith('activity-1', {
+        pickupCompletions: [
+          { date: '2026-03-11', completedBy: 'member-parent-1', completedAt: at },
+        ],
+      });
+    });
+
+    it('is a no-op for an unknown activity', async () => {
+      const store = useActivityStore();
+      const result = await store.toggleDutyCompletion('nope', 'dropoff', '2026-03-04', 'm');
+      expect(result).toBeNull();
+      expect(activityRepo.updateActivity).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Delete ──
 
   describe('deleteActivity', () => {

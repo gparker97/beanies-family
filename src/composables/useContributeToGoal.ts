@@ -3,6 +3,7 @@ import { useAuthoringMember } from '@/composables/useAuthoringMember';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { celebrate } from '@/composables/useCelebration';
+import { generateUUID } from '@/utils/id';
 import type { Goal, UpdateGoalInput, UUID } from '@/types/models';
 
 export interface ApplyResult {
@@ -58,15 +59,21 @@ export function useContributeToGoal() {
     });
     if (!author) return { success: false };
 
+    // Minted HERE so Undo targets exactly this device's entry: once concurrent appends merge,
+    // "the last entry" can be another device's, and undoing that would delete their history.
+    const mintedId = generateUUID();
     const updated = await goalsStore.updateGoal(
       goalId,
       { ...extraInput, currentAmount: newCurrentAmount },
-      { contribution: { author, note } }
+      { contribution: { id: mintedId, author, note } }
     );
     if (!updated) return { success: false };
 
     const appliedDelta = updated.currentAmount - goalBefore.currentAmount;
-    const contributionId = updated.manualContributions?.at(-1)?.id;
+    // Only when the store actually recorded it (a zero delta appends nothing).
+    const contributionId = updated.manualContributions?.some((c) => c.id === mintedId)
+      ? mintedId
+      : undefined;
 
     safeCelebrateMilestone(goalBefore, updated);
 
