@@ -582,7 +582,14 @@ const patchSettingsOp: NamedOpHandler = (draft, args) => {
   // (a pasted plan token here, a rate refresh there) must both survive the CRDT merge, and
   // Automerge only merges field-wise when the fields themselves are the writes. A whole-map
   // assignment would make the two patches a conflict on `settings` and keep one of them.
-  if (!d.settings || typeof d.settings !== 'object') d.settings = {};
+  // A document with no settings yet (a fresh family's first write) starts from the DEFAULTS the
+  // caller passes, so the document carries the full settings object, as every reader of the
+  // raw document (exports, the .beanpod file, the E2E bridge) expects. Never applied to an
+  // existing object: that would reset real values. Defaults come in as an argument because this
+  // runs in the worker, which must not import main-thread modules.
+  if (!d.settings || typeof d.settings !== 'object') {
+    d.settings = { ...((args.defaults as AnyRecord | undefined) ?? {}) };
+  }
   const target = d.settings as AnyRecord;
   for (const [k, v] of Object.entries(patch)) target[k] = v;
   for (const key of deleteKeys) delete target[key];

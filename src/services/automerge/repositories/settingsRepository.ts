@@ -87,7 +87,9 @@ export async function saveSettings(
   const written = await mutate<Partial<Settings> | null>({
     op: 'named',
     name: 'patchSettings',
-    args: { patch },
+    // `defaults` seed a document that has no settings yet (first write of a fresh family); the
+    // worker ignores them when a settings object already exists.
+    args: { patch, defaults: getDefaultSettings() },
   });
   return withDefaults(written ?? {});
 }
