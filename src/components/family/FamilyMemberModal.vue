@@ -136,8 +136,48 @@ const colorSharedWith = ref<string | null>(null);
  */
 const takenSwatches = computed(() => takenColors(familyStore.members, props.member?.id));
 
+/** A placeholder address for a bean with no email. Impure (clock), so it is minted only at save
+ *  time and never inside `buildPayload`, where it would be a permanent phantom diff. */
+function mintTempEmail(): string {
+  return `${Date.now()}@temp.beanies.family`;
+}
+
+// Every field is emitted so an edit can diff against the open-time snapshot. Pure: no clock.
+// The email is the typed one, or (pets / a blank field) the STORED one, so an untouched edit
+// leaves it alone; `handleSave` mints a temp address only when a create/clear needs one.
+function buildPayload() {
+  const storedEmail = props.member?.email ?? '';
+  const typedEmail = email.value.trim();
+  return {
+    name: name.value.trim(),
+    email: isPet.value
+      ? storedEmail
+      : typedEmail || (isTemporaryEmail(storedEmail) ? storedEmail : ''),
+    gender: gender.value,
+    ageGroup: ageGroup.value,
+    color: color.value,
+    requiresPassword: !isPet.value,
+    // Pets never receive an invite, login, or permission flags.
+    canViewFinances: isPet.value ? false : canViewFinances.value,
+    canEditActivities: isPet.value ? false : canEditActivities.value,
+    canManagePod: isPet.value ? false : canManagePod.value,
+    isPet: isPet.value,
+    dateOfBirth:
+      dobMonth.value && dobDay.value
+        ? {
+            month: parseInt(dobMonth.value, 10),
+            day: parseInt(dobDay.value, 10),
+            ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
+          }
+        : undefined,
+    // `undefined` clears a removed avatar (the repository treats it as "delete this key").
+    avatarPhotoId: avatarPhotoId.value,
+  };
+}
+type MemberPayload = ReturnType<typeof buildPayload>;
+
 // Reset form when modal opens
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<FamilyMember, MemberPayload>(
   () => props.member,
   () => props.open,
   {
@@ -181,6 +221,7 @@ const { isEditing, isSubmitting } = useFormModal(
       uploadedButNotSaved.value = [];
       initialSnapshot.value = takeSnapshot();
     },
+    snapshot: { build: buildPayload, name: 'FamilyMemberModal' },
   }
 );
 
@@ -280,45 +321,13 @@ function handleSave() {
   isSubmitting.value = true;
 
   try {
-    // Pets never receive an invite, login, or permission flags — force
-    // everything off on the data path regardless of any stale form state.
-    const data: Record<string, unknown> = {
-      name: name.value.trim(),
-      email: isPet.value
-        ? `${Date.now()}@temp.beanies.family`
-        : email.value.trim() || `${Date.now()}@temp.beanies.family`,
-      gender: gender.value,
-      ageGroup: ageGroup.value,
-      // CREATE only — every new member starts as 'member'. NEVER set role
-      // on UPDATE: this modal is not the role-management surface (that's
-      // TransferOwnershipModal). Hardcoding role: 'member' on edit silently
-      // demoted the owner every time anyone fixed a typo on their profile;
-      // normalizeRoles() then re-promoted on next load, masking the issue
-      // until you noticed the chip flipping mid-session.
-      ...(isEditing.value ? {} : { role: 'member' as const }),
-      color: color.value,
-      requiresPassword: !isPet.value,
-      canViewFinances: isPet.value ? false : canViewFinances.value,
-      canEditActivities: isPet.value ? false : canEditActivities.value,
-      canManagePod: isPet.value ? false : canManagePod.value,
-      isPet: isPet.value,
-    };
-
-    // Attach date of birth
-    if (dobMonth.value && dobDay.value) {
-      data.dateOfBirth = {
-        month: parseInt(dobMonth.value, 10),
-        day: parseInt(dobDay.value, 10),
-        ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
-      };
-    }
+    const payload = buildPayload();
 
     // Avatar photo: include the current selection (or explicit undefined to
     // clear a removed avatar — automergeRepository treats explicit
     // undefined as "delete this key"). Tombstone the PREVIOUS avatar if it
     // was replaced or removed; the new one (if any) is now referenced by
     // this member so it stays.
-    data.avatarPhotoId = avatarPhotoId.value;
     const previousId = initialAvatarPhotoId.value;
     if (previousId && previousId !== avatarPhotoId.value) {
       photoStore.markDeleted(previousId);
@@ -338,9 +347,27 @@ function handleSave() {
     uploadedButNotSaved.value = [];
 
     if (isEditing.value && props.member) {
+      const data: Record<string, unknown> = { ...formDiff.changes(payload) };
+      // The permission flags default from `ageGroup`, so a role switch carries them as shown on
+      // screen: otherwise adult -> child would silently drop a finances toggle the form showed
+      // as on (and child -> adult would grant one it showed as off).
+      if ('ageGroup' in data) {
+        data.canViewFinances = payload.canViewFinances;
+        data.canEditActivities = payload.canEditActivities;
+        data.canManagePod = payload.canManagePod;
+      }
+      // A cleared real email (or a pet-to-person change with none stored) still needs an address.
+      if ('email' in data && !data.email) data.email = mintTempEmail();
+      // NEVER set role on UPDATE: this modal is not the role-management surface (that's
+      // TransferOwnershipModal). Hardcoding role: 'member' on edit silently demoted the owner.
       emit('save', { id: props.member.id, data: data as UpdateFamilyMemberInput });
     } else {
-      emit('save', data as CreateFamilyMemberInput);
+      emit('save', {
+        ...payload,
+        email: payload.email || mintTempEmail(),
+        // CREATE only: every new member starts as 'member'.
+        role: 'member' as const,
+      } as CreateFamilyMemberInput);
     }
   } finally {
     isSubmitting.value = false;

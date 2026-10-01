@@ -56,7 +56,41 @@ const categoryAllocations = ref<Record<string, number | undefined>>({});
 // Which groups are expanded to show per-category inputs
 const expandedGroups = ref<Set<string>>(new Set());
 
-const { isEditing, isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot; `categories` goes
+// whole (the worker reconciles it per item), `totalAmount`/`currency` only when changed.
+function buildPayload() {
+  const categories: BudgetCategory[] = [];
+
+  for (const group of expenseGroups.value) {
+    if (hasCategoryAmounts(group)) {
+      // Category-level data exists — save per-category entries
+      for (const cat of group.categories) {
+        const amount = categoryAllocations.value[cat.id];
+        if (amount && amount > 0) {
+          categories.push({ categoryId: cat.id, amount });
+        }
+      }
+    } else {
+      // Group-level entry
+      const amount = groupAllocations.value[group.name];
+      if (amount && amount > 0) {
+        categories.push({ categoryId: makeGroupBudgetId(group.name), amount });
+      }
+    }
+  }
+
+  // All amounts are captured in display currency. The store converts to base for calculations.
+  return {
+    mode: mode.value,
+    totalAmount: mode.value === 'fixed' ? (totalAmount.value ?? 0) : effectiveAmount.value,
+    percentage: mode.value === 'percentage' ? percentage.value : undefined,
+    currency: currency.value,
+    categories,
+  };
+}
+type BudgetPayload = ReturnType<typeof buildPayload>;
+
+const { isEditing, isSubmitting, formDiff } = useFormModal<Budget, BudgetPayload>(
   () => props.budget,
   () => props.open,
   {
@@ -99,6 +133,7 @@ const { isEditing, isSubmitting } = useFormModal(
       expandedGroups.value = new Set();
       showCategories.value = false;
     },
+    snapshot: { build: buildPayload, name: 'BudgetSettingsModal' },
   }
 );
 
@@ -161,40 +196,11 @@ function hasCategoryAmounts(group: { categories: { id: string }[] }): boolean {
 }
 
 function handleSave() {
-  const categories: BudgetCategory[] = [];
-
-  for (const group of expenseGroups.value) {
-    if (hasCategoryAmounts(group)) {
-      // Category-level data exists — save per-category entries
-      for (const cat of group.categories) {
-        const amount = categoryAllocations.value[cat.id];
-        if (amount && amount > 0) {
-          categories.push({ categoryId: cat.id, amount });
-        }
-      }
-    } else {
-      // Group-level entry
-      const amount = groupAllocations.value[group.name];
-      if (amount && amount > 0) {
-        categories.push({ categoryId: makeGroupBudgetId(group.name), amount });
-      }
-    }
-  }
-
-  // All amounts are captured in display currency. The store converts to base for calculations.
-  const base = {
-    mode: mode.value,
-    totalAmount: mode.value === 'fixed' ? (totalAmount.value ?? 0) : effectiveAmount.value,
-    percentage: mode.value === 'percentage' ? percentage.value : undefined,
-    currency: currency.value,
-    categories,
-    isActive: true,
-  };
-
+  const payload = buildPayload();
   if (isEditing.value && props.budget) {
-    emit('save', { id: props.budget.id, data: base });
+    emit('save', { id: props.budget.id, data: formDiff.changes(payload) });
   } else {
-    emit('save', base as CreateBudgetInput);
+    emit('save', { ...payload, isActive: true } as CreateBudgetInput);
   }
 }
 

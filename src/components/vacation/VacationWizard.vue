@@ -13,6 +13,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormValidation } from '@/composables/useFormValidation';
+import { useFormModal } from '@/composables/useFormModal';
 import { formatDateShort } from '@/utils/date';
 import { bookingProgress, tripTypeEmoji, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import type {
@@ -141,27 +142,45 @@ const steps = [
   { num: 5, icon: '🌟', label: 'vacation.step.ideas' },
 ];
 
-// Reset form when modal opens
-watch(
-  () => props.open,
-  (open) => {
-    if (!open) return;
+// The trip payload. Every field is emitted so an edit can diff against the open-time snapshot
+// (`formDiff`): scalars go only when changed, and an array only when changed (the worker
+// reconciles it per item). Pure function of form state.
+function buildPayload() {
+  return {
+    name: name.value.trim(),
+    tripType: tripType.value,
+    tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
+    assigneeIds: [...assigneeIds.value],
+    startDate: tripStartDate.value || undefined,
+    endDate: tripEndDate.value || undefined,
+    travelSegments: [...travelSegments.value],
+    accommodations: [...accommodations.value],
+    transportation: [...transportation.value],
+    ideas: [...ideas.value],
+  };
+}
+type VacationPayload = ReturnType<typeof buildPayload>;
 
-    if (props.vacation) {
-      // Edit mode — populate from existing
-      name.value = props.vacation.name;
-      tripType.value = props.vacation.tripType;
-      tripPurpose.value = props.vacation.tripPurpose ?? 'vacation';
-      assigneeIds.value = [...props.vacation.assigneeIds];
-      tripStartDate.value = props.vacation.startDate ?? '';
-      tripEndDate.value = props.vacation.endDate ?? '';
-      tripDatesValid.value = !!(props.vacation.startDate && props.vacation.endDate);
-      travelSegments.value = JSON.parse(JSON.stringify(props.vacation.travelSegments));
-      accommodations.value = JSON.parse(JSON.stringify(props.vacation.accommodations));
-      transportation.value = JSON.parse(JSON.stringify(props.vacation.transportation));
-      ideas.value = JSON.parse(JSON.stringify(props.vacation.ideas));
+// Reset form when modal opens
+const { formDiff } = useFormModal<FamilyVacation, VacationPayload>(
+  () => props.vacation,
+  () => props.open,
+  {
+    onEdit: (vacation) => {
+      name.value = vacation.name;
+      tripType.value = vacation.tripType;
+      tripPurpose.value = vacation.tripPurpose ?? 'vacation';
+      assigneeIds.value = [...vacation.assigneeIds];
+      tripStartDate.value = vacation.startDate ?? '';
+      tripEndDate.value = vacation.endDate ?? '';
+      tripDatesValid.value = !!(vacation.startDate && vacation.endDate);
+      travelSegments.value = JSON.parse(JSON.stringify(vacation.travelSegments));
+      accommodations.value = JSON.parse(JSON.stringify(vacation.accommodations));
+      transportation.value = JSON.parse(JSON.stringify(vacation.transportation));
+      ideas.value = JSON.parse(JSON.stringify(vacation.ideas));
       currentStep.value = props.editStep ?? 1;
-    } else {
+    },
+    onNew: () => {
       // New mode — always start fresh. Reset trip dates explicitly so
       // state doesn't bleed across wizard sessions.
       name.value = '';
@@ -176,7 +195,8 @@ watch(
       transportation.value = [];
       ideas.value = [];
       currentStep.value = 1;
-    }
+    },
+    snapshot: { build: buildPayload, name: 'VacationWizard' },
   }
 );
 
@@ -208,30 +228,15 @@ async function handleSave() {
     let saved: FamilyVacation | null;
 
     if (isEditing.value && props.vacation) {
-      saved = await vacationStore.updateVacation(props.vacation.id, {
-        name: name.value.trim(),
-        tripType: tripType.value,
-        tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
-        assigneeIds: [...assigneeIds.value],
-        startDate: tripStartDate.value || undefined,
-        endDate: tripEndDate.value || undefined,
-        travelSegments: [...travelSegments.value],
-        accommodations: [...accommodations.value],
-        transportation: [...transportation.value],
-        ideas: [...ideas.value],
-      });
+      // Only what changed: an unrelated save must not rewrite a field (or a whole booking list)
+      // another device just edited. An untouched save is a no-op write.
+      saved = await vacationStore.updateVacation(
+        props.vacation.id,
+        formDiff.changes(buildPayload())
+      );
     } else {
       saved = await vacationStore.createVacation({
-        name: name.value.trim(),
-        tripType: tripType.value,
-        tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
-        assigneeIds: [...assigneeIds.value],
-        startDate: tripStartDate.value || undefined,
-        endDate: tripEndDate.value || undefined,
-        travelSegments: [...travelSegments.value],
-        accommodations: [...accommodations.value],
-        transportation: [...transportation.value],
-        ideas: [...ideas.value],
+        ...buildPayload(),
         createdBy: currentMemberId.value,
       });
     }

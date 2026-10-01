@@ -21,6 +21,7 @@
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue';
 import type { UUID } from '@/types/models';
+import type { FormDiff } from '@/composables/useFormModal';
 
 export interface EagerEntityCreateOptions<TEntity extends { id: UUID }, TPayload> {
   /** Returns the existing entity id (edit mode) OR null. */
@@ -40,6 +41,12 @@ export interface EagerEntityCreateOptions<TEntity extends { id: UUID }, TPayload
   create: (payload: TPayload) => Promise<TEntity | null>;
   /** Store-side update. Used by `commit()` when the entity already exists. */
   update: (id: UUID, payload: Partial<TPayload>) => Promise<TEntity | null>;
+  /**
+   * Optional snapshot diff (from `useFormModal`). When given, `ensureId` re-baselines on the
+   * eager-created payload and `commit` sends only the changed fields. An empty diff still
+   * calls `update` (the worker turns it into a no-op), so `commit`'s contract is unchanged.
+   */
+  formDiff?: FormDiff<TPayload>;
 }
 
 export interface EagerEntityCreateApi<TEntity extends { id: UUID }> {
@@ -103,8 +110,10 @@ export function useEagerEntityCreate<TEntity extends { id: UUID }, TPayload>(
 
     isCreating.value = true;
     try {
-      const created = await opts.create(opts.buildPayload());
+      const payload = opts.buildPayload();
+      const created = await opts.create(payload);
       if (!created) return null;
+      opts.formDiff?.rebaseline(payload);
       eagerCreatedId.value = created.id;
       return created.id;
     } finally {
@@ -115,7 +124,8 @@ export function useEagerEntityCreate<TEntity extends { id: UUID }, TPayload>(
   async function commit(): Promise<TEntity | null> {
     const id = entityId.value;
     if (id) {
-      return opts.update(id, opts.buildPayload());
+      const payload = opts.buildPayload();
+      return opts.update(id, opts.formDiff ? opts.formDiff.changes(payload) : payload);
     }
     if (opts.firstMissingField() !== null) return null;
     return opts.create(opts.buildPayload());

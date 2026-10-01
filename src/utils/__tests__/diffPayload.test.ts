@@ -92,6 +92,31 @@ describe('diffPayload', () => {
     });
   });
 
+  describe('arrays of objects', () => {
+    it('reads an array of equal objects as unchanged', () => {
+      const out = diffPayload(
+        {
+          cats: [
+            { id: 'a', n: 1 },
+            { id: 'b', n: 2 },
+          ],
+        },
+        {
+          cats: [
+            { id: 'a', n: 1 },
+            { id: 'b', n: 2 },
+          ],
+        }
+      );
+      expect(out).toEqual({});
+    });
+
+    it('reads an array with a changed object element as changed', () => {
+      const out = diffPayload({ cats: [{ id: 'a', n: 1 }] }, { cats: [{ id: 'a', n: 2 }] });
+      expect(out).toEqual({ cats: [{ id: 'a', n: 2 }] });
+    });
+  });
+
   describe('complexity budget (documented limits — deliberately NOT supported)', () => {
     // Guards the utility from growing into a general object-diff library.
     // Payloads are flat by design; nested objects fall back to JSON.stringify,

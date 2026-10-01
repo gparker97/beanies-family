@@ -10,6 +10,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormValidation } from '@/composables/useFormValidation';
 import type {
   Goal,
@@ -117,7 +118,24 @@ const remainingAmount = computed<number | undefined>({
 });
 
 // Reset form when modal opens
-const { isEditing, isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot; `currentAmount` then
+// only reaches `saveWithContribution` when changed (so a contribution is only recorded for a
+// real change). `isCompleted` is deliberately absent: an edit must not reset it.
+function buildPayload() {
+  return {
+    name: name.value.trim(),
+    type: type.value,
+    targetAmount: targetAmount.value ?? 0,
+    currentAmount: currentAmount.value ?? 0,
+    currency: currency.value,
+    priority: priority.value,
+    memberId: memberId.value && memberId.value !== '__shared__' ? memberId.value : null,
+    deadline: orUndefined(deadline.value),
+  };
+}
+type GoalPayload = ReturnType<typeof buildPayload>;
+
+const { isEditing, isSubmitting, formDiff } = useFormModal<Goal, GoalPayload>(
   () => props.goal,
   () => props.open,
   {
@@ -143,6 +161,7 @@ const { isEditing, isSubmitting } = useFormModal(
       memberId.value = props.defaults?.memberId ?? '';
       deadline.value = '';
     },
+    snapshot: { build: buildPayload, name: 'GoalModal' },
   }
 );
 
@@ -170,22 +189,12 @@ function handleSave() {
   isSubmitting.value = true;
 
   try {
-    const data = {
-      name: name.value.trim(),
-      type: type.value,
-      targetAmount: targetAmount.value ?? 0,
-      currentAmount: currentAmount.value ?? 0,
-      currency: currency.value,
-      priority: priority.value,
-      memberId: memberId.value && memberId.value !== '__shared__' ? memberId.value : null,
-      deadline: deadline.value || undefined,
-      isCompleted: false,
-    };
+    const data = buildPayload();
 
     if (isEditing.value && props.goal) {
-      emit('save', { id: props.goal.id, data: data as UpdateGoalInput });
+      emit('save', { id: props.goal.id, data: formDiff.changes(data) as UpdateGoalInput });
     } else {
-      emit('save', data as CreateGoalInput);
+      emit('save', { ...data, isCompleted: false } as CreateGoalInput);
     }
   } finally {
     isSubmitting.value = false;

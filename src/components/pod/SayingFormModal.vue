@@ -9,6 +9,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSayingsStore } from '@/stores/sayingsStore';
@@ -34,7 +35,7 @@ const saidOn = ref('');
 const place = ref('');
 const context = ref('');
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<SayingItem, SayingPayload>(
   () => props.saying,
   () => props.open,
   {
@@ -50,8 +51,22 @@ const { isEditing, isSubmitting } = useFormModal(
       place.value = '';
       context.value = '';
     },
+    snapshot: { build: buildPayload, name: 'SayingFormModal' },
   }
 );
+
+// Every field is emitted (`undefined` when blank) so an edit can clear it; the snapshot diff
+// keeps untouched blanks out of the write.
+function buildPayload() {
+  return {
+    memberId: props.memberId,
+    words: words.value.trim(),
+    saidOn: orUndefined(saidOn.value),
+    place: orUndefined(place.value),
+    context: orUndefined(context.value),
+  };
+}
+type SayingPayload = ReturnType<typeof buildPayload>;
 
 const canSave = computed(() => words.value.trim().length > 0);
 
@@ -61,15 +76,9 @@ async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = {
-      memberId: props.memberId,
-      words: words.value.trim(),
-      ...(saidOn.value ? { saidOn: saidOn.value } : {}),
-      ...(place.value.trim() ? { place: place.value.trim() } : {}),
-      ...(context.value.trim() ? { context: context.value.trim() } : {}),
-    };
+    const payload = buildPayload();
     if (isEditing.value && props.saying) {
-      await sayingsStore.updateSaying(props.saying.id, payload);
+      await sayingsStore.updateSaying(props.saying.id, formDiff.changes(payload));
     } else {
       await sayingsStore.createSaying(payload);
     }

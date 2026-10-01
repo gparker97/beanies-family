@@ -30,7 +30,7 @@ const notesStore = useMemberNotesStore();
 const title = ref('');
 const body = ref('');
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<MemberNote, MemberNotePayload>(
   () => props.note,
   () => props.open,
   {
@@ -42,8 +42,18 @@ const { isEditing, isSubmitting } = useFormModal(
       title.value = '';
       body.value = '';
     },
+    snapshot: { build: buildPayload, name: 'MemberNoteFormModal' },
   }
 );
+
+function buildPayload() {
+  return {
+    memberId: props.memberId,
+    title: title.value.trim(),
+    body: body.value.trim(),
+  };
+}
+type MemberNotePayload = ReturnType<typeof buildPayload>;
 
 const canSave = computed(() => title.value.trim().length > 0 && body.value.trim().length > 0);
 
@@ -55,13 +65,9 @@ async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = {
-      memberId: props.memberId,
-      title: title.value.trim(),
-      body: body.value.trim(),
-    };
+    const payload = buildPayload();
     if (isEditing.value && props.note) {
-      await notesStore.updateMemberNote(props.note.id, payload);
+      await notesStore.updateMemberNote(props.note.id, formDiff.changes(payload));
     } else {
       await notesStore.createMemberNote(payload);
     }

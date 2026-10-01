@@ -297,7 +297,26 @@ describe('TransactionModal — Save Flow', () => {
       wrapper.vm.description = 'Renamed';
       wrapper.vm.handleSave();
       const payload = wrapper.emitted('save')![0][0] as { data: Record<string, unknown> };
-      expect(payload.data.isReconciled).toBe(true);
+      // An edit sends only what changed, so an untouched reconciled flag is not written at all
+      // (and so can never be un-reconciled); it is never sent as false.
+      expect(payload.data.isReconciled).not.toBe(false);
+      expect(payload.data).toMatchObject({ description: 'Renamed' });
+      expect('amount' in payload.data).toBe(false);
+    });
+
+    it('edit sends only changed fields, and an untouched edit sends an empty diff', async () => {
+      const untouched = await mountAndOpen({ transaction: existingTransaction });
+      untouched.vm.handleSave();
+      expect((untouched.emitted('save')![0][0] as { data: object }).data).toEqual({});
+
+      const wrapper = await mountAndOpen({ transaction: existingTransaction });
+      wrapper.vm.amount = 250;
+      wrapper.vm.handleSave();
+      const data = (wrapper.emitted('save')![0][0] as { data: Record<string, unknown> }).data;
+      expect(data.amount).toBe(250);
+      expect('description' in data).toBe(false);
+      // Non-empty edit clears the computed goal allocation so the store reapplies it.
+      expect('goalAllocApplied' in data).toBe(true);
     });
 
     it('should populate form fields from existing transaction', async () => {

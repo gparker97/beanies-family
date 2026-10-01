@@ -62,7 +62,34 @@ const tripAssigneeIds = computed(
   () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
 );
 
-const { isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot (`formDiff`); the
+// drawer then saves only what changed, addressed by id. Pure function of form state.
+function buildPayload() {
+  return {
+    title: autoTitle.value,
+    status: status.value,
+    name: name.value,
+    address: address.value,
+    checkInDate: checkInDate.value,
+    checkOutDate: checkOutDate.value,
+    confirmationNumber: confirmationNumber.value,
+    roomType: roomType.value,
+    contactPhone: contactPhone.value,
+    breakfastIncluded: breakfastIncluded.value,
+    link: link.value || undefined,
+    notes: notes.value,
+    // undefined = "everyone on this trip", re-resolved whenever the roster changes.
+    // Materializing it here froze the list, so a family member added later was excluded
+    // from every previously-saved segment forever.
+    travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
+  };
+}
+type VacationAccommodationPayload = ReturnType<typeof buildPayload>;
+
+const { isSubmitting, formDiff } = useFormModal<
+  VacationAccommodation,
+  VacationAccommodationPayload
+>(
   () => props.accommodation,
   () => props.open,
   {
@@ -94,6 +121,7 @@ const { isSubmitting } = useFormModal(
       notes.value = '';
       travellerIds.value = [...tripAssigneeIds.value];
     },
+    snapshot: { build: buildPayload, name: 'AccommodationEditModal' },
   }
 );
 
@@ -156,43 +184,22 @@ function onPhotoIds(ids: string[]): void {
 }
 
 async function handleSave() {
-  if (!props.vacationId || props.accommodationIndex < 0) return;
+  const targetId = props.accommodation?.id;
+  if (!props.vacationId || !targetId) return;
   await validation.attemptSave(async () => {
     isSubmitting.value = true;
     try {
-      const vacation = vacationStore.getVacationById(props.vacationId);
-      if (!vacation) return;
-      const accommodations = [...vacation.accommodations];
-      // Resolve BY ID, not by the index captured at open — a CRDT merge that shifts this
-      // array re-points the index at a different booking and this save overwrites the wrong
-      // one. See TravelSegmentEditModal for the full reasoning.
-      const targetId = props.accommodation?.id;
-      const idx = targetId ? accommodations.findIndex((x) => x.id === targetId) : -1;
-      if (idx < 0) {
+      // Addressed BY ID and merged onto the CURRENT segment (`updateSegment`): a CRDT merge that
+      // shifts the array can no longer aim this save at a different booking, and fields the user
+      // did not touch are never rewritten. See TravelSegmentEditModal for the full reasoning.
+      const saved = await vacationStore.updateSegment(
+        props.vacationId,
+        targetId,
+        formDiff.changes(buildPayload())
+      );
+      if (!saved) {
         showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
-        emit('close');
-        return;
       }
-      accommodations[idx] = {
-        ...accommodations[idx]!,
-        title: autoTitle.value,
-        status: status.value,
-        name: name.value,
-        address: address.value,
-        checkInDate: checkInDate.value,
-        checkOutDate: checkOutDate.value,
-        confirmationNumber: confirmationNumber.value,
-        roomType: roomType.value,
-        contactPhone: contactPhone.value,
-        breakfastIncluded: breakfastIncluded.value,
-        link: link.value || undefined,
-        notes: notes.value,
-        // undefined = "everyone on this trip", re-resolved whenever the roster changes.
-        // Materializing it here froze the list, so a family member added later was excluded
-        // from every previously-saved segment forever.
-        travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
-      };
-      await vacationStore.updateVacation(props.vacationId, { accommodations });
       emit('close');
     } finally {
       isSubmitting.value = false;

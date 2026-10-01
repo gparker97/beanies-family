@@ -34,6 +34,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import GroupedChipPicker from '@/components/ui/GroupedChipPicker.vue';
 import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMilestonesStore } from '@/stores/milestonesStore';
@@ -120,7 +121,7 @@ watch(category, (newCat) => {
   if (cat) title.value = t(cat.titleKey);
 });
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<Milestone, MilestonePayload>(
   () => props.milestone,
   () => props.open,
   {
@@ -143,6 +144,7 @@ const { isEditing, isSubmitting } = useFormModal(
       description.value = '';
       dateError.value = null;
     },
+    snapshot: { build: buildPayload, name: 'MilestoneFormModal' },
   }
 );
 
@@ -203,10 +205,12 @@ function buildPayload() {
     // path with an unfilled title.
     title: title.value.trim() || t('milestone.cat.custom'),
     occurredOn: occurredOn.value || toDateInputValue(new Date()),
-    ...(description.value.trim() ? { description: description.value.trim() } : {}),
-    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
+    // Emitted even when blank so an edit can clear it; the snapshot diff keeps an untouched
+    // blank out of the write. No `photoIds`: the binding is the only writer of photo ids.
+    description: orUndefined(description.value),
   };
 }
+type MilestonePayload = ReturnType<typeof buildPayload>;
 
 /**
  * Eager-create + photo-binding wiring.
@@ -221,12 +225,13 @@ function buildPayload() {
  * photo itself is GC'd after 24h via the photoStore tombstone sweep;
  * the bare entity remains until explicitly deleted.
  */
-const eager = useEagerEntityCreate<Milestone, ReturnType<typeof buildPayload>>({
+const eager = useEagerEntityCreate<Milestone, MilestonePayload>({
   resolveExistingId: () => props.milestone?.id ?? null,
   firstMissingField: () => (selectedMemberId.value === undefined ? 'member' : null),
   buildPayload,
   create: (payload) => milestonesStore.createMilestone(payload),
   update: (id, payload) => milestonesStore.updateMilestone(id, payload),
+  formDiff,
 });
 
 const binding = usePhotoEntityBinding({

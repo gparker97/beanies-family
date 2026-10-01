@@ -9,7 +9,7 @@
  * Hosts the read-only ingredients panel (#116, `MealIngredientsPanel`); the panel owns
  * its own list write, so this form still saves only MealPlanEntry fields.
  */
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
@@ -21,6 +21,7 @@ import MealIngredientsPanel from '@/components/mealplan/MealIngredientsPanel.vue
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { useCardDefaultHint } from '@/composables/useCardDefaultHint';
 import { confirm } from '@/composables/useConfirm';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -92,23 +93,43 @@ const typeOptions = computed(() =>
   }))
 );
 
-watch(
+// Edit-only: this form never creates, so `onNew` has nothing to seed. The snapshot taken after
+// `onEdit` is the baseline `save` diffs against, so untouched fields are never written (a
+// concurrent edit to the same meal from another device survives).
+const { formDiff } = useFormModal<MealPlanEntry, UpdateMealPlanInput>(
+  () => props.meal,
   () => props.open,
-  (open) => {
-    if (!open || !props.meal) return;
-    const m = props.meal;
-    kind.value = m.kind;
-    label.value = m.label ?? '';
-    cookId.value = m.cookMemberId ?? '';
-    // No stored eaters has always meant everyone, so the chips SHOW everyone picked.
-    eaterIds.value = seedEaterIds(m.eaterMemberIds, humanIds.value);
-    guestNames.value = [...(m.guestNames ?? [])];
-    guestDraft.value = '';
-    note.value = m.note ?? '';
-    serveTime.value = m.serveTime ?? '';
-  },
-  { immediate: true }
+  {
+    onEdit: (m) => {
+      kind.value = m.kind;
+      label.value = m.label ?? '';
+      cookId.value = m.cookMemberId ?? '';
+      // No stored eaters has always meant everyone, so the chips SHOW everyone picked.
+      eaterIds.value = seedEaterIds(m.eaterMemberIds, humanIds.value);
+      guestNames.value = [...(m.guestNames ?? [])];
+      guestDraft.value = '';
+      note.value = m.note ?? '';
+      serveTime.value = m.serveTime ?? '';
+    },
+    onNew: () => {},
+    snapshot: { build: buildPayload, name: 'MealEditModal' },
+  }
 );
+
+function buildPayload(): UpdateMealPlanInput {
+  return {
+    kind: kind.value,
+    // A non-recipe kind clears the recipe link; a recipe kind keeps it.
+    recipeId: kind.value === 'recipe' ? props.meal?.recipeId : undefined,
+    label: label.value.trim() || undefined,
+    cookMemberId: cookId.value || undefined,
+    // Everyone (all picked) or nobody (cleared) both save as "everyone": no stored ids.
+    eaterMemberIds: eaterIdsToStore(eaterIds.value, humanIds.value),
+    guestNames: guestNames.value.length ? guestNames.value : undefined,
+    note: note.value.trim() || undefined,
+    serveTime: serveTime.value || undefined,
+  };
+}
 
 function addGuest(): void {
   const name = guestDraft.value.trim();
@@ -123,18 +144,7 @@ function removeGuest(i: number): void {
 
 async function save(): Promise<void> {
   if (!props.meal) return;
-  const patch: UpdateMealPlanInput = {
-    kind: kind.value,
-    // A non-recipe kind clears the recipe link; a recipe kind keeps it.
-    recipeId: kind.value === 'recipe' ? props.meal.recipeId : undefined,
-    label: label.value.trim() || undefined,
-    cookMemberId: cookId.value || undefined,
-    // Everyone (all picked) or nobody (cleared) both save as "everyone": no stored ids.
-    eaterMemberIds: eaterIdsToStore(eaterIds.value, humanIds.value),
-    guestNames: guestNames.value.length ? guestNames.value : undefined,
-    note: note.value.trim() || undefined,
-    serveTime: serveTime.value || undefined,
-  };
+  const patch = formDiff.changes(buildPayload());
   const holderId = holderFor({ kind: 'mealSlot', slot: props.meal.slot })?.memberId;
   const overridden =
     !!holderId && props.meal.cookMemberId === holderId && cookId.value !== holderId;
