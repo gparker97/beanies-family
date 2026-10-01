@@ -2,6 +2,9 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useVacationStore } from './vacationStore';
 import { showToast } from '@/composables/useToast';
+import { logEvent } from '@/services/telemetry/logEvent';
+
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 vi.mock('@/composables/useToast', () => ({
   showToast: vi.fn(),
@@ -501,6 +504,35 @@ describe('vacationStore', () => {
       expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
 
       errorSpy.mockRestore();
+    });
+  });
+
+  // ── Missing segments ──
+
+  describe('missing segment', () => {
+    it('updateSegment logs to the firehose and returns false', async () => {
+      const store = useVacationStore();
+      store.vacations.push(makeVacation());
+      expect(await store.updateSegment('vac-1', 'gone', { notes: 'x' })).toBe(false);
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          surface: 'vacation-segment',
+          context: { action: 'update_missing' },
+        })
+      );
+    });
+
+    it('deleteSegment logs to the firehose and returns false', async () => {
+      const store = useVacationStore();
+      store.vacations.push(makeVacation());
+      expect(await store.deleteSegment('vac-1', 'gone')).toBe(false);
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'vacation-segment',
+          context: { action: 'delete_missing' },
+        })
+      );
     });
   });
 

@@ -66,6 +66,8 @@ The bug is pre-existing and no user has reported it. Almost every whole-value wr
 - `form-diff`: `debug` for an empty diff, `warn` for an edit without a baseline.
 - Merge terminus: `root_conflicts=<total>,added=<n>` in `detail` on every merge, `warn` only when `added > 0`.
 
+**Form payload rules.** `diffPayload` treats `''`, `null` and `undefined` as the same "absent" state when deciding whether a field changed, but a change to a raw `null` is written as `null` while a change to `''` or `undefined` is a delete: `null` is a write, `''` / `undefined` is a delete. This matters for fields such as `memberId: null` ("family-wide"), which readers test with `=== null`. BudgetSettingsModal no longer sends `isActive: true` on edit; the page only opens the modal for the active budget, so editing never re-activated a superseded budget by design, and the payload test pins it.
+
 **Cost.** One module of about 500 lines to own, plus a permanent `automergeSemantics.test.ts` so an Automerge upgrade that changes any probed behaviour fails CI.
 
 ## Alternatives considered

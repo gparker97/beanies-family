@@ -125,6 +125,26 @@ describe('MilestoneFormModal', () => {
     expect(dateInput.value).toBe('2024-06-15');
   });
 
+  it('an edit saved later does not diff occurredOn when the date was untouched', async () => {
+    const m: Milestone = {
+      id: 'm-2',
+      memberId: MEMBER_ID,
+      category: 'graduation',
+      title: 'Graduation',
+      occurredOn: '2024-06-15',
+      createdAt: '2024-06-15T00:00:00.000Z',
+      updatedAt: '2024-06-15T00:00:00.000Z',
+    };
+    const { wrapper, store } = await mountModal(m);
+    await wrapper.find('input[type="text"]').setValue('Graduation Day');
+    await nextTick();
+    wrapper.findComponent(BeanieFormModal).vm.$emit('save');
+    await vi.waitFor(() => expect(store.updateMilestone).toHaveBeenCalled());
+    const patch = vi.mocked(store.updateMilestone).mock.calls[0]![1] as Record<string, unknown>;
+    expect(patch.title).toBe('Graduation Day');
+    expect('occurredOn' in patch).toBe(false);
+  });
+
   it('preserves user-typed title across category changes (no overwrite)', async () => {
     const { wrapper } = await mountModal(null);
     const titleInput = wrapper.find('input[type="text"]');
