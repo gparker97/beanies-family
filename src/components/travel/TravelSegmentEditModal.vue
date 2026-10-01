@@ -129,7 +129,59 @@ const tripAssigneeIds = computed(
   () => vacationStore.getVacationById(props.vacationId)?.assigneeIds ?? []
 );
 
-const { isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot (`formDiff`); the
+// drawer then saves only what changed, addressed by segment id. Pure function of form state.
+function buildPayload() {
+  const sortDate = departureDate.value || embarkationDate.value || '';
+  return {
+    title: effectiveTitle.value,
+    status: status.value,
+    airline: airline.value,
+    flightNumber: flightNumber.value,
+    departureAirport: departureAirport.value,
+    arrivalAirport: arrivalAirport.value,
+    departureDate: departureDate.value,
+    departureTime: departureTime.value,
+    arrivalDate: computedArrivalDate.value,
+    arrivalTime: arrivalTime.value,
+    // Shadow for pre-update clients, which only understand the boolean.
+    arrivesNextDay: arrivalDayOffset.value >= 1,
+    terminal: terminal.value,
+    cruiseLine: cruiseLine.value,
+    shipName: shipName.value,
+    departurePort: departurePort.value,
+    cabinNumber: cabinNumber.value,
+    embarkationDate: embarkationDate.value,
+    embarkationTime: embarkationTime.value,
+    disembarkationDate: disembarkationDate.value,
+    operator: operator.value,
+    route: route.value,
+    departureStation: departureStation.value,
+    arrivalStation: arrivalStation.value,
+    bookingReference: bookingReference.value,
+    notes: notes.value,
+    carType: (carType.value as 'family_car' | 'rental_car' | 'other') || undefined,
+    carLabel: carLabel.value,
+    leavingTime: leavingTime.value,
+    activityCategory: activityCategory.value
+      ? (activityCategory.value as import('@/types/models').VacationActivityCategory)
+      : undefined,
+    description: description.value || undefined,
+    location: location.value || undefined,
+    link: link.value || undefined,
+    startTime: startTime.value || undefined,
+    duration: activityDuration.value || undefined,
+    // undefined, NOT the materialized trip roster. `undefined` is the documented
+    // "everyone on this trip" sentinel (segmentTravellers.ts) and is re-resolved every
+    // time the trip's travellers change. Writing the roster in freezes it: add a family
+    // member later and every previously-saved segment excludes them forever.
+    travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
+    sortDate,
+  };
+}
+type SegmentPayload = ReturnType<typeof buildPayload>;
+
+const { isSubmitting, formDiff } = useFormModal<VacationTravelSegment, SegmentPayload>(
   () => props.segment,
   () => props.open,
   {
@@ -211,6 +263,7 @@ const { isSubmitting } = useFormModal(
       activityDuration.value = '';
       travellerIds.value = [...tripAssigneeIds.value];
     },
+    snapshot: { build: buildPayload, name: 'TravelSegmentEditModal' },
   }
 );
 
@@ -430,128 +483,91 @@ const computedArrivalDate = computed(() => {
   return departureDate.value;
 });
 
+/**
+ * Patch for the paired return flight, computed against its CURRENT stored value (never the form
+ * snapshot): an outbound edit fills the return's airports / airline / booking reference only
+ * where the return is blank or still mirrors the outbound's previous value.
+ */
+function returnFlightPatch(
+  segments: readonly VacationTravelSegment[],
+  prev: VacationTravelSegment
+): { id: string; patch: Record<string, unknown> } | null {
+  const idx = segments.findIndex((sg) => sg.id === prev.id);
+  if (idx < 0 || segments[idx]!.type !== 'flight_outbound') return null;
+  // The nearest return flight after this outbound (created as adjacent pairs), else before it.
+  let retIdx = -1;
+  for (let i = idx + 1; i < segments.length; i++) {
+    if (segments[i]!.type === 'flight_return') {
+      retIdx = i;
+      break;
+    }
+    if (segments[i]!.type === 'flight_outbound') break;
+  }
+  if (retIdx < 0) {
+    for (let i = idx - 1; i >= 0; i--) {
+      if (segments[i]!.type === 'flight_return') {
+        retIdx = i;
+        break;
+      }
+      if (segments[i]!.type === 'flight_outbound') break;
+    }
+  }
+  if (retIdx < 0) return null;
+  const ret = segments[retIdx]!;
+  const patch: Record<string, unknown> = {};
+  const follow = (
+    key: keyof VacationTravelSegment,
+    prevValue: string | undefined,
+    next: string
+  ) => {
+    const current = (ret[key] as string | undefined) ?? '';
+    if ((!current || current === (prevValue ?? '')) && current !== next) patch[key] = next;
+  };
+  follow('departureAirport', prev.arrivalAirport, arrivalAirport.value);
+  follow('arrivalAirport', prev.departureAirport, departureAirport.value);
+  follow('airline', prev.airline, airline.value);
+  follow('bookingReference', prev.bookingReference, bookingReference.value);
+  // Regenerate the return flight's title only when its airports moved.
+  if ('departureAirport' in patch || 'arrivalAirport' in patch) {
+    patch.title = buildTravelSegmentTitle({
+      type: ret.type,
+      departureAirport: (patch.departureAirport as string | undefined) ?? ret.departureAirport,
+      arrivalAirport: (patch.arrivalAirport as string | undefined) ?? ret.arrivalAirport,
+    });
+  }
+  return Object.keys(patch).length ? { id: ret.id, patch } : null;
+}
+
 async function handleSave() {
-  if (!props.vacationId || props.segmentIndex < 0) return;
+  const targetId = props.segment?.id;
+  if (!props.vacationId || !targetId) return;
   await validation.attemptSave(async () => {
     isSubmitting.value = true;
     try {
-      const vacation = vacationStore.getVacationById(props.vacationId);
-      if (!vacation) return;
-      const segments = [...vacation.travelSegments];
-      // RESOLVE BY ID, not by the index captured when the drawer opened.
-      //
-      // A CRDT merge that shifts this array — another parent deleting a cancelled flight —
-      // re-points the stored index at a DIFFERENT booking, and this save then overwrites
-      // ~35 fields of the wrong one. Out of range was worse: `{...undefined}` yields `{}`,
-      // appending a segment with no id and no type that breaks :key, the photo binding and
-      // the merge key. Refusing to write beats writing somewhere else.
-      const targetId = props.segment?.id;
-      const idx = targetId ? segments.findIndex((s) => s.id === targetId) : -1;
-      if (idx < 0) {
+      // RESOLVE BY ID against the CURRENT store value, never by an index captured at open: a
+      // CRDT merge that shifts the array would otherwise aim this save at a different booking.
+      // Refusing to write beats writing somewhere else.
+      const segments = vacationStore.getVacationById(props.vacationId)?.travelSegments ?? [];
+      const current = segments.find((sg) => sg.id === targetId);
+      if (!current) {
         showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
         emit('close');
         return;
       }
-      const sortDate = departureDate.value || embarkationDate.value || '';
-      segments[idx] = {
-        ...segments[idx]!,
-        title: effectiveTitle.value,
-        status: status.value,
-        airline: airline.value,
-        flightNumber: flightNumber.value,
-        departureAirport: departureAirport.value,
-        arrivalAirport: arrivalAirport.value,
-        departureDate: departureDate.value,
-        departureTime: departureTime.value,
-        arrivalDate: computedArrivalDate.value,
-        arrivalTime: arrivalTime.value,
-        // Shadow for pre-update clients, which only understand the boolean.
-        arrivesNextDay: arrivalDayOffset.value >= 1,
-        terminal: terminal.value,
-        cruiseLine: cruiseLine.value,
-        shipName: shipName.value,
-        departurePort: departurePort.value,
-        cabinNumber: cabinNumber.value,
-        embarkationDate: embarkationDate.value,
-        embarkationTime: embarkationTime.value,
-        disembarkationDate: disembarkationDate.value,
-        operator: operator.value,
-        route: route.value,
-        departureStation: departureStation.value,
-        arrivalStation: arrivalStation.value,
-        bookingReference: bookingReference.value,
-        notes: notes.value,
-        carType: (carType.value as 'family_car' | 'rental_car' | 'other') || undefined,
-        carLabel: carLabel.value,
-        leavingTime: leavingTime.value,
-        activityCategory: activityCategory.value
-          ? (activityCategory.value as import('@/types/models').VacationActivityCategory)
-          : undefined,
-        description: description.value || undefined,
-        location: location.value || undefined,
-        link: link.value || undefined,
-        startTime: startTime.value || undefined,
-        duration: activityDuration.value || undefined,
-        // undefined, NOT the materialized trip roster. `undefined` is the documented
-        // "everyone on this trip" sentinel (segmentTravellers.ts) and is re-resolved every
-        // time the trip's travellers change. Writing the roster in freezes it: add a family
-        // member later and every previously-saved segment excludes them forever.
-        travellerIds: travellerIds.value.length ? travellerIds.value : undefined,
-        sortDate,
-      };
-      // Auto-populate return flight from outbound flight data.
-      // Find the nearest return flight after this outbound (they're created as adjacent pairs).
-      const currentSeg = segments[idx]!;
-      if (currentSeg.type === 'flight_outbound') {
-        let retIdx = -1;
-        for (let i = idx + 1; i < segments.length; i++) {
-          if (segments[i]!.type === 'flight_return') {
-            retIdx = i;
-            break;
-          }
-          if (segments[i]!.type === 'flight_outbound') break;
-        }
-        if (retIdx < 0) {
-          for (let i = idx - 1; i >= 0; i--) {
-            if (segments[i]!.type === 'flight_return') {
-              retIdx = i;
-              break;
-            }
-            if (segments[i]!.type === 'flight_outbound') break;
-          }
-        }
-        if (retIdx >= 0) {
-          const ret = segments[retIdx]!;
-          const prev = vacation.travelSegments.find((sg) => sg.id === targetId)!;
-          if (!ret.departureAirport || ret.departureAirport === (prev.arrivalAirport ?? '')) {
-            segments[retIdx] = { ...segments[retIdx]!, departureAirport: arrivalAirport.value };
-          }
-          if (!ret.arrivalAirport || ret.arrivalAirport === (prev.departureAirport ?? '')) {
-            segments[retIdx] = { ...segments[retIdx]!, arrivalAirport: departureAirport.value };
-          }
-          if (!ret.airline || ret.airline === (prev.airline ?? '')) {
-            segments[retIdx] = { ...segments[retIdx]!, airline: airline.value };
-          }
-          if (!ret.bookingReference || ret.bookingReference === (prev.bookingReference ?? '')) {
-            segments[retIdx] = {
-              ...segments[retIdx]!,
-              bookingReference: bookingReference.value,
-            };
-          }
-          // Regenerate return flight title with updated airports
-          const retSeg = segments[retIdx]!;
-          segments[retIdx] = {
-            ...retSeg,
-            title: buildTravelSegmentTitle({
-              type: retSeg.type,
-              departureAirport: retSeg.departureAirport,
-              arrivalAirport: retSeg.arrivalAirport,
-            }),
-          };
-        }
+      // Auto-populate the return flight from the outbound's data, read BEFORE the outbound's own
+      // patch lands so "still mirrors the previous value" compares against what it was.
+      const ret = returnFlightPatch(segments, current);
+      const saved = await vacationStore.updateSegment(
+        props.vacationId,
+        targetId,
+        formDiff.changes(buildPayload())
+      );
+      if (!saved) {
+        showToast('info', t('travel.segmentGone.title'), t('travel.segmentGone.message'));
+        emit('close');
+        return;
       }
-
-      await vacationStore.updateVacation(props.vacationId, { travelSegments: segments });
+      if (ret) await vacationStore.updateSegment(props.vacationId, ret.id, ret.patch);
       emit('close');
     } finally {
       isSubmitting.value = false;

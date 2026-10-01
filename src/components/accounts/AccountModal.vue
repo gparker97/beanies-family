@@ -17,6 +17,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { orUndefined } from '@/utils/diffPayload';
 import { useAttentionPulse } from '@/composables/useAttentionPulse';
 import { useFormValidation } from '@/composables/useFormValidation';
 import {
@@ -134,8 +135,50 @@ function getMruDefaults() {
   };
 }
 
+// Every field is emitted so an edit can diff against the open-time snapshot; the diff keeps
+// untouched fields (balance included) out of the write.
+function buildPayload() {
+  return {
+    icon: getSubtypeEmoji(type.value as AccountType) || undefined,
+    name: name.value.trim(),
+    type: type.value as AccountType,
+    balance: balance.value ?? 0,
+    currency: currency.value,
+    memberId: memberId.value,
+    institution: institution.value || undefined,
+    institutionCountry: institutionCountry.value || undefined,
+    isActive: isActive.value,
+    includeInNetWorth: includeInNetWorth.value,
+    // Joint owners (excl. the primary owner); undefined when none so the repo
+    // clears the key on update. Descriptive only — not wired to net-worth.
+    coOwnerIds: (() => {
+      const co = coOwnerIds.value.filter((id) => id && id !== memberId.value);
+      return co.length ? co : undefined;
+    })(),
+    // "For whom" — only persisted on the qualifying types; cleared otherwise.
+    forMemberIds:
+      showsForWhomField(type.value) && forMemberIds.value.length
+        ? [...forMemberIds.value]
+        : undefined,
+    // Loan fields: present (possibly undefined, so a clear is representable) only on loans.
+    ...(type.value === 'loan'
+      ? {
+          interestRate: interestRate.value,
+          monthlyPayment: monthlyPayment.value,
+          loanTermMonths: loanTermMonths.value,
+          loanStartDate: orUndefined(loanStartDate.value),
+          payFromAccountId: orUndefined(loanPayFromAccountId.value),
+        }
+      : {}),
+    // Optional account-details tier — type-gated; omits off-type keys, emits
+    // `undefined` only for in-type cleared fields (never wipes a loan's rate).
+    ...buildAccountDetailsPatch(details, type.value),
+  };
+}
+type AccountPayload = ReturnType<typeof buildPayload>;
+
 // Reset form when modal opens
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<Account, AccountPayload>(
   () => props.account,
   () => props.open,
   {
@@ -192,6 +235,7 @@ const { isEditing, isSubmitting } = useFormModal(
       createRecurringPayment.value = false;
       loanPayFromAccountId.value = '';
     },
+    snapshot: { build: buildPayload, name: 'AccountModal' },
   }
 );
 
@@ -223,52 +267,12 @@ async function handleRemoveCustomInstitution(instName: string) {
 async function handleSave() {
   isSubmitting.value = true;
   try {
-    const data = {
-      icon: getSubtypeEmoji(type.value as AccountType) || undefined,
-      name: name.value.trim(),
-      type: type.value as AccountType,
-      balance: balance.value ?? 0,
-      currency: currency.value,
-      memberId: memberId.value,
-      institution: institution.value || undefined,
-      institutionCountry: institutionCountry.value || undefined,
-      isActive: isActive.value,
-      includeInNetWorth: includeInNetWorth.value,
-      // Joint owners (excl. the primary owner); undefined when none so the repo
-      // clears the key on update. Descriptive only — not wired to net-worth.
-      coOwnerIds: (() => {
-        const co = coOwnerIds.value.filter((id) => id && id !== memberId.value);
-        return co.length ? co : undefined;
-      })(),
-      // "For whom" — only persisted on the qualifying types; cleared otherwise.
-      forMemberIds:
-        showsForWhomField(type.value) && forMemberIds.value.length
-          ? [...forMemberIds.value]
-          : undefined,
-      ...(type.value === 'loan' && interestRate.value !== undefined
-        ? { interestRate: interestRate.value }
-        : {}),
-      ...(type.value === 'loan' && monthlyPayment.value !== undefined
-        ? { monthlyPayment: monthlyPayment.value }
-        : {}),
-      ...(type.value === 'loan' && loanTermMonths.value !== undefined
-        ? { loanTermMonths: loanTermMonths.value }
-        : {}),
-      ...(type.value === 'loan' && loanStartDate.value
-        ? { loanStartDate: loanStartDate.value }
-        : {}),
-      ...(type.value === 'loan' && loanPayFromAccountId.value
-        ? { payFromAccountId: loanPayFromAccountId.value }
-        : {}),
-      // Optional account-details tier — type-gated; omits off-type keys, emits
-      // `undefined` only for in-type cleared fields (never wipes a loan's rate).
-      ...buildAccountDetailsPatch(details, type.value),
-    };
+    const data = buildPayload();
 
     await persistCustomInstitutionIfNeeded(institution.value);
 
     if (isEditing.value && props.account) {
-      emit('save', { id: props.account.id, data: data as UpdateAccountInput });
+      emit('save', { id: props.account.id, data: formDiff.changes(data) as UpdateAccountInput });
     } else {
       emit('save', data as CreateAccountInput);
     }

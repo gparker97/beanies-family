@@ -15,6 +15,7 @@ import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAllergiesStore } from '@/stores/allergiesStore';
@@ -58,7 +59,7 @@ const severityOptions = computed(() => [
   { value: 'mild', label: t('allergies.severity.mild'), icon: '\u{1F331}' },
 ]);
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<Allergy, AllergyPayload>(
   () => props.allergy,
   () => props.open,
   {
@@ -82,8 +83,26 @@ const { isEditing, isSubmitting } = useFormModal(
       diagnosedBy.value = '';
       reviewedOn.value = toDateInputValue(new Date());
     },
+    snapshot: { build: buildPayload, name: 'AllergyFormModal' },
   }
 );
+
+// Every field is emitted (`undefined` when blank) so an edit can clear it; the snapshot diff
+// keeps untouched blanks out of the write.
+function buildPayload() {
+  return {
+    memberId: props.memberId,
+    name: name.value.trim(),
+    allergyType: allergyType.value,
+    severity: severity.value,
+    avoidList: orUndefined(avoidList.value),
+    reaction: orUndefined(reaction.value),
+    emergencyResponse: orUndefined(emergencyResponse.value),
+    diagnosedBy: orUndefined(diagnosedBy.value),
+    reviewedOn: orUndefined(reviewedOn.value),
+  };
+}
+type AllergyPayload = ReturnType<typeof buildPayload>;
 
 const canSave = computed(() => name.value.trim().length > 0);
 
@@ -95,21 +114,9 @@ async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = {
-      memberId: props.memberId,
-      name: name.value.trim(),
-      allergyType: allergyType.value,
-      severity: severity.value,
-      ...(avoidList.value.trim() ? { avoidList: avoidList.value.trim() } : {}),
-      ...(reaction.value.trim() ? { reaction: reaction.value.trim() } : {}),
-      ...(emergencyResponse.value.trim()
-        ? { emergencyResponse: emergencyResponse.value.trim() }
-        : {}),
-      ...(diagnosedBy.value.trim() ? { diagnosedBy: diagnosedBy.value.trim() } : {}),
-      ...(reviewedOn.value ? { reviewedOn: reviewedOn.value } : {}),
-    };
+    const payload = buildPayload();
     if (isEditing.value && props.allergy) {
-      await allergiesStore.updateAllergy(props.allergy.id, payload);
+      await allergiesStore.updateAllergy(props.allergy.id, formDiff.changes(payload));
     } else {
       await allergiesStore.createAllergy(payload);
     }

@@ -7,10 +7,13 @@
  * first render, there was no transition to catch, and the form drew every field blank with a
  * perfectly good prefill sitting in its props. Nothing errored.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { defineComponent, nextTick, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import { useFormModal } from '../useFormModal';
+
+const logEventMock = vi.hoisted(() => vi.fn());
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
 
 const onEdit = vi.fn();
 const onNew = vi.fn();
@@ -142,5 +145,117 @@ describe('isEditing', () => {
     expect(w.vm.isEditing).toBe(false);
     await w.setProps({ entity: { id: 'x' } });
     expect(w.vm.isEditing).toBe(true);
+  });
+});
+
+describe('snapshot diff', () => {
+  interface P {
+    name: string;
+    note?: string;
+    tags: string[];
+  }
+  const form = { name: '', note: undefined as string | undefined, tags: [] as string[] };
+  const build = (): P => ({ name: form.name, note: form.note, tags: [...form.tags] });
+
+  const Snap = defineComponent({
+    props: {
+      open: Boolean,
+      entity: { type: Object as () => { id: string; name: string } | null, default: null },
+    },
+    setup(props) {
+      const api = useFormModal<{ id: string; name: string }, P>(
+        () => props.entity,
+        () => props.open,
+        {
+          onEdit: (e) => {
+            form.name = e.name;
+            form.note = 'old';
+            form.tags = ['a'];
+          },
+          onNew: () => {
+            form.name = '';
+            form.note = undefined;
+            form.tags = [];
+          },
+          entityKey: () => props.entity?.id,
+          snapshot: { build, name: 'TestModal' },
+        }
+      );
+      return api;
+    },
+    template: '<div />',
+  });
+
+  beforeEach(() => logEventMock.mockClear());
+
+  it('captures the baseline after onEdit and returns only changed fields', async () => {
+    const w = mount(Snap, { props: { open: true, entity: { id: 'a', name: 'Ann' } } });
+    await nextTick();
+    form.name = 'Anna';
+    expect(w.vm.formDiff.changes(build())).toEqual({ name: 'Anna' });
+  });
+
+  it('returns the full payload on create, with no warning', async () => {
+    const w = mount(Snap, { props: { open: true } });
+    await nextTick();
+    form.name = 'New';
+    expect(w.vm.formDiff.changes(build())).toEqual(build());
+    expect(logEventMock).not.toHaveBeenCalled();
+  });
+
+  it('represents a cleared field as a present undefined key', async () => {
+    const w = mount(Snap, { props: { open: true, entity: { id: 'a', name: 'Ann' } } });
+    await nextTick();
+    form.note = undefined;
+    const out = w.vm.formDiff.changes(build());
+    expect('note' in out).toBe(true);
+    expect(out.note).toBeUndefined();
+    expect(Object.keys(out)).toEqual(['note']);
+  });
+
+  it('logs a debug event for an empty diff', async () => {
+    const w = mount(Snap, { props: { open: true, entity: { id: 'a', name: 'Ann' } } });
+    await nextTick();
+    expect(w.vm.formDiff.changes(build())).toEqual({});
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'debug',
+        surface: 'form-diff',
+        context: { kind: 'TestModal' },
+      })
+    );
+  });
+
+  it('does not let a stale capture leak into a following create', async () => {
+    const w = mount(Snap, { props: { open: false, entity: { id: 'a', name: 'Ann' } } });
+    await w.setProps({ open: true }); // queues a capture
+    await w.setProps({ open: false, entity: null });
+    await w.setProps({ open: true }); // create
+    await nextTick();
+    form.name = 'Fresh';
+    expect(w.vm.formDiff.changes(build())).toEqual(build());
+  });
+
+  it('warns and degrades to the full payload when an edit has no baseline', () => {
+    const w = mount(Snap, { props: { open: true, entity: { id: 'a', name: 'Ann' } } });
+    // No tick has passed, so the capture has not run yet.
+    const payload = build();
+    expect(w.vm.formDiff.changes(payload)).toEqual(payload);
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'form-diff',
+        message: 'edit without baseline',
+      })
+    );
+  });
+
+  it('rebaseline re-anchors the diff', async () => {
+    const w = mount(Snap, { props: { open: true } });
+    await nextTick();
+    form.name = 'Eager';
+    w.vm.formDiff.rebaseline(build());
+    form.note = 'x';
+    expect(w.vm.formDiff.changes(build())).toEqual({ note: 'x' });
   });
 });

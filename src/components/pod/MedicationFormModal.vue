@@ -17,6 +17,7 @@ import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import FrequencyChips, { type ChipOption } from '@/components/ui/FrequencyChips.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMedicationsStore } from '@/stores/medicationsStore';
@@ -114,7 +115,7 @@ const scheduleOptions = computed(() => [
   { value: 'ends', label: t('medications.schedule.hasEndDate') },
 ]);
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<Medication, MedicationPayload>(
   () => props.medication,
   () => props.open,
   {
@@ -155,6 +156,7 @@ const { isEditing, isSubmitting } = useFormModal(
       ongoing.value = true;
       notes.value = '';
     },
+    snapshot: { build: buildPayload, name: 'MedicationFormModal' },
   }
 );
 
@@ -184,13 +186,15 @@ function buildPayload() {
     // structured" (legacy undefined). useCriticalItems treats both as
     // "no reminder" — but downstream logic may diverge, so be explicit.
     dosesPerDay: dosesPerDay.value,
-    ...(startDate.value ? { startDate: startDate.value } : {}),
-    ...(endDate.value ? { endDate: endDate.value } : {}),
-    ...(ongoing.value ? { ongoing: true as const } : {}),
-    ...(notes.value.trim() ? { notes: notes.value.trim() } : {}),
-    ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
+    // Every field is emitted (`undefined` when blank) so an edit can CLEAR it; the snapshot
+    // diff keeps untouched blanks out of the write. No `photoIds`: the binding owns those.
+    startDate: orUndefined(startDate.value),
+    endDate: orUndefined(endDate.value),
+    ongoing: ongoing.value ? (true as const) : undefined,
+    notes: orUndefined(notes.value),
   };
 }
+type MedicationPayload = ReturnType<typeof buildPayload>;
 
 /**
  * Eager-create + photo-binding wiring.
@@ -203,7 +207,7 @@ function buildPayload() {
  */
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
-const eager = useEagerEntityCreate<Medication, ReturnType<typeof buildPayload>>({
+const eager = useEagerEntityCreate<Medication, MedicationPayload>({
   resolveExistingId: () => props.medication?.id ?? null,
   firstMissingField: () => {
     if (!name.value.trim()) return 'name';
@@ -214,6 +218,7 @@ const eager = useEagerEntityCreate<Medication, ReturnType<typeof buildPayload>>(
   buildPayload,
   create: (payload) => medicationsStore.createMedication(payload),
   update: (id, payload) => medicationsStore.updateMedication(id, payload),
+  formDiff,
 });
 
 const binding = usePhotoEntityBinding({

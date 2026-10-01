@@ -8,7 +8,7 @@
  * table — most cooks that get logged were good cooks, so one-click
  * happy path for the common case.
  */
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -16,7 +16,11 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
+import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
+import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
+import { usePhotoStore } from '@/stores/photoStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -41,6 +45,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
+const photoStore = usePhotoStore();
 
 const cookedOn = ref('');
 const cookedBy = ref<string>('');
@@ -48,8 +53,6 @@ const rating = ref<CookLogRating>(5);
 const servings = ref('');
 const wentWell = ref('');
 const toImprove = ref('');
-const photoIds = ref<UUID[]>([]);
-const entryId = ref<UUID | null>(null);
 
 const cookOptions = computed(() => [
   { value: '', label: t('cookLog.byline.someone') },
@@ -57,7 +60,7 @@ const cookOptions = computed(() => [
   ...familyStore.humans.map((m) => ({ value: m.id, label: m.name })),
 ]);
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<CookLogEntry, CookLogPayload>(
   () => props.entry,
   () => props.open,
   {
@@ -68,8 +71,6 @@ const { isEditing, isSubmitting } = useFormModal(
       servings.value = c.servings ?? '';
       wentWell.value = c.wentWell ?? '';
       toImprove.value = c.toImprove ?? '';
-      photoIds.value = [...(c.photoIds ?? [])];
-      entryId.value = c.id;
     },
     onNew: () => {
       cookedOn.value = props.presetCookedOn ?? toDateInputValue(new Date());
@@ -78,9 +79,8 @@ const { isEditing, isSubmitting } = useFormModal(
       servings.value = '';
       wentWell.value = '';
       toImprove.value = '';
-      photoIds.value = [];
-      entryId.value = null;
     },
+    snapshot: { build: buildPayload, name: 'CookLogFormModal' },
   }
 );
 
@@ -90,43 +90,56 @@ const modalTitle = computed(() =>
   isEditing.value ? t('cookLog.editTitle') : t('cookLog.addTitle')
 );
 
-function buildPayload(): Omit<CookLogEntry, 'id' | 'createdAt' | 'updatedAt'> {
+// Every field is emitted (`undefined` when blank) so an edit can clear it; the snapshot diff
+// keeps untouched blanks out of the write. No `photoIds`: the binding is the only writer.
+function buildPayload() {
   return {
     recipeId: props.recipeId,
     cookedOn: cookedOn.value,
     rating: rating.value,
-    ...(cookedBy.value ? { cookedBy: cookedBy.value } : {}),
-    ...(servings.value.trim() ? { servings: servings.value.trim() } : {}),
-    ...(wentWell.value.trim() ? { wentWell: wentWell.value.trim() } : {}),
-    ...(toImprove.value.trim() ? { toImprove: toImprove.value.trim() } : {}),
-    ...(photoIds.value.length ? { photoIds: [...photoIds.value] } : {}),
+    cookedBy: cookedBy.value || undefined,
+    servings: orUndefined(servings.value),
+    wentWell: orUndefined(wentWell.value),
+    toImprove: orUndefined(toImprove.value),
   };
 }
+type CookLogPayload = ReturnType<typeof buildPayload>;
 
 const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
 
-async function ensureEntryId(): Promise<UUID | null> {
-  if (entryId.value) return entryId.value;
-  if (!canSave.value) return null;
-  const created = await recipesStore.createCookLog(buildPayload());
-  if (!created) return null;
-  entryId.value = created.id;
-  return created.id;
-}
+// Eager-create gates on the same rule as Save, so a photo can attach as soon as the entry is
+// well-formed enough to save.
+const eager = useEagerEntityCreate<CookLogEntry, CookLogPayload>({
+  resolveExistingId: () => props.entry?.id ?? null,
+  firstMissingField: () => (canSave.value ? null : 'cookedOn'),
+  buildPayload,
+  create: (payload) => recipesStore.createCookLog(payload),
+  update: (id, payload) => recipesStore.updateCookLog(id, payload),
+  formDiff,
+});
+
+const binding = usePhotoEntityBinding({
+  entityId: eager.entityId,
+  // Live photoIds from the doc, so a photo that lands after the drawer closed still shows.
+  initialPhotoIds: () => photoStore.photoIdsFor('cookLogs', eager.entityId.value),
+  watchSource: () => props.entry?.id,
+  update: (id, patch) => recipesStore.updateCookLog(id, patch),
+  surface: 'CookLogFormModal',
+});
+
+// A closed-then-reopened modal must not keep targeting the previous eager-created entry.
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (isOpen && !props.entry) eager.reset();
+  }
+);
 
 async function handleAddFirstPhoto(): Promise<void> {
-  const id = await ensureEntryId();
+  const id = await eager.ensureId();
   if (!id) return;
   await nextTick();
   photoAttachmentsRef.value?.openPicker();
-}
-
-function updatePhotoIds(ids: UUID[]): void {
-  photoIds.value = ids;
-  const id = entryId.value ?? props.entry?.id;
-  if (id) {
-    void recipesStore.updateCookLog(id, { photoIds: ids });
-  }
 }
 
 function setRating(n: number): void {
@@ -137,16 +150,10 @@ async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    const payload = buildPayload();
     const wasFiveStar = rating.value === 5;
     const wasAlreadyFiveStar = props.entry?.rating === 5;
-    if (isEditing.value && props.entry) {
-      await recipesStore.updateCookLog(props.entry.id, payload);
-    } else if (entryId.value) {
-      await recipesStore.updateCookLog(entryId.value, payload);
-    } else {
-      await recipesStore.createCookLog(payload);
-    }
+    const result = await eager.commit();
+    if (!result) return; // store reported via wrapAsync; keep modal open for retry
     // Fire the celebration only on NEW 5-star entries (creation or an
     // edit that flipped from <5 to 5). Editing a 5-star log keeps the
     // existing 5 and shouldn't re-celebrate.
@@ -227,22 +234,22 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('cookLog.field.photo')" optional>
-      <div v-if="entryId || entry">
+      <div v-if="eager.entityId.value">
         <PhotoAttachments
           ref="photoAttachmentsRef"
           collection="cookLogs"
-          :entity-id="(entryId ?? entry?.id) as UUID"
-          :photo-ids="photoIds"
+          :entity-id="eager.entityId.value"
+          :photo-ids="binding.photoIds.value"
           :current-member-id="currentMemberId"
           :max="1"
-          @update:photo-ids="updatePhotoIds"
+          @update:photo-ids="binding.updatePhotoIds"
         />
       </div>
       <button
         v-else
         type="button"
         class="hover:border-primary-500 hover:text-primary-500 dark:hover:text-accent-lift flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
-        :disabled="!canSave"
+        :disabled="!canSave || eager.isCreating.value"
         @click="handleAddFirstPhoto"
       >
         <BeanieIcon name="camera" size="md" />

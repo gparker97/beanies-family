@@ -73,19 +73,22 @@ const save = async (w: ReturnType<typeof mounted>) => {
 beforeEach(() => h.updateMeal.mockClear());
 
 describe('MealEditModal who’s eating', () => {
-  it('shows everyone picked when the meal stores no eaters, with the toggle on', () => {
+  it('shows everyone picked when the meal stores no eaters, with the toggle on', async () => {
     const w = mounted(MEAL);
+    await flushPromises();
     expect(eaters(w).props('modelValue')).toEqual(['a', 'b', 'c']);
     expect(eaters(w).props('allToggle')).toBe(true);
   });
 
-  it('shows the stored subset, dropping members who left', () => {
+  it('shows the stored subset, dropping members who left', async () => {
     const w = mounted({ ...MEAL, eaterMemberIds: ['b', 'gone'] });
+    await flushPromises();
     expect(eaters(w).props('modelValue')).toEqual(['b']);
   });
 
   it('saving with everyone picked stores no eaterMemberIds', async () => {
     const w = mounted(MEAL);
+    await flushPromises();
     expect((await save(w)).eaterMemberIds).toBeUndefined();
   });
 
@@ -99,5 +102,22 @@ describe('MealEditModal who’s eating', () => {
     const w = mounted(MEAL);
     eaters(w).vm.$emit('update:modelValue', ['a', 'c']);
     expect((await save(w)).eaterMemberIds).toEqual(['a', 'c']);
+  });
+
+  describe('snapshot diff', () => {
+    const FULL = { ...MEAL, label: 'Pizza night', note: 'extra cheese', serveTime: '18:00' };
+
+    it('an edit writes only the changed fields', async () => {
+      const w = mounted(FULL);
+      await flushPromises();
+      eaters(w).vm.$emit('update:modelValue', ['a', 'c']);
+      expect(await save(w)).toEqual({ eaterMemberIds: ['a', 'c'] });
+    });
+
+    it('an untouched save writes an empty patch, so a concurrent edit is not clobbered', async () => {
+      const w = mounted(FULL);
+      await flushPromises();
+      expect(await save(w)).toEqual({});
+    });
   });
 });

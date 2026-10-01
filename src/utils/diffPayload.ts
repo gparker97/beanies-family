@@ -19,7 +19,8 @@
  *                                      → included as `undefined` so the key is
  *                                        DELETED. `null` would otherwise be
  *                                        persisted as a literal null.
- *  - arrays compared BY VALUE, element-wise (daysOfWeek, assigneeIds, photoIds)
+ *  - arrays compared BY VALUE, element-wise (daysOfWeek, assigneeIds, photoIds); elements
+ *    use the same equality, so an array of equal objects reads as unchanged
  *
  * A cleared field is ASSIGNED (`out[k] = undefined`), never omitted — both
  * `automergeRepository.update` (which keys its delete list off `Object.keys`)
@@ -27,7 +28,7 @@
  * depend on the key being present.
  *
  * COMPLEXITY BUDGET — deliberately ~30 lines. Scalars by `===`, arrays by
- * length + element-wise `===`, anything else by a `JSON.stringify` fallback.
+ * length + element-wise `isEqual`, anything else by a `JSON.stringify` fallback.
  * No deep-equal dependency, no nested-object semantics, no key-ordering
  * guarantees for objects. Activity and reschedule payloads contain only scalars
  * and flat arrays. If a future payload needs nested-object diffing, that is a
@@ -44,7 +45,7 @@ function normalize(value: unknown): unknown {
 function isEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, i) => item === b[i]);
+    return a.length === b.length && a.every((item, i) => isEqual(item, b[i]));
   }
   if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
     return JSON.stringify(a) === JSON.stringify(b);
@@ -63,4 +64,13 @@ export function diffPayload<T extends object>(original: T, next: Partial<T>): Pa
     out[key] = nextValue;
   }
   return out as Partial<T>;
+}
+
+/**
+ * The payload spelling of an optional free-text field: trimmed, and `undefined` when blank, so
+ * a form built with `buildPayload` can represent a CLEAR (the key is present and undefined).
+ * Pair with `useFormModal`'s `formDiff`, which keeps untouched blanks out of the write.
+ */
+export function orUndefined(v: string): string | undefined {
+  return v.trim() || undefined;
 }

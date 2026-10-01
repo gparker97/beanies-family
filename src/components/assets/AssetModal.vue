@@ -15,6 +15,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { orUndefined } from '@/utils/diffPayload';
 import {
   useInstitutionOptions,
   persistCustomInstitutionIfNeeded,
@@ -111,7 +112,25 @@ const createRecurringPayment = ref(false);
 const loanPayFromAccountId = ref('');
 
 // Reset form when modal opens
-const { isEditing, isSubmitting } = useFormModal(
+// Every field is emitted so an edit can diff against the open-time snapshot. `loan` stays ONE
+// key (diffed as a whole value); the worker reconciles it per sub-key.
+function buildPayload() {
+  return {
+    name: name.value.trim(),
+    type: type.value,
+    purchaseValue: purchaseValue.value ?? 0,
+    currentValue: currentValue.value ?? 0,
+    currency: currency.value,
+    memberId: memberId.value,
+    purchaseDate: orUndefined(purchaseDate.value),
+    notes: orUndefined(notes.value),
+    includeInNetWorth: includeInNetWorth.value,
+    loan: cleanLoan(),
+  };
+}
+type AssetPayload = ReturnType<typeof buildPayload>;
+
+const { isEditing, isSubmitting, formDiff } = useFormModal<Asset, AssetPayload>(
   () => props.asset,
   () => props.open,
   {
@@ -166,6 +185,7 @@ const { isEditing, isSubmitting } = useFormModal(
       createRecurringPayment.value = false;
       loanPayFromAccountId.value = '';
     },
+    snapshot: { build: buildPayload, name: 'AssetModal' },
   }
 );
 
@@ -211,24 +231,12 @@ async function handleSave() {
   isSubmitting.value = true;
 
   try {
-    const loan = cleanLoan();
     await persistCustomInstitutionIfNeeded(lender.value);
 
-    const data = {
-      name: name.value.trim(),
-      type: type.value,
-      purchaseValue: purchaseValue.value ?? 0,
-      currentValue: currentValue.value ?? 0,
-      currency: currency.value,
-      memberId: memberId.value,
-      purchaseDate: purchaseDate.value || undefined,
-      notes: notes.value || undefined,
-      includeInNetWorth: includeInNetWorth.value,
-      loan,
-    };
+    const data = buildPayload();
 
     if (isEditing.value && props.asset) {
-      emit('save', { id: props.asset.id, data: data as UpdateAssetInput });
+      emit('save', { id: props.asset.id, data: formDiff.changes(data) as UpdateAssetInput });
     } else {
       emit('save', data as CreateAssetInput);
     }

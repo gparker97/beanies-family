@@ -16,6 +16,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
+import { orUndefined } from '@/utils/diffPayload';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -85,7 +86,7 @@ const categoryOptions = computed(() => [
   { value: 'other', label: t('favorites.category.other'), icon: '\u2728' },
 ]);
 
-const { isEditing, isSubmitting } = useFormModal(
+const { isEditing, isSubmitting, formDiff } = useFormModal<FavoriteItem, FavoritePayload>(
   () => props.favorite,
   () => props.open,
   {
@@ -101,6 +102,7 @@ const { isEditing, isSubmitting } = useFormModal(
       category.value = 'food';
       recipeId.value = '';
     },
+    snapshot: { build: buildPayload, name: 'FavoriteFormModal' },
   }
 );
 
@@ -128,31 +130,37 @@ const title = computed(() =>
   isEditing.value ? t('favorites.editTitle') : t('favorites.addTitle')
 );
 
+// Every field is emitted (`undefined` when blank) so an edit can clear it; the snapshot diff
+// keeps untouched blanks out of the write.
+function buildPayload() {
+  // For food-with-recipe: auto-populate name from the recipe so the
+  // favorite card still has something to display if the recipe is
+  // later unlinked / deleted. Mirrors the mockup's behavior where
+  // the selected recipe becomes the favorite's identity.
+  let resolvedName = name.value.trim();
+  if (category.value === 'food' && recipeId.value && !resolvedName) {
+    const recipe = recipesStore.recipes.find((r) => r.id === recipeId.value);
+    resolvedName = recipe?.name ?? '';
+  }
+  return {
+    memberId: props.memberId,
+    category: category.value,
+    name: resolvedName,
+    description: orUndefined(description.value),
+    // recipeId only meaningful when category is food. Explicit
+    // `undefined` tells the repo to drop the field.
+    recipeId: category.value === 'food' && recipeId.value ? recipeId.value : undefined,
+  };
+}
+type FavoritePayload = ReturnType<typeof buildPayload>;
+
 async function handleSave(): Promise<void> {
   if (!canSave.value) return;
   isSubmitting.value = true;
   try {
-    // For food-with-recipe: auto-populate name from the recipe so the
-    // favorite card still has something to display if the recipe is
-    // later unlinked / deleted. Mirrors the mockup's behavior where
-    // the selected recipe becomes the favorite's identity.
-    let resolvedName = name.value.trim();
-    if (category.value === 'food' && recipeId.value && !resolvedName) {
-      const recipe = recipesStore.recipes.find((r) => r.id === recipeId.value);
-      resolvedName = recipe?.name ?? '';
-    }
-
-    const payload = {
-      memberId: props.memberId,
-      category: category.value,
-      name: resolvedName,
-      ...(description.value.trim() ? { description: description.value.trim() } : {}),
-      // recipeId only meaningful when category is food. Explicit
-      // `undefined` tells the repo to drop the field.
-      recipeId: category.value === 'food' && recipeId.value ? recipeId.value : undefined,
-    };
+    const payload = buildPayload();
     if (isEditing.value && props.favorite) {
-      await favoritesStore.updateFavorite(props.favorite.id, payload);
+      await favoritesStore.updateFavorite(props.favorite.id, formDiff.changes(payload));
     } else {
       await favoritesStore.createFavorite(payload);
     }
