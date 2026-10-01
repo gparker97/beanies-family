@@ -80,3 +80,22 @@ CloudWatch, log group `/aws/lambda/beanies-family-billing-prod`:
 | Mark a founding family                                                                                                    | `billing-cohort.mjs --first-ten <familyId> --apply`                                                                                                                                          |
 | Row looks stale after a Stripe change                                                                                     | Dashboard → the subscription → resend the last `customer.subscription.updated`; the Lambda re-reads current state                                                                            |
 | Roll back a flip                                                                                                          | Reverse the step's one-line change and apply; rows are data, nothing is deleted                                                                                                              |
+| A family wants the other currency, or picked the wrong one at checkout                                                    | See **Switching a family's currency** below. Stripe never changes a customer's currency; the switch is a new customer and a new subscription.                                                |
+
+## Switching a family's currency
+
+Stripe fixes a customer's currency with their first invoice and never changes it, and `/billing/checkout-session` reuses the stored `stripeCustomerId`, so a second checkout would be pinned to the old currency too. A currency switch is therefore a NEW Stripe customer and a NEW subscription, done by hand; it is rare enough that there is no automated path. Do all four steps in one sitting, because the family reads as lapsed (read-only on the next refresh) between steps 1 and 3.
+
+1. **Stripe Dashboard → the family's subscription → Cancel → Immediately.** Refund the unused portion of the last invoice (the cancel dialog can prorate it; a same-day wrong pick is a full refund). The `customer.subscription.deleted` webhook writes `canceled` on the row, which is what lets checkout accept the family again.
+2. **Drop the stored customer from the billing row**, so the Lambda falls back to `customer_email` and Stripe creates a fresh customer in the new currency. `cohort` and `planTokenHash` stay as they are; the early-family discount still applies.
+
+   ```bash
+   aws dynamodb update-item --table-name beanies-family-billing-prod \
+     --key '{"familyId":{"S":"<familyId>"}}' \
+     --update-expression 'REMOVE stripeCustomerId'
+   ```
+
+3. **The family chooses the plan again:** Settings → Your beanies Plan → See Plans → the other currency → pay. The webhook sees a new subscription id that is active and applies it; the row picks up the new `stripeCustomerId` and `stripeSubscriptionId`. The Plan page's claim mints a new plan token for the new subscription into the family file (the old token stops working, as designed).
+4. **Nothing else to do.** Manage Plan and Receipts now open the new customer's portal.
+
+Side effect: invoices from before the switch sit on the old Stripe customer and are not visible in the family's portal. If asked, send the PDFs from the Dashboard. The old customer can stay; do not delete it while a refund is still settling.
