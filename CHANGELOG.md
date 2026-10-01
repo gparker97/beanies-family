@@ -19,6 +19,7 @@ _Unreleased on `main`. Nothing in this section is visible to users yet._
 
 ### Fixed
 
+- (unreleased) Edits made on two devices between syncs now both survive the merge: ticks and additions on a shared list, photos attached to the same recipe, votes on a holiday idea, drop-off and pick-up ticks, goal contributions, loan details, and exchange rates or API keys added on different devices. Saving a form now writes only the fields you changed, so an unrelated save on one device no longer undoes an edit made on another.
 - (unreleased) On Settings, the Beanie Wall card's "How to set your device up" link no longer runs into the Start button.
 - (unreleased) Help Center: the magic link article now says links last 15 minutes and that a new link does not cancel an earlier one (it still described the retired 7-day link).
 
