@@ -29,6 +29,13 @@ vi.mock('@/composables/useTranslation', () => ({
   }),
 }));
 vi.mock('@/services/sync/capabilities', () => ({ isNative: () => h.native }));
+// The store and the banner read `features.entitlement` / `features.checkout` through
+// pricingGate, and those derive from VITE_* env values. CI has no .env, so the tests state
+// their own precondition instead of inheriting the developer's.
+vi.mock('@/config/features', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/config/features')>();
+  return { ...mod, features: { ...mod.features, entitlement: true, checkout: true } };
+});
 const isExporting = ref(false);
 vi.mock('@/composables/usePodExport', () => ({
   usePodExport: () => ({ isExporting, exportEncryptedPod: h.exportEncryptedPod }),

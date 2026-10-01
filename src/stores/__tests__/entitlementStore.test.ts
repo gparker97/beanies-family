@@ -43,6 +43,13 @@ vi.mock('@/services/registry/registryService', () => ({
   },
 }));
 vi.mock('@/config/flags', () => ({ isFlagEnabled: () => h.flagOn }));
+// The store and the banner read `features.entitlement` / `features.checkout` through
+// pricingGate, and those derive from VITE_* env values. CI has no .env, so the tests state
+// their own precondition instead of inheriting the developer's.
+vi.mock('@/config/features', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/config/features')>();
+  return { ...mod, features: { ...mod.features, entitlement: true, checkout: true } };
+});
 const online = ref(true);
 vi.mock('@/composables/useOnline', () => ({ useOnline: () => ({ isOnline: online }) }));
 // The REAL poller runs (so a boot fire would show up as a lookup); the wrapper only records
