@@ -273,10 +273,10 @@ describe('native (iOS / Android)', () => {
 
 describe('the magic-beans line (#95 Phase 4)', () => {
   it("renders the composable's line when there is one", () => {
-    allowance.line = '0 of 1 magic beans left today, more at 8am.';
+    allowance.line = '0 of 1 magic beans left today. Resets on 2 Oct at 8:00am.';
     setState(TRIAL);
     expect(render().get('[data-testid="allowance-meter"]').text()).toBe(
-      '0 of 1 magic beans left today, more at 8am.'
+      '0 of 1 magic beans left today. Resets on 2 Oct at 8:00am.'
     );
   });
 
