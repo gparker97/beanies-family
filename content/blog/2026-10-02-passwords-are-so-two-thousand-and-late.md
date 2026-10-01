@@ -68,7 +68,7 @@ Allow me to introduce: the [_**beanies recovery kit**_](https://beanies.family/h
 
 If you’ve been snooping around the settings menus (which is one of my favorite pastimes) you may have noticed this new little gem:
 
-![The recovery & backup section in beanies.family settings with the recovery kit card highlighted, and the "your recovery kit" dialog open showing a family's recovery code, scribbled out, with save as pdf and share buttons](/blog/passwords-settings-recovery-kit.webp)
+![The recovery & backup section in beanies.family settings with the recovery kit card highlighted, and the "your recovery kit" dialog open for the family beanies with the recovery code masked, and save as pdf and share buttons](/blog/passwords-settings-recovery-kit.webp)
 
 _this is your last-ditch, forgot-everything-else, just get-me-in unlock method. don’t lose it._
 
