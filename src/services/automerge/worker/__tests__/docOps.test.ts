@@ -357,13 +357,28 @@ describe('docOps — projectionDeltasBetween (poll-merge delta)', () => {
     }).doc;
     expect(doc.settings).toMatchObject({ baseCurrency: 'GBP', theme: 'light' });
     expect((doc.settings as unknown as Record<string, unknown>).planToken).toBeUndefined();
-    // A document with no settings yet: the patch becomes the settings (defaults are backfilled on read).
+    // A document with no settings yet: the caller's defaults seed it, then the patch applies,
+    // so the raw document carries the whole settings object (exports read it raw).
     const fresh = applyMutation(base(), {
       op: 'named',
       name: 'patchSettings',
-      args: { patch: { baseCurrency: 'SGD' } },
+      args: {
+        patch: { onboardingCompleted: true },
+        defaults: { baseCurrency: 'USD', theme: 'system' },
+      },
     }).doc;
-    expect(fresh.settings).toMatchObject({ baseCurrency: 'SGD' });
+    expect(fresh.settings).toMatchObject({
+      baseCurrency: 'USD',
+      theme: 'system',
+      onboardingCompleted: true,
+    });
+    // ...and never reset an existing object.
+    const kept = applyMutation(fresh, {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { theme: 'dark' }, defaults: { baseCurrency: 'SGD', theme: 'system' } },
+    }).doc;
+    expect(kept.settings).toMatchObject({ baseCurrency: 'USD', theme: 'dark' });
   });
 
   it('patchSettings from two devices on different fields both survive the merge', () => {
