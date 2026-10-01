@@ -247,6 +247,15 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Sync guards validate `familyId` on save, load, and decrypt to prevent cross-family data leakage
 - See [ADR-018](adr/018-automerge-crdt-migration.md) for the migration decision
 
+### Write-path rule: the worker reconciles
+
+- Stores and repositories send **whole-value `patch`es** plus a `base`. The repository attaches `base` from the projection automatically (`patchOp` in `automergeRepository.ts`; `saveSettings` for settings), so call sites do not pass it.
+- The doc worker **reconciles** each patch into fine-grained writes (per-key assignment, `splice` insert/remove/move), so concurrent edits to the same list, photo set, loan or settings array both survive a merge. See `src/services/automerge/worker/reconcile.ts`.
+- **Never hand-build a CRDT op at a call site**, and never rebuild-and-reassign an array or object. Send the new value and let the worker work out the edits.
+- `set` is for **creates and whole-invariant entities only** (for example responsibility cards). It replaces the entity whole by design.
+- Edit modals send only what the user changed: pass `snapshot` to `useFormModal` and save with `formDiff.changes(payload)`, which diffs against a snapshot taken when the form opened.
+- See [ADR-039](adr/039-fine-grained-crdt-writes.md) for the four laws, the `base` contract and the accepted residuals.
+
 ### Recurring Transactions
 
 - `RecurringItem` is a template, not a transaction itself
