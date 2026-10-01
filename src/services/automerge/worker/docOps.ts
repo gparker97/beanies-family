@@ -30,6 +30,7 @@ import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/t
 import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import { docInitOpts } from './docActor';
+import { MIGRATION_CHANGES } from './migrationChanges';
 import {
   calculateAmortization,
   calculateExtraPayment,
@@ -64,7 +65,6 @@ function toPlain<T>(value: T): T {
 
 // ─── Doc lifecycle ───────────────────────────────────────────────────────────
 
-/** Initialize any collections missing from an older document. */
 /**
  * This document's lineage, normalised — the ONE place absent-or-null is decided.
  *
@@ -99,12 +99,133 @@ export function nextLineage(prev: PodLineage | null): PodLineage {
   return { id: generateUUID(), seq: (prev?.seq ?? 0) + 1 };
 }
 
+/**
+ * Plain `atob` decode (browser, worker and Node alike) for the small, trusted migration table.
+ * Deliberately NOT `base64ToBuffer`: that one is perf-instrumented and chunked for multi-MB
+ * payloads, and store tests mock it, which would break every document they create.
+ */
+function decodeBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Decode the committed migration change for `name` (#117, plan F). A table entry that does not
+ * decode, or decodes to anything but one root op creating `name`, is a BUILD defect: it throws,
+ * loudly, rather than silently creating the collection the old, merge-unsafe way.
+ */
+function storedMigrationChange(name: CollectionName): Uint8Array {
+  const b64 = MIGRATION_CHANGES[name];
+  if (typeof b64 !== 'string') {
+    throw new Error(`migrateDoc: no stored migration change for "${name}" (build defect)`);
+  }
+  let bytes: Uint8Array;
+  let decoded: Automerge.DecodedChange;
+  try {
+    bytes = decodeBase64(b64);
+    decoded = Automerge.decodeChange(bytes);
+  } catch (e) {
+    // Classified as a build defect and rethrown with the collection named: the worker cannot
+    // telemeter, so the throw IS the signal, surfaced on main through the RPC error path.
+    throw new Error(`migrateDoc: stored migration change for "${name}" is undecodable`, {
+      cause: e,
+    });
+  }
+  const op = decoded.ops[0];
+  const shapeOk =
+    decoded.ops.length === 1 &&
+    op?.action === 'makeMap' &&
+    op.obj === '_root' &&
+    op.key === name &&
+    decoded.deps.length === 0;
+  if (!shapeOk) {
+    throw new Error(`migrateDoc: stored migration change for "${name}" has the wrong shape`);
+  }
+  return bytes;
+}
+
+/**
+ * Initialize any collections missing from an older document.
+ *
+ * ⚠️ ABSENT AND `null` ARE DIFFERENT CASES (#117, plan F):
+ *  - ABSENT: apply the committed `MIGRATION_CHANGES` entry (fixed actor, seq 1, deps []). Every
+ *    device that migrates the pod applies the SAME change, so they all hold the SAME map object
+ *    and concurrent writes into it merge. An ordinary `d[name] = {}` here would give each device
+ *    its own object, and only one device's entities would survive the merge.
+ *  - `null`: an ordinary change, as before. The stored change is concurrent with whatever wrote
+ *    the `null`, which sits behind earlier ops and so wins on op counter: the key would STAY
+ *    `null` (`automergeSemantics.test.ts`, probe c).
+ * Collections that already exist are never touched, and a doc with nothing missing is returned
+ * as-is (same handle, heads unchanged).
+ *
+ * A key still absent AFTER its stored change was applied means the change was already in the
+ * history and the key was later deleted (no code path deletes a collection). Applying a change a
+ * document already holds is a no-op, so that key falls through to the ordinary change: usable,
+ * just not merge-deterministic.
+ */
 export function migrateDoc(doc: Doc): Doc {
-  const missing = COLLECTION_NAMES.filter((name) => doc[name] === undefined || doc[name] === null);
-  if (missing.length === 0) return doc;
-  return Automerge.change(doc, 'migrate: add missing collections', (d) => {
-    for (const name of missing) (d as unknown as AnyRecord)[name] = {};
+  const absent = COLLECTION_NAMES.filter((name) => doc[name] === undefined);
+  const nulls = COLLECTION_NAMES.filter((name) => doc[name] === null);
+  if (absent.length === 0 && nulls.length === 0) return doc;
+  let next = doc;
+  if (absent.length > 0) {
+    [next] = Automerge.applyChanges(next, absent.map(storedMigrationChange));
+  }
+  const ordinary = [...nulls, ...absent.filter((name) => next[name] === undefined)];
+  if (ordinary.length === 0) return next;
+  return Automerge.change(next, 'migrate: add missing collections', (d) => {
+    for (const name of ordinary) (d as unknown as AnyRecord)[name] = {};
   });
+}
+
+/** The root keys a root conflict can occur at: every collection map plus the settings seed. */
+const ROOT_CONFLICT_KEYS = [...COLLECTION_NAMES, 'settings'] as const;
+
+/** Conflicted root keys only, each with how many concurrent values it holds (always 2+). */
+export type RootConflictSnapshot = ReadonlyMap<string, number>;
+
+/**
+ * Which root keys (`COLLECTION_NAMES` + `settings`) hold MORE than one concurrent value (#117,
+ * plan F). A root conflict means two devices each created that key with their own object (a
+ * pre-#117 device's `{}` beside the stored migration change, or the settings seed race), so the
+ * losing map's entities are invisible. Nothing reassigns a collection key, so a conflict
+ * persists: callers compare before/after an operation (`rootConflictsSince`) rather than alert
+ * on the total.
+ *
+ * On 3.4.1 `getConflicts` returns `undefined` for a key with a single value (probes c/d), so only
+ * a result with 2+ entries counts. Pure, and cheap: one lookup per root key.
+ */
+export function rootConflictSnapshot(doc: Doc): RootConflictSnapshot {
+  const out = new Map<string, number>();
+  for (const key of ROOT_CONFLICT_KEYS) {
+    const values = Automerge.getConflicts(doc, key);
+    const n = values ? Object.keys(values).length : 0;
+    if (n > 1) out.set(key, n);
+  }
+  return out;
+}
+
+/** How many root keys hold more than one concurrent value. See `rootConflictSnapshot`. */
+export function countRootConflicts(doc: Doc): number {
+  return rootConflictSnapshot(doc).size;
+}
+
+/**
+ * The root conflicts `doc` holds, and how many keys an operation since `before` ADDED. A key
+ * counts as added when it was not conflicted before OR its conflict grew (a third device's value
+ * arrived): either can change which map wins, and with it which entities are visible, which is
+ * exactly what a delta projection cannot express.
+ */
+export function rootConflictsSince(
+  before: RootConflictSnapshot,
+  doc: Doc
+): { total: number; added: number } {
+  const after = rootConflictSnapshot(doc);
+  let added = 0;
+  for (const [key, n] of after) if (n > (before.get(key) ?? 1)) added++;
+  return { total: after.size, added };
 }
 
 export function loadDoc(binary: Uint8Array): Doc {

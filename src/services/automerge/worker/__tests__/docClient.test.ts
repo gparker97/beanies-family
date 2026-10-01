@@ -327,9 +327,44 @@ describe('docClient', () => {
 
     logMergeTerminus('poll terminus', { action: 'merged' }, 'fam-1');
     const last = vi.mocked(logEvent).mock.calls.at(-1)![0];
-    // The field's presence is itself the answer to "did a rebase happen".
+    // No rebase and no root-conflict report: nothing to put in `detail`.
     expect(last.context).not.toHaveProperty('detail');
     expect(last.level).toBe('info');
+  });
+
+  it('appends root_conflicts=<total>,added=<n> on every action and warns only when added > 0 (#117 F)', () => {
+    // A root conflict persists forever, so a family that has one must not warn on every poll.
+    logMergeTerminus(
+      'poll terminus',
+      { action: 'merged', rootConflicts: { total: 1, added: 0 } },
+      'fam-1'
+    );
+    let last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({ action: 'merged', detail: 'root_conflicts=1,added=0' });
+
+    // This merge introduced it (and the worker pushed a full projection for it): news.
+    logMergeTerminus(
+      'poll terminus',
+      { action: 'merged', rootConflicts: { total: 2, added: 1 } },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('warn');
+    expect(last.context).toMatchObject({ detail: 'root_conflicts=2,added=1' });
+
+    // Rides after the rebase fields, on the same `detail` key (already allowlisted).
+    logMergeTerminus(
+      'open terminus',
+      { action: 'rebased', replayed: 3, conflicts: 0, rootConflicts: { total: 0, added: 0 } },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({
+      detail: 'replayed=3,conflicts=0,root_conflicts=0,added=0',
+    });
+    expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
   });
 
   it('reports a rebase that could not run — on the BLOCKED half', async () => {

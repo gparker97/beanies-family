@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument } from '@/types/automerge';
+import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
 import {
   migrateDoc,
@@ -407,10 +407,9 @@ describe('worker/applyAndProject', () => {
   });
 
   it('poll-merge reports dirty:true, streams a DELTA (not a full rebuild), and keeps both', async () => {
-    // Local and remote must share ancestry (as they do in production — both
-    // descend from the same created doc), else the two independently-migrated
-    // `todos` maps conflict on merge and one side's entry is dropped. Prime the
-    // cache with a shared origin, load it as local, derive remote from the same.
+    // Local and remote share ancestry, as they do in production (both descend
+    // from the same created doc). Prime the cache with a shared origin, load it
+    // as local, derive remote from the same.
     const originBin = saveDoc(base());
     await cache.initPersistenceDB(FAMILY_ID);
     await cache.persistDocBinary(key, originBin);
@@ -432,6 +431,7 @@ describe('worker/applyAndProject', () => {
     });
 
     expect(res.dirty).toBe(true); // local l1 is not in remote → must push back
+    expect(res.rootConflicts).toEqual({ total: 0, added: 0 });
     // A poll-merge now streams a DELTA (only the entity the merge brought in),
     // NOT a full 27-collection rebuild: an upsert for r1, and NO bulk reset.
     expect(bulkFor('todos')).toHaveLength(0);
@@ -448,6 +448,55 @@ describe('worker/applyAndProject', () => {
     const { payload } = await exportEncryptedPayload();
     const merged = await mergeReadBack(payload, key);
     expect(Object.keys(merged.todos).sort()).toEqual(['l1', 'r1']);
+  });
+
+  it('poll-merge that ADDS a root conflict pushes a full projection: no phantom entity (#117 F)', async () => {
+    // A pod from before `todos` shipped, its other collections created the ordinary way.
+    const oldPod = Automerge.change(Automerge.init<FamilyDocument>(), (d) => {
+      for (const name of COLLECTION_NAMES) {
+        if (name !== 'todos') (d as unknown as Record<string, unknown>)[name] = {};
+      }
+    });
+    const originBin = saveDoc(oldPod);
+    await cache.initPersistenceDB(FAMILY_ID);
+    await cache.persistDocBinary(key, originBin);
+
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID); // this (new) build migrates `todos` via the stored change
+    mutate({ op: 'set', collection: 'todos', id: 'l1', entity: { id: 'l1' } });
+
+    // A pre-#117 device migrated the same pod with an ordinary random-actor `{}`, which sits
+    // behind the old pod's ops and so WINS the root key: this device's `l1` becomes invisible.
+    const remote = Automerge.change(Automerge.load<FamilyDocument>(originBin), (d) => {
+      (d as unknown as Record<string, unknown>).todos = { r1: { id: 'r1' } };
+    });
+    chunks = [];
+    const res = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+      kind: 'baseline',
+      heads: null,
+    });
+
+    expect(res.action).toBe('merged');
+    expect(res.rootConflicts).toEqual({ total: 1, added: 1 });
+    // A delta would upsert r1 and emit NOTHING for l1, leaving it as a phantom. The full
+    // projection resets `todos` to exactly what the document shows.
+    const todoBulks = bulkFor('todos');
+    expect(todoBulks.every((d) => d.reset)).toBe(true);
+    expect(todoBulks.at(-1)!.entities.map(([id]) => id)).toEqual(['r1']);
+    const partial = chunks
+      .map((c) => c.delta)
+      .filter((d) => d.kind === 'upsert' || d.kind === 'remove');
+    expect(partial).toHaveLength(0);
+    expect(chunks.filter((c) => c.final)).toHaveLength(1);
+
+    // The conflict persists, but the next merge did not ADD it: back to deltas, `added: 0`.
+    chunks = [];
+    const again = await mergeRemoteEnvelope(await envelopeFor(remote, key), FAMILY_ID, {
+      kind: 'baseline',
+      heads: null,
+    });
+    expect(again.rootConflicts).toEqual({ total: 1, added: 0 });
+    expect(bulkFor('todos')).toHaveLength(0);
   });
 
   it('poll-merge falls back to a COMPLETE full projection (never a partial) when the delta cannot be derived', async () => {
