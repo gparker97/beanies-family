@@ -356,6 +356,11 @@ function handleSave() {
         data.canEditActivities = payload.canEditActivities;
         data.canManagePod = payload.canManagePod;
       }
+      // Becoming a pet: it must not keep a person's address, so the diff carries a fresh temp one
+      // (an already-temporary address is left alone, like an untouched edit).
+      if (data.isPet === true && !isTemporaryEmail(props.member.email ?? '')) {
+        data.email = mintTempEmail();
+      }
       // A cleared real email (or a pet-to-person change with none stored) still needs an address.
       if ('email' in data && !data.email) data.email = mintTempEmail();
       // NEVER set role on UPDATE: this modal is not the role-management surface (that's
