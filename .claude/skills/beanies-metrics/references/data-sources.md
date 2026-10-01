@@ -1,6 +1,6 @@
 # Data sources — beanies-metrics
 
-Deep reference for the three data sources this skill reads. SKILL.md points here
+Deep reference for the data sources this skill reads. SKILL.md points here
 when you need exact identifiers, schemas, or caveats. Everything here is
 **read-only**; nothing this skill runs may write, delete, or publish customer data
 without the masking rules below.
@@ -11,7 +11,8 @@ without the masking rules below.
 3. Plausible Analytics (traffic + product usage)
 3b. Google Search Console (search terms — optional)
 4. What is NOT available
-5. Privacy / masking rules
+5. Ad spend ledger (manual — paid campaigns)
+6. Privacy / masking rules
 
 ---
 
@@ -123,6 +124,20 @@ is recorded in `_degraded`, never breaking the run):
   **deduplicated** `contains` query for links to `app.beanies.family`. Use the deduped
   one for the hand-off number: summing per-URL rows double-counts a visitor who
   clicked both `/welcome` and `/login`.
+- `paid.*` (marketing) — the paid-campaign UTM breakdowns: traffic quality by
+  `visit:utm_source × visit:utm_campaign × visit:utm_content`, and CTA clicks
+  (`event:name contains "CTA: "`) by `event:name × utm_campaign × utm_content` and
+  by `event:name × utm_campaign`. All filtered to `['is_not','visit:utm_source',['(not set)']]`
+  — **verified accepted by the live API 2026-10-01**. If Plausible ever refuses the
+  filter the CTA queries fall back to the unfiltered form, `paid.ctaFilteredByUtmSource`
+  flips to `false`, and `build_dashboard.mjs` drops the `(not set)` rows itself.
+  CTA events inherit the visit's UTMs, which is what makes "CTA clicks per ad" possible.
+- `paid.*` (app) — app visitors by `utm_source` / `utm_campaign` / `utm_content`, and
+  the `signup` EVENT by `utm_campaign × utm_content`. **Empty today by design**: nothing
+  carries UTMs from the marketing site into `app.beanies.family` (tracker issue "carry
+  UTM attribution through to the app"). The only app-side `utm_source` seen so far is a
+  base64 blob from a share link, not a campaign. Built now so the pods-per-ad column
+  switches from the manual ledger to Plausible with no code change when that ships.
 - **New-vs-returning: not available, and not fixable.** Plausible is cookieless and its
   visitor hash is stable only within a single day, so the Stats API v2 has no such
   dimension, metric or filter — `visit:is_returning`, the `returning_visitors` metric and
@@ -274,7 +289,79 @@ reported separately as `queryLevelTotals`. Never present the query total as site
 
 ---
 
-## 5. Privacy / masking rules
+## 5. Ad spend ledger (manual — paid campaigns)
+
+- **Why it exists:** there is **no ads-platform API** for the channels we buy on (first:
+  ChatGPT Ads, Singapore pilot from 2026-10-02). Spend, impressions and clicks per ad
+  come from Ads Manager and are typed in by hand. Plausible supplies the other half of
+  the picture (visitors + CTA clicks per ad) because every ad is tagged
+  `utm_source=<platform>&utm_medium=cpc&utm_campaign=<campaign>&utm_content=<angle>-<ad-slug>`
+  and `utm_content` is the join key.
+- **File:** `~/.config/beanies/ad-spend.json` (gitignored location, never committed).
+  **Optional** — absent means the paid-campaigns panel hides itself with a note; a
+  malformed file is reported as `paidLedgerError` in `dashboard_data.json` and in the
+  dashboard's "missing this run" banner, never a crash. Example to copy:
+  `assets/ad-spend.example.json`.
+- **Schema:**
+
+```jsonc
+{
+  "campaigns": [
+    {
+      "platform": "chatgpt",             // free text, shown as the campaign label
+      "utm_source": "chatgpt",           // must equal the ads' utm_source
+      "utm_campaign": "sg-pilot-oct26",  // must equal the ads' utm_campaign
+      "currency": "USD",
+      "credit_usd": 350,                 // optional: lifetime budget / promo credit
+      "credit_deadline": "2026-10-14",   // optional: ISO date the credit expires
+      "started": "2026-10-02",           // optional, informational
+      "notes": "...",
+      "ads": [
+        { "utm_content": "straight-one-app", "name": "...",
+          "angle": "straight|funny|testimonial|alternative", "status": "active|paused" }
+      ],
+      "daily": [                         // one row per ad per day, from Ads Manager
+        { "date": "2026-10-02", "utm_content": "straight-one-app",
+          "spend": 12.3, "impressions": 4000, "clicks": 31 }
+      ],
+      "pods_manual": [                   // interim attribution, see below
+        { "date": "2026-10-01", "utm_content": null, "note": "slack heard-via chatgpt, untagged" }
+      ]
+    }
+  ]
+}
+```
+
+- **Window scoping:** `daily` and `pods_manual` rows are filtered to the dashboard's
+  date range (`dateRange.start..end`, inclusive, by the row's `date`). `credit` progress
+  is **lifetime** — the credit is a budget, not a window figure.
+- **`pods_manual` is the interim attribution.** Until the UTM carry-through ships, a pod
+  created by someone who came via an ad can only be attributed by greg reading the
+  create-pod Slack message (and, ideally, asking). Record it here with the ad's
+  `utm_content` when known, or `null` when only "heard via chatgpt" is known — untagged
+  rows count toward the campaign total but no ad row. The dashboard labels the source
+  (`podsSource: 'plausible-app-utm' | 'manual' | 'none'`) on every figure. The rule is
+  per campaign: once ANY app-side `signup` carries that campaign's UTMs, Plausible wins
+  for the whole campaign and `pods_manual` is ignored, so the two sources never mix.
+- **Derived columns** (`build_dashboard.mjs` → `dashboard_data.json.paid`): per campaign
+  and per ad — spend, impressions, clicks, **CTR** (clicks ÷ impressions), **CPC**
+  (spend ÷ clicks), visitors + bounce + duration (Plausible), **CTA clicks** and
+  **CTA rate** (CTA clickers ÷ tagged visitors), signups (app UTM, when present), pods,
+  **CPA = spend ÷ pods** (`null` when pods = 0 — never a divide-by-zero, never "$0").
+  `winner` = lowest CPA among ads with ≥1 pod, else highest CTA-click rate, else null.
+  `undeclaredLedger` / `undeclaredPlausible` list ad slugs seen in one source but not
+  the `ads` list — tagging mistakes, surfaced rather than dropped.
+- **What CPA means here:** cost per **new family (pod)**. It is **not** a revenue ROI —
+  no paid plan exists yet, so there is no revenue to earn back. Read CPA against the
+  value of an early-adopter family, not against a sale.
+- **Keeping it current:** daily, from Ads Manager, one `daily` row per ad per day; add a
+  `pods_manual` row the moment a create-pod Slack message can be tied to the campaign.
+  Stale ledgers under-report spend and overstate nothing — but CPA is only as fresh as
+  the last row.
+
+---
+
+## 6. Privacy / masking rules
 
 - **Terminal report** (local, ephemeral) may show full `ownerEmail` + family names — it's
   greg's own admin data on his own machine, and identifying "who to nurture / who we
@@ -283,4 +370,6 @@ reported separately as `queryLevelTotals`. Never present the query total as site
   (`jo****@gmail.com`, via `pull_registry.mjs` `ownerMasked`) and prefer family name +
   country + masked owner. Never publish full customer email lists to an artifact.
 - **Never** print or commit the Plausible token, AWS keys, or `.beanpod` contents.
+- The ad-spend ledger holds no customer data, but `pods_manual.note` may — keep notes
+  to "heard via chatgpt", never a name or email. Never commit the real ledger.
 - Raw JSON dumps go to the session scratchpad, never into the repo.

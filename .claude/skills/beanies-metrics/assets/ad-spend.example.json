@@ -1,0 +1,102 @@
+{
+  "_comment": "Example manual ad-spend ledger. Copy to ~/.config/beanies/ad-spend.json and keep it current daily from Ads Manager. Schema: references/data-sources.md section 5. Never commit the real file.",
+  "campaigns": [
+    {
+      "platform": "chatgpt",
+      "utm_source": "chatgpt",
+      "utm_campaign": "sg-pilot-oct26",
+      "currency": "USD",
+      "credit_usd": 350,
+      "credit_deadline": "2026-10-14",
+      "started": "2026-10-02",
+      "notes": "ChatGPT Ads pilot. SG + US + UK + AU. Four angles, two ads each, run in parallel week 1. Numbers here are illustrative.",
+      "ads": [
+        {
+          "utm_content": "straight-one-app",
+          "name": "family calendar, chores, meals and money. one app.",
+          "angle": "straight",
+          "status": "active"
+        },
+        {
+          "utm_content": "straight-everything",
+          "name": "the family app that keeps everything in one place",
+          "angle": "straight",
+          "status": "active"
+        },
+        {
+          "utm_content": "funny-dinner",
+          "name": "mommy, what’s for dinner? ask the app, not me.",
+          "angle": "funny",
+          "status": "active"
+        },
+        {
+          "utm_content": "funny-partner",
+          "name": "a family app your partner will actually open",
+          "angle": "funny",
+          "status": "active"
+        },
+        {
+          "utm_content": "testimonial-replaced",
+          "name": "“replaced several different apps for our family”",
+          "angle": "testimonial",
+          "status": "active"
+        },
+        {
+          "utm_content": "testimonial-checking",
+          "name": "“if you can balance a checking account…”",
+          "angle": "testimonial",
+          "status": "active"
+        },
+        {
+          "utm_content": "alt-maple-cozi",
+          "name": "looking for a maple or cozi alternative?",
+          "angle": "alternative",
+          "status": "active"
+        },
+        {
+          "utm_content": "alt-skylight",
+          "name": "a family wall calendar, without the $300 frame",
+          "angle": "alternative",
+          "status": "active"
+        }
+      ],
+      "daily": [
+        {
+          "date": "2026-10-02",
+          "utm_content": "straight-one-app",
+          "spend": 6.1,
+          "impressions": 2100,
+          "clicks": 14
+        },
+        {
+          "date": "2026-10-02",
+          "utm_content": "funny-dinner",
+          "spend": 6.4,
+          "impressions": 2300,
+          "clicks": 21
+        },
+        {
+          "date": "2026-10-02",
+          "utm_content": "testimonial-replaced",
+          "spend": 5.9,
+          "impressions": 1900,
+          "clicks": 11
+        },
+        {
+          "date": "2026-10-02",
+          "utm_content": "alt-maple-cozi",
+          "spend": 6.2,
+          "impressions": 2000,
+          "clicks": 9
+        }
+      ],
+      "pods_manual": [
+        {
+          "date": "2026-10-02",
+          "utm_content": "funny-dinner",
+          "note": "create-pod slack msg, heard via chatgpt ad"
+        }
+      ]
+    }
+  ]
+}

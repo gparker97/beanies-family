@@ -3,7 +3,8 @@
  * beanies-metrics: consolidate collected JSON into the dashboard.
  *
  * Reads the raw source dumps from a directory (produced by pull_registry.mjs,
- * query_cloudwatch.sh, query_plausible.mjs), does the registry<->CloudWatch
+ * cw_cache.mjs, query_plausible.mjs) plus the optional manual ad-spend ledger
+ * at ~/.config/beanies/ad-spend.json, does the registry<->CloudWatch
  * reconciliation (the key insight: registry lastLoginAt is date-only/login-only
  * and undercounts, so true "active" comes from CloudWatch last-seen), then:
  *   - writes `dashboard_data.json` (the consolidated, artifact-safe figures), and
@@ -22,6 +23,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const dir = process.argv[2];
@@ -535,6 +537,223 @@ if (gsc) {
   };
 }
 
+// ── Paid campaigns (manual spend ledger x Plausible UTM) ────────────────────
+// There is no ads-platform API, so spend / impressions / clicks per ad are typed
+// into ~/.config/beanies/ad-spend.json by hand (schema: references/data-sources.md
+// §5). Plausible contributes visitors + CTA clicks per `utm_content` on the
+// marketing site, and — once UTMs carry through to the app — signups per ad.
+// Until then `pods` falls back to the ledger's `pods_manual` rows, and every
+// figure says which source it came from (`podsSource`).
+//
+// CPA here = spend ÷ new families (pods). It is NOT a revenue ROI — no paid
+// plan exists yet, so there is no revenue to divide by.
+const LEDGER_PATH = join(homedir(), '.config', 'beanies', 'ad-spend.json');
+let paid = null;
+let paidLedgerError = null;
+{
+  let ledger = null;
+  if (existsSync(LEDGER_PATH)) {
+    try {
+      ledger = JSON.parse(readFileSync(LEDGER_PATH, 'utf8'));
+    } catch (err) {
+      // A malformed ledger must hide the panel with a reason, never crash the
+      // whole dashboard over a hand-edited file.
+      paidLedgerError = `ad-spend.json unreadable: ${String(err?.message || err).slice(0, 160)}`;
+    }
+  }
+  const campaignsIn = Array.isArray(ledger?.campaigns) ? ledger.campaigns : [];
+  if (campaignsIn.length) {
+    const inWindowDate = (d) => typeof d === 'string' && d >= dateRange.start && d <= dateRange.end;
+    const r1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
+    const r2 = (n) => (n == null ? null : Math.round(n * 100) / 100);
+    const ratio = (a, b) => (b ? a / b : null); // never divide by zero
+    const notSet = (v) => !v || v === '(not set)';
+    const mktPaid = pl?.marketing?.paid || null;
+    const appPaid = pl?.app?.paid || null;
+
+    const campaigns = campaignsIn.map((c) => {
+      const ads = Array.isArray(c.ads) ? c.ads : [];
+      const dailyAll = Array.isArray(c.daily) ? c.daily : [];
+      const daily = dailyAll.filter((d) => inWindowDate(d.date));
+      const podsManual = (Array.isArray(c.pods_manual) ? c.pods_manual : []).filter((p) => inWindowDate(p.date));
+
+      // Plausible rows for THIS campaign, keyed by utm_content.
+      const sameCampaign = (r) =>
+        r['visit:utm_campaign'] === c.utm_campaign &&
+        (r['visit:utm_source'] == null || r['visit:utm_source'] === c.utm_source);
+      const trafficByContent = new Map();
+      for (const r of (mktPaid?.byAd || []).filter(sameCampaign)) {
+        trafficByContent.set(r['visit:utm_content'], r);
+      }
+      // CTA clickers per ad: visitors summed across the CTA event names. A
+      // visitor who clicked two different CTAs counts twice — same approximation
+      // the site-wide CTA panel accepts. Rows without a utm_source (only present
+      // when the API refused the filter) are dropped here.
+      const ctaByContent = new Map();
+      for (const r of (mktPaid?.ctaByContent || []).filter(sameCampaign)) {
+        const k = r['visit:utm_content'];
+        ctaByContent.set(k, (ctaByContent.get(k) || 0) + (r.visitors || 0));
+      }
+      const ctaCampaign = (mktPaid?.ctaByCampaign || [])
+        .filter((r) => r['visit:utm_campaign'] === c.utm_campaign)
+        .reduce((n, r) => n + (r.visitors || 0), 0);
+      const signupsByContent = new Map();
+      for (const r of (appPaid?.signupsByContent || []).filter((r) => r['visit:utm_campaign'] === c.utm_campaign)) {
+        const k = r['visit:utm_content'];
+        signupsByContent.set(k, (signupsByContent.get(k) || 0) + (r.visitors || 0));
+      }
+      const appVisitorsCampaign = (appPaid?.byCampaign || []).find((r) => r['visit:utm_campaign'] === c.utm_campaign)?.visitors ?? null;
+      const campaignSignups = [...signupsByContent.values()].reduce((a, b) => a + b, 0);
+      // One rule for the whole campaign, so per-ad pods and the campaign total
+      // never mix sources: Plausible app-UTM signups when ANY exist, else the
+      // hand-recorded pods, else nothing.
+      const podsSource = campaignSignups > 0 ? 'plausible-app-utm' : podsManual.length ? 'manual' : 'none';
+
+      const adRows = ads.map((ad) => {
+        const mine = daily.filter((d) => d.utm_content === ad.utm_content);
+        const spend = mine.reduce((n, d) => n + (Number(d.spend) || 0), 0);
+        const impressions = mine.reduce((n, d) => n + (Number(d.impressions) || 0), 0);
+        const clicks = mine.reduce((n, d) => n + (Number(d.clicks) || 0), 0);
+        const t = trafficByContent.get(ad.utm_content) || null;
+        const visitors = t ? t.visitors : null;
+        const ctaClicks = ctaByContent.has(ad.utm_content) ? ctaByContent.get(ad.utm_content) : (t ? 0 : null);
+        const signups = signupsByContent.get(ad.utm_content) || 0;
+        const pods =
+          podsSource === 'plausible-app-utm'
+            ? signups
+            : podsSource === 'manual'
+              ? podsManual.filter((p) => p.utm_content === ad.utm_content).length
+              : 0;
+        return {
+          utmContent: ad.utm_content,
+          name: ad.name || ad.utm_content,
+          angle: ad.angle || null,
+          status: ad.status || null,
+          daysActive: new Set(mine.map((d) => d.date)).size,
+          spend: r2(spend),
+          impressions,
+          clicks,
+          ctr: r2(ratio(clicks * 100, impressions)),
+          cpc: r2(ratio(spend, clicks)),
+          visitors,
+          bounce: t?.bounce_rate ?? null,
+          duration: t?.visit_duration ?? null,
+          ctaClicks,
+          ctaRate: r1(ctaClicks != null && visitors ? (ctaClicks / visitors) * 100 : null),
+          signups: podsSource === 'plausible-app-utm' ? signups : null,
+          pods,
+          podsSource,
+          cpa: pods > 0 && spend > 0 ? r2(spend / pods) : null,
+        };
+      });
+
+      const spend = adRows.reduce((n, a) => n + a.spend, 0);
+      const impressions = adRows.reduce((n, a) => n + a.impressions, 0);
+      const clicks = adRows.reduce((n, a) => n + a.clicks, 0);
+      // Campaign visitors come from the per-ad rows (same denominator as the
+      // table); untagged-content rows ("(not set)") are added so a mis-tagged
+      // ad still counts toward the campaign.
+      const visitorsAll = [...trafficByContent.values()].reduce((n, r) => n + (r.visitors || 0), 0);
+      const hasTraffic = trafficByContent.size > 0;
+      const untaggedPods = podsSource === 'manual' ? podsManual.filter((p) => notSet(p.utm_content)).length : 0;
+      const pods =
+        podsSource === 'plausible-app-utm' ? campaignSignups : podsSource === 'manual' ? podsManual.length : 0;
+      const ctaClicks = hasTraffic ? ctaCampaign : null;
+
+      // Spend the ledger says this ad slug drew but no `ads` entry declares, and
+      // Plausible contents nobody declared — both are tagging mistakes worth a
+      // line, not silent drops.
+      const declared = new Set(ads.map((a) => a.utm_content));
+      const undeclaredLedger = [...new Set(daily.map((d) => d.utm_content).filter((k) => k && !declared.has(k)))];
+      const undeclaredPlausible = [...trafficByContent.keys()].filter((k) => !notSet(k) && !declared.has(k));
+
+      // Credit progress is LIFETIME (the credit is a budget, not a window).
+      const lifetimeSpend = dailyAll.reduce((n, d) => n + (Number(d.spend) || 0), 0);
+      const credit = c.credit_usd
+        ? {
+            amount: c.credit_usd,
+            spent: r2(lifetimeSpend),
+            pct: Math.min(100, Math.round((lifetimeSpend / c.credit_usd) * 100)),
+            deadline: c.credit_deadline || null,
+            daysLeft: c.credit_deadline
+              ? Math.max(0, Math.ceil((new Date(c.credit_deadline + 'T23:59:59Z').getTime() / 1000 - NOW) / DAY))
+              : null,
+          }
+        : null;
+
+      // Winner: lowest CPA among ads with pods; else highest CTA-click rate.
+      const withPods = adRows.filter((a) => a.pods > 0 && a.cpa != null);
+      let winner = null;
+      if (withPods.length) {
+        const w = withPods.sort((a, b) => a.cpa - b.cpa)[0];
+        winner = { utmContent: w.utmContent, name: w.name, by: 'cpa', value: w.cpa };
+      } else {
+        const withRate = adRows.filter((a) => a.ctaRate != null && a.ctaRate > 0);
+        if (withRate.length) {
+          const w = withRate.sort((a, b) => b.ctaRate - a.ctaRate)[0];
+          winner = { utmContent: w.utmContent, name: w.name, by: 'cta-rate', value: w.ctaRate };
+        }
+      }
+
+      return {
+        platform: c.platform,
+        utmSource: c.utm_source,
+        utmCampaign: c.utm_campaign,
+        currency: c.currency || 'USD',
+        notes: c.notes || null,
+        started: c.started || null,
+        totals: {
+          spend: r2(spend),
+          impressions,
+          clicks,
+          ctr: r2(ratio(clicks * 100, impressions)),
+          cpc: r2(ratio(spend, clicks)),
+          visitors: hasTraffic ? visitorsAll : null,
+          appVisitors: appVisitorsCampaign,
+          ctaClicks,
+          ctaRate: r1(ctaClicks != null && visitorsAll ? (ctaClicks / visitorsAll) * 100 : null),
+          signups: podsSource === 'plausible-app-utm' ? campaignSignups : null,
+          pods,
+          untaggedPods,
+          podsSource,
+          cpa: pods > 0 && spend > 0 ? r2(spend / pods) : null,
+        },
+        credit,
+        ads: adRows.sort((a, b) => b.spend - a.spend),
+        winner,
+        undeclaredLedger,
+        undeclaredPlausible,
+      };
+    });
+
+    const sumT = (k) => campaigns.reduce((n, c) => n + (c.totals[k] || 0), 0);
+    const anyTraffic = campaigns.some((c) => c.totals.visitors != null);
+    const totalSpend = sumT('spend');
+    const totalPods = sumT('pods');
+    paid = {
+      ledgerPath: '~/.config/beanies/ad-spend.json',
+      plausibleAvailable: !!pl,
+      // Overall attribution source, for the one-line note. Mixed campaigns are
+      // possible in principle; the per-campaign `podsSource` is the exact answer.
+      attribution: campaigns.some((c) => c.totals.podsSource === 'plausible-app-utm')
+        ? 'plausible-app-utm'
+        : campaigns.some((c) => c.totals.podsSource === 'manual')
+          ? 'manual'
+          : 'none',
+      utmCarryThrough: campaigns.some((c) => c.totals.signups != null),
+      ctaFilteredByUtmSource: mktPaid?.ctaFilteredByUtmSource ?? null,
+      totals: {
+        spend: r2(totalSpend),
+        clicks: sumT('clicks'),
+        visitors: anyTraffic ? sumT('visitors') : null,
+        pods: totalPods,
+        cpa: totalPods > 0 && totalSpend > 0 ? r2(totalSpend / totalPods) : null,
+      },
+      campaigns,
+    };
+  }
+}
+
 // Activation & retention cohort (registry createdAt joined to CloudWatch last-seen).
 // A true per-family funnel over a single denominator: families created >=28d ago
 // (so every one has had the chance to hit all thresholds). "Retained at N days" =
@@ -575,6 +794,11 @@ const data = {
   direct,
   searchTerms,
   searchConsoleAvailable: !!gsc,
+  // Paid campaigns: null when ~/.config/beanies/ad-spend.json is absent or has
+  // no campaigns (the panel hides itself); `paidLedgerError` names a malformed
+  // file so it is never a silent drop.
+  paid,
+  paidLedgerError,
   // Which optional Plausible queries degraded this run, so the page can say so
   // rather than rendering a silently-empty panel.
   degraded: pl?._degraded || [],

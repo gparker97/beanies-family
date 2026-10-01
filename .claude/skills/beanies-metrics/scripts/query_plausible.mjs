@@ -208,6 +208,14 @@ async function marketingBundle() {
     }),
   ]);
 
+  // ── Paid campaigns (all soft) ──────────────────────────────────────────────
+  // Ads are tagged utm_source=<platform>&utm_medium=cpc&utm_campaign=<campaign>
+  // &utm_content=<angle>-<ad-slug>, so utm_content is the per-AD key the manual
+  // spend ledger (~/.config/beanies/ad-spend.json) joins on. Plausible records
+  // the utm_* dimensions natively on the marketing site; CTA events inherit the
+  // visit's UTMs, which is what makes "CTA clicks per ad" possible at all.
+  const paid = await paidQueries(site);
+
   return {
     site,
     overview: rows(overview)[0] || {},
@@ -233,6 +241,102 @@ async function marketingBundle() {
       countries: rows(directCountries),
       devices: rows(directDevices),
     },
+    paid,
+  };
+}
+
+// Plausible returns the literal string "(not set)" for visits with no UTM.
+const UTM_SOURCE_PRESENT = ['is_not', 'visit:utm_source', ['(not set)']];
+const CTA_EVENTS = ['contains', 'event:name', ['CTA: ']];
+
+/**
+ * Soft query that prefers a filter and falls back to the unfiltered form if the
+ * API rejects it. The build step dedupes "(not set)" rows itself, so the fallback
+ * is lossless on content — only the row volume differs. The degradation is still
+ * recorded so the operator can see the filter was refused.
+ */
+async function softWithFallback(name, siteId, body, filterToDrop) {
+  const primary = await soft(`${name} (filtered)`, siteId, body);
+  if (primary) return { resp: primary, filtered: true };
+  const fallback = await soft(name, siteId, {
+    ...body,
+    filters: (body.filters || []).filter((f) => f !== filterToDrop),
+  });
+  return { resp: fallback, filtered: false };
+}
+
+/** Marketing-site paid-campaign queries. Every one is soft. */
+async function paidQueries(site) {
+  const [byAd, ctaByContent, ctaByCampaign] = await Promise.all([
+    // (a) traffic quality per source x campaign x ad. One query, three
+    // dimensions, so a campaign's rows all come back together.
+    soft('paid traffic by utm source/campaign/content', site, {
+      metrics: ['visitors', 'visits', 'bounce_rate', 'visit_duration'],
+      dimensions: ['visit:utm_source', 'visit:utm_campaign', 'visit:utm_content'],
+      filters: [UTM_SOURCE_PRESENT],
+      pagination: { limit: 200 },
+    }),
+    // (b) CTA clicks per ad, scoped by campaign so two campaigns reusing an
+    // ad slug never merge. The build step maps these onto ledger rows.
+    softWithFallback('paid cta clicks by utm content', site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['event:name', 'visit:utm_campaign', 'visit:utm_content'],
+      filters: [CTA_EVENTS, UTM_SOURCE_PRESENT],
+      pagination: { limit: 200 },
+    }, UTM_SOURCE_PRESENT),
+    // (c) CTA clicks per campaign — the campaign-level total WITHOUT summing
+    // per-ad visitor rows (which would double-count a visitor seen under two
+    // ads).
+    softWithFallback('paid cta clicks by utm campaign', site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['event:name', 'visit:utm_campaign'],
+      filters: [CTA_EVENTS, UTM_SOURCE_PRESENT],
+      pagination: { limit: 100 },
+    }, UTM_SOURCE_PRESENT),
+  ]);
+  return {
+    byAd: rows(byAd),
+    ctaByContent: rows(ctaByContent.resp),
+    ctaByCampaign: rows(ctaByCampaign.resp),
+    // false => the utm_source filter was refused and rows include "(not set)";
+    // the build step drops those itself.
+    ctaFilteredByUtmSource: ctaByContent.filtered && ctaByCampaign.filtered,
+  };
+}
+
+/**
+ * App-site attribution. EMPTY TODAY by design: nothing yet carries UTMs from
+ * the marketing site into app.beanies.family (tracker issue "carry UTM
+ * attribution through to the app"). Built now so the day that ships the
+ * dashboard's pods-per-ad column flips from the manual ledger to Plausible with
+ * no code change. All soft.
+ */
+async function appPaidQueries(site) {
+  const [bySource, byCampaign, byContent, signupsByContent] = await Promise.all([
+    soft('app visitors by utm source', site, {
+      metrics: ['visitors', 'visits'], dimensions: ['visit:utm_source'], filters: [UTM_SOURCE_PRESENT], pagination: { limit: 20 },
+    }),
+    soft('app visitors by utm campaign', site, {
+      metrics: ['visitors', 'visits'], dimensions: ['visit:utm_campaign'], filters: [UTM_SOURCE_PRESENT], pagination: { limit: 30 },
+    }),
+    soft('app visitors by utm content', site, {
+      metrics: ['visitors', 'visits'], dimensions: ['visit:utm_campaign', 'visit:utm_content'], filters: [UTM_SOURCE_PRESENT], pagination: { limit: 200 },
+    }),
+    // Signup EVENT by ad — the real per-ad "pods created" once UTMs carry
+    // through. Queried on the event name (not the goal) for the same reason as
+    // the CTA panel: it works the moment the event fires.
+    soft('app signups by utm content', site, {
+      metrics: ['visitors', 'events'],
+      dimensions: ['visit:utm_campaign', 'visit:utm_content'],
+      filters: [['is', 'event:name', ['signup']], UTM_SOURCE_PRESENT],
+      pagination: { limit: 200 },
+    }),
+  ]);
+  return {
+    bySource: rows(bySource),
+    byCampaign: rows(byCampaign),
+    byContent: rows(byContent),
+    signupsByContent: rows(signupsByContent),
   };
 }
 
@@ -276,6 +380,7 @@ async function appBundle() {
   const appChannels = await soft('app arrivals by channel', site, {
     metrics: ['visitors', 'visits'], dimensions: ['visit:channel'], pagination: { limit: 10 },
   });
+  const paid = await appPaidQueries(site);
   return {
     site,
     overview: rows(overview)[0] || {},
@@ -286,6 +391,7 @@ async function appBundle() {
     loginMethods: rows(loginMethods),
     signupPlatforms: rows(signupPlatforms),
     channels: rows(appChannels),
+    paid,
   };
 }
 

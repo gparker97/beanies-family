@@ -22,11 +22,11 @@ description: >-
 
 A founder's-eye read on how beanies.family is growing and being used. It answers
 "who's actually using this, who's the heaviest, who did we lose, where do new
-families come from, and what do they do once inside?" by combining four sources
+families come from, and what do they do once inside?" by combining five sources
 that each hold part of the picture. Read `references/data-sources.md` for exact
 schemas, identifiers, and caveats before interpreting anything.
 
-## The four sources (and which question each answers)
+## The five sources (and which question each answers)
 
 1. **DynamoDB family registry** (`beanies-family-registry-prod`, ap-southeast-1) —
    the roster. Total families, signup dates (growth), last-login recency,
@@ -57,6 +57,13 @@ schemas, identifiers, and caveats before interpreting anything.
    attached. Needs a service-account key at
    `~/.config/beanies/gsc-service-account.json` (or env `GSC_ACCESS_TOKEN`); the
    script exits 3 and the panel self-hides when absent.
+5. **Ad spend ledger** (optional, manual) — `~/.config/beanies/ad-spend.json`. There is
+   no ads-platform API, so spend / impressions / clicks per ad are typed in from Ads
+   Manager; Plausible adds visitors + CTA clicks per ad via `utm_content`. First
+   campaign: the ChatGPT Ads Singapore pilot (`utm_source=chatgpt`,
+   `utm_campaign=sg-pilot-oct26`, from 2026-10-02). Absent → the paid panel hides
+   with a note. Schema + example: `references/data-sources.md` §5 and
+   `assets/ad-spend.example.json`.
 
 ## Workflow
 
@@ -89,7 +96,8 @@ node $SKILL/query_plausible.mjs both 30d > "$OUT/plausible.json" || echo "PLAUSI
 # 3b. Google search terms (optional — exits 3 without credentials).
 node $SKILL/query_search_console.mjs 30 > "$OUT/search_console.json" || echo "SEARCH CONSOLE SKIPPED"
 
-# 4. Consolidate + reconcile registry<->CloudWatch, and render the dashboard HTML
+# 4. Consolidate + reconcile registry<->CloudWatch, join the (optional) ad-spend
+#    ledger at ~/.config/beanies/ad-spend.json, and render the dashboard HTML
 #    from assets/dashboard-template.html. Writes $OUT/dashboard_data.json (the
 #    figures for the terminal report) and $OUT/beanies-metrics.html (the artifact).
 node $SKILL/build_dashboard.mjs "$OUT"
@@ -188,6 +196,27 @@ signal, not every field.
      clicks; call `opportunities` (high impressions, CTR <2%, position ≤20) the
      cheapest SEO win. Never call any term "converting" without saying it is
      **inferred via the landing page** — GSC has no conversion signal.
+9b. **Paid campaigns** (`paid` — skip with a one-line note when `null`, i.e. no
+    ledger). Per campaign: spend, impressions, clicks, CTR, CPC (ledger, window-scoped);
+    tagged visitors + CTA clicks (Plausible by `utm_content`); pods and **CPA**. Then the
+    per-ad table and the `winner` (lowest CPA with ≥1 pod, else highest CTA-click rate).
+    Credit progress (`credit.spent` of `credit.amount`, `daysLeft`).
+    - **Always name the attribution source** (`totals.podsSource`): `manual` means pods
+      were recorded by greg from the create-pod Slack message (`pods_manual`), because
+      nothing carries UTMs into the app yet; `plausible-app-utm` means the app-side
+      `signup` event carried the ad's UTMs (only after the carry-through ships). Mention
+      `untaggedPods` — pods heard-via the platform but not tied to an ad.
+    - **CPA = spend per new family (pod), not a revenue ROI.** There is no paid plan, so
+      there is no revenue to divide by; say so if the word "ROI" comes up. `cpa` is
+      `null` (render "—") when pods = 0 — never report $0.
+    - Tagged `visitors` is `null` until the first tagged visit lands (the tile says "no
+      tagged visits yet"); ad `clicks` (ledger) vs `visitors` (Plausible) will differ —
+      ad-blockers, bots, and bounce-before-load all sit in that gap.
+    - Call out `undeclaredLedger` / `undeclaredPlausible` (ad slugs in one source but not
+      the ledger's `ads` list) as tagging mistakes to fix today.
+    - **Keeping the ledger current is greg's daily job**: one `daily` row per ad per day
+      from Ads Manager, plus a `pods_manual` row per attributed Slack create-pod message.
+      Remind him if the newest `daily.date` is older than yesterday.
 10. **App usage (Plausible app)** — goals/conversions (signups, logins,
     member_joined, discord clicks…), feature_used breakdown, login-method mix.
 11. **Founder callouts** — 3–5 bullets: the one number that moved most, the biggest
@@ -221,7 +250,8 @@ the parent session publishes instead.
 - The template is already brand-correct (Heritage Orange / Deep Slate / Sky Silk /
   Cloud White, Outfit + Inter, squircle cards, theme-aware, inline CSS charts, CSP-safe)
   and **data-driven** — every number, the callouts, and the source list recompute from
-  the embedded data, and the traffic panels self-hide when Plausible is absent. So you
+  the embedded data, the traffic panels self-hide when Plausible is absent, and the
+  paid-campaigns panel self-hides when there is no ad-spend ledger. So you
   normally don't touch the HTML. Only load `beanies-theme` / `artifact-design` /
   `dataviz` if you're changing the template's **design or which panels it shows**.
 - **Privacy:** the template only ever shows masked owners + family name + country —
@@ -244,7 +274,8 @@ dashboard" option (its own `/beanies-plan`, with a threat model), not to bolt it
   count with NO member data — always report **total users with its coverage %**
   (families quiet since the field shipped report none, so the total is a floor;
   never backfill unknowns as 1).
-- **Never** print or commit the Plausible token, AWS credentials, or beanpod contents.
+- **Never** print or commit the Plausible token, AWS credentials, beanpod contents, or
+  the real ad-spend ledger (only `assets/ad-spend.example.json` lives in the repo).
 - Save raw JSON to the scratchpad, not the repo.
 - If AWS creds fail (registry/CloudWatch error), say so plainly and report whatever
   sources did succeed rather than aborting the whole run.
