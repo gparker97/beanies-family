@@ -28,7 +28,7 @@ _Unreleased on `main`. Nothing in this section is visible to users yet._
 - (unreleased) Fixed a long-standing bug where a setting with no default (such as the new plan token) could be silently erased on app start by the exchange-rate refresh.
 - (unreleased) Your beanies Plan now sits at the top of Settings, shows magic beans as a meter, and links to a Plan Details page (also from the profile menu); the Plan page has a way back to Settings.
 - (unreleased) A cancelled plan now says so, with the date everything stays included until and a **Restart Plan** button; a failed renewal says **Payment Issue** with **Update Card**. The magic-beans line no longer shows the wrong allowance right after a page refresh.
-- (unreleased, web, live keys only) Settings → Your beanies Plan → See Plans opens a Plan page on the web where a family can pick beanies basic or beanies + magic beans, in USD or SGD, yearly or monthly, and pay inside the page with Stripe; an active plan shows Manage Plan and Receipts (Stripe's portal) and a place to paste a plan token. Nothing is offered in the iPhone or Android apps.
+- (unreleased, web, live keys only) Settings → Your beanies Plan → See Plans opens a Plan page on the web where a family can pick beanies basic or beanies + magic beans, in USD or SGD, yearly or monthly, and pay inside the page with Stripe; an active plan shows Manage Plan and Receipts (Stripe's portal). Nothing is offered in the iPhone or Android apps.
 
 ---
 
