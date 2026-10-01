@@ -99,9 +99,10 @@ export function useAllowanceLine() {
     // `resetsAt` before it can get here, so a second fallback would be unreachable.
     const reset = allowanceResetParts(u.resetsAt)!;
     const left = Math.max(0, u.limit - u.used);
-    return u.period === 'month'
-      ? fillTemplate(t('plan.allowance.month'), { left, limit: u.limit, date: reset.date })
-      : fillTemplate(t('plan.allowance.day'), { left, limit: u.limit, time: reset.time });
+    // Both periods name the reset date AND local time: "resets on 2 Oct at 8:00am" reads the
+    // same whether the window is a day or a month.
+    const key = u.period === 'month' ? 'plan.allowance.month' : 'plan.allowance.day';
+    return fillTemplate(t(key), { left, limit: u.limit, date: reset.date, time: reset.time });
   });
 
   /** For the meter: how much of the allowance is LEFT, 0..100 (the sentence says "left", so the

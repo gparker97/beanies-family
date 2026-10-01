@@ -11303,12 +11303,12 @@ const STRING_DEFS = {
   },
   'ai.allowance.action': { en: 'AI Settings', beanie: 'ai settings' },
   'plan.allowance.day': {
-    en: '{left} of {limit} magic beans left today, more at {time}.',
-    beanie: '{left} of {limit} magic beans left today, more at {time}.',
+    en: '{left} of {limit} magic beans left today. Resets on {date} at {time}.',
+    beanie: '{left} of {limit} magic beans left today. resets on {date} at {time}.',
   },
   'plan.allowance.month': {
-    en: '{left} of {limit} magic beans left this month, more on {date}.',
-    beanie: '{left} of {limit} magic beans left this month, more on {date}.',
+    en: '{left} of {limit} magic beans left this month. Resets on {date} at {time}.',
+    beanie: '{left} of {limit} magic beans left this month. resets on {date} at {time}.',
   },
   'plan.allowance.unavailable': {
     en: "Magic beans usage isn't available right now.",
