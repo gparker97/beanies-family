@@ -45,9 +45,21 @@ export function fork(origin: Doc): Devices {
   return { a, b };
 }
 
-/** What a device would show: the full projection, the same materialisation the worker streams. */
+/**
+ * What a device would show: the full projection, the same materialisation the worker streams,
+ * with each collection's entities sorted by id.
+ *
+ * ⚠️ SORTED because entity ORDER is not converged state: on 3.4.1 two devices holding identical
+ * documents can enumerate a map's keys in different orders (observed: one device's merged map
+ * lists `e1, e2`, the other's `e2, e1`). The projection is keyed by id on main, so the order
+ * carries no meaning, and comparing it would fail any test where both devices add an entity.
+ */
 export function materialise(doc: Doc): unknown {
-  return buildFullProjection(doc);
+  return buildFullProjection(doc).map((d) =>
+    d.kind === 'bulk'
+      ? { ...d, entities: [...d.entities].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)) }
+      : d
+  );
 }
 
 /**

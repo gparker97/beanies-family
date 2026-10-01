@@ -1582,14 +1582,17 @@ export async function mergeRemoteEnvelope(
  * What a merge terminus needs to report. A DELIBERATELY LOOSER view of
  * `MergeOutcome` (`protocol.ts`), which is the source of truth for the shape.
  *
- * ⚠️ EXACTLY THESE THREE KEYS. Callers pass fresh object literals (see
- * `docClient.test.ts`), so widening the `Pick` to `heads`/`dirty`/`changed`/
- * `remoteHeads` would break them — and the terminus genuinely does not need them.
+ * ⚠️ EXACTLY THESE FOUR KEYS, all but `action` optional. Callers pass fresh object
+ * literals (see `docClient.test.ts`), so widening the `Pick` to `heads`/`dirty`/
+ * `changed`/`remoteHeads` would break them — and the terminus genuinely does not need them.
  * `carried`/`carryFailed` are excluded for a second reason: the carry is reported
  * from `mergeRemoteEnvelope`'s own wrapper (`finishMerge`), so every caller is
  * covered by construction rather than by whether it happens to log a terminus.
  */
-export type MergeTerminusOutcome = Pick<MergeOutcome, 'action' | 'replayed' | 'conflicts'>;
+export type MergeTerminusOutcome = Pick<
+  MergeOutcome,
+  'action' | 'replayed' | 'conflicts' | 'rootConflicts'
+>;
 
 /**
  * Report where a merge ended up. ONE implementation, both termini.
@@ -1610,22 +1613,32 @@ export function logMergeTerminus(
   outcome: MergeTerminusOutcome,
   familyId: string | null
 ): void {
+  // ⚠️ ON THE SUCCESS PATH TOO, so the RATE is measurable and not just the
+  // failures. `replayed=`/`conflicts=` appear only on a rebase, so their presence
+  // is itself the answer to "did a rebase happen".
+  const parts: string[] = [];
+  if (outcome.action === 'rebased') {
+    parts.push(`replayed=${outcome.replayed ?? 0}`, `conflicts=${outcome.conflicts ?? 0}`);
+  }
+  // #117 plan F: root conflicts on every action the worker reported them for. A
+  // root conflict hides one map's entities and never goes away, so `total` alone
+  // would warn on every poll forever for an affected family; only `added` (this
+  // merge introduced one, and the worker pushed a full projection for it) is news.
+  const rootAdded = outcome.rootConflicts?.added ?? 0;
+  if (outcome.rootConflicts) {
+    parts.push(`root_conflicts=${outcome.rootConflicts.total}`, `added=${rootAdded}`);
+  }
   logEvent({
     // A rebase that dropped a write is not routine: `conflicts` counts edits the
     // replay could not carry, so a family that lost something is findable
-    // without a repro.
-    level: outcome.conflicts ? 'warn' : 'info',
+    // without a repro. Nor is a merge that created a root conflict.
+    level: outcome.conflicts || rootAdded > 0 ? 'warn' : 'info',
     surface: 'pod-lineage',
     message: `${where} ${outcome.action}`,
     context: {
       action: outcome.action,
       ...(familyId ? { family_id: familyId } : {}),
-      // ⚠️ ON THE SUCCESS PATH TOO, so the RATE is measurable and not just the
-      // failures. Absent for every other action, so the field's presence is
-      // itself the answer to "did a rebase happen".
-      ...(outcome.action === 'rebased'
-        ? { detail: `replayed=${outcome.replayed ?? 0},conflicts=${outcome.conflicts ?? 0}` }
-        : {}),
+      ...(parts.length > 0 ? { detail: parts.join(',') } : {}),
     },
   });
 }

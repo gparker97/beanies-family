@@ -39,6 +39,7 @@
     "translate:zh": "node scripts/updateTranslations.mjs zh",
     "update-airports": "node scripts/updateAirports.mjs",
     "generate:holidays": "node scripts/generateHolidays.mjs",
+    "generate:migration-changes": "node scripts/generateMigrationChanges.mjs",
     "lint": "npm run lint:eslint && npm run lint:style",
     "lint:eslint": "eslint . --cache --cache-location node_modules/.cache/eslint",
     "lint:style": "stylelint \"src/**/*.{vue,css}\"",
