@@ -48,7 +48,7 @@ The upshot of all this: passwords are really gone (for new families). In its pla
 
 Introducing: [_**beanie magic links and QR codes!**_](https://beanies.family/help/security/your-beanies-magic-link?utm_source=blog&utm_medium=post&utm_campaign=passwords-are-so-two-thousand-and-late&utm_content=help-magic-link)
 
-Going forward, any logged-in family member can generate a personal, limited-time use magic link **and** QR code, created on the spot and specific to the family member you choose. Just send the link to the person who wants to sign in, or ask them to scan the QR code on your device. Done.
+Going forward, any logged-in admin family member can generate a personal, limited-time use magic link **and** QR code, created on the spot and specific to the family member you choose. Just send the link to the person who wants to sign in, or ask them to scan the QR code on your device. Done.
 
 _(Note: For legacy families who DID create passwords when you started your pod, they’ll still work.)_
 
