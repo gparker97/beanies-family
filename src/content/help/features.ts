@@ -2790,4 +2790,146 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'plans-trial-and-read-only',
+    category: 'features',
+    title: 'Plans, your trial, and what read-only means',
+    excerpt:
+      'What the 90-day trial includes, what changes when it ends, how to choose a plan from the website, and what happens to your family’s data if you stop paying (nothing).',
+    icon: '\u{1F331}',
+    readTime: 5,
+    updatedDate: '2026-10-01',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'beanies.family is built and paid for by one family, for families. There are no ads and nothing is sold on, so at some point a plan is what keeps the lights on. This article explains what the trial includes, exactly what changes when it ends, and how to choose a plan when you are ready. The short version: <strong>everything you add is always yours, export always works, and nothing is ever deleted</strong>.',
+      },
+      {
+        type: 'heading',
+        content: 'The 90-day trial',
+        level: 2,
+        id: 'trial',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every family gets <strong>90 days with everything included</strong>: every feature, every member, every device, and one magic bean a day for reading paperwork. Nothing is charged during the trial, and no card is asked for. In <strong>Settings → Your beanies Plan</strong> you can see which day of the trial you are on and the date it ends.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you choose a plan during the trial, billing begins that day. If you wait, nothing is charged until you decide.',
+      },
+      {
+        type: 'heading',
+        content: 'What read-only means',
+        level: 2,
+        id: 'read-only',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When the trial ends without a plan, beanies.family goes <strong>read-only</strong>. Everything stays exactly where it was: your accounts, activities, recipes, lists, photos and cards are all still there to look at, and every member can still sign in and sync. What changes is that nothing new can be added or edited until a plan is chosen. A small band at the top of the app says so, and any change you try is gently declined rather than lost.',
+      },
+      {
+        type: 'list',
+        content: 'Always works, plan or no plan:',
+        items: [
+          'Signing in, on every device',
+          'Reading everything your family has added',
+          '<strong>Export My Data</strong> (your whole family file, encrypted, from the band or from Settings)',
+          'Changing the look of the app: theme, language, text size',
+          'Receiving changes from a family member who is still adding',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Nothing is ever deleted',
+        icon: '\u{1F512}',
+        content:
+          'Read-only is a pause, not a countdown. A family that stays read-only for a year loses nothing. Choosing a plan later picks up exactly where you left off.',
+      },
+      {
+        type: 'heading',
+        content: 'The two plans',
+        level: 2,
+        id: 'plans',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>beanies basic</strong>: the whole app for the whole family, sold by the year. Includes one magic bean a month, so the paperwork reader is there when you need it.',
+          '<strong>beanies + magic beans</strong>: everything in basic, plus ten magic beans a day, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Magic beans are counted per family, not per person, and reset on a UTC day; the app shows the reset in your local time. If you use your <strong>own AI key</strong> (Settings → AI) there is no limit at all, on any plan, because the reading happens with your key rather than ours.',
+      },
+      {
+        type: 'heading',
+        content: 'Early families',
+        level: 2,
+        id: 'early-families',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Families who joined before version 1 pay <strong>half price for life</strong> on either plan. There is no code to type and nothing to claim: the discount is already on your plan page and on every invoice. A handful of founding families have their own price, shown the same way.',
+      },
+      {
+        type: 'heading',
+        content: 'Choosing a plan',
+        level: 2,
+        id: 'choose',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>app.beanies.family</strong> in a web browser and sign in.',
+          'Go to <strong>Settings → Your beanies Plan</strong> and tap <strong>See Plans</strong>.',
+          'Pick your currency, then a plan. On beanies + magic beans you can also pick <strong>Yearly</strong> or <strong>Monthly</strong>.',
+          'Pay in the box on the same page. It is Stripe’s secure checkout; beanies.family never sees your card.',
+          'That’s it. The page switches to your active plan, and every device in the family picks it up the next time it checks in.',
+        ],
+      },
+      {
+        type: 'callout',
+        title: 'Plans are chosen on the website, not in the iPhone or Android app',
+        icon: '\u{1F4BB}',
+        content:
+          'The iOS and Android apps show your plan but cannot start or change one. Open beanies.family in any browser, sign in as usual, and everything is there.',
+      },
+      {
+        type: 'heading',
+        content: 'Changing your card, switching plan, cancelling',
+        level: 2,
+        id: 'manage',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On the plan page, <strong>Manage Plan</strong> opens Stripe’s secure portal where you can update your card, switch between the two plans, download <strong>Receipts</strong>, or cancel. Cancelling stops the next payment; your plan runs to the end of what you have paid for, and <strong>Your beanies Plan</strong> shows the date it ends with a <strong>Restart Plan</strong> button in case you change your mind. After that date beanies.family goes read-only. Nothing is deleted, and you can come back any time.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If a payment fails, Stripe emails you and retries for a while before the plan ends. During those retries everything stays included; the card says <strong>Payment Issue</strong> and offers <strong>Update Card</strong>.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Self-hosting beanies.family stays free, and always will. Plans are for the hosted service at beanies.family.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Related: <a href="/help/features/sharing-feedback">Sharing feedback</a> if anything about your plan looks wrong, and <a href="/help/security/how-your-data-is-encrypted">How your data is encrypted</a> for what is stored where.',
+      },
+    ],
+  },
 ];

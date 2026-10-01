@@ -1,0 +1,82 @@
+# Runbook: pricing launch (#95)
+
+> Owner: greg. Plan: `docs/plans/2026-09-30-pricing-entitlement-read-only.md`. ADR-038.
+> Everything below is reversible in the same order backwards, one flip at a time.
+
+## What is live today (sandbox, dry-run, flag off)
+
+| Switch                 | Where                                                 | Value now                  |
+| ---------------------- | ----------------------------------------------------- | -------------------------- |
+| Stripe keys            | `~/.beanies-tf.env` + GitHub `STRIPE_PUBLISHABLE_KEY` | `sk_test_` / `pk_test_`    |
+| `v1_launch_at`         | `infrastructure/terraform.auto.tfvars`                | `""` (every family `beta`) |
+| `pricing` flag         | `src/config/featureFlags.committed.ts`                | `false`                    |
+| `billing_enforce`      | `terraform.auto.tfvars`                               | `false` (dry-run)          |
+| `ai_allowance_enforce` | `terraform.auto.tfvars`                               | `false` (dry-run)          |
+
+**The flag can be ON in prod before launch.** Every family then sees the beta card ("everything is free for now") on web and native, and nothing else: on app.beanies.family the Plan page needs a LIVE publishable key (`features.checkout`), so no family is ever offered Stripe's test-mode checkout while prod holds the sandbox pair, and the read-only gate cannot act while `billing_enforce` is false. Until the flag is committed on, a family only sees any of this with the per-browser override `localStorage beanies:flag:pricing=true`; either way only on a cloud build: `features.pricing` (registry + `VITE_STRIPE_PUBLISHABLE_KEY`) is false on every self-host, so the plan card, the Plan page and the read-only gate are simply absent there.
+
+**Testing from `npm run dev` works until step 1 below**: with the sandbox key in prod the Lambda allows localhost checkouts and looks localhost families up in the DEV registry table. After the live flip it refuses them (`dev_origin`), and the local harness is the sandbox path.
+
+## Stripe objects (created once per mode, same names in sandbox and live)
+
+Prices are found by `lookup_key = <cohort>.<plan>.<interval>.<currency>` where cohort is `list`, `pre_v1` (unused: pre_v1 is a coupon on the list Price) or `first_ten`. Amounts are `packages/brand/pricing.ts`.
+
+| lookup_key                 | Product               | Amount         |
+| -------------------------- | --------------------- | -------------- |
+| `list.basic.year.usd`      | beanies basic         | $30 / year     |
+| `list.basic.year.sgd`      | beanies basic         | S$39 / year    |
+| `list.full.month.usd`      | beanies + magic beans | $9.99 / month  |
+| `list.full.month.sgd`      | beanies + magic beans | S$13 / month   |
+| `list.full.year.usd`       | beanies + magic beans | $84.99 / year  |
+| `list.full.year.sgd`       | beanies + magic beans | S$110 / year   |
+| `first_ten.basic.year.usd` | beanies basic         | $12 / year     |
+| `first_ten.basic.year.sgd` | beanies basic         | S$16.20 / year |
+| `first_ten.full.month.usd` | beanies + magic beans | $1 / month     |
+| `first_ten.full.month.sgd` | beanies + magic beans | S$1.35 / month |
+| `first_ten.full.year.usd`  | beanies + magic beans | $12 / year     |
+| `first_ten.full.year.sgd`  | beanies + magic beans | S$16.20 / year |
+
+Plus: coupon `PRE_V1_50` (50%, `duration=forever`); a Customer Portal configuration (cancel at period end, switch between the two products' Prices, update payment method, invoice history); customer emails for successful and failed payments ON; the Dashboard "manage failed payments" setting → `unpaid` after Smart Retries; a webhook endpoint at `https://api.beanies.family/billing/webhook` subscribed to `customer.subscription.created|updated|deleted`, API version `2026-08-26.dahlia` (the value of `STRIPE_API_VERSION` in `lambda/billing/stripeApi.mjs`).
+
+The sandbox set was created 2026-10-01 via the Stripe MCP (`stripe_api_write`, test mode). In live, recreate them by hand or with the same calls against a live key.
+
+## Deploy order for a billing change
+
+Lambda before bundle, always: `scripts/infra/tf-plan.sh -target=module.billing` → read every change → `scripts/infra/tf-apply.sh` → then the web deploy workflow. A bundle that calls a route the Lambda does not have yet shows "checkout isn't available".
+
+The webhook secret is a two-apply dance the first time in any mode: apply with `TF_VAR_stripe_webhook_secret` empty (the route must exist before Stripe can be pointed at it), create the endpoint, paste its `whsec_`, apply again. Until then the Lambda answers 500 `webhook_secret_unset` and Stripe retries.
+
+## The flip order (v1)
+
+Each step is its own commit or apply, and each is watched before the next.
+
+1. **Live keys.** In the live Dashboard create the Stripe objects above. Set `TF_VAR_stripe_secret_key=sk_live_...` and the GitHub secret `STRIPE_PUBLISHABLE_KEY=pk_live_...`; create the live webhook endpoint, set `TF_VAR_stripe_webhook_secret`; `tf-plan.sh -target=module.billing` → apply → web deploy. Verify with a real card on a `first_ten` test family ($1), then refund it in the Dashboard. Sandbox testing from here on is `npm run billing:local` + `stripe listen` on the dev machine.
+2. **`v1_launch_at`.** One-line change to `terraform.auto.tfvars` (an ISO instant), `tf-plan.sh -target=module.registry` → apply. Every family's trial clock starts: `trialEndsAt = max(createdAt, v1_launch_at) + 90 d`. Watch `entitlement_computed` in CloudWatch: every state should read `trial`, none `read_only`.
+3. **Cohort snapshot.** `node scripts/billing-cohort.mjs --snapshot-pre-v1` (dry-run, read the list) then `--apply`. Every live family at that instant gets `cohort=pre_v1`; `--first-ten <familyId>` for the ten. A family created after this has no cohort and sees list prices.
+4. **`pricing` flag.** `featureFlags.committed.ts` `pricing: true` → web deploy AND the mobile lanes (native shows the plan card and the band copy; no purchase path). The Plan card, Plan page and See plans are now visible to every family.
+5. **`billing_enforce`.** `terraform.auto.tfvars` → apply `module.registry`. Read-only now ACTS. Do this at least a week after step 2 and after reading `read-only-gate would_block` rates; on day 91 the first trials end.
+6. **`ai_allowance_enforce`.** Last. `terraform.auto.tfvars` → apply `module.ai_extract`. Over-allowance reads now 402.
+
+## Store metadata (before step 4 reaches the store lanes)
+
+- Apple App Privacy / Google Data Safety: no In-App Purchases; the Diagnostics rows for `entitlement_state` / `plan` / `dry_run` are already declared (`docs/runbooks/native-store-submission.md`); no purchase data is collected natively.
+- `web/src/pages/privacy.astro`: Stripe as a processor (card details never reach beanies.family; customer id and email are held by Stripe for receipts).
+- Review notes: "Plans are chosen on the website; the app displays plan state only" with the read-only copy.
+
+## Watching it
+
+CloudWatch, log group `/aws/lambda/beanies-family-billing-prod`:
+
+- `checkout_session_created` / `checkout_refused {reason}` / `claim_ok` / `claim_refused {reason}` / `portal_session_created` / `webhook_received` / `webhook_applied {status, plan}` / `webhook_ignored {reason}` / `webhook_signature_failed`.
+- Alarms (Slack via the alerts topic): `[billing] webhook_apply_failed` (a verified event that could not be written; Stripe is retrying), `[billing] billing_upstream_error` (Stripe unreachable or refused a request: a missing lookup_key, coupon or portal configuration).
+- Client (`billing-ui`): `checkout_mounted`, `checkout_complete`, `claim_ok`, `claim_failed` (**critical**: money taken, plan not applied), `portal_opened`, `portal_failed`, `stripe_js_load_failed`.
+
+## Support levers
+
+| Situation                                                                                                                 | Do                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A paying family's plan token is missing or does not match (`plan_token_missing`, `portal_failed token_missing/bad_token`) | Refund the current period in the Stripe Dashboard and ask the family to choose the plan again; the claim mints a fresh token into their file. There is NO paste or reissue path, on purpose. |
+| Extend a trial                                                                                                            | `billing-cohort.mjs --trial-ends-at <familyId> <iso> --apply`                                                                                                                                |
+| Mark a founding family                                                                                                    | `billing-cohort.mjs --first-ten <familyId> --apply`                                                                                                                                          |
+| Row looks stale after a Stripe change                                                                                     | Dashboard → the subscription → resend the last `customer.subscription.updated`; the Lambda re-reads current state                                                                            |
+| Roll back a flip                                                                                                          | Reverse the step's one-line change and apply; rows are data, nothing is deleted                                                                                                              |

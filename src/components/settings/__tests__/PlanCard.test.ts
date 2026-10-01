@@ -26,6 +26,8 @@ vi.mock('@/composables/useTranslation', () => ({
 vi.mock('@/services/sync/capabilities', () => ({ isNative: () => h.native }));
 
 const store = reactive({
+  cancelAt: null as string | null,
+  pastDue: false,
   state: null as string | null,
   reason: null as string | null,
   isStale: false,
@@ -40,7 +42,32 @@ vi.mock('@/stores/entitlementStore', () => ({ useEntitlementStore: () => store }
 const allowance = vi.hoisted(() => ({ line: null as string | null }));
 vi.mock('@/composables/useAllowanceLine', async () => {
   const { computed } = await import('vue');
-  return { useAllowanceLine: () => ({ line: computed(() => allowance.line) }) };
+  return {
+    useAllowanceLine: () => ({
+      line: computed(() => allowance.line),
+      pct: computed(() => (allowance.line ? 30 : null)),
+    }),
+  };
+});
+const gate = vi.hoisted(() => ({ reachable: true }));
+vi.mock('@/services/billing/pricingGate', () => ({
+  // The real predicate is web-only; the mock must say so too or the native tests lie.
+  isPlanPageReachable: () => gate.reachable && !h.native,
+  isPricingAvailable: () => true,
+}));
+
+// #95 Phase 5: Manage plan / Receipts come from their own composable (tested on its own).
+const portal = vi.hoisted(() => ({ showManage: false, openPortal: vi.fn() }));
+vi.mock('@/composables/usePlanPortal', async () => {
+  const { computed, ref } = await import('vue');
+  return {
+    usePlanPortal: () => ({
+      showManage: computed(() => portal.showManage),
+      hasToken: computed(() => true),
+      opening: ref(false),
+      openPortal: portal.openPortal,
+    }),
+  };
 });
 
 import PlanCard from '../PlanCard.vue';
@@ -53,6 +80,8 @@ const render = () => mount(PlanCard, { global: { stubs } });
 
 function setState(over: Partial<typeof store>): void {
   Object.assign(store, {
+    cancelAt: null,
+    pastDue: false,
     state: null,
     reason: null,
     isStale: false,
@@ -81,6 +110,7 @@ const TRIAL_ENDED = { state: 'read_only', reason: 'trial_ended' };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  portal.showManage = false;
   h.native = false;
   h.hasRoute.mockReturnValue(true);
   setState({});
@@ -102,6 +132,17 @@ describe('web', () => {
     expect(h.push).toHaveBeenCalledWith({ name: 'Plan' });
   });
 
+  it('active: Manage plan and Receipts open the portal when the composable offers them', async () => {
+    setState(ACTIVE);
+    portal.showManage = true;
+    const w = render();
+    await w.get('[data-testid="plan-manage"]').trigger('click');
+    await w.get('[data-testid="plan-receipts"]').trigger('click');
+    expect(portal.openPortal).toHaveBeenCalledTimes(2);
+    portal.showManage = false;
+    expect(render().find('[data-testid="plan-manage"]').exists()).toBe(false);
+  });
+
   it('renders no See plans until the Phase 5 plan route exists', () => {
     h.hasRoute.mockReturnValue(false);
     setState(TRIAL);
@@ -117,13 +158,40 @@ describe('web', () => {
     expect(w.find('[data-testid="plan-see-plans"]').exists()).toBe(true);
   });
 
-  it('active: plan name and renewal date, no action yet (Manage plan is Phase 5)', () => {
+  it("active: plan name, renewal date, and Plan Details (the portal pair is the composable's call)", () => {
     setState(ACTIVE);
+    portal.showManage = true; // Plan Details sits on the portal row, so it shows with it
     const w = render();
     expect(w.get('[data-testid="plan-pill"]').text()).toBe('plan.pill.active');
     expect(w.get('[data-testid="plan-lead"]').text()).toBe('plan.name.full');
     expect(w.text()).toContain('plan.active.renews');
-    expect(w.find('button').exists()).toBe(false);
+    expect(w.find('[data-testid="plan-see-plans"]').exists()).toBe(false);
+    expect(w.find('[data-testid="plan-details"]').exists()).toBe(true);
+  });
+
+  it('active on the web: Plan Details opens the Plan page; never when the page is unreachable', async () => {
+    setState(ACTIVE);
+    portal.showManage = true;
+    const w = render();
+    await w.get('[data-testid="plan-details"]').trigger('click');
+    expect(h.push).toHaveBeenCalledWith({ name: 'Plan' });
+    gate.reachable = false;
+    expect(render().find('[data-testid="plan-details"]').exists()).toBe(false);
+    gate.reachable = true;
+  });
+
+  it('cancelled: the Ending pill and the end date; past due: the Payment Issue pill', () => {
+    setState({ ...ACTIVE, cancelAt: '2027-09-30T00:00:00.000Z' });
+    let w = render();
+    expect(w.get('[data-testid="plan-pill"]').text()).toBe('plan.pill.ending');
+    expect(w.get('[data-testid="plan-lead"]').text()).toBe('plan.name.full');
+    expect(w.text()).toContain('plan.active.ends');
+    expect(w.text()).not.toContain('plan.active.renews');
+
+    setState({ ...ACTIVE, pastDue: true });
+    w = render();
+    expect(w.get('[data-testid="plan-pill"]').text()).toBe('plan.pill.paymentIssue');
+    expect(w.text()).toContain('plan.active.pastDue');
   });
 
   it('read-only after the trial: the web sentence and See plans', () => {
@@ -207,7 +275,7 @@ describe('the magic-beans line (#95 Phase 4)', () => {
   it("renders the composable's line when there is one", () => {
     allowance.line = '0 of 1 magic beans left today, more at 8am.';
     setState(TRIAL);
-    expect(render().get('[data-testid="plan-allowance"]').text()).toBe(
+    expect(render().get('[data-testid="allowance-meter"]').text()).toBe(
       '0 of 1 magic beans left today, more at 8am.'
     );
   });
@@ -215,6 +283,6 @@ describe('the magic-beans line (#95 Phase 4)', () => {
   it('renders nothing when the line does not apply', () => {
     allowance.line = null;
     setState(TRIAL);
-    expect(render().find('[data-testid="plan-allowance"]').exists()).toBe(false);
+    expect(render().find('[data-testid="allowance-meter"]').exists()).toBe(false);
   });
 });

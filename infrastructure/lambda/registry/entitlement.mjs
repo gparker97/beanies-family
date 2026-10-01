@@ -110,7 +110,8 @@ function toIso(value) {
  *   state: 'beta'|'trial'|'active'|'read_only',
  *   reason: 'no_launch'|'in_trial'|'subscribed'|'trial_ended'|'lapsed',
  *   plan: string|null, cohort: string|null, trialEndsAt: string|null,
- *   currentPeriodEnd: string|null, enforced: boolean, serverTime: string }}
+ *   currentPeriodEnd: string|null, cancelAt: string|null, pastDue: boolean,
+ *   interval: 'month'|'year'|null, currency: string|null, enforced: boolean, serverTime: string }}
  */
 export function computeEntitlement({
   createdAt,
@@ -127,6 +128,15 @@ export function computeEntitlement({
     cohort: row?.cohort ?? null,
     trialEndsAt: null,
     currentPeriodEnd: null,
+    // Subscription detail, meaningful only when `active` (null/false otherwise):
+    //   cancelAt   the family cancelled; everything stays included until this instant, then
+    //              the subscription ends (Stripe fires `deleted` and the row reads `canceled`).
+    //   pastDue    a renewal payment failed and Stripe is retrying; still entitled.
+    //   interval / currency  what they are paying, for the card's wording.
+    cancelAt: null,
+    pastDue: false,
+    interval: null,
+    currency: null,
     enforced: enforce === true,
     serverTime: new Date(nowMs).toISOString(),
   };
@@ -149,6 +159,16 @@ export function computeEntitlement({
       plan: row.plan ?? null,
       trialEndsAt,
       currentPeriodEnd: toIso(row.currentPeriodEnd),
+      // `cancelAt` is what the billing Lambda writes now; rows written before 2026-10-01 carry
+      // only the boolean `cancelAtPeriodEnd` marker, for which the end is the period end.
+      cancelAt:
+        toIso(row.cancelAt) ??
+        (row.cancelAtPeriodEnd === 'true' || row.cancelAtPeriodEnd === true
+          ? toIso(row.currentPeriodEnd)
+          : null),
+      pastDue: row.status === 'past_due',
+      interval: row.interval === 'month' || row.interval === 'year' ? row.interval : null,
+      currency: typeof row.currency === 'string' && row.currency ? row.currency : null,
     };
   }
 

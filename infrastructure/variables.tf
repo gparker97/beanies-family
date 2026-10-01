@@ -114,3 +114,27 @@ variable "ai_allowance_enforce" {
   type        = bool
   default     = false
 }
+
+# ── Stripe (#95 Phase 5) ─────────────────────────────────────────────────────
+# The two secrets are declared with NO default so an apply from a shell that lacks them FAILS
+# rather than blanking the live values (the silent-revert class in .beanies-tf.env.example).
+# The coupon id is config with a safe default and lives here, not in tfvars, because it is the
+# same string in sandbox and live.
+
+variable "stripe_secret_key" {
+  description = "Stripe secret key for the billing Lambda: sk_test_ (sandbox) until the pricing launch runbook flips it to sk_live_. ONE variable for both modes; the value swaps, never the name. Supply via TF_VAR_stripe_secret_key."
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_webhook_secret" {
+  description = "Signing secret (whsec_) of the Stripe webhook endpoint pointed at /billing/webhook. It exists only after that endpoint is created in the Dashboard, so the first Phase 5 apply runs with it EMPTY (the Lambda answers 500 webhook_secret_unset) and a second apply sets it. Supply via TF_VAR_stripe_webhook_secret."
+  type        = string
+  sensitive   = true
+}
+
+variable "stripe_pre_v1_coupon" {
+  description = "Id of the 50%-off-forever coupon applied to pre_v1 families at checkout. Created with the same id in sandbox and live (docs/runbooks/pricing-launch.md)."
+  type        = string
+  default     = "PRE_V1_50"
+}

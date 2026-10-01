@@ -2374,6 +2374,17 @@ export interface Entitlement {
   cohort: PlanCohort | null;
   trialEndsAt: ISODateString | null;
   currentPeriodEnd: ISODateString | null;
+  /**
+   * Subscription detail, meaningful only when `active` (absent on records cached before it
+   * existed, hence optional):
+   *   cancelAt  the family cancelled; everything stays included until this instant, then the
+   *             subscription ends and the next refresh reads `read_only` / `lapsed`.
+   *   pastDue   a renewal payment failed and Stripe is retrying; still entitled meanwhile.
+   */
+  cancelAt?: ISODateString | null;
+  pastDue?: boolean;
+  interval?: 'month' | 'year' | null;
+  currency?: string | null;
   /** BILLING_ENFORCE on the server. False = dry-run: display the state, never act on it. */
   enforced: boolean;
   serverTime: ISODateString;

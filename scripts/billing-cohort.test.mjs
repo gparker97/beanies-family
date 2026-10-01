@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BILLING_TABLE,
   firstTenUpdate,
-  hashPlanToken,
   isExplicitInstant,
-  mintPlanToken,
   parseArgs,
-  reissueTokenUpdate,
   selectPreV1Targets,
   snapshotPreV1Update,
   trialEndsAtUpdate,
@@ -38,7 +35,6 @@ describe('billing-cohort: write discipline (UpdateItem SET on own attributes onl
     snapshot: snapshotPreV1Update(FAMILY_ID),
     firstTen: firstTenUpdate(FAMILY_ID),
     trialEndsAt: trialEndsAtUpdate(FAMILY_ID, '2027-01-01'),
-    reissue: reissueTokenUpdate(FAMILY_ID, 'tok'),
   };
 
   it.each(Object.entries(builders))('%s is a SET on the billing table by familyId', (_n, input) => {
@@ -69,24 +65,6 @@ describe('billing-cohort: write discipline (UpdateItem SET on own attributes onl
   });
 });
 
-describe('billing-cohort: plan token', () => {
-  it('stores only the sha256 hex of the token, never the token', () => {
-    const token = mintPlanToken();
-    const input = reissueTokenUpdate(FAMILY_ID, token, new Date('2026-10-01T00:00:00Z'));
-    expect(JSON.stringify(input)).not.toContain(token);
-    expect(input.ExpressionAttributeValues[':hash']).toBe(hashPlanToken(token));
-    expect(input.ExpressionAttributeValues[':hash']).toMatch(/^[0-9a-f]{64}$/);
-    expect(input.ExpressionAttributeValues[':claimedAt']).toBe('2026-10-01T00:00:00.000Z');
-  });
-
-  it('mints 32 random bytes, base64url', () => {
-    const token = mintPlanToken();
-    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(Buffer.from(token, 'base64url')).toHaveLength(32);
-    expect(mintPlanToken()).not.toBe(token);
-  });
-});
-
 describe('billing-cohort: arguments', () => {
   it('is dry-run unless --apply is given', () => {
     expect(parseArgs(['--snapshot-pre-v1'])).toEqual({ mode: 'snapshot', apply: false });
@@ -104,7 +82,6 @@ describe('billing-cohort: arguments', () => {
       familyId: FAMILY_ID,
       iso: '2027-01-01T00:00:00Z',
     });
-    expect(parseArgs(['--reissue-token', FAMILY_ID])).toMatchObject({ mode: 'reissue-token' });
   });
 
   it('refuses a malformed familyId, a bad date, extra arguments and unknown flags', () => {

@@ -87,14 +87,33 @@ module "web" {
 }
 
 # ── billing: plan state for pricing and read-only (#95) ──────────────────────
-# Phase 1: the billing table only; the billing Lambda and its /billing/* routes arrive in
-# Phase 5. The registry reads it (GET computes `entitlement`); ai-extract will read it for the
-# allowance tier. Neither ever writes it.
+# The billing table (Phase 1) and, since Phase 5, the billing Lambda with its four
+# `POST /billing/*` routes on the registry's shared API. The registry reads the table (GET
+# computes `entitlement`) and ai-extract reads it for the allowance tier; only this module's
+# Lambda and scripts/billing-cohort.mjs ever write it.
+#
+# Module references run both ways (billing takes the registry's API id and table ARN; the
+# registry takes billing's table name) and that is fine: Terraform resolves per output, and no
+# RESOURCE depends on itself.
 module "billing" {
   source = "./modules/billing"
 
   app_name    = var.app_name
   environment = var.environment
+
+  api_gateway_id            = module.registry.api_gateway_id
+  api_gateway_execution_arn = module.registry.api_gateway_execution_arn
+  api_domain_name           = module.registry.api_domain_name
+  api_key                   = var.registry_api_key
+  registry_table_name       = module.registry.dynamodb_table_name
+  registry_table_arn        = module.registry.dynamodb_table_arn
+  registry_dev_table_name   = module.registry.dynamodb_dev_table_name
+  registry_dev_table_arn    = module.registry.dynamodb_dev_table_arn
+
+  stripe_secret_key     = var.stripe_secret_key
+  stripe_webhook_secret = var.stripe_webhook_secret
+  stripe_pre_v1_coupon  = var.stripe_pre_v1_coupon
+  alerts_topic_arn      = module.content_fetch.alerts_topic_arn
 }
 
 module "registry" {

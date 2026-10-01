@@ -119,6 +119,10 @@ The Settings page footer shows which build you're on:
 | 🛠 Self-hosted · Developer build  | Both Drive (`VITE_GOOGLE_CLIENT_ID`) and registry (`VITE_REGISTRY_API_URL` + `VITE_REGISTRY_API_KEY`) are configured. |
 | 🏠 Self-hosted · Community build | One or both essentials are missing. The corresponding UI surfaces are disabled with a tooltip explaining why.         |
 
+### Plans and pricing are a hosted-only feature
+
+A vanilla self-hosted beanies.family has no plan card, no Plan page and never goes read-only: plan state comes from the family registry (`features.entitlement`), and choosing a plan needs a Stripe publishable key (`VITE_STRIPE_PUBLISHABLE_KEY`, `features.checkout`), which only the hosted service at app.beanies.family has. Leave both unset and everything about plans is simply absent. If you run your own registry Lambda, the card shows your families as on the beta (your own `V1_LAUNCH_AT`, unset); still no Plan page. Self-hosting stays free by construction.
+
 ---
 
 ## Optional features (independent of Path A vs B)

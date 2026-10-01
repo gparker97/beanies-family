@@ -564,6 +564,32 @@ const setSettingsOp: NamedOpHandler = (draft, args) => {
   return { result: settings, deltas: [{ kind: 'settings', settings }] };
 };
 
+/**
+ * MERGE a partial into the settings singleton, inside the worker, against the AUTHORITATIVE
+ * document (#95 fix, 2026-10-01). `setSettings` replaces the whole object, and every repository
+ * writer used to build that object from the MAIN-THREAD projection; in the window after the
+ * worker has loaded the document but before the projection has hydrated, that read returns
+ * the defaults, so the first boot-time write (the exchange-rate refresh) replaced a family's
+ * settings with defaults-plus-one-field and silently dropped every field that has no default,
+ * the plan token first among them. Merging here cannot read anything stale: the draft IS the
+ * document. `deleteKeys` is the explicit way to clear a field; an absent key is left alone.
+ */
+const patchSettingsOp: NamedOpHandler = (draft, args) => {
+  const patch = (args.patch ?? {}) as AnyRecord;
+  const deleteKeys = (args.deleteKeys as string[] | undefined) ?? [];
+  const d = draft as unknown as AnyRecord;
+  // PER KEY, never a whole-map assignment: two devices patching DIFFERENT fields concurrently
+  // (a pasted plan token here, a rate refresh there) must both survive the CRDT merge, and
+  // Automerge only merges field-wise when the fields themselves are the writes. A whole-map
+  // assignment would make the two patches a conflict on `settings` and keep one of them.
+  if (!d.settings || typeof d.settings !== 'object') d.settings = {};
+  const target = d.settings as AnyRecord;
+  for (const [k, v] of Object.entries(patch)) target[k] = v;
+  for (const key of deleteKeys) delete target[key];
+  const settings = toPlain(draft.settings ?? null);
+  return { result: settings, deltas: [{ kind: 'settings', settings }] };
+};
+
 /** Register the core domain ops. Called at module load + re-registered after a
  * test reset, so production + tests always have them (plugins like photo attach
  * register separately). */
@@ -572,6 +598,7 @@ export function registerCoreNamedOps(): void {
   registerNamedOp('applyLoanPayment', applyLoanPaymentOp);
   registerNamedOp('reverseLoanPayment', reverseLoanPaymentOp);
   registerNamedOp('setSettings', setSettingsOp);
+  registerNamedOp('patchSettings', patchSettingsOp);
 }
 registerCoreNamedOps();
 

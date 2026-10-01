@@ -70,6 +70,46 @@ describe('config/features', () => {
       expect(mod.features.registry).toBe(true);
     });
 
+    it('entitlement needs the registry (every platform); checkout also needs the Stripe key (web)', async () => {
+      // greg's local .env carries the sandbox key; the test must not inherit it.
+      vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', '');
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
+      vi.stubEnv('VITE_REGISTRY_API_KEY', 'secret');
+      let mod = await importFeatures();
+      expect(mod.features.entitlement).toBe(true);
+      expect(mod.features.checkout).toBe(false);
+
+      vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
+      mod = await importFeatures();
+      expect(mod.features.checkout).toBe(true);
+
+      // A self-host with a key but no registry has nothing to be entitled BY.
+      vi.stubEnv('VITE_REGISTRY_API_URL', '');
+      mod = await importFeatures();
+      expect(mod.features.entitlement).toBe(false);
+      expect(mod.features.checkout).toBe(false);
+    });
+
+    it('checkout on the cloud host needs a LIVE key: a sandbox key never offers test-mode checkout at app.beanies.family', async () => {
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
+      vi.stubEnv('VITE_REGISTRY_API_KEY', 'secret');
+      vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
+      setHostname('app.beanies.family');
+      let mod = await importFeatures();
+      expect(mod.features.entitlement).toBe(true);
+      expect(mod.features.checkout).toBe(false);
+
+      vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_live_x');
+      mod = await importFeatures();
+      expect(mod.features.checkout).toBe(true);
+
+      // A dev build with the sandbox key keeps the full flow.
+      vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
+      setHostname('localhost');
+      mod = await importFeatures();
+      expect(mod.features.checkout).toBe(true);
+    });
+
     it('single-var features derive directly from their env vars', async () => {
       const cases: Array<
         [string, 'slackPodCreate' | 'errorReporter' | 'analytics' | 'translationApiUpgrade']

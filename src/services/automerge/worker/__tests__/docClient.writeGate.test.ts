@@ -161,9 +161,10 @@ describe('docClient write gate (#95)', () => {
       expect(showToast).not.toHaveBeenCalled();
     });
 
-    it('passes the named setSettings op (theme, language, sync bookkeeping)', async () => {
+    it('passes the named setSettings and patchSettings ops (theme, language, sync bookkeeping)', async () => {
       await mutate(setSettings);
-      expect(mutatesPosted()).toBe(1);
+      await mutate({ op: 'named', name: 'patchSettings', args: { patch: { theme: 'dark' } } });
+      expect(mutatesPosted()).toBe(2);
     });
 
     it('refuses any other named op, naming it as the kind', async () => {

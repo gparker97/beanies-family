@@ -255,6 +255,31 @@ resource "aws_apigatewayv2_stage" "default" {
     throttling_rate_limit  = 2
   }
 
+  # Per-route throttles for the billing Lambda (#95 Phase 5, billing module adds the four
+  # `POST /billing/*` routes). Every client call creates a Stripe object, and the soft key
+  # ships in the bundle, so volume is capped low: a family checks out once. The webhook gets
+  # more room: Stripe fans out `customer.subscription.*` on renewal days and retries on 5xx.
+  route_settings {
+    route_key              = "POST /billing/checkout-session"
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+  route_settings {
+    route_key              = "POST /billing/claim"
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+  route_settings {
+    route_key              = "POST /billing/portal-session"
+    throttling_burst_limit = 5
+    throttling_rate_limit  = 2
+  }
+  route_settings {
+    route_key              = "POST /billing/webhook"
+    throttling_burst_limit = 20
+    throttling_rate_limit  = 10
+  }
+
   tags = {
     Name        = "${var.app_name}-registry-default"
     Environment = var.environment

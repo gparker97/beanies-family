@@ -244,6 +244,51 @@ describe('computeEntitlement: the table', () => {
 });
 
 describe('computeEntitlement: the enforce flag', () => {
+  it('active carries the subscription detail: cancelAt, pastDue, interval, currency (null/false otherwise)', () => {
+    const now = Date.parse('2026-10-01T00:00:00Z');
+    const active = computeEntitlement({
+      createdAt: '2026-01-01T00:00:00Z',
+      billing: {
+        status: 'active',
+        plan: 'full',
+        interval: 'year',
+        currency: 'usd',
+        currentPeriodEnd: '2027-10-01T00:00:00Z',
+        cancelAt: '2027-10-01T00:00:00Z',
+      },
+      now,
+    });
+    expect(active.state).toBe('active');
+    expect(active.cancelAt).toBe('2027-10-01T00:00:00.000Z');
+    expect(active.pastDue).toBe(false);
+    expect(active.interval).toBe('year');
+    expect(active.currency).toBe('usd');
+
+    // A row written before `cancelAt` existed: the boolean marker means "ends at the period end".
+    const legacy = computeEntitlement({
+      billing: {
+        status: 'active',
+        plan: 'full',
+        currentPeriodEnd: '2027-10-01T01:05:18Z',
+        cancelAtPeriodEnd: 'true',
+      },
+      now,
+    });
+    expect(legacy.cancelAt).toBe('2027-10-01T01:05:18.000Z');
+
+    const pastDue = computeEntitlement({
+      billing: { status: 'past_due', plan: 'basic', interval: 'bogus' },
+      now,
+    });
+    expect(pastDue.state).toBe('active');
+    expect(pastDue.pastDue).toBe(true);
+    expect(pastDue.cancelAt).toBeNull();
+    expect(pastDue.interval).toBeNull();
+
+    const beta = computeEntitlement({ billing: null, now });
+    expect(beta).toMatchObject({ cancelAt: null, pastDue: false, interval: null, currency: null });
+  });
+
   it('passes BILLING_ENFORCE through as `enforced`, without changing the state', () => {
     const args = { createdAt: BETA_CREATED, launchAt: LAUNCH, now: LAUNCH_MS + 100 * DAY };
     const on = computeEntitlement({ ...args, enforce: true });
@@ -268,9 +313,13 @@ describe('computeEntitlement: the shape', () => {
     const result = computeEntitlement({ createdAt: BETA_CREATED, launchAt: LAUNCH, now });
     expect(Object.keys(result).sort()).toEqual(
       [
+        'cancelAt',
         'cohort',
+        'currency',
         'currentPeriodEnd',
         'enforced',
+        'interval',
+        'pastDue',
         'plan',
         'reason',
         'serverTime',

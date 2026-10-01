@@ -4,6 +4,27 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
+## An "accepted hazard" in a plan is a hypothesis until it is probed
+
+**Date:** 2026-10-01
+**Context:** The #95 pricing plan recorded, as an accepted v1 hazard, that the settings singleton
+is whole-replaced by `setSettings` and that a concurrent writer could therefore drop the plan
+token "between syncs". It was framed as rare and multi-device. greg's first real test lost the
+token on ONE device within minutes, and the magic-beans line flipped between tiers. A ten-line
+probe (`console.warn` in `saveSettings` with the stack) found the writer in one run: the boot-time
+exchange-rate refresh saving while the worker had the document but the main-thread projection
+had not hydrated, so `getSettings()` returned the defaults and the replace erased every field
+with no default. Not rare, not multi-device, and not specific to the token: it had been quietly
+resetting no-default settings on stale-rate boots for as long as both paths existed.
+
+**Rule:** when a plan "accepts" a data-loss hazard, do not ship on the prose. Write the probe
+that would show it happening (an instrumented write path, a reload loop) and run it once. If the
+hazard fires, it is a bug with a structural fix (here: merge inside the worker against the
+authoritative document, `patchSettings`), not a note. The cost of the probe was ten minutes; the
+hazard had been live for months.
+
+---
+
 ## A subagent sweep's findings are hypotheses, not conclusions
 
 **Date:** 2026-09-21
